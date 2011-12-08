@@ -1,0 +1,46 @@
+#!/usr/bin/expect -f
+
+set timeout 5
+set Host [lindex $argv 0]
+
+spawn ssh root@$Host
+
+while {$timeout ne 0} {
+    expect {
+      "Host key verification failed" {
+	system "cat ~/.ssh/known_hosts|sed '/\$IP/d'>~/.ssh/known_hosts"
+     }
+     "assword:" {
+	send "w96286mp6\r"
+    	expect "#"
+	send "dd if=/dev/zero of=/dev/shm/brick1 bs=1k count=8234720\n"
+	expect "copied"
+	send "\n"
+	expect "#"
+	send "losetup /dev/loop0 /dev/shm/brick1\n"
+	expect "#"
+	send "\n"
+	expect "#"
+	send "mkfs.ext4 -m 0 /dev/shm/brick1\n"
+	expect "(y,n)"
+	send "y\n"
+	expect "#"
+	send "mkdir -p /mnt/rambrick1\n"
+	expect "#"
+	send "mount -t ext4 /dev/loop0 /mnt/rambrick1\n"
+	expect "#"
+	send "df -h\n"
+	expect "/mnt/rambrick1"
+	exit
+     }
+     "yes/no" {
+        send "yes\r"
+     }
+     timeout {
+	exit
+     }
+     eof {
+        exit
+     }
+  }
+}

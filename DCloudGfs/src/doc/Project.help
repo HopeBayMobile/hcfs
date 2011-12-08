@@ -1,0 +1,56 @@
+[main]
+
+list=NAME
+	-	list - list project
+	SYSNOPSIS
+	-	list
+	DESCRIPTION
+	-	list your projects
+	OPTION:
+	-	none
+
+select=NAME
+	-	select - select project
+	SYSNOPSIS
+	-	select name=project_name
+	DESCRIPTION
+	-	select your project.
+	OPTION:
+	-	project_name   the name of the project you going to work with	
+
+create=NAME
+	-	create = create project
+	SYSNOPSIS
+	-	create project_name
+	DESCRIPTION
+	-	create a project.
+	OPTION:
+		name	the project you are about to create
+	
+delete=NAME
+	-	delete - delete a project
+	SYSNOPSIS
+	-	delete name=project
+	DESCRIPTION
+		delete a project
+	OPTION:
+	-	name	the name of the project you are about to delete
+	
+show_current=NAME
+	-	show_current	- show current working project
+	SYSNOPSIS
+	-	show_current
+	DESCRIPTIOM
+	-	show you current working project
+	OPTION
+	-	None
+
+help=NAME
+        -       help
+        SYSNOPSIS
+        -       help command
+        DESCRIPTION
+        -       print out help for a command
+        OPTION
+        -       None
+

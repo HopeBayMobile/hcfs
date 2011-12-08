@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#HOSTLIST="1 2 3 4 5"
+#HOSTLIST="1 3 4"
+#HOSTLIST="1 3 5"
+[ -e ./iplist ] || exit 1
+
+HOSTLIST=`cat iplist`
+
+rm /tmp/tmp.*_rnc
+LOG=`mktemp --suffix=_rnc`
+
+for i in ${HOSTLIST}; do
+ssh ${i} "hostname;$@"
+#ssh u$i "hostname;$@" &>>${LOG} &
+done

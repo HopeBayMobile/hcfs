@@ -1,0 +1,119 @@
+#!/bin/bash
+
+
+start_glusterd () {
+for i in `seq 1 80`; do
+	if [ ${i} -le 9 ]; then
+		ssh ntu0${i} "sudo /etc/init.d/glusterfs-server start"
+		echo "starting ntu0${i}"
+	else
+		ssh ntu${i} "sudo /etc/init.d/glusterfs-server start"
+		echo "starting ntu${i}"
+	fi
+done
+}
+
+
+stop_glusterd () {
+for i in `seq 1 80`; do
+	if [ ${i} -le 9 ]; then
+		ssh ntu0${i} "sudo /etc/init.d/glusterfs-server stop"
+		echo "stopping ntu0${i}"
+	else
+		ssh ntu${i} "sudo /etc/init.d/glusterfs-server stop"
+		echo "stopping ntu${i}"
+	fi
+done
+}
+
+clean_glusterdcfg () {
+for i in `seq 1 80`; do
+	if [ ${i} -le 9 ]; then
+		ssh ntu0${i} "sudo rm -rf /etc/glusterd/*"
+		echo "remove /etc/glusterd/* on ntu0${i}"
+	else
+		ssh ntu${i} "sudo rm -rf /etc/glusterd/*"
+		echo "remove /etc/glusterd/* on ntu${i}"
+	fi
+done
+}
+
+uninstall_glusterd () {
+for i in `seq 1 80`; do
+	if [ ${i} -le 9 ]; then
+		echo "uninstalling ntu0${i}"
+		ssh ntu0${i} "sudo dpkg -r glusterfs-*"
+		ssh ntu0${i} "sudo dpkg --purge  glusterfs-*"
+		ssh ntu0${i} "sudo rm -rf /etc/glusterd/"
+		ssh ntu0${i} "sudo rm -rf *.deb"
+	else
+		echo "uninstalling ntu${i}"
+		ssh ntu${i} "sudo dpkg -r glusterfs-*"
+		ssh ntu${i} "sudo dpkg --purge  glusterfs-*"
+		ssh ntu${i} "sudo rm -rf /etc/glusterd/"
+		ssh ntu${i} "sudo rm -rf *.deb"
+
+	fi
+done
+}
+
+install_glusterd () {
+for i in `seq 1 80`; do
+	if [ ${i} -le 9 ]; then
+		echo "installing ntu0${i}"
+		scp /home/nii/glusterfs_deb/*.deb nii@ntu0${i}:/home/nii/
+		ssh ntu0${i} "sudo dpkg -i *.deb"
+	else
+		echo "installing ntu${i}"
+		scp /home/nii/glusterfs_deb/*.deb nii@ntu${i}:/home/nii
+                ssh ntu${i} "sudo dpkg -i *.deb"
+	fi
+done
+}
+
+check_glusterd() {
+for i in `seq 1 80`; do
+        if [ ${i} -le 9 ]; then
+                echo "checking ntu0${i}"
+		ssh ntu0${i} "sudo glusterfs --versio"
+        else
+                echo "checking ntu${i}"
+		ssh ntu${i} "sudo glusterfs --versio"
+        fi
+done
+
+}
+
+case "$1" in
+start)
+	start_glusterd
+	;;
+
+stop)
+	stop_glusterd
+	;;
+
+force-reload|restart)
+	clean_glusterdcfg	
+	start_glusterd
+	;;
+
+clean)
+	clean_glusterdcfg	
+	;;
+
+install)
+	install_glusterd	
+	;;
+
+uninstall)
+	uninstall_glusterd	
+	;;
+check)
+	check_glusterd
+	;;
+*)
+	echo "Usage: ./glusterdcfg {start|stop|clean|restart|install|uninstall|check}"
+	exit 1
+	;;
+esac

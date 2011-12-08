@@ -1,0 +1,49 @@
+[main]
+login=NAME
+	-	login - login into system
+	SYSNOPSIS
+	-	login (iteractive)
+	DESCRIPTIONS
+	-	the admin of the openstack will be asked to create during the first setup
+	-	the project admin will be asked to create during the first setup
+	-	a new user will be asked to create during the first setup
+	-	if you want to add new user, please go to admin>user and make sure you are project admin
+	OPTIONS
+	-	none
+
+admin=NAME
+	-	admin - to enter admin menu
+	DISCRIPTION
+	-	to enter admin menu
+	OPTIONS
+	-	none
+
+vdc=NAME
+	-	vdc - to enter vdc menu
+	DISCRIPTION
+	-	to enter vdc menu
+	OPTIONS
+	-	none
+
+logout=NAME
+	-	logout
+	DISCRIPTION
+	-	to logut out from the CLI
+	OPTIONS
+	-	none
+
+logout=NAME
+	-	logout
+	DISCRIPTION
+	-	quit the CLI
+	OPTIONS
+	-	none
+help=NAME
+        -       help
+        SYSNOPSIS
+        -       help command
+        DESCRIPTION
+        -       print out help for a command
+        OPTION
+        -       None
+

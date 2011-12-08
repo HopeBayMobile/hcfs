@@ -1,0 +1,46 @@
+[main]
+list=NAME
+	-	list - list users
+	SYSNOPSIS
+	-	list
+	DESCRIPTION
+	-	list users
+	OPTION
+	-	none	
+
+add=NAME
+	-	add = add user
+	SYSNOPSIS
+	-	add name=username
+	DESCRIPTION
+	-	add an user to a project.
+	Option:
+	-	name	the username you are about to add
+
+delete=NAME
+	-	delete	- delete user
+	SYSNOPSIS
+	-	delete name=username
+	DESCRIPTION
+	-	Delete an existing user. You get the user list by issuing the command 'list' 
+	Option:
+	-	name	the username you are about to add
+
+quit=NAME:
+	-	quit - quit
+	SYSNOPSIS
+	-	quit
+	DESCRIPTION
+	-	quit the user menu
+	OPTION
+	-	none
+
+help=NAME
+        -       help
+        SYSNOPSIS
+        -       help command
+        DESCRIPTION
+        -       print out help for a command
+        OPTION
+        -       None
+

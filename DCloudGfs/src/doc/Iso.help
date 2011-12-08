@@ -1,0 +1,122 @@
+[main]
+
+
+list_upload=NAME
+	-	list_upload - list upload
+	SYSNOPSIS
+	-	list_upload
+	DESCRIPTION
+	-	to list files on upload folder
+	OPTION
+	-	none
+
+list_myimage=NAME
+	-	list_myimage -	list my image
+	SYSNOPSIS
+	-	list_myimage
+	DESCRIPTION
+	-	to list the images that belongs to you
+	OPTION
+	-	none
+
+convert=NAME
+	-	convert
+	SYSYNOSIS
+	-	iteractive
+	DESCRIPTION
+	-	convert an image from one format to another
+	OPTION
+	-	none
+
+delete=NAME
+	-	delete
+	SYSNOPSIS
+	-	delete filename
+	DESCRIPTION
+	-	to delete a file from local folder
+	OPTION:
+		filename to be deleted
+
+kvm_install_linux=NAME
+	-	kvm_install_linux - install linux via kvm
+	SYSNOPISIS
+	-	kvm_install_linux vmsize=nG,vmmemory=mG,isofile=isofilename
+	DESCRIPTION
+	-	use kvm to install linux image from dvd/cdrom.
+        -	you have extract the image from the media and upload to server's upload folder
+	OPTION:
+	-	vmsize=n,vmmemory=xxx,isofile=xxx
+	-	vmsize : 5 => 5G
+	-	vmmemory : 128 => 128 Mb
+	-	isofile : test.iso => file in upload folder
+
+
+qemu_install_linux=NAME
+	-	qemu_install_linux - install linux via qemu
+	SYSNOPISIS
+	-	qemu_install_linux vmsize=nG,vmmemory=mG,isofile=isofilename
+	DESCRIPTION
+	-	use qemu to install linux image from dvd/cdrom.
+        -	you have extract the image from the media and upload to server's upload folder
+	OPTION
+	-	vmsize=n,vmmemory=xxx,isofile=xxx
+	-	vmsize : 5 => 5G
+	-	vmmemory : 128 => 128 Mb
+	-	isofile : test.iso => file in upload folder
+
+
+kvm_install_windows=NAME
+	-	kvm_install_windows - install windows via kvm
+	SYSNOPISIS
+	-	kvm_install_linux vmsize=nG,vmmemory=mG,isofile=isofilename
+	DESCRIPTION
+	-	use kvm to install windows image from dvd/cdrom.
+        -	you have extract the image from the media and upload to server's upload folder
+	OPTION
+	-	vmsize=n,vmmemory=xxx,isofile=xxx
+	-	vmsize : 5 => 5G
+	-	vmmemory : 128 => 128 Mb
+	-	isofile : test.iso => file in upload folder
+
+
+qemu_install_windows=NAME
+	-	qemu_install_windows - install windows via qemu
+	SYSNOPISIS
+	-	qemu_install_linux vmsize=nG,vmmemory=mG,isofile=isofilename
+	DESCRIPTION
+	-	use qemu to install windows image from dvd/cdrom.
+        -	you have extract the image from the media and upload to server's upload folder
+	OPTION
+	-	vmsize=n,vmmemory=xxx,isofile=xxx
+	-	vmsize : 5 => 5G
+	-	vmmemory : 128 => 128 Mb
+	-	isofile : test.iso => file in upload folder
+
+
+list_install=NAME
+	-	list_install - list install
+	SYSNOPSIS
+	-	list_install
+	DESCRIPTION
+	-	list running installation process's pid
+	OPTIONS
+	-	none
+
+terminate_install=NAME
+	-	terminate_install - terminate install
+	SYSNOPSIS
+	-	terminate_install pid=xxxx
+	DESCRIPTION
+	-	kill a specific installation process
+	OPTION
+	-	pid   pid of a specific for a installation process
+
+help=NAME
+        -       help
+        SYSNOPSIS
+        -       help command
+        DESCRIPTION
+        -       print out help for a command
+        OPTION
+        -       None
+

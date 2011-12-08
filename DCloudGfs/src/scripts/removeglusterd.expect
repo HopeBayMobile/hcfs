@@ -1,0 +1,43 @@
+#!/usr/bin/expect -f
+
+set timeout 5
+set Host [lindex $argv 0]
+
+proc Command {} {
+  send "killall glusterd\r"
+  send "\r"
+  expect "#"
+  send "rm -rf /etc/glusterd/*\r"
+  send "\r"
+  expect "#"
+  send "\r"
+  expect "#"
+  return
+}
+
+spawn ssh root@$Host
+
+while {$timeout ne 0} {
+    expect {
+      "Host key verification failed" {
+	system "cat ~/.ssh/known_hosts|sed '/\$IP/d'>~/.ssh/known_hosts"
+     }
+     "assword:" {
+	send "w96286mp6\r"
+	send "\r"
+        expect "#" {
+          Command
+		  exit
+        }
+     }
+     "yes/no" {
+        send "yes\r"
+     }
+     timeout {
+	exit
+     }
+     eof {
+        exit
+     }
+  }
+}

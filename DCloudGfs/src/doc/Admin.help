@@ -1,0 +1,81 @@
+[main]
+
+image=NAME
+	-	image
+	SYSNOPSIS
+	-	image
+	DESCRIPTION
+	-	enter image menu.
+	OPTION
+	-	None
+
+instance=NAME
+	-	instance
+	SYSNOPSIS
+	-	instance
+	DESCRIPTION
+	-	enter instance menu.
+	OPTION
+	-	None
+
+image=NAME
+	-	instance
+	SYSNOPSIS
+	-	instance
+	DESCRIPTION
+	-	enter image menu.
+	OPTION
+	-	None
+
+volume=NAME
+	-	volume
+	SYSNOPSIS
+	-	volume
+	DESCRIPTION
+	-	enter volume menu.
+	OPTION
+	-	None
+
+iso=NAME
+	-	iso
+	SYSNOPSIS
+	-	iso
+	DESCRIPTION
+	-	enter iso menu.
+	OPTION
+	-	None
+
+project=NAME
+	-	project
+	SYSNOPSIS
+	-	project
+	DESCRIPTION
+	-	enter project menu.
+	OPTION
+	-	None
+
+user=NAME
+	-	user
+	SYSNOPSIS
+	-	user
+	DESCRIPTION
+	-	enter user menu.
+	OPTION
+	-	None
+
+quit=NAME
+	-	quit
+	SYSNOPSIS
+	-	quit
+	DESCRIPTION
+	-	return to main menu.
+	OPTION
+	-	None
+help=NAME
+	-	help
+	SYSNOPSIS
+	-	help command
+	DESCRIPTION
+	-	print out help for a command
+	OPTION
+	-	None
