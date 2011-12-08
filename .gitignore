@@ -1,0 +1,5 @@
+*.pyc
+*.swp
+*.swo
+*.log
+/DCloudGfs/src/scripts/log
