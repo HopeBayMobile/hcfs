@@ -23,8 +23,8 @@ from ConfigParser import ConfigParser
 import uuid
 
 #import from Delta Cloud Manager
-#from task_worker import WorkerTask
-from test import WorkerTask
+from task_worker import WorkerTask
+#from test import WorkerTask
 
 #Third party packages
 import paramiko
@@ -108,7 +108,7 @@ class GlusterfsMgt:
 		if q is None:
 			return "{}"
 		jsonStr = json.dumps({'taskId':taskId})
-		cmd = "python " + self.__codeDir + "/cmdReceiver.py -r \'" + jsonStr + "\'"
+		cmd = "sudo python " + self.__codeDir + "/cmdReceiver.py -r \'" + jsonStr + "\'"
 		q.sendline(cmd)
 		i = q.expect(['readReport start', 'Usage error'])
 		if i != 0:
@@ -143,7 +143,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python " + self.__codeDir + "/cmdReceiver.py -C \'" + jsonStr + "\'"
+		cmd ="sudo python " + self.__codeDir + "/cmdReceiver.py -C \'" + jsonStr + "\'"
 		p.sendline(cmd)
 		i = p.expect(['createVolume start', 'Usage error'])
 
@@ -216,7 +216,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python "+self.__codeDir+"/cmdReceiver.py -R \'"+jsonStr+"\'"
+		cmd ="sudo python "+self.__codeDir+"/cmdReceiver.py -R \'"+jsonStr+"\'"
 		p.sendline(cmd)
 		i = p.expect(['replaceServer start', 'Usage error'])
 #		p.expect('end')
@@ -303,7 +303,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python "+self.__codeDir+"/cmdReceiver.py -T \'"+jsonStr+"\'"
+		cmd ="sudo python "+self.__codeDir+"/cmdReceiver.py -T \'"+jsonStr+"\'"
 		p.sendline(cmd)
 		i = p.expect(['triggerSelfHealing start', 'Usage error'])
 #		p.expect('end')
