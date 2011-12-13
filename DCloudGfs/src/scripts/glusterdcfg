@@ -1,84 +1,105 @@
 #!/bin/bash
 
+#####config#####
+hostName=ntu
+hostStart=1
+hostEnd=80
+hostNameWithZero=yes
+################
+
 
 start_glusterd () {
-for i in `seq 1 80`; do
-	if [ ${i} -le 9 ]; then
-		ssh ntu0${i} "sudo /etc/init.d/glusterfs-server start"
-		echo "starting ntu0${i}"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		ssh ${hostName}0${i} "sudo /etc/init.d/glusterfs-server start"
+		echo "starting ${hostName}0${i}"
 	else
-		ssh ntu${i} "sudo /etc/init.d/glusterfs-server start"
-		echo "starting ntu${i}"
+		ssh ${hostName}${i} "sudo /etc/init.d/glusterfs-server start"
+		echo "starting ${hostName}${i}"
 	fi
 done
 }
 
 
 stop_glusterd () {
-for i in `seq 1 80`; do
-	if [ ${i} -le 9 ]; then
-		ssh ntu0${i} "sudo /etc/init.d/glusterfs-server stop"
-		echo "stopping ntu0${i}"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		ssh ${hostName}0${i} "sudo /etc/init.d/glusterfs-server stop"
+		echo "stopping ${hostName}0${i}"
 	else
-		ssh ntu${i} "sudo /etc/init.d/glusterfs-server stop"
-		echo "stopping ntu${i}"
+		ssh ${hostName}${i} "sudo /etc/init.d/glusterfs-server stop"
+		echo "stopping ${hostName}${i}"
 	fi
 done
 }
 
 clean_glusterdcfg () {
-for i in `seq 1 80`; do
-	if [ ${i} -le 9 ]; then
-		ssh ntu0${i} "sudo rm -rf /etc/glusterd/*"
-		echo "remove /etc/glusterd/* on ntu0${i}"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		ssh ${hostName}0${i} "sudo rm -rf /etc/glusterd/*"
+		echo "remove /etc/glusterd/* on ${hostName}0${i}"
 	else
-		ssh ntu${i} "sudo rm -rf /etc/glusterd/*"
-		echo "remove /etc/glusterd/* on ntu${i}"
+		ssh ${hostName}${i} "sudo rm -rf /etc/glusterd/*"
+		echo "remove /etc/glusterd/* on ${hostName}${i}"
+	fi
+done
+}
+
+distclean_glusterd () {
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		ssh ${hostName}0${i} "sudo killall glusterd; sudo killall glusterfsd"
+		echo "killall glusterd on ${hostName}0${i}"
+	else
+		ssh ${hostName}${i} "sudo killall glusterd; sudo killall glusterfsd"
+		echo "killall glusterd on ${hostName}${i}"
 	fi
 done
 }
 
 uninstall_glusterd () {
-for i in `seq 1 80`; do
-	if [ ${i} -le 9 ]; then
-		echo "uninstalling ntu0${i}"
-		ssh ntu0${i} "sudo dpkg -r glusterfs-*"
-		ssh ntu0${i} "sudo dpkg --purge  glusterfs-*"
-		ssh ntu0${i} "sudo rm -rf /etc/glusterd/"
-		ssh ntu0${i} "sudo rm -rf *.deb"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		echo "uninstalling ${hostName}0${i}"
+		ssh ${hostName}0${i} "sudo dpkg -r glusterfs-*"
+		ssh ${hostName}0${i} "sudo dpkg --purge glusterfs-client glusterfs-common glusterfs-dbg glusterfs-examples glusterfs-server"
+		ssh ${hostName}0${i} "sudo rm -rf /etc/glusterd/"
+		ssh ${hostName}0${i} "sudo rm -rf *.deb"
 	else
-		echo "uninstalling ntu${i}"
-		ssh ntu${i} "sudo dpkg -r glusterfs-*"
-		ssh ntu${i} "sudo dpkg --purge  glusterfs-*"
-		ssh ntu${i} "sudo rm -rf /etc/glusterd/"
-		ssh ntu${i} "sudo rm -rf *.deb"
+		echo "uninstalling ${hostName}${i}"
+		ssh ${hostName}${i} "sudo dpkg -r glusterfs-*"
+		ssh ${hostName}${i} "sudo dpkg --purge glusterfs-client glusterfs-common glusterfs-dbg glusterfs-examples glusterfs-server"
+		ssh ${hostName}${i} "sudo rm -rf /etc/glusterd/"
+		ssh ${hostName}${i} "sudo rm -rf *.deb"
 
 	fi
 done
 }
 
 install_glusterd () {
-for i in `seq 1 80`; do
-	if [ ${i} -le 9 ]; then
-		echo "installing ntu0${i}"
-		scp /home/nii/glusterfs_deb/*.deb nii@ntu0${i}:/home/nii/
-		ssh ntu0${i} "sudo dpkg -i *.deb"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		echo "installing ${hostName}0${i}"
+		scp *.deb nii@${hostName}0${i}:/home/nii/
+		ssh ${hostName}0${i} "sudo dpkg -i *.deb"
 	else
-		echo "installing ntu${i}"
-		scp /home/nii/glusterfs_deb/*.deb nii@ntu${i}:/home/nii
-                ssh ntu${i} "sudo dpkg -i *.deb"
+		echo "installing ${hostName}${i}"
+		scp *.deb nii@${hostName}${i}:/home/nii
+                ssh ${hostName}${i} "sudo dpkg -i *.deb"
 	fi
 done
 }
 
 check_glusterd() {
-for i in `seq 1 80`; do
-        if [ ${i} -le 9 ]; then
-                echo "checking ntu0${i}"
-		ssh ntu0${i} "sudo glusterfs --versio"
+for i in `seq ${hostStart} ${hostEnd}`; do
+	if [ "${hostNameWithZero}" == "yes" ] && [ ${i} -le 9 ]; then
+		echo "checking ${hostName}0${i}"
+		ssh ${hostName}0${i} "sudo service glusterfs-server status"
+#		ssh ${hostName}0${i} "ls -lsa /etc/glusterd/"
         else
-                echo "checking ntu${i}"
-		ssh ntu${i} "sudo glusterfs --versio"
+                echo "checking ${hostName}${i}"
+		ssh ${hostName}${i} "sudo service glusterfs-server status"
+#		ssh ${hostName}${i} "ls -lsa /etc/glusterd/"
         fi
 done
 
@@ -94,12 +115,16 @@ stop)
 	;;
 
 force-reload|restart)
+	stop_glusterd
 	clean_glusterdcfg	
 	start_glusterd
 	;;
 
 clean)
 	clean_glusterdcfg	
+	;;
+distclean)
+	distclean_glusterd	
 	;;
 
 install)
@@ -113,7 +138,7 @@ check)
 	check_glusterd
 	;;
 *)
-	echo "Usage: ./glusterdcfg {start|stop|clean|restart|install|uninstall|check}"
+	echo "Usage: ./glusterdcfg {start|stop|clean|restart|install|uninstall|check|distclean}"
 	exit 1
 	;;
 esac
