@@ -23,45 +23,12 @@ from ConfigParser import ConfigParser
 import uuid
 
 #import from Delta Cloud Manager
-from task_worker import WorkerTask
+from task_worker import WorkerTask, task_class
 #from test import WorkerTask
 
 #Third party packages
 import paramiko
 import pexpect
-
-
-class volumeCreate(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self, params):
-		kwparams = json.loads(params)
-		return self.__mgt.createVolume(**kwparams)
-
-
-class replaceServer(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self, params):
-		kwparams = json.loads(params)
-		return self.__mgt.replaceServer(**kwparams)
-
-
-class triggerSelfHealing(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self,params):
-		kwparams = json.loads(params)
-		return self.__mgt.triggerSelfHealing(**kwparams)
 
 
 class GlusterfsMgt:
@@ -361,6 +328,37 @@ class GlusterfsMgt:
                         }
 
                 return json.dumps(status, sort_keys=True, indent=4)
+
+
+@task_class
+class volumeCreate(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self, params):
+                kwparams = json.loads(params)
+                return self.__mgt.createVolume(**kwparams)
+
+@task_class
+class replaceServer(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self, params):
+                kwparams = json.loads(params)
+                return self.__mgt.replaceServer(**kwparams)
+
+@task_class
+class triggerSelfHealing(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self,params):
+		kwparams = json.loads(params)
+                return self.__mgt.triggerSelfHealing(**kwparams)
 
 
 if __name__ == '__main__':
