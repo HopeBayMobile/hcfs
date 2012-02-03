@@ -23,7 +23,7 @@ from ConfigParser import ConfigParser
 import uuid
 
 #import from Delta Cloud Manager
-from task_worker import WorkerTask, task_class
+#from task_worker import WorkerTask, task_class
 #from test import WorkerTask
 
 #Third party packages
@@ -130,10 +130,11 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished'] == True:
-					self.__worker.update_progress(100, "volumeCreate is finished!")
+					#self.__worker.update_progress(100, "volumeCreate is finished!")
 					break	
 				else:
-					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "volumeCreate is not finished yet!")
+					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "volumeCreate is not finished yet!")
+					pass
 			time.sleep(1)
 		p.close()
 
@@ -202,10 +203,11 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished']==True:
-					self.__worker.update_progress(100, "replaceServer is finished!")
+					#self.__worker.update_progress(100, "replaceServer is finished!")
 					break	
 				else:
-					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "replaceServer is not finished yet!")
+					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "replaceServer is not finished yet!")
+					pass
 			time.sleep(1)
 		p.close()
 
@@ -289,10 +291,11 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished'] == True:
-					self.__worker.update_progress(100, "triggerSelfHealing is finished!")
+					#self.__worker.update_progress(100, "triggerSelfHealing is finished!")
 					break	
 				else:
-					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "triggerSelfHealing is not finished yet!")
+					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "triggerSelfHealing is not finished yet!")
+					pass
 			time.sleep(1)
 		p.close()
 
@@ -330,30 +333,30 @@ class GlusterfsMgt:
                 return json.dumps(status, sort_keys=True, indent=4)
 
 
-@task_class
-class volumeCreate(WorkerTask):
+#@task_class
+class volumeCreate:
         def __init__(self):
-                WorkerTask.__init__(self)
+                #WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self, params):
                 kwparams = json.loads(params)
                 return self.__mgt.createVolume(**kwparams)
 
-@task_class
-class replaceServer(WorkerTask):
+#@task_class
+class replaceServer:
         def __init__(self):
-                WorkerTask.__init__(self)
+                #WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self, params):
                 kwparams = json.loads(params)
                 return self.__mgt.replaceServer(**kwparams)
 
-@task_class
-class triggerSelfHealing(WorkerTask):
+#@task_class
+class triggerSelfHealing:
         def __init__(self):
-                WorkerTask.__init__(self)
+                #WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self,params):
@@ -362,31 +365,14 @@ class triggerSelfHealing(WorkerTask):
 
 
 if __name__ == '__main__':
-	vc = volumeCreate(100)
+	vc = volumeCreate()
 	print "==========GUI volumeCreate==========\n"
-        param1 = {'receiver': 'ntu01',
-                  'hostList': ['ntu01', 'ntu02', 'ntu03'],
-                  'volType': 'distribute',
-                  'count': '10'
+        param1 = {'receiver': 'TPE1AA0118',
+                  'hostList': ['TPE1AA0118', 'TPE1AA0133'],
+                  'volType': 'replica',
+                  'count': '2'
         }
         jsonStr1 = json.dumps(param1, sort_keys=True, indent=4)
         vc.run(jsonStr1)
 
-
-        rs = replaceServer(200)
-        print "==========GUI replaceServer==========\n"
-	param2 = {'receiver': 'ntu01',
-                  'hostname': 'ntu02'
-	}
-	jsonStr2 = json.dumps(param2, sort_keys=True, indent=4)
-	rs.run(jsonStr2)
-
-
-        sh = triggerSelfHealing(300)
-        print "==========GUI triggerSelfHealing==========\n"
-	param3 = {'receiver': 'ntu01',
-                  'volName': 'testVol'
-	}
-	jsonStr3 = json.dumps(param3, sort_keys=True, indent=4)
-	sh.run(jsonStr3)
 
