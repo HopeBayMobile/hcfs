@@ -1,0 +1,9 @@
+After installing the OS (Ubuntu 11.04) on system volume server,
+you should execute SystemVolumeDeploy.sh.
+
+The script will do the following things:
+(1) Install GlusterFS 3.2.3
+(2) Create two directory /export1 and /export2
+(3) Mount /dev/sdb on /export2 
+(4) Create a GlusterFS volume using /export1 and /export2 as bricks
+(5) Return a mount point (xxx.xxx.xxx.xxx:/SystemVolume)
