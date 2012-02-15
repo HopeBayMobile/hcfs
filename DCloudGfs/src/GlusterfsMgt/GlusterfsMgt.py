@@ -7,6 +7,8 @@ Modified by CW on 2011/11/24
 Modified by CW on 2011/11/25
 Modified by CW on 2011/11/28
 Modified by CW on 2011/11/29
+Modified by CW on 2012/02/06
+Modified by CW on 2012/02/15
 '''
 
 import sys
@@ -22,8 +24,11 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 import uuid
 
-#import from Delta Cloud Manager
-#from task_worker import WorkerTask, task_class
+from HardDriveChecking import HardDriveChecking
+
+#import from Delta Cloud Manager(PDCM)
+sys.path.append('/var/www/PDCM/task/worker')
+from task_worker import WorkerTask, task_class, task
 #from test import WorkerTask
 
 #Third party packages
@@ -35,12 +40,12 @@ class GlusterfsMgt:
 	def __init__(self, worker):
 		
 		config = ConfigParser()
-		config.readfp(open("../Global.ini"))
+		config.readfp(open("/etc/DCloud/DCloudGfs/src/Global.ini"))
 		self.__codeDir = config.get('glusterfs', 'codeDir')
 		self.__worker = worker
 
 		config2 = ConfigParser()
-		config2.readfp(open("../DCloudGfs.ini"))
+		config2.readfp(open("/etc/DCloud/DCloudGfs/src/DCloudGfs.ini"))
 		self.__username = config2.get('main', 'username')
 		self.__password = config2.get('main', 'password')
 		self.__taskReceiver = {}
@@ -87,7 +92,7 @@ class GlusterfsMgt:
 		return result
 		
 	def createVolume(self, volCreator=None, receiver="", 
-			 hostList=[], volName='testVol', brickPrefix='/exp', 
+			 hostList=[], volName='testVol', brickPrefix='/GlusterHD/disk', 
 			 volType='distribute', count=1, transport='tcp'): 
 		if hostList == []:
 			print "hostList is empty"
@@ -130,11 +135,10 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished'] == True:
-					#self.__worker.update_progress(100, "volumeCreate is finished!")
+					self.__worker.update_progress(100, "volumeCreate is finished!")
 					break	
 				else:
-					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "volumeCreate is not finished yet!")
-					pass
+					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "volumeCreate is not finished yet!")
 			time.sleep(1)
 		p.close()
 
@@ -203,11 +207,10 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished']==True:
-					#self.__worker.update_progress(100, "replaceServer is finished!")
+					self.__worker.update_progress(100, "replaceServer is finished!")
 					break	
 				else:
-					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "replaceServer is not finished yet!")
-					pass
+					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "replaceServer is not finished yet!")
 			time.sleep(1)
 		p.close()
 
@@ -291,11 +294,10 @@ class GlusterfsMgt:
 			report = json.loads(report)
 			if report != {}:
 				if report['finished'] == True:
-					#self.__worker.update_progress(100, "triggerSelfHealing is finished!")
+					self.__worker.update_progress(100, "triggerSelfHealing is finished!")
 					break	
 				else:
-					#self.__worker.update_progress(int(Decimal(report['progress']) * 100), "triggerSelfHealing is not finished yet!")
-					pass
+					self.__worker.update_progress(int(Decimal(report['progress']) * 100), "triggerSelfHealing is not finished yet!")
 			time.sleep(1)
 		p.close()
 
@@ -333,30 +335,37 @@ class GlusterfsMgt:
                 return json.dumps(status, sort_keys=True, indent=4)
 
 
-#@task_class
-class volumeCreate:
+@task_class
+class volumeCreate(WorkerTask):
         def __init__(self):
-                #WorkerTask.__init__(self)
+                WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self, params):
                 kwparams = json.loads(params)
+		
+		checkHostList = kwparams['hostList']
+		resultHostList = []
+		HDCheck = HardDriveChecking(checkHostList)
+		resultHostList = HDCheck.DiskTesting()
+		kwparams['hostList'] = resultHostList
+
                 return self.__mgt.createVolume(**kwparams)
 
-#@task_class
-class replaceServer:
+@task_class
+class replaceServer(WorkerTask):
         def __init__(self):
-                #WorkerTask.__init__(self)
+                WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self, params):
                 kwparams = json.loads(params)
                 return self.__mgt.replaceServer(**kwparams)
 
-#@task_class
-class triggerSelfHealing:
+@task_class
+class triggerSelfHealing(WorkerTask):
         def __init__(self):
-                #WorkerTask.__init__(self)
+                WorkerTask.__init__(self)
                 self.__mgt = GlusterfsMgt(self)
 
         def run(self,params):
@@ -365,14 +374,31 @@ class triggerSelfHealing:
 
 
 if __name__ == '__main__':
-	vc = volumeCreate()
+	vc = volumeCreate(100)
 	print "==========GUI volumeCreate==========\n"
-        param1 = {'receiver': 'TPE1AA0118',
-                  'hostList': ['TPE1AA0118', 'TPE1AA0133'],
-                  'volType': 'replica',
-                  'count': '2'
+        param1 = {'receiver': 'ntu01',
+                  'hostList': ['ntu01', 'ntu02', 'ntu03'],
+                  'volType': 'distribute',
+                  'count': '10'
         }
         jsonStr1 = json.dumps(param1, sort_keys=True, indent=4)
         vc.run(jsonStr1)
 
+
+        rs = replaceServer(200)
+        print "==========GUI replaceServer==========\n"
+	param2 = {'receiver': 'ntu01',
+                  'hostname': 'ntu02'
+	}
+	jsonStr2 = json.dumps(param2, sort_keys=True, indent=4)
+	rs.run(jsonStr2)
+
+
+        sh = triggerSelfHealing(300)
+        print "==========GUI triggerSelfHealing==========\n"
+	param3 = {'receiver': 'ntu01',
+                  'volName': 'testVol'
+	}
+	jsonStr3 = json.dumps(param3, sort_keys=True, indent=4)
+	sh.run(jsonStr3)
 

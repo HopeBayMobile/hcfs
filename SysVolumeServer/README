@@ -1,9 +1,18 @@
-After installing the OS (Ubuntu 11.04) on system volume server,
-you should execute SystemVolumeDeploy.sh.
+1. Install the OS (Ubuntu 11.04) on /dev/sda of system volume server, and configure the network.
 
-The script will do the following things:
-(1) Install GlusterFS 3.2.3
-(2) Create two directory /export1 and /export2
-(3) Mount /dev/sdb on /export2 
-(4) Create a GlusterFS volume using /export1 and /export2 as bricks
-(5) Return a mount point (xxx.xxx.xxx.xxx:/SystemVolume)
+2. Place this directory (SysVolumeServer) on the root directory (/).
+
+3. Change your privilege to root.
+
+2. Execute SystemVolumeDeploy.sh.
+
+   The script will do the following things:
+   (1) Install GlusterFS 3.2.3 and NFS-kernel-server
+   (2) Create two directory /export1 and /export2
+   (3) Mount /dev/sdb on /export2 
+   (4) Create a GlusterFS volume using /export1 and /export2 as bricks (replica two)
+   (5) Mount the GlusterFS volume on /SystemVolume (/SystemVolume is the directory of nfs export directory)
+   (6) Return a mount point (xxx.xxx.xxx.xxx:/SystemVolume)
+   (7) Modify /etc/fstab to mount /dev/sdb automatically
+   (8) Modify /etc/rc.local to execute ./nfs_ServiceStart.sh automatically every rebooting
+

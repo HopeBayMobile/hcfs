@@ -28,7 +28,7 @@ import paramiko
 
 
 class GlusterfsVolumeCreator:
-	def __init__(self, hostList = [], brickPrefix = '/disk', volType = 'replica', count = 3):
+	def __init__(self, hostList = [], brickPrefix = '/GlusterHD/disk', volType = 'replica', count = 3):
 		self.__hostList = hostList
 		self.__volType = volType
 		self.__count = count
@@ -201,7 +201,7 @@ class GlusterfsDeploy:
 			return 0
 	
 
-	def volumeCreate(self, volCreator = GlusterfsVolumeCreator(), volName = 'testVol', brickPrefix = '/exp', volType = 'replica', count = 3, transport = 'tcp'):
+	def volumeCreate(self, volCreator = GlusterfsVolumeCreator(), volName = 'testVol', brickPrefix = '/GlusterHD/disk', volType = 'replica', count = 3, transport = 'tcp'):
 		self.__cfgLog.logEvent("volumeCreate start\n")
 		
 		#TODO: write a function to Check if the input variables are correct
