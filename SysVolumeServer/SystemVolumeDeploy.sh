@@ -14,8 +14,7 @@
 # 2012/02/06 Modified by CW
 # 2012/02/15 Modified by CW
 
-sudo dpkg -i ./deb_source/glusterfs-*.deb
-sudo dpkg -i ./deb_source/nfs-kernel-server_1%3a1.2.2-4ubuntu5_amd64.deb
+sudo dpkg -i ./deb_source/*.deb
 sudo /etc/init.d/glusterfs-server restart
 sudo mkdir -p /export1
 sudo mkdir -p /export2
@@ -38,5 +37,5 @@ sudo echo "/SystemVolume *(rw,no_root_squash,fsid=0)" >> /etc/exports
 sleep 5
 sudo /etc/init.d/nfs-kernel-server restart
 sudo echo "/dev/sdb /export2 ext4 defaults 1 2" >> /etc/fstab
-echo "The mount point is $IP:/SystemVolume"
 sudo cp /SysVolumeServer/rc.local /etc
+echo "The mount point is $IP:/SystemVolume"
