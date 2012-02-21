@@ -1,5 +1,6 @@
 #!/bin/bash
 
-/SysVolumeServer/nfs_ServiceStart.sh
+sudo /etc/init.d/glusterfs-server restart
+sudo gluster volume start SystemVolume
 
 exit 0
