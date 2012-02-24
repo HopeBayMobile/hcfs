@@ -4,7 +4,7 @@
 # (1) Install GlusterFS and nfs-common; (2) mount /dev/sdb on /export2; (3) create a system volume;
 # (4) modify /dev/fstab to mount /dev/sdb automatically;
 # (5) modify /etc/rc.local to start GlusterFS service automatically every rebooting;
-# (6) add all IPs of n-i hosts into /etc/hosts.
+# (6) modify the IP of the name server in /etc/resolv.conf.
 # This system volume is a GlusterFS volume of replica 2. The nfs export mounting entry is 
 # xxx.xxx.xxx.xxx/SystemVolume, and use the nfs access protocol of GlusterFS.
 # History:
@@ -40,11 +40,8 @@ echo "[`date`]: Modify /etc/fstab and /etc/rc.local"
 sudo echo "/dev/sdb /export2 ext4 defaults 1 2" >> /etc/fstab
 sudo cp ./rc.local /etc
 
-echo "[`date`]: Add all IPs of n-i hosts into /etc/hosts"
-for i in $(seq 1 255)
-do
-	sudo echo "192.168.11.$i" >> /etc/hosts
-done
+echo "[`date`]: Modify the IP of the name server in /etc/resolv.conf"
+sudo cp ./resolv.conf /etc
 
 echo "[`date`]: SystemVolume is ready for use!"
 echo "The mount point is $IP:/SystemVolume"
