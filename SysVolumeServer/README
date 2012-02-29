@@ -12,4 +12,6 @@
    (5) Return a mount point (xxx.xxx.xxx.xxx:/SystemVolume)
    (6) Modify /etc/fstab to mount /dev/sdb automatically
    (7) Modify /etc/rc.local to start GlusterFS services automatically every rebooting
+   (8) Modify /etc/resolv.conf to change the name server
+   (9) Add Management 1 and 2 into /etc/hosts
 
