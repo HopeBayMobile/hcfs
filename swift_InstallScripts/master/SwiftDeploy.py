@@ -5,6 +5,7 @@ Created on 2012/03/01
 
 Modified by CW on 2012/03/02
 Modified by CW on 2012/03/03
+Modified by CW on 2012/03/05
 '''
 
 import sys
@@ -78,6 +79,9 @@ class SwiftDeploy:
 	def storageDeploy(self):
 		#TODO: use fork and report progress
 		for i in self.__storageList:
+			pid = os.fork()
+			if pid == 0:
+				continue
 			ScpStatus = os.system("sshpass -p %s scp -r ../storage root@%s:/" % (self.__password, i))
 			if ScpStatus != 0:
 				print "Fail to scp the storage node: %s" % i
@@ -90,8 +94,9 @@ class SwiftDeploy:
 			if sshpassStatus != 0:
 				print "Fail to deploy the storage node: %s" % i
 				sys.exit(1)
+			if pid != 0:
+				os._exit(0)
 			
-
 
 if __name__ == '__main__':
 	SD= SwiftDeploy("./Swift.ini", ['192.168.122.183'], ['192.168.122.139', '192.168.122.168'])

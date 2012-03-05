@@ -1,1 +1,27 @@
-Not ready yet!
+[Description]:
+1. The scripts is used to deploy Swift. The development environment is listed
+   in the following.
+	(1) OS: Ubuntu 11.04 64bit
+	(2) Language: python and bash shell
+	(3) Hardware: AMD 64bit
+
+2. How to use the scripts:
+	(1) Copy the folder 'swif_InstallScripts' to the master node.
+	(2) Modify the '__main__' section of swift_InstallScripts/master/SwiftDeploy.py
+	    SD = SwiftDeploy("./Swift.ini", [PROXY_NODE_IP], [STORAGE_NODE_IP])
+	    Modify PROXY_NODE_IP and STORAGE_NODE_IP to your proxy node IP and 
+	    storage node IP, respectively.
+	(3) Change your privilege to root.
+	(4) Execute the command: python SwiftDeploy.py
+
+
+[Note]:
+1. The existence of the master node is for the use of PDCM. When PDCM is ready, 
+   we don't have to modify the proxy node IP and storage node IP in SwiftDeploy.py. 
+   PDCM will assign the IPs of proxy and storage nodes automatically. However, a 
+   few codes must be writen to connect the scripts with PDCM.
+
+2. The scripts do not support the mutiple proxy servers.
+
+3. The logs and error handling are not ready yet! Some logs can be found 
+   in /var/log/SwiftDeploy of the master node.  
