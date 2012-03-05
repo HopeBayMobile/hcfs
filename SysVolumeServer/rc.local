@@ -1,6 +1,0 @@
-#!/bin/bash
-
-sudo /etc/init.d/glusterfs-server restart
-sudo gluster volume start SystemVolume
-
-exit 0
