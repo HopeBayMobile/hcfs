@@ -109,6 +109,7 @@ sudo cat >/etc/resolv.conf << EOF
 nameserver 192.168.11.1
 EOF
 
+sleep 5
 
 echo -e "\n[`date`]: Self test of mounting the system volume with the nfs protocol"
 sudo mount -t nfs -o vers=3,nolock $IP:/SystemVolume /mnt
