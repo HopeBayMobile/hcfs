@@ -2,6 +2,8 @@
 Created on 2012/03/01
 
 @author: CW
+
+Modified by CW on 2012/03/06
 '''
 
 import sys
@@ -16,51 +18,53 @@ from ConfigParser import ConfigParser
 
 class SwiftCfg:
 	def __init__(self, configFile):
+		self.__kwparams = {}
 		self.__configFile = configFile
 
 		config = ConfigParser()
 		config.readfp(open(self.__configFile))
 
 		self.__logDir = config.get('log', 'dir')
+		self.__logName = config.get('log', 'logName')
 		self.__reportDir = config.get('report', 'dir')
 
 		self.__username = config.get('main', 'username')
 		self.__password = config.get('main', 'password')
 
 		self.__proxyInterval = config.get('timeout', 'proxyInterval')
+		self.__proxyInterval = int(self.__proxyInterval)
 		self.__storageInterval = config.get('timeout', 'storageInterval')
+		self.__storageInterval = int(self.__storageInterval)
 
 		self.__numOfReplica = config.get('proxy', 'replica')
+		self.__numOfReplica = int(self.__numOfReplica)
+		self.__proxyInterface = config.get('proxy', 'proxyInterface')
+
 		self.__deviceName = config.get('storage', 'device')
+		self.__storageInterface = config.get('storage', 'storageInterface')
 
-	def getUsername(self):
-		return self.__username
+		self.__kwparams = {
+			'logDir': self.__logDir,
+			'logName': self.__logName,
+			'reportDir': self.__reportDir,
+			'username': self.__username,
+			'password': self.__password,
+			'proxyInterval': self.__proxyInterval,
+			'storageInterval': self.__storageInterval,
+			'numOfReplica': self.__numOfReplica,
+			'proxyInterface': self.__proxyInterface,
+			'deviceName': self.__deviceName,
+			'storageInterface': self.__storageInterface
+		}
 
-	def getPassword(self):
-		return self.__password
-
-	def getLogDir(self):
-		return self.__logDir
-
-	def getReportDir(self):
-		return self.__reportDir
-
-	def getProxyInterval(self):
-		return int(self.__proxyInterval)
-
-	def getStorageInterval(self):
-		return int(self.__storageInterval)
-
-	def getNumOfReplica(self):
-		return int(self.__numOfReplica)
-
-	def getDeviceName(self):
-		return self.__deviceName
+	def getKwparams(self):
+		return self.__kwparams
 	
 
 if __name__ == '__main__':
 	SC = SwiftCfg("./Swift.ini")
-	print "Username: %s, Password: %s" % (SC.getUsername(), SC.getPassword())
-	print "logDir: %s, reportDir: %s" % (SC.getLogDir(), SC.getReportDir())
-	print "proxyinterval: %d, storageinterval: %d" % (SC.getProxyInterval(), SC.getStorageInterval())
-	print "numofreplica: %d, nameofdevice: %s" % (SC.getNumOfReplica(), SC.getDeviceName())
+	kwparams = SC.getKwparams()
+	print "Username: %s, Password: %s" % (kwparams['username'], kwparams['password'])
+	print "logDir: %s, reportDir: %s" % (kwparams['logDir'], kwparams['reportDir'])
+	print "proxyinterval: %d, storageinterval: %d" % (kwparams['proxyInterval'], kwparams['storageInterval'])
+	print "numofreplica: %d, nameofdevice: %s" % (kwparams['numOfReplica'], kwparams['deviceName'])

@@ -3,6 +3,8 @@
 # History:
 # 2012/02/24 first release by CW
 # 2012/03/01 modified by CW
+# 2012/03/06 modified by CW: check the existence of IP address
+
 
 if [ $# != 1 ]; then
         echo "Please enter the correct parameters!"
@@ -11,13 +13,15 @@ if [ $# != 1 ]; then
 	echo "./PackageInstall.sh 3"
         exit 1
 fi
-
 Replica=$1
+
 
 dpkg -i /proxy/deb_source/*.deb
 
+
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
+
 
 cat >/etc/swift/swift.conf <<EOF
 [swift-hash]
@@ -25,9 +29,15 @@ cat >/etc/swift/swift.conf <<EOF
 swift_hash_path_suffix = `od -t x8 -N 8 -A n </dev/random`
 EOF
 
+
 IP=""
 IP=`ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{print $1}'`
+if [ "$IP" = "" ]; then
+	echo "The IP address of the proxy node does not exist!"
+	exit 1
+fi
 export PROXY_LOCAL_NET_IP=$IP
+
 
 openssl req -new -x509 -nodes -out cert.crt -keyout cert.key << EOF
 TW
@@ -41,15 +51,18 @@ EOF
 mv cert.key /etc/swift
 mv cert.crt /etc/swift
 
-perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
 
+perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
 service memcached restart
 
+
 /proxy/ProxyConfigCreation.sh
+
 
 cd /etc/swift
 swift-ring-builder account.builder create 18 $Replica 1
 swift-ring-builder container.builder create 18 $Replica 1
 swift-ring-builder object.builder create 18 $Replica 1
+
 
 echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config
