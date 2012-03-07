@@ -4,6 +4,7 @@ Created on 2012/03/01
 @author: CW
 
 Modified by CW on 2012/03/06
+Modified by CW on 2012/03/07
 '''
 
 import sys
@@ -11,6 +12,8 @@ import os
 import socket
 import posixfile
 import json
+import datetime
+import logging
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
@@ -56,6 +59,15 @@ class SwiftCfg:
 			'deviceName': self.__deviceName,
 			'storageInterface': self.__storageInterface
 		}
+
+		logging.basicConfig(level = logging.DEBUG,
+			format = '%(asctime)s %(levelname)s %(message)s',
+			filename = self.__kwparams['logDir'] + self.__kwparams['logName']
+		)
+
+		infoMsg = "The parsing of Swift configuration has been finished!"
+		print "[Info]: %s" % infoMsg
+		logging.info(infoMsg)
 
 	def getKwparams(self):
 		return self.__kwparams
