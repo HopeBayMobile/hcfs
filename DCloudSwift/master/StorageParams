@@ -1,0 +1,1 @@
+{"username": "root", "proxyList": ["192.168.122.202"], "reportDir": "/var/log/swiftDeploy/reports/", "storageInterval": 180, "storageList": ["192.168.122.17", "192.168.122.53"], "logDir": "/var/log/swiftDeploy/", "deviceName": "sdb1", "password": "deltacloud", "proxyInterval": 300, "numOfReplica": 2}
