@@ -5,6 +5,7 @@ Created on 2012/03/01
 
 Modified by CW on 2012/03/06
 Modified by CW on 2012/03/07
+Modified by Ken on 2012/03/09
 '''
 
 import sys
@@ -28,7 +29,8 @@ class SwiftCfg:
 		config.readfp(open(self.__configFile))
 
 		self.__logDir = config.get('log', 'dir')
-		self.__logName = config.get('log', 'logName')
+		self.__logName = config.get('log', 'name')
+		self.__logLevel = config.get('log', 'level')
 		self.__reportDir = config.get('report', 'dir')
 
 		self.__username = config.get('main', 'username')
@@ -48,6 +50,7 @@ class SwiftCfg:
 
 		self.__kwparams = {
 			'logDir': self.__logDir,
+			'logLevel':self.__logLevel,
 			'logName': self.__logName,
 			'reportDir': self.__reportDir,
 			'username': self.__username,
@@ -60,13 +63,14 @@ class SwiftCfg:
 			'storageInterface': self.__storageInterface
 		}
 
+		os.system("sudo mkdir -p "+self.__kwparams['logDir'])
+		os.system("sudo touch "+ self.__kwparams['logDir'] + self.__kwparams['logName'])
 		logging.basicConfig(level = logging.DEBUG,
-			format = '%(asctime)s %(levelname)s %(message)s',
+			format = '[%(levelname)s on %(asctime)s] %(message)s',
 			filename = self.__kwparams['logDir'] + self.__kwparams['logName']
 		)
 
 		infoMsg = "The parsing of Swift configuration has been finished!"
-		print "[Info]: %s" % infoMsg
 		logging.info(infoMsg)
 
 	def getKwparams(self):
@@ -74,7 +78,7 @@ class SwiftCfg:
 	
 
 if __name__ == '__main__':
-	SC = SwiftCfg("./Swift.ini")
+	SC = SwiftCfg("../Swift.ini")
 	kwparams = SC.getKwparams()
 	print "Username: %s, Password: %s" % (kwparams['username'], kwparams['password'])
 	print "logDir: %s, reportDir: %s" % (kwparams['logDir'], kwparams['reportDir'])

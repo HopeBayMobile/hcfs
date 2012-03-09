@@ -8,6 +8,7 @@ Modified by CW on 2012/03/03
 Modified by CW on 2012/03/05
 Modified by CW on 2012/03/06
 Modified by CW on 2012/03/07
+Modified by Ken on 2012/03/09
 '''
 
 import sys
@@ -24,6 +25,7 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 
 #Self defined packages
+sys.path.append("../util")
 from SwiftCfg import SwiftCfg
 
 
@@ -107,7 +109,7 @@ class SwiftDeploy:
 			
 
 if __name__ == '__main__':
-	SD= SwiftDeploy("./Swift.ini", ['192.168.122.183'], ['192.168.122.139', '192.168.122.168'])
+	SD= SwiftDeploy("../Swift.ini", ['192.168.122.183'], ['192.168.122.139', '192.168.122.168'])
 	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
 	SD.storageDeploy()
