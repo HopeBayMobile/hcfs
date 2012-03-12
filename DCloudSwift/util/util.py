@@ -14,7 +14,7 @@ import time
 
 from SwiftCfg import SwiftCfg
 
-SWIFTCONF = '../Swift.ini'
+SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 logLock = threading.Lock()
@@ -101,8 +101,27 @@ def sshpass(passwd, cmd, timeout=0):
 			raise TimeoutError(sshpasscmd, timeout)
 		time.sleep(0.1)
 
-	return (po.returncode, po.stdout)
+	return (po.returncode, po.stdout, po.stderr)
 	
+def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
+	logger = getLogger(name="spreadMetadata")
+	blackList=[]
+	returncode = 0
+	for ip in nodeList:
+		try:
+			cmd = "scp %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
+			if status != 0:
+				blackList.append(ip)
+				returncode +=1
+				logger.error("Failed to execute \"%s\" for %s\n"%(cmd, stderr))
+		except TimeoutError as err:
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+				
+
+	return (returncode, blackList)
+
+
 class TimeoutError(Exception):
 	def __init__(self, cmd, timeout):
 		self.cmd = cmd
@@ -122,9 +141,10 @@ if __name__ == '__main__':
 #	logger3 = getLogger(name="Hi")
 #	logger3.info("Hi")
 
-	try:
-		cmd = "ssh root@192.168.1.131 touch aaa"
-		(returncode, stdoutdata) = sshpass("deltacloud", cmd, timeout=2)
-		print stdoutdata.readlines()
-	except TimeoutError as err:
-		print err
+#	try:
+#		cmd = "ssh root@192.168.1.131 touch aaa"
+#		(returncode, stdoutdata) = sshpass("deltacloud", cmd, timeout=2)
+#		print stdoutdata.readlines()
+#	except TimeoutError as err:
+#		print err
+	spreadMetadata("deltacloud",["192.168.1.132", "192.168.1.133", "192.168.1.134", "192.168.1.135"])

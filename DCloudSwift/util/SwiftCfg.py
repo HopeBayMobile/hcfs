@@ -78,7 +78,7 @@ class SwiftCfg:
 	
 
 if __name__ == '__main__':
-	SC = SwiftCfg("../Swift.ini")
+	SC = SwiftCfg("/etc/deltaSwift/Swift.ini")
 	kwparams = SC.getKwparams()
 	print "Username: %s, Password: %s" % (kwparams['username'], kwparams['password'])
 	print "logDir: %s, reportDir: %s" % (kwparams['logDir'], kwparams['reportDir'])

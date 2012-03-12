@@ -14,10 +14,13 @@ import time
 import json
 import subprocess
 import shlex
+import random
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
 
+sys.path.append("/DCloudSwift/util")
+import util
 
 Usage = '''
 Usage:
@@ -35,29 +38,43 @@ def usage():
 	sys.exit(1)
 
 def triggerAddStorage(**kwargs):
+	logger = util.getLogger(name="triggerAddStorage")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
-	numOfReplica = kwargs['numOfReplica']
 	deviceName = kwargs['deviceName']
-#	os.system("/proxy/PackageInstall.sh %d" % numOfReplica)
-#	zoneNumber = 1
-#	for i in storageList: 
-#		os.system("/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
-#		zoneNumber += 1
-#	os.system("/proxy/ProxyStart.sh")
-	os.system("touch /tmp/Hello")
+	password = kwargs['password']
+
+		
+
+	random.seed(time.time())
+	for i in storageList: 
+		zoneNumber= random.randint(1,100000)
+		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+
+	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	os.system("cp /etc/swift/*.ring.gz /tmp/")
+
+	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=proxyList)
+
+	allStorageNodes = util.getStorageNodeIpList()
+	blackStorageNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=allStorageNodes)
+
+	returncode = len(blackProxyNodes)+len(blackStorageNodes)
+
+	return (returncode, blackProxyNodes, blackStorageNodes)
+
 
 def triggerProxyDeploy(**kwargs):
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
 	deviceName = kwargs['deviceName']
-	os.system("/proxy/PackageInstall.sh %d" % numOfReplica)
+	os.system("/DCloudSwift/proxy/PackageInstall.sh %d" % numOfReplica)
 	zoneNumber = 1
 	for i in storageList: 
-		os.system("/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
 		zoneNumber += 1
-	os.system("/proxy/ProxyStart.sh")
+	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 
 def triggerStorageDeploy(**kwargs):
 	proxyNode = kwargs['proxyList'][0]
@@ -68,7 +85,7 @@ def main():
 	if (len(sys.argv) == 2 ):
 		kwargs = None
         	if (sys.argv[1] == 'addStorage' or sys.argv[1] == '-a'):
-			f = file('/proxy/AddStorageParams', 'r')
+			f = file('/DCloudSwift/proxy/AddStorageParams', 'r')
 			kwargs = f.readline()
 
 			try:
@@ -78,10 +95,12 @@ def main():
 				usage()
 
 			print 'AddStorage start'
-			triggerAddStorage(**kwargs)
+			(returncode, blackProxy, blackStorage) = triggerAddStorage(**kwargs)
+
+			
 
         	elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
-			f = file('/proxy/ProxyParams', 'r')
+			f = file('/DCloudSwift/proxy/ProxyParams', 'r')
 			kwargs = f.readline()
 
 			try:
