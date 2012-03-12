@@ -1,8 +1,16 @@
+'''
+Created on 2012/03/08
+
+@author: Ken
+
+Modified by Ken, Mingchi on 2012/03/09
+'''
 import os
 import subprocess
 import logging
 import threading
 import sys
+import time
 
 from SwiftCfg import SwiftCfg
 
@@ -76,17 +84,47 @@ def getStorageNodeIpList():
 
 	return ipList
 
+def sshpass(passwd, cmd, timeout=0):
+
+	t_beginning = time.time()
+	seconds_passed = 0
+
+	sshpasscmd = "sshpass -p %s %s" % (passwd, cmd)
+	po  = subprocess.Popen(sshpasscmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+	while True:
+		if po.poll() is not None:
+			break
+		seconds_passed = time.time() - t_beginning
+		if timeout and seconds_passed > timeout:
+			po.terminate()
+			raise TimeoutError(sshpasscmd, timeout)
+		time.sleep(0.1)
+
+	return (po.returncode, po.stdout)
+	
+class TimeoutError(Exception):
+	def __init__(self, cmd, timeout):
+		self.cmd = cmd
+		self.timeout= timeout
+	def __str__(self):
+		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
 #	print getStorageNodeIpList()
 
-	logger = getLogger(name="Hello")
-	logger.info("HELLo!")
+#	logger = getLogger(name="Hello")
+#	logger.info("HELLo!")
 
-	logger2 = getLogger(name="Hello")
-	logger2.info("Hello2")
+#	logger2 = getLogger(name="Hello")
+#	logger2.info("Hello2")
 
-	logger3 = getLogger(name="Hi")
-	logger3.info("Hi")
+#	logger3 = getLogger(name="Hi")
+#	logger3.info("Hi")
 
-	
+	try:
+		cmd = "ssh root@192.168.1.131 touch aaa"
+		(returncode, stdoutdata) = sshpass("deltacloud", cmd, timeout=2)
+		print stdoutdata.readlines()
+	except TimeoutError as err:
+		print err

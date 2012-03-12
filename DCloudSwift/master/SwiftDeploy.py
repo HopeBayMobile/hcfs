@@ -9,6 +9,7 @@ Modified by CW on 2012/03/05
 Modified by CW on 2012/03/06
 Modified by CW on 2012/03/07
 Modified by Ken on 2012/03/09
+Modified by Ken on 2012/03/12
 '''
 
 import sys
@@ -27,6 +28,7 @@ from ConfigParser import ConfigParser
 #Self defined packages
 sys.path.append("../util")
 from SwiftCfg import SwiftCfg
+import util
 
 
 class SwiftDeploy:
@@ -43,15 +45,15 @@ class SwiftDeploy:
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 		os.system("mkdir -p %s" % self.__kwparams['reportDir'])
 
-		if self.__kwparams['numOfReplica'] > len(self.__storageList):
-			errMsg = "The number of storage nodes is less than the number of replicas!"
-			print "[Error]: %s" % errMsg
-			logging.error(errMsg)
-			sys.exit(1)
+#		if self.__kwparams['numOfReplica'] > len(self.__storageList):
+#			errMsg = "The number of storage nodes is less than the number of replicas!"
+#			print "[Error]: %s" % errMsg
+#			logging.error(errMsg)
+#			sys.exit(1)
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
-		os.system("dpkg -i ./sshpass_1.05-1_amd64.deb")
+		os.system("dpkg -i ./debsrc/*.deb")
 		os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 
@@ -107,10 +109,47 @@ class SwiftDeploy:
 			if pid != 0:
 				os._exit(0)
 			
+	def addStorage(self):
+		logger = util.getLogger(name="addStorage")
+		self.storageDeploy()
+
+		for i in self.__proxyList:
+			try:
+				#TODO: read timeout setting from configure files
+				cmd = "scp -r ../proxy root@%s:/"%i
+				(status, stdout) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+				if status !=0:
+					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stdout.readlines()))
+					continue
+			
+				#TODO: directly send params
+				os.system("echo \'%s\' > AddStorageParams" % self.__jsonStr)
+				cmd = "scp AddStorageParams root@%s:/proxy" % i
+				(status, stdout) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+
+				if status !=0:
+					logger.error("Failed to scp params to %s for %s"%(i, stdout.readlines()))
+					continue
+
+				#TODO: Monitor Progress report
+				cmd = "ssh root@%s python /proxy/CmdReceiver.py -a"%i
+				(status, stdout)  = util.sshpass(self.__kwparams['password'], cmd)
+			
+				if status != 0:
+					logger.error("Failed to addStorage from proxy %s for %s"%(i, stdout.readlines()))
+					continue
+
+				#TODO: Return black list
+			except TimeoutError as err:
+				print err
+		
+		logger.error("Failed to addStorage\n")
+		return self.__storageList
 
 if __name__ == '__main__':
-	SD= SwiftDeploy("../Swift.ini", ['192.168.122.183'], ['192.168.122.139', '192.168.122.168'])
-	SD.proxyDeploy()
+	SD= SwiftDeploy("../Swift.ini", ['192.168.1.81'], ['192.168.1.82', '192.168.1.83'])
+	SD.addStorage()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
+	#SD.storageDeploy()
 

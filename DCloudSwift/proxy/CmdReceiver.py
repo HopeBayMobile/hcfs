@@ -2,6 +2,8 @@
 Created on 2012/03/01
 
 @author: CW
+
+Modified by Ken on 2012/03/12
 '''
 
 import sys
@@ -21,6 +23,7 @@ Usage = '''
 Usage:
 	python CmdReceiver.py [Option]
 Options:
+	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
 	[-s | storage] - for storage node
 Examples:
@@ -30,6 +33,19 @@ Examples:
 def usage():
 	print Usage
 	sys.exit(1)
+
+def triggerAddStorage(**kwargs):
+	proxyList = kwargs['proxyList']
+	storageList = kwargs['storageList']
+	numOfReplica = kwargs['numOfReplica']
+	deviceName = kwargs['deviceName']
+#	os.system("/proxy/PackageInstall.sh %d" % numOfReplica)
+#	zoneNumber = 1
+#	for i in storageList: 
+#		os.system("/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+#		zoneNumber += 1
+#	os.system("/proxy/ProxyStart.sh")
+	os.system("touch /tmp/Hello")
 
 def triggerProxyDeploy(**kwargs):
 	proxyList = kwargs['proxyList']
@@ -51,7 +67,20 @@ def triggerStorageDeploy(**kwargs):
 def main():
 	if (len(sys.argv) == 2 ):
 		kwargs = None
-        	if (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
+        	if (sys.argv[1] == 'addStorage' or sys.argv[1] == '-a'):
+			f = file('/proxy/AddStorageParams', 'r')
+			kwargs = f.readline()
+
+			try:
+				kwargs = json.loads(kwargs)
+			except ValueError:
+				print "Usage error: Ivalid json format"
+				usage()
+
+			print 'AddStorage start'
+			triggerAddStorage(**kwargs)
+
+        	elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 			f = file('/proxy/ProxyParams', 'r')
 			kwargs = f.readline()
 
