@@ -4,6 +4,7 @@ Created on 2012/03/01
 @author: CW
 
 Modified by Ken on 2012/03/12
+Modified by Ken on 2012/03/13
 '''
 
 import sys
@@ -49,10 +50,11 @@ def triggerAddStorage(**kwargs):
 	random.seed(time.time())
 	for i in storageList: 
 		zoneNumber= random.randint(1,100000)
+		logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
 		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
 
-	os.system("/DCloudSwift/proxy/ProxyStart.sh")
-	os.system("cp /etc/swift/*.ring.gz /tmp/")
+	os.system("/DCloudSwift/proxy/Rebalance.sh")
+	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
 
 	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=proxyList)
 

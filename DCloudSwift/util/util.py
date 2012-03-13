@@ -77,7 +77,7 @@ def getStorageNodeIpList():
 	i = 0
 	ipList =[]
 	for line in po.stdout.readlines():
-		if i > 4:
+		if i > 3:
 			ipList.append(line.split()[2])
 
 		i+=1
@@ -109,12 +109,24 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 	returncode = 0
 	for ip in nodeList:
 		try:
-			cmd = "scp %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip)
+			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
 			if status != 0:
 				blackList.append(ip)
 				returncode +=1
 				logger.error("Failed to execute \"%s\" for %s\n"%(cmd, stderr))
+				continue
+
+			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip))
+			cmd = "ssh root@%s chown -R swift:swift /etc/swift "%(ip)
+
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
+			if status != 0:
+				blackList.append(ip)
+				returncode +=1
+				logger.error("Failed to execute \"%s\" for %s\n"%(cmd, stderr))
+				continue
+
 		except TimeoutError as err:
 			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
 				
@@ -130,7 +142,7 @@ class TimeoutError(Exception):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
-#	print getStorageNodeIpList()
+	print getStorageNodeIpList()
 
 #	logger = getLogger(name="Hello")
 #	logger.info("HELLo!")
@@ -147,4 +159,4 @@ if __name__ == '__main__':
 #		print stdoutdata.readlines()
 #	except TimeoutError as err:
 #		print err
-	spreadMetadata("deltacloud",["192.168.1.132", "192.168.1.133", "192.168.1.134", "192.168.1.135"])
+#	spreadMetadata(password="deltacloud",nodeList=["192.168.1.132"])
