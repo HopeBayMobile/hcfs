@@ -21,50 +21,25 @@ Usage = '''
 Usage:
 	python CmdReceiver.py [Option]
 Options:
-	[-p | proxy] - for proxy node
 	[-s | storage] - for storage node
 Examples:
-	python CmdReceiver.py -p 
+	python CmdReceiver.py -s 
 '''
 
 def usage():
 	print Usage
 	sys.exit(1)
 
-def triggerProxyDeploy(**kwargs):
-	proxyList = kwargs['proxyList']
-	storageList = kwargs['storageList']
-	numOfReplica = kwargs['numOfReplica']
-	deviceName = kwargs['deviceName']
-	os.system("/proxy/PackageInstall.sh %d" % numOfReplica)
-	zoneNumber = 1
-	for i in storageList: 
-		os.system("/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
-		zoneNumber += 1
-	os.system("/proxy/ProxyStart.sh")
-
 def triggerStorageDeploy(**kwargs):
 	proxyNode = kwargs['proxyList'][0]
 	deviceName = kwargs['deviceName']
-	os.system("/storage/StorageInstall.sh %s %s" % (proxyNode, deviceName))
+	os.system("/DCloudSwift/storage/StorageInstall.sh %s %s" % (proxyNode, deviceName))
 	
 def main():
 	if (len(sys.argv) == 2 ):
 		kwargs = None
-        	if (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
-			f = file('/proxy/ProxyParams', 'r')
-			kwargs = f.readline()
-
-			try:
-				kwargs = json.loads(kwargs)
-			except ValueError:
-				print "Usage error: Ivalid json format"
-				usage()
-
-			print 'Proxy deployment start'
-			triggerProxyDeploy(**kwargs)
-		elif (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
-			f = file('/storage/StorageParams', 'r')
+		if (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
+			f = file('/DCloudSwift/storage/StorageParams', 'r')
 			kwargs = f.readline()
 
 			try:

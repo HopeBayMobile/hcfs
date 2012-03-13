@@ -3,6 +3,7 @@
 # History:
 # 2012/02/24 first release by CW
 # 2012/03/01 modified by CW 
+# 2012/03/13 modified by Ken
 
 if [ $# != 2 ]; then
 	echo "Please enter the IP of proxy node and the device name as parameters!"
@@ -14,7 +15,8 @@ fi
 ProxyIP=$1
 DeviceName=$2
 
-dpkg -i //storage/deb_source/*.deb
+#Absolute path
+dpkg -i /DCloudSwift/storage/deb_source/*.deb
 
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
@@ -28,6 +30,7 @@ export STORAGE_LOCAL_NET_IP=$IP
 
 sshpass -p deltacloud scp root@$ProxyIP:/etc/swift/*.ring.gz /etc/swift/
 
+umount /srv/node/sdb1
 mkfs -t ext4 /dev/sdb << EOF
 y
 EOF

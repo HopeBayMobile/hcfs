@@ -29,7 +29,6 @@ Usage:
 Options:
 	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
-	[-s | storage] - for storage node
 Examples:
 	python CmdReceiver.py -p 
 '''
@@ -78,11 +77,6 @@ def triggerProxyDeploy(**kwargs):
 		zoneNumber += 1
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 
-def triggerStorageDeploy(**kwargs):
-	proxyNode = kwargs['proxyList'][0]
-	deviceName = kwargs['deviceName']
-	os.system("/storage/StorageInstall.sh %s %s" % (proxyNode, deviceName))
-	
 def main():
 	if (len(sys.argv) == 2 ):
 		kwargs = None
@@ -113,18 +107,7 @@ def main():
 
 			print 'Proxy deployment start'
 			triggerProxyDeploy(**kwargs)
-		elif (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
-			f = file('/storage/StorageParams', 'r')
-			kwargs = f.readline()
 
-			try:
-				kwargs = json.loads(kwargs)
-			except ValueError:
-				print "Usage error: Ivalid json format"
-				usage()
-
-			print 'storage deployment start'
-			triggerStorageDeploy(**kwargs)
 		else:
 			print "Usage error: Invalid optins"
                 	usage()

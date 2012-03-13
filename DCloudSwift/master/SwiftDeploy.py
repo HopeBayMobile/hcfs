@@ -10,6 +10,7 @@ Modified by CW on 2012/03/06
 Modified by CW on 2012/03/07
 Modified by Ken on 2012/03/09
 Modified by Ken on 2012/03/12
+Modified by Ken on 2012/03/13
 '''
 
 import sys
@@ -60,7 +61,7 @@ class SwiftDeploy:
 	def proxyDeploy(self):
 		#TODO: use fork and report progress
 		for i in self.__proxyList:
-			scpStatus = os.system("sshpass -p %s scp -r ../../DCloudSwift/ root@%s:/" % (self.__kwparams['password'], i))
+			scpStatus = os.system("sshpass -p %s scp -r /DCloudSwift/ root@%s:/" % (self.__kwparams['password'], i))
 			if scpStatus != 0:
 				errMsg = "Fail to scp the proxy node: " + i
 				print "[Debug]: %s" % errMsg
@@ -68,9 +69,9 @@ class SwiftDeploy:
 				sys.exit(1)
 
 			os.system("echo \'%s\' > ProxyParams" % self.__jsonStr)
-			os.system("sshpass -p %s scp ProxyParams root@%s:/proxy" % (self.__kwparams['password'], i))
+			os.system("sshpass -p %s scp ProxyParams root@%s:DCloudSwift/proxy" % (self.__kwparams['password'], i))
 
-			cmd = "python /proxy/CmdReceiver.py -p"
+			cmd = "python /DCloudSwift/proxy/CmdReceiver.py -p"
 			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/proxyDeploy_%s.log"\
 					 % (self.__kwparams['password'], i, cmd, self.__kwparams['logDir'], i))
 			if sshpassStatus != 0:
@@ -81,13 +82,13 @@ class SwiftDeploy:
 
 
 	def storageDeploy(self):
-		#TODO: use fork and report progress
+		#TODO: use thread pool and report progress
 		for i in self.__storageList:
-			pid = os.fork()
-			if pid == 0:
-				continue
+		#	pid = os.fork()
+		#	if pid == 0:
+		#		continue
 
-			ScpStatus = os.system("sshpass -p %s scp -r ../storage root@%s:/" % (self.__kwparams['password'], i))
+			ScpStatus = os.system("sshpass -p %s scp -r /DCloudSwift/ root@%s:/" % (self.__kwparams['password'], i))
 			if ScpStatus != 0:
 				errMsg = "Fail to scp the storage node: " + i
 				print "[Debug]: %s" % errMsg
@@ -95,9 +96,9 @@ class SwiftDeploy:
 				sys.exit(1)
 
 			os.system("echo \'%s\' > StorageParams" % self.__jsonStr)
-                        os.system("sshpass -p %s scp StorageParams root@%s:/storage" % (self.__kwparams['password'], i))
+                        os.system("sshpass -p %s scp StorageParams root@%s:/DCloudSwift/storage" % (self.__kwparams['password'], i))
 
-			cmd = "python /storage/CmdReceiver.py -s"
+			cmd = "python /DCloudSwift/storage/CmdReceiver.py -s"
 			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/storageDeploy_%s.log"\
 					 % (self.__kwparams['password'], i, cmd, self.__kwparams['logDir'], i))
 			if sshpassStatus != 0:
@@ -106,12 +107,12 @@ class SwiftDeploy:
 				logging.debug(errMsg)
 				sys.exit(1)
 
-			if pid != 0:
-				os._exit(0)
+		#	if pid != 0:
+		#		os._exit(0)
 			
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
-	#	self.storageDeploy()
+		self.storageDeploy()
 
 		for i in self.__proxyList:
 			try:
