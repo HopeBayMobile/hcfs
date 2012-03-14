@@ -53,8 +53,8 @@ def getLogger(conf=SWIFTCONF, name=None):
 		logName = kwparams.get('logName', 'deltaSwift.log')
 		logLevel = kwparams.get('logLevel', 'INFO')
 
-		os.system("sudo mkdir -p "+logDir)
-		os.system("sudo touch "+logDir+'/'+logName)
+		os.system("mkdir -p "+logDir)
+		os.system("touch "+logDir+'/'+logName)
 
 		hdlr = logging.FileHandler(logDir+'/'+logName)
 		hdlr.setFormatter(logging.Formatter(FORMATTER))

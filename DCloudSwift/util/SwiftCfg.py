@@ -63,8 +63,8 @@ class SwiftCfg:
 			'storageInterface': self.__storageInterface
 		}
 
-		os.system("sudo mkdir -p "+self.__kwparams['logDir'])
-		os.system("sudo touch "+ self.__kwparams['logDir'] + self.__kwparams['logName'])
+		os.system("mkdir -p "+self.__kwparams['logDir'])
+		os.system("touch "+ self.__kwparams['logDir'] + self.__kwparams['logName'])
 		logging.basicConfig(level = logging.DEBUG,
 			format = '[%(levelname)s on %(asctime)s] %(message)s',
 			filename = self.__kwparams['logDir'] + self.__kwparams['logName']

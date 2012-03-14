@@ -97,5 +97,15 @@ def prepareMountPoints(deviceCnt=1):
 	
 	return mountFormattedDisks(disks)
 
+def main(argv):
+	ret = 0
+	if len(argv) > 0:
+		ret = prepareMountPoints(int(sys.argv[1]))
+	else:
+		sys.exit(-1)
+
+	
+	return ret
+
 if __name__ == '__main__':
-	print prepareMountPoints()
+	main(sys.argv[1:])

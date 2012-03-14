@@ -153,8 +153,8 @@ class SwiftDeploy:
 
 if __name__ == '__main__':
 	SD= SwiftDeploy(['192.168.1.81'], ['192.168.1.85'])
-	SD.addStorage()
+	#SD.addStorage()
 	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()
 
