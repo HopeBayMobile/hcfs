@@ -19,6 +19,17 @@ FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 logLock = threading.Lock()
 
+
+def findLine(filename, line):
+	f = open(filename, 'r')
+	for l in f.readlines():
+		l1 = l.strip()
+		l2 = line.strip()
+		if l1 == l2:
+			return True
+
+	return False
+	
 def getLogger(conf=SWIFTCONF, name=None):
 	"""
 	Get a file logger using config settings.
@@ -142,8 +153,8 @@ class TimeoutError(Exception):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
-	print getStorageNodeIpList()
-
+	print isLineExistent("/etc/fstab","ddd")
+#	print getStorageNodeIpList()
 #	logger = getLogger(name="Hello")
 #	logger.info("HELLo!")
 
