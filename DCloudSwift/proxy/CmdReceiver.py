@@ -29,6 +29,7 @@ Usage:
 Options:
 	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
+	[-r | rmStorage] - for removing storage nodes
 Examples:
 	python CmdReceiver.py -p 
 '''
@@ -77,6 +78,29 @@ def triggerProxyDeploy(**kwargs):
 		zoneNumber += 1
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 
+def triggerRmStorage(**kwargs):
+	logger = util.getLogger(name="triggerRmStorage")
+	proxyList = kwargs['proxyList']
+	storageList = kwargs['storageList']
+	deviceName = kwargs['deviceName']
+	password = kwargs['password']
+
+	for i in storageList: 
+		logger.info("/DCloudSwift/proxy/RmRingDevice.sh %s %s"% (i, deviceName))
+		os.system("/DCloudSwift/proxy/RmRingDevice.sh %s %s" % (i, deviceName))
+
+	os.system("/DCloudSwift/proxy/Rebalance.sh")
+	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
+
+	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=proxyList)
+
+	allStorageNodes = util.getStorageNodeIpList()
+	blackStorageNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=allStorageNodes)
+
+	returncode = len(blackProxyNodes)+len(blackStorageNodes)
+
+	return (returncode, blackProxyNodes, blackStorageNodes)
+
 def main():
 	if (len(sys.argv) == 2 ):
 		kwargs = None
@@ -107,7 +131,18 @@ def main():
 
 			print 'Proxy deployment start'
 			triggerProxyDeploy(**kwargs)
+        	elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
+			f = file('/DCloudSwift/proxy/RmStorageParams', 'r')
+			kwargs = f.readline()
 
+			try:
+				kwargs = json.loads(kwargs)
+			except ValueError:
+				print "Usage error: Ivalid json format"
+				usage()
+
+			print 'Proxy deployment start'
+			triggerRmStorage(**kwargs)
 		else:
 			print "Usage error: Invalid optins"
                 	usage()

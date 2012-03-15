@@ -35,6 +35,9 @@ def getAllDisks():
 	return disks
 
 def formatNonRootDisks(deviceCnt=1):
+	'''
+	Format the first deviceCnt non-root disks
+	'''
 	logger = util.getLogger(name="formatNonRootDisks")
 	rootDisk = getRootDisk()
 	disks = getAllDisks()

@@ -11,6 +11,7 @@ Modified by CW on 2012/03/07
 Modified by Ken on 2012/03/09
 Modified by Ken on 2012/03/12
 Modified by Ken on 2012/03/13
+Modified by Ken on 2012/03/15
 '''
 
 import sys
@@ -144,17 +145,58 @@ class SwiftDeploy:
 					continue
 
 				#TODO: Return black list
-				return []
+				return (0,[],[])
 			except TimeoutError as err:
 				print err
 		
 		logger.error("Failed to addStorage\n")
-		return self.__storageList
+		return (1, self.__proxyList, self.__storageList)
 
+	def rmStorage(self):
+		logger = util.getLogger(name="rmStorage")
+		self.storageDeploy()
+
+		for i in self.__proxyList:
+			try:
+				#TODO: read timeout setting from configure files
+				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
+				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+				if status !=0:
+					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr.readlines()))
+					continue
+			
+				#TODO: directly send params
+				os.system("echo \'%s\' > RmStorageParams" % self.__jsonStr)
+				cmd = "scp RmStorageParams root@%s:/DCloudSwift/proxy" % i
+				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+
+				if status !=0:
+					logger.error("Failed to scp params to %s for %s"%(i, stderr.readlines()))
+					continue
+
+				#TODO: Monitor Progress report
+				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -r"%i
+
+				print cmd
+
+				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
+			
+				if status != 0:
+					logger.error("Failed to rmStorage from proxy %s for %s"%(i, stderr.readlines()))
+					continue
+
+				#TODO: Return black list
+				return (0,[],[])
+			except TimeoutError as err:
+				print err
+		
+		logger.error("Failed to rmStorage\n")
+		return (1, self.__proxyList, self.__storageList)
 if __name__ == '__main__':
 	SD= SwiftDeploy(['192.168.1.81'], ['192.168.1.85'])
+	SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
+	#SD.storageDeploy()
 

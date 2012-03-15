@@ -35,12 +35,12 @@ python /DCloudSwift/storage/mountDisks.py 1
 
 chown -R swift:swift /srv/node
 
-/storage/rsync.sh
+/DCloudSwift/storage/rsync.sh
 perl -pi -e 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/' /etc/default/rsync
 service rsync start
 
-/storage/accountserver.sh
-/storage/containerserver.sh
-/storage/objectserver.sh
+/DCloudSwift/storage/accountserver.sh
+/DCloudSwift/storage/containerserver.sh
+/DCloudSwift/storage/objectserver.sh
 
 swift-init all start
