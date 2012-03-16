@@ -12,6 +12,7 @@ Modified by Ken on 2012/03/09
 Modified by Ken on 2012/03/12
 Modified by Ken on 2012/03/13
 Modified by Ken on 2012/03/15
+Modified by Ken on 2012/03/16
 '''
 
 import sys
@@ -21,6 +22,7 @@ import posixfile
 import time
 import json
 import subprocess
+import threading
 import datetime
 import logging
 from decimal import *
@@ -55,8 +57,11 @@ class SwiftDeploy:
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
-		os.system("dpkg -i ./debsrc/*.deb")
-		os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+		if not util.isAllDebInstalled("/DCloudSwift/master/debsrc/"):
+			util.installAllDeb("/DCloudSwift/master/debsrc/")
+
+		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 
 	def proxyDeploy(self):
@@ -194,9 +199,9 @@ class SwiftDeploy:
 		return (1, self.__proxyList, self.__storageList)
 if __name__ == '__main__':
 	SD= SwiftDeploy(['192.168.1.81'], ['192.168.1.85'])
-	SD.rmStorage()
+	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()
 

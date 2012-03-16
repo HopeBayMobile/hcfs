@@ -72,14 +72,7 @@ def getStorageNodeIpList():
 	Collect ip list of all storge nodes  
 	'''
 
-	logger = logging.getLogger('SwiftInfo')
-	hdlr = logging.FileHandler('/var/swiftInfo.log')
-	formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-	hdlr.setFormatter(formatter)
-	logger.addHandler(hdlr)
-	logger.setLevel(logging.INFO)
-
-	logger.info('a log message')
+	logger = getLogger(name='SwiftInfo')
 
 	cmd = 'cd /etc/swift; swift-ring-builder object.builder'
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -94,6 +87,40 @@ def getStorageNodeIpList():
 		i+=1
 
 	return ipList
+
+def isAllDebInstalled(debSrc):
+	logger = getLogger(name='isAllDebInstalled')
+	cmd = "find %s -maxdepth 1 -name \'*.deb\'  "%debSrc
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	po.wait()
+
+	if po.returncode !=0:
+		logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
+		return -1
+
+	returncode = 0
+	devnull = open(os.devnull, "w")
+	for line in po.stdout.readlines():
+		pkgname = line.split('/')[-1].split('_')[0]
+		retval = subprocess.call(["dpkg", "-s", pkgname], stdout=devnull, stderr=devnull)
+		if retval != 0:
+			return False
+
+	devnull.close()
+	
+	return True
+
+def installAllDeb(debSrc):
+	logger = getLogger(name='installDeb')
+	cmd = "dpkg -i  %s/*.deb"%debSrc
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	po.wait()
+
+	if po.returncode !=0:
+		logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
+		return 1
+
+	return 0
 
 def sshpass(passwd, cmd, timeout=0):
 
@@ -153,7 +180,8 @@ class TimeoutError(Exception):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
-	print isLineExistent("/etc/fstab","ddd")
+	print installAllDeb("/DCloudSwift/storage/deb_source")
+#	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()
 #	logger = getLogger(name="Hello")
 #	logger.info("HELLo!")
