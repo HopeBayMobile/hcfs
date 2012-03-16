@@ -105,6 +105,7 @@ class SwiftDeploy:
                         os.system("sshpass -p %s scp StorageParams root@%s:/DCloudSwift/storage" % (self.__kwparams['password'], i))
 
 			cmd = "python /DCloudSwift/storage/CmdReceiver.py -s"
+			print cmd
 			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/storageDeploy_%s.log"\
 					 % (self.__kwparams['password'], i, cmd, self.__kwparams['logDir'], i))
 			if sshpassStatus != 0:

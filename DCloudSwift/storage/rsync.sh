@@ -1,3 +1,6 @@
+IP=`ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{print $1}'`
+export STORAGE_LOCAL_NET_IP=$IP
+
 cat >/etc/rsyncd.conf <<EOF
 uid = swift
 gid = swift

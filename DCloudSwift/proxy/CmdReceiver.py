@@ -49,7 +49,7 @@ def triggerAddStorage(**kwargs):
 
 	random.seed(time.time())
 	for i in storageList: 
-		zoneNumber= random.randint(1,100000)
+		zoneNumber= random.randint(1,100)
 		logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
 		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
 

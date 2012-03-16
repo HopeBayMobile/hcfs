@@ -2,6 +2,7 @@
 Created on 2012/03/01
 
 @author: CW
+modified by Ken 2012/03/16
 '''
 
 import sys
@@ -16,6 +17,8 @@ from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
 
+
+import StorageInstall
 
 Usage = '''
 Usage:
@@ -32,8 +35,11 @@ def usage():
 
 def triggerStorageDeploy(**kwargs):
 	proxyNode = kwargs['proxyList'][0]
-	deviceName = kwargs['deviceName']
-	os.system("/DCloudSwift/storage/StorageInstall.sh %s %s" % (proxyNode, deviceName))
+	#TODO: read from config
+	devicePrx = "sdb"
+	deviceCnt = 1
+	installer = StorageInstall.StorageNodeInstaller(proxyNode, devicePrx, deviceCnt)
+	installer.install()
 	
 def main():
 	if (len(sys.argv) == 2 ):

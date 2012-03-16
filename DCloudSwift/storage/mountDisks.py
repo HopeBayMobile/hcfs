@@ -98,6 +98,7 @@ def prepareMountPoints(deviceCnt=1):
 	if ret != 0:
 		return ret
 	
+	os.system("chown -R swift:swift /srv/node/")
 	return mountFormattedDisks(disks)
 
 def main(argv):
