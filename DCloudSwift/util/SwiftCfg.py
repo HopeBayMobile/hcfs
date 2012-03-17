@@ -46,7 +46,6 @@ class SwiftCfg:
 		self.__numOfReplica = int(self.__numOfReplica)
 		self.__proxyInterface = config.get('proxy', 'proxyInterface')
 
-		self.__deviceName = config.get('storage', 'device')
 		self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
 		self.__devicePrx = config.get('storage', 'devicePrx')
 		self.__storageInterface = config.get('storage', 'storageInterface')
@@ -62,7 +61,6 @@ class SwiftCfg:
 			'storageInterval': self.__storageInterval,
 			'numOfReplica': self.__numOfReplica,
 			'proxyInterface': self.__proxyInterface,
-			'deviceName': self.__deviceName,
 			'devicePrx': self.__devicePrx,
 			'deviceCnt': self.__deviceCnt,
 			'storageInterface': self.__storageInterface
@@ -83,9 +81,10 @@ class SwiftCfg:
 	
 
 if __name__ == '__main__':
-	SC = SwiftCfg("/etc/deltaSwift/Swift.ini")
+	SC = SwiftCfg("/DCloudSwift/Swift.ini")
 	kwparams = SC.getKwparams()
+	print "device prefix is %s \n"% kwparams['devicePrx']
 	print "Username: %s, Password: %s" % (kwparams['username'], kwparams['password'])
 	print "logDir: %s, reportDir: %s" % (kwparams['logDir'], kwparams['reportDir'])
 	print "proxyinterval: %d, storageinterval: %d" % (kwparams['proxyInterval'], kwparams['storageInterval'])
-	print "numofreplica: %d, nameofdevice: %s" % (kwparams['numOfReplica'], kwparams['deviceName'])
+	print "numofreplica: %d" % (kwparams['numOfReplica'])

@@ -46,6 +46,7 @@ class SwiftDeploy:
 		self.__kwparams = self.__SC.getKwparams()
 		self.__kwparams['proxyList'] = self.__proxyList
 		self.__kwparams['storageList'] = self.__storageList
+		self.__cnt = self.__kwparams['deviceCnt'] 
 
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 		os.system("mkdir -p %s" % self.__kwparams['reportDir'])
@@ -58,8 +59,8 @@ class SwiftDeploy:
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
-		if not util.isAllDebInstalled("/DCloudSwift/master/debsrc/"):
-			util.installAllDeb("/DCloudSwift/master/debsrc/")
+		if not util.isAllDebInstalled("/DCloudSwift/master/deb_source/"):
+			util.installAllDeb("/DCloudSwift/master/deb_source/")
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -161,7 +162,6 @@ class SwiftDeploy:
 
 	def rmStorage(self):
 		logger = util.getLogger(name="rmStorage")
-		self.storageDeploy()
 
 		for i in self.__proxyList:
 			try:
@@ -201,9 +201,8 @@ class SwiftDeploy:
 		return (1, self.__proxyList, self.__storageList)
 if __name__ == '__main__':
 	SD= SwiftDeploy(['192.168.1.81'], ['192.168.1.85'])
-	#SD.rmStorage()
+	SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
-
+	#SD.storageDeploy()

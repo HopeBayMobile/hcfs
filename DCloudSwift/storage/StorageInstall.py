@@ -41,13 +41,13 @@ class StorageNodeInstaller:
 	def install(self):
 		
 		cmd = "scp root@%s:/etc/swift/swift.conf /etc/swift/"%self.__proxy
-		(ret, stdout, stderr) = util.sshpass(password='deltacloud', cmd, timeout=60) 
+		(ret, stdout, stderr) = util.sshpass(passwd='deltacloud', cmd=cmd, timeout=60) 
 		if ret !=0:
 			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
 		cmd = "scp root@%s:/etc/swift/*.ring.gz /etc/swift/"%self.__proxy
-		(ret, stdout, stderr) = util.sshpass(password='deltacloud', cmd, timeout=60) 
+		(ret, stdout, stderr) = util.sshpass(passwd='deltacloud', cmd=cmd, timeout=60) 
 		if ret !=0:
 			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1

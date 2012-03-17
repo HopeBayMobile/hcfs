@@ -35,6 +35,7 @@ def usage():
 
 def triggerStorageDeploy(**kwargs):
 	proxyNode = kwargs['proxyList'][0]
+
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
 	installer = StorageInstall.StorageNodeInstaller(proxyNode, devicePrx, deviceCnt)

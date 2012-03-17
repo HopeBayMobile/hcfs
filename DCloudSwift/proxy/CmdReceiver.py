@@ -91,13 +91,13 @@ def triggerRmStorage(**kwargs):
 
 	for i in storageList: 
 		cmd = "cd /etc/swift; swift-ring-builder account.builder remove %s"% (i)
-		util.runPopenCommunicate(cmd, inputString='y\n', logger)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger=logger)
 
 		cmd = "cd /etc/swift; swift-ring-builder container.builder remove %s"% (i)
-		util.runPopenCommunicate(cmd, inputString='y\n', logger)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger=logger)
 
 		cmd = "cd /etc/swift; swift-ring-builder object.builder remove %s"% (i)
-		util.runPopenCommunicate(cmd, inputString='y\n', logger)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger=logger)
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
@@ -112,6 +112,12 @@ def triggerRmStorage(**kwargs):
 	return (returncode, blackProxyNodes, blackStorageNodes)
 
 def main():
+	if not util.isAllDebInstalled("/DCloudSwift/proxy/deb_source/"):
+		util.installAllDeb("/DCloudSwift/proxy/deb_source/")
+
+	if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+		os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+
 	if (len(sys.argv) == 2 ):
 		kwargs = None
         	if (sys.argv[1] == 'addStorage' or sys.argv[1] == '-a'):

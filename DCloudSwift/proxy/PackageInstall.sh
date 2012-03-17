@@ -4,6 +4,7 @@
 # 2012/02/24 first release by CW
 # 2012/03/01 modified by CW
 # 2012/03/06 modified by CW: check the existence of IP address
+# 2012/03/17 modified by Ken
 
 
 if [ $# != 1 ]; then
@@ -64,5 +65,3 @@ swift-ring-builder account.builder create 18 $Replica 1
 swift-ring-builder container.builder create 18 $Replica 1
 swift-ring-builder object.builder create 18 $Replica 1
 
-
-echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config

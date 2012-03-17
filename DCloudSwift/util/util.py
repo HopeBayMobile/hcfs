@@ -210,3 +210,4 @@ if __name__ == '__main__':
 #	except TimeoutError as err:
 #		print err
 #	spreadMetadata(password="deltacloud",nodeList=["192.168.1.132"])
+	pass
