@@ -42,16 +42,17 @@ def triggerAddStorage(**kwargs):
 	logger = util.getLogger(name="triggerAddStorage")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
-	deviceName = kwargs['deviceName']
+	devicePrx = kwargs['devicePrx']
+	deviceCnt = kwargs['deviceCnt']
 	password = kwargs['password']
-
-		
 
 	random.seed(time.time())
 	for i in storageList: 
 		zoneNumber= random.randint(1,100)
-		logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
-		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+		for j in range(deviceCnt):
+			deviceName = devicePrx + str(j+1)
+			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
+			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
@@ -70,24 +71,33 @@ def triggerProxyDeploy(**kwargs):
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
-	deviceName = kwargs['deviceName']
+	deviceCnt = kwargs['deviceCnt']
+	devicePrx = kwargs['devicePrx']
 	os.system("/DCloudSwift/proxy/PackageInstall.sh %d" % numOfReplica)
 	zoneNumber = 1
 	for i in storageList: 
-		os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
-		zoneNumber += 1
+		for j in range(deviceCnt):
+			deviceName = devicePrx + str(j+1)
+			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
+			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+			zoneNumber += 1
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 
 def triggerRmStorage(**kwargs):
 	logger = util.getLogger(name="triggerRmStorage")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
-	deviceName = kwargs['deviceName']
 	password = kwargs['password']
 
 	for i in storageList: 
-		logger.info("/DCloudSwift/proxy/RmRingDevice.sh %s %s"% (i, deviceName))
-		os.system("/DCloudSwift/proxy/RmRingDevice.sh %s %s" % (i, deviceName))
+		cmd = "cd /etc/swift; swift-ring-builder account.builder remove %s"% (i)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger)
+
+		cmd = "cd /etc/swift; swift-ring-builder container.builder remove %s"% (i)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger)
+
+		cmd = "cd /etc/swift; swift-ring-builder object.builder remove %s"% (i)
+		util.runPopenCommunicate(cmd, inputString='y\n', logger)
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")

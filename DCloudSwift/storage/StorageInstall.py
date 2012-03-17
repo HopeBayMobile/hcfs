@@ -1,6 +1,7 @@
 # This script is used to deploy the storage node of Swift.
 # History:
 # 2012/03/16 first release by Ken
+# 2012/03/17 modified by Ken
 
 import sys
 import os
@@ -39,19 +40,17 @@ class StorageNodeInstaller:
 
 	def install(self):
 		
-		cmd = "sshpass -p deltacloud scp root@%s:/etc/swift/swift.conf /etc/swift/"%self.__proxy
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		po.wait()
-		if po.returncode !=0:
-			logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
+		cmd = "scp root@%s:/etc/swift/swift.conf /etc/swift/"%self.__proxy
+		(ret, stdout, stderr) = util.sshpass(password='deltacloud', cmd, timeout=60) 
+		if ret !=0:
+			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
-		cmd = "sshpass -p deltacloud scp root@%s:/etc/swift/*.ring.gz /etc/swift/"%self.__proxy
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		po.wait()
-		if po.returncode !=0:
-                	logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
-                        return 1
+		cmd = "scp root@%s:/etc/swift/*.ring.gz /etc/swift/"%self.__proxy
+		(ret, stdout, stderr) = util.sshpass(password='deltacloud', cmd, timeout=60) 
+		if ret !=0:
+			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
+			return 1
 
 		mountDisks.prepareMountPoints(self.__deviceCnt)
 

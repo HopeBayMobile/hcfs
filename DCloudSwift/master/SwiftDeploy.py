@@ -13,6 +13,7 @@ Modified by Ken on 2012/03/12
 Modified by Ken on 2012/03/13
 Modified by Ken on 2012/03/15
 Modified by Ken on 2012/03/16
+Modified by Ken on 2012/03/17
 '''
 
 import sys
@@ -30,7 +31,7 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 
 #Self defined packages
-sys.path.append("/DCloudSwift//util")
+sys.path.append("/DCloudSwift/util")
 from SwiftCfg import SwiftCfg
 import util
 

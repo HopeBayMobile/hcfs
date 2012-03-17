@@ -6,6 +6,7 @@ Created on 2012/03/01
 Modified by CW on 2012/03/06
 Modified by CW on 2012/03/07
 Modified by Ken on 2012/03/09
+Modified by Ken on 2012/03/17
 '''
 
 import sys
@@ -46,6 +47,8 @@ class SwiftCfg:
 		self.__proxyInterface = config.get('proxy', 'proxyInterface')
 
 		self.__deviceName = config.get('storage', 'device')
+		self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
+		self.__devicePrx = config.get('storage', 'devicePrx')
 		self.__storageInterface = config.get('storage', 'storageInterface')
 
 		self.__kwparams = {
@@ -60,6 +63,8 @@ class SwiftCfg:
 			'numOfReplica': self.__numOfReplica,
 			'proxyInterface': self.__proxyInterface,
 			'deviceName': self.__deviceName,
+			'devicePrx': self.__devicePrx,
+			'deviceCnt': self.__deviceCnt,
 			'storageInterface': self.__storageInterface
 		}
 

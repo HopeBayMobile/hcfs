@@ -19,6 +19,16 @@ FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 logLock = threading.Lock()
 
+def runPopenCommunicate(cmd, inputString, logger):
+	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+	(stdout, stderr) = po.communicate(inputString)
+
+	if po.returncode == 0:
+		logger.debug("Succeed to run \'%s\'"%cmd)
+	else:
+		logger.error(stderr)
+
+	return po.returncode
 
 def findLine(filename, line):
 	f = open(filename, 'r')
@@ -180,11 +190,12 @@ class TimeoutError(Exception):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
-	print installAllDeb("/DCloudSwift/storage/deb_source")
+#	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()
 #	logger = getLogger(name="Hello")
-#	logger.info("HELLo!")
+#	runPopenCommunicate("cd /etc/swift", inputString='y\n', logger=logger)
+#	runPopenCommunicate("mkfs -t ext4 /dev/sda", inputString='y\n', logger=logger)
 
 #	logger2 = getLogger(name="Hello")
 #	logger2.info("Hello2")
