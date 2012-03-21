@@ -3,24 +3,21 @@
 # This script is invoked by ./SystemVolumeDeploy.sh and also must be executed 
 # in root privilege.
 # History:
-# 2012/03/03 CW First release
+# 2012/03/21 CW First release
 
 
 echo -e "\n[`date`]: Errors occured in the deploy process. The recovery process is going to start."
 
 
-echo -e "\n[`date`]: Remove GlusterFS"
-/etc/init.d/glusterfs-server stop
-dpkg -r glusterfs-client glusterfs-common glusterfs-dbg glusterfs-examples glusterfs-server
-dpkg --purge glusterfs-common glusterfs-server
-rm -rf /etc/glusterd
+# remove all installed packages
+echo -e "\n[`date`]: Remove all installed packages"
+#/etc/init.d/glusterfs-server stop
+#dpkg -r glusterfs-client glusterfs-common glusterfs-dbg glusterfs-examples glusterfs-server
+#dpkg --purge glusterfs-common glusterfs-server
+#rm -rf /etc/glusterd
 
 
-echo -e "\n[`date`]: Remove nfs-common"
-dpkg -r nfs-common
-dpkg --purge nfs-common
-
-
+# recover all modified configuration files
 echo -e "\n[`date`]: Restore all modified configuration files"
 mv /etc/hosts.backup /etc/hosts
 mv /etc/fstab.backup /etc/fstab

@@ -1,19 +1,20 @@
 #!/bin/bash
-# The script is placed in rc.local directory and
-# executes to mount /dev/sda1 /dev/sda2 and /dev/sdb
+# The script is placed in rc.local directory, and
+# executes to mount all disks and to modify /etc/fstab
 # History:
-# 2012/02/03 CW First release
-# 2012/02/15 Modified by CW for checking the existence of /dev/sda and /dev/sdb
+# 2012/03/21 CW First release
 
-sudo /etc/init.d/glusterfs-server stop
+# waiting for the completion of detecting all devices
+sleep 10
 
-sudo test -e /dev/sda
-sdaTestCode=$?
-sudo test -e /dev/sdb
-sdbTestCode=$?
-if [ "$sdaTestCode" != 0 ]; then
+swift-init proxy stop
+swift-init all stop
+
+# check the existence of all disks
+if [ -e /dev/sda ] ; then
+	
+else
 	echo "Device sda does not exist!"
-	exit 1
 fi
 
 # Copy the configuration of GlusterFS in RAM

@@ -10,10 +10,10 @@
    (2) Backup original configuration files (/etc/hosts, /etc/fstab, /etc/rc.local, 
        /etc/resolv.conf, and /etc/network/interfaces)
    (3) Set up the network configuration and double checking
-   (4) Install GlusterFS 3.2.3 and nfs-common
+   (4) Install all required packages (*.deb)
    (5) Mount /dev/sdb on /export2 and modify /etc/fstab accordingly for automatic mounting
-       (including the checking the existence of /dev/sdb)
-   (6) Create a GlusterFS volume using /export1 and /export2 as bricks (replica two)
+       (including the checking the existence of all disks)
+   (6) Create a system volume
    (7) Modify /etc/resolv.conf to change the name server to 192.168.11.1
    (8) Add hosts into /etc/hosts: MANAGEMENT1, MANAGEMENT2, MANAGEMENT3
    (9) Self testing of mounting the system volume with the nfs access protocol.
