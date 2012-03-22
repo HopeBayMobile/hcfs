@@ -5,6 +5,7 @@
 # 2012/03/01 modified by CW
 # 2012/03/06 modified by CW: check the existence of IP address
 # 2012/03/17 modified by Ken
+# 2012/03/22 modified by CW: modify the absolute path of directory deb_source
 
 
 if [ $# != 1 ]; then
@@ -17,7 +18,7 @@ fi
 Replica=$1
 
 
-dpkg -i /proxy/deb_source/*.deb
+dpkg -i /DCloudSwift/proxy/deb_source/*.deb
 
 
 mkdir -p /etc/swift
@@ -57,7 +58,7 @@ perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
 service memcached restart
 
 
-/proxy/ProxyConfigCreation.sh
+/DCloudSwift/proxy/ProxyConfigCreation.sh
 
 
 cd /etc/swift

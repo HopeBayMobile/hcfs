@@ -5,6 +5,7 @@ Created on 2012/03/01
 
 Modified by Ken on 2012/03/12
 Modified by Ken on 2012/03/13
+Modified by CW on 2012/03/22: correct the absolute path of function triggerProxyDeploy()
 '''
 
 import sys
@@ -68,6 +69,7 @@ def triggerAddStorage(**kwargs):
 
 
 def triggerProxyDeploy(**kwargs):
+	logger = util.getLogger(name = "triggerProxyDeploy")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']

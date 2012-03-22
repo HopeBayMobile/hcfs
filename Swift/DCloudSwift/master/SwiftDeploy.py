@@ -14,6 +14,7 @@ Modified by Ken on 2012/03/13
 Modified by Ken on 2012/03/15
 Modified by Ken on 2012/03/16
 Modified by Ken on 2012/03/17
+Modified by CW on 2012/03/22: correct the absolute path of function proxyDeploy()
 '''
 
 import sys
@@ -77,7 +78,7 @@ class SwiftDeploy:
 				sys.exit(1)
 
 			os.system("echo \'%s\' > ProxyParams" % self.__jsonStr)
-			os.system("sshpass -p %s scp ProxyParams root@%s:DCloudSwift/proxy" % (self.__kwparams['password'], i))
+			os.system("sshpass -p %s scp ProxyParams root@%s:/DCloudSwift/proxy" % (self.__kwparams['password'], i))
 
 			cmd = "python /DCloudSwift/proxy/CmdReceiver.py -p"
 			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/proxyDeploy_%s.log"\
@@ -199,10 +200,12 @@ class SwiftDeploy:
 		
 		logger.error("Failed to rmStorage\n")
 		return (1, self.__proxyList, self.__storageList)
+
+
 if __name__ == '__main__':
-	SD= SwiftDeploy(['192.168.1.81'], ['192.168.1.85'])
-	SD.rmStorage()
+	SD = SwiftDeploy(['192.168.122.202'], ['192.168.122.87', '192.168.122.76'])
+	#SD.rmStorage()
 	#SD.addStorage()
-	#SD.proxyDeploy()
+	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()

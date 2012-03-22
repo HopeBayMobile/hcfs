@@ -2,6 +2,7 @@
 # History:
 # 2012/03/16 first release by Ken
 # 2012/03/17 modified by Ken
+# 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512 
 
 import sys
 import os
@@ -38,6 +39,8 @@ class StorageNodeInstaller:
 		os.system("chown -R swift:swift /etc/swift/")
 		os.system("mkdir -p /srv/node/")
 
+		logger = util.getLogger(name = "StorageNodeInstaller")
+
 	def install(self):
 		
 		cmd = "scp root@%s:/etc/swift/swift.conf /etc/swift/"%self.__proxy
@@ -62,6 +65,7 @@ class StorageNodeInstaller:
 		os.system("/DCloudSwift/storage/accountserver.sh")
 		os.system("/DCloudSwift/storage/containerserver.sh")
 		os.system("/DCloudSwift/storage/objectserver.sh")
+		os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
 		os.system("swift-init all start")
 
 if __name__ == '__main__':

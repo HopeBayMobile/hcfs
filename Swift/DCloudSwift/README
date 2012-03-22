@@ -1,19 +1,19 @@
 [Description]:
 1. The scripts is used to deploy Swift. The development environment is listed
    in the following.
-	(1) OS: Ubuntu 11.04 64bit
+	(1) OS: Ubuntu 11.04 64 bits
 	(2) Language: python and bash shell
 	(3) Hardware: AMD 64bit
 
 2. How to use the scripts:
-	(1) Copy the folder 'swif_InstallScripts' to the master node.
-	(2) Execute 'python setup.py install'
-	(3) cd /DCloudSwift/master
-	(4) Modify the '__main__' section of DCloudSwift/master/SwiftDeploy.py
+	(1) Copy the folder 'DCloudSwift' to the master node.
+	(2) Change your privilege to root.
+	(3) Execute 'python setup.py install'
+	(4) cd /DCloudSwift/master
+	(5) Modify the '__main__' section of /DCloudSwift/master/SwiftDeploy.py
 	    SD = SwiftDeploy("./Swift.ini", [PROXY_NODE_IP], [STORAGE_NODE_IP])
 	    Modify PROXY_NODE_IP and STORAGE_NODE_IP to your proxy node IP and 
 	    storage node IP, respectively.
-	(5) Change your privilege to root.
 	(6) Execute the command: python SwiftDeploy.py
 
 

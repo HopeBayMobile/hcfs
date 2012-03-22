@@ -5,6 +5,7 @@
 # 2012/03/01 modified by CW 
 # 2012/03/13 modified by Ken
 # 2012/03/14 modified by Ken
+# 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512
 
 if [ $# != 2 ]; then
 	echo "Please enter the IP of proxy node and the device name as parameters!"
@@ -42,5 +43,7 @@ service rsync start
 /DCloudSwift/storage/accountserver.sh
 /DCloudSwift/storage/containerserver.sh
 /DCloudSwift/storage/objectserver.sh
+
+perl -pi -e 's/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/' /usr/share/pyshared/swift/common/constraints.py
 
 swift-init all start
