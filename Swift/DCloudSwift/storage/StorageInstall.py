@@ -2,7 +2,8 @@
 # History:
 # 2012/03/16 first release by Ken
 # 2012/03/17 modified by Ken
-# 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512 
+# 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512
+# 2012/03/26 modified by CW: correct the declaration of logger 
 
 import sys
 import os
@@ -39,20 +40,20 @@ class StorageNodeInstaller:
 		os.system("chown -R swift:swift /etc/swift/")
 		os.system("mkdir -p /srv/node/")
 
-		logger = util.getLogger(name = "StorageNodeInstaller")
+		self.__logger = util.getLogger(name = "StorageNodeInstaller")
 
 	def install(self):
 		
 		cmd = "scp root@%s:/etc/swift/swift.conf /etc/swift/"%self.__proxy
 		(ret, stdout, stderr) = util.sshpass(passwd='deltacloud', cmd=cmd, timeout=60) 
 		if ret !=0:
-			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
+			self.__logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
 		cmd = "scp root@%s:/etc/swift/*.ring.gz /etc/swift/"%self.__proxy
 		(ret, stdout, stderr) = util.sshpass(passwd='deltacloud', cmd=cmd, timeout=60) 
 		if ret !=0:
-			logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
+			self.__logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
 		mountDisks.prepareMountPoints(self.__deviceCnt)
