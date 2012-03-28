@@ -10,6 +10,7 @@ import logging
 import threading
 import sys
 import time
+import json
 
 sys.path.append("/DCloudSwift/util")
 import util
@@ -34,6 +35,27 @@ def getAllDisks():
 
 	return disks
 
+def getDiskSN(disk=""):
+        '''
+        get disk serial number
+        '''
+        logger = util.getLogger(name="getDiskSN")
+
+        cmd = "hdparm -I %s | grep \"Serial Number\""%disk
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+
+        if po.returncode != 0:
+        	logger.error("Failed to get SN of %s for %s"%(disk,po.stderr.readline()))
+		return (po.returncode,"")
+
+
+	SN = po.stdout.readline()
+	SN = SN.split(':')[1].strip()
+	
+        return (0,SN)
+
+
 def formatNonRootDisks(deviceCnt=1):
 	'''
 	Format the first deviceCnt non-root disks
@@ -57,7 +79,7 @@ def formatNonRootDisks(deviceCnt=1):
 		po.wait()
 
 		if po.returncode != 0:
-			logger.error("Failed to format %s for %s"%(disk,po.stderr.readlines()))
+			logger.error("Failed to format %s for %s"%(disk,po.stderr.readline()))
 			returncode+=1
 			continue
 
@@ -65,7 +87,7 @@ def formatNonRootDisks(deviceCnt=1):
 
 
 	return (returncode,formattedDisks)
-
+'''
 def mountFormattedDisks(disks=[]):
 	logger = util.getLogger(name="mountFormattedDisks")
 	returncode = 0
@@ -92,14 +114,92 @@ def mountFormattedDisks(disks=[]):
 			returncode+=1
 			continue
 	return returncode
+'''
 		
-def prepareMountPoints(deviceCnt=1):
+def mountSingleFormattedDisk(disk, devicePrx, deviceNum):
+        logger = util.getLogger(name="mountSingleFormattedDisk")
+
+        mountpoint = "/srv/node/%s%d"%(devicePrx,deviceNum)
+        os.system("mkdir -p %s"%mountpoint)
+        if os.path.ismount(mountpoint):
+        	os.system("umount -l %s"%mountpoint)
+
+        cmd = "mount %s %s"%(disk, mountpoint)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+
+        if po.returncode != 0:
+        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
+
+	return po.returncode
+
+def mountFormattedDisks(disks=[], deviceCnt=5, devicePrx="sdb"):
+        logger = util.getLogger(name="mountFormattedDisks")
+
+        count = 0
+        for disk in disks:
+		try:
+                	count+=1
+                	mountpoint = "/srv/node"+"/%s%d"%(devicePrx,count)
+                	os.system("mkdir -p %s"%mountpoint)
+                	if os.path.ismount(mountpoint):
+                        	os.system("umount -l %s"%mountpoint)
+
+                #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
+                #if not util.findLine("/etc/fstab", line):
+                 #       cmd = "echo \"%s\" >>/etc/fstab\n"%line
+                  #      os.system(cmd)
+		
+			if writeMetadata(disk, deviceCnt, devicePrx, count)!=0:
+				raise
+
+			if mountSingleFormattedDisk(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
+				raise
+
+			if count == deviceCnt:
+				return 0
+		except Exception as e:
+			logger.error("Failed to mount %s for %s"%(disk, e))
+			count-=1
+			continue
+
+        return deviceCnt-count
+
+def prepareMountPoints(deviceCnt=2, devicePrx="sdb"):
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
 		return ret
 	
 	os.system("chown -R swift:swift /srv/node/")
-	return mountFormattedDisks(disks)
+	return mountFormattedDisks(disks, deviceCnt=deviceCnt, devicePrx=devicePrx)
+
+def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
+	logger = util.getLogger(name="writeMetadata")
+
+	mountpoint =  "/temp/%s"%disk
+	os.system("mkdir -p %s"%mountpoint)
+	if os.path.ismount(mountpoint):
+                        os.system("umount -l %s"%mountpoint)
+
+	cmd = "mount %s %s"%(disk, mountpoint)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+        if po.returncode != 0:
+        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
+		return po.returncode
+
+	os.system("touch /%s/Metadata"%mountpoint)
+	line1 = "deviceCnt %d"%deviceCnt
+	line2 = "devicePrx %s"%devicePrx
+	line3 = "deviceNum %d"%deviceNum
+	os.system("echo \"%s\" > /temp/%s/Metadata"%(line1,disk)) 
+	os.system("echo \"%s\" >> /temp/%s/Metadata"%(line2,disk)) 
+	os.system("echo \"%s\" >> /temp/%s/Metadata"%(line3,disk)) 
+	os.system("umount %s"%mountpoint)
+
+	return 0
+
+	
 
 def main(argv):
 	ret = 0
@@ -113,3 +213,7 @@ def main(argv):
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
+#	(ret, sn) = getDiskSN("/dev/sda")
+#	print sn
+#	writeMetadata(disk="/dev/sdb", deviceNum=1, devicePrx="sdb", deviceCnt=5)
+	

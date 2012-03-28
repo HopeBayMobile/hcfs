@@ -4,6 +4,7 @@ Created on 2012/03/08
 @author: Ken
 
 Modified by Ken, Mingchi on 2012/03/09
+Modified by Ken on 2012/03/28
 '''
 import os
 import subprocess
@@ -76,6 +77,7 @@ def getLogger(conf=SWIFTCONF, name=None):
 		return logger
 	finally:
 		logLock.release()
+
 
 def getStorageNodeIpList():
 	'''
