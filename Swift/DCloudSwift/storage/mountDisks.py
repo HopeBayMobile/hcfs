@@ -173,6 +173,65 @@ def prepareMountPoints(deviceCnt=2, devicePrx="sdb"):
 	os.system("chown -R swift:swift /srv/node/")
 	return mountFormattedDisks(disks, deviceCnt=deviceCnt, devicePrx=devicePrx)
 
+def readMetadata(disk):
+        logger = util.getLogger(name="readMetadata")
+
+	deviceCnt=5
+	devicePrx="sdb"
+	deviceNum=-1
+
+        mountpoint =  "/temp/%s"%disk
+        os.system("mkdir -p %s"%mountpoint)
+        if os.path.ismount(mountpoint):
+                        os.system("umount -l %s"%mountpoint)
+
+        cmd = "mount %s %s"%(disk, mountpoint)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+        if po.returncode != 0:
+                logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
+                return (po.returncode, deviceCnt, devicePrx, deviceNum)
+
+	try:
+		fh = open("%s/Metadata"%mountpoint, "r")
+
+		deviceCnt = int(fh.readline().split()[1].strip())
+		devicePrx = fh.readline().split()[1].strip()
+		deviceNum = int(fh.readline().split()[1].strip())
+		fh.close()
+	except Exception as e:
+		logger.error("Failed to read metadata from %s for %s"%(disk, e))
+		return(1, deviceCnt, devicePrx, deviceNum)
+
+	os.system("umount %s"%mountpoint)
+        return (0, deviceCnt, devicePrx, deviceNum)
+
+def remountDisks():
+	logger = util.getLogger(name="remountDisks")
+
+	rootDisk = getRootDisk()
+        disks = getAllDisks()
+	count = 0
+	mountedDisks=[]
+	returncode = 1
+
+        for disk in disks:
+                if disk == rootDisk:
+                        continue
+
+		(ret, deviceCnt, devicePrx, deviceNum) = readMetadata(disk)
+		print (ret, deviceCnt, devicePrx, deviceNum)
+		if ret == 0:
+			if mountSingleFormattedDisk(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
+				mountedDisks.append(disk)
+				if len(mountedDisks) == deviceCnt:
+					returncode = 0
+
+				
+
+        return (returncode, mountedDisks)
+
+
 def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
 
@@ -212,8 +271,10 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+#	main(sys.argv[1:])
 #	(ret, sn) = getDiskSN("/dev/sda")
 #	print sn
 #	writeMetadata(disk="/dev/sdb", deviceNum=1, devicePrx="sdb", deviceCnt=5)
+	#print readMetadata(disk="/dev/sdb")
+	print remountDisks()
 	
