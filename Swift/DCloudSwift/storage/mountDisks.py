@@ -263,7 +263,10 @@ def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
 def main(argv):
 	ret = 0
 	if len(argv) > 0:
-		ret = prepareMountPoints(int(sys.argv[1]))
+		if sys.argv[1]=="-r":
+			remountDisks()
+		else:
+			ret = prepareMountPoints(int(sys.argv[1]))
 	else:
 		sys.exit(-1)
 
@@ -271,10 +274,10 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-#	main(sys.argv[1:])
+	main(sys.argv[1:])
 #	(ret, sn) = getDiskSN("/dev/sda")
 #	print sn
 #	writeMetadata(disk="/dev/sdb", deviceNum=1, devicePrx="sdb", deviceCnt=5)
 	#print readMetadata(disk="/dev/sdb")
-	print remountDisks()
+#	print remountDisks()
 	

@@ -4,6 +4,7 @@
 # 2012/03/17 modified by Ken
 # 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512
 # 2012/03/26 modified by CW: correct the declaration of logger 
+# 2012/03/28 modified by Ken: overwrite rc.local to remount disks in order
 
 import sys
 import os
@@ -68,6 +69,12 @@ class StorageNodeInstaller:
 		os.system("/DCloudSwift/storage/objectserver.sh")
 		os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
 		os.system("swift-init all start")
+		
+		#TODO: for NTU mode only
+		line1 = " #!/bin/sh -e"
+		line2 = "python /DCloudSwift/storage/mountDisks.py -r"
+		os.system("echo \"%s\" > /etc/rc.local"%line1)
+		os.system("echo \"%s\" >> /etc/rc.local"%line2)
 
 if __name__ == '__main__':
 	pass
