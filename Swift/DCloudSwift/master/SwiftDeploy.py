@@ -15,6 +15,7 @@ Modified by Ken on 2012/03/15
 Modified by Ken on 2012/03/16
 Modified by Ken on 2012/03/17
 Modified by CW on 2012/03/22: correct the absolute path of function proxyDeploy()
+Modified by Ken on 2012/03/28: pass argument by appending json string to the end of sshpass command 
 '''
 
 import sys
@@ -68,26 +69,27 @@ class SwiftDeploy:
 
 
 	def proxyDeploy(self):
-		#TODO: use fork and report progress
-		for i in self.__proxyList:
-			scpStatus = os.system("sshpass -p %s scp -r /DCloudSwift/ root@%s:/" % (self.__kwparams['password'], i))
-			if scpStatus != 0:
-				errMsg = "Fail to scp the proxy node: " + i
-				print "[Debug]: %s" % errMsg
-				logging.debug(errMsg)
-				sys.exit(1)
+		logger = util.getLogger(name="proxyDeploy")
+		#TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
+		i = self.__proxyList[0]
+		try:
 
-			os.system("echo \'%s\' > ProxyParams" % self.__jsonStr)
-			os.system("sshpass -p %s scp ProxyParams root@%s:/DCloudSwift/proxy" % (self.__kwparams['password'], i))
+			cmd = "scp -r /DCloudSwift/ root@%s:/"%i
+                        (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+                        if status !=0:
+                        	logger.error("Failed to scp proxy deploy scrips to %s for %s"%(i, stderr.readlines()))
+                                continue
 
-			cmd = "python /DCloudSwift/proxy/CmdReceiver.py -p"
-			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/proxyDeploy_%s.log"\
-					 % (self.__kwparams['password'], i, cmd, self.__kwparams['logDir'], i))
-			if sshpassStatus != 0:
-				errMsg = "Fail to deploy the proxy node: " + i
-				print "[Debug]: %s" % errMsg
-				logging.debug(errMsg)
-				sys.exit(1)
+			cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -p %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
+                        print cmd
+                        (status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+                        if status != 0:
+                        	logger.error("Failed to deploy proxy %s for %s"%(i, stderr.readlines()))
+                                continue
+
+		except util.TimeoutError as err
+			logger.error("%s"%err)
+			sys.stderr.write("%s\n"%err)
 
 
 	def storageDeploy(self):
@@ -112,7 +114,8 @@ class SwiftDeploy:
                                         continue
 
 			except util.TimeoutError as err:
-				print err
+				logger.error("%s"%err)
+                        	sys.stderr.write("%s\n"%err)
 
 		#	if pid != 0:
 		#		os._exit(0)
@@ -142,7 +145,8 @@ class SwiftDeploy:
 				#TODO: Return black list
 				return (0,[],[])
 			except util.TimeoutError as err:
-				print err
+				logger.error("%s"%err)
+                        	sys.stderr.write("%s\n"%err)
 		
 		logger.error("Failed to addStorage\n")
 		return (1, self.__proxyList, self.__storageList)
@@ -171,8 +175,9 @@ class SwiftDeploy:
 				#TODO: Return black list
 				return (0,[],[])
 			except util.TimeoutError as err:
-				print err
-		
+				logger.error("%s"%err)
+                        	sys.stderr.write("%s\n"%err)
+
 		logger.error("Failed to rmStorage\n")
 		return (1, self.__proxyList, self.__storageList)
 
@@ -180,7 +185,7 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	SD = SwiftDeploy(['172.16.228.53'], ['172.16.228.57'])
 	#SD.rmStorage()
-	SD.addStorage()
-	#SD.proxyDeploy()
+	#SD.addStorage()
+	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
 	#SD.storageDeploy()

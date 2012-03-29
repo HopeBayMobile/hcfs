@@ -26,7 +26,7 @@ Usage:
 Options:
 	[-s | storage] - for storage node
 Examples:
-	python CmdReceiver.py -s {"password": deltacloud}
+	python CmdReceiver.py -s {"password": "deltacloud"}
 '''
 
 def usage():

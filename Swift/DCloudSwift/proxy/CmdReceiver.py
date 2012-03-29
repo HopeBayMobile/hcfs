@@ -32,11 +32,11 @@ Options:
 	[-p | proxy] - for proxy node
 	[-r | rmStorage] - for removing storage nodes
 Examples:
-	python CmdReceiver.py -p 
+	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
 
 def usage():
-	print Usage
+	print >> sys.stderr, Usage
 	sys.exit(1)
 
 def triggerAddStorage(**kwargs):
@@ -126,46 +126,34 @@ def main():
 			try:
 				kwargs = json.loads(sys.argv[2])
 			except ValueError:
-				print "Usage error: Ivalid json format"
+				print >> sys.stderr, "Usage error: Ivalid json format"
 				usage()
 
 			print 'AddStorage start'
 			(returncode, blackProxy, blackStorage) = triggerAddStorage(**kwargs)
 		elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
-                        f = file('/DCloudSwift/proxy/RmStorageParams', 'r')
-                        kwargs = f.readline()
-
                         try:
-                                kwargs = json.loads(kwargs)
+                                kwargs = json.loads(sys.argv[2])
                         except ValueError:
-                                print "Usage error: Ivalid json format"
+                                print >> sys.stderr, "Usage error: Ivalid json format"
                                 usage()
 
                         print 'Proxy deployment start'
                         triggerRmStorage(**kwargs)	
 
-			
-	elif (len(sys.argv) == 2):
-
-        	if (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
-			f = file('/DCloudSwift/proxy/ProxyParams', 'r')
-			kwargs = f.readline()
-
+        	elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 			try:
-				kwargs = json.loads(kwargs)
+				kwargs = json.loads(sys.argv[2])
 			except ValueError:
-				print "Usage error: Ivalid json format"
+				print >>sys.stderr,  "Usage error: Ivalid json format"
 				usage()
 
 			print 'Proxy deployment start'
 			triggerProxyDeploy(**kwargs)
 		else:
-			print "Usage error: Invalid optins"
+			print >> sys.stderr, "Usage error: Invalid optins"
                 	usage()
         else:
-		#print len(sys.argv)
-		#for i in range(0, len(sys.argv)):
-		#	print sys.argv[i]
 		usage()
 
 
