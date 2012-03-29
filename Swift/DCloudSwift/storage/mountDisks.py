@@ -193,13 +193,13 @@ def readMetadata(disk):
                 return (po.returncode, deviceCnt, devicePrx, deviceNum)
 
 	try:
-		fh = open("%s/Metadata"%mountpoint, "r")
+		with open("%s/Metadata"%mountpoint, "r") as fh
 
 		deviceCnt = int(fh.readline().split()[1].strip())
 		devicePrx = fh.readline().split()[1].strip()
 		deviceNum = int(fh.readline().split()[1].strip())
 		fh.close()
-	except Exception as e:
+	except IOError as e:
 		logger.error("Failed to read metadata from %s for %s"%(disk, e))
 		return(1, deviceCnt, devicePrx, deviceNum)
 
