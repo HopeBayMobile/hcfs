@@ -91,31 +91,28 @@ class SwiftDeploy:
 
 
 	def storageDeploy(self):
+		logger = util.getLogger(name="storageDeploy")
 		#TODO: use thread pool and report progress
 		for i in self.__storageList:
 		#	pid = os.fork()
 		#	if pid == 0:
 		#		continue
+			try:
+				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
+                                (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+                                if status !=0:
+                                        logger.error("Failed to scp storage scrips to %s for %s"%(i, stderr.readlines()))
+                                        continue
 
-			ScpStatus = os.system("sshpass -p %s scp -r /DCloudSwift/ root@%s:/" % (self.__kwparams['password'], i))
-			if ScpStatus != 0:
-				errMsg = "Fail to scp the storage node: " + i
-				print "[Debug]: %s" % errMsg
-				logging.debug(errMsg)
-				sys.exit(1)
+				cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -s %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
+				print cmd
+				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+				if status != 0:
+                                        logger.error("Failed to deploy storage %s for %s"%(i, stderr.readlines()))
+                                        continue
 
-			os.system("echo \'%s\' > StorageParams" % self.__jsonStr)
-                        os.system("sshpass -p %s scp StorageParams root@%s:/DCloudSwift/storage" % (self.__kwparams['password'], i))
-
-			cmd = "python /DCloudSwift/storage/CmdReceiver.py -s"
-			print cmd
-			sshpassStatus = os.system("sshpass -p %s ssh root@%s %s > %s/storageDeploy_%s.log"\
-					 % (self.__kwparams['password'], i, cmd, self.__kwparams['logDir'], i))
-			if sshpassStatus != 0:
-				errMsg = "Fail to deploy the storage node: " + i
-				print "[Debug]: %s" % errMsg
-				logging.debug(errMsg)
-				sys.exit(1)
+			except util.TimeoutError as err:
+				print err
 
 		#	if pid != 0:
 		#		os._exit(0)
@@ -126,16 +123,14 @@ class SwiftDeploy:
 
 		for i in self.__proxyList:
 			try:
-				#TODO: read timeout setting from configure files
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 				if status !=0:
 					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr.readlines()))
 					continue
 			
 				#TODO: Monitor Progress report
 				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -a %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-
 				print cmd
 
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
@@ -146,7 +141,7 @@ class SwiftDeploy:
 
 				#TODO: Return black list
 				return (0,[],[])
-			except TimeoutError as err:
+			except util.TimeoutError as err:
 				print err
 		
 		logger.error("Failed to addStorage\n")
@@ -157,16 +152,14 @@ class SwiftDeploy:
 
 		for i in self.__proxyList:
 			try:
-				#TODO: read timeout setting from configure files
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
+				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 				if status !=0:
 					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr.readlines()))
 					continue
 			
 				#TODO: Monitor Progress report
 				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -r %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-
 				print cmd
 
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
@@ -177,7 +170,7 @@ class SwiftDeploy:
 
 				#TODO: Return black list
 				return (0,[],[])
-			except TimeoutError as err:
+			except util.TimeoutError as err:
 				print err
 		
 		logger.error("Failed to rmStorage\n")

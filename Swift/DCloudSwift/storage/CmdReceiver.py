@@ -22,15 +22,15 @@ import StorageInstall
 
 Usage = '''
 Usage:
-	python CmdReceiver.py [Option]
+	python CmdReceiver.py [Option] jsonStr
 Options:
 	[-s | storage] - for storage node
 Examples:
-	python CmdReceiver.py -s 
+	python CmdReceiver.py -s {"password": deltacloud}
 '''
 
 def usage():
-	print Usage
+	print >> sys.stderr, Usage
 	sys.exit(1)
 
 def triggerStorageDeploy(**kwargs):
@@ -42,27 +42,21 @@ def triggerStorageDeploy(**kwargs):
 	installer.install()
 	
 def main():
-	if (len(sys.argv) == 2 ):
+	if (len(sys.argv) == 3 ):
 		kwargs = None
 		if (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
-			f = file('/DCloudSwift/storage/StorageParams', 'r')
-			kwargs = f.readline()
-
 			try:
-				kwargs = json.loads(kwargs)
+				kwargs = json.loads(sys.argv[2])
 			except ValueError:
-				print "Usage error: Ivalid json format"
+				sys.stderr.write( "Usage error: Ivalid json format\n")
 				usage()
 
 			print 'storage deployment start'
 			triggerStorageDeploy(**kwargs)
 		else:
-			print "Usage error: Invalid optins"
+			sys.stderr.write( "Usage error: Invalid optins\n")
                 	usage()
         else:
-		#print len(sys.argv)
-		#for i in range(0, len(sys.argv)):
-		#	print sys.argv[i]
 		usage()
 
 
