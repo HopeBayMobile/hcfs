@@ -15,6 +15,10 @@ import json
 sys.path.append("/DCloudSwift/util")
 import util
 
+
+class MountSwiftDeviceError(Exception): pass
+class WriteMetadataError(Exception): pass
+
 def getRootDisk():
 	cmd = "mount"
 	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -35,30 +39,9 @@ def getAllDisks():
 
 	return disks
 
-def getDiskSN(disk=""):
-        '''
-        get disk serial number
-        '''
-        logger = util.getLogger(name="getDiskSN")
-
-        cmd = "hdparm -I %s | grep \"Serial Number\""%disk
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        po.wait()
-
-        if po.returncode != 0:
-        	logger.error("Failed to get SN of %s for %s"%(disk,po.stderr.readline()))
-		return (po.returncode,"")
-
-
-	SN = po.stdout.readline()
-	SN = SN.split(':')[1].strip()
-	
-        return (0,SN)
-
-
 def formatNonRootDisks(deviceCnt=1):
 	'''
-	Format the first deviceCnt non-root disks
+	Format deviceCnt non-root disks
 	'''
 	logger = util.getLogger(name="formatNonRootDisks")
 	rootDisk = getRootDisk()
@@ -74,7 +57,7 @@ def formatNonRootDisks(deviceCnt=1):
 		if count > deviceCnt:
 			break
 
-		cmd = "umount %s; mkfs.xfs -i size=1024 -f %s"%(disk,disk) 
+		cmd = "mkfs.xfs -i size=1024 -f %s"%(disk) 
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
 
@@ -87,91 +70,100 @@ def formatNonRootDisks(deviceCnt=1):
 
 
 	return (returncode,formattedDisks)
-'''
-def mountFormattedDisks(disks=[]):
-	logger = util.getLogger(name="mountFormattedDisks")
-	returncode = 0
-	count = 0
 
-	for disk in disks:
-		count+=1
-		mountpoint = "/srv/node"+"/sdb%d"%count
+def lazyUnmount(mountpoint):
+        logger = util.getLogger(name="lazyUnmount")
+
+        returncode = 1
+        try:
+                cmd = "umount -l %s"%mountpoint
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po.wait()
+
+                if po.returncode !=0:
+                        logger.error("Failed to umount -l  %s for %s"%(disk, po.stderr.readline()))
+
+                returncode = 0
+
+        except OSError as e:
+                logger.error("Failed to umount -l %s for %s"%(disk, e))
+
+        return returncode
+
+def mountDisk(disk, mountpoint):
+	logger = util.getLogger(name="mountDisk")
+
+	returncode = 1
+	try:
 		os.system("mkdir -p %s"%mountpoint)
 		if os.path.ismount(mountpoint):
-			os.system("umount -l %s"%mountpoint)
+                	os.system("umount -l %s"%mountpoint)
 
-		line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
-		if not util.findLine("/etc/fstab", line):
-			cmd = "echo \"%s\" >>/etc/fstab\n"%line
-			os.system(cmd)
+                cmd = "mount %s %s"%(disk, mountpoint)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po.wait()
 
-		cmd = "mount %s"%(mountpoint)
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		po.wait()
+                if po.returncode !=0:
+                        logger.error("Failed to mount  %s for %s"%(disk, po.stderr.readline()))
 
-		if po.returncode != 0:
-			logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
-			returncode+=1
-			continue
+		returncode = 0
+
+        except OSError as e:
+                logger.error("Failed to mount %s for %s"%(disk, e))
+
 	return returncode
-'''
+
 		
-def mountSingleFormattedDisk(disk, devicePrx, deviceNum):
-        logger = util.getLogger(name="mountSingleFormattedDisk")
+def mountSwiftDevice(disk, devicePrx, deviceNum):
+        logger = util.getLogger(name="mountSwiftDevice")
 
         mountpoint = "/srv/node/%s%d"%(devicePrx,deviceNum)
-        os.system("mkdir -p %s"%mountpoint)
-        if os.path.ismount(mountpoint):
-        	os.system("umount -l %s"%mountpoint)
+	returncode = mountDisk(disk, mountpoint)
 
-        cmd = "mount %s %s"%(disk, mountpoint)
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        po.wait()
+        if returncode != 0:
+        	logger.error("Failed to mount %s on %s"%(disk,mountpoint))
 
-        if po.returncode != 0:
-        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
+	return returncode
 
-	return po.returncode
-
-def mountFormattedDisks(disks=[], deviceCnt=5, devicePrx="sdb"):
-        logger = util.getLogger(name="mountFormattedDisks")
-
-        count = 0
-        for disk in disks:
-		try:
-                	count+=1
-                	mountpoint = "/srv/node"+"/%s%d"%(devicePrx,count)
-                	os.system("mkdir -p %s"%mountpoint)
-                	if os.path.ismount(mountpoint):
-                        	os.system("umount -l %s"%mountpoint)
-
-                #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
-                #if not util.findLine("/etc/fstab", line):
-                 #       cmd = "echo \"%s\" >>/etc/fstab\n"%line
-                  #      os.system(cmd)
-		
-			if writeMetadata(disk, deviceCnt, devicePrx, count)!=0:
-				raise
-
-			if mountSingleFormattedDisk(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
-				raise
-
-			if count == deviceCnt:
-				return 0
-		except Exception as e:
-			logger.error("Failed to mount %s for %s"%(disk, e))
-			count-=1
-			continue
-
-        return deviceCnt-count
-
-def prepareMountPoints(deviceCnt=2, devicePrx="sdb"):
+def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
+        logger = util.getLogger(name="createSwiftDevices")
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
-		return ret
+		return deviceCnt
 	
-	os.system("chown -R swift:swift /srv/node/")
-	return mountFormattedDisks(disks, deviceCnt=deviceCnt, devicePrx=devicePrx)
+
+	count = 0
+        for disk in disks:
+                try:
+                        count+=1
+                        mountpoint = "/srv/node"+"/%s%d"%(devicePrx,count)
+                        os.system("mkdir -p %s"%mountpoint)
+                        if os.path.ismount(mountpoint):
+                                os.system("umount -l %s"%mountpoint)
+
+			print "%s\n"%mountpoint
+                #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
+
+                        if writeMetadata(disk, deviceCnt, devicePrx, count)!=0:
+                                raise WriteMetadataError("Failed to write metadata into %s"%disk)
+
+                        if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
+                                raise MountSwiftDeviceError("Failed to mount %s on %s"%(disk, mountpoint))
+
+                        if count == deviceCnt:
+                                return 0
+                except OSError as err:
+                        logger.error("Failed to mount %s for %s"%(disk, err))
+                        count-=1
+                        continue
+                except (WriteMetadataError, MountSwiftDeviceError) as err:
+                        logger.error("%s"%err)
+                        count-=1
+                        continue
+
+	os.system("mkdir -p /srv/node")
+        os.system("chown -R swift:swift /srv/node/")
+        return deviceCnt-count
 
 def readMetadata(disk):
         logger = util.getLogger(name="readMetadata")
@@ -182,28 +174,25 @@ def readMetadata(disk):
 
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
-        if os.path.ismount(mountpoint):
-                        os.system("umount -l %s"%mountpoint)
 
-        cmd = "mount %s %s"%(disk, mountpoint)
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        po.wait()
-        if po.returncode != 0:
-                logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
-                return (po.returncode, deviceCnt, devicePrx, deviceNum)
+
+	if mountDisk(disk, mountpoint) !=0:
+                logger.error("Failed to mount %s"%disk)
+                return (1, deviceCnt, devicePrx, deviceNum)
 
 	try:
-		with open("%s/Metadata"%mountpoint, "r") as fh
-
-		deviceCnt = int(fh.readline().split()[1].strip())
-		devicePrx = fh.readline().split()[1].strip()
-		deviceNum = int(fh.readline().split()[1].strip())
-		fh.close()
+		with open("%s/Metadata"%mountpoint, "r") as fh:
+			deviceCnt = int(fh.readline().split()[1].strip())
+			devicePrx = fh.readline().split()[1].strip()
+			deviceNum = int(fh.readline().split()[1].strip())
+			fh.close()
 	except IOError as e:
 		logger.error("Failed to read metadata from %s for %s"%(disk, e))
 		return(1, deviceCnt, devicePrx, deviceNum)
 
-	os.system("umount %s"%mountpoint)
+	if lazyUnmount(mountpoint)!=0:
+		logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
+
         return (0, deviceCnt, devicePrx, deviceNum)
 
 def remountDisks():
@@ -222,7 +211,7 @@ def remountDisks():
 		(ret, deviceCnt, devicePrx, deviceNum) = readMetadata(disk)
 		print (ret, deviceCnt, devicePrx, deviceNum)
 		if ret == 0:
-			if mountSingleFormattedDisk(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
+			if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
 				mountedDisks.append(disk)
 				if len(mountedDisks) == deviceCnt:
 					returncode = 0
@@ -231,6 +220,24 @@ def remountDisks():
 
         return (returncode, mountedDisks)
 
+
+def lazyUmount(mountpoint):
+        logger = util.getLogger(name="umount")
+
+        returncode = 1
+        try:
+                cmd = "umount -l %s"%mountpoint
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po.wait()
+
+                if po.returncode !=0:
+                        logger.error("Failed to umount -l  %s for %s"%(disk, po.stderr.readline()))
+
+                returncode = 0
+        except OSError as e:
+                logger.error("Failed to umount -l %s for %s"%(disk, e))
+
+        return returncode
 
 def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
@@ -244,7 +251,7 @@ def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         po.wait()
         if po.returncode != 0:
-        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readlines()))
+        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readline()))
 		return po.returncode
 
 	os.system("touch /%s/Metadata"%mountpoint)
@@ -266,7 +273,7 @@ def main(argv):
 		if sys.argv[1]=="-r":
 			remountDisks()
 		else:
-			ret = prepareMountPoints(int(sys.argv[1]))
+			ret = createSwiftDevices(int(sys.argv[1]))
 	else:
 		sys.exit(-1)
 
