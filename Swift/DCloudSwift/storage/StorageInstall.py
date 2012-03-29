@@ -57,7 +57,7 @@ class StorageNodeInstaller:
 			self.__logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
-		mountDisks.prepareMountPoints(self.__deviceCnt)
+		mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
 
 		os.system("chown -R swift:swift /srv/node/ ")
 		os.system("/DCloudSwift/storage/rsync.sh")

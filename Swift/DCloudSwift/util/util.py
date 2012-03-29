@@ -183,6 +183,15 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 
 	return (returncode, blackList)
 
+def jsonStr2SshpassArg(jsonStr):
+	arg = jsonStr.replace(" ","")
+	arg = arg.replace("{","\{")
+	arg = arg.replace("}","\}")
+	arg = arg.replace("\"", '\\"')
+	arg = "\'"+arg+"\'"
+	return arg
+	
+
 
 class TimeoutError(Exception):
 	def __init__(self, cmd, timeout):
@@ -192,6 +201,7 @@ class TimeoutError(Exception):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
 
 if __name__ == '__main__':
+	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()
