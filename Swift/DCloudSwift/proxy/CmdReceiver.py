@@ -26,7 +26,7 @@ import util
 
 Usage = '''
 Usage:
-	python CmdReceiver.py [Option]
+	python CmdReceiver.py [Option] [jsonStr]
 Options:
 	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
@@ -120,24 +120,34 @@ def main():
 	if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 		os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
-	if (len(sys.argv) == 2 ):
+	if (len(sys.argv) == 3 ):
 		kwargs = None
         	if (sys.argv[1] == 'addStorage' or sys.argv[1] == '-a'):
-			f = file('/DCloudSwift/proxy/AddStorageParams', 'r')
-			kwargs = f.readline()
-
 			try:
-				kwargs = json.loads(kwargs)
+				kwargs = json.loads(sys.argv[2])
 			except ValueError:
 				print "Usage error: Ivalid json format"
 				usage()
 
 			print 'AddStorage start'
 			(returncode, blackProxy, blackStorage) = triggerAddStorage(**kwargs)
+		elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
+                        f = file('/DCloudSwift/proxy/RmStorageParams', 'r')
+                        kwargs = f.readline()
+
+                        try:
+                                kwargs = json.loads(kwargs)
+                        except ValueError:
+                                print "Usage error: Ivalid json format"
+                                usage()
+
+                        print 'Proxy deployment start'
+                        triggerRmStorage(**kwargs)	
 
 			
+	elif (len(sys.argv) == 2):
 
-        	elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
+        	if (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 			f = file('/DCloudSwift/proxy/ProxyParams', 'r')
 			kwargs = f.readline()
 
@@ -149,18 +159,6 @@ def main():
 
 			print 'Proxy deployment start'
 			triggerProxyDeploy(**kwargs)
-        	elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
-			f = file('/DCloudSwift/proxy/RmStorageParams', 'r')
-			kwargs = f.readline()
-
-			try:
-				kwargs = json.loads(kwargs)
-			except ValueError:
-				print "Usage error: Ivalid json format"
-				usage()
-
-			print 'Proxy deployment start'
-			triggerRmStorage(**kwargs)
 		else:
 			print "Usage error: Invalid optins"
                 	usage()

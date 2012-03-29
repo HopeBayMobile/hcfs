@@ -133,17 +133,8 @@ class SwiftDeploy:
 					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr.readlines()))
 					continue
 			
-				#TODO: directly send params
-				os.system("echo \'%s\' > AddStorageParams" % self.__jsonStr)
-				cmd = "scp AddStorageParams root@%s:/DCloudSwift/proxy" % i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
-
-				if status !=0:
-					logger.error("Failed to scp params to %s for %s"%(i, stderr.readlines()))
-					continue
-
 				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -a"%i
+				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -a %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
 
 				print cmd
 
@@ -173,17 +164,8 @@ class SwiftDeploy:
 					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr.readlines()))
 					continue
 			
-				#TODO: directly send params
-				os.system("echo \'%s\' > RmStorageParams" % self.__jsonStr)
-				cmd = "scp RmStorageParams root@%s:/DCloudSwift/proxy" % i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=20)
-
-				if status !=0:
-					logger.error("Failed to scp params to %s for %s"%(i, stderr.readlines()))
-					continue
-
 				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -r"%i
+				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -r %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
 
 				print cmd
 
@@ -203,9 +185,9 @@ class SwiftDeploy:
 
 
 if __name__ == '__main__':
-	SD = SwiftDeploy(['192.168.122.202'], ['192.168.122.87', '192.168.122.76'])
+	SD = SwiftDeploy(['172.16.228.53'], ['172.16.228.57'])
 	#SD.rmStorage()
-	#SD.addStorage()
-	SD.proxyDeploy()
+	SD.addStorage()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
+	#SD.storageDeploy()
