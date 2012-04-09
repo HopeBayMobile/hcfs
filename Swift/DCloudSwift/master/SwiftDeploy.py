@@ -78,16 +78,16 @@ class SwiftDeploy:
                         (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
                         if status !=0:
                         	logger.error("Failed to scp proxy deploy scrips to %s for %s"%(i, stderr.readlines()))
-                                continue
+				sys.exit(1)
 
-			cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -p %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
+			cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -p %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
                         print cmd
                         (status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
                         if status != 0:
                         	logger.error("Failed to deploy proxy %s for %s"%(i, stderr.readlines()))
-                                continue
+                                sys.exit(1)
 
-		except util.TimeoutError as err
+		except util.TimeoutError as err:
 			logger.error("%s"%err)
 			sys.stderr.write("%s\n"%err)
 
@@ -183,9 +183,9 @@ class SwiftDeploy:
 
 
 if __name__ == '__main__':
-	SD = SwiftDeploy(['172.16.228.53'], ['172.16.228.57'])
+	SD = SwiftDeploy(['172.16.229.122'], ['172.16.229.93', '172.16.229.73'])
 	#SD.rmStorage()
 	#SD.addStorage()
 	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()
