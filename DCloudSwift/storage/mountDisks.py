@@ -185,7 +185,6 @@ def readMetadata(disk):
 			deviceCnt = int(fh.readline().split()[1].strip())
 			devicePrx = fh.readline().split()[1].strip()
 			deviceNum = int(fh.readline().split()[1].strip())
-			fh.close()
 	except IOError as e:
 		logger.error("Failed to read metadata from %s for %s"%(disk, e))
 		return(1, deviceCnt, devicePrx, deviceNum)

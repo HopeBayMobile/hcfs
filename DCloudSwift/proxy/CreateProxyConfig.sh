@@ -6,19 +6,7 @@
 # 2012/03/06 modified by CW: check the existence of IP address
 # 2012/03/17 modified by Ken
 # 2012/03/22 modified by CW: modify the absolute path of directory deb_source
-
-
-if [ $# != 1 ]; then
-        echo "Please enter the correct parameters!"
-	echo "For example:"
-	echo "If you want to use 3 replicas, type the following command."
-	echo "./PackageInstall.sh 3"
-        exit 1
-fi
-Replica=$1
-
-
-dpkg -i /DCloudSwift/proxy/deb_source/*.deb
+# 2012/04/10 modified by Ken: assign swift_hash_path_suffix a fixed string
 
 
 mkdir -p /etc/swift
@@ -28,7 +16,7 @@ chown -R swift:swift /etc/swift/
 cat >/etc/swift/swift.conf <<EOF
 [swift-hash]
 # random unique string that can never change (DO NOT LOSE)
-swift_hash_path_suffix = `od -t x8 -N 8 -A n </dev/random`
+swift_hash_path_suffix =  69b4da4fbde33158
 EOF
 
 
@@ -57,12 +45,31 @@ mv cert.crt /etc/swift
 perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
 service memcached restart
 
+cat >/etc/swift/proxy-server.conf <<EOF
+[DEFAULT]
+cert_file = /etc/swift/cert.crt
+key_file = /etc/swift/cert.key
+bind_port = 8080
+workers = 8
+user = swift
 
-/DCloudSwift/proxy/ProxyConfigCreation.sh
+[pipeline:main]
+pipeline = healthcheck cache tempauth proxy-server
 
+[app:proxy-server]
+use = egg:swift#proxy
+allow_account_management = true
+account_autocreate = true
 
-cd /etc/swift
-swift-ring-builder account.builder create 18 $Replica 1
-swift-ring-builder container.builder create 18 $Replica 1
-swift-ring-builder object.builder create 18 $Replica 1
+[filter:tempauth]
+use = egg:swift#tempauth
+user_system_root = testpass .admin https://$PROXY_LOCAL_NET_IP:8080/v1/AUTH_system
+
+[filter:healthcheck]
+use = egg:swift#healthcheck
+
+[filter:cache]
+use = egg:swift#memcache
+memcache_servers = $PROXY_LOCAL_NET_IP:11211
+EOF
 

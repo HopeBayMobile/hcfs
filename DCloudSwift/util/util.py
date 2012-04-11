@@ -159,27 +159,35 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 	returncode = 0
 	for ip in nodeList:
 		try:
-			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip)
+			cmd = "ssh root@%s mkdir -p /etc/swift/"%ip
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
 			if status != 0:
-				blackList.append(ip)
-				returncode +=1
-				logger.error("Failed to execute \"%s\" for %s\n"%(cmd, stderr))
-				continue
+				raise SshpassError(stderr.read())
 
-			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz root@%s:/etc/swift/"%(sourceDir,ip))
+			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz %s/*.builder root@%s:/etc/swift/"%(sourceDir, sourceDir, ip))
+			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz %s/*.builder root@%s:/etc/swift/"%(sourceDir,sourceDir, ip)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
+			if status !=0:
+				raise SshpassError(stderr.read())
+
+
 			cmd = "ssh root@%s chown -R swift:swift /etc/swift "%(ip)
 
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
 			if status != 0:
-				blackList.append(ip)
-				returncode +=1
-				logger.error("Failed to execute \"%s\" for %s\n"%(cmd, stderr))
-				continue
+				raise SshpassError(stderr.read())
 
 		except TimeoutError as err:
+			blackList.append(ip)
+			returncode +=1
 			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
-				
+			continue
+		except SshpassError as err:
+			blackList.append(ip)
+			returncode +=1
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+			continue
+					
 
 	return (returncode, blackList)
 
@@ -199,6 +207,13 @@ class TimeoutError(Exception):
 		self.timeout= timeout
 	def __str__(self):
 		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
+
+class SshpassError(Exception):
+	def __init__(self, errMsg):
+		self.errMsg = errMsg
+	def __str__(self):
+		return self.errMsg
+		
 
 if __name__ == '__main__':
 	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')

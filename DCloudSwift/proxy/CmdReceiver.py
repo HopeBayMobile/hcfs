@@ -6,6 +6,7 @@ Created on 2012/03/01
 Modified by Ken on 2012/03/12
 Modified by Ken on 2012/03/13
 Modified by CW on 2012/03/22: correct the absolute path of function triggerProxyDeploy()
+Modified by Ken on 2012/04/09: add triggerFirstProxy
 '''
 
 import sys
@@ -31,6 +32,7 @@ Options:
 	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
 	[-r | rmStorage] - for removing storage nodes
+	[-f | firstProxy] - for the first proxy node
 Examples:
 	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
@@ -38,6 +40,7 @@ Examples:
 def usage():
 	print >> sys.stderr, Usage
 	sys.exit(1)
+
 
 def triggerAddStorage(**kwargs):
 	logger = util.getLogger(name="triggerAddStorage")
@@ -68,14 +71,15 @@ def triggerAddStorage(**kwargs):
 	return (returncode, blackProxyNodes, blackStorageNodes)
 
 
-def triggerProxyDeploy(**kwargs):
+def triggerFirstProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
-	os.system("/DCloudSwift/proxy/PackageInstall.sh %d" % numOfReplica)
+	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
+	os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 	zoneNumber = 1
 	for i in storageList: 
 		for j in range(deviceCnt):
@@ -83,7 +87,21 @@ def triggerProxyDeploy(**kwargs):
 			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
 			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
 			zoneNumber += 1
+
+	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	return 0
+
+def triggerProxyDeploy(**kwargs):
+	logger = util.getLogger(name = "triggerProxyDeploy")
+	proxyList = kwargs['proxyList']
+	storageList = kwargs['storageList']
+	numOfReplica = kwargs['numOfReplica']
+	deviceCnt = kwargs['deviceCnt']
+	devicePrx = kwargs['devicePrx']
+	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
+	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	return 0
 
 def triggerRmStorage(**kwargs):
 	logger = util.getLogger(name="triggerRmStorage")
@@ -140,6 +158,16 @@ def main():
 
                         print 'Proxy deployment start'
                         triggerRmStorage(**kwargs)	
+
+        	elif (sys.argv[1] == 'firstProxy' or sys.argv[1] == '-f'):
+			try:
+				kwargs = json.loads(sys.argv[2])
+			except ValueError:
+				print >>sys.stderr,  "Usage error: Ivalid json format"
+				usage()
+
+			print 'First proxy deployment start'
+			triggerFirstProxyDeploy(**kwargs)
 
         	elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 			try:

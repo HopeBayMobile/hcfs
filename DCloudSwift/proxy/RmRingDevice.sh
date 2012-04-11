@@ -1,5 +1,5 @@
 #!/bin/bash
-# The shell script is used to add the storage device of ring. (OS: Ubuntu 11.04)
+# The shell script is used to remove a device from the ring. (OS: Ubuntu 11.04)
 # History:
 # 2012/03/15 first release by Ken
 
