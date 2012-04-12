@@ -50,18 +50,16 @@ def triggerAddStorage(**kwargs):
 	deviceCnt = kwargs['deviceCnt']
 	password = kwargs['password']
 
-	random.seed(time.time())
-	for i in storageList: 
-		zoneNumber= random.randint(1,100)
+	for node in storageList: 
 		for j in range(deviceCnt):
 			deviceName = devicePrx + str(j+1)
-			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
-			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
+			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
+			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
 
-	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=proxyList)
+	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=[node["ip"] for node in proxyList])
 
 	allStorageNodes = util.getStorageNodeIpList()
 	blackStorageNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=allStorageNodes)
@@ -72,7 +70,7 @@ def triggerAddStorage(**kwargs):
 
 
 def triggerFirstProxyDeploy(**kwargs):
-	logger = util.getLogger(name = "triggerProxyDeploy")
+	logger = util.getLogger(name = "triggerFirstProxyDeploy")
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
@@ -81,12 +79,11 @@ def triggerFirstProxyDeploy(**kwargs):
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
 	os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 	zoneNumber = 1
-	for i in storageList: 
+	for node in storageList: 
 		for j in range(deviceCnt):
 			deviceName = devicePrx + str(j+1)
-			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (zoneNumber, i, deviceName))
-			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (zoneNumber, i, deviceName))
-			zoneNumber += 1
+			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
+			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
@@ -122,7 +119,7 @@ def triggerRmStorage(**kwargs):
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
 
-	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=proxyList)
+	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=[node["ip"] for node in proxyList])
 
 	allStorageNodes = util.getStorageNodeIpList()
 	blackStorageNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=allStorageNodes)

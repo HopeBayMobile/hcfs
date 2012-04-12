@@ -34,7 +34,7 @@ def usage():
 	sys.exit(1)
 
 def triggerStorageDeploy(**kwargs):
-	proxyNode = kwargs['proxyList'][0]
+	proxyNode = kwargs['proxyList'][0]["ip"]
 
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
