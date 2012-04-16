@@ -134,9 +134,6 @@ def main():
 	try:
 		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
 
-		if not util.isAllDebInstalled("/DCloudSwift/proxy/deb_source/"):
-			util.installAllDeb("/DCloudSwift/proxy/deb_source/")
-
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 

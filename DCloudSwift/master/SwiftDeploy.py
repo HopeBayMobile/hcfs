@@ -62,9 +62,6 @@ class SwiftDeploy:
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
-		if not util.isAllDebInstalled("/DCloudSwift/master/deb_source/"):
-			util.installAllDeb("/DCloudSwift/master/deb_source/")
-
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
@@ -233,9 +230,10 @@ class SwiftDeploy:
 
 
 if __name__ == '__main__':
-	SD = SwiftDeploy([{"ip":"172.16.229.122"}, {"ip":"172.16.229.34"}], [{"ip":"172.16.229.46", "zid":1}, {"ip":"172.16.229.73", "zid":2}])
+	util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
+	#SD = SwiftDeploy([{"ip":"172.16.229.122"}, {"ip":"172.16.229.34"}], [{"ip":"172.16.229.46", "zid":1}, {"ip":"172.16.229.73", "zid":2}])
 	#SD.rmStorage()
 	#SD.addStorage()
-	SD.proxyDeploy()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
 	#SD.storageDeploy()
