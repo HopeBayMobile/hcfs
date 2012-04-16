@@ -1,21 +1,5 @@
 '''
-Created on 2012/03/01
-
-@author: CW
-
-Modified by CW on 2012/03/02
-Modified by CW on 2012/03/03
-Modified by CW on 2012/03/05
-Modified by CW on 2012/03/06
-Modified by CW on 2012/03/07
-Modified by Ken on 2012/03/09
-Modified by Ken on 2012/03/12
-Modified by Ken on 2012/03/13
-Modified by Ken on 2012/03/15
-Modified by Ken on 2012/03/16
-Modified by Ken on 2012/03/17
-Modified by CW on 2012/03/22: correct the absolute path of function proxyDeploy()
-Modified by Ken on 2012/03/28: pass argument by appending json string to the end of sshpass command 
+First created on 2012/03/01 by CW
 '''
 
 import sys
@@ -214,7 +198,6 @@ class SwiftDeploy:
 				print cmd
 
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
-			
 				if status != 0:
 					logger.error("Failed to rmStorage from proxy %s for %s"%(i, stderr.read()))
 					continue
@@ -230,10 +213,10 @@ class SwiftDeploy:
 
 
 if __name__ == '__main__':
-	util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-	#SD = SwiftDeploy([{"ip":"172.16.229.122"}, {"ip":"172.16.229.34"}], [{"ip":"172.16.229.46", "zid":1}, {"ip":"172.16.229.73", "zid":2}])
+	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
+	SD = SwiftDeploy([{"ip":"172.16.229.56"}, {"ip":"172.16.229.22"}], [{"ip":"172.16.229.22", "zid":1}, {"ip":"172.16.229.128", "zid":2}])
 	#SD.rmStorage()
 	#SD.addStorage()
-	#SD.proxyDeploy()
+	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()

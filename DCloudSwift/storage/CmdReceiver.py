@@ -1,8 +1,5 @@
 '''
-Created on 2012/03/01
-
-@author: CW
-modified by Ken 2012/03/16
+First Created on 2012/03/01 by CW
 '''
 
 import sys

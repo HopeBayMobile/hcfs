@@ -32,8 +32,6 @@ class StorageNodeInstaller:
 		self.__devicePrx = devPrx
 		self.__deviceCnt = devCnt
 		
-		if not util.isAllDebInstalled("/DCloudSwift/storage/deb_source/"):
-			util.installAllDeb("/DCloudSwift/storage/deb_source/")
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
