@@ -62,16 +62,13 @@ class SwiftDeploy:
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
-		if not util.isAllDebInstalled("/DCloudSwift/master/deb_source/"):
-			util.installAllDeb("/DCloudSwift/master/deb_source/")
-
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 	def __firstProxyDeploy(self):
 		logger = util.getLogger(name="firstProxyDeploy")
                 #TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
-                i = self.__proxyList[0]
+                i = self.__proxyList[0]["ip"]
                 try:
 
                         cmd = "scp -r /DCloudSwift/ root@%s:/"%i
@@ -106,10 +103,10 @@ class SwiftDeploy:
 		logger = util.getLogger(name="proxyDeploy")
 		#TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
 		if self.__firstProxyDeploy() !=0:
-			return (1, self.__proxyList)
+			return (1, [node["ip"] for node in self.__proxyList])
 
 		blackList = []
-		for i in self.__proxyList[1:]:
+		for i in [node["ip"] for node in self.__proxyList[1:]]:
 			try:
 							
 				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/tmp/swift', nodeList=[i])[0] !=0:
@@ -120,7 +117,7 @@ class SwiftDeploy:
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
                         	(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
                         	if status !=0:
-                        		logger.error("Failed to scp proxy deploy scrips to %s for %s"%(i, stderr.readlines()))
+                        		logger.error("Failed to scp proxy deploy scrips to %s for %s"%(i, stderr.read()))
 					blackList.append(i)
 					continue
 
@@ -128,7 +125,7 @@ class SwiftDeploy:
                         	print cmd
                         	(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
                         	if status != 0:
-                        		logger.error("Failed to deploy proxy %s for %s"%(i, stderr.readlines()))
+                        		logger.error("Failed to deploy proxy %s for %s"%(i, stderr.read()))
 					blackList.append(i)
 					continue
 			
@@ -145,7 +142,7 @@ class SwiftDeploy:
 	def storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
 		#TODO: use thread pool and report progress
-		for i in self.__storageList:
+		for i in [node["ip"] for node in self.__storageList]:
 		#	pid = os.fork()
 		#	if pid == 0:
 		#		continue
@@ -153,14 +150,14 @@ class SwiftDeploy:
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
                                 (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
                                 if status !=0:
-                                        logger.error("Failed to scp storage scrips to %s for %s"%(i, stderr.readlines()))
+                                        logger.error("Failed to scp storage scrips to %s for %s"%(i, stderr.read()))
                                         continue
 
 				cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -s %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
 				print cmd
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 				if status != 0:
-                                        logger.error("Failed to deploy storage %s for %s"%(i, stderr.readlines()))
+                                        logger.error("Failed to deploy storage %s for %s"%(i, stderr.read()))
                                         continue
 
 			except util.TimeoutError as err:
@@ -174,7 +171,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="addStorage")
 		self.storageDeploy()
 
-		for i in self.__proxyList:
+		for i in [node["ip"] for node in self.__proxyList]:
 			try:
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
 				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
@@ -189,7 +186,7 @@ class SwiftDeploy:
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
 			
 				if status != 0:
-					logger.error("Failed to addStorage from proxy %s for %s"%(i, stderr.readlines()))
+					logger.error("Failed to addStorage from proxy %s for %s"%(i, stderr.read()))
 					continue
 
 				#TODO: Return black list
@@ -204,7 +201,7 @@ class SwiftDeploy:
 	def rmStorage(self):
 		logger = util.getLogger(name="rmStorage")
 
-		for i in self.__proxyList:
+		for i in [node["ip"] for node in self.__proxyList]:
 			try:
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
 				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
@@ -219,7 +216,7 @@ class SwiftDeploy:
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
 			
 				if status != 0:
-					logger.error("Failed to rmStorage from proxy %s for %s"%(i, stderr.readlines()))
+					logger.error("Failed to rmStorage from proxy %s for %s"%(i, stderr.read()))
 					continue
 
 				#TODO: Return black list
@@ -233,9 +230,10 @@ class SwiftDeploy:
 
 
 if __name__ == '__main__':
-	SD = SwiftDeploy(['172.16.229.34','172.16.229.73'], ['172.16.229.46', '172.16.229.73'])
+	util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
+	#SD = SwiftDeploy([{"ip":"172.16.229.122"}, {"ip":"172.16.229.34"}], [{"ip":"172.16.229.46", "zid":1}, {"ip":"172.16.229.73", "zid":2}])
 	#SD.rmStorage()
 	#SD.addStorage()
-	SD.proxyDeploy()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
 	#SD.storageDeploy()

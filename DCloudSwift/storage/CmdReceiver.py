@@ -17,8 +17,13 @@ from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
 
-
+sys.path.append("/DCloudSwift/util")
 import StorageInstall
+import util
+
+EEXIST = 17
+lockFile = "/tmp/CmdReceiver.lock"
+
 
 Usage = '''
 Usage:
@@ -29,12 +34,14 @@ Examples:
 	python CmdReceiver.py -s {"password": "deltacloud"}
 '''
 
+class UsageError(Exception):
+	pass
+
 def usage():
 	print >> sys.stderr, Usage
-	sys.exit(1)
 
 def triggerStorageDeploy(**kwargs):
-	proxyNode = kwargs['proxyList'][0]
+	proxyNode = kwargs['proxyList'][0]["ip"]
 
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
@@ -42,22 +49,47 @@ def triggerStorageDeploy(**kwargs):
 	installer.install()
 	
 def main():
-	if (len(sys.argv) == 3 ):
-		kwargs = None
-		if (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
-			try:
-				kwargs = json.loads(sys.argv[2])
-			except ValueError:
-				sys.stderr.write( "Usage error: Ivalid json format\n")
-				usage()
+	
+	returncode =0
+	fd = -1
+	try:
+		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
 
-			print 'storage deployment start'
-			triggerStorageDeploy(**kwargs)
+		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+
+		if (len(sys.argv) == 3 ):
+			kwargs = None
+			if (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
+				kwargs = json.loads(sys.argv[2])
+				print 'storage deployment start'
+				triggerStorageDeploy(**kwargs)
+			else:
+				print >> sys.stderr, "Usage error: Invalid optins"
+				raise UsageError
+
+        	else:
+			raise UsageError
+	except OSError as e:
+		if e.errno == EEXIST:
+			print >>sys.stderr, "A confilct task is in execution"
 		else:
-			sys.stderr.write( "Usage error: Invalid optins\n")
-                	usage()
-        else:
+			print >>sys.stderr, str(e)
+		returncode = e.errno
+	except UsageError:
 		usage()
+		returncode =1
+	except ValueError:
+		print >>sys.stderr,  "Usage error: Ivalid json format"
+		returncode = 1
+	except Exception as e:
+		print >>sys.stderr, str(e)
+		returncode = 1
+	finally:
+		if fd != -1:
+			os.close(fd)
+			os.unlink(lockFile)
+		sys.exit(returncode)
 
 
 if __name__ == '__main__':

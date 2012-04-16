@@ -191,6 +191,49 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 
 	return (returncode, blackList)
 
+def spreadPackages(password, nodeList=[]):
+	logger = getLogger(name="spreadPackages")
+	blackList=[]
+	returncode = 0
+	for ip in nodeList:
+		try:
+			print "Start installation of swfit packages on %s ..."%ip
+
+			cmd = "ssh root@%s mkdir -p /var/lib/swift/"%(ip)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
+                        if status != 0:
+                                raise SshpassError(stderr.read())
+
+			logger.info("scp -o StrictHostKeyChecking=no /var/lib/swift/* root@%s:/var/lib/swift/"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no /var/lib/swift/* root@%s:/var/lib/swift/"%(ip)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
+			if status !=0:
+				raise SshpassError(stderr.read())
+
+
+			cmd = "ssh root@%s dpkg -i /var/lib/swift/* "%(ip)
+
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			if status != 0:
+				raise SshpassError(stderr.read())
+
+		except TimeoutError as err:
+			blackList.append(ip)
+			returncode +=1
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+			print "Failed to install swift packages on %s"%ip
+			continue
+		except SshpassError as err:
+			blackList.append(ip)
+			returncode +=1
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+			print "Failed to install swift packages on %s"%ip
+			continue
+					
+
+	return (returncode, blackList)
+	
+
 def jsonStr2SshpassArg(jsonStr):
 	arg = jsonStr.replace(" ","")
 	arg = arg.replace("{","\{")
@@ -216,7 +259,8 @@ class SshpassError(Exception):
 		
 
 if __name__ == '__main__':
-	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
+#	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
+	spreadPackages(password="deltacloud", nodeList = ["172.16.229.34"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()

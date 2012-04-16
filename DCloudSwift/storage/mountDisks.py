@@ -11,6 +11,7 @@ import threading
 import sys
 import time
 import json
+import socket
 
 sys.path.append("/DCloudSwift/util")
 import util
@@ -182,6 +183,7 @@ def readMetadata(disk):
 
 	try:
 		with open("%s/Metadata"%mountpoint, "r") as fh:
+			hostname = fh.readline().split()[1].strip()
 			deviceCnt = int(fh.readline().split()[1].strip())
 			devicePrx = fh.readline().split()[1].strip()
 			deviceNum = int(fh.readline().split()[1].strip())
@@ -192,32 +194,46 @@ def readMetadata(disk):
 	if lazyUnmount(mountpoint)!=0:
 		logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
 
-        return (0, deviceCnt, devicePrx, deviceNum)
+        return (0, hostname, deviceCnt, devicePrx, deviceNum)
 
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
 
 	rootDisk = getRootDisk()
         disks = getAllDisks()
-	count = 0
-	mountedDisks=[]
-	returncode = 1
+	unusedDisks = []
+	returncode = 0
+	seenSwiftDevices = set()
+	swiftDeviceCnt = 0
+	
 
         for disk in disks:
                 if disk == rootDisk:
                         continue
 
-		(ret, deviceCnt, devicePrx, deviceNum) = readMetadata(disk)
-		print (ret, deviceCnt, devicePrx, deviceNum)
-		if ret == 0:
+		(ret, hostname, deviceCnt, devicePrx, deviceNum) = readMetadata(disk)
+		print (ret, hostname, deviceCnt, devicePrx, deviceNum)
+		if ret == 0 and hostname == socket.gethostname() and deviceNum not in seenSwiftDevices:
 			if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
+				seenSwiftDevices.add(deviceNum)
+				swiftDeviceCnt = deviceCnt 
+		else:
+			unusedDisks.append(disk)
+
+		
+	lostDeviceNum= [x for x in range(1,swiftDeviceCnt+1) if x not in seenDeviceNum]
+	for disk in unusedDisks:
+		if len(lostDeviceNum) == 0:
+			break
+		else:
+			if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=lostDeviceNum[0]) == 0:
 				mountedDisks.append(disk)
-				if len(mountedDisks) == deviceCnt:
-					returncode = 0
+				lostDeviceNum.pop(0)
+			
 
-				
+	returncode = len(lostDeviceNum)			
 
-        return (returncode, mountedDisks)
+        return (returncode, lostDeviceNum)
 
 
 def lazyUmount(mountpoint):
@@ -254,6 +270,7 @@ def writeMetadata(disk, deviceCnt, devicePrx, deviceNum):
 		return po.returncode
 
 	os.system("touch /%s/Metadata"%mountpoint)
+	line0 = "hostname %s"%socket.gethostname()
 	line1 = "deviceCnt %d"%deviceCnt
 	line2 = "devicePrx %s"%devicePrx
 	line3 = "deviceNum %d"%deviceNum
@@ -281,9 +298,7 @@ def main(argv):
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
-#	(ret, sn) = getDiskSN("/dev/sda")
-#	print sn
-#	writeMetadata(disk="/dev/sdb", deviceNum=1, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sdb", deviceNum=1, devicePrx="sdb", deviceCnt=5)
 	#print readMetadata(disk="/dev/sdb")
 #	print remountDisks()
 	
