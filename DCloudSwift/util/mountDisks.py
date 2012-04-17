@@ -222,6 +222,47 @@ def getLatestMetadata():
 
 	return latestMetadata
 
+def __loadSwiftMetadata(disk):
+        logger = util.getLogger(name="__reloadSwiftMetadata")
+	metadata = {}
+        mountpoint =  "/temp/%s"%disk
+        os.system("mkdir -p %s"%mountpoint)
+
+
+	#TODO: chechsum
+	if mountDisk(disk, mountpoint) !=0:
+                logger.error("Failed to mount %s"%disk)
+                return 1
+
+	returncode = 0
+
+	cmd = "cp %s/swift/*.ring.gz %s/swift/*.builder %s/swift/swift.conf /etc/swift/"%(mountpoint, mountpoint, mountpoint)
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+        if po.returncode != 0:
+                logger.error("Failed to reload swift metadata from %s for %s"%(disk,po.stderr.readline()))
+		returncode = 1
+
+	if lazyUmount(mountpoint)!=0:
+		logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
+
+	return returncode
+
+def loadSwiftMetadata():
+	logger = util.getLogger(name="loadSwiftMetadata")
+        disks = getNonRootDisks()
+
+        for disk in disks:
+		if readMetadata(disk) is not None:
+			if __loadSwiftMetadata(disk) !=0:
+				os.system("chown -R swift:swift /etc/swift")
+				continue
+			else:
+				return 0
+
+	return 1
+
+
 def remountRecognizableDisks():
 	logger = util.getLogger(name="remountRecognizableDisks")
 	
@@ -302,6 +343,16 @@ def lazyUmountSwiftDevices(deviceCnt, devicePrx):
 	for deviceNum in range(1,deviceCnt+1):
 		lazyUmount("/srv/node/%s%d"%(devicePrx,deviceNum))
 
+def dumpSwiftMetadata(destDir):
+	logger = util.getLogger(name="dumpSwiftMetadata")
+	os.system("mkdir -p %s"%destDir)
+        cmd = "cp /etc/swift/*.ring.gz /etc/swift/*.builder /etc/swift/swift.conf %s"%destDir
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+        if po.returncode != 0:
+                logger.error("Failed to dump swift metadata to %s for %s"%(destDir,po.stderr.read()))
+                return po.returncode
+
 def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
 
@@ -317,13 +368,18 @@ def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
         	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readline()))
 		return po.returncode
 
+
 	#TODO: write checksum
 	os.system("touch /%s/Metadata"%mountpoint)
 	metadata = {"hostname":socket.gethostname(), "vers":vers, "proxyList":proxyList, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
 	
 	try:
 		with open("%s/Metadata"%mountpoint, "wb") as fh:
-			pickle.dump(metadata, fh)	
+			pickle.dump(metadata, fh)
+
+		if dumpSwiftMetadata("/%s/swift"%mountpoint) !=0:
+                	logger.error("Failed to dump swift metadata to %s"%(disk))
+                	return 1
 		return 0
 	except IOError as e:
 		logger.error("Failed to wirte metadata for disk %s"%disk)
@@ -331,7 +387,7 @@ def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
 	finally:
 		if lazyUmount(mountpoint)!=0:
                         logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
-
+	
 
 	
 
@@ -353,7 +409,8 @@ if __name__ == '__main__':
 	#print getLatestMetadata()
 	#proxyList = [{"ip":"172.16.229.45"}, {"ip":"172.16.229.54"}]
 	#createSwiftDevices(proxyList=proxyList, deviceCnt=5)
-	#writeMetadata(disk="/dev/sdb", deviceNum=3, devicePrx="sdb", deviceCnt=5)
+	#writeMetadata(disk="/dev/sdb", proxyList=proxyList, vers=0, deviceNum=3, devicePrx="sdb", deviceCnt=5)
+	#print loadSwiftMetadata()
 	#print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
