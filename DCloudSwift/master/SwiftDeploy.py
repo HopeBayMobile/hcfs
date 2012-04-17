@@ -123,12 +123,18 @@ class SwiftDeploy:
 
 	def storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
+		blackList =[]
 		#TODO: use thread pool and report progress
 		for i in [node["ip"] for node in self.__storageList]:
 		#	pid = os.fork()
 		#	if pid == 0:
 		#		continue
 			try:
+				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/tmp/swift', nodeList=[i])[0] !=0:
+                                        logger.error("Failed to spread metadata to %s"%i)
+                                        blackList.append(i)
+                                        continue
+
 				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
                                 (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
                                 if status !=0:
@@ -212,9 +218,9 @@ class SwiftDeploy:
 
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-	SD = SwiftDeploy([{"ip":"172.16.229.56"}, {"ip":"172.16.229.22"}], [{"ip":"172.16.229.22", "zid":1}, {"ip":"172.16.229.128", "zid":2}])
+	SD = SwiftDeploy([{"ip":"172.16.229.56"}, {"ip":"172.16.229.101"}], [{"ip":"172.16.229.101", "zid":1}, {"ip":"172.16.229.156", "zid":2}])
 	#SD.rmStorage()
 	#SD.addStorage()
-	SD.proxyDeploy()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	#SD.storageDeploy()
+	SD.storageDeploy()

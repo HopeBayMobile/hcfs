@@ -164,7 +164,7 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 			if status != 0:
 				raise SshpassError(stderr.read())
 
-			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz %s/*.builder root@%s:/etc/swift/"%(sourceDir, sourceDir, ip))
+			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz %s/*.builder %s/swift.conf root@%s:/etc/swift/"%(sourceDir, sourceDir, sourceDir, ip))
 			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/*.ring.gz %s/*.builder root@%s:/etc/swift/"%(sourceDir,sourceDir, ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
