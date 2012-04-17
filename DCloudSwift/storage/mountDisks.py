@@ -1,7 +1,5 @@
 '''
-Created on 2012/03/14
-
-@author: Ken
+First Created on 2012/03/14 by Ken
 
 '''
 import os
@@ -41,6 +39,39 @@ def getAllDisks():
 
 	return disks
 
+def getNonRootDisks():
+	rootDisk = getRootDisk()
+	disks = getAllDisks()
+	nonRootDisks =[]
+
+	for disk in disks:
+		if disk != rootDisk:
+			nonRootDisks.append(disk)
+
+	return nonRootDisks
+		
+
+def formatDisks(diskList):
+	logger = util.getLogger(name="formatDisks")
+	returncode=0
+	formattedDisks = []
+
+	for disk in diskList:
+                cmd = "mkfs.xfs -i size=1024 -f %s"%(disk)
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po.wait()
+
+                if po.returncode != 0:
+                        logger.error("Failed to format %s for %s"%(disk,po.stderr.read()))
+                        returncode+=1
+                        continue
+
+                formattedDisks.append(disk)
+
+
+        return (returncode,formattedDisks)
+
+
 def formatNonRootDisks(deviceCnt=1):
 	'''
 	Format deviceCnt non-root disks
@@ -73,24 +104,6 @@ def formatNonRootDisks(deviceCnt=1):
 
 	return (returncode,formattedDisks)
 
-def lazyUnmount(mountpoint):
-        logger = util.getLogger(name="lazyUnmount")
-
-        returncode = 1
-        try:
-                cmd = "umount -l %s"%mountpoint
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                po.wait()
-
-                if po.returncode !=0:
-                        logger.error("Failed to umount -l  %s for %s"%(disk, po.stderr.readline()))
-
-                returncode = 0
-
-        except OSError as e:
-                logger.error("Failed to umount -l %s for %s"%(disk, e))
-
-        return returncode
 
 def mountDisk(disk, mountpoint):
 	logger = util.getLogger(name="mountDisk")
@@ -190,8 +203,8 @@ def readMetadata(disk):
 		logger.error("Failed to read metadata from %s for %s"%(disk, e))
 		return (1, metadata)
 	finally:
-		if lazyUnmount(mountpoint)!=0:
-			logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
+		if lazyUmount(mountpoint)!=0:
+			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
 
 
 def getLatestMetadata():
@@ -211,72 +224,85 @@ def getLatestMetadata():
 
 	return latestMetadata
 
+def remountRecognizableDisks():
+	logger = util.getLogger(name="remountRecognizableDisks")
+	
+        disks = getNonRootDisks()
+        unusedDisks = []
+	lostDevices =[]
+
+	latest = getLatestMetadata()	
+        if latest is None:
+                return (lostDevices, disks)
+
+	seenDevices = set()
+        for disk in disks:
+                (ret, metadata) = readMetadata(disk)
+                if ret == 0 and metadata["hostname"] == socket.gethostname() and metadata["vers"] == latest["vers"] and metadata["deviceNum"] not in seenDevices:
+			mountpoint = "/srv/node/%s%d"%(metadata["devicePrx"], metadata["deviceNum"])
+                        if mountSwiftDevice(disk=disk, devicePrx=metadata["devicePrx"], deviceNum=metadata["deviceNum"]) == 0:
+				seenDevices.add(metadata["deviceNum"])
+				print "/srv/node/%s%d is back!"%(metadata["devicePrx"], metadata["deviceNum"])
+				continue
+			else:
+                                logger.error("Failed to mount disk %s as swift device %s%d"%(disk, metadata["devicePrx"],metadata["deviceNum"]))
+
+        	unusedDisks.append(disk)
+
+	lostDevices = [x for x in range(1,latest["deviceCnt"]+1) if x not in seenDevices]
+	return (lostDevices, unusedDisks)
 
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
-
-	rootDisk = getRootDisk()
-        disks = getAllDisks()
-	unusedDisks = []
-	seenSwiftDevices = set()
-	swiftDeviceCnt = None
-	swiftDevicePrx = None
-	blackList = []
+	
 	latest = getLatestMetadata()
 
 	if latest is None:
 		return (0, [])
 
-       	for disk in disks:
-               	if disk == rootDisk:
-                       	continue
+	lazyUmountSwiftDevices(deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"])
 
-		(ret, metadata) = readMetadata(disk)
-		if ret == 0 and metadata["hostname"] == socket.gethostname() and metadata["vers"] == latest["vers"] and metadata["deviceNum"] not in seenSwiftDevices:
-			seenSwiftDevices.add(metadata["deviceNum"])
+	(lostDevices, unusedDisks) = remountRecognizableDisks()
 
-			if mountSwiftDevice(disk=disk, devicePrx=metadata["devicePrx"], deviceNum=metadata["deviceNum"]) != 0:
-				blackList.append(metadata["deviceNum"])
-                               	logger.error("Failed to mount disk %s as swift device %s%d"%(disk, metadata["devicePrx"],metadata["deviceNum"]))
-			print "%s%d"%(metadata["devicePrx"], metadata["deviceNum"])
-
-		else:
-			unusedDisks.append(disk)
-		
-	lostDeviceNum= [x for x in range(1,latest["deviceCnt"]+1) if x not in seenSwiftDevices]
-	for disk in unusedDisks:
-		if len(lostDeviceNum) == 0:
+	for disk in formatDisks(unusedDisks)[1]:
+		if len(lostDevices) == 0:
 			break
-		if writeMetadata(disk=disk, vers=latest["vers"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDeviceNum[0]) == 0:
-			deviceNum = lostDeviceNum.pop(0)
-			seenSwiftDevices.add(deviceNum)
-			if mountSwiftDevice(disk=disk, devicePrx=latest["devicePrx"], deviceNum=deviceNum) != 0:
-				blackList.append(deviceNum)
+		if writeMetadata(disk=disk, vers=latest["vers"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDevices[0]) == 0:
+			deviceNum = lostDevices[0]
+			if mountSwiftDevice(disk=disk, devicePrx=latest["devicePrx"], deviceNum=deviceNum) == 0:
+				lostDevices.pop(0)
+				print "/srv/node/%s%d is back!"%(latest["devicePrx"], deviceNum)
+			else:
 				logger.error("Failed to mount disk %s as swift device %s%d "%(disk, latest["devicePrx"], deviceNum))
-			print "%s%d"%(metadata["devicePrx"], metadata["deviceNum"])
 		else:
-			logger.warn("Failed to write metadata to %s"%disk)
+			logger.error("Failed to write metadata to %s"%disk)
 
-       	return (len(blackList), blackList)
+       	return (len(lostDevices), lostDevices)
 
 
 def lazyUmount(mountpoint):
         logger = util.getLogger(name="umount")
 
-        returncode = 1
+        returncode = 0
         try:
-                cmd = "umount -l %s"%mountpoint
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                po.wait()
+		if os.path.ismount(mountpoint):
+                	cmd = "umount -l %s"%mountpoint
+                	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                	po.wait()
 
-                if po.returncode !=0:
-                        logger.error("Failed to umount -l  %s for %s"%(disk, po.stderr.readline()))
+                	if po.returncode !=0:
+                        	logger.error("Failed to umount -l  %s for %s"%(mountpoint, po.stderr.readline()))
+				returncode = 1
 
-                returncode = 0
         except OSError as e:
                 logger.error("Failed to umount -l %s for %s"%(disk, e))
+		returncode = 1
 
         return returncode
+
+def lazyUmountSwiftDevices(deviceCnt, devicePrx):
+	for deviceNum in range(1,deviceCnt+1):
+		lazyUmount("/srv/node/%s%d"%(devicePrx,deviceNum))
 
 def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
@@ -305,7 +331,7 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 		logger.error("Failed to wirte metadata for disk %s"%disk)
 		return 1
 	finally:
-		if lazyUnmount(mountpoint)!=0:
+		if lazyUmount(mountpoint)!=0:
                         logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
 
 
@@ -325,9 +351,9 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	#main(sys.argv[1:])
 	#writeMetadata(disk="/dev/sdb", deviceNum=3, devicePrx="sdb", deviceCnt=5)
-	#print readMetadata(disk="/dev/sdc")
-	#print remountDisks()
+	#print readMetadata(disk="/dev/sdb")
+	print remountDisks()
 	#print int(time.time())
 	
