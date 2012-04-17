@@ -7,6 +7,7 @@ import util
 
 class SwiftMonitor(Daemon):
 	def run(self):
+		
 		while True:
 			time.sleep(1)
 

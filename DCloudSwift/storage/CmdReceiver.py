@@ -38,11 +38,12 @@ def usage():
 	print >> sys.stderr, Usage
 
 def triggerStorageDeploy(**kwargs):
-	proxyNode = kwargs['proxyList'][0]["ip"]
+	proxy = kwargs['proxyList'][0]["ip"]
+	proxyList = kwargs['proxyList']
 
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
-	installer = StorageInstall.StorageNodeInstaller(proxyNode, devicePrx, deviceCnt)
+	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 	
 def main():

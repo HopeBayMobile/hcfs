@@ -15,12 +15,14 @@ import subprocess
 import shlex
 import random
 import fcntl
+import pickle
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
 
 sys.path.append("/DCloudSwift/util")
 import util
+import mountDisks
 
 Usage = '''
 Usage:
@@ -87,6 +89,10 @@ def triggerFirstProxyDeploy(**kwargs):
 
 	os.system("/DCloudSwift/proxy/Rebalance.sh")
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	metadata = mountDisks.getLatestMetadata()
+	if metadata is None:
+		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
+	
 	return 0
 
 def triggerProxyDeploy(**kwargs):
@@ -98,6 +104,9 @@ def triggerProxyDeploy(**kwargs):
 	devicePrx = kwargs['devicePrx']
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	metadata = mountDisks.getLatestMetadata()
+	if metadata is None:
+		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
 	return 0
 
 def triggerRmStorage(**kwargs):

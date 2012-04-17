@@ -1,11 +1,3 @@
-# This script is used to deploy the storage node of Swift.
-# History:
-# 2012/03/16 first release by Ken
-# 2012/03/17 modified by Ken
-# 2012/03/22 modified by CW: modify MAX_META_VALUE_LENGTH from 256 to 512
-# 2012/03/26 modified by CW: correct the declaration of logger 
-# 2012/03/28 modified by Ken: overwrite rc.local to remount disks in order
-
 import sys
 import os
 import socket
@@ -27,10 +19,11 @@ import util
 import mountDisks
 
 class StorageNodeInstaller:
-	def __init__(self, proxy, devPrx="sdb", devCnt=1):
+	def __init__(self, proxy, proxyList, devicePrx="sdb", deviceCnt=1):
 		self.__proxy = proxy
-		self.__devicePrx = devPrx
-		self.__deviceCnt = devCnt
+		self.__proxyList = proxyList
+		self.__devicePrx = devicePrx
+		self.__deviceCnt = deviceCnt
 		
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -55,7 +48,11 @@ class StorageNodeInstaller:
 			self.__logger.error("Failed to execute %s for %s"%(cmd, stderr.readlines()))
 			return 1
 
-		mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
+		self.__logger.info("getlatestMetadata")
+		metadata = mountDisks.getLatestMetadata()
+		if metadata is None:
+			self.__logger.info("Write Metadata")
+			mountDisks.createSwiftDevices(proxyList=self.__proxyList, deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
 
 		os.system("chown -R swift:swift /srv/node/ ")
 		os.system("/DCloudSwift/storage/rsync.sh")
@@ -70,7 +67,7 @@ class StorageNodeInstaller:
 		
 		#TODO: for NTU mode only
 		line1 = " #!/bin/sh -e"
-		line2 = "python /DCloudSwift/storage/mountDisks.py -r"
+		line2 = "python /DCloudSwift/util/mountDisks.py -r"
 		os.system("echo \"%s\" > /etc/rc.local"%line1)
 		os.system("echo \"%s\" >> /etc/rc.local"%line2)
 

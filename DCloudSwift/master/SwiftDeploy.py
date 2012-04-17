@@ -217,4 +217,4 @@ if __name__ == '__main__':
 	#SD.addStorage()
 	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
+	#SD.storageDeploy()

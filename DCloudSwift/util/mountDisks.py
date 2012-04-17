@@ -11,8 +11,6 @@ import time
 import json
 import pickle
 import socket
-
-sys.path.append("/DCloudSwift/util")
 import util
 
 
@@ -141,7 +139,7 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
 
 	return returncode
 
-def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
+def createSwiftDevices(proxyList, deviceCnt=1, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
@@ -161,7 +159,7 @@ def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
 			print "%s\n"%mountpoint
                 #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
 
-                        if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
+                        if writeMetadata(disk=disk, vers=vers, proxyList=proxyList, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
                                 raise WriteMetadataError("Failed to write metadata into %s"%disk)
 
                         if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
@@ -208,7 +206,7 @@ def readMetadata(disk):
 
 
 def getLatestMetadata():
-	logger = util.getLogger(name="getLatestVersNum")
+	logger = util.getLogger(name="getLatestMetadata")
 	rootDisk = getRootDisk()
 	disks = getAllDisks()
 	latestMetadata = None
@@ -267,7 +265,7 @@ def remountDisks():
 	for disk in formatDisks(unusedDisks)[1]:
 		if len(lostDevices) == 0:
 			break
-		if writeMetadata(disk=disk, vers=latest["vers"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDevices[0]) == 0:
+		if writeMetadata(disk=disk, vers=latest["vers"], proxyList=latest["proxyList"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDevices[0]) == 0:
 			deviceNum = lostDevices[0]
 			if mountSwiftDevice(disk=disk, devicePrx=latest["devicePrx"], deviceNum=deviceNum) == 0:
 				lostDevices.pop(0)
@@ -304,7 +302,7 @@ def lazyUmountSwiftDevices(deviceCnt, devicePrx):
 	for deviceNum in range(1,deviceCnt+1):
 		lazyUmount("/srv/node/%s%d"%(devicePrx,deviceNum))
 
-def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
+def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
 
 	mountpoint =  "/temp/%s"%disk
@@ -321,7 +319,7 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 
 	#TODO: write checksum
 	os.system("touch /%s/Metadata"%mountpoint)
-	metadata = {"hostname":socket.gethostname(), "vers":vers, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
+	metadata = {"hostname":socket.gethostname(), "vers":vers, "proxyList":proxyList, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
 	
 	try:
 		with open("%s/Metadata"%mountpoint, "wb") as fh:
@@ -343,7 +341,7 @@ def main(argv):
 		if sys.argv[1]=="-r":
 			remountDisks()
 		else:
-			ret = createSwiftDevices(int(sys.argv[1]))
+			sys.exit(-1)
 	else:
 		sys.exit(-1)
 
@@ -351,9 +349,12 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	#main(sys.argv[1:])
+	main(sys.argv[1:])
+	#print getLatestMetadata()
+	#proxyList = [{"ip":"172.16.229.45"}, {"ip":"172.16.229.54"}]
+	#createSwiftDevices(proxyList=proxyList, deviceCnt=5)
 	#writeMetadata(disk="/dev/sdb", deviceNum=3, devicePrx="sdb", deviceCnt=5)
 	#print readMetadata(disk="/dev/sdb")
-	print remountDisks()
+	#print remountDisks()
 	#print int(time.time())
 	
