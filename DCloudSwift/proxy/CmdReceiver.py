@@ -44,6 +44,15 @@ class UsageError(Exception):
 def usage():
 	print >> sys.stderr, Usage
 
+
+def updateRC():
+	line1 = " #!/bin/sh -e"
+	line2 = "python /DCloudSwift/util/mountDisks.py -r"
+	line3 = "python /DCloudSwift/util/mountDisks.py -l"
+	os.system("echo \"%s\" > /etc/rc.local"%line1)
+	os.system("echo \"%s\" >> /etc/rc.local"%line2)
+	os.system("echo \"%s\" >> /etc/rc.local"%line3)
+
 def triggerAddStorage(**kwargs):
 	logger = util.getLogger(name="triggerAddStorage")
 	proxyList = kwargs['proxyList']
@@ -78,6 +87,12 @@ def triggerFirstProxyDeploy(**kwargs):
 	numOfReplica = kwargs['numOfReplica']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
+
+
+	os.system("touch /etc/swift/proxyList")
+	with open("/etc/swift/proxyList", "wb") as fh:
+		pickle.dump(proxyList, fh)
+
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
 	os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 	zoneNumber = 1
@@ -93,6 +108,8 @@ def triggerFirstProxyDeploy(**kwargs):
 	if metadata is None:
 		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
 	
+	updateRC()
+
 	return 0
 
 def triggerProxyDeploy(**kwargs):
@@ -107,6 +124,9 @@ def triggerProxyDeploy(**kwargs):
 	metadata = mountDisks.getLatestMetadata()
 	if metadata is None:
 		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
+
+	updateRC()
+
 	return 0
 
 def triggerRmStorage(**kwargs):

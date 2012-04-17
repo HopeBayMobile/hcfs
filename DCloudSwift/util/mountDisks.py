@@ -14,6 +14,9 @@ import socket
 import util
 
 
+#TODO: Read from config files
+UNNECESSARYFILES = "cert* backup"
+
 class MountSwiftDeviceError(Exception): pass
 class WriteMetadataError(Exception): pass
 
@@ -223,7 +226,7 @@ def getLatestMetadata():
 	return latestMetadata
 
 def __loadSwiftMetadata(disk):
-        logger = util.getLogger(name="__reloadSwiftMetadata")
+        logger = util.getLogger(name="__loadSwiftMetadata")
 	metadata = {}
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
@@ -236,7 +239,7 @@ def __loadSwiftMetadata(disk):
 
 	returncode = 0
 
-	cmd = "cp %s/swift/*.ring.gz %s/swift/*.builder %s/swift/swift.conf /etc/swift/"%(mountpoint, mountpoint, mountpoint)
+	cmd = "cp %s/swift/* /etc/swift/"%(mountpoint)
 	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         po.wait()
         if po.returncode != 0:
@@ -306,7 +309,7 @@ def remountDisks():
 	for disk in formatDisks(unusedDisks)[1]:
 		if len(lostDevices) == 0:
 			break
-		if writeMetadata(disk=disk, vers=latest["vers"], proxyList=latest["proxyList"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDevices[0]) == 0:
+		if writeMetadata(disk=disk, vers=latest["vers"], deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"], deviceNum=lostDevices[0]) == 0:
 			deviceNum = lostDevices[0]
 			if mountSwiftDevice(disk=disk, devicePrx=latest["devicePrx"], deviceNum=deviceNum) == 0:
 				lostDevices.pop(0)
@@ -346,14 +349,16 @@ def lazyUmountSwiftDevices(deviceCnt, devicePrx):
 def dumpSwiftMetadata(destDir):
 	logger = util.getLogger(name="dumpSwiftMetadata")
 	os.system("mkdir -p %s"%destDir)
-        cmd = "cp /etc/swift/*.ring.gz /etc/swift/*.builder /etc/swift/swift.conf %s"%destDir
+        cmd = "cp -r /etc/swift/* %s"%destDir
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         po.wait()
         if po.returncode != 0:
                 logger.error("Failed to dump swift metadata to %s for %s"%(destDir,po.stderr.read()))
                 return po.returncode
 
-def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
+	os.system("cd %s; rm -rf %s"%(destDir, UNNECESSARYFILES))
+
+def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
 
 	mountpoint =  "/temp/%s"%disk
@@ -371,7 +376,7 @@ def writeMetadata(disk, vers, proxyList,  deviceCnt, devicePrx, deviceNum):
 
 	#TODO: write checksum
 	os.system("touch /%s/Metadata"%mountpoint)
-	metadata = {"hostname":socket.gethostname(), "vers":vers, "proxyList":proxyList, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
+	metadata = {"hostname":socket.gethostname(), "vers":vers, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
 	
 	try:
 		with open("%s/Metadata"%mountpoint, "wb") as fh:
@@ -396,6 +401,8 @@ def main(argv):
 	if len(argv) > 0:
 		if sys.argv[1]=="-r":
 			remountDisks()
+		elif sys.argv[1]=="l":
+			loadSwiftMetadata()
 		else:
 			sys.exit(-1)
 	else:
@@ -407,7 +414,6 @@ def main(argv):
 if __name__ == '__main__':
 	main(sys.argv[1:])
 	#print getLatestMetadata()
-	#proxyList = [{"ip":"172.16.229.45"}, {"ip":"172.16.229.54"}]
 	#createSwiftDevices(proxyList=proxyList, deviceCnt=5)
 	#writeMetadata(disk="/dev/sdb", proxyList=proxyList, vers=0, deviceNum=3, devicePrx="sdb", deviceCnt=5)
 	#print loadSwiftMetadata()

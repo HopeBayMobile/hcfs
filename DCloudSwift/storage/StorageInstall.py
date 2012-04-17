@@ -55,8 +55,10 @@ class StorageNodeInstaller:
 		#TODO: for NTU mode only
 		line1 = " #!/bin/sh -e"
 		line2 = "python /DCloudSwift/util/mountDisks.py -r"
+		line3 = "python /DCloudSwift/util/mountDisks.py -l"
 		os.system("echo \"%s\" > /etc/rc.local"%line1)
 		os.system("echo \"%s\" >> /etc/rc.local"%line2)
+		os.system("echo \"%s\" >> /etc/rc.local"%line3)
 
 if __name__ == '__main__':
 	pass

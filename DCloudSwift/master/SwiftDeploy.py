@@ -20,6 +20,8 @@ from SwiftCfg import SwiftCfg
 import util
 
 
+#TODO: read from config files
+UNNECESSARYFILES = "cert* backup"
 
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
@@ -71,6 +73,10 @@ class SwiftDeploy:
                         if status !=0:
                                 logger.error("Failed to retrieve /etc/swift from %s for %s"%(i, stderr.read()))
                                 return 1
+
+			#Remove unnecessary files
+			os.system("cd /tmp/swift; rm -rf %s"%UNNECESSARYFILES)
+
 
 			return 0
 
