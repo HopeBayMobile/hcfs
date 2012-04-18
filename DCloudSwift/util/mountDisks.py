@@ -417,7 +417,7 @@ def main(argv):
 if __name__ == '__main__':
 	main(sys.argv[1:])
 	#print getLatestMetadata()
-	#createSwiftDevices(proxyList=proxyList, deviceCnt=5)
+	#createSwiftDevices()
 	#writeMetadata(disk="/dev/sdb", proxyList=proxyList, vers=0, deviceNum=3, devicePrx="sdb", deviceCnt=5)
 	#print loadSwiftMetadata()
 	#print readMetadata(disk="/dev/sdb")

@@ -81,7 +81,7 @@ def getLogger(conf=SWIFTCONF, name=None):
 def getSwiftConfVers(confDir="/etc/swift"):
 	logger = getLogger(name="getSwiftConfVers")
 
-	cmd = 'cd %s; swift-ring-builder object.builder'%confdir
+	cmd = 'cd %s; swift-ring-builder object.builder'%confDir
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	po.wait()
 
