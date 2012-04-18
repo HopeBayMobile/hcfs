@@ -15,10 +15,38 @@ import util
 
 
 #TODO: Read from config files
-UNNECESSARYFILES = "cert* backup"
+UNNECESSARYFILES = "cert* backups"
 
 class MountSwiftDeviceError(Exception): pass
 class WriteMetadataError(Exception): pass
+
+def getMajorityHostname():
+	logger = util.getLogger(name="getMajorityHostname")
+	logger.debug("start")
+	disks = getNonRootDisks()
+	hostnameCount = {}
+	maxCount =0
+	mojorityHostname=None
+
+       	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret == 0:
+			hostnameCount.setdefault(metadata["hostname"], 0)
+			hostnameCount[metadata["hostname"]] +=1 
+			
+	for hostname in hostnameCount:
+		if hostnameCount[hostname] > maxCount:
+			maxCount = hostnameCount[hostname]
+			majorityHostname = hostname
+
+	latestMetadata = getLatestMetadata()
+
+	if latestMetadata is not None:
+		if (2*maxCount) <= latestMetadata["deviceCnt"]:
+			majorityHostname = None		
+
+	logger.debug("end")
+	return majorityHostname
 
 def getRootDisk():
 	cmd = "mount"
@@ -78,15 +106,12 @@ def formatNonRootDisks(deviceCnt=1):
 	Format deviceCnt non-root disks
 	'''
 	logger = util.getLogger(name="formatNonRootDisks")
-	rootDisk = getRootDisk()
-	disks = getAllDisks()
+	disks = getNonRootDisks()
 	formattedDisks = []
 	count=0
 	returncode=0
 
 	for disk in disks:
-		if disk == rootDisk:
-			continue
 		count+=1
 		if count > deviceCnt:
 			break
@@ -254,16 +279,19 @@ def __loadSwiftMetadata(disk):
 def loadSwiftMetadata():
 	logger = util.getLogger(name="loadSwiftMetadata")
         disks = getNonRootDisks()
+	latestMetadata = getLatestMetadata()
+	os.system("mkdir -p /etc/swift")
+	returncode = 1
 
         for disk in disks:
-		if readMetadata(disk) is not None:
-			if __loadSwiftMetadata(disk) !=0:
-				os.system("chown -R swift:swift /etc/swift")
-				continue
-			else:
-				return 0
+		(ret, metadata) = readMetadata(disk)
+		if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+			if __loadSwiftMetadata(disk) ==0:
+				returncode = 0
+				break
 
-	return 1
+	os.system("chown -R swift:swift /etc/swift")
+	return returncode
 
 
 def remountRecognizableDisks():
@@ -294,9 +322,29 @@ def remountRecognizableDisks():
 	lostDevices = [x for x in range(1,latest["deviceCnt"]+1) if x not in seenDevices]
 	return (lostDevices, unusedDisks)
 
+
+def resume():
+	logger = util.getLogger(name="resume")
+        logger.debug("start")
+
+	hostname = socket.gethostname()
+        majorityHostname = getMajorityHostname()
+
+	if majorityHostname is not None and majorityHostname != hostname:
+		os.system("mkdir -p /etc/swift")
+		os.system("touch /etc/swift/majorityHostname")
+		os.system("echo \"%s\" > /etc/swift/majorityHostname"%majorityHostname)
+		os.system("chown -R swift:swift /etc/swift")
+		return
+
+	remountDisks()
+	loadSwiftMetadata()	
+
+
+
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
-	logger.debug("remountDisks start")
+	logger.debug("start")
 	
 	latest = getLatestMetadata()
 
@@ -320,7 +368,7 @@ def remountDisks():
 		else:
 			logger.error("Failed to write metadata to %s"%disk)
 
-	logger.debug("remountDisks end")
+	logger.debug("end")
        	return (len(lostDevices), lostDevices)
 
 
@@ -404,8 +452,10 @@ def main(argv):
 	if len(argv) > 0:
 		if sys.argv[1]=="-r":
 			remountDisks()
-		elif sys.argv[1]=="l":
+		elif sys.argv[1]=="-l":
 			loadSwiftMetadata()
+		elif sys.argv[1]=="-R":
+			resume()
 		else:
 			sys.exit(-1)
 	else:
@@ -415,12 +465,16 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	#main(sys.argv[1:])
+	#print getMajorityHostname()
 	#print getLatestMetadata()
 	#createSwiftDevices()
-	#writeMetadata(disk="/dev/sdb", proxyList=proxyList, vers=0, deviceNum=3, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sdc", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=9)
+	writeMetadata(disk="/dev/sdd", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=9)
+	writeMetadata(disk="/dev/sde", vers=1, deviceNum=6, devicePrx="sdb", deviceCnt=9)
+	#print getMajorityHostname()
 	#print loadSwiftMetadata()
 	#print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
-	
+	resume()

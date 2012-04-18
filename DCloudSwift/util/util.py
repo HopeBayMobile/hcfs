@@ -1,11 +1,3 @@
-'''
-Created on 2012/03/08
-
-@author: Ken
-
-Modified by Ken, Mingchi on 2012/03/09
-Modified by Ken on 2012/03/28
-'''
 import os
 import subprocess
 import logging
@@ -41,7 +33,7 @@ def findLine(filename, line):
 
 	return False
 	
-def getLogger(conf=SWIFTCONF, name=None):
+def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	Get a file logger using config settings.
 
@@ -182,7 +174,7 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 
 			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/* root@%s:/etc/swift/"%(sourceDir, ip))
 			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/* root@%s:/etc/swift/"%(sourceDir, ip)
-			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
 			if status !=0:
 				raise SshpassError(stderr.read())
 
@@ -262,14 +254,14 @@ def jsonStr2SshpassArg(jsonStr):
 
 def updateRC():
 	logger = util.getLogger(name="udateRC")	
-	logger.debug("start updating rc.local")
+	logger.debug("start")
+
 	line1 = "#!/bin/sh -e"
-	line2 = "python /DCloudSwift/util/mountDisks.py -r"
-	line3 = "python /DCloudSwift/util/mountDisks.py -l"
+	line2 = "python /DCloudSwift/util/mountDisks.py -R"
 	os.system("echo \"%s\" > /etc/rc.local"%line1)
 	os.system("echo \"%s\" >> /etc/rc.local"%line2)
-	os.system("echo \"%s\" >> /etc/rc.local"%line3)
-	logger.debug("end updating rc.local")
+
+	logger.debug("end")
 
 class TimeoutError(Exception):
 	def __init__(self, cmd, timeout):
