@@ -58,6 +58,7 @@ class SwiftDeploy:
 		deviceCnt = self.__kwparams['deviceCnt']
 		devicePrx = self.__kwparams['devicePrx']
 
+		os.system("mkdir -p /etc/delta/swift")
 		os.system("mkdir -p /etc/swift")
 		os.system("touch /etc/swift/proxyList")
 		with open("/etc/swift/proxyList", "wb") as fh:
@@ -74,9 +75,9 @@ class SwiftDeploy:
 
 		os.system("/DCloudSwift/proxy/Rebalance.sh")
 
-		os.system("cp -r /etc/swift /tmp")
+		os.system("cp -r /etc/swift /etc/delta")
 		os.system("rm -rf /etc/swift/*")
-		os.system("cd /tmp/swift; rm -rf %s"%UNNECESSARYFILES)
+		os.system("cd /etc/delta/swift; rm -rf %s"%UNNECESSARYFILES)
 
 
 
@@ -89,7 +90,7 @@ class SwiftDeploy:
 		for i in [node["ip"] for node in self.__proxyList]:
 			try:
 							
-				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/tmp/swift', nodeList=[i])[0] !=0:
+				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[i])[0] !=0:
 					logger.error("Failed to spread metadata to %s"%i)
 					blackList.append(i)
 					continue
@@ -128,7 +129,7 @@ class SwiftDeploy:
 		#	if pid == 0:
 		#		continue
 			try:
-				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/tmp/swift', nodeList=[i])[0] !=0:
+				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[i])[0] !=0:
                                         logger.error("Failed to spread metadata to %s"%i)
                                         blackList.append(i)
                                         continue

@@ -79,7 +79,7 @@ def triggerProxyDeploy(**kwargs):
 	logger.info("Proxy started")
 	metadata = mountDisks.getLatestMetadata()
 	
-	if metadata is None:
+	if metadata is None or metadata["vers"] < util.getSwiftConfVers():
 		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
 	else:
 		mountDisks.remountDisks()

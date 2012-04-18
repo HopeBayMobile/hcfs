@@ -144,14 +144,14 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
 
 def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
-	logger.debug("createSwiftDevices start")
+	logger.debug("start")
 
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
 		return deviceCnt
 	
 	#TODO: modified to match the ring version
-	vers = 0 
+	vers = util.getSwiftConfVers() 
 	count = 0
         for disk in disks:
                 try:
@@ -162,7 +162,7 @@ def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
                                 os.system("umount -l %s"%mountpoint)
 
 			print "%s\n"%mountpoint
-                #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
+                	#line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
 
                         if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
                                 raise WriteMetadataError("Failed to write metadata into %s"%disk)
@@ -172,18 +172,17 @@ def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
 
                         if count == deviceCnt:
                                 return 0
-                except OSError as err:
-                        logger.error("Failed to mount %s for %s"%(disk, err))
-                        count-=1
-                        continue
-                except (WriteMetadataError, MountSwiftDeviceError) as err:
+                except WriteMetadataError as err:
                         logger.error("%s"%err)
                         count-=1
+                        continue
+                except MountSwiftDeviceError as err:
+                	logger.error("%s"%err)
                         continue
 
 	os.system("mkdir -p /srv/node")
         os.system("chown -R swift:swift /srv/node/")
-	logger.debug("createSwiftDevices end")
+	logger.debug("end")
         return deviceCnt-count
 
 def readMetadata(disk):

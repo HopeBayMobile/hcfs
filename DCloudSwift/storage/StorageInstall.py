@@ -37,7 +37,7 @@ class StorageNodeInstaller:
 	def install(self):
 		self.__logger.info("start install")
 		metadata = mountDisks.getLatestMetadata()
-		if metadata is None:
+		if metadata is None or metadata["vers"] < util.getSwiftMetadataVers():
 			mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
 		else:
 			mountDisks.remountDisks()

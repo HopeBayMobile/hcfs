@@ -78,6 +78,22 @@ def getLogger(conf=SWIFTCONF, name=None):
 	finally:
 		logLock.release()
 
+def getSwiftConfVers(confDir="/etc/swift"):
+	logger = getLogger(name="getSwiftConfVers")
+
+	cmd = 'cd %s; swift-ring-builder object.builder'%confdir
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	po.wait()
+
+	if po.returncode !=0:
+		return -1
+
+	line = po.stdout.readline()
+	tokens = line.split()	
+	vers = int(tokens[3])
+	
+	return vers
+	
 
 def getStorageNodeIpList():
 	'''
@@ -270,8 +286,9 @@ class SshpassError(Exception):
 		
 
 if __name__ == '__main__':
+	print getSwiftConfVers()
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
-	spreadPackages(password="deltacloud", nodeList = ["172.16.229.34"])
+	#spreadPackages(password="deltacloud", nodeList = ["172.16.229.34"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()
