@@ -10,6 +10,7 @@ import subprocess
 import threading
 import datetime
 import logging
+import pickle
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
@@ -21,7 +22,7 @@ import util
 
 
 #TODO: read from config files
-UNNECESSARYFILES = "cert* backup"
+UNNECESSARYFILES = "cert* backups"
 
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
@@ -49,52 +50,43 @@ class SwiftDeploy:
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
-	def __firstProxyDeploy(self):
-		logger = util.getLogger(name="firstProxyDeploy")
-                #TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
-                i = self.__proxyList[0]["ip"]
-                try:
+	def createMetadata(self):
+		logger = util.getLogger(name = "createMetadata")
+		proxyList = self.__kwparams['proxyList']
+		storageList = self.__kwparams['storageList']
+		numOfReplica = self.__kwparams['numOfReplica']
+		deviceCnt = self.__kwparams['deviceCnt']
+		devicePrx = self.__kwparams['devicePrx']
 
-                        cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-                        (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
-                        if status !=0:
-                                logger.error("Failed to scp proxy deploy scrips to %s for %s"%(i, stderr.read()))
-                                return 1
+		os.system("mkdir -p /etc/swift")
+		os.system("touch /etc/swift/proxyList")
+		with open("/etc/swift/proxyList", "wb") as fh:
+			pickle.dump(proxyList, fh)
 
-                        cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -f %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-                        print cmd
-                        (status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
-                        if status != 0:
-                                logger.error("Failed to deploy the first proxy %s for %s"%(i, stderr.read()))
-                                return 1
+		os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
+		os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
+		zoneNumber = 1
+		for node in storageList: 
+			for j in range(deviceCnt):
+				deviceName = devicePrx + str(j+1)
+				logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
+				os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
 
-			cmd = "scp -r root@%s:/etc/swift /tmp"%i
-			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
-                        if status !=0:
-                                logger.error("Failed to retrieve /etc/swift from %s for %s"%(i, stderr.read()))
-                                return 1
+		os.system("/DCloudSwift/proxy/Rebalance.sh")
 
-			#Remove unnecessary files
-			os.system("cd /tmp/swift; rm -rf %s"%UNNECESSARYFILES)
+		os.system("cp -r /etc/swift /tmp")
+		os.system("rm -rf /etc/swift/*")
+		os.system("cd /tmp/swift; rm -rf %s"%UNNECESSARYFILES)
 
-
-			return 0
-
-                except util.TimeoutError as err:
-                        logger.error("%s"%err)
-                        sys.stderr.write("%s\n"%err)
-			return 1
-			
 
 
 	def proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
 		#TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
-		if self.__firstProxyDeploy() !=0:
-			return (1, [node["ip"] for node in self.__proxyList])
+		self.createMetadata()
 
 		blackList = []
-		for i in [node["ip"] for node in self.__proxyList[1:]]:
+		for i in [node["ip"] for node in self.__proxyList]:
 			try:
 							
 				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/tmp/swift', nodeList=[i])[0] !=0:
@@ -224,9 +216,10 @@ class SwiftDeploy:
 
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-	SD = SwiftDeploy([{"ip":"172.16.229.56"}, {"ip":"172.16.229.101"}], [{"ip":"172.16.229.101", "zid":1}, {"ip":"172.16.229.156", "zid":2}])
+	SD = SwiftDeploy([{"ip":"172.16.229.56"}, {"ip":"172.16.229.101"}], [{"ip":"172.16.229.101", "zid":1}, {"ip":"172.16.229.150", "zid":2}])
+	#SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
-	#SD.proxyDeploy()
+	SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
-	SD.storageDeploy()
+	#SD.storageDeploy()

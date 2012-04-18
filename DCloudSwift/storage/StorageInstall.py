@@ -35,30 +35,27 @@ class StorageNodeInstaller:
 		self.__logger = util.getLogger(name = "StorageNodeInstaller")
 
 	def install(self):
-		self.__logger.info("getlatestMetadata")
+		self.__logger.info("start install")
 		metadata = mountDisks.getLatestMetadata()
 		if metadata is None:
-			self.__logger.info("Write Metadata")
-			mountDisks.createSwiftDevices(proxyList=self.__proxyList, deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
+			mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
+		else:
+			mountDisks.remountDisks()
 
 		os.system("chown -R swift:swift /srv/node/ ")
 		os.system("/DCloudSwift/storage/rsync.sh")
 		os.system("perl -pi -e 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/' /etc/default/rsync")
-		os.system("service rsync start")
+		os.system("service rsync restart")
 
 		os.system("/DCloudSwift/storage/accountserver.sh")
 		os.system("/DCloudSwift/storage/containerserver.sh")
 		os.system("/DCloudSwift/storage/objectserver.sh")
 		os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
-		os.system("swift-init all start")
+		os.system("swift-init all restart")
 		
-		#TODO: for NTU mode only
-		line1 = " #!/bin/sh -e"
-		line2 = "python /DCloudSwift/util/mountDisks.py -r"
-		line3 = "python /DCloudSwift/util/mountDisks.py -l"
-		os.system("echo \"%s\" > /etc/rc.local"%line1)
-		os.system("echo \"%s\" >> /etc/rc.local"%line2)
-		os.system("echo \"%s\" >> /etc/rc.local"%line3)
+		util.updateRC()
+
+		self.__logger.info("end install")
 
 if __name__ == '__main__':
 	pass

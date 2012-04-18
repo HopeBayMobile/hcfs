@@ -1,10 +1,3 @@
-'''
-Created on 2012/03/01
-
-@author: CW
-Modified by Ken on 2012/04/13: add lockfile
-'''
-
 import sys
 import os
 import socket
@@ -45,14 +38,6 @@ def usage():
 	print >> sys.stderr, Usage
 
 
-def updateRC():
-	line1 = " #!/bin/sh -e"
-	line2 = "python /DCloudSwift/util/mountDisks.py -r"
-	line3 = "python /DCloudSwift/util/mountDisks.py -l"
-	os.system("echo \"%s\" > /etc/rc.local"%line1)
-	os.system("echo \"%s\" >> /etc/rc.local"%line2)
-	os.system("echo \"%s\" >> /etc/rc.local"%line3)
-
 def triggerAddStorage(**kwargs):
 	logger = util.getLogger(name="triggerAddStorage")
 	proxyList = kwargs['proxyList']
@@ -80,40 +65,10 @@ def triggerAddStorage(**kwargs):
 	return (returncode, blackProxyNodes, blackStorageNodes)
 
 
-def triggerFirstProxyDeploy(**kwargs):
-	logger = util.getLogger(name = "triggerFirstProxyDeploy")
-	proxyList = kwargs['proxyList']
-	storageList = kwargs['storageList']
-	numOfReplica = kwargs['numOfReplica']
-	deviceCnt = kwargs['deviceCnt']
-	devicePrx = kwargs['devicePrx']
-
-
-	os.system("touch /etc/swift/proxyList")
-	with open("/etc/swift/proxyList", "wb") as fh:
-		pickle.dump(proxyList, fh)
-
-	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
-	os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
-	zoneNumber = 1
-	for node in storageList: 
-		for j in range(deviceCnt):
-			deviceName = devicePrx + str(j+1)
-			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
-			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
-
-	os.system("/DCloudSwift/proxy/Rebalance.sh")
-	os.system("/DCloudSwift/proxy/ProxyStart.sh")
-	metadata = mountDisks.getLatestMetadata()
-	if metadata is None:
-		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
-	
-	updateRC()
-
-	return 0
-
 def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
+	logger.info("triggerProxyDeploy start")
+
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
@@ -121,12 +76,17 @@ def triggerProxyDeploy(**kwargs):
 	devicePrx = kwargs['devicePrx']
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	logger.info("Proxy started")
 	metadata = mountDisks.getLatestMetadata()
+	
 	if metadata is None:
-		mountDisks.createSwiftDevices(proxyList=proxyList, deviceCnt=deviceCnt,devicePrx=devicePrx)
+		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+	else:
+		mountDisks.remountDisks()
 
-	updateRC()
+	util.updateRC()
 
+	looger.info("triggerProxyDeploy end")
 	return 0
 
 def triggerRmStorage(**kwargs):
@@ -176,10 +136,6 @@ def main():
                                	kwargs = json.loads(sys.argv[2])
                         	print 'Proxy deployment start'
                         	triggerRmStorage(**kwargs)	
-        		elif (sys.argv[1] == 'firstProxy' or sys.argv[1] == '-f'):
-				kwargs = json.loads(sys.argv[2])
-				print 'First proxy deployment start'
-				triggerFirstProxyDeploy(**kwargs)
         		elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 				kwargs = json.loads(sys.argv[2])
 				print 'Proxy deployment start'

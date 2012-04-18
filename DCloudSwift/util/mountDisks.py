@@ -142,8 +142,10 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
 
 	return returncode
 
-def createSwiftDevices(proxyList, deviceCnt=1, devicePrx="sdb"):
+def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
+	logger.debug("createSwiftDevices start")
+
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
 		return deviceCnt
@@ -162,7 +164,7 @@ def createSwiftDevices(proxyList, deviceCnt=1, devicePrx="sdb"):
 			print "%s\n"%mountpoint
                 #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
 
-                        if writeMetadata(disk=disk, vers=vers, proxyList=proxyList, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
+                        if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
                                 raise WriteMetadataError("Failed to write metadata into %s"%disk)
 
                         if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
@@ -181,6 +183,7 @@ def createSwiftDevices(proxyList, deviceCnt=1, devicePrx="sdb"):
 
 	os.system("mkdir -p /srv/node")
         os.system("chown -R swift:swift /srv/node/")
+	logger.debug("createSwiftDevices end")
         return deviceCnt-count
 
 def readMetadata(disk):
@@ -192,7 +195,7 @@ def readMetadata(disk):
 
 	#TODO: chechsum
 	if mountDisk(disk, mountpoint) !=0:
-                logger.error("Failed to mount %s"%disk)
+                logger.debug("Failed to mount %s"%disk)
                 return (1, metadata)
 
 	try:
@@ -201,7 +204,7 @@ def readMetadata(disk):
 
 		return (0, metadata)
 	except IOError as e:
-		logger.error("Failed to read metadata from %s for %s"%(disk, e))
+		logger.debug("Failed to read metadata from %s for %s"%(disk, e))
 		return (1, metadata)
 	finally:
 		if lazyUmount(mountpoint)!=0:
@@ -210,19 +213,17 @@ def readMetadata(disk):
 
 def getLatestMetadata():
 	logger = util.getLogger(name="getLatestMetadata")
-	rootDisk = getRootDisk()
-	disks = getAllDisks()
+	logger.debug("getLatestMetadata start")
+	disks = getNonRootDisks()
 	latestMetadata = None
 
        	for disk in disks:
-               	if disk == rootDisk:
-                       	continue
-
 		(ret, metadata) = readMetadata(disk)
 		if ret == 0:
 			latestMetadata  = metadata  if latestMetadata is None or latestMetadata["vers"] < metadata["vers"]  else latestMetadata
 			
 
+	logger.debug("getLatestMetadata end")
 	return latestMetadata
 
 def __loadSwiftMetadata(disk):
@@ -296,6 +297,7 @@ def remountRecognizableDisks():
 
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
+	logger.debug("remountDisks start")
 	
 	latest = getLatestMetadata()
 
@@ -319,6 +321,7 @@ def remountDisks():
 		else:
 			logger.error("Failed to write metadata to %s"%disk)
 
+	logger.debug("remountDisks end")
        	return (len(lostDevices), lostDevices)
 
 
@@ -354,9 +357,10 @@ def dumpSwiftMetadata(destDir):
         po.wait()
         if po.returncode != 0:
                 logger.error("Failed to dump swift metadata to %s for %s"%(destDir,po.stderr.read()))
-                return po.returncode
+                return 1
 
 	os.system("cd %s; rm -rf %s"%(destDir, UNNECESSARYFILES))
+	return 0
 
 def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")

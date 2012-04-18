@@ -244,6 +244,17 @@ def jsonStr2SshpassArg(jsonStr):
 	
 
 
+def updateRC():
+	logger = util.getLogger(name="udateRC")	
+	logger.debug("start updating rc.local")
+	line1 = "#!/bin/sh -e"
+	line2 = "python /DCloudSwift/util/mountDisks.py -r"
+	line3 = "python /DCloudSwift/util/mountDisks.py -l"
+	os.system("echo \"%s\" > /etc/rc.local"%line1)
+	os.system("echo \"%s\" >> /etc/rc.local"%line2)
+	os.system("echo \"%s\" >> /etc/rc.local"%line3)
+	logger.debug("end updating rc.local")
+
 class TimeoutError(Exception):
 	def __init__(self, cmd, timeout):
 		self.cmd = cmd

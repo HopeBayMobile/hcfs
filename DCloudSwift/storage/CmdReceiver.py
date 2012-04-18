@@ -1,7 +1,3 @@
-'''
-First Created on 2012/03/01 by CW
-'''
-
 import sys
 import os
 import socket
