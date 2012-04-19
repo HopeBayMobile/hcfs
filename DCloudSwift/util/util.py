@@ -211,19 +211,19 @@ def spreadPackages(password, nodeList=[]):
 		try:
 			print "Start installation of swfit packages on %s ..."%ip
 
-			cmd = "ssh root@%s mkdir -p /var/lib/swift/"%(ip)
+			cmd = "ssh root@%s mkdir -p /etc/lib/swift/"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
                         if status != 0:
                                 raise SshpassError(stderr.read())
 
-			logger.info("scp -o StrictHostKeyChecking=no -r /var/lib/swift/* root@%s:/var/lib/swift/"%(ip))
-			cmd = "scp -o StrictHostKeyChecking=no -r /var/lib/swift/* root@%s:/var/lib/swift/"%(ip)
+			logger.info("scp -o StrictHostKeyChecking=no -r /etc/lib/swift/* root@%s:/etc/lib/swift/"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no -r /etc/lib/swift/* root@%s:/etc/lib/swift/"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
 				raise SshpassError(stderr.read())
 
 
-			cmd = "ssh root@%s dpkg -i /var/lib/swift/*.deb "%(ip)
+			cmd = "ssh root@%s dpkg -i /etc/lib/swift/*.deb "%(ip)
 
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
 			if status != 0:
@@ -255,8 +255,8 @@ def spreadRC(password, nodeList=[]):
 			print "Start spreading rc.local to %s ..."%ip
 
 
-			logger.info("scp -o StrictHostKeyChecking=no /var/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip))
-			cmd = "scp -o StrictHostKeyChecking=no /var/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip)
+			logger.info("scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
 				raise SshpassError(stderr.read())

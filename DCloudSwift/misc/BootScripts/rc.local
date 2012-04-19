@@ -11,5 +11,5 @@
 #
 # By default this script does nothing.
 
-python /var/lib/swift/BootScripts/rc.py
+python /etc/lib/swift/BootScripts/rc.py
 exit 0
