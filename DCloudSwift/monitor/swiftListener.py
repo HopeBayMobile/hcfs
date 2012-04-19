@@ -1,31 +1,18 @@
 import sys, time
-import socket
-import pickle
 
 sys.path.append("/DCloudSwift/util")
 from SwiftCfg import SwiftCfg
 from daemon import Daemon
 import util
 
-PORT=2308
-
-class SwiftMonitor(Daemon):
+class SwiftListener(Daemon):
 	def run(self):
-		logger = util.getLogger(name="SwiftMonitor")
-		storageIpList = util.getStorageIpList()
 		
-		try:
-			with open("/etc/swift/proxyList","rb") as fh:
-				proxyList = pickle.load(fh)
-		except IOError:
-			logger.error("Failed to load proxyList")
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		while True:
-			time.sleep(10)
-			
+			time.sleep(1)
 
 if __name__ == "__main__":
-	daemon = SwiftMonitor('/var/run/swiftMonitor.pid')
+	daemon = SwiftMonitor('/var/run/swiftListener.pid')
 	if len(sys.argv) == 2:
 		if 'start' == sys.argv[1]:
 			daemon.start()

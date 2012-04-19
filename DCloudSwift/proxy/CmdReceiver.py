@@ -84,8 +84,6 @@ def triggerProxyDeploy(**kwargs):
 	else:
 		mountDisks.remountDisks()
 
-	util.updateRC()
-
 	looger.info("triggerProxyDeploy end")
 	return 0
 

@@ -97,6 +97,9 @@ def getStorageNodeIpList():
 	cmd = 'cd /etc/swift; swift-ring-builder object.builder'
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	po.wait()
+	
+	if po.returncode != 0:
+		return None
 
 	i = 0
 	ipList =[]
@@ -203,6 +206,7 @@ def spreadPackages(password, nodeList=[]):
 	logger = getLogger(name="spreadPackages")
 	blackList=[]
 	returncode = 0
+	cmd =""
 	for ip in nodeList:
 		try:
 			print "Start installation of swfit packages on %s ..."%ip
@@ -212,14 +216,14 @@ def spreadPackages(password, nodeList=[]):
                         if status != 0:
                                 raise SshpassError(stderr.read())
 
-			logger.info("scp -o StrictHostKeyChecking=no /var/lib/swift/* root@%s:/var/lib/swift/"%(ip))
-			cmd = "scp -o StrictHostKeyChecking=no /var/lib/swift/* root@%s:/var/lib/swift/"%(ip)
+			logger.info("scp -o StrictHostKeyChecking=no -r /var/lib/swift/* root@%s:/var/lib/swift/"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no -r /var/lib/swift/* root@%s:/var/lib/swift/"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
 				raise SshpassError(stderr.read())
 
 
-			cmd = "ssh root@%s dpkg -i /var/lib/swift/* "%(ip)
+			cmd = "ssh root@%s dpkg -i /var/lib/swift/*.deb "%(ip)
 
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
 			if status != 0:
@@ -241,6 +245,38 @@ def spreadPackages(password, nodeList=[]):
 
 	return (returncode, blackList)
 	
+def spreadRC(password, nodeList=[]):
+	logger = getLogger(name="spreadRC")
+	blackList=[]
+	returncode = 0
+	cmd=""
+	for ip in nodeList:
+		try:
+			print "Start spreading rc.local to %s ..."%ip
+
+
+			logger.info("scp -o StrictHostKeyChecking=no /var/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no /var/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
+			if status !=0:
+				raise SshpassError(stderr.read())
+
+
+		except TimeoutError as err:
+			blackList.append(ip)
+			returncode +=1
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+			print "Failed to spread rc.local to %s"%ip
+			continue
+		except SshpassError as err:
+			blackList.append(ip)
+			returncode +=1
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+			print "Failed to rc.local to %s"%ip
+			continue
+					
+
+	return (returncode, blackList)
 
 def jsonStr2SshpassArg(jsonStr):
 	arg = jsonStr.replace(" ","")
@@ -250,18 +286,6 @@ def jsonStr2SshpassArg(jsonStr):
 	arg = "\'"+arg+"\'"
 	return arg
 	
-
-
-def updateRC():
-	logger = util.getLogger(name="udateRC")	
-	logger.debug("start")
-
-	line1 = "#!/bin/sh -e"
-	line2 = "python /DCloudSwift/util/mountDisks.py -R"
-	os.system("echo \"%s\" > /etc/rc.local"%line1)
-	os.system("echo \"%s\" >> /etc/rc.local"%line2)
-
-	logger.debug("end")
 
 class TimeoutError(Exception):
 	def __init__(self, cmd, timeout):
@@ -278,9 +302,9 @@ class SshpassError(Exception):
 		
 
 if __name__ == '__main__':
-	print getSwiftConfVers()
+#	print getSwiftConfVers()
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
-	#spreadPackages(password="deltacloud", nodeList = ["172.16.229.34"])
+#	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()

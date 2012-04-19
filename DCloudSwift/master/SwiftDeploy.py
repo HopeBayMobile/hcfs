@@ -213,10 +213,11 @@ class SwiftDeploy:
 
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-	SD = SwiftDeploy([{"ip":"172.16.229.35"}, {"ip":"172.16.229.24"}], [{"ip":"172.16.229.24", "zid":1}, {"ip":"172.16.229.148", "zid":2}])
+	util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
+	#SD = SwiftDeploy([{"ip":"172.16.229.35"}, {"ip":"172.16.229.24"}], [{"ip":"172.16.229.24", "zid":1}, {"ip":"172.16.229.148", "zid":2}])
 	#SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
-	SD.proxyDeploy()
+	#SD.proxyDeploy()
 	#TODO: maybe need some time to wait for proxy deploy
 	#SD.storageDeploy()

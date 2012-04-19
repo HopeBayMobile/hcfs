@@ -53,8 +53,6 @@ class StorageNodeInstaller:
 		os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
 		os.system("swift-init all restart")
 		
-		util.updateRC()
-
 		self.__logger.info("end install")
 
 if __name__ == '__main__':
