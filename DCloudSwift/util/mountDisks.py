@@ -1,7 +1,3 @@
-'''
-First Created on 2012/03/14 by Ken
-
-'''
 import os
 import subprocess
 import logging
@@ -278,6 +274,8 @@ def __loadSwiftMetadata(disk):
 
 def loadSwiftMetadata():
 	logger = util.getLogger(name="loadSwiftMetadata")
+	logger.info("start")
+
         disks = getNonRootDisks()
 	latestMetadata = getLatestMetadata()
 	os.system("mkdir -p /etc/swift")
@@ -291,6 +289,8 @@ def loadSwiftMetadata():
 				break
 
 	os.system("chown -R swift:swift /etc/swift")
+
+	logger.info("end")
 	return returncode
 
 
@@ -325,26 +325,27 @@ def remountRecognizableDisks():
 
 def resume():
 	logger = util.getLogger(name="resume")
-        logger.debug("start")
+        logger.info("start")
 
 	hostname = socket.gethostname()
-        majorityHostname = getMajorityHostname()
+        #majorityHostname = getMajorityHostname()
 
-	if majorityHostname is not None and majorityHostname != hostname:
-		os.system("mkdir -p /etc/swift")
-		os.system("touch /etc/swift/majorityHostname")
-		os.system("echo \"%s\" > /etc/swift/majorityHostname"%majorityHostname)
-		os.system("chown -R swift:swift /etc/swift")
-		return
+	#if majorityHostname is not None and majorityHostname != hostname:
+	#	os.system("mkdir -p /etc/swift")
+	#	os.system("touch /etc/swift/majorityHostname")
+	#	os.system("echo \"%s\" > /etc/swift/majorityHostname"%majorityHostname)
+	#	os.system("chown -R swift:swift /etc/swift")
+	#	return
 
 	remountDisks()
 	loadSwiftMetadata()	
 
 
+	logger.info("end")
 
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
-	logger.debug("start")
+	logger.info("start")
 	
 	latest = getLatestMetadata()
 
@@ -368,7 +369,7 @@ def remountDisks():
 		else:
 			logger.error("Failed to write metadata to %s"%disk)
 
-	logger.debug("end")
+	logger.info("end")
        	return (len(lostDevices), lostDevices)
 
 
@@ -465,16 +466,16 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	#main(sys.argv[1:])
+	main(sys.argv[1:])
 	#print getMajorityHostname()
 	#print getLatestMetadata()
 	#createSwiftDevices()
-	writeMetadata(disk="/dev/sdc", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=9)
-	writeMetadata(disk="/dev/sdd", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=9)
-	writeMetadata(disk="/dev/sde", vers=1, deviceNum=6, devicePrx="sdb", deviceCnt=9)
+	#writeMetadata(disk="/dev/sdc", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=9)
+	#writeMetadata(disk="/dev/sdd", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=9)
+	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=6, devicePrx="sdb", deviceCnt=9)
 	#print getMajorityHostname()
 	#print loadSwiftMetadata()
 	#print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
-	resume()
+	#resume()
