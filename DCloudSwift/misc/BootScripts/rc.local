@@ -10,6 +10,7 @@
 # bits.
 #
 # By default this script does nothing.
+sleep 18
 
 python /etc/lib/swift/BootScripts/rc.py
 exit 0
