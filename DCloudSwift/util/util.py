@@ -3,6 +3,7 @@ import subprocess
 import logging
 import threading
 import sys
+import signal
 import time
 
 from SwiftCfg import SwiftCfg
@@ -11,6 +12,29 @@ SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 logLock = threading.Lock()
+
+
+class TimeoutException(Exception):
+	pass
+
+def timeout(timeout_time, default):
+	def timeout_function(f):
+		def f2(*args):
+			def timeout_handler(signum, frame):
+				raise TimeoutException()
+ 
+			old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
+			signal.alarm(timeout_time) # triger alarm in timeout_time seconds
+			try: 
+				retval = f()
+			except TimeoutException:
+				return default
+			finally:
+				signal.signal(signal.SIGALRM, old_handler) 
+			signal.alarm(0)
+			return retval
+		return f2
+	return timeout_function
 
 def runPopenCommunicate(cmd, inputString, logger):
 	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -325,4 +349,12 @@ if __name__ == '__main__':
 #	except TimeoutError as err:
 #		print err
 #	spreadMetadata(password="deltacloud",nodeList=["192.168.1.132"])
-	pass
+#	pass
+	@timeout(5, "This is timeout!!!")
+	def printstring():
+		print "Start!!"
+		time.sleep(10)
+		print "This is not timeout!!!"
+
+	s = printstring()
+	print s
