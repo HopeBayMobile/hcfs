@@ -168,7 +168,7 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
 
 	return returncode
 
-def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
+def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
 	logger.debug("start")
 
@@ -403,6 +403,53 @@ def lazyUmountSwiftDevices(deviceCnt, devicePrx):
 	for deviceNum in range(1,deviceCnt+1):
 		lazyUmount("/srv/node/%s%d"%(devicePrx,deviceNum))
 
+def __loadScripts(disk):
+        logger = util.getLogger(name="__loadSripts")
+	metadata = {}
+        mountpoint =  "/temp/%s"%disk
+        os.system("mkdir -p %s"%mountpoint)
+
+
+	#TODO: chechsum
+	if mountDisk(disk, mountpoint) !=0:
+                logger.error("Failed to mount %s"%disk)
+                return 1
+
+	returncode = 0
+
+	cmd = "cp -r %s/DCloudSwift /"%(mountpoint)
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
+
+        po.wait()
+        if po.returncode != 0:
+                logger.error("Failed to reload scripts from %s for %s"%(disk,output))
+		returncode = 1
+
+	if lazyUmount(mountpoint)!=0:
+		logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
+
+	return returncode
+
+def loadScripts():
+	logger = util.getLogger(name="loadSripts")
+	logger.info("start")
+
+        disks = getNonRootDisks()
+	latestMetadata = getLatestMetadata()
+	os.system("mkdir -p /etc/swift")
+	returncode = 1
+
+        for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+			if __loadScripts(disk) ==0:
+				returncode = 0
+				break
+
+	logger.info("end")
+	return returncode
+
 def dumpScripts(destDir):
 	logger = util.getLogger(name="dumpScripts")
 	os.system("mkdir -p %s"%destDir)
@@ -495,7 +542,7 @@ def main(argv):
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
-	#generateSwiftConfig()
+	#util.generateSwiftConfig()
 	#formatDisks(["/dev/sdc"])
 	#print getRootDisk()
 	#print getAllDisks()
@@ -508,9 +555,8 @@ if __name__ == '__main__':
 	#writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sdf", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=5)
-	#print getMajorityHostname()
 	#print loadSwiftMetadata()
-	#print readMetadata(disk="/dev/sdb")
+	print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
 	#resume()

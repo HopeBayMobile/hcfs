@@ -1,11 +1,14 @@
 import os
 import subprocess
+import fcntl
 import logging
+import logging.handlers
 import threading
 import sys
 import signal
 import time
 import socket
+import struct
 import math
 
 from SwiftCfg import SwiftCfg
@@ -47,7 +50,7 @@ def timeout(timeout_time, default):
 	def timeout_function(f):
 		def f2(*args,**kwargs):
 			def timeout_handler(signum, frame):
-				raise TimeoutError(time=str(timeout_time))
+				raise TimeoutError(timeout=timeout_time)
  
 			old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
 			signal.alarm(timeout_time) # triger alarm in timeout_time seconds
@@ -75,10 +78,11 @@ def restartRsync():
 
 	return po.returncode
 
-def startSwiftServices(():
+def startSwiftServices():
 	'''
 	start appropriate swift services
 	'''
+	pass
 
 
 def runPopenCommunicate(cmd, inputString, logger):
@@ -127,7 +131,7 @@ def getLogger(name=None, conf=SWIFTCONF):
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
 
-		hdlr = logging.RotatingFileHandler(logDir+'/'+logName, maxBytes=1024*1024, backupCount=5)
+		hdlr = logging.handlers.RotatingFileHandler(logDir+'/'+logName, maxBytes=1024*1024, backupCount=5)
 		hdlr.setFormatter(logging.Formatter(FORMATTER))
 		logger.addHandler(hdlr)
 		logger.setLevel(logLevel)
@@ -140,6 +144,8 @@ def getLogger(name=None, conf=SWIFTCONF):
 
 def generateSwiftConfig():
 	ip = socket.gethostbyname(socket.gethostname())
+	if ip.startswith("127"):
+		ip =getIpAddress()
 
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
 
@@ -148,6 +154,15 @@ def generateSwiftConfig():
 	os.system("/DCloudSwift/storage/accountserver.sh %s"%ip)
 	os.system("/DCloudSwift/storage/containerserver.sh %s"%ip)
 	os.system("/DCloudSwift/storage/objectserver.sh %s"%ip)
+
+def getIpAddress():
+    arg='ip route list'    
+    p=subprocess.Popen(arg,shell=True,stdout=subprocess.PIPE)
+    data = p.communicate()
+    sdata = data[0].split()
+    ipaddr = sdata[ sdata.index('src')+1 ]
+    #netdev = sdata[ sdata.index('dev')+1 ]
+    return ipaddr
 
 def getSwiftConfVers(confDir="/etc/swift"):
 	logger = getLogger(name="getSwiftConfVers")
@@ -218,7 +233,7 @@ def sshpass(passwd, cmd, timeout=0):
 		return (po.returncode, stdoutData, stderrData)
 		
 	except TimeoutError:
-		raise TimeoutError(cmd=cmd, timeout=str(timeout))
+		raise TimeoutError(cmd=cmd, timeout=timeout)
 	finally:
 		signal.alarm(0)
 		signal.signal(signal.SIGALRM, old_handler)
@@ -350,7 +365,7 @@ def jsonStr2SshpassArg(jsonStr):
 class TimeoutError(Exception):
 	def __init__(self, cmd=None, timeout=None):
 		self.cmd = cmd
-		self.timeout= timeout
+		self.timeout= str(timeout)
 	def __str__(self):
 		if cmd is not None and timeout is not None:
 			return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
@@ -375,29 +390,31 @@ if __name__ == '__main__':
 #	print installAllDeb("/DCloudSwift/storage/deb_source")
 #	print isLineExistent("/etc/fstab","ddd")
 #	print getStorageNodeIpList()
-#	logger = getLogger(name="Hello")
 #	runPopenCommunicate("cd /etc/swift", inputString='y\n', logger=logger)
 #	runPopenCommunicate("mkfs -t ext4 /dev/sda", inputString='y\n', logger=logger)
 
-#	logger2 = getLogger(name="Hello")
-#	logger2.info("Hello2")
-
-#	logger3 = getLogger(name="Hi")
-#	logger3.info("Hi")
+#	logger = getLogger(name="Hello")
+#	logger.info("Hello")
 
 #	try:
-#		cmd = "ssh root@192.168.1.131 touch aaa"
-#		(returncode, stdoutdata) = sshpass("deltacloud", cmd, timeout=2)
-#		print stdoutdata.readlines()
+#		cmd = "ssh root@172.16.229.35 touch aaa"
+#		(returncode, stdoutdata, stderrdata) = sshpass("deltacloud", cmd, timeout=5)
+#		if returncode==0:
+#			print stdoutdata
+#		else:
+#			print stderrdata
 #	except TimeoutError as err:
 #		print err
-#	spreadMetadata(password="deltacloud",nodeList=["192.168.1.132"])
-#	pass
-	@timeout(5, "This is timeout!!!")
-	def printstring():
-		print "Start!!"
-		time.sleep(10)
-		print "This is not timeout!!!"
 
-	s = printstring()
-	print s
+#	spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
+
+#	@timeout(5, "This is timeout!!!")
+#	def printstring():
+#		print "Start!!"
+#		time.sleep(10)
+#		print "This is not timeout!!!"
+
+#	s = printstring()
+#	print s
+	#print getIpAddress()
+	pass
