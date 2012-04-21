@@ -1,13 +1,13 @@
-#!/bin/bash
-# The shell script is used to install Swift's packages. (OS: Ubuntu 11.04)
-# History:
-# 2012/02/24 first release by CW
-# 2012/03/01 modified by CW
-# 2012/03/06 modified by CW: check the existence of IP address
-# 2012/03/17 modified by Ken
-# 2012/03/22 modified by CW: modify the absolute path of directory deb_source
-# 2012/04/10 modified by Ken: assign swift_hash_path_suffix a fixed string
+if [ $# != 1 ]; then
+        echo "Please enter the correct parameters!"
+        echo "For example:"
+        echo "./CreateProxyConfig ProxyIP"
+        exit 1
+fi
 
+
+IP=$1
+export PROXY_LOCAL_NET_IP=$IP
 
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
@@ -18,15 +18,6 @@ cat >/etc/swift/swift.conf <<EOF
 # random unique string that can never change (DO NOT LOSE)
 swift_hash_path_suffix =  69b4da4fbde33158
 EOF
-
-
-IP=""
-IP=`ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{print $1}'`
-if [ "$IP" = "" ]; then
-	echo "The IP address of the proxy node does not exist!"
-	exit 1
-fi
-export PROXY_LOCAL_NET_IP=$IP
 
 
 openssl req -new -x509 -nodes -out cert.crt -keyout cert.key << EOF

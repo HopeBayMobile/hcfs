@@ -69,12 +69,14 @@ def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
 	logger.info("triggerProxyDeploy start")
 
+	ip = socket.gethostbyname(socket.gethostname())
+
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
 	numOfReplica = kwargs['numOfReplica']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
-	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
+	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 	logger.info("Proxy started")
 	metadata = mountDisks.getLatestMetadata()
@@ -84,7 +86,7 @@ def triggerProxyDeploy(**kwargs):
 	else:
 		mountDisks.remountDisks()
 
-	looger.info("triggerProxyDeploy end")
+	logger.info("triggerProxyDeploy end")
 	return 0
 
 def triggerRmStorage(**kwargs):

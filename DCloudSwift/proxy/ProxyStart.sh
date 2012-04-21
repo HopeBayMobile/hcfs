@@ -7,6 +7,6 @@
 
 chown -R swift:swift /etc/swift
 
-perl -pi -e 's/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/' /usr/share/pyshared/swift/common/constraints.py
+#perl -pi -e 's/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/' /usr/share/pyshared/swift/common/constraints.py
 
 swift-init proxy restart

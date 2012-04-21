@@ -11,6 +11,7 @@ import logging
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
+import socket
 
 #Self defined packages
 sys.path.append("/DCloudSwift/util")
@@ -24,6 +25,7 @@ class StorageNodeInstaller:
 		self.__proxyList = proxyList
 		self.__devicePrx = devicePrx
 		self.__deviceCnt = deviceCnt
+		self.__privateIP = socket.gethostbyname(socket.gethostname())
 		
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -43,14 +45,14 @@ class StorageNodeInstaller:
 			mountDisks.remountDisks()
 
 		os.system("chown -R swift:swift /srv/node/ ")
-		os.system("/DCloudSwift/storage/rsync.sh")
+		os.system("/DCloudSwift/storage/rsync.sh %s"%self.__privateIP)
 		os.system("perl -pi -e 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/' /etc/default/rsync")
 		os.system("service rsync restart")
 
-		os.system("/DCloudSwift/storage/accountserver.sh")
-		os.system("/DCloudSwift/storage/containerserver.sh")
-		os.system("/DCloudSwift/storage/objectserver.sh")
-		os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
+		os.system("/DCloudSwift/storage/accountserver.sh %s"%self.__privateIP)
+		os.system("/DCloudSwift/storage/containerserver.sh %s"%self.__privateIP)
+		os.system("/DCloudSwift/storage/objectserver.sh %s"%self.__privateIP)
+		#os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
 		os.system("swift-init all restart")
 		
 		self.__logger.info("end install")

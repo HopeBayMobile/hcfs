@@ -1,4 +1,13 @@
-IP=`ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{print $1}'`
+if [ $# != 1 ]; then
+        echo "Please enter the correct parameters!"
+        echo "For example:"
+        echo "./Containerserver IP"
+        exit 1
+fi
+
+
+IP=$1
+export PROXY_LOCAL_NET_IP=$IP
 export STORAGE_LOCAL_NET_IP=$IP
 
 cat >/etc/swift/container-server.conf <<EOF

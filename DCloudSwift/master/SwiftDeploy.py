@@ -60,7 +60,6 @@ class SwiftDeploy:
 		with open("/etc/swift/proxyList", "wb") as fh:
 			pickle.dump(proxyList, fh)
 
-		os.system("/DCloudSwift/proxy/CreateProxyConfig.sh")
 		os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 		zoneNumber = 1
 		for node in storageList: 
@@ -80,7 +79,6 @@ class SwiftDeploy:
 	def proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
 		#TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
-		self.createMetadata()
 
 		blackList = []
 		for i in [node["ip"] for node in self.__proxyList]:
@@ -213,11 +211,10 @@ class SwiftDeploy:
 
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-	util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	#SD = SwiftDeploy([{"ip":"172.16.229.35"}, {"ip":"172.16.229.24"}], [{"ip":"172.16.229.24", "zid":1}, {"ip":"172.16.229.148", "zid":2}])
-	#SD.createMetadata()
+	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
+	SD = SwiftDeploy([{"ip":"192.168.11.6"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}])
+	SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
-	#SD.proxyDeploy()
-	#TODO: maybe need some time to wait for proxy deploy
+	SD.proxyDeploy()
 	#SD.storageDeploy()

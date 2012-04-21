@@ -111,40 +111,6 @@ def getStorageNodeIpList():
 
 	return ipList
 
-def isAllDebInstalled(debSrc):
-	logger = getLogger(name='isAllDebInstalled')
-	cmd = "find %s -maxdepth 1 -name \'*.deb\'  "%debSrc
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	po.wait()
-
-	if po.returncode !=0:
-		logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
-		return -1
-
-	returncode = 0
-	devnull = open(os.devnull, "w")
-	for line in po.stdout.readlines():
-		pkgname = line.split('/')[-1].split('_')[0]
-		retval = subprocess.call(["dpkg", "-s", pkgname], stdout=devnull, stderr=devnull)
-		if retval != 0:
-			return False
-
-	devnull.close()
-	
-	return True
-
-def installAllDeb(debSrc):
-	logger = getLogger(name='installDeb')
-	cmd = "dpkg -i  %s/*.deb"%debSrc
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	po.wait()
-
-	if po.returncode !=0:
-		logger.error("Failed to execute %s for %s"%(cmd, po.stderr.readlines()))
-		return 1
-
-	return 0
-
 def sshpass(passwd, cmd, timeout=0):
 
 	t_beginning = time.time()

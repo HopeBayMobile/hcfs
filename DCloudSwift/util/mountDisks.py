@@ -8,6 +8,7 @@ import json
 import pickle
 import socket
 import util
+import re
 
 
 #TODO: Read from config files
@@ -46,21 +47,24 @@ def getMajorityHostname():
 
 def getRootDisk():
 	cmd = "mount"
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	po.wait()
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	
 
-	firstLine = po.stdout.readline()
-	device = firstLine.split()[0]
+	device = lines[0].split()[0]
 	return device[:8]
 
 def getAllDisks():
-	cmd = "fdisk -l|grep \"Disk /dev\" "
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	po.wait()
+	cmd = "fdisk -l"
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+
 
 	disks = []
-	for line in po.stdout.readlines():
-		disks.append(line.split()[1][:8])
+	for line in lines:
+		match = re.match(r"^Disk /dev/sd\w:", line)
+		if match is not None: 
+			disks.append(line.split()[1][:8])
 
 	return disks
 
@@ -82,12 +86,13 @@ def formatDisks(diskList):
 	formattedDisks = []
 
 	for disk in diskList:
-                cmd = "mkfs.xfs -i size=1024 -f %s"%(disk)
-                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                po.wait()
+                cmd = "mkfs.ext4 -F %s"%(disk)
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
 
                 if po.returncode != 0:
-                        logger.error("Failed to format %s for %s"%(disk,po.stderr.read()))
+                        logger.error("Failed to format %s for %s"%(disk,output))
                         returncode+=1
                         continue
 
@@ -104,25 +109,24 @@ def formatNonRootDisks(deviceCnt=1):
 	logger = util.getLogger(name="formatNonRootDisks")
 	disks = getNonRootDisks()
 	formattedDisks = []
-	count=0
 	returncode=0
 
 	for disk in disks:
-		count+=1
-		if count > deviceCnt:
+		if len(formattedDisks) == deviceCnt:
 			break
 
-		cmd = "mkfs.xfs -i size=1024 -f %s"%(disk) 
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		cmd = "mkfs.ext4 -F %s"%(disk) 
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
 		po.wait()
 
 		if po.returncode != 0:
-			logger.error("Failed to format %s for %s"%(disk,po.stderr.readline()))
-			returncode+=1
+			logger.warn("Failed to format %s for %s"%(disk,output))
 			continue
 
 		formattedDisks.append(disk)
 
+	returncode = 0 if deviceCnt - len(formattedDisks) ==0 else 0
 
 	return (returncode,formattedDisks)
 
@@ -138,11 +142,12 @@ def mountDisk(disk, mountpoint):
 
 		#TODO: Add timeout mechanism
                 cmd = "mount %s %s"%(disk, mountpoint)
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
                 po.wait()
 
                 if po.returncode !=0:
-                        logger.error("Failed to mount  %s for %s"%(disk, po.stderr.readline()))
+                        logger.error("Failed to mount  %s for %s"%(disk, output))
 
 		returncode = 0
 
@@ -261,10 +266,12 @@ def __loadSwiftMetadata(disk):
 	returncode = 0
 
 	cmd = "cp %s/swift/* /etc/swift/"%(mountpoint)
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
         po.wait()
+
         if po.returncode != 0:
-                logger.error("Failed to reload swift metadata from %s for %s"%(disk,po.stderr.readline()))
+                logger.error("Failed to reload swift metadata from %s for %s"%(disk,output))
 		returncode = 1
 
 	if lazyUmount(mountpoint)!=0:
@@ -372,11 +379,12 @@ def lazyUmount(mountpoint):
         try:
 		if os.path.ismount(mountpoint):
                 	cmd = "umount -l %s"%mountpoint
-                	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			output = po.stdout.read()
                 	po.wait()
 
                 	if po.returncode !=0:
-                        	logger.error("Failed to umount -l  %s for %s"%(mountpoint, po.stderr.readline()))
+                        	logger.error("Failed to umount -l  %s for %s"%(mountpoint, output))
 				returncode = 1
 
         except OSError as e:
@@ -394,10 +402,12 @@ def dumpScripts(destDir):
 	os.system("mkdir -p %s"%destDir)
 	os.system("rm -r %s/*"%destDir)
         cmd = "cp -r /DCloudSwift/* %s"%destDir
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()	
         po.wait()
+
         if po.returncode != 0:
-                logger.error("Failed to dump scripts to %s for %s"%(destDir,po.stderr.read()))
+                logger.error("Failed to dump scripts to %s for %s"%(destDir,output))
                 return 1
 
 	return 0
@@ -405,11 +415,14 @@ def dumpScripts(destDir):
 def dumpSwiftMetadata(destDir):
 	logger = util.getLogger(name="dumpSwiftMetadata")
 	os.system("mkdir -p %s"%destDir)
+	os.system("mkdir -p /etc/swift")
         cmd = "cp -r /etc/swift/* %s"%destDir
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
         po.wait()
+
         if po.returncode != 0:
-                logger.error("Failed to dump swift metadata to %s for %s"%(destDir,po.stderr.read()))
+                logger.error("Failed to dump swift metadata to %s for %s"%(destDir,output))
                 return 1
 
 	os.system("cd %s; rm -rf %s"%(destDir, UNNECESSARYFILES))
@@ -424,10 +437,12 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
                         os.system("umount -l %s"%mountpoint)
 
 	cmd = "mount %s %s"%(disk, mountpoint)
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
         po.wait()
+
         if po.returncode != 0:
-        	logger.error("Failed to mount %s for %s"%(disk,po.stderr.readline()))
+        	logger.error("Failed to mount %s for %s"%(disk,output))
 		return po.returncode
 
 
@@ -474,6 +489,10 @@ def main(argv):
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
+	#formatDisks(["/dev/sdc"])
+	#print getRootDisk()
+	#print getAllDisks()
+	#print formatNonRootDisks(deviceCnt=3)
 	#print getMajorityHostname()
 	#print getLatestMetadata()
 	#createSwiftDevices()
