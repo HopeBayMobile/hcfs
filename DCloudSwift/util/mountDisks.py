@@ -12,7 +12,7 @@ import re
 
 
 #TODO: Read from config files
-UNNECESSARYFILES = "cert* backups"
+UNNECESSARYFILES = "cert* backups *.conf"
 
 class MountSwiftDeviceError(Exception): pass
 class WriteMetadataError(Exception): pass
@@ -197,7 +197,7 @@ def createSwiftDevices(deviceCnt=1, devicePrx="sdb"):
                                 raise MountSwiftDeviceError("Failed to mount %s on %s"%(disk, mountpoint))
 
                         if count == deviceCnt:
-                                return 0
+				break
                 except WriteMetadataError as err:
                         logger.error("%s"%err)
                         count-=1
@@ -339,6 +339,12 @@ def resume():
 	remountDisks()
 	loadSwiftMetadata()	
 
+	util.generateSwiftConfig()
+	if util.restartRsync() !=0:
+		logger.error("Failed to restart rsync daemon")
+
+	#TODO: check if this node is a proxy node
+	os.system("swift-init all restart")
 
 	logger.info("end")
 
@@ -489,6 +495,7 @@ def main(argv):
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
+	#generateSwiftConfig()
 	#formatDisks(["/dev/sdc"])
 	#print getRootDisk()
 	#print getAllDisks()

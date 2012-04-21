@@ -73,8 +73,6 @@ class SwiftCfg:
 			filename = self.__kwparams['logDir'] + self.__kwparams['logName']
 		)
 
-		infoMsg = "The parsing of Swift configuration has been finished!"
-		logging.info(infoMsg)
 
 	def getKwparams(self):
 		return self.__kwparams

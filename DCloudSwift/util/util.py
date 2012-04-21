@@ -5,6 +5,7 @@ import threading
 import sys
 import signal
 import time
+import socket
 
 from SwiftCfg import SwiftCfg
 
@@ -35,6 +36,25 @@ def timeout(timeout_time, default):
 			return retval
 		return f2
 	return timeout_function
+
+def restartRsync():
+	
+	os.system("/etc/init.d/rsync stop")
+	os.system("rm /var/run/rsyncd.pid")
+
+	cmd = "/etc/init.d/rsync start"
+	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+	output = po.stdout.read()
+	po.wait()
+
+	return po.returncode
+
+def startSwiftServices(():
+	'''
+	start appropriate swift services
+	'''
+
 
 def runPopenCommunicate(cmd, inputString, logger):
 	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -93,6 +113,17 @@ def getLogger(name=None, conf=SWIFTCONF):
 		return logger
 	finally:
 		logLock.release()
+
+def generateSwiftConfig():
+	ip = socket.gethostbyname(socket.gethostname())
+
+	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
+
+	os.system("/DCloudSwift/storage/rsync.sh %s"%ip)
+
+	os.system("/DCloudSwift/storage/accountserver.sh %s"%ip)
+	os.system("/DCloudSwift/storage/containerserver.sh %s"%ip)
+	os.system("/DCloudSwift/storage/objectserver.sh %s"%ip)
 
 def getSwiftConfVers(confDir="/etc/swift"):
 	logger = getLogger(name="getSwiftConfVers")

@@ -45,14 +45,13 @@ class StorageNodeInstaller:
 			mountDisks.remountDisks()
 
 		os.system("chown -R swift:swift /srv/node/ ")
-		os.system("/DCloudSwift/storage/rsync.sh %s"%self.__privateIP)
-		os.system("perl -pi -e 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/' /etc/default/rsync")
-		os.system("service rsync restart")
+		util.generateSwiftConfig()
 
-		os.system("/DCloudSwift/storage/accountserver.sh %s"%self.__privateIP)
-		os.system("/DCloudSwift/storage/containerserver.sh %s"%self.__privateIP)
-		os.system("/DCloudSwift/storage/objectserver.sh %s"%self.__privateIP)
+		if util.restartRsync() !=0:
+			self.__logger.error("Failed to restart rsync daemon")
+
 		#os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
+		#TODO:check if this node is a proxy node
 		os.system("swift-init all restart")
 		
 		self.__logger.info("end install")

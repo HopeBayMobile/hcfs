@@ -76,7 +76,8 @@ def triggerProxyDeploy(**kwargs):
 	numOfReplica = kwargs['numOfReplica']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
-	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
+
+	util.generateSwiftConfig()
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
 	logger.info("Proxy started")
 	metadata = mountDisks.getLatestMetadata()

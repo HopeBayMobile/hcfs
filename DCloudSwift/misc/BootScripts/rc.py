@@ -214,8 +214,7 @@ def lazyUmount(mountpoint):
 
 def main(argv):
 	if loadScripts() == 0:
-		pass
-	#	os.system("python /DCloudSwift/util/mountDisks.py -R")
+		os.system("python /DCloudSwift/util/mountDisks.py -R")
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
