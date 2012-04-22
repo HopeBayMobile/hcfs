@@ -141,7 +141,7 @@ def mountDisk(disk, mountpoint):
                 	os.system("umount -l %s"%mountpoint)
 
 		#TODO: Add timeout mechanism
-                cmd = "mount %s %s"%(disk, mountpoint)
+                cmd = "mount -o user_xattr %s %s"%(disk, mountpoint)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
                 po.wait()
@@ -172,6 +172,8 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
 	logger.debug("start")
 
+	
+	lazyUmountSwiftDevices()
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
 		return deviceCnt
@@ -343,6 +345,9 @@ def resume():
 	if util.restartRsync() !=0:
 		logger.error("Failed to restart rsync daemon")
 
+	if util.restartMemcached() !=0:
+		logger.error("Failed to restart memcached")
+
 	#TODO: check if this node is a proxy node
 	os.system("swift-init all restart")
 
@@ -357,7 +362,7 @@ def remountDisks():
 	if latest is None:
 		return (0, [])
 
-	lazyUmountSwiftDevices(deviceCnt=latest["deviceCnt"], devicePrx=latest["devicePrx"])
+	lazyUmountSwiftDevices()
 
 	(lostDevices, unusedDisks) = remountRecognizableDisks()
 
@@ -399,9 +404,9 @@ def lazyUmount(mountpoint):
 
         return returncode
 
-def lazyUmountSwiftDevices(deviceCnt, devicePrx):
-	for deviceNum in range(1,deviceCnt+1):
-		lazyUmount("/srv/node/%s%d"%(devicePrx,deviceNum))
+def lazyUmountSwiftDevices():
+	cmd ="umount -l /srv/node/*"
+	os.system(cmd)
 
 def __loadScripts(disk):
         logger = util.getLogger(name="__loadSripts")
@@ -556,7 +561,7 @@ if __name__ == '__main__':
 	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sdf", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=5)
 	#print loadSwiftMetadata()
-	print readMetadata(disk="/dev/sdb")
+	#print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
 	#resume()

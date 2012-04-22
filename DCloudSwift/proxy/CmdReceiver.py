@@ -67,9 +67,7 @@ def triggerAddStorage(**kwargs):
 
 def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
-	logger.info("triggerProxyDeploy start")
-
-	ip = socket.gethostbyname(socket.gethostname())
+	logger.info("start")
 
 	proxyList = kwargs['proxyList']
 	storageList = kwargs['storageList']
@@ -78,16 +76,19 @@ def triggerProxyDeploy(**kwargs):
 	devicePrx = kwargs['devicePrx']
 
 	util.generateSwiftConfig()
+	util.restartMemcached()
 	os.system("/DCloudSwift/proxy/ProxyStart.sh")
-	logger.info("Proxy started")
+
 	metadata = mountDisks.getLatestMetadata()
 	
 	if metadata is None or metadata["vers"] < util.getSwiftConfVers():
-		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+		ret = mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+		if ret !=0:
+			logger.warn("Failed to create all swift devices")
 	else:
 		mountDisks.remountDisks()
 
-	logger.info("triggerProxyDeploy end")
+	logger.info("end")
 	return 0
 
 def triggerRmStorage(**kwargs):

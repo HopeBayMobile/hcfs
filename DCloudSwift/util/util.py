@@ -10,6 +10,7 @@ import time
 import socket
 import struct
 import math
+import pickle
 
 from SwiftCfg import SwiftCfg
 
@@ -71,6 +72,19 @@ def restartRsync():
 	os.system("rm /var/run/rsyncd.pid")
 
 	cmd = "/etc/init.d/rsync start"
+	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+	output = po.stdout.read()
+	po.wait()
+
+	return po.returncode
+
+def restartMemcached():
+	
+	os.system("/etc/init.d/memcached stop")
+	os.system("rm /var/run/memcached.pid")
+
+	cmd = "/etc/init.d/memcached start"
 	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
 	output = po.stdout.read()
@@ -148,12 +162,12 @@ def generateSwiftConfig():
 		ip =getIpAddress()
 
 	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
-
 	os.system("/DCloudSwift/storage/rsync.sh %s"%ip)
-
 	os.system("/DCloudSwift/storage/accountserver.sh %s"%ip)
 	os.system("/DCloudSwift/storage/containerserver.sh %s"%ip)
 	os.system("/DCloudSwift/storage/objectserver.sh %s"%ip)
+
+	os.system("chown -R swift:swift /etc/swift")
 
 def getIpAddress():
     arg='ip route list'    
@@ -417,4 +431,5 @@ if __name__ == '__main__':
 #	s = printstring()
 #	print s
 	#print getIpAddress()
+#	print restartMemcached()
 	pass
