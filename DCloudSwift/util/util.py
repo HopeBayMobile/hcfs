@@ -127,7 +127,7 @@ def getLogger(name=None, conf=SWIFTCONF):
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
 
-		hdlr = logging.FileHandler(logDir+'/'+logName)
+		hdlr = logging.RotatingFileHandler(logDir+'/'+logName, maxBytes=1024*1024, backupCount=5)
 		hdlr.setFormatter(logging.Formatter(FORMATTER))
 		logger.addHandler(hdlr)
 		logger.setLevel(logLevel)
