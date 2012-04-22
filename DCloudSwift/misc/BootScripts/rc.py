@@ -9,7 +9,6 @@ import socket
 import logging
 import threading
 
-logLock = threading.Lock()
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 def getLogger(name=None):
@@ -19,7 +18,6 @@ def getLogger(name=None):
 	"""
 	
 	try:
-		logLock.acquire()
 
 		logger = logging.getLogger(name)
 
@@ -46,7 +44,7 @@ def getLogger(name=None):
 		getLogger.handler4Logger[logger] = hdlr
 		return logger
 	finally:
-		logLock.release()
+		pass
 
 def getRootDisk():
 	cmd = "mount"
