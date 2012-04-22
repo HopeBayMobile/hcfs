@@ -42,7 +42,7 @@ def retry(tries, delay=3):
   	
   	return deco_retry  # @retry(arg[, ...]) -> true decorator
 
-
+#timeout decorator
 def timeout(timeout_time, default):
 	def timeout_function(f):
 		def f2(*args,**kwargs):
@@ -154,13 +154,13 @@ def getSwiftConfVers(confDir="/etc/swift"):
 
 	cmd = 'cd %s; swift-ring-builder object.builder'%confDir
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
 	po.wait()
 
 	if po.returncode !=0:
 		return -1
 
-	line = po.stdout.readline()
-	tokens = line.split()	
+	tokens = lines[0].split()	
 	vers = int(tokens[3])
 	
 	return vers
@@ -175,6 +175,7 @@ def getStorageNodeIpList():
 
 	cmd = 'cd /etc/swift; swift-ring-builder object.builder'
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
 	po.wait()
 	
 	if po.returncode != 0:
@@ -182,7 +183,7 @@ def getStorageNodeIpList():
 
 	i = 0
 	ipList =[]
-	for line in po.stdout.readlines():
+	for line in lines:
 		if i > 3:
 			ipList.append(line.split()[2])
 
@@ -192,22 +193,27 @@ def getStorageNodeIpList():
 
 def sshpass(passwd, cmd, timeout=0):
 
-	t_beginning = time.time()
-	seconds_passed = 0
+	def timeoutHandler(signum, frame):
+		raise TimeoutError()
+ 
+	old_handler = signal.signal(signal.SIGALRM, timeoutHandler) 
+	signal.alarm(timeout) # triger alarm in timeout_time seconds
+	
+	try:
 
-	sshpasscmd = "sshpass -p %s %s" % (passwd, cmd)
-	po  = subprocess.Popen(sshpasscmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		sshpasscmd = "sshpass -p %s %s" % (passwd, cmd)
+		po  = subprocess.Popen(sshpasscmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		
+		(stdoutData, stderrData) = po.communicate()
+		
+		return (po.returncode, stdoutData, stderrData)
+		
+	except TimeoutError:
+		raise TimeoutError(cmd=cmd, timeout=str(timeout))
+	finally:
+		signal.alarm(0)
+		signal.signal(signal.SIGALRM, old_handler)
 
-	while True:
-		if po.poll() is not None:
-			break
-		seconds_passed = time.time() - t_beginning
-		if timeout and seconds_passed > timeout:
-			po.terminate()
-			raise TimeoutError(sshpasscmd, timeout)
-		time.sleep(0.1)
-
-	return (po.returncode, po.stdout, po.stderr)
 	
 def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 	logger = getLogger(name="spreadMetadata")
@@ -218,20 +224,20 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 			cmd = "ssh root@%s mkdir -p /etc/swift/"%ip
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
 			if status != 0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 			logger.info("scp -o StrictHostKeyChecking=no --preserve %s/* root@%s:/etc/swift/"%(sourceDir, ip))
 			cmd = "scp -o StrictHostKeyChecking=no --preserve %s/* root@%s:/etc/swift/"%(sourceDir, ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
 			if status !=0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 
 			cmd = "ssh root@%s chown -R swift:swift /etc/swift "%(ip)
 
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
 			if status != 0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 		except TimeoutError as err:
 			blackList.append(ip)
@@ -259,20 +265,20 @@ def spreadPackages(password, nodeList=[]):
 			cmd = "ssh root@%s mkdir -p /etc/lib/swift/"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
                         if status != 0:
-                                raise SshpassError(stderr.read())
+                                raise SshpassError(stderr)
 
 			logger.info("scp -o StrictHostKeyChecking=no -r /etc/lib/swift/* root@%s:/etc/lib/swift/"%(ip))
 			cmd = "scp -o StrictHostKeyChecking=no -r /etc/lib/swift/* root@%s:/etc/lib/swift/"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 
 			cmd = "ssh root@%s dpkg -i /etc/lib/swift/*.deb "%(ip)
 
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
 			if status != 0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 		except TimeoutError as err:
 			blackList.append(ip)
@@ -304,7 +310,7 @@ def spreadRC(password, nodeList=[]):
 			cmd = "scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
-				raise SshpassError(stderr.read())
+				raise SshpassError(stderr)
 
 
 		except TimeoutError as err:
