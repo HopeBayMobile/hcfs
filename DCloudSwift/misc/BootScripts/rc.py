@@ -133,7 +133,7 @@ def loadSwiftMetadata():
 	logger.info("end")
 	return returncode
 	
-	def getLogger(name=None):
+def getLogger(name=None):
 	"""
 	Get a file logger using config settings.
 
