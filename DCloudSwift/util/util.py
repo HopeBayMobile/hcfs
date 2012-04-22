@@ -158,12 +158,21 @@ def getSwiftConfVers(confDir="/etc/swift"):
 	po.wait()
 
 	if po.returncode !=0:
+		logger.error("Failed to get version info from %s/objcet.builder"%confDir)
 		return -1
-
+		
 	tokens = lines[0].split()	
 	vers = int(tokens[3])
 	
-	return vers
+	versBase = 0
+	try:
+		with open("%s/versBase"%confDir, "rb") as fh:
+			versBase = pickle.load(fh)
+	except OSError:
+		logger.erro("Failed to load version base from %s/versBase"%confDir)
+		return -1
+	
+	return vers+versBase
 	
 
 def getStorageNodeIpList():
