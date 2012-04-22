@@ -134,7 +134,7 @@ def formatNonRootDisks(deviceCnt=1):
 def mountDisk(disk, mountpoint):
 	logger = util.getLogger(name="mountDisk")
 
-	returncode = 1
+	returncode = 0
 	try:
 		os.system("mkdir -p %s"%mountpoint)
 		if os.path.ismount(mountpoint):
@@ -148,11 +148,11 @@ def mountDisk(disk, mountpoint):
 
                 if po.returncode !=0:
                         logger.error("Failed to mount  %s for %s"%(disk, output))
-
-		returncode = 0
+                        returncode = 1
 
         except OSError as e:
                 logger.error("Failed to mount %s for %s"%(disk, e))
+                returncode = 1
 
 	return returncode
 
