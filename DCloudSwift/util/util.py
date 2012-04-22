@@ -12,20 +12,47 @@ from SwiftCfg import SwiftCfg
 SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
-class TimeoutException(Exception):
-	pass
+
+# Retry decorator
+def retry(tries, delay=3):
+	'''Retries a function or method until it returns True.
+	delay sets the delay in seconds, and backoff sets the factor by which
+	the delay should lengthen after each failure. tries must be at least 0, and delay
+	greater than 0.'''
+	
+	tries = math.floor(tries)
+	if tries < 0:
+		raise ValueError("tries must be 0 or greater")
+	if delay <= 0:
+		raise ValueError("delay must be greater than 0")
+	
+	def deco_retry(f):
+		def f_retry(*args, **kwargs):
+			mtries, mdelay = tries, delay # make mutable
+			rv = f(*args, **kwargs) # first attempt
+			while mtries > 0:
+				if rv ==0 or rv ==True: # Done on success
+					return rv
+				mtries -= 1      # consume an attempt
+				time.sleep(mdelay) # wait...
+				rv = f(*args, **kwargs) # Try again
+  			return rv # Ran out of tries :-(
+  		return f_retry # true decorator -> decorated function
+  	
+  	return deco_retry  # @retry(arg[, ...]) -> true decorator
+
 
 def timeout(timeout_time, default):
 	def timeout_function(f):
-		def f2(*args):
+		def f2(*args,**kwargs):
 			def timeout_handler(signum, frame):
-				raise TimeoutException()
+				raise TimeoutError(time=str(timeout_time))
  
 			old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
 			signal.alarm(timeout_time) # triger alarm in timeout_time seconds
 			try: 
-				retval = f()
-			except TimeoutException:
+				retval = f(*args, **kwargs)
+			except TimeoutError:
 				return default
 			finally:
 				signal.signal(signal.SIGALRM, old_handler) 
@@ -305,11 +332,18 @@ def jsonStr2SshpassArg(jsonStr):
 	
 
 class TimeoutError(Exception):
-	def __init__(self, cmd, timeout):
+	def __init__(self, cmd=None, timeout=None):
 		self.cmd = cmd
 		self.timeout= timeout
 	def __str__(self):
-		return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
+		if cmd is not None and timeout is not None:
+			return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
+		elif cmd is not None:
+			return "Failed to complete \"%s\" in time"%self.cmd
+		elif timeout is not None:
+			return "Failed to finish in %s seconds"%(sefl.timeout)
+		else:
+			return "TimeoutError"
 
 class SshpassError(Exception):
 	def __init__(self, errMsg):
