@@ -53,12 +53,17 @@ class SwiftDeploy:
 		numOfReplica = self.__kwparams['numOfReplica']
 		deviceCnt = self.__kwparams['deviceCnt']
 		devicePrx = self.__kwparams['devicePrx']
+		versBase = int(time.time())*100000
 
 		os.system("mkdir -p /etc/delta/swift")
 		os.system("mkdir -p /etc/swift")
 		os.system("touch /etc/swift/proxyList")
+		os.system("touch /etc/swift/versBase")
 		with open("/etc/swift/proxyList", "wb") as fh:
 			pickle.dump(proxyList, fh)
+			
+		with open("/etc/swift/versBase", "wb") as fh:
+			pickle.dump(versBase, fh)
 
 		os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 		zoneNumber = 1
