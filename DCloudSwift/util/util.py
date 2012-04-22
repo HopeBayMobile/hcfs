@@ -12,9 +12,6 @@ from SwiftCfg import SwiftCfg
 SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
-logLock = threading.Lock()
-
-
 class TimeoutException(Exception):
 	pass
 
@@ -84,7 +81,6 @@ def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	
 	try:
-		logLock.acquire()
 
 		logger = logging.getLogger(name)
 
@@ -112,7 +108,7 @@ def getLogger(name=None, conf=SWIFTCONF):
 		getLogger.handler4Logger[logger] = hdlr
 		return logger
 	finally:
-		logLock.release()
+		pass
 
 def generateSwiftConfig():
 	ip = socket.gethostbyname(socket.gethostname())
