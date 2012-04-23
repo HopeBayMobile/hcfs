@@ -1,5 +1,7 @@
 # Django settings for StorageGateway project.
 
+import os
+
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
@@ -69,6 +71,7 @@ ADMIN_MEDIA_PREFIX = '/static/admin/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets/static'),
     # Put strings here, like "/home/html/static" or "C:/www/django/static".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -103,6 +106,7 @@ MIDDLEWARE_CLASSES = (
 ROOT_URLCONF = 'StorageGateway.urls'
 
 TEMPLATE_DIRS = (
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets/templates'),
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form id="form" class="form-horizontal" method="POST">
+	{% csrf_token %}
+	{{ form.render }}
+	<div class="form-actions">
+		<button type="button" class="btn btn-primary">Save</button>
+		<span class="label hide"></span>
+	</div>
+</form>
+{% endblock content %}
