@@ -3,7 +3,7 @@
     <head>
         <!--Title-->
 
-        <title>Delta Cloud Management System</title>
+        <title>Delta Storage Gateway</title>
 
         <!--Metadata-->
 
@@ -46,8 +46,15 @@
 
     <body>
     <!-- Top Navigation Bar -->
+    <div class="navbar navbar-fixed-top">
+      <div class="navbar-inner">
+        <div class="container">
+          <a href="/" class="brand">Delta Storage Gateway</a>
+          </div>
+      </div>
+    </div>
+    
     <div class="container">
-    <section class="content">
 
     <!-- Inner Navigation Tab -->
     {% block content_tab %}
@@ -55,12 +62,11 @@
 
     {% block content %}
 
-    {% endblock content %}
-    </section>
+    {% endblock content %}    
 
     <footer class="footer">
         <p class="pull-right">
-         &copy; 2011 Delta Electronics, Inc. All Rights Reserved.
+         &copy; 2012 Delta Electronics, Inc. All Rights Reserved.
         </p>
         <p><a href="#">Back to top</a></p>
     </footer>

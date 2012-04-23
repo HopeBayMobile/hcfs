@@ -15,5 +15,9 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     # url(r'^admin/', include(admin.site.urls)),
+    url(r'^$', 'views.home', name='home'),
+    url(r'^login$', 'views.login', name='login'),
+    url(r'^wizard/', include('wizard.urls', namespace="wizard")),
+    url(r'^dashboard/', include('dashboard.urls', namespace="dashboard")),
     url(r'^test_form/$', "test_view.test_form"),
 ) + staticfiles_urlpatterns()

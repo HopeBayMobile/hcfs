@@ -1,0 +1,26 @@
+{% extends "base.html" %} {% block content %}
+<div class="row" style="padding: 30px 0;">
+	<div class="span6 offset3">
+		<form class="well form-horizontal" method="post" action="/login">
+			{% csrf_token %}
+			<div style="padding: 0 0 24px 0;">
+				<h2>Administrator Login</h2>
+			</div>
+			<div class="control-group">
+				<label for="account" class="control-label">Account</label>
+				<div class="controls">
+					<input type="text" id="account" name="username">
+				</div>
+			</div>
+			<div class="control-group">
+				<label for="account" class="control-label">Password</label>
+				<div class="controls">
+					<input type="text" id="password" name="password">
+					<button class="btn btn-large btn-primary" type="submit"
+						style="width: 100px; margin-left: 16px;">Login</button>
+				</div>
+			</div>
+		</form>
+	</div>
+</div>
+{% endblock content %}

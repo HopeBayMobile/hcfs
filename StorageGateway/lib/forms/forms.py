@@ -5,7 +5,6 @@ from django.forms.forms import BoundField, DeclarativeFieldsMetaclass
 from django.template.loader import render_to_string
 
 from widgets import *
-from fields import *
 
 
 __all__ = ['get_config_form', 'RenderFormMixinClass']
