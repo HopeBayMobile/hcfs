@@ -1,5 +1,6 @@
-import sys, time
+import os, sys, time
 import socket
+import random
 import pickle
 
 sys.path.append("/DCloudSwift/util")
@@ -8,24 +9,43 @@ from daemon import Daemon
 import util
 
 PORT=2308
+lockFile="/etc/delta/swift.lock"
 
 class SwiftMonitor(Daemon):
 	def run(self):
 		logger = util.getLogger(name="SwiftMonitor")
-		storageIpList = util.getStorageIpList()
 		
-		try:
-			with open("/etc/swift/proxyList","rb") as fh:
-				proxyList = pickle.load(fh)
-		except IOError:
-			logger.error("Failed to load proxyList")
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		while True:
-			time.sleep(10)
+			fd = -1
+			try:
+				os.system("mkdir -p %s"%os.path.dirname(self.lockFile))
+				fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
+
+				if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+					os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+
+				ipList = util.getSwiftNodeIpList()
+                        	if len(ipList) == 0:
+                                	logger.info("The swift cluster is empty!")
+                                	time.sleep(10)
+                                	continue
+
+                        	tco = random.choice(ipList)
+                        	logger.info("The chosen one is %s"%tco)
+
+                        	vers = util.getSwiftConfVers()
+
+                        	time.sleep(10)
+
+
+			finally:
+				if fd != -1:
+					os.close(fd)
+					os.unlink(self.lockFile)
 			
 
 if __name__ == "__main__":
-	daemon = SwiftMonitor('/var/run/swiftMonitor.pid')
+	daemon = SwiftMonitor('/var/run/swiftMonitor.pid', lockFile=lockFile)
 	if len(sys.argv) == 2:
 		if 'start' == sys.argv[1]:
 			daemon.start()

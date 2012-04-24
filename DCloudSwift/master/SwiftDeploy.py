@@ -65,15 +65,15 @@ class SwiftDeploy:
 		with open("/etc/swift/versBase", "wb") as fh:
 			pickle.dump(versBase, fh)
 
-		os.system("/DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
+		os.system("sh /DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
 		zoneNumber = 1
 		for node in storageList: 
 			for j in range(deviceCnt):
 				deviceName = devicePrx + str(j+1)
 				logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
-				os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
+				os.system("sh /DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
 
-		os.system("/DCloudSwift/proxy/Rebalance.sh")
+		os.system("sh /DCloudSwift/proxy/Rebalance.sh")
 
 		os.system("cp -r /etc/swift /etc/delta")
 		os.system("rm -rf /etc/swift/*")

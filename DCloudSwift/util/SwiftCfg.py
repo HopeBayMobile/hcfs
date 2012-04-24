@@ -1,14 +1,3 @@
-'''
-Created on 2012/03/01
-
-@author: CW
-
-Modified by CW on 2012/03/06
-Modified by CW on 2012/03/07
-Modified by Ken on 2012/03/09
-Modified by Ken on 2012/03/17
-'''
-
 import sys
 import os
 import socket
@@ -81,8 +70,3 @@ class SwiftCfg:
 if __name__ == '__main__':
 	SC = SwiftCfg("/DCloudSwift/Swift.ini")
 	kwparams = SC.getKwparams()
-	print "device prefix is %s \n"% kwparams['devicePrx']
-	print "Username: %s, Password: %s" % (kwparams['username'], kwparams['password'])
-	print "logDir: %s, reportDir: %s" % (kwparams['logDir'], kwparams['reportDir'])
-	print "proxyinterval: %d, storageinterval: %d" % (kwparams['proxyInterval'], kwparams['storageInterval'])
-	print "numofreplica: %d" % (kwparams['numOfReplica'])

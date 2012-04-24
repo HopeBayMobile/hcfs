@@ -4,6 +4,7 @@ import fcntl
 import logging
 import logging.handlers
 import threading
+import random
 import sys
 import signal
 import time
@@ -12,6 +13,7 @@ import struct
 import math
 import pickle
 
+from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
 SWIFTCONF = '/DCloudSwift/Swift.ini'
@@ -92,7 +94,7 @@ def restartMemcached():
 
 	return po.returncode
 
-def startSwiftServices():
+def restartSwiftServices():
 	'''
 	start appropriate swift services
 	'''
@@ -177,6 +179,28 @@ def getIpAddress():
     ipaddr = sdata[ sdata.index('src')+1 ]
     #netdev = sdata[ sdata.index('dev')+1 ]
     return ipaddr
+
+
+def getSwiftNodeIpList():
+	storageIpList = getStorageNodeIpList()
+	proxyList =[]
+	ipSet = set()
+	
+	try:
+		with open("/etc/swift/proxyList","rb") as fh:
+			proxyList = pickle.load(fh)
+	except IOError:
+		logger.error("Failed to load proxyList")
+
+	for ip in storageIpList:
+		ipSet.add(ip)
+
+	for node in proxyList:
+		ipSet.add(node["ip"])
+
+	ipList = [ip for ip in ipSet]
+	
+	return ipList
 
 def getSwiftConfVers(confDir="/etc/swift"):
 	logger = getLogger(name="getSwiftConfVers")
@@ -344,8 +368,8 @@ def spreadRC(password, nodeList=[]):
 			print "Start spreading rc.local to %s ..."%ip
 
 
-			logger.info("scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip))
-			cmd = "scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc.local root@%s:/etc/rc.local"%(ip)
+			logger.info("scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc root@%s:/etc/init.d/rc"%(ip))
+			cmd = "scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc root@%s:/etc/init.d/rc"%(ip)
 			(status, stdout, stderr) = sshpass(password, cmd, timeout=60)
 			if status !=0:
 				raise SshpassError(stderr)
@@ -410,16 +434,6 @@ if __name__ == '__main__':
 #	logger = getLogger(name="Hello")
 #	logger.info("Hello")
 
-#	try:
-#		cmd = "ssh root@172.16.229.35 touch aaa"
-#		(returncode, stdoutdata, stderrdata) = sshpass("deltacloud", cmd, timeout=5)
-#		if returncode==0:
-#			print stdoutdata
-#		else:
-#			print stderrdata
-#	except TimeoutError as err:
-#		print err
-
 #	spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
 
 #	@timeout(5, "This is timeout!!!")
@@ -430,6 +444,9 @@ if __name__ == '__main__':
 
 #	s = printstring()
 #	print s
-	#print getIpAddress()
-#	print restartMemcached()
+
+	print getSwiftNodeIpList()
+	print random.choice(getSwiftNodeIpList())
+	print os.path.exists("")
+	print getLockFilePath()
 	pass

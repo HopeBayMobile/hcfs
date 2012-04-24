@@ -29,7 +29,7 @@ Examples:
 	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
 EEXIST = 17
-lockFile = "/tmp/CmdReceiver.lock"
+lockFile = "/etc/delta/swift.lock"
 
 class UsageError(Exception):
 	pass
@@ -122,7 +122,9 @@ def triggerRmStorage(**kwargs):
 def main():
 	returncode =0
 	fd = -1
+
 	try:
+		os.system("mkdir -p %s"%os.path.dirname(lockFile))
 		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
