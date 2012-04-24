@@ -1,11 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib import auth
-from django.contrib.auth.decorators import login_required
 from lib.models.config import Config
 
 def home(request):
     if Config.objects.all().count() == 0 :
         return redirect('/wizard')
+    elif request.user.is_authenticated():
+        return redirect('/dashboard')
     else:
         return render(request, 'home.html')
 
@@ -22,3 +23,8 @@ def login(request):
             return redirect('/dashboard')
         else:
             return render(request, 'home.html')
+
+def logout(request):
+    auth.logout(request)
+    return render(request, 'home.html')
+    
