@@ -1,3 +1,24 @@
+{% if form.fieldset %}
+
+{% for legend, items in form.fieldset_list %}
+<fieldset>
+	<legend>{{legend}}</legend>
+	{% for field in items %}
+	<div class="control-group">
+		{{ field.label_tag }}
+		<div class='controls'>
+			{{ field }}
+			{% for error in field.errors %}
+			<p class="help-block" style="color:red;">{{ error }}</p>
+			{% endfor %}
+		</div>
+	</div>
+{% endfor %}
+</fieldset>
+{% endfor %}
+
+{% else %}
+
 {% for field in form %}
 	<div class="control-group">
 		{{ field.label_tag }}
@@ -9,3 +30,4 @@
 		</div>
 	</div>
 {% endfor %}
+{% endif %}

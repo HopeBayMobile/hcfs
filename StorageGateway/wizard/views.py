@@ -27,6 +27,11 @@ class InstallationFrom(RenderFormMixinClass, forms.Form):
     shared_folder_name = forms.CharField(initial='SaveBox')
     folder_username = forms.CharField(label='Username for folder', initial='savebox')
     folder_password = forms.CharField(label='Passward for folder', initial='savebox')
+    
+    fieldset = [('Network', ['ip_address', 'subnet_mask']),
+                ('Cloud Storage', ['cloud_username', 'cloud_password', 'encryption_key']),
+                ('Local Storage', ['raid', 'shared_folder_name', 'folder_username', 'folder_password'])
+                ]
 
 def index(request):
     if request.method == 'POST':
