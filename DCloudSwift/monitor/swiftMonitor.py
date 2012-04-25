@@ -76,9 +76,13 @@ class SwiftMonitor(Daemon):
 				if e.errno == EEXIST:
 					logger.info("A confilct task is in execution")
 				else:
-					logger.info(str(e))
+					logger.error(str(e))
 			except SwiftMonitor.TimeoutException:
 				logger.error("Timeout error")
+			
+			except Exception as e:
+				logger.error(str(e))
+				raise
 			finally:
 				if fd != -1:
 					os.close(fd)

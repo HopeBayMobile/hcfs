@@ -172,13 +172,17 @@ def generateSwiftConfig():
 	os.system("chown -R swift:swift /etc/swift")
 
 def getIpAddress():
-    arg='ip route list'    
-    p=subprocess.Popen(arg,shell=True,stdout=subprocess.PIPE)
-    data = p.communicate()
-    sdata = data[0].split()
-    ipaddr = sdata[ sdata.index('src')+1 ]
-    #netdev = sdata[ sdata.index('dev')+1 ]
-    return ipaddr
+	ipaddr = socket.gethostbyname(socket.gethostname())
+	if not ipaddr.startswith("127"):
+		return ipaddr
+
+    	arg='ip route list'    
+    	p=subprocess.Popen(arg,shell=True,stdout=subprocess.PIPE)
+    	data = p.communicate()
+    	sdata = data[0].split()
+    	ipaddr = sdata[ sdata.index('src')+1 ]
+    	#netdev = sdata[ sdata.index('dev')+1 ]
+    	return ipaddr
 
 
 def getSwiftNodeIpList():
@@ -253,6 +257,7 @@ def getStorageNodeIpList():
 
 	return ipList
 
+
 def sshpass(passwd, cmd, timeout=0):
 
 	def timeoutHandler(signum, frame):
@@ -276,6 +281,47 @@ def sshpass(passwd, cmd, timeout=0):
 		signal.alarm(0)
 		signal.signal(signal.SIGALRM, old_handler)
 
+
+def sendMaterials(password, peerIp):
+	logger = getLogger(name="sendMaterials")
+	logger.info("start")
+
+	myIp = getIpAddress()
+	returncode = 1
+
+	try:
+		cmd = "ssh root@%s mkdir -p /etc/delta/%s"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
+		if status != 0:
+			raise SshpassError(stderr)
+		
+		os.system("mkdir -p /etc/delta/swift")
+		os.system("cp -r /etc/swift/* /etc/delta/swift/")
+
+		#TODO: delete unnecessary files
+
+		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
+		if status !=0:
+			raise SshpassError(stderr)
+
+			
+		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
+		if status !=0:
+			raise SshpassError(stderr)
+
+		returncode =0
+	except TimeoutError as err:
+		logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+	except SshpassError as err:
+		logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+	finally:
+		logger.info("end")
+		return returncode
+	
 	
 def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 	logger = getLogger(name="spreadMetadata")
@@ -445,8 +491,4 @@ if __name__ == '__main__':
 #	s = printstring()
 #	print s
 
-	print getSwiftNodeIpList()
-	print random.choice(getSwiftNodeIpList())
-	print os.path.exists("")
-	print getLockFilePath()
-	pass
+	sendMaterials("deltacloud", "172.16.229.146")
