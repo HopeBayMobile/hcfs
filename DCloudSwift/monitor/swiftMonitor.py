@@ -13,6 +13,26 @@ EEXIST = 17
 PORT=2308
 lockFile="/etc/delta/swift.lock"
 
+# DisableSIGTERM decorator
+def disableSIGTERM():
+	def decorator(f):
+		def terminationHdlr(signum, frame):
+			pass
+
+		def f_disable(*args, **kwargs):
+			oldHdlr = signal.signal(signal.SIGTERM, terminationHdlr)
+			try:
+				rv = f(*args, **kwargs) 
+  				return rv 
+			except Exception:
+				raise
+			finally:
+				signal.signal(signal.SIGTERM, oldHdlr)
+
+  		return f_disable #decorated function
+  	
+  	return decorator  #true decorator
+
 class SwiftMonitor(Daemon):
 	def __init__(self, pidfile, lockfile, timeout=360):
 		Daemon.__init__(self, pidfile, lockfile)
@@ -36,38 +56,69 @@ class SwiftMonitor(Daemon):
 		pass
 
 
-	def disableSIGTERM(self):
-		signal.signal(signal.SIGTERM, SwiftMonitor.terminationHdlr)
-
-
-	def copyMaterails(self):
-		
-		cmd = "ssh root@%s mkdir -p /etc/delta/%s"%(peerIp, myIp)
-		(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
-		if status != 0:
-			raise SshpassError(stderr)
-		
+	@disableSIGTERM
+	def copyMaterials(self):
 		#TODO: delete unnecessay files
-		os.system("mkdir -p /etc/delta/swift")
-		os.system("cp -r /etc/swift/* /etc/delta/swift/")
-		os.system("cp -r /DCloudSwift /etc/delta/")
 
-		#TODO: delete unnecessary files
+		fd = -1
+		returncode = 1
+		try:
+			fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
+			os.system("mkdir -p /etc/delta/daemon")
+			os.system("rm -rf /etc/delta/daemon/*") #clear old materials
+			os.system("cp -r /etc/swift /etc/delta/daemon/")
+			os.system("cp -r /DCloudSwift /etc/delta/daemon/")
+			returncode =0
 
-		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
-		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
-		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
-		if status !=0:
-			raise SshpassError(stderr)
+		except OSError as e:
+			if e.errno == EEXIST:
+				logger.info("A confilct task is in execution")
+			else:
+				logger.error(str(e))
+		finally:
+			if fd != -1:
+				os.close(fd)
+				os.unlink(self.lockfile)
 
-			
-		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
-		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
-		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
-		if status !=0:
-			raise SshpassError(stderr)
+			return returncode
 
-		returncode =0
+	def sendMaterials(self, peerIp):
+		logger = util.getLogger(name="SwiftMonitor.sendMaterials")
+		logger.info("start")
+
+		myIp = util.getIpAddress()
+		returncode =1
+
+		try:
+			cmd = "ssh root@%s mkdir -p /etc/delta/%s"%(peerIp, myIp)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+                	if status != 0:
+                		raise SshpassError(stderr)
+
+			cmd = "ssh root@%s rm -rf /etc/delta/%s/*"%(peerIp, myIp)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+                	if status != 0:
+                		raise SshpassError(stderr)
+
+			logger.info("scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+			cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			if status !=0:
+				raise SshpassError(stderr)
+
+			logger.info("scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+			cmd = "scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			if status !=0:
+				raise SshpassError(stderr)
+
+		except TimeoutError as err:
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+		except SshpassError as err:
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+		finally:
+			logger.info("end")
+			return returncode
 
 	def doJob(self):
 		logger = util.getLogger(name="SwiftMonitor.doJob")
@@ -79,34 +130,27 @@ class SwiftMonitor(Daemon):
                			logger.info("The swift cluster is empty!")
 				return
 
-                	tco = random.choice(ipList)
-                	logger.info("The chosen one is %s"%tco)
+                	peerIp = random.choice(ipList)
+                	logger.info("The chosen one is %s"%peerIp)
+
+			if self.sendMaterials(peerIp) !=0:
+				logger.error("Failed to send materials to %s"%peerIp)
+				return
 			
-                	vers = util.getSwiftConfVers()
-			if vers < 0:
-				logger.info("No valid version found!")
 		finally:
 			logger.info("end")
-
-	def enableSIGTERM(self):
-		signal.signal(signal.SIGTERM, self.oldHdlr)
 
 	def run(self):
 		logger = util.getLogger(name="SwiftMonitor.run")
 
 		while True:
-			fd = -1
 			try:
-				self.disableSIGTERM()
 				signal.alarm(self.timeout) # triger alarm in timeout_time seconds
-				fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
+				if self.copyMaterials() !=0:
+					logger.error("Failed to copy materilas")
+					continue
 				self.doJob()
 
-			except OSError as e:
-				if e.errno == EEXIST:
-					logger.info("A confilct task is in execution")
-				else:
-					logger.error(str(e))
 			except SwiftMonitor.TimeoutException:
 				logger.error("Timeout error")
 			
@@ -114,12 +158,7 @@ class SwiftMonitor(Daemon):
 				logger.error(str(e))
 				raise
 			finally:
-				if fd != -1:
-					os.close(fd)
-					os.unlink(self.lockfile)
-
 				signal.alarm(0)
-				self.enableSIGTERM()
 				time.sleep(10)
 
 

@@ -21,32 +21,6 @@ from SwiftCfg import SwiftCfg
 SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
-# DisableSIGTERM decorator
-'''
-def disableSIGTERM():
-	
-		signal.signal(signal.SIGALRM, SwiftMonitor.timeoutHdlr)
-		self.oldHdlr = signal.getsignal(signal.SIGTERM)
-	def disableSIGTERM(self):
-		signal.signal(signal.SIGTERM, SwiftMonitor.terminationHdlr)
-	def enableSIGTERM(self):
-		signal.signal(signal.SIGTERM, self.oldHdlr)
-	def w(f):
-		def f_retry(*args, **kwargs):
-			mtries, mdelay = tries, delay # make mutable
-			rv = f(*args, **kwargs) # first attempt
-			while mtries > 0:
-				if rv ==0 or rv ==True: # Done on success
-					return rv
-				mtries -= 1      # consume an attempt
-				time.sleep(mdelay) # wait...
-				rv = f(*args, **kwargs) # Try again
-  			return rv # Ran out of tries :-(
-  		return f_retry # true decorator -> decorated function
-  	
-  	return deco_retry  # @retry(arg[, ...]) -> true decorator
-'''
-
 # Retry decorator
 def retry(tries, delay=3):
 	'''Retries a function or method until it returns True.
