@@ -39,6 +39,36 @@ class SwiftMonitor(Daemon):
 	def disableSIGTERM(self):
 		signal.signal(signal.SIGTERM, SwiftMonitor.terminationHdlr)
 
+
+	def copyMaterails(self):
+		
+		cmd = "ssh root@%s mkdir -p /etc/delta/%s"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=20)
+		if status != 0:
+			raise SshpassError(stderr)
+		
+		#TODO: delete unnecessay files
+		os.system("mkdir -p /etc/delta/swift")
+		os.system("cp -r /etc/swift/* /etc/delta/swift/")
+		os.system("cp -r /DCloudSwift /etc/delta/")
+
+		#TODO: delete unnecessary files
+
+		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
+		if status !=0:
+			raise SshpassError(stderr)
+
+			
+		logger.info("scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
+		cmd = "scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
+		(status, stdout, stderr) = sshpass(password, cmd, timeout=120)
+		if status !=0:
+			raise SshpassError(stderr)
+
+		returncode =0
+
 	def doJob(self):
 		logger = util.getLogger(name="SwiftMonitor.doJob")
 		logger.info("start")

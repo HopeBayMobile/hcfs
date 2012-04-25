@@ -7,11 +7,13 @@ import threading
 import random
 import sys
 import signal
-import time
 import socket
 import struct
 import math
 import pickle
+import time
+import eventlet
+from eventlet import GreenPool, tpool, Timeout, sleep, hubs
 
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
@@ -19,6 +21,31 @@ from SwiftCfg import SwiftCfg
 SWIFTCONF = '/DCloudSwift/Swift.ini'
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
+# DisableSIGTERM decorator
+'''
+def disableSIGTERM():
+	
+		signal.signal(signal.SIGALRM, SwiftMonitor.timeoutHdlr)
+		self.oldHdlr = signal.getsignal(signal.SIGTERM)
+	def disableSIGTERM(self):
+		signal.signal(signal.SIGTERM, SwiftMonitor.terminationHdlr)
+	def enableSIGTERM(self):
+		signal.signal(signal.SIGTERM, self.oldHdlr)
+	def w(f):
+		def f_retry(*args, **kwargs):
+			mtries, mdelay = tries, delay # make mutable
+			rv = f(*args, **kwargs) # first attempt
+			while mtries > 0:
+				if rv ==0 or rv ==True: # Done on success
+					return rv
+				mtries -= 1      # consume an attempt
+				time.sleep(mdelay) # wait...
+				rv = f(*args, **kwargs) # Try again
+  			return rv # Ran out of tries :-(
+  		return f_retry # true decorator -> decorated function
+  	
+  	return deco_retry  # @retry(arg[, ...]) -> true decorator
+'''
 
 # Retry decorator
 def retry(tries, delay=3):
@@ -49,22 +76,38 @@ def retry(tries, delay=3):
   	return deco_retry  # @retry(arg[, ...]) -> true decorator
 
 #timeout decorator
-def timeout(timeout_time, default):
+def timeout(timeout_time):
 	def timeout_function(f):
 		def f2(*args,**kwargs):
-			def timeout_handler(signum, frame):
-				raise TimeoutError(timeout=timeout_time)
- 
-			old_handler = signal.signal(signal.SIGALRM, timeout_handler) 
-			signal.alarm(timeout_time) # triger alarm in timeout_time seconds
-			try: 
-				retval = f(*args, **kwargs)
-			except TimeoutError:
-				return default
-			finally:
-				signal.signal(signal.SIGALRM, old_handler) 
-			signal.alarm(0)
-			return retval
+			class InterruptableThread(threading.Thread):
+				def __init__(self,f, *args, **kwargs):
+            				threading.Thread.__init__(self)
+					self.f = f
+            				self.args =args
+					self.kwargs = kwargs
+					self.result = None
+        			def run(self):
+					result = None
+					try:
+						self.result = (0,self.f(*(self.args), **(self.kwargs)))
+						
+					except Exception as e:
+						self.result = (1, e)
+		
+			timeout=timeout_time
+			if timeout <=0:
+				timeout = 86400*7 #one week
+			it = InterruptableThread(f, *args, **kwargs)
+			it.daemon =True
+			it.start()
+			it.join(timeout)
+			if it.isAlive():
+				raise TimeoutError(timeout)
+			elif it.result[0] == 0:
+				return it.result[1]
+			else:
+				raise e
+
 		return f2
 	return timeout_function
 
@@ -260,26 +303,32 @@ def getStorageNodeIpList():
 
 def sshpass(passwd, cmd, timeout=0):
 
-	def timeoutHandler(signum, frame):
-		raise TimeoutError()
- 
-	old_handler = signal.signal(signal.SIGALRM, timeoutHandler) 
-	signal.alarm(timeout) # triger alarm in timeout_time seconds
-	
-	try:
-
-		sshpasscmd = "sshpass -p %s %s" % (passwd, cmd)
-		po  = subprocess.Popen(sshpasscmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	class InterruptableThread(threading.Thread):
+		def __init__(self, passwd, cmd):
+            		threading.Thread.__init__(self)
+            		self.cmd =cmd
+			self.passwd = passwd
+			self.result = None
+        	def run(self):
+			try:
+				sshpasscmd = "sshpass -p %s %s" % (self.passwd, self.cmd)
+				po = subprocess.Popen(sshpasscmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				(stdoutData, stderrData) = po.communicate()
+				
+				self.result = (po.returncode, stdoutData, stderrData)
+			except Exception as e:
+				self.result = (1, 0, str(e))
 		
-		(stdoutData, stderrData) = po.communicate()
-		
-		return (po.returncode, stdoutData, stderrData)
-		
-	except TimeoutError:
+	if timeout <=0:
+		timeout = 86400*7 #one week
+	it = InterruptableThread(passwd, cmd)
+	it.daemon =True
+	it.start()
+	it.join(timeout)
+	if it.isAlive():
 		raise TimeoutError(cmd=cmd, timeout=timeout)
-	finally:
-		signal.alarm(0)
-		signal.signal(signal.SIGALRM, old_handler)
+	else:
+		return it.result
 
 
 def sendMaterials(password, peerIp):
@@ -358,7 +407,6 @@ def spreadMetadata(password, sourceDir="/etc/swift/", nodeList=[]):
 			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
 			continue
 					
-
 	return (returncode, blackList)
 
 def spreadPackages(password, nodeList=[]):
@@ -449,14 +497,16 @@ def jsonStr2SshpassArg(jsonStr):
 class TimeoutError(Exception):
 	def __init__(self, cmd=None, timeout=None):
 		self.cmd = cmd
-		self.timeout= str(timeout)
+		self.timeout = timeout
+		if self.timeout is not None:
+			self.timeout= str(self.timeout)
 	def __str__(self):
-		if cmd is not None and timeout is not None:
-			return "Failed to complete \"%s\" in %s seconds"%(self.cmd, self.timeout)
-		elif cmd is not None:
-			return "Failed to complete \"%s\" in time"%self.cmd
-		elif timeout is not None:
-			return "Failed to finish in %s seconds"%(sefl.timeout)
+		if self.cmd is not None and self.timeout is not None:
+			return "Failed to complete \"%s\" in %s secondssss"%(self.cmd, self.timeout)
+		elif self.cmd is not None:
+			return "Failed to complete in \"%s\" seconds"%self.cmd
+		elif self.timeout is not None:
+			return "Failed to finish in %s seconds"%(self.timeout)
 		else:
 			return "TimeoutError"
 
@@ -482,13 +532,13 @@ if __name__ == '__main__':
 
 #	spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
 
-#	@timeout(5, "This is timeout!!!")
-#	def printstring():
-#		print "Start!!"
-#		time.sleep(10)
+	@timeout(5)
+	def printstring():
+		print "Start!!"
+		time.sleep(10)
 #		print "This is not timeout!!!"
-
-#	s = printstring()
-#	print s
-
-	sendMaterials("deltacloud", "172.16.229.146")
+	printstring()
+	#sendMaterials("deltacloud", "172.16.229.146")
+	#cmd = "ssh root@172.16.229.146 sleep 5"
+	#print sshpass("deltacloud", cmd, timeout=1)
+	
