@@ -113,9 +113,7 @@ class Daemon:
                         else:
                                 print str(err)
                                 sys.exit(1)
-		finally:
-			if os.path.exists(self.lockfile):
-				os.remove(self.lockfile)
+			
      
         def restart(self):
                 """

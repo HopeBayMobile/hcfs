@@ -13,30 +13,32 @@ EEXIST = 17
 PORT=2308
 lockFile="/etc/delta/swift.lock"
 
-# DisableSIGTERM decorator
-def disableSIGTERM():
-	def decorator(f):
-		def terminationHdlr(signum, frame):
-			pass
+# deferSIGTERM decorator
+def deferSIGTERM(f):
+	def terminationHdlr(signum, frame):
+		pass
+	
+	from functools import wraps
+	@wraps(f)
+	def wrapper(*args, **kwargs):
+		oldHdlr = signal.signal(signal.SIGTERM, terminationHdlr)
+		try:
+			rv = f(*args, **kwargs) 
+  			return rv 
+		except Exception:
+			raise
+		finally:
+			signal.signal(signal.SIGTERM, oldHdlr)
 
-		def f_disable(*args, **kwargs):
-			oldHdlr = signal.signal(signal.SIGTERM, terminationHdlr)
-			try:
-				rv = f(*args, **kwargs) 
-  				return rv 
-			except Exception:
-				raise
-			finally:
-				signal.signal(signal.SIGTERM, oldHdlr)
-
-  		return f_disable #decorated function
+  	return wrapper #decorated function
   	
-  	return decorator  #true decorator
 
 class SwiftMonitor(Daemon):
 	def __init__(self, pidfile, lockfile, timeout=360):
 		Daemon.__init__(self, pidfile, lockfile)
 
+		SC = SwiftCfg("/DCloudSwift/Swift.ini")
+		self.password = SC.getKwparams()["password"]
 		self.timeout = timeout
 
 		signal.signal(signal.SIGALRM, SwiftMonitor.timeoutHdlr)
@@ -52,17 +54,15 @@ class SwiftMonitor(Daemon):
 	def timeoutHdlr(signum, frame):
 		raise TimeoutException()
 
-	def terminationHdlr(signum, frame):
-		pass
-
-
-	@disableSIGTERM
+	@deferSIGTERM
 	def copyMaterials(self):
 		#TODO: delete unnecessay files
+		logger = util.getLogger(name="SwiftMonitor.copymaterials")
+		logger.info("start")
 
 		fd = -1
 		returncode = 1
-		try:
+		try:	
 			fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
 			os.system("mkdir -p /etc/delta/daemon")
 			os.system("rm -rf /etc/delta/daemon/*") #clear old materials
@@ -80,6 +80,7 @@ class SwiftMonitor(Daemon):
 				os.close(fd)
 				os.unlink(self.lockfile)
 
+			logger.info("end")
 			return returncode
 
 	def sendMaterials(self, peerIp):
@@ -91,30 +92,34 @@ class SwiftMonitor(Daemon):
 
 		try:
 			cmd = "ssh root@%s mkdir -p /etc/delta/%s"%(peerIp, myIp)
-			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
                 	if status != 0:
-                		raise SshpassError(stderr)
+                		raise util.SshpassError(stderr)
 
 			cmd = "ssh root@%s rm -rf /etc/delta/%s/*"%(peerIp, myIp)
-			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
                 	if status != 0:
-                		raise SshpassError(stderr)
+                		raise util.SshpassError(stderr)
 
-			logger.info("scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
 			cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/swift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
-			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
 			if status !=0:
-				raise SshpassError(stderr)
+				raise util.SshpassError(stderr)
 
-			logger.info("scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp))
 			cmd = "scp -r -o StrictHostKeyChecking=no --preserve /DCloudSwift/ root@%s:/etc/delta/%s/"%(peerIp, myIp)
-			(status, stdout, stderr) = sshpass(password, cmd, timeout=360)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
 			if status !=0:
-				raise SshpassError(stderr)
+				raise util.SshpassError(stderr)
 
-		except TimeoutError as err:
+			returncode = 0
+
+		except util.TimeoutError as err:
 			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
-		except SshpassError as err:
+		except util.SshpassError as err:
 			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
 		finally:
 			logger.info("end")
@@ -145,7 +150,7 @@ class SwiftMonitor(Daemon):
 
 		while True:
 			try:
-				signal.alarm(self.timeout) # triger alarm in timeout_time seconds
+				signal.alarm(self.timeout) # triger alarm in timeout seconds
 				if self.copyMaterials() !=0:
 					logger.error("Failed to copy materilas")
 					continue

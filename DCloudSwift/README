@@ -26,7 +26,5 @@
    PDCM will assign the IPs of proxy and storage nodes automatically. However, a 
    few codes must be writen to connect the scripts with PDCM.
 
-2. The scripts do not support the mutiple proxy servers.
-
-3. The logs and error handling are not ready yet! Some logs can be found 
-   in /var/log/deltaSwift of the master node.  
+2. The logs and error handling are not ready yet! Some logs can be found 
+   in /var/log/deltaSwift .  
