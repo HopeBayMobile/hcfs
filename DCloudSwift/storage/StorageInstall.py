@@ -14,7 +14,11 @@ from ConfigParser import ConfigParser
 import socket
 
 #Self defined packages
-sys.path.append("/DCloudSwift/util")
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
+sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+
 from SwiftCfg import SwiftCfg
 import util
 import mountDisks

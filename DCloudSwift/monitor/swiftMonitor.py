@@ -4,7 +4,12 @@ import random
 import pickle
 import signal
 
-sys.path.append("/DCloudSwift/util")
+
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
+sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+
 from SwiftCfg import SwiftCfg
 from daemon import Daemon
 import util
@@ -37,7 +42,7 @@ class SwiftMonitor(Daemon):
 	def __init__(self, pidfile, lockfile, timeout=360):
 		Daemon.__init__(self, pidfile, lockfile)
 
-		SC = SwiftCfg("/DCloudSwift/Swift.ini")
+		SC = SwiftCfg("../Swift.ini")
 		self.password = SC.getKwparams()["password"]
 		self.timeout = timeout
 

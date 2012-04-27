@@ -2,6 +2,10 @@ import sys
 import os
 import subprocess
 
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
+
 def isAllDebInstalled(debSrc):
 	cmd = "find %s -maxdepth 1 -name \'*.deb\'  "%debSrc
 	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)

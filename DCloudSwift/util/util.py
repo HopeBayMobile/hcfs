@@ -11,10 +11,14 @@ import math
 import pickle
 import time
 
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+os.chdir(WORKING_DIR)
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
-SWIFTCONF = '/DCloudSwift/Swift.ini'
+SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 # Retry decorator
@@ -153,7 +157,7 @@ def getLogger(name=None, conf=SWIFTCONF):
 
 		kwparams = SwiftCfg(conf).getKwparams()
 	
-		logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
+		logDir = kwparams.get('logDir', '%s/var/log/deltaSwift/'%BASEDIR)
 		logName = kwparams.get('logName', 'deltaSwift.log')
 		logLevel = kwparams.get('logLevel', 'INFO')
 
@@ -176,11 +180,11 @@ def generateSwiftConfig():
 	if ip.startswith("127"):
 		ip =getIpAddress()
 
-	os.system("/DCloudSwift/proxy/CreateProxyConfig.sh %s"%ip)
-	os.system("/DCloudSwift/storage/rsync.sh %s"%ip)
-	os.system("/DCloudSwift/storage/accountserver.sh %s"%ip)
-	os.system("/DCloudSwift/storage/containerserver.sh %s"%ip)
-	os.system("/DCloudSwift/storage/objectserver.sh %s"%ip)
+	os.system("%s/DCloudSwift/proxy/CreateProxyConfig.sh %s"%(BASEDIR,ip))
+	os.system("%s/DCloudSwift/storage/rsync.sh %s"%(BASEDIR,ip))
+	os.system("%s/DCloudSwift/storage/accountserver.sh %s"%(BASEDIR,ip))
+	os.system("%s/DCloudSwift/storage/containerserver.sh %s"%(BASEDIR,ip))
+	os.system("%s/DCloudSwift/storage/objectserver.sh %s"%(BASEDIR,ip))
 
 	os.system("chown -R swift:swift /etc/swift")
 
@@ -464,13 +468,14 @@ if __name__ == '__main__':
 
 #	spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
 
-	@timeout(5)
-	def printstring():
-		print "Start!!"
-		time.sleep(10)
+#	@timeout(5)
+#	def printstring():
+#		print "Start!!"
+#		time.sleep(10)
 #		print "This is not timeout!!!"
-	printstring()
+#	printstring()
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
 	#print sshpass("deltacloud", cmd, timeout=1)
-	
+	print os.path.dirname(os.path.dirname(os.getcwd()))
+	pass	

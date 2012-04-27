@@ -12,7 +12,11 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 
 #Self defined packages
-sys.path.append("/DCloudSwift/util")
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
+sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+
 import threadpool
 import util
 from SwiftCfg import SwiftCfg
@@ -28,7 +32,7 @@ class SwiftDeploy:
 		self.__storageList = storageList
 		self.__mentor = proxyList[0]
 
-		self.__SC = SwiftCfg("/DCloudSwift/Swift.ini")
+		self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 		self.__kwparams = self.__SC.getKwparams()
 		self.__kwparams['proxyList'] = self.__proxyList
 		self.__kwparams['storageList'] = self.__storageList

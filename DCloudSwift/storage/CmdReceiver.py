@@ -10,7 +10,11 @@ from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
 
-sys.path.append("/DCloudSwift/util")
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
+sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+
 import StorageInstall
 import util
 

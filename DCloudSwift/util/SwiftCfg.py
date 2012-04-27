@@ -10,6 +10,10 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 
 
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+os.chdir(WORKING_DIR)
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+
 class SwiftCfg:
 	def __init__(self, configFile):
 		self.__kwparams = {}
@@ -68,5 +72,5 @@ class SwiftCfg:
 	
 
 if __name__ == '__main__':
-	SC = SwiftCfg("/DCloudSwift/Swift.ini")
+	SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 	kwparams = SC.getKwparams()

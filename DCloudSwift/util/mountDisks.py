@@ -11,8 +11,13 @@ import util
 import re
 
 
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+os.chdir(WORKING_DIR)
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+
 #TODO: Read from config files
 UNNECESSARYFILES = "cert* backups *.conf"
+
 
 class MountSwiftDeviceError(Exception): pass
 class WriteMetadataError(Exception): pass
@@ -459,7 +464,7 @@ def dumpScripts(destDir):
 	logger = util.getLogger(name="dumpScripts")
 	os.system("mkdir -p %s"%destDir)
 	os.system("rm -r %s/*"%destDir)
-        cmd = "cp -r /DCloudSwift/* %s"%destDir
+        cmd = "cp -r %s/DCloudSwift/* %s"%(BASEDIR,destDir)
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	output = po.stdout.read()	
         po.wait()
