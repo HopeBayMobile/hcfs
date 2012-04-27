@@ -35,7 +35,7 @@ def retry(tries, delay=3):
 		raise ValueError("delay must be greater than 0")
 	
 	def deco_retry(f):
-		def f_retry(*args, **kwargs):
+		def wrapper(*args, **kwargs):
 			mtries, mdelay = tries, delay # make mutable
 			rv = f(*args, **kwargs) # first attempt
 			while mtries > 0:
@@ -44,15 +44,15 @@ def retry(tries, delay=3):
 				mtries -= 1      # consume an attempt
 				time.sleep(mdelay) # wait...
 				rv = f(*args, **kwargs) # Try again
-  			return rv # Ran out of tries :-(
-  		return f_retry # true decorator -> decorated function
+  			return rv # Ran out of tries
+  		return wrapper #decorated function
   	
   	return deco_retry  # @retry(arg[, ...]) -> true decorator
 
 #timeout decorator
 def timeout(timeout_time):
-	def timeout_function(f):
-		def f2(*args,**kwargs):
+	def timeoutDeco(f):
+		def wrapper(*args,**kwargs):
 			class InterruptableThread(threading.Thread):
 				def __init__(self,f, *args, **kwargs):
             				threading.Thread.__init__(self)
@@ -82,8 +82,8 @@ def timeout(timeout_time):
 			else:
 				raise e
 
-		return f2
-	return timeout_function
+		return wrapper
+	return timeoutDeco
 
 def restartRsync():
 	
@@ -157,7 +157,7 @@ def getLogger(name=None, conf=SWIFTCONF):
 
 		kwparams = SwiftCfg(conf).getKwparams()
 	
-		logDir = kwparams.get('logDir', '%s/var/log/deltaSwift/'%BASEDIR)
+		logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
 		logName = kwparams.get('logName', 'deltaSwift.log')
 		logLevel = kwparams.get('logLevel', 'INFO')
 

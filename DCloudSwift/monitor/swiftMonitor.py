@@ -42,7 +42,7 @@ class SwiftMonitor(Daemon):
 	def __init__(self, pidfile, lockfile, timeout=360):
 		Daemon.__init__(self, pidfile, lockfile)
 
-		SC = SwiftCfg("../Swift.ini")
+		SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 		self.password = SC.getKwparams()["password"]
 		self.timeout = timeout
 
@@ -72,7 +72,7 @@ class SwiftMonitor(Daemon):
 			os.system("mkdir -p /etc/delta/daemon")
 			os.system("rm -rf /etc/delta/daemon/*") #clear old materials
 			os.system("cp -r /etc/swift /etc/delta/daemon/")
-			os.system("cp -r /DCloudSwift /etc/delta/daemon/")
+			os.system("cp -r %s/DCloudSwift /etc/delta/daemon/"%BASEDIR)
 			returncode =0
 
 		except OSError as e:
