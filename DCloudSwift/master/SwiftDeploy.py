@@ -56,7 +56,7 @@ class SwiftDeploy:
 	def getDeployProgress(self):
 		return self.__deployProgress
 
-	def updateProgress(self, success=False, ip="", swiftType, msg=""):
+	def __updateProgress(self, success=False, ip="", swiftType="proxy", msg=""):
 		if swiftType == "proxy":
 			self.__deployProgress['deployedProxy'] += 1
 			self.__deployProgress['proxyProgress'] = (self.__deployProgress['deployedProxy']/len(self.__proxyList)) * 100.0
@@ -103,11 +103,11 @@ class SwiftDeploy:
 		os.system("rm -rf /etc/swift/*")
 		os.system("cd /etc/delta/swift; rm -rf %s"%UNNECESSARYFILES)
 
-	@timeout(self.__kwparams['proxyInterval'], -1)
-	def proxyDeploySubtask(self, proxyIP):
+	#@timeout(self.__kwparams['proxyInterval'], -1)
+	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
 		try:
-			if util.spreadmetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
+			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
 				errMsg = "Failed to spread metadata to %s" % proxyIP
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
@@ -131,57 +131,75 @@ class SwiftDeploy:
 				return -4
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
+			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
 			return 0
 
 		except util.TimeoutError as err:
-                                logger.error("%s" % err)
-                                sys.stderr.write("%s\n" % err)
-                                self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=err)
+			logger.error("%s" % err)
+			sys.stderr.write("%s\n" % err)
+			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=err)
 
 	def proxyDeploy(self):
-		#TODO: 1) use fork and report progress 2) deploy multiple proxy nodes
 		logger = util.getLogger(name="proxyDeploy")
-
 		argumentList = []
 		for i in [node["ip"] for node in self.__proxyList]:
 			argumentList.append(([i], None))
-
 		pool = threadpool.ThreadPool(10)
 		requests = threadpool.makeRequests(self.__proxyDeploySubtask, argumentList)
 		for req in requests:
 			pool.putRequest(req)
-
 		pool.wait()
 		pool.dismissWorkers(10)
 		pool.joinAllDismissedWorkers()
 
+	#@timeout(self.__kwparams['storageInterval'], -1)
+	def __storageDeploySubtask(self, storageIP):
+		logger = util.getLogger(name="storageDeploySubtask: %s" % storageIP)
+		try:
+			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[storageIP])[0] != 0:
+				errMsg = "Failed to spread metadata to %s" % storageIP
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -2
+
+			cmd = "scp -r /DCloudSwift/ root@%s:/" % storageIP
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to scp storage scripts to %s for %s" % (storageIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -3
+
+			cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -s %s"%(storageIP, util.jsonStr2SshpassArg(self.__jsonStr))
+			print cmd
+			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+			if status != 0:
+				errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -4
+
+			logger.info("Succeeded to deploy storage %s" % storageIP)
+			self.__updateProgress(success=True, ip=storageIP, swiftType="storage", msg="")
+			return 0
+
+		except util.TimeoutError as err:
+			logger.error("%s" % err)
+			sys.stderr.write("%s\n" % err)
+			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=err)
+
 	def storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
-		blackList =[]
-		#TODO: use thread pool and report progress
-		for i in [node["ip"] for node in self.__storageList]:
-			try:
-				if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[i])[0] !=0:
-                                        logger.error("Failed to spread metadata to %s"%i)
-                                        blackList.append(i)
-                                        continue
-
-				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-                                (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
-                                if status !=0:
-                                        logger.error("Failed to scp storage scrips to %s for %s"%(i, stderr))
-                                        continue
-
-				cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -s %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-				print cmd
-				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
-				if status != 0:
-                                        logger.error("Failed to deploy storage %s for %s"%(i, stderr))
-                                        continue
-
-			except util.TimeoutError as err:
-				logger.error("%s"%err)
-                        	sys.stderr.write("%s\n"%err)
+		argumentList = []
+                for i in [node["ip"] for node in self.__storageList]:
+                        argumentList.append(([i], None))
+                pool = threadpool.ThreadPool(20)
+                requests = threadpool.makeRequests(self.__storageDeploySubtask, argumentList)
+                for req in requests:
+                        pool.putRequest(req)
+                pool.wait()
+                pool.dismissWorkers(20)
+                pool.joinAllDismissedWorkers()
 
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
