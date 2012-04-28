@@ -14,11 +14,12 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-os.chdir(WORKING_DIR)
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+os.chdir(WORKING_DIR)
 sys.path.append("%s/DCloudSwift/util"%BASEDIR)
 
 import util
+import maintenance
 import mountDisks
 
 Usage = '''
@@ -53,10 +54,11 @@ def triggerAddStorage(**kwargs):
 	for node in storageList: 
 		for j in range(deviceCnt):
 			deviceName = devicePrx + str(j+1)
-			logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
-			os.system("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
+			cmd = "%s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (BASEDIR, node["zid"], node["ip"], deviceName)
+			logger.info(cmd)
+			os.system(cmd)
 
-	os.system("/DCloudSwift/proxy/Rebalance.sh")
+	os.system("sh %s/DCloudSwift/proxy/Rebalance.sh"%BASEDIR)
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
 
 	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=[node["ip"] for node in proxyList])
@@ -68,6 +70,17 @@ def triggerAddStorage(**kwargs):
 
 	return (returncode, blackProxyNodes, blackStorageNodes)
 
+
+def triggerUpdateMetadata(confDir):
+	logger = util.getLogger(name="triggerUpdateMetadata")
+
+	if not maintenance.isNewer(confDir=confDir):
+		logger.info("Already the latest metadata")
+		return 0
+
+	maintenance.updateMetadata(confDir=confDir)
+
+	return 0
 
 def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
@@ -81,7 +94,7 @@ def triggerProxyDeploy(**kwargs):
 
 	util.generateSwiftConfig()
 	util.restartMemcached()
-	os.system("/DCloudSwift/proxy/ProxyStart.sh")
+	os.system("sh /DCloudSwift/proxy/ProxyStart.sh")
 
 	metadata = mountDisks.getLatestMetadata()
 	
@@ -142,12 +155,16 @@ def main():
 				triggerAddStorage(**kwargs)
 			elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
                                	kwargs = json.loads(sys.argv[2])
-                        	print 'Proxy deployment start'
+                        	print 'RmStorage deployment start'
                         	triggerRmStorage(**kwargs)	
         		elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 				kwargs = json.loads(sys.argv[2])
 				print 'Proxy deployment start'
 				triggerProxyDeploy(**kwargs)
+        		elif (sys.argv[1] == 'updateMetadata' or sys.argv[1] == '-u'):
+				print 'updateMetadata start'
+				confDir = sys.argv[2] 
+				triggerUpdateMetadata(confDir=confDir)
 			else:
 				print >> sys.stderr, "Usage error: Invalid optins"
                 		raise UsageError
