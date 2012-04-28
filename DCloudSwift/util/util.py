@@ -180,11 +180,11 @@ def generateSwiftConfig():
 	if ip.startswith("127"):
 		ip =getIpAddress()
 
-	os.system("%s/DCloudSwift/proxy/CreateProxyConfig.sh %s"%(BASEDIR,ip))
-	os.system("%s/DCloudSwift/storage/rsync.sh %s"%(BASEDIR,ip))
-	os.system("%s/DCloudSwift/storage/accountserver.sh %s"%(BASEDIR,ip))
-	os.system("%s/DCloudSwift/storage/containerserver.sh %s"%(BASEDIR,ip))
-	os.system("%s/DCloudSwift/storage/objectserver.sh %s"%(BASEDIR,ip))
+	os.system("sh %s/DCloudSwift/proxy/CreateProxyConfig.sh %s"%(BASEDIR,ip))
+	os.system("sh %s/DCloudSwift/storage/rsync.sh %s"%(BASEDIR,ip))
+	os.system("sh %s/DCloudSwift/storage/accountserver.sh %s"%(BASEDIR,ip))
+	os.system("sh %s/DCloudSwift/storage/containerserver.sh %s"%(BASEDIR,ip))
+	os.system("sh %s/DCloudSwift/storage/objectserver.sh %s"%(BASEDIR,ip))
 
 	os.system("chown -R swift:swift /etc/swift")
 
