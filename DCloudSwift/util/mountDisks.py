@@ -491,6 +491,55 @@ def dumpSwiftMetadata(destDir):
 	os.system("cd %s; rm -rf %s"%(destDir, UNNECESSARYFILES))
 	return 0
 
+def getDeviceMapping():
+	logger = util.getLogger(name="getDeviceMapping")
+
+        disks = getNonRootDisks()
+
+	deviceMapping = dict()
+	latestMetadata = getLatestMetadata()
+	if latestMetadata is None:
+		return deviceMapping
+	
+	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret !=0:
+			logger.warn("Failed to read metadata from disk %s"%disk)
+			continue
+
+		if metadata["vers"] < latestMetadata["vers"]:
+			logger.warn("Metadata of Disk %s is out of date"%disk)
+			continue
+
+		if metadata["hostname"] != socket.gethostname():
+			logger.warn("Metadata of Disk %s is not valid"%disk)
+			continue
+
+		deviceMapping.setdefault(metadata["deviceNum"], disk)
+
+	return deviceMapping
+
+def updateMetadataOnDisks(vers, deviceCnt, devicePrx):
+	logger = util.getLogger(name="updateMetadataOnDisks")
+
+	deviceMapping = getDeviceMapping()
+	newDeviceMapping = dict()
+	for deviceNum in deviceMapping:
+		if deviceNum > deviceCnt+1:
+			continue
+
+		disk = deviceMapping[deviceNum]
+		ret = writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum)
+		if ret !=0:
+			logger.error("Failed to update metadata on disk %s"%disk)
+			continue
+	
+		newDeviceMapping.setdefault(deviceNum, disk)
+		logger.info("Succeed to update Metadata on disk %s with deviceNum=%d and vers=%s"%(disk, deviceNum, vers))
+
+		
+	return deviceMapping
+
 def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
 
@@ -560,12 +609,14 @@ if __name__ == '__main__':
 	#print getMajorityHostname()
 	#print getLatestMetadata()
 	#createSwiftDevices()
+	#print updateMetadataOnDisks(vers=44, deviceCnt=5, devicePrx="sdb")
 	#writeMetadata(disk="/dev/sdb", vers=1, deviceNum=1, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sdc", vers=1, deviceNum=2, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
 	#writeMetadata(disk="/dev/sdf", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=5)
 	#print loadSwiftMetadata()
+	#print updateMetadataOnDisks(vers=44, deviceCnt=5, devicePrx="sdb")
 	#print readMetadata(disk="/dev/sdb")
 	#print remountDisks()
 	#print int(time.time())
