@@ -17,10 +17,13 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 os.chdir(WORKING_DIR)
 sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+sys.path.append("%s/DCloudSwift/proxy"%BASEDIR)
+sys.path.append("%s/DCloudSwift/storage"%BASEDIR)
 
 import util
 import maintenance
 import mountDisks
+import StorageInstall
 
 Usage = '''
 Usage:
@@ -29,7 +32,8 @@ Options:
 	[-a | addStorage] - for adding storage nodes
 	[-p | proxy] - for proxy node
 	[-r | rmStorage] - for removing storage nodes
-	[-f | firstProxy] - for the first proxy node
+	[-u | updateMetadata]
+	[-s | storage] - for storage node
 Examples:
 	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
@@ -94,7 +98,7 @@ def triggerProxyDeploy(**kwargs):
 
 	util.generateSwiftConfig()
 	util.restartMemcached()
-	os.system("sh /DCloudSwift/proxy/ProxyStart.sh")
+	os.system("sh %s/DCloudSwift/proxy/ProxyStart.sh"%BASEDIR)
 
 	metadata = mountDisks.getLatestMetadata()
 	
@@ -124,7 +128,7 @@ def triggerRmStorage(**kwargs):
 		cmd = "cd /etc/swift; swift-ring-builder object.builder remove %s"% (i)
 		util.runPopenCommunicate(cmd, inputString='y\n', logger=logger)
 
-	os.system("/DCloudSwift/proxy/Rebalance.sh")
+	os.system("sh %s/DCloudSwift/proxy/Rebalance.sh"%BASEDIR)
 	os.system("cp --preserve /etc/swift/*.ring.gz /tmp/")
 
 	blackProxyNodes = util.spreadMetadata(password=password, sourceDir="/tmp/", nodeList=[node["ip"] for node in proxyList])
@@ -135,6 +139,15 @@ def triggerRmStorage(**kwargs):
 	returncode = len(blackProxyNodes)+len(blackStorageNodes)
 
 	return (returncode, blackProxyNodes, blackStorageNodes)
+
+def triggerStorageDeploy(**kwargs):
+	proxy = kwargs['proxyList'][0]["ip"]
+	proxyList = kwargs['proxyList']
+
+	devicePrx = kwargs['devicePrx']
+	deviceCnt = kwargs['deviceCnt']
+	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
+	installer.install()
 
 def main():
 	returncode =0
@@ -153,14 +166,18 @@ def main():
 				kwargs = json.loads(sys.argv[2])
 				print 'AddStorage start'
 				triggerAddStorage(**kwargs)
-			elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
-                               	kwargs = json.loads(sys.argv[2])
-                        	print 'RmStorage deployment start'
-                        	triggerRmStorage(**kwargs)	
         		elif (sys.argv[1] == 'proxy' or sys.argv[1] == '-p'):
 				kwargs = json.loads(sys.argv[2])
 				print 'Proxy deployment start'
 				triggerProxyDeploy(**kwargs)
+			elif (sys.argv[1] == 'rmStorage' or sys.argv[1] == '-r'):
+                               	kwargs = json.loads(sys.argv[2])
+                        	print 'RmStorage deployment start'
+                        	triggerRmStorage(**kwargs)	
+			elif (sys.argv[1] == 'storage' or sys.argv[1] == '-s'):
+				kwargs = json.loads(sys.argv[2])
+				print 'storage deployment start'
+				triggerStorageDeploy(**kwargs)
         		elif (sys.argv[1] == 'updateMetadata' or sys.argv[1] == '-u'):
 				print 'updateMetadata start'
 				confDir = sys.argv[2] 

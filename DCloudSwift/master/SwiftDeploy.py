@@ -125,7 +125,7 @@ class SwiftDeploy:
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
 				return -3
 
-			cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -p %s" % (proxyIP, util.jsonStr2SshpassArg(self.__jsonStr))
+			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
@@ -174,7 +174,7 @@ class SwiftDeploy:
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
 				return -3
 
-			cmd = "ssh root@%s python /DCloudSwift/storage/CmdReceiver.py -s %s"%(storageIP, util.jsonStr2SshpassArg(self.__jsonStr))
+			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -s %s"%(storageIP, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
 			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
@@ -218,7 +218,7 @@ class SwiftDeploy:
 					continue
 			
 				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -a %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
+				cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -a %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
 				print cmd
 
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
@@ -248,7 +248,7 @@ class SwiftDeploy:
 					continue
 			
 				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/proxy/CmdReceiver.py -r %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
+				cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -r %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
 				print cmd
 
 				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
