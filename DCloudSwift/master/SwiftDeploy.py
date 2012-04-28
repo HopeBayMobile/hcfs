@@ -26,6 +26,8 @@ from util import timeout
 #TODO: read from config files
 UNNECESSARYFILES = "cert* backups"
 
+lock = threading.Lock()
+
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
 		self.__proxyList = proxyList
@@ -58,21 +60,28 @@ class SwiftDeploy:
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 	def getDeployProgress(self):
-		return self.__deployProgress
+		while self.__deployProgress['finished'] != True:
+			time.sleep(5)
+			print self.__deployProgress
+		print "Swift deploy process is done!"
 
 	def __updateProgress(self, success=False, ip="", swiftType="proxy", msg=""):
-		if swiftType == "proxy":
-			self.__deployProgress['deployedProxy'] += 1
-			self.__deployProgress['proxyProgress'] = (self.__deployProgress['deployedProxy']/len(self.__proxyList)) * 100.0
-		if swiftType == "storage":
-			self.__deployProgress['deployedStorage'] += 1
-			self.__deployProgress['storageProgress'] = (self.__deployProgress['deployedStorage']/len(self.__storageList)) * 100.0
-		if success == False:
-			self.__deployProgress['blackList'].append(ip)
-			self.__deployProgress['message'].append(msg)
-			self.__deployProgress['code'] += 1
-		if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
-			self.__deployProgress['finished'] = True
+		lock.acquire()
+		try:
+			if swiftType == "proxy":
+				self.__deployProgress['deployedProxy'] += 1
+				self.__deployProgress['proxyProgress'] = (self.__deployProgress['deployedProxy']/len(self.__proxyList)) * 100.0
+			if swiftType == "storage":
+				self.__deployProgress['deployedStorage'] += 1
+				self.__deployProgress['storageProgress'] = (self.__deployProgress['deployedStorage']/len(self.__storageList)) * 100.0
+			if success == False:
+				self.__deployProgress['blackList'].append(ip)
+				self.__deployProgress['message'].append(msg)
+				self.__deployProgress['code'] += 1
+			if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
+				self.__deployProgress['finished'] = True
+		finally:
+			lock.release()
 
 	def createMetadata(self):
 		logger = util.getLogger(name = "createMetadata")
@@ -269,11 +278,25 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	#SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
-	SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
+	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
+	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
-	SD.createMetadata()
+	#SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#SD.storageDeploy()
+	pool = threadpool.ThreadPool(3)
+	requests = threadpool.makeRequests(SD.getDeployProgress, [(None, None)])
+	for req in requests:
+		pool.putRequest(req)
+	requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])i
+	for req in requests:
+		pool.putRequest(req)
+	requests = threadpool.makeRequests(SD.storageDeploy, [(None, None)])
+	for req in requests:
+		pool.putRequest(req)
+	pool.wait()
+	pool.dismissWorkers(3)
+	pool.joinAllDismissedWorkers()
+
