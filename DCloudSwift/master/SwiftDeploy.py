@@ -70,10 +70,10 @@ class SwiftDeploy:
 		try:
 			if swiftType == "proxy":
 				self.__deployProgress['deployedProxy'] += 1
-				self.__deployProgress['proxyProgress'] = (self.__deployProgress['deployedProxy']/len(self.__proxyList)) * 100.0
+				self.__deployProgress['proxyProgress'] = (float(self.__deployProgress['deployedProxy'])/len(self.__proxyList)) * 100.0
 			if swiftType == "storage":
 				self.__deployProgress['deployedStorage'] += 1
-				self.__deployProgress['storageProgress'] = (self.__deployProgress['deployedStorage']/len(self.__storageList)) * 100.0
+				self.__deployProgress['storageProgress'] = (float(self.__deployProgress['deployedStorage'])/len(self.__storageList)) * 100.0
 			if success == False:
 				self.__deployProgress['blackList'].append(ip)
 				self.__deployProgress['message'].append(msg)
@@ -281,22 +281,22 @@ if __name__ == '__main__':
 	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
 	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
-	#SD.createMetadata()
+	SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#SD.storageDeploy()
-	pool = threadpool.ThreadPool(3)
+	pool = threadpool.ThreadPool(2)
 	requests = threadpool.makeRequests(SD.getDeployProgress, [(None, None)])
 	for req in requests:
 		pool.putRequest(req)
-	requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])i
+	requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])
 	for req in requests:
 		pool.putRequest(req)
 	requests = threadpool.makeRequests(SD.storageDeploy, [(None, None)])
 	for req in requests:
 		pool.putRequest(req)
 	pool.wait()
-	pool.dismissWorkers(3)
+	pool.dismissWorkers(2)
 	pool.joinAllDismissedWorkers()
 
