@@ -339,7 +339,7 @@ def remountRecognizableDisks():
 def resume():
 	logger = util.getLogger(name="resume")
         logger.info("start")
-
+	os.system("sh /etc/DCloud/ServerRegister/autoRun.sh")
 	hostname = socket.gethostname()
 
 	remountDisks()
