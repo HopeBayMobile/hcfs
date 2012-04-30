@@ -14,6 +14,7 @@ BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 os.chdir(WORKING_DIR)
 
 import util
+import mountDisks
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
@@ -43,13 +44,25 @@ def updateMetadata(confDir):
 	os.system("cp -r %s/DCloudSwift /"%BASEDIR)
 	os.system("chown -R swift:swift /etc/swift")
 
+	vers = util.getSwiftConfVers()
+	deviceCnt = util.getDeviceCnt()
+	devicePrx = util.getDevicePrx()
+
+	oriMetadata = mountDisks.getLatestMetadata()
+	if oriMetadata is None:
+		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+		util.restartAllServices()
+	else:
+		mountDisks.updateMetadataOnDisks(vers=vers,deviceCnt=deviceCnt, devicePrx=devicePrx)
+		
+
 	return 0
 
 
 
 if __name__ == '__main__':
-	print isNewer(confDir="/etc/delta/swift")
-#	updateMetadata(confDir="/etc/delta/swift")
+#	print isNewer(confDir="/etc/delta/swift")
+	updateMetadata(confDir="/etc/delta/swift")
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")

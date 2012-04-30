@@ -85,6 +85,14 @@ def timeout(timeout_time):
 		return wrapper
 	return timeoutDeco
 
+def restartAllServices():
+	util.generateSwiftConfig()
+	restartRsync()
+	restartMemcached()
+	os.system("chown -R swift:swift /srv/node/ ")
+	restartSwiftServices()
+		
+
 def restartRsync():
 	
 	os.system("/etc/init.d/rsync stop")
@@ -115,8 +123,7 @@ def restartSwiftServices():
 	'''
 	start appropriate swift services
 	'''
-	pass
-
+	os.system("swift-init all restart")
 
 def runPopenCommunicate(cmd, inputString, logger):
 	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -187,6 +194,36 @@ def generateSwiftConfig():
 	os.system("sh %s/DCloudSwift/storage/objectserver.sh %s"%(BASEDIR,ip))
 
 	os.system("chown -R swift:swift /etc/swift")
+
+def getDeviceCnt():
+	logger = getLogger(name="getDeviceCnt")
+	
+	config = ConfigParser()
+	config.readfp(open(SWIFTCONF))
+
+	try:
+		with open(SWIFTCONF,"rb") as fh:
+			config.readfp(fh)
+	except IOError:
+		logger.error("Failed to load swift.ini")
+		return None
+
+	return int(config.get('storage', 'deviceCnt'))
+
+def getDevicePrx():
+	logger = getLogger(name="getDevicePrx")
+	
+	config = ConfigParser()
+	config.readfp(open(SWIFTCONF))
+
+	try:
+		with open(SWIFTCONF,"rb") as fh:
+			config.readfp(fh)
+	except IOError:
+		logger.error("Failed to load swift.ini")
+		return None
+
+	return config.get('storage', 'devicePrx')
 
 def getIpAddress():
 	logger = getLogger(name="getIpAddress")
@@ -275,7 +312,6 @@ def getStorageNodeIpList():
 		i+=1
 
 	return ipList
-
 
 def sshpass(passwd, cmd, timeout=0):
 	logger = getLogger(name="sshpass")
@@ -477,5 +513,5 @@ if __name__ == '__main__':
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
 	#print sshpass("deltacloud", cmd, timeout=1)
-	print os.path.dirname(os.path.dirname(os.getcwd()))
+	#print os.path.dirname(os.path.dirname(os.getcwd()))
 	pass	

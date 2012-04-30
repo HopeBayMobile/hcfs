@@ -177,7 +177,6 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
 	logger.debug("start")
 
-	
 	lazyUmountSwiftDevices()
 	(ret,disks)=formatNonRootDisks(deviceCnt)
 	if ret != 0:
