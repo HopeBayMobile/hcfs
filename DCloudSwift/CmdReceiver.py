@@ -75,13 +75,14 @@ def triggerAddStorage(**kwargs):
 
 def triggerUpdateMetadata(confDir):
 	logger = util.getLogger(name="triggerUpdateMetadata")
+	logger.info("start")
 
 	if not maintenance.isNewer(confDir=confDir):
 		logger.info("Already the latest metadata")
-		return 0
+	else:
+		maintenance.updateMetadata(confDir=confDir)
 
-	maintenance.updateMetadata(confDir=confDir)
-
+	logger.info("end")
 	return 0
 
 def triggerProxyDeploy(**kwargs):

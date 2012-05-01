@@ -59,6 +59,30 @@ class SwiftMonitor(Daemon):
 	def timeoutHdlr(signum, frame):
 		raise TimeoutException()
 
+	def clearMaterials(self, peerIp):
+		logger = util.getLogger(name="SwiftMonitor.clearMaterials")
+		logger.info("start")
+
+		myIp = util.getIpAddress()
+		returncode =1
+
+		try:
+			cmd = "ssh root@%s rm -rf /etc/delta/%s"%(peerIp, myIp)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
+                	if status != 0:
+                		raise util.SshpassError(stderr)
+
+			returncode = 0
+
+		except util.TimeoutError as err:
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+		except util.SshpassError as err:
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+		finally:
+			logger.info("end")
+			return returncode
+
 	@deferSIGTERM
 	def copyMaterials(self):
 		#TODO: delete unnecessay files
@@ -158,8 +182,9 @@ class SwiftMonitor(Daemon):
 			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
 		except util.SshpassError as err:
 			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
-			
 		finally:
+			if peerIp is not None:
+				self.clearMaterials(peerIp)
 			logger.info("end")
 
 	def run(self):
@@ -172,6 +197,8 @@ class SwiftMonitor(Daemon):
 					logger.error("Failed to copy materilas")
 					continue
 				self.doJob()
+
+		
 
 			except SwiftMonitor.TimeoutException:
 				logger.error("Timeout error")

@@ -295,8 +295,11 @@ def getSwiftConfVers(confDir="/etc/swift"):
 	try:
 		with open("%s/versBase"%confDir, "rb") as fh:
 			versBase = pickle.load(fh)
+	except IOError:
+		logger.error("Failed to load version base from %s/versBase"%confDir)
+		return -1
 	except OSError:
-		logger.erro("Failed to load version base from %s/versBase"%confDir)
+		logger.error("Failed to load version base from %s/versBase"%confDir)
 		return -1
 	
 	return vers+versBase
