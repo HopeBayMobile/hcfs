@@ -19,6 +19,7 @@ os.chdir(WORKING_DIR)
 sys.path.append("%s/DCloudSwift/util"%BASEDIR)
 sys.path.append("%s/DCloudSwift/proxy"%BASEDIR)
 sys.path.append("%s/DCloudSwift/storage"%BASEDIR)
+sys.path.append("%s/DCloudSwift/maintenance"%BASEDIR)
 
 import util
 import maintenance
@@ -83,7 +84,6 @@ def triggerUpdateMetadata(confDir):
 		return 0
 
 	maintenance.updateMetadata(confDir=confDir)
-	mountDisks.updateMetadataOnDisks() 
 
 	return 0
 

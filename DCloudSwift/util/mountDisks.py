@@ -83,6 +83,84 @@ def getNonRootDisks():
 			nonRootDisks.append(disk)
 
 	return nonRootDisks
+
+def getMountedDisks():
+	cmd = "mount"
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+
+	mountedDisks = set()
+
+	for line in lines:
+		disk = line.split()[0]
+		if disk.startswith("/dev/sd"):
+			mountedDisks.add(disk[0:8])	
+			
+
+	return mountedDisks
+
+def getUmountedDisks():
+	disks = getNonRootDisks()
+	mountedDisks = getMountedDisks()
+	umountedDisks = set()
+	for disk in disks:
+		if not disk in mountedDisks:
+			umountedDisks.add(disk)
+
+	return umountedDisks
+
+def getUnusedDisks(vers):
+	disks = getUmountedDisks()
+	unusedDisks = []
+	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret !=0 or not util.isValid(vers, metadata):
+			unusedDisks.append(disk)
+
+	return unusedDisks
+		
+	
+
+def getMountedSwiftDevices(devicePrx):
+	cmd = "mount"
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+
+	prefix = "/srv/node/%s"%devicePrx
+
+	mountedSwiftDevices=dict()
+
+	for line in lines:
+		disk = line.split()[0]
+		mountpoint = line.split()[2]
+		if mountpoint.startswith(prefix):
+			deviceNum = int(mountpoint.replace(prefix,""))
+			mountedSwiftDevices.setdefault(deviceNum, disk)
+			
+
+	return mountedSwiftDevices
+
+def getUmountedSwiftDevices(deviceCnt, devicePrx):
+	cmd = "mount"
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+
+	prefix = "/srv/node/%s"%devicePrx
+
+	devices=set(range(1,deviceCnt+1))
+
+	for line in lines:
+		disk = line.split()[0]
+		mountpoint = line.split()[2]
+		if mountpoint.startswith(prefix):
+			deviceNum = int(mountpoint.replace(prefix,""))
+			devices.discard(deviceNum)
+			
+
+	return devices
 		
 
 def formatDisks(diskList):
@@ -135,7 +213,6 @@ def formatNonRootDisks(deviceCnt=1):
 
 	return (returncode,formattedDisks)
 
-
 def mountDisk(disk, mountpoint):
 	logger = util.getLogger(name="mountDisk")
 
@@ -172,6 +249,74 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
         	logger.error("Failed to mount %s on %s"%(disk,mountpoint))
 
 	return returncode
+
+def mountUmountedSwiftDevices():
+        logger = util.getLogger(name="mountUmountedSwiftDevices")
+
+	vers = util.getSwiftConfVers()
+	devicePrx = util.getDevicePrx()
+	deviceCnt = util.getDeviceCnt()
+
+	umountedSwiftDevices = getUmountedSwiftDevices(deviceCnt=deviceCnt, devicePrx=devicePrx)
+
+	disks = getUmountedDisks()
+
+	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret!=0:
+			logger.info("Failed to read metadata from disk %s"%disk)
+			continue
+
+		deviceNum = metadata["deviceNum"]
+		if util.isValid(vers, metadata) and deviceNum in umountedSwiftDevices:
+			if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
+				umountedSwiftDevices.discard(deviceNum)
+
+	return umountedSwiftDevices	
+
+def createLostSwiftDevices(lostDevices):
+        logger = util.getLogger(name="createLostSwiftDevices")
+	logger.info("start")
+
+	vers = util.getSwiftConfVers()
+	deviceCnt = util.getDeviceCnt()
+	devicePrx = util.getDevicePrx()
+
+	disks = getUnusedDisks(vers)
+	(ret,disks)=formatDisks(disks)
+
+	mLostDevices = set(lostDevices)
+
+        for disk in disks:
+                try:
+			if len(mLostDevices)==0:
+				break
+			deviceNum = mLostDevices.pop()
+                        mountpoint = "/srv/node"+"/%s%d"%(devicePrx,deviceNum)
+                        os.system("mkdir -p %s"%mountpoint)
+                        if os.path.ismount(mountpoint):
+                                os.system("umount -l %s"%mountpoint)
+
+			print "%s\n"%mountpoint
+
+                        if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum)!=0:
+                                raise WriteMetadataError("Failed to write metadata into %s"%disk)
+
+                        if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum)!=0:
+                                raise MountSwiftDeviceError("Failed to mount %s on %s"%(disk, mountpoint))
+
+                except WriteMetadataError as err:
+                        logger.error("%s"%err)
+			mLostDevices.add(deviceNum)
+                        continue
+                except MountSwiftDeviceError as err:
+                	logger.error("%s"%err)
+                        continue
+
+	os.system("mkdir -p /srv/node")
+        os.system("chown -R swift:swift /srv/node/")
+	logger.info("end")
+	return mLostDevices
 
 def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
         logger = util.getLogger(name="createSwiftDevices")
@@ -256,6 +401,21 @@ def getLatestMetadata():
 
 	logger.debug("getLatestMetadata end")
 	return latestMetadata
+
+def getLatestVers():
+	logger = util.getLogger(name="getLatestVers")
+	logger.info("start")
+	disks = getNonRootDisks()
+	latestVers = None
+
+       	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret == 0:
+			latestVers  = metadata["vers"]  if latestVers is None or latestVers < metadata["vers"]  else latestVers
+			
+
+	logger.info("end")
+	return latestVers
 
 def __loadSwiftMetadata(disk):
         logger = util.getLogger(name="__loadSwiftMetadata")
@@ -518,26 +678,63 @@ def getDeviceMapping():
 
 	return deviceMapping
 
-def updateMetadataOnDisks(vers, deviceCnt, devicePrx):
-	logger = util.getLogger(name="updateMetadataOnDisks")
 
-	deviceMapping = getDeviceMapping()
-	newDeviceMapping = dict()
-	for deviceNum in deviceMapping:
-		if deviceNum > deviceCnt+1:
-			continue
 
-		disk = deviceMapping[deviceNum]
+def updateMountedSwiftDevices():
+	logger = util.getLogger(name="updateMetadataOnMountedDevices")
+
+	vers = util.getSwiftConfVers()
+	devicePrx =util.getDevicePrx()
+	deviceCnt =util.getDeviceCnt()
+
+	mountedSwiftDevices = getMountedSwiftDevices(devicePrx)
+	blackSet = set()
+	for deviceNum in mountedSwiftDevices:
+		disk = mountedSwiftDevices[deviceNum]
 		ret = writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum)
 		if ret !=0:
 			logger.error("Failed to update metadata on disk %s"%disk)
+			blackSet.add(deviceNum)
 			continue
 	
-		newDeviceMapping.setdefault(deviceNum, disk)
 		logger.info("Succeed to update Metadata on disk %s with deviceNum=%d and vers=%s"%(disk, deviceNum, vers))
 
 		
-	return deviceMapping
+	return blackSet
+
+def updateUmountedSwiftDevices(oriVers):
+        logger = util.getLogger(name="updateUmountedSwiftDevices")
+
+	newVers = util.getSwiftConfVers()
+	devicePrx =util.getDevicePrx()
+	deviceCnt =util.getDeviceCnt()
+
+	umountedSwiftDevices = getUmountedSwiftDevices(deviceCnt=deviceCnt, devicePrx=devicePrx)
+
+	disks = getUmountedDisks()
+
+	for disk in disks:
+		(ret, metadata) = readMetadata(disk)
+		if ret!=0:
+			logger.warn("Failed to read metadata from disk %s"%disk)
+			continue
+
+		deviceNum = metadata["deviceNum"]
+		if util.isValid(oriVers, metadata) and deviceNum in umountedSwiftDevices:
+			if writeMetadata(disk=disk, vers=newVers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
+				logger.info("Succeed to update metadata on disk %s with deviceNum=%d and vers=%s"%(disk, deviceNum, newVers))
+				umountedSwiftDevices.discard(deviceNum)
+
+	return umountedSwiftDevices	
+def updateMetadataOnDisks(oriVers):
+	logger = util.getLogger(name="updateMetadataOnDisks")
+
+	blackSet = updateMountedSwiftDevices()
+	lostDevices = updateUmountedSwiftDevices(oriVers=oriVers)
+	lostDevices = createLostSwiftDevices(lostDevices)
+	return lostDevices.union(blackSet)
+
+
 
 def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	logger = util.getLogger(name="writeMetadata")
@@ -599,7 +796,9 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	#main(sys.argv[1:])
+	print getUmountedDisks()
+	#print getUmountedSwiftDevices(deviceCnt=5, devicePrx="sdb")
 	#util.generateSwiftConfig()
 	#formatDisks(["/dev/sdc"])
 	#print getRootDisk()
@@ -609,14 +808,22 @@ if __name__ == '__main__':
 	#print getLatestMetadata()
 	#createSwiftDevices()
 	#print updateMetadataOnDisks(vers=44, deviceCnt=5, devicePrx="sdb")
-	#writeMetadata(disk="/dev/sdb", vers=1, deviceNum=1, devicePrx="sdb", deviceCnt=5)
-	#writeMetadata(disk="/dev/sdc", vers=1, deviceNum=2, devicePrx="sdb", deviceCnt=5)
-	#writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
-	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
-	#writeMetadata(disk="/dev/sdf", vers=1, deviceNum=5, devicePrx="sdb", deviceCnt=5)
-	#print loadSwiftMetadata()
-	#print updateMetadataOnDisks(vers=44, deviceCnt=5, devicePrx="sdb")
-	#print readMetadata(disk="/dev/sdb")
+	
+	#print updateMountedSwiftDevices(vers=2, deviceCnt=5, devicePrx="sdb")
+	
+	print 1==None
+	writeMetadata(disk="/dev/sdb", vers=1, deviceNum=1, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sdc", vers=1, deviceNum=2, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
+	writeMetadata(disk="/dev/sdf", vers=0, deviceNum=5, devicePrx="sdb", deviceCnt=5)
+	print updateMetadataOnDisks(oriVers=1)
+	print "/dev/sdb %s"%str(readMetadata(disk="/dev/sdb"))
+	print "/dev/sdc %s"%str(readMetadata(disk="/dev/sdc"))
+	print "/dev/sdd %s"%str(readMetadata(disk="/dev/sdd"))
+	print "/dev/sde %s"%str(readMetadata(disk="/dev/sde"))
+	print "/dev/sdf %s"%str(readMetadata(disk="/dev/sdf"))
+	mountUmountedSwiftDevices()
 	#print remountDisks()
 	#print int(time.time())
 	#resume()

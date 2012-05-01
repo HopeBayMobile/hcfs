@@ -12,6 +12,7 @@ import time
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 os.chdir(WORKING_DIR)
+sys.path.append("%s/DCloudSwift/util"%BASEDIR)
 
 import util
 import mountDisks
@@ -44,18 +45,18 @@ def updateMetadata(confDir):
 	os.system("cp -r %s/DCloudSwift /"%BASEDIR)
 	os.system("chown -R swift:swift /etc/swift")
 
-	vers = util.getSwiftConfVers()
 	deviceCnt = util.getDeviceCnt()
 	devicePrx = util.getDevicePrx()
 
-	oriMetadata = mountDisks.getLatestMetadata()
-	if oriMetadata is None:
+	oriVers = mountDisks.getLatestVers()
+	if oriVers is None:
 		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
-		util.restartAllServices()
 	else:
-		mountDisks.updateMetadataOnDisks(vers=vers,deviceCnt=deviceCnt, devicePrx=devicePrx)
+		mountDisks.updateMetadataOnDisks(oriVers=oriVers)
+		mountDisks.mountUmountedSwiftDevices()
 		
 
+	util.restartAllServices()
 	return 0
 
 

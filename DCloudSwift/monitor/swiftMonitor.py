@@ -147,6 +147,17 @@ class SwiftMonitor(Daemon):
 				logger.error("Failed to send materials to %s"%peerIp)
 				return
 			
+			cmd = "ssh root@%s python /etc/delta/%s/DCloudSwift/CmdReceiver.py -m /etc/delta/%s/swift"%(peerIp, myIp, myIp)
+			logger.info(cmd)
+			(status, stdout, stderr) = util.sshpass(self.password, cmd)
+			if status !=0:
+				raise util.SshpassError(stderr)
+			
+		except util.TimeoutError as err:
+			logger.error("Failed to execute \"%s\" in time"%(cmd)) 
+		except util.SshpassError as err:
+			logger.error("Failed to execute \"%s\" for %s"%(cmd, err))
+			
 		finally:
 			logger.info("end")
 

@@ -85,10 +85,25 @@ def timeout(timeout_time):
 		return wrapper
 	return timeoutDeco
 
+def isValid(vers, metadata):
+	retval = True
+
+	if vers != metadata["vers"]:
+		retval=False
+
+	if socket.gethostname()!=metadata["hostname"]:
+		retval=False 
+
+	return retval
 def restartAllServices():
-	util.generateSwiftConfig()
-	restartRsync()
-	restartMemcached()
+	logger = getLogger(name="restartAllServices")
+	generateSwiftConfig()
+	if restartRsync() != 0:
+		logger.error("Failed to restart rsyncd")
+
+	if restartMemcached() !=0:
+		logger.error("Failed to restart memcached")
+
 	os.system("chown -R swift:swift /srv/node/ ")
 	restartSwiftServices()
 		
