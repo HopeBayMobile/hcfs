@@ -16,12 +16,10 @@ import socket
 #Self defined packages
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-os.chdir(WORKING_DIR)
 sys.path.append("%s/DCloudSwift/util"%BASEDIR)
 
-from SwiftCfg import SwiftCfg
-import util
-import mountDisks
+from util import util
+from util import mountDisks
 
 class StorageNodeInstaller:
 	def __init__(self, proxy, proxyList, devicePrx="sdb", deviceCnt=1):

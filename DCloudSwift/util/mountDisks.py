@@ -13,7 +13,6 @@ import re
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-os.chdir(WORKING_DIR)
 
 #TODO: Read from config files
 UNNECESSARYFILES = "cert* backups *.conf"

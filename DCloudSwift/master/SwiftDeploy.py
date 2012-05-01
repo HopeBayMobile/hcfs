@@ -14,14 +14,11 @@ from ConfigParser import ConfigParser
 #Self defined packages
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-os.chdir(WORKING_DIR)
-sys.path.append("%s/DCloudSwift/util"%BASEDIR)
+sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
-import threadpool
-import util
-from SwiftCfg import SwiftCfg
-from util import timeout
-
+from util import util
+from util import threadpool
+from util.SwiftCfg import SwiftCfg
 
 #TODO: read from config files
 UNNECESSARYFILES = "cert* backups"
@@ -278,25 +275,25 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
-	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
+	#SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
+	SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
 	SD.createMetadata()
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
 	#SD.storageDeploy()
-	pool = threadpool.ThreadPool(2)
-	requests = threadpool.makeRequests(SD.getDeployProgress, [(None, None)])
-	for req in requests:
-		pool.putRequest(req)
-	requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])
-	for req in requests:
-		pool.putRequest(req)
-	requests = threadpool.makeRequests(SD.storageDeploy, [(None, None)])
-	for req in requests:
-		pool.putRequest(req)
-	pool.wait()
-	pool.dismissWorkers(2)
-	pool.joinAllDismissedWorkers()
+	#pool = threadpool.ThreadPool(2)
+	#requests = threadpool.makeRequests(SD.getDeployProgress, [(None, None)])
+	#for req in requests:
+	#	pool.putRequest(req)
+	#requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])
+	#for req in requests:
+	#	pool.putRequest(req)
+	#requests = threadpool.makeRequests(SD.storageDeploy, [(None, None)])
+	#for req in requests:
+	#	pool.putRequest(req)
+	#pool.wait()
+	#pool.dismissWorkers(2)
+	#pool.joinAllDismissedWorkers()
 

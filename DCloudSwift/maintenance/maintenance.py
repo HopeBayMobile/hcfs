@@ -11,25 +11,15 @@ import time
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-os.chdir(WORKING_DIR)
-sys.path.append("%s/DCloudSwift/util"%BASEDIR)
 
-import util
-import mountDisks
-from ConfigParser import ConfigParser
-from SwiftCfg import SwiftCfg
-
-SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
-FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
-
+from util import util
+from util import mountDisks
 
 def isNewer(confDir):
-	logger = util.getLogger(name="checkSwiftConfVers")
+	logger = util.getLogger(name="isNewer")
 	oriVers = util.getSwiftConfVers(confDir="/etc/swift/")
 	vers = util.getSwiftConfVers(confDir=confDir)
 	
-	
-
 	if vers <= oriVers:
 		return False
 	
@@ -62,8 +52,9 @@ def updateMetadata(confDir):
 
 
 if __name__ == '__main__':
+	sys.path.append("%s/DCloudSwift/"%BASEDIR)
 #	print isNewer(confDir="/etc/delta/swift")
-	updateMetadata(confDir="/etc/delta/swift")
+	#updateMetadata(confDir="/etc/delta/swift")
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")

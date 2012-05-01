@@ -16,15 +16,12 @@ from ConfigParser import ConfigParser
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(WORKING_DIR)
 os.chdir(WORKING_DIR)
-sys.path.append("%s/DCloudSwift/util"%BASEDIR)
-sys.path.append("%s/DCloudSwift/proxy"%BASEDIR)
-sys.path.append("%s/DCloudSwift/storage"%BASEDIR)
-sys.path.append("%s/DCloudSwift/maintenance"%BASEDIR)
+sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
-import util
-import maintenance
-import mountDisks
-import StorageInstall
+from util import util
+from util import mountDisks
+from maintenance import maintenance
+from storage import StorageInstall
 
 Usage = '''
 Usage:
