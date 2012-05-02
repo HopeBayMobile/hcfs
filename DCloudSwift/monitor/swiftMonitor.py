@@ -177,14 +177,14 @@ class SwiftMonitor(Daemon):
 
 	def run(self):
 		logger = util.getLogger(name="SwiftMonitor.run")
-		time.sleep(15)
 		
-		util.restartRsync()
-		time.sleep(10)
-		util.restartMemcached()
-
 		while True:
 			try:
+				if not util.isDaemonAlive("rsyncd")
+					util.restartRsync()
+				if not util.isDaemonAlive("memcached")
+					util.restartMemcached()
+
 				if self.copyMaterials() !=0:
 					logger.error("Failed to copy materilas")
 					continue

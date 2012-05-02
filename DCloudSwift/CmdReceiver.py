@@ -80,6 +80,9 @@ def triggerUpdateMetadata(confDir):
 	else:
 		maintenance.updateMetadata(confDir=confDir)
 
+	if not util.isDaemonAlive("swiftMonitor")
+		os.system("python %s/DCloudSwift/monitor/swiftMonitor.py restart"%BASEDIR)
+
 	logger.info("end")
 	return 0
 

@@ -116,6 +116,23 @@ def timeout(timeout_time):
 
 		return wrapper
 	return timeoutDeco
+#TODO: findout a beter way to check if a daemon is alive
+def isDaemonAlive(daemonName):
+	logger = getLogger(name="isDaemonAlive")
+
+	cmd = 'ps -ef | grep %s'%daemonName
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+
+	if po.returncode !=0:
+		return False
+
+	if len(lines) > 2:
+		return True
+	else: 
+		return False
+	
 
 def isValid(vers, metadata):
 	retval = True
@@ -570,9 +587,10 @@ if __name__ == '__main__':
 	#print sshpass("deltacloud", cmd, timeout=1)
 	#print os.path.dirname(os.path.dirname(os.getcwd()))
 	
-	@tryLock()
-	def testTryLock():
-		print "Hello"	
+	#@tryLock()
+	#def testTryLock():
+	#	print "Hello"	
 
-	testTryLock()
+	#testTryLock()
+	print isDaemonAlive("memcached")
 	pass	
