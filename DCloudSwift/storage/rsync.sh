@@ -12,7 +12,7 @@ export STORAGE_LOCAL_NET_IP=$IP
 
 perl -pi -e 's/RSYNC_ENABLE=false/RSYNC_ENABLE=true/' /etc/default/rsync
 
-cal >/etc/rsyncd.conf <<EOF
+cat >/etc/rsyncd.conf <<EOF
 uid = swift
 gid = swift
 log file = /var/log/rsyncd.log

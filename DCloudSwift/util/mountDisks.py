@@ -513,6 +513,8 @@ def resume():
 
 	#TODO: check if this node is a proxy node
 	os.system("swift-init all restart")
+		
+	os.system("python /DCloudSwift/monitor/swiftMonitor.py start")
 
 	logger.info("end")
 
