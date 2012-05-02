@@ -10,6 +10,7 @@ import pickle
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
+from threading import Thread
 
 #Self defined packages
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -57,10 +58,7 @@ class SwiftDeploy:
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 	def getDeployProgress(self):
-		while self.__deployProgress['finished'] != True:
-			time.sleep(5)
-			print self.__deployProgress
-		print "Swift deploy process is done!"
+		return self.__deployProgress
 
 	def __updateProgress(self, success=False, ip="", swiftType="proxy", msg=""):
 		lock.acquire()
@@ -211,6 +209,11 @@ class SwiftDeploy:
                 pool.dismissWorkers(20)
                 pool.joinAllDismissedWorkers()
 
+	def deploySwift(self):
+		logger = util.getLogger(name="deploySwift")
+		self.proxyDeploy()
+		self.storageDeploy()
+
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
 		self.storageDeploy()
@@ -275,10 +278,18 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	#SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
-	SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
+	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
+	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
 	SD.createMetadata()
+	t = Thread(target=SD.deploySwift, args=())
+	t.start()
+	progress = SD.getDeployProgress()
+	while progress['finished'] != True:
+		time.sleep(5)
+		print progress
+		progress = SD.getDeployProgress()
+	print "Swift deploy process is done!"
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
