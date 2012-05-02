@@ -20,6 +20,39 @@ from SwiftCfg import SwiftCfg
 SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
+lockFile = "/etc/delta/swift.lock"
+EEXIST=17
+
+# tryLock decorator
+def tryLock(tries=1, delay=3):
+	def deco_tryLock(fn):
+		def wrapper(*args, **kwargs):
+			mtries, mdelay = tries, delay # make mutable
+	
+			fd = -1
+			returnVal = None
+			try:
+				os.system("mkdir -p %s"%os.path.dirname(lockFile))
+				fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
+				returnVal = fn(*args, **kwargs) # first attempt
+				return returnVal
+			except OSError as e:
+				if e.errno == EEXIST:
+					raise TryLockError()
+				else:
+					raise
+			except Exception as e:
+				print "%s"%str(e)
+				raise
+			finally:
+				if fd != -1:
+					os.close(fd)
+					os.unlink(lockFile)
+
+  		return wrapper #decorated function
+  	
+  	return deco_tryLock  # @retry(arg[, ...]) -> true decorator
+
 # Retry decorator
 def retry(tries, delay=3):
 	'''Retries a function or method until it returns True.
@@ -505,6 +538,9 @@ class SshpassError(Exception):
 	def __str__(self):
 		return self.errMsg
 		
+class TryLockError(Exception):
+	def __str__(self):
+		return "Failed to tryLock lockFile"
 
 if __name__ == '__main__':
 #	print getSwiftConfVers()
@@ -531,4 +567,10 @@ if __name__ == '__main__':
 	#cmd = "ssh root@172.16.229.146 sleep 5"
 	#print sshpass("deltacloud", cmd, timeout=1)
 	#print os.path.dirname(os.path.dirname(os.getcwd()))
+	
+	@tryLock()
+	def testTryLock():
+		print "Hello"	
+
+	testTryLock()
 	pass	

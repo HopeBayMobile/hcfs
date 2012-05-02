@@ -498,7 +498,7 @@ def remountRecognizableDisks():
 def resume():
 	logger = util.getLogger(name="resume")
         logger.info("start")
-	os.system("sh /etc/DCloud/ServerRegister/autoRun.sh")
+	#os.system("sh /etc/DCloud/ServerRegister/autoRun.sh")
 	hostname = socket.gethostname()
 
 	remountDisks()
@@ -795,8 +795,8 @@ def main(argv):
 	return ret
 
 if __name__ == '__main__':
-	#main(sys.argv[1:])
-	print getUmountedDisks()
+	main(sys.argv[1:])
+	#print getUmountedDisks()
 	#print getUmountedSwiftDevices(deviceCnt=5, devicePrx="sdb")
 	#util.generateSwiftConfig()
 	#formatDisks(["/dev/sdc"])
@@ -806,23 +806,22 @@ if __name__ == '__main__':
 	#print getMajorityHostname()
 	#print getLatestMetadata()
 	#createSwiftDevices()
-	#print updateMetadataOnDisks(vers=44, deviceCnt=5, devicePrx="sdb")
+	#print updateMetadataOnDisks(2)
 	
 	#print updateMountedSwiftDevices(vers=2, deviceCnt=5, devicePrx="sdb")
 	
-	print 1==None
-	writeMetadata(disk="/dev/sdb", vers=1, deviceNum=1, devicePrx="sdb", deviceCnt=5)
-	writeMetadata(disk="/dev/sdc", vers=1, deviceNum=2, devicePrx="sdb", deviceCnt=5)
-	writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
-	writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
-	writeMetadata(disk="/dev/sdf", vers=0, deviceNum=5, devicePrx="sdb", deviceCnt=5)
-	print updateMetadataOnDisks(oriVers=1)
-	print "/dev/sdb %s"%str(readMetadata(disk="/dev/sdb"))
-	print "/dev/sdc %s"%str(readMetadata(disk="/dev/sdc"))
-	print "/dev/sdd %s"%str(readMetadata(disk="/dev/sdd"))
-	print "/dev/sde %s"%str(readMetadata(disk="/dev/sde"))
-	print "/dev/sdf %s"%str(readMetadata(disk="/dev/sdf"))
-	mountUmountedSwiftDevices()
+	#writeMetadata(disk="/dev/sdb", vers=1, deviceNum=1, devicePrx="sdb", deviceCnt=5)
+	#writeMetadata(disk="/dev/sdc", vers=1, deviceNum=2, devicePrx="sdb", deviceCnt=5)
+	#writeMetadata(disk="/dev/sdd", vers=1, deviceNum=3, devicePrx="sdb", deviceCnt=5)
+	#writeMetadata(disk="/dev/sde", vers=1, deviceNum=4, devicePrx="sdb", deviceCnt=5)
+	#writeMetadata(disk="/dev/sdf", vers=0, deviceNum=5, devicePrx="sdb", deviceCnt=5)
+	#print updateMetadataOnDisks(oriVers=1)
+	#print "/dev/sdb %s"%str(readMetadata(disk="/dev/sdb"))
+	#print "/dev/sdc %s"%str(readMetadata(disk="/dev/sdc"))
+	#print "/dev/sdd %s"%str(readMetadata(disk="/dev/sdd"))
+	#print "/dev/sde %s"%str(readMetadata(disk="/dev/sde"))
+	#print "/dev/sdf %s"%str(readMetadata(disk="/dev/sdf"))
+	#mountUmountedSwiftDevices()
 	#print remountDisks()
 	#print int(time.time())
 	#resume()

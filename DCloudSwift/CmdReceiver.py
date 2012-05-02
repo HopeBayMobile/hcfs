@@ -35,8 +35,8 @@ Options:
 Examples:
 	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
-EEXIST = 17
-lockFile = "/etc/delta/swift.lock"
+#EEXIST = 17
+#lockFile = "/etc/delta/swift.lock"
 
 class UsageError(Exception):
 	pass
@@ -148,13 +148,12 @@ def triggerStorageDeploy(**kwargs):
 	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 
+@util.tryLock()
 def main():
 	returncode =0
-	fd = -1
 
 	try:
 		os.system("mkdir -p %s"%os.path.dirname(lockFile))
-		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -186,12 +185,6 @@ def main():
                 		raise UsageError
         	else:
 			raise UsageError
-	except OSError as e:
-		if e.errno == EEXIST:
-			print >>sys.stderr, "A confilct task is in execution"
-		else:
-			print >>sys.stderr, str(e)
-		returncode = e.errno
 	except UsageError:
 		usage()
 		returncode = 1
@@ -202,12 +195,15 @@ def main():
 		print >>sys.stderr, str(e)
 		returncode = 1
 	finally:
-		if fd != -1:
-			os.close(fd)
-			os.unlink(lockFile)
-		sys.exit(returncode)
-
+		return returncode
 
 if __name__ == '__main__':
-	main()
-	print "End of executing CmdReceiver.py"
+	retcode = 0
+	try:
+		retcode = main()
+	except util.TryLockError as e:
+		print >>sys.stderr, str(e)
+		retcode = 1
+
+	sys.exit(retcode)
+		

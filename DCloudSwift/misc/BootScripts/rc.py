@@ -11,6 +11,8 @@ import threading
 import re
 
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+EEXIST=17
+lockFile="/etc/delta/swift.lock"
 
 def __loadSwiftMetadata(disk):
         logger = getLogger(name="__loadSwiftMetadata")
@@ -267,8 +269,25 @@ def readMetadata(disk):
 
 
 def main(argv):
-	if loadScripts() == 0:
-		os.system("python /DCloudSwift/util/mountDisks.py -R")
+	fd =-1
+	try:
+		os.system("mkdir -p %s"%os.path.dirname(lockFile))
+		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
+		
+		if loadScripts() == 0:
+			os.system("python /DCloudSwift/util/mountDisks.py -R")
+
+	except OSError as e:
+		if e.errno == EEXIST:
+			print >>sys.stderr, "A confilct task is in execution"
+		else:
+			print >>sys.stderr, str(e)
+	except Exception as e:
+		print >>sys.stderr, str(e)
+	finally:
+		if fd != -1:
+			os.close(fd)
+			os.unlink(lockFile)
 
 if __name__ == '__main__':
 	main(sys.argv[1:])
