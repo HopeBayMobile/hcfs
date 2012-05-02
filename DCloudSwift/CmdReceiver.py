@@ -35,8 +35,6 @@ Options:
 Examples:
 	python CmdReceiver.py -p {"password": "deltacloud"}
 '''
-#EEXIST = 17
-#lockFile = "/etc/delta/swift.lock"
 
 class UsageError(Exception):
 	pass
@@ -153,7 +151,6 @@ def main():
 	returncode =0
 
 	try:
-		os.system("mkdir -p %s"%os.path.dirname(lockFile))
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
