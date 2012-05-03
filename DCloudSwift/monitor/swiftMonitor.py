@@ -15,6 +15,8 @@ from util import util
 
 PORT=2308
 
+UNNECESSARYFILES = "cert* backups *.conf"
+
 # deferSIGTERM decorator
 def deferSIGTERM(f):
 	def terminationHdlr(signum, frame):
@@ -81,7 +83,6 @@ class SwiftMonitor(Daemon):
 	@deferSIGTERM
 	@util.tryLock()
 	def copyMaterials(self):
-		#TODO: delete unnecessay files
 		logger = util.getLogger(name="SwiftMonitor.copymaterials")
 		logger.info("start")
 
@@ -90,6 +91,7 @@ class SwiftMonitor(Daemon):
 			os.system("mkdir -p /etc/delta/daemon")
 			os.system("rm -rf /etc/delta/daemon/*") #clear old materials
 			os.system("cp -r /etc/swift /etc/delta/daemon/")
+			os.system("cd /etc/delta/daemon/swift; rm -rf %s"%UNNECESSARYFILES) #delete unnecessary files
 			os.system("cp -r %s/DCloudSwift /etc/delta/daemon/"%BASEDIR)
 			returncode =0
 
@@ -147,6 +149,11 @@ class SwiftMonitor(Daemon):
 		
 		peerIp = None
 		try:
+			if not util.isDaemonAlive("rsyncd"):
+				util.restartRsync()
+			if not util.isDaemonAlive("memcached"):
+				util.restartMemcached()
+
 			myIp = util.getIpAddress()
 			ipList = util.getSwiftNodeIpList()
                 	if len(ipList) == 0:
@@ -178,13 +185,14 @@ class SwiftMonitor(Daemon):
 	def run(self):
 		logger = util.getLogger(name="SwiftMonitor.run")
 		
-		while True:
-			try:
-				if not util.isDaemonAlive("rsyncd")
-					util.restartRsync()
-				if not util.isDaemonAlive("memcached")
-					util.restartMemcached()
+		if not util.isDaemonAlive("rsyncd"):
+			util.restartRsync()
+		if not util.isDaemonAlive("memcached"):
+			util.restartMemcached()
 
+		while True:
+			time.sleep(10)
+			try:
 				if self.copyMaterials() !=0:
 					logger.error("Failed to copy materilas")
 					continue
@@ -201,7 +209,6 @@ class SwiftMonitor(Daemon):
 				raise
 			finally:
 				signal.alarm(0)
-				time.sleep(10)
 
 
 if __name__ == "__main__":

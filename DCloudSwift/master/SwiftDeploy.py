@@ -22,7 +22,7 @@ from util import threadpool
 from util.SwiftCfg import SwiftCfg
 
 #TODO: read from config files
-UNNECESSARYFILES = "cert* backups"
+UNNECESSARYFILES = "*.conf cert* backups"
 
 lock = threading.Lock()
 

@@ -109,6 +109,9 @@ def triggerProxyDeploy(**kwargs):
 	else:
 		mountDisks.remountDisks()
 
+	if not util.isDaemonAlive("swiftMonitor")
+		os.system("python %s/DCloudSwift/monitor/swiftMonitor.py restart"%BASEDIR)
+
 	logger.info("end")
 	return 0
 
@@ -148,6 +151,9 @@ def triggerStorageDeploy(**kwargs):
 	deviceCnt = kwargs['deviceCnt']
 	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
+
+	if not util.isDaemonAlive("swiftMonitor")
+		os.system("python %s/DCloudSwift/monitor/swiftMonitor.py restart"%BASEDIR)
 
 @util.tryLock()
 def main():
