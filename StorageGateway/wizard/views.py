@@ -1,57 +1,111 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from django import forms
-
+from django.shortcuts import render
+from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from lib.models.config import Config
-from lib.forms import RenderFormMixinClass
-from lib.forms.widgets import *
+from forms import Form_1, Form_2, Form_3, Form_4
 
-class InstallationFrom(RenderFormMixinClass, forms.Form):
-    RAID_CHOICES = [
-        ('', ''),
-        ('raid-0', 'RAID 0'),
-        ('raid-1', 'RAID 1'),
-    ]
-    
-    #Network
-    ip_address = forms.IPAddressField(label='IP address', initial='192.168.0.1')
-    subnet_mask = forms.IPAddressField(initial='255.255.255.0')
-    #Cloud Storage
-    cloud_username = forms.CharField(label='Username of cloud')
-    cloud_password = forms.CharField(label='Passward of cloud')
-    #Security
-    encryption_key = forms.CharField()
-    #Disk
-    raid = forms.ChoiceField(label="RAID", choices=RAID_CHOICES)
-    #Share Folder
-    shared_folder_name = forms.CharField(initial='SaveBox')
-    folder_username = forms.CharField(label='Username for folder', initial='savebox')
-    folder_password = forms.CharField(label='Passward for folder', initial='savebox')
-    
-    fieldset = [('Network', ['ip_address', 'subnet_mask']),
-                ('Cloud Storage', ['cloud_username', 'cloud_password', 'encryption_key']),
-                ('Local Storage', ['raid', 'shared_folder_name', 'folder_username', 'folder_password'])
-                ]
+def welcome(request):
+    return render(request, 'welcome.html')
 
 def index(request):
+    try:
+        wizard = Config.objects.get(key='wizard')
+    except ObjectDoesNotExist:
+        wizard = Config.objects.create(key='wizard', value=str(None))
+                  
+    case = {str(None): form_1_action,
+            Form_1.__name__: form_2_action,
+            Form_2.__name__: form_3_action,
+            Form_3.__name__: form_4_action,
+            Form_4.__name__: finish_action,
+            }
+    
+    return case[wizard.value](request)
+
+def form_1_action(request):
     if request.method == 'POST':
-        form = InstallationFrom(request.POST)
+        form = Form_1(request.POST)
         if form.is_valid():
-            #Call storage gateway API
+            #Verify user and change admin password
+            user = authenticate(username=form.cleaned_data['username'], password=form.cleaned_data['password'])
+            if user is not None:
+                admin = User.objects.get(username=form.cleaned_data['username'])
+                admin.set_password(form.cleaned_data['new_password'])
+                admin.save()
+            else:
+                return render(request, 'message.html', {'error': 'Username or password were incorrect.'})
             
-            
-            
-            #Save settings into lib_config
-            for field in form.fields:
-                c = Config(key=field, value=form.data[field])
-                c.save()
-            
-            return render(request, 'home.html')            
+            #Save status of wizard
+            wizard = Config.objects.get(key='wizard')
+            wizard.value = Form_1.__name__
+            wizard.save()
+            #return render(request, 'process.html')
+            form = Form_2()
     else:
-        form = InstallationFrom()
+        form = Form_1()
     
     return render(request, 'form.html', {'header': 'System Installation',
                                          'form': form,
                                          'action': '.',
+                                         'submit': 'Next',
                                          })
 
+def form_2_action(request):
+    if request.method == 'POST':
+        form = Form_2(request.POST)
+        if form.is_valid():
+            
+            #Save status of wizard
+            wizard = Config.objects.get(key='wizard')
+            wizard.value = Form_2.__name__
+            wizard.save()
+            return render(request, 'process.html')
+    else:
+        form = Form_2()
+
+    return render(request, 'form.html', {'header': 'System Installation',
+                                         'form': form,
+                                         'action': '.',
+                                         'submit': 'Next',
+                                         })
+
+def form_3_action(request):
+    if request.method == 'POST':
+        form = Form_3(request.POST)
+        if form.is_valid():
+            
+            #Save status of wizard
+            wizard = Config.objects.get(key='wizard')
+            wizard.value = Form_3.__name__
+            wizard.save()
+            return render(request, 'process.html')
+    else:
+        form = Form_3()
+
+    return render(request, 'form.html', {'header': 'System Installation',
+                                         'form': form,
+                                         'action': '.',
+                                         'submit': 'Next',
+                                         })
+
+def form_4_action(request):
+    if request.method == 'POST':
+        form = Form_4(request.POST)
+        if form.is_valid():
+            
+            #Save status of wizard
+            wizard = Config.objects.get(key='wizard')
+            wizard.value = Form_4.__name__
+            wizard.save()
+            return render(request, 'process.html')
+    else:
+        form = Form_4()
+
+    return render(request, 'form.html', {'header': 'System Installation',
+                                         'form': form,
+                                         'action': '.',
+                                         'submit': 'Next',
+                                         })
+def finish_action(request):
+    return render(request, 'home.html')

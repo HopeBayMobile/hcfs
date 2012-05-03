@@ -8,7 +8,13 @@
 			action="{{action}}">
 			{% csrf_token %} {{ form.render }}
 			<div class="form-actions">
-				<button type="submit" class="btn btn-primary">Save</button>
+				<button type="submit" class="btn btn-primary">
+				{% if submit %}
+				{{submit}}
+				{% else %}
+				Submit
+				{% endif %}
+				</button>
 				<span class="label hide"></span>
 			</div>
 		</form>
