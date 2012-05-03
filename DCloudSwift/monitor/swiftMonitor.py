@@ -161,7 +161,11 @@ class SwiftMonitor(Daemon):
 				return
 
                 	peerIp = random.choice(ipList)
-                	logger.info("The chosen one is %s"%peerIp)
+                	logger.info("The chosen peer is %s"%peerIp)
+
+			if peerIp == myIp:
+				logger.info("peerIp == myIp")
+				return
 
 			if self.sendMaterials(peerIp) !=0:
 				logger.error("Failed to send materials to %s"%peerIp)

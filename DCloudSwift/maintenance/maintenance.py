@@ -40,12 +40,12 @@ def updateMetadata(confDir):
 
 	oriVers = mountDisks.getLatestVers()
 	if oriVers is None:
+		util.stopAllServices() #prevent services from occupying disks
 		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
 	else:
 		mountDisks.updateMetadataOnDisks(oriVers=oriVers)
 		mountDisks.mountUmountedSwiftDevices()
 		
-
 	util.restartAllServices()
 	return 0
 

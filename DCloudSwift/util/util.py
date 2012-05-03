@@ -160,10 +160,9 @@ def restartAllServices():
 def restartRsync():
 	logger = getLogger(name="restartRsync")	
 	
-	os.system("/etc/init.d/rsync stop")
 	os.system("rm /var/run/rsyncd.pid")
 
-	cmd = "/etc/init.d/rsync start"
+	cmd = "/etc/init.d/rsync restart"
 	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
 	output = po.stdout.read()
@@ -526,6 +525,27 @@ def spreadRC(password, nodeList=[]):
 
 	return (returncode, blackList)
 
+def stopAllServices():
+	logger = getLogger(name="stopAllServices")
+
+	stopDaemon("rsync")
+	stopDaemon("memcached")
+	os.system("swift-init all stop")
+
+def stopDaemon(daemonName):
+	logger = getLogger(name="stopDaemon")
+
+	cmd = "/etc/init.d/%s stop"%daemonName
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	(stdoutData, stderrData) = po.communicate()
+				
+	if po.returncode !=0:
+		logger.error(stderrData)
+	else:
+		logger.info(stdoutData)
+
+	return po.returncode
+
 def jsonStr2SshpassArg(jsonStr):
 	arg = jsonStr.replace(" ","")
 	arg = arg.replace("{","\{")
@@ -593,4 +613,5 @@ if __name__ == '__main__':
 
 	#testTryLock()
 	print isDaemonAlive("memcached")
+	print stopAllServices()
 	pass	
