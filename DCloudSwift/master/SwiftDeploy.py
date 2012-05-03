@@ -120,7 +120,7 @@ class SwiftDeploy:
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
 				return -2
-
+			#TODO: copy to specific directory first to avoid confict
 			cmd = "scp -r /DCloudSwift/ root@%s:/" % proxyIP
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
@@ -213,6 +213,10 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 		self.proxyDeploy()
 		self.storageDeploy()
+		#print self.__proxyList[0]["ip"]
+		#TODO: read password from config
+		os.system("swauth-prep -K deltacloud -A https://%s:8080/auth"%self.__proxyList[0]["ip"])
+		os.system("swauth-add-user -A https://%s:8080/auth -K deltacloud  -a system root testpass"%self.__proxyList[0]["ip"])
 
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
@@ -278,7 +282,7 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
+	SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}])
 	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
 	SD.createMetadata()
@@ -290,6 +294,7 @@ if __name__ == '__main__':
 		print progress
 		progress = SD.getDeployProgress()
 	print "Swift deploy process is done!"
+	#SD.deploySwift()
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
