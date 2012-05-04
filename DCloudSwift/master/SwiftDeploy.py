@@ -120,14 +120,31 @@ class SwiftDeploy:
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
 				return -2
+
+			cmd = "ssh root@%s mkdir -p /etc/delta/master"% proxyIP
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
+				return -3
+
+			cmd = "ssh root@%s rm -rf /etc/delta/master/*"% proxyIP
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
+				return -4
+
 			#TODO: copy to specific directory first to avoid confict
-			cmd = "scp -r /DCloudSwift/ root@%s:/" % proxyIP
+			cmd = "scp -r /DCloudSwift/ root@%s:/etc/delta/master" % proxyIP
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp proxy deploy scripts to %s for %s" % (proxyIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -3
+				return -5
 
 			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
@@ -136,7 +153,7 @@ class SwiftDeploy:
 				errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -4
+				return -6
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
 			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
@@ -170,7 +187,23 @@ class SwiftDeploy:
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
 				return -2
 
-			cmd = "scp -r /DCloudSwift/ root@%s:/" % storageIP
+			cmd = "ssh root@%s mkdir -p /etc/delta/master"%storageIP
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -3
+
+			cmd = "ssh root@%s rm -rf /etc/delta/master/*"%storageIP
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -4
+
+			cmd = "scp -r /DCloudSwift/ root@%s:/etc/delta/master" % storageIP
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp storage scripts to %s for %s" % (storageIP, stderr)

@@ -147,6 +147,8 @@ def isValid(vers, metadata):
 def restartAllServices():
 	logger = getLogger(name="restartAllServices")
 	generateSwiftConfig()
+	os.system("chown -R swift:swift /etc/swift")	
+
 	if restartRsync() != 0:
 		logger.error("Failed to restart rsyncd")
 
