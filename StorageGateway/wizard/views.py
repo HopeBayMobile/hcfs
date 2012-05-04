@@ -4,7 +4,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from lib.models.config import Config
 from forms import Form_1, Form_2, Form_3, Form_4, Form_All
-from tasks import form_1_task, form_2_task, form_3_task, form_4_task
+from tasks import step_1_task, step_2_task, step_3_task, step_4_task
 from celery.result import AsyncResult
 from celery import states
 
@@ -18,7 +18,9 @@ def index(request):
     if request.method == 'POST':
         form = Form_All(request.POST)
         if form.is_valid():
-            pass
+            result = step_1_task.delay()
+            step_task = Config.objects.create(key=STEP[1], value=result.task_id)            
+            return render(request, 'process.html')
     else:
         form = Form_All()
     
@@ -91,7 +93,7 @@ def form_2_action(request):
     if request.method == 'POST':
         form = Form_2(request.POST)
         if form.is_valid():
-            result = form_2_task.delay()
+            result = step_2_task.delay()
             step_task = Config.objects.create(key=STEP[2], value=result.task_id)            
             return render(request, 'process.html')
     else:
@@ -123,7 +125,7 @@ def form_3_action(request):
     if request.method == 'POST':
         form = Form_3(request.POST)
         if form.is_valid():
-            result = form_3_task.delay()
+            result = step_3_task.delay()
             step_task = Config.objects.create(key=STEP[3], value=result.task_id)            
             return render(request, 'process.html')
     else:
@@ -155,7 +157,7 @@ def form_4_action(request):
     if request.method == 'POST':
         form = Form_4(request.POST)
         if form.is_valid():
-            result = form_4_task.delay()
+            result = step_4_task.delay()
             step_task = Config.objects.create(key=STEP[4], value=result.task_id)            
             return render(request, 'process.html')
     else:

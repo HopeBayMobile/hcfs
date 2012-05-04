@@ -14,7 +14,7 @@ class Form_1(RenderFormMixinClass, forms.Form):
                                                 ]
                  )]
     def clean(self):
-        cleaned_data = self.cleaned_data
+        cleaned_data = super(Form_All, self).clean()
         new_password = cleaned_data.get('new_password')
         retype_new_password = cleaned_data.get('retype_new_password')
         if new_password and retype_new_password:
@@ -107,7 +107,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
                  )]
 
     def clean(self):
-        cleaned_data = self.cleaned_data
+        cleaned_data = super(Form_All, self).clean()
         new_password = cleaned_data.get('new_password')
         retype_new_password = cleaned_data.get('retype_new_password')
         if new_password and retype_new_password:

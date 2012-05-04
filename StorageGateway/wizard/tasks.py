@@ -2,20 +2,33 @@ from celery.task import task
 import time
 
 @task
-def form_1_task():
-    pass
+def step_1_task():
+    time.sleep(5)
+    return {'result': True,
+            'msg': 'Step 1',
+            'data': {}
+            }
 
 @task
-def form_2_task():
+def step_2_task():
     time.sleep(5)
-    pass
+    return {'result': True,
+            'msg': 'Step 2',
+            'data': {}
+            }
 
 @task
-def form_3_task():
+def step_3_task():
     time.sleep(5)
-    pass
+    return {'result': True,
+            'msg': 'Step 3',
+            'data': {}
+            }
 
 @task
-def form_4_task():
+def step_4_task():
     time.sleep(5)
-    pass
+    return {'result': True,
+            'msg': 'Step 4',
+            'data': {}
+            }
