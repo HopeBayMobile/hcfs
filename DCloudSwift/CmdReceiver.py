@@ -103,19 +103,23 @@ def triggerProxyDeploy(**kwargs):
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
 
-	util.generateSwiftConfig()
-	util.restartMemcached()
-	os.system("sh %s/DCloudSwift/proxy/ProxyStart.sh"%BASEDIR)
+	if util.isDaemonAlive("swiftMonitor"):
+		os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+
+	util.stopAllServices()
 
 	metadata = mountDisks.getLatestMetadata()
-	
 	if metadata is None or metadata["vers"] < util.getSwiftConfVers():
 		ret = mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+		if BASEDIR != "/":
+			os.system("rm -rf /DCloudSwift")
+			os.system("cp -r %s/DCloudSwift /"%BASEDIR)
 		if ret !=0:
 			logger.warn("Failed to create all swift devices")
 	else:
 		mountDisks.remountDisks()
 
+	util.restartAllServices()
 	if not util.isDaemonAlive("swiftMonitor"):
 		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
@@ -156,6 +160,10 @@ def triggerStorageDeploy(**kwargs):
 
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
+
+	if util.isDaemonAlive("swiftMonitor"):
+		os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+
 	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 

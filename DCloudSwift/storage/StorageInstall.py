@@ -40,21 +40,23 @@ class StorageNodeInstaller:
 
 	def install(self):
 		self.__logger.info("start install")
+
+		util.stopAllServices()
+
 		metadata = mountDisks.getLatestMetadata()
 		if metadata is None or metadata["vers"] < util.getSwiftConfVers():
 			mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
+			if BASEDIR != "/":
+				os.system("rm -rf /DCloudSwift")
+				os.system("cp -r %s/DCloudSwift /"%BASEDIR)
 		else:
 			mountDisks.remountDisks()
 
 		os.system("chown -R swift:swift /srv/node/ ")
 		util.generateSwiftConfig()
 
-		if util.restartRsync() !=0:
-			self.__logger.error("Failed to restart rsync daemon")
-
-		#os.system("perl -pi -e \'s/MAX_META_VALUE_LENGTH = 256/MAX_META_VALUE_LENGTH = 512/\' /usr/share/pyshared/swift/common/constraints.py")
 		#TODO:check if this node is a proxy node
-		os.system("swift-init all restart")
+		util.restartAllServices()
 		
 		self.__logger.info("end install")
 

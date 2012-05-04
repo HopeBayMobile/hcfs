@@ -9,10 +9,10 @@
 	(1) Copy the folder 'DCloudSwift' to the master node.
 	(2) Change your privilege to root.
 	(3) Execute 'python setup.py install'
-	(4) cd /DCloudSwift/master
+	(4) cd /etc/delta/scripts/DCloudSwift/master
 	(5) In case deb packages are not installed on nodes to be deployed, add the following line to the '__main__' section of /DCloudSwift/master/SwiftDeploy.py:
 	    util.spreadPackages(password, [NODE1_IP, NODE2_IP, ...]
-	(5) Modify the '__main__' section of /DCloudSwift/master/SwiftDeploy.py
+	(5) Modify the '__main__' section of DCloudSwift/master/SwiftDeploy.py
 	    SD = SwiftDeploy("./Swift.ini", [{"ip":"PROXY_NODE1_IP"},{"ip":"PROXY_NODE2_IP"},...], 
                                             [{"ip":STORAGE_NODE1_IP, "zid":ZONE_ID}, {"ip":STORAGE_NODE2_IP, "zid":STORAGE_NODE2_ZONE_ID}, ...])
 	    Modify PROXY_NODE_IP and STORAGE_NODE_IP to your proxy node IP and 

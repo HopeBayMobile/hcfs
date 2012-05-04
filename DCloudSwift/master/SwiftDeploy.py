@@ -17,14 +17,12 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
+UNNECESSARYFILES="cert* *.conf backups"
+lock = threading.Lock()
+
 from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
-
-#TODO: read from config files
-UNNECESSARYFILES = "*.conf cert* backups"
-
-lock = threading.Lock()
 
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
@@ -97,15 +95,15 @@ class SwiftDeploy:
 		with open("/etc/swift/versBase", "wb") as fh:
 			pickle.dump(versBase, fh)
 
-		os.system("sh /DCloudSwift/proxy/CreateRings.sh %d" % numOfReplica)
+		os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d" % (BASEDIR, numOfReplica))
 		zoneNumber = 1
 		for node in storageList: 
 			for j in range(deviceCnt):
 				deviceName = devicePrx + str(j+1)
-				logger.info("/DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
-				os.system("sh /DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (node["zid"], node["ip"], deviceName))
+				logger.info("DCloudSwift/proxy/AddRingDevice.sh %d %s %s"% (node["zid"], node["ip"], deviceName))
+				os.system("sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s" % (BASEDIR,node["zid"], node["ip"], deviceName))
 
-		os.system("sh /DCloudSwift/proxy/Rebalance.sh")
+		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh"%BASEDIR)
 
 		os.system("cp -r /etc/swift /etc/delta")
 		os.system("rm -rf /etc/swift/*")
@@ -121,22 +119,41 @@ class SwiftDeploy:
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
 				return -2
 
-			cmd = "scp -r /DCloudSwift/ root@%s:/" % proxyIP
+			pathname = "/etc/delta/master/%s"%socket.gethostname()
+
+			cmd = "ssh root@%s mkdir -p %s"%(proxyIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
+				return -3
+
+			cmd = "ssh root@%s rm -rf %s/*"%(proxyIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
+				return -4
+
+			#TODO: copy to specific directory to avoid confict
+			cmd = "scp -r %s/DCloudSwift/ root@%s:%s" %(BASEDIR, proxyIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp proxy deploy scripts to %s for %s" % (proxyIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -3
+				return -5
 
-			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, util.jsonStr2SshpassArg(self.__jsonStr))
+			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
-			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
 			if status != 0:
 				errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -4
+				return -6
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
 			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
@@ -170,22 +187,40 @@ class SwiftDeploy:
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
 				return -2
 
-			cmd = "scp -r /DCloudSwift/ root@%s:/" % storageIP
+			pathname = "/etc/delta/master/%s"%socket.gethostname()
+
+			cmd = "ssh root@%s mkdir -p %s"%(storageIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -3
+
+			cmd = "ssh root@%s rm -rf %s/*"%(storageIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -4
+
+			cmd = "scp -r %s/DCloudSwift/ root@%s:%s" % (BASEDIR, storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp storage scripts to %s for %s" % (storageIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -3
+				return -5
 
-			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -s %s"%(storageIP, util.jsonStr2SshpassArg(self.__jsonStr))
+			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s"%(storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
 			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
 				errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -4
+				return -6
 
 			logger.info("Succeeded to deploy storage %s" % storageIP)
 			self.__updateProgress(success=True, ip=storageIP, swiftType="storage", msg="")
@@ -213,6 +248,10 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 		self.proxyDeploy()
 		self.storageDeploy()
+
+		#create a defautl account:user 
+		os.system("swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"]))	
+		os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (self.__proxyList[0]["ip"], self.__kwparams['password']))
 
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
@@ -278,7 +317,7 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	SD = SwiftDeploy([{"ip":"192.168.11.6"},{"ip":"192.168.11.7"}], [{"ip":"192.168.11.7", "zid":1}, {"ip":"192.168.11.8", "zid":2}, {"ip":"192.168.11.9", "zid":3}])
+	SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}])
 	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
 	SD.createMetadata()
@@ -290,6 +329,7 @@ if __name__ == '__main__':
 		print progress
 		progress = SD.getDeployProgress()
 	print "Swift deploy process is done!"
+	#SD.deploySwift()
 	#SD.rmStorage()
 	#SD.addStorage()
 	#SD.proxyDeploy()
