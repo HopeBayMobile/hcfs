@@ -14,6 +14,8 @@ from .ordered_dict import OrderedDict
 from Queue import Queue
 from contextlib import contextmanager
 from llfuse import lock, lock_released, FUSEError
+import llfuse
+import errno
 import logging
 import os
 import shutil
@@ -171,8 +173,9 @@ class CacheEntry(object):
         return self.pos
 
     def truncate(self, size=None):
-        os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
-        self.dirty = True
+        if self.dirty == False:
+            os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
+            self.dirty = True
         self.fh.truncate(size)
         if size is None:
             if self.pos < self.size:
@@ -181,8 +184,9 @@ class CacheEntry(object):
             self.size = size
 
     def write(self, buf):
-        os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
-        self.dirty = True
+        if self.dirty == False:
+            os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
+            self.dirty = True
         self.fh.write(buf)
         self.pos += len(buf)
         self.size = max(self.pos, self.size)
@@ -192,6 +196,12 @@ class CacheEntry(object):
 
     def unlink(self):
         os.unlink(self.fh.name)
+
+    #Jiahong:New function for checking if the cache blocks are partially downloaded
+    #Jiahong:If the group read bit of the cache files is on, then it is still being downloaded
+    def download_set(self):
+        os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP) 
+        self.dirty = True
 
     def __str__(self):
         return ('<%sCacheEntry, inode=%d, blockno=%d>'
@@ -630,9 +640,13 @@ class BlockCache(object):
                               inode, blockno, obj_id)
                     def do_read(fh):
                         el = CacheEntry(inode, blockno, filename)
+                        #Jiahong: At the start of the download, mark the group read bit to specify that this block is being downloaded
+                        el.download_set()
                         shutil.copyfileobj(fh, el, BUFSIZE)
                         return el
                     try:
+                        #Jiahong: added retry mechanism to perform_read
+#Jiahong (5/4/12): Implemented a mechanism for labeling partially downloaded block objects. Such objects are removed during fsck
                         with lock_released:
                             no_attempts=0
                             while no_attempts < 10:
@@ -644,9 +658,11 @@ class BlockCache(object):
                                     if no_attempts >= 9:
                                         log.error('Read cache block error timed out....')
                                         raise(llfuse.FUSEError(errno.EIO))
-                                    log.info('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
+                                    log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
-                                    time.sleep(10)
+                                    if el is not None:
+                                        el.unlink()
+                                    time.sleep(5)
                                     with self.bucket_pool() as bucket:
                                         bucket.bucket.conn.close()
                                         bucket.bucket.conn = bucket.bucket._get_conn()
@@ -773,6 +789,8 @@ class BlockCache(object):
         # the database before we remove it from the cache!
 
         log.debug('expire: start')
+#Jiahong: TODO: put some mechanism here to check for network connection before
+#actually trying to expire any blocks
 
         did_nothing_count = 0
         while (len(self.entries) > self.max_entries or
@@ -928,6 +946,8 @@ class BlockCache(object):
 
         # Cache entries are automatically flushed after each read() and write()
         pass
+
+
 
 #TODO: May rename/remove this function if we do not require dirty blocks to be uploaded before a snapshot is taken
     def commit(self):

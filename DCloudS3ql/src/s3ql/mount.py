@@ -74,6 +74,9 @@ def main(args=None):
         args = sys.argv[1:]
 
     options = parse_args(args)
+
+#Jiahong: added mechanism for raising the file handle limit.
+#Jiahong: TODO: need to check if this mechanism works for upstart mounts
     if options.max_cache_entries > 290000:
         raise QuietError('Too many cache entries (max 290000)')
     resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))

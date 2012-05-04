@@ -164,6 +164,15 @@ class Fsck(object):
 
         for filename in os.listdir(self.cachedir):
 
+            full_filename = os.path.join(self.cachedir, filename)
+
+            #Jiahong (5/4/12): Check if the cached file was still being downloaded but stopped due to crash. If so, delete.
+            mode_bits=stat.S_IMODE(os.stat(full_filename).st_mode)
+            if mode_bits & 32:
+                os.unlink(full_filename)
+                log.info('Deleting partially downloaded block object %s' % filename)
+                continue
+
             match = re.match('^(\\d+)-(\\d+)$', filename)
             if match:
                 inode = int(match.group(1))
@@ -171,7 +180,6 @@ class Fsck(object):
             else:
                 raise RuntimeError('Strange file in cache directory: %s' % filename)
 
-            full_filename = os.path.join(self.cachedir, filename)
             block_size=os.stat(full_filename).st_size
 
             log.info("Adding cached data (%d, %d)" % (inode, blockno))
@@ -479,7 +487,6 @@ class Fsck(object):
                 self.conn.execute("UPDATE inodes SET size=? WHERE id=?", (size, id_))
 
             for inode_id, cached_max_size in self.inode_size_cache.iteritems():
-                print(inode_id, cached_max_size)
                 try:
                     (size_a, size_b) = self.conn.query('''
                        SELECT size, min_size
@@ -498,7 +505,6 @@ class Fsck(object):
                     except ValueError:
                         self.log_error("inode %d not in table but in cache... skipping",inode_id)
                         continue
-                print(size_old,size)
                 if size_old < cached_max_size and size < cached_max_size:
                     self.found_errors = True
                     self.log_error("Size of inode %d (%s) does not agree with number of blocks (in cache), "

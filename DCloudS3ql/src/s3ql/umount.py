@@ -119,8 +119,6 @@ def blocking_umount(mountpoint):
     ctrlfile = os.path.join(mountpoint, CTRL_NAME)
 
     #Commented out the following two lines. We do not flush cache at umount.
-#TODO: How to ensure that dirty block uploading is terminated or interruptted successfully
-#TODO: if dirty block uploading is being done at the time of umount
     #log.debug('Flushing cache...')
     #llfuse.setxattr(ctrlfile, b's3ql_flushcache!', b'dummy')
 
