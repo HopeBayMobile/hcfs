@@ -48,11 +48,12 @@ def main():
 	if (len(sys.argv) == 2 and sys.argv[1] == 'install'):
 			if not isAllDebInstalled("../DCloudSwift/misc/deb_src"):
 				os.system("cd ../DCloudSwift/misc/deb_src; dpkg -i *.deb")
-			os.system("cp -r ../DCloudSwift /")
+			os.system("mkdir /etc/delta/scripts")
+			os.system("cp -r ../DCloudSwift /etc/delta/scripts")
 			os.system("mkdir -p /etc/lib/swift")
 			os.system("cp -r ../DCloudSwift/misc/deb_src/* /etc/lib/swift")
 			os.system("cp -r ../DCloudSwift/misc/BootScripts /etc/lib/swift")
-			os.system("rm -rf /DCloudSwift/misc/deb_src")
+			os.system("rm -rf /etc/delta/scripts/DCloudSwift/misc/deb_src")
 
         else:
 		usage()

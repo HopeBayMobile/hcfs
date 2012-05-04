@@ -157,7 +157,9 @@ def restartAllServices():
 
 	os.system("chown -R swift:swift /srv/node/ ")
 	restartSwiftServices()
-		
+
+	#Read password from config
+	#os.system("swauth-prep -K deltacloud -A https://127.0.0.1:8080/auth/")	
 
 def restartRsync():
 	logger = getLogger(name="restartRsync")	

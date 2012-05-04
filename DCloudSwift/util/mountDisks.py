@@ -504,16 +504,7 @@ def resume():
 	remountDisks()
 	loadSwiftMetadata()	
 
-	util.generateSwiftConfig()
-	if util.restartRsync() !=0:
-		logger.error("Failed to restart rsync daemon")
-
-	if util.restartMemcached() !=0:
-		logger.error("Failed to restart memcached")
-
-	#TODO: check if this node is a proxy node
-	os.system("swift-init all restart")
-		
+	util.restartAllServices()
 	os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
 	logger.info("end")
