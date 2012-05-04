@@ -154,6 +154,7 @@ LOGGING = {
 
 LOGIN_URL = '/login'
 LOGOUT_URL = '/logout'
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 #Celery settings
 BROKER_TRANSPORT = "sqlalchemy"

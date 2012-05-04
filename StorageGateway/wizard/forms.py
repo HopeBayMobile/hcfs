@@ -45,7 +45,8 @@ class Form_3(RenderFormMixinClass, forms.Form):
                  )]
     
 class Form_4(RenderFormMixinClass, forms.Form):
-    encryption_key = forms.CharField(min_length=6,
+    encryption_key = forms.CharField(help_text='Input 6-20 alphanumeric characters',
+                                     min_length=6,
                                      max_length=20,
                                      widget=forms.PasswordInput())
     confirm_encryption_key = forms.CharField(min_length=6,

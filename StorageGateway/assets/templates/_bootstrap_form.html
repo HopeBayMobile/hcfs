@@ -8,6 +8,9 @@
 		{{ field.label_tag }}
 		<div class='controls'>
 			{{ field }}
+			{%if field.help_text %}
+			<span class="help-inline">{{field.help_text}}</span>
+			{% endif %}
 			{% for error in field.errors %}
 			<p class="help-block" style="color:red;">{{ error }}</p>
 			{% endfor %}
@@ -24,6 +27,9 @@
 		{{ field.label_tag }}
 		<div class='controls'>
 			{{ field }}
+			{%if field.help_text %}
+			<span class="help-inline">{{field.help_text}}</span>
+			{% endif %}
 			{% for error in field.errors %}
 			<p class="help-block" style="color:red;">{{ error }}</p>
 			{% endfor %}
