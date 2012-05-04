@@ -3,7 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from lib.models.config import Config
-from forms import Form_1, Form_2, Form_3, Form_4
+from forms import Form_1, Form_2, Form_3, Form_4, Form_All
 from tasks import form_1_task, form_2_task, form_3_task, form_4_task
 from celery.result import AsyncResult
 from celery import states
@@ -15,6 +15,20 @@ def welcome(request):
     return render(request, 'welcome.html')
 
 def index(request):
+    if request.method == 'POST':
+        form = Form_All(request.POST)
+        if form.is_valid():
+            pass
+    else:
+        form = Form_All()
+    
+    return render(request, 'form.html', {'header': 'System Installation',
+                                         'form': form,
+                                         'action': '.',
+                                         'submit': 'Install',
+                                         })
+
+def step_index(request):
     try:
         wizard = Config.objects.get(key='wizard')
     except ObjectDoesNotExist:
