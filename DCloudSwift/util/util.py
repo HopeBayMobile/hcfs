@@ -616,6 +616,7 @@ if __name__ == '__main__':
 	#	print "Hello"	
 
 	#testTryLock()
-	print isDaemonAlive("memcached")
-	print stopAllServices()
+	#print isDaemonAlive("memcached")
+	restartAllServices()
+	#print stopAllServices()
 	pass	
