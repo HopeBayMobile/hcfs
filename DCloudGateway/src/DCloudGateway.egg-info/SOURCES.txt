@@ -1,8 +1,0 @@
-README
-setup.py
-src/DCloudGateway.egg-info/PKG-INFO
-src/DCloudGateway.egg-info/SOURCES.txt
-src/DCloudGateway.egg-info/dependency_links.txt
-src/DCloudGateway.egg-info/top_level.txt
-src/gateway/__init__.py
-src/gateway/common.py
