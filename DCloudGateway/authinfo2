@@ -2,5 +2,5 @@
 storage-url = deltacloud.delta.com.tw:8080
 backend-login = system:root
 backend-passphrase = testpass
-bucket-passphrase = 123
+bucket-passphrase = 123456
 

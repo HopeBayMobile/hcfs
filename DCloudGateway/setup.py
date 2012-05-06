@@ -1,6 +1,7 @@
 import os
 from setuptools import setup, find_packages
 CONFDIR='/etc/delta'
+AUTHDIR='/root/.s3ql'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -21,7 +22,7 @@ def main():
         	'': ['*.txt', '*.rst'],
     		},
 
-		data_files=[ (CONFDIR, ['Gateway.ini']) ], 
+		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2'])], 
 		
 		test_suite='unittest',
 		long_description=read('README'),
@@ -32,6 +33,7 @@ def main():
 	)
 
 	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
+	os.system("chmod 600 %s/authinfo2"%AUTHDIR)
 
 if __name__ == '__main__':
     main()
