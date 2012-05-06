@@ -1,0 +1,6 @@
+Delta Inc. Cloud Technology Business Unit Storage Gateway
+
+1) The config file is placed at /etc/delta/Gateway.ini.
+   To read or write the config file, you must have the root priviledge.
+
+2) The log file is placed at /var/log/delta/gateway.log

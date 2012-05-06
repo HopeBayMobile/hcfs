@@ -10,12 +10,8 @@ import math
 import pickle
 import time
 
-WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-
 from ConfigParser import ConfigParser
 
-CONF = '%s/Gateway.ini'%BASEDIR
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 # Retry decorator
@@ -82,23 +78,6 @@ def timeout(timeout_time):
 		return wrapper
 	return timeoutDeco
 
-#TODO: findout a beter way to check if a daemon is alive
-def isDaemonAlive(daemonName):
-	logger = getLogger(name="isDaemonAlive")
-
-	cmd = 'ps -ef | grep %s'%daemonName
-	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	lines = po.stdout.readlines()
-	po.wait()
-
-	if po.returncode !=0:
-		return False
-
-	if len(lines) > 2:
-		return True
-	else: 
-		return False
-	
 
 def runPopenCommunicate(cmd, inputString, logger):
 	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -111,18 +90,7 @@ def runPopenCommunicate(cmd, inputString, logger):
 
 	return po.returncode
 
-class GatewayCfg:
-	def __init__(self, configFile):
-		self.__kwparams = {}
-		self.__configFile = configFile
-
-	def get(self, section, name, value):
-		pass
-
-	def set(self, section, name, value):
-		pass
-
-def getLogger(name=None, conf=CONF):
+def getLogger(name=None, conf=None):
 	"""
 	Get a file logger using config settings.
 
@@ -138,11 +106,19 @@ def getLogger(name=None, conf=CONF):
 		if logger in getLogger.handler4Logger:
 			return logger
 
-		kwparams = GatewayCfg(conf).getKwparams()
-	
-		logDir = kwparams.get('logDir', '/var/log/deltaGateway/')
-		logName = kwparams.get('logName', 'deltaGateway.log')
-		logLevel = kwparams.get('logLevel', 'INFO')
+		logDir = logName = logLevel = None 
+
+		config = ConfigParser()
+		try:
+			with open(conf) as fh:
+				config.readfp(fh)
+				logDir = config.get('log', 'dir')
+				logName = config.get('log', 'name')
+				logLevel = config.get('log', 'level')
+		except Exception as e:
+			logDir = '/var/log/delta'
+			logName = 'Gateway.log'
+			logLevel = 'INFO'
 
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
@@ -190,4 +166,6 @@ class TimeoutError(Exception):
 			return "TimeoutError"
 
 if __name__ == '__main__':
+	log = getLogger("test", conf="/etc/delta/Gateway.ini")
+	log.info("TEST")
 	pass	
