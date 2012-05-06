@@ -22,7 +22,8 @@ def main():
     		},
 
 		data_files=[ (CONFDIR, ['Gateway.ini']) ], 
-
+		
+		test_suite='unittest',
 		long_description=read('README'),
 		classifiers=[
         		"Development Status :: 3 - Alpha",
