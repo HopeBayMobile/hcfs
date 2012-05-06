@@ -8,7 +8,7 @@ def main():
 	setup(
 		name = "DCloudGateway",
     		version = "0.1",
-    		author = "Jiahong Wu",
+    		author = "Cloud Data Team, CTBU, Delta Electronic Inc.",
     		author_email = "JiahongWu@delta.com.tw",
     		description = ("Delta Inc. CTBU Storage Gateway"),
     		license = "Delta Inc.",
