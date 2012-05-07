@@ -15,12 +15,61 @@ def welcome(request):
     return render(request, 'welcome.html')
 
 def index(request):
+    #get status of wizard
+    try:
+        wizard = Config.objects.get(key='wizard')
+    except ObjectDoesNotExist:
+        return form_action(request)
+    
+    #determine the current step
+    step_name = wizard.value
+    try:
+        step_task = Config.objects.get(key=step_name)
+    except ObjectDoesNotExist:
+        step_task = None
+    
+    if step_task:
+        #check task status
+        result = AsyncResult(step_task.value)
+        if result.state == states.SUCCESS:
+            if result.result['result']:
+                
+                #next step
+                wizard = Config.objects.get(key='wizard')
+                wizard.value = 'step_' + str(int(step_name[-1]) + 1)
+                wizard.save()
+                return render(request, 'process.html', {'info': 'Finish ' + step_name})
+            else:
+                #clear step
+                Config.objects.get(key='wizard').delete()
+                Config.objects.filter(key__startswith='step_').delete()  
+                return render(request, 'message.html', {'error': result.result['msg']})
+        else:
+            return render(request, 'process.html', {'info': step_name + ' is running'})
+    else:
+        if step_name == 'step_5':
+            #installation complete
+            return render(request, 'home.html')
+        else:
+            #execute task
+            result = eval(step_name + "_task.delay()")
+            step_task = Config.objects.create(key=step_name, value=result.task_id)
+            return render(request, 'process.html', {'info': 'Start ' + step_name})
+
+
+def form_action(request):
     if request.method == 'POST':
         form = Form_All(request.POST)
         if form.is_valid():
-            result = step_1_task.delay()
-            step_task = Config.objects.create(key=STEP[1], value=result.task_id)            
-            return render(request, 'process.html')
+            #Save settings into lib_config
+            for field in form.fields:
+                c = Config(key=field, value=form.data[field])
+                c.save()
+            
+            #Save status of wizard
+            Config.objects.create(key='wizard', value='step_1')
+                        
+            return render(request, 'process.html', {'info': 'Save settings and execute setup.'})
     else:
         form = Form_All()
     
@@ -30,22 +79,22 @@ def index(request):
                                          'submit': 'Install',
                                          })
 
-def step_index(request):
+def wizard_index(request):
     try:
         wizard = Config.objects.get(key='wizard')
     except ObjectDoesNotExist:
         wizard = Config.objects.create(key='wizard', value=STEP[0])
                   
-    case = {STEP[0]: form_1_action,
-            STEP[1]: form_2_action,
-            STEP[2]: form_3_action,
-            STEP[3]: form_4_action,
+    case = {STEP[0]: wizard_1_action,
+            STEP[1]: wizard_2_action,
+            STEP[2]: wizard_3_action,
+            STEP[3]: wizard_4_action,
             STEP[4]: finish_action,
             }
     
     return case[wizard.value](request)
 
-def form_1_action(request):    
+def wizard_1_action(request):    
     if request.method == 'POST':
         form = Form_1(request.POST)
         if form.is_valid():
@@ -73,7 +122,7 @@ def form_1_action(request):
                                          'submit': 'Next',
                                          })
 
-def form_2_action(request):
+def wizard_2_action(request):
     try:
         step_task = Config.objects.get(key=STEP[2])
     except ObjectDoesNotExist:
@@ -105,7 +154,7 @@ def form_2_action(request):
                                          'submit': 'Next',
                                          })
 
-def form_3_action(request):
+def wizard_3_action(request):
     try:
         step_task = Config.objects.get(key=STEP[3])
     except ObjectDoesNotExist:
@@ -137,7 +186,7 @@ def form_3_action(request):
                                          'submit': 'Next',
                                          })
 
-def form_4_action(request):
+def wizard_4_action(request):
     try:
         step_task = Config.objects.get(key=STEP[4])
     except ObjectDoesNotExist:

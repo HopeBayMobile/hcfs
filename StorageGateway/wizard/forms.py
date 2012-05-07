@@ -60,8 +60,8 @@ class Form_4(RenderFormMixinClass, forms.Form):
                  )]
     
 class Form_All(RenderFormMixinClass, forms.Form):
-    username = forms.CharField()
-    password = forms.CharField(widget=forms.PasswordInput())
+#    username = forms.CharField()
+#    password = forms.CharField(widget=forms.PasswordInput())
     new_password = forms.CharField(widget=forms.PasswordInput())
     retype_new_password = forms.CharField(widget=forms.PasswordInput())
     
@@ -83,8 +83,8 @@ class Form_All(RenderFormMixinClass, forms.Form):
                                              max_length=20,
                                              widget=forms.PasswordInput())
     
-    fieldset = [('1. Account', ['username',
-                                'password',
+    fieldset = [('1. Password', [#'username',
+                                #'password',
                                 'new_password',
                                 'retype_new_password',
                                 ]
