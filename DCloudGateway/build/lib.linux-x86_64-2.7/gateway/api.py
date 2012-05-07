@@ -38,10 +38,3 @@ def get_storage_account():
 
 	log.info("get_storage_account end")
 	return json.dumps(return_val)
-
-if __name__ == '__main__':
-	log.debug("...")
-	log.warn("...")
-	log.info("...")
-	log.error("...")
-	pass	
