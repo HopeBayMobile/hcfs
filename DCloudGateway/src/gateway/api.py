@@ -7,6 +7,8 @@ import time
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
+class BuildGWError(Exception):
+	pass
 class TestStorageError(Exception):
 	pass
 
@@ -138,8 +140,84 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		log.info("apply_user_enc_key end")
 		return json.dumps(return_val)
 
+@common.timeout(180)
+def _openContainter(storage_url, account, password):
+
+	os.system("touch gatewayContainer.txt")
+	cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
+        po.wait()
+
+        if po.returncode != 0:
+		op_msg = "Failed to open container for"%output
+               	raise BuildGWError(op_msg)
+	
+	output=output.strip()
+	if output != "gatewayContainer.txt":
+		op_msg = "Failed to open container for %s"%output
+               	raise BuildGWError(op_msg)
+	os.system("rm gatewayContainer.txt")
+
+@common.timeout(180)
+def _mkfs(storage_url, key):
+	cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+	po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	(stdout, stderr) = po.communicate(key)
+        if po.returncode != 0:
+		if stderr.find("existing file system!") == -1:
+			op_msg = "Failed to mkfs for %s"%stderr
+               		raise BuildGWError(op_msg)
+		else:
+			log.info("Found existing file system!")
+
+
 def build_gateway():
-	return json.dumps(return_val)
+	log.info("build_gateway start")
+
+	op_ok = False
+	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
+
+	try:
+		op_config = ConfigParser.ConfigParser()
+		#Create authinfo2 if it doesn't exist
+        	with open('/root/.s3ql/authinfo2','rb') as op_fh:
+			op_config.readfp(op_fh)
+
+		section = "CloudStorageGateway"
+		if not op_config.has_section(section):
+			op_config.add_section(section)
+
+		url = op_config.get(section, 'storage-url').replace("swift://","")
+		account = op_config.get(section, 'backend-login')
+		password = op_config.get(section, 'backend-password')
+		key = op_config.get(section, 'bucket-passphrase')
+
+		_openContainter(storage_url=url, account=account, password=password)
+		_mkfs(storage_url=url, key = key)
+
+		op_ok = True
+		op_msg = 'Succeeded to build gateway'
+
+	except common.TimeoutError:
+		op_msg ="Build Gateway failed due to timeout" 
+		log.error(op_msg)
+	except IOError as e:
+		op_msg = 'Failed to access /root/.s3ql/authinfo2'
+		log.error(str(e))
+	except BuildGWError as e:
+		op_msg = str(e)
+		log.error(op_msg)
+	except Exception as e:
+		log.error(str(e))
+
+	finally:
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+                      	      'data'   : {}}
+
+		log.info("build_gateway end")
+		return json.dumps(return_val)
 
 def restart_nfs_service():
 	log.info("restart_nfs_service start")
