@@ -1,0 +1,3 @@
+sudo s3qlctrl flushcache /mnt/cloudgwfiles
+sudo s3qlctrl upload-meta /mnt/cloudgwfiles
+
