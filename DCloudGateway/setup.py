@@ -22,7 +22,7 @@ def main():
         	'': ['*.txt', '*.rst'],
     		},
 
-		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2'])], 
+		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2.template'])], 
 		
 		test_suite='unittest',
 		long_description=read('README'),

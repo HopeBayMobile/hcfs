@@ -73,22 +73,27 @@ def timeout(timeout_time):
 			elif it.result[0] == 0:
 				return it.result[1]
 			else:
-				raise e
+				raise it.result[1]
 
 		return wrapper
 	return timeoutDeco
 
-
-def runPopenCommunicate(cmd, inputString, logger):
-	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-	(stdout, stderr) = po.communicate(inputString)
-
-	if po.returncode == 0:
-		logger.debug("Succeed to run \'%s\'"%cmd)
+def isHttp200(response):
+	if response.find("HTTP/1.1 200")  !=-1:
+		return True
 	else:
-		logger.error(stderr)
+		return False
 
-	return po.returncode
+def isValidEncKey(key):
+	#Todo: Make sure key is a string
+
+	if key is None:
+		return False
+
+	if len(key) > 20 or len(key) <6:
+		return False
+	
+	return key.isalnum()
 
 def getLogger(name=None, conf=None):
 	"""
