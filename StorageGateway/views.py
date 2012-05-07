@@ -3,7 +3,7 @@ from django.contrib import auth
 from lib.models.config import Config
 
 def home(request):
-    if Config.objects.filter(key='wizard').count() == 0 :
+    if Config.objects.all().count() == 0 :
         return redirect('/wizard/welcome')
     elif Config.objects.filter(key='wizard').count() == 1:
         return redirect('/wizard/')

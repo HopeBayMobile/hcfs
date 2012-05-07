@@ -4,7 +4,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from lib.models.config import Config
 from forms import Form_1, Form_2, Form_3, Form_4, Form_All
-from tasks import step_1_task, step_2_task, step_3_task, step_4_task
+from tasks import step_1_task, step_2_task, step_3_task, step_4_task, install_task
 from celery.result import AsyncResult
 from celery import states
 
@@ -17,44 +17,29 @@ def welcome(request):
 def index(request):
     #get status of wizard
     try:
-        wizard = Config.objects.get(key='wizard')
+        install_task = Config.objects.get(key='wizard')
     except ObjectDoesNotExist:
-        return form_action(request)
+        install_task = None
     
-    #determine the current step
-    step_name = wizard.value
-    try:
-        step_task = Config.objects.get(key=step_name)
-    except ObjectDoesNotExist:
-        step_task = None
-    
-    if step_task:
+    if install_task:
         #check task status
-        result = AsyncResult(step_task.value)
+        result = AsyncResult(install_task.value)
         if result.state == states.SUCCESS:
-            if result.result['result']:
-                
-                #next step
-                wizard = Config.objects.get(key='wizard')
-                wizard.value = 'step_' + str(int(step_name[-1]) + 1)
-                wizard.save()
-                return render(request, 'process.html', {'info': 'Finish ' + step_name})
+            if result.result:
+                Config.objects.get(key='wizard').delete()
+                return render(request, 'message.html', {'info': 'Installation Completed.',
+                                                        'next': '/'})
             else:
                 #clear step
                 Config.objects.get(key='wizard').delete()
                 Config.objects.filter(key__startswith='step_').delete()  
-                return render(request, 'message.html', {'error': result.result['msg']})
+                return render(request, 'message.html', {'error': 'Installation Failed.',
+                                                        'next': '.'})
         else:
-            return render(request, 'process.html', {'info': step_name + ' is running'})
+            steps = Config.objects.filter(key__startswith='step_').order_by('-key')
+            return render(request, 'progress.html', {'steps': steps})
     else:
-        if step_name == 'step_5':
-            #installation complete
-            return render(request, 'home.html')
-        else:
-            #execute task
-            result = eval(step_name + "_task.delay()")
-            step_task = Config.objects.create(key=step_name, value=result.task_id)
-            return render(request, 'process.html', {'info': 'Start ' + step_name})
+        return form_action(request)
 
 
 def form_action(request):
@@ -66,9 +51,9 @@ def form_action(request):
                 c = Config(key=field, value=form.data[field])
                 c.save()
             
-            #Save status of wizard
-            Config.objects.create(key='wizard', value='step_1')
-                        
+            #execute install_task and save task_id
+            result = install_task.delay()
+            Config.objects.create(key='wizard', value=result.task_id)    
             return render(request, 'process.html', {'info': 'Save settings and execute setup.'})
     else:
         form = Form_All()
@@ -105,7 +90,8 @@ def wizard_1_action(request):
                 admin.set_password(form.cleaned_data['new_password'])
                 admin.save()
             else:
-                return render(request, 'message.html', {'error': 'Username or password were incorrect.'})
+                return render(request, 'message.html', {'error': 'Username or password were incorrect.',
+                                                        'next': '.'})
             
             #Save status of wizard
             wizard = Config.objects.get(key='wizard')
