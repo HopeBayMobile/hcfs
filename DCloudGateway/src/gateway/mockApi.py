@@ -55,9 +55,41 @@ def apply_user_enc_key(old_key, new_key):
     print('received new_key: %s' % new_key)
 
 def build_gateway():
+	return_val = {
+		'result': True,
+		'msg' : "This is a mock value for testing purpose",
+		'data': {}
+	}
+	return json.dumps(return_val)
 
-    return_val = {'result' : True,
-                  'msg' : 'This is a mock value for testing purpose'}
+def restart_nfs_service():
+	return_val = {
+		'resutl': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {}
+	}
+	return json.dumps(return_val)
 
-    return json.dumps(return_val)
+def restart_smb_service():
+	return_val = {
+		'result': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {}
+	}
+	return json.dumps(return_val)
 
+def reset_gateway():
+	return_val = {
+		'result': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
+def shutdown_gateway():
+	return_val = {
+		'result': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {}
+	}
+	return json.dumps(return_val)

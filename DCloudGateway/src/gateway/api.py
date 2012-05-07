@@ -2,6 +2,7 @@ import json
 import os
 import ConfigParser
 import common
+import subprocess
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
@@ -133,6 +134,44 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		log.info("apply_user_enc_key end")
 		return json.dumps(return_val)
 
+def build_gateway():
+	return json.dumps(return_val)
+
+def restart_nfs_service():
+	log.info("restart_nfs_service start")
+
+	return_val = {}
+	op_ok = False
+	op_msg = "Restarting the nfs service failed."
+
+	try:
+		cmd = "/etc/init.d/nfs-kernel-server restart"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		po.wait()
+		if po.returncode == 0:
+			op_ok = True
+			op_msg = "Restarting the nfs service succeeded."
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	return_val = {
+		'result': op_ok,
+		'msg': op_msg,
+		'data': {}
+	}
+
+	log.info("restart_nfs_service end")
+	return json.dumps(return_val)
+
+def restart_smb_service():
+	return json.dumps(return_val)
+
+def reset_gateway():
+	return json.dumps(return_val)
+
+def shutdown_gateway():
+	return json.dumps(return_val)
 
 if __name__ == '__main__':
 	#Example of log usage
@@ -140,4 +179,3 @@ if __name__ == '__main__':
 	log.warn("...")
 	log.info("...")
 	log.error("...")
-	pass	
