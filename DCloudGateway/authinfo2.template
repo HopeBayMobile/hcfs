@@ -1,5 +1,5 @@
 [CloudStorageGateway]
-storage-url = deltacloud.delta.com.tw:8080
+storage-url = 172.16.229.146:8080
 backend-login = system:root
 backend-passphrase = testpass
 bucket-passphrase = 123456

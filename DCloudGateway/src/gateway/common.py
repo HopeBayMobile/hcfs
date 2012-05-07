@@ -90,6 +90,17 @@ def runPopenCommunicate(cmd, inputString, logger):
 
 	return po.returncode
 
+def isValidEncKey(key):
+	#Todo: Make sure key is a string
+
+	if key is None:
+		return False
+
+	if len(key) > 20 or len(key) <6:
+		return False
+	
+	return key.isalnum()
+
 def getLogger(name=None, conf=None):
 	"""
 	Get a file logger using config settings.
