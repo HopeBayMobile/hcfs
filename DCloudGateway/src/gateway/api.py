@@ -32,3 +32,37 @@ def get_storage_account():
                             'account' : op_account}}
     return json.dumps(return_val)
 
+def build_gateway():
+	return json.dumps(return_val)
+
+def restart_nfs_service():
+	return_val = {}
+	op_ok = False
+	op_msg = "Restarting the nfs service failed."
+
+	try:
+		cmd = "/etc/init.d/nfs-kernel-server restart"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		po.wait()
+		if po.returncode == 0:
+			op_ok = True
+			op_msg = "Restarting the nfs service succeeded."
+	except Exception as e:
+		op_ok = False
+		op_msg = str(e)
+	finally:
+		return_val = {
+			'result': op_ok,
+			'msg': op_msg,
+			'data': {}
+		}
+		return json.dumps(return_val)
+
+def restart_smb_service():
+	return json.dumps(return_val)
+
+def reset_gateway():
+	return json.dumps(return_val)
+
+def shutdown_gateway():
+	return json.dumps(return_val)
