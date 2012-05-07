@@ -10,7 +10,7 @@ def main():
 		name = "DCloudGateway",
     		version = "0.1",
     		author = "Cloud Data Team, CTBU, Delta Electronic Inc.",
-    		author_email = "JiahongWu@delta.com.tw",
+    		author_email = "jiahong.wu@delta.com.tw",
     		description = ("Delta Inc. CTBU Storage Gateway"),
     		license = "Delta Inc.",
     		keywords = ['gateway', 'swift', 'cloud', 'dedup'],
