@@ -18,14 +18,14 @@ def get_storage_account():
         	with open('/root/.s3ql/authinfo2') as op_fh:
 			op_config.readfp(op_fh)
 
-		for section in op_config.sections():
-			op_storage_url = op_config.get(section, 'storage-url')
-			op_account = op_config.get(section, 'backend-login')
-			op_ok = True
-			op_msg = 'Obtained storage account information'
-			break
+		section = "CloudStorageGateway"
+		op_storage_url = op_config.get(section, 'storage-url')
+		op_account = op_config.get(section, 'backend-login')
+		op_ok = True
+		op_msg = 'Obtained storage account information'
+
 	except IOError as e:
-		op_msg = 'Storage account information not created or not readable.'
+		op_msg = 'Unable to access /root/.s3ql/authinfo2.'
 		log.error(str(e))
 	except Exception as e:
 		op_msg = 'Unable to obtain storage url or login info.' 
@@ -38,10 +38,54 @@ def get_storage_account():
 	log.info("get_storage_account end")
 	return json.dumps(return_val)
 
+def apply_storage_account(storage_url, account, password, test=True):
+	log.info("apply_storage_account start")
+
+	op_ok = False
+	op_msg = 'Failed to apply Storage account unexpetcedly.'
+
+	try:
+		op_config = ConfigParser.ConfigParser()
+		if not os.path.exists('/root/.s3ql/authinfo2'):
+			os.system("mkdir -p /root/.s3ql")
+			os.system("touch /root/.s3ql/authinfo2")
+			os.system("chmod 600 /root/.s3ql/authinfo2")
+
+        	with open('/root/.s3ql/authinfo2','rb') as op_fh:
+			op_config.readfp(op_fh)
+
+		section = "CloudStorageGateway"
+		if not op_config.has_section(section):
+			op_config.add_section(section)
+
+		op_config.set(section, 'storage-url', storage_url)
+		op_config.set(section, 'backend-login', account)
+		op_config.set(section, 'backend-passphrase', password)
+
+		with open('/root/.s3ql/authinfo2','wb') as op_fh:
+			op_config.write(op_fh)
+		
+		op_ok = True
+		op_msg = 'Succeeded to apply storage account'
+
+	except IOError as e:
+		op_msg = 'Failed to access /root/.s3ql/authinfo2'
+		log.error(str(e))
+	except Exception as e:
+		log.error(str(e))
+
+	return_val = {'result' : op_ok,
+		      'msg'    : op_msg,
+                      'data'   : {}}
+
+	log.info("apply_storage_account end")
+	return json.dumps(return_val)
 if __name__ == '__main__':
 	#Example of log usage
 	log.debug("...")
 	log.warn("...")
 	log.info("...")
 	log.error("...")
+	#print get_storage_account()
+	#apply_storage_account("ooxx:890", "system:ggg", "323432")
 	pass	
