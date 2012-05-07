@@ -1,6 +1,6 @@
 [CloudStorageGateway]
 storage-url = 172.16.229.146:8080
 backend-login = system:root
-backend-passphrase = testpass
+backend-password= testpass
 bucket-passphrase = 123456
 
