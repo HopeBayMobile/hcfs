@@ -118,7 +118,7 @@ def getLogger(name=None, conf=None):
 		except Exception as e:
 			logDir = '/var/log/delta'
 			logName = 'Gateway.log'
-			logLevel = 'INFO'
+			logLevel = 'DEBUG'
 
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
