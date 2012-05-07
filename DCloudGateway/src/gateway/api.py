@@ -3,6 +3,7 @@ import os
 import ConfigParser
 import common
 import subprocess
+import time
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
@@ -145,7 +146,7 @@ def restart_nfs_service():
 
 	return_val = {}
 	op_ok = False
-	op_msg = "Restarting the nfs service failed."
+	op_msg = "Restarting nfs service failed."
 
 	try:
 		cmd = "/etc/init.d/nfs-kernel-server restart"
@@ -153,7 +154,7 @@ def restart_nfs_service():
 		po.wait()
 		if po.returncode == 0:
 			op_ok = True
-			op_msg = "Restarting the nfs service succeeded."
+			op_msg = "Restarting nfs service succeeded."
 	except Exception as e:
 		op_ok = False
 		log.error(str(e))
@@ -168,13 +169,61 @@ def restart_nfs_service():
 	return json.dumps(return_val)
 
 def restart_smb_service():
+	log.info("restart_smb_service start")
+
+	return_val = {}
+	op_ok = False
+	op_msg = "Restarting samba service failed."
+
+	try:
+		cmd = "/etc/init.d/smbd restart"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		po.wait()
+		if po.returncode == 0:
+			op_ok = True
+			op_msg = "Restarting samba service succeeded."
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	return_val = {
+		'result': op_ok,
+		'msg': op_msg,
+		'data': {}
+	}
+
+	log.info("restart_smb_service end")
 	return json.dumps(return_val)
 
 def reset_gateway():
-	return json.dumps(return_val)
+	log.info("reset_gateway start")
+
+	return_val = {}
+	op_ok = True
+	op_msg = "Succeeded to reset the gateway."
+	
+	pid = os.fork()
+	if pid == 0:
+		time.sleep(10)
+		os.system("reboot")
+	else:
+		log.info("The gateway will restart after ten seconds.")
+		return json.dumps(return_val)
 
 def shutdown_gateway():
-	return json.dumps(return_val)
+	log.info("shutdown_gateway start")
+	
+	return_val = {}
+	op_ok = True
+	op_msg = "Succeeded to shutdown the gateway."
+
+	pid = os.fork()
+	if pid == 0:
+		time.sleep(10)
+		os.system("poweroff")
+	else:
+		log.info("The gateway will shutdown after ten seconds.")
+		return json.dumps(return_val)
 
 @common.timeout(180)
 def _test_storage_account(storage_url, account, password):
