@@ -23,7 +23,7 @@ def get_storage_account():
 			op_config.readfp(op_fh)
 
 		section = "CloudStorageGateway"
-		op_storage_url = op_config.get(section, 'storage-url')
+		op_storage_url = op_config.get(section, 'storage-url').replace("swift://","")
 		op_account = op_config.get(section, 'backend-login')
 		op_ok = True
 		op_msg = 'Obtained storage account information'
@@ -63,9 +63,9 @@ def apply_storage_account(storage_url, account, password, test=True):
 		if not op_config.has_section(section):
 			op_config.add_section(section)
 
-		op_config.set(section, 'storage-url', storage_url)
+		op_config.set(section, 'storage-url', "swift://%s"%storage_url)
 		op_config.set(section, 'backend-login', account)
-		op_config.set(section, 'backend-passphrase', password)
+		op_config.set(section, 'backend-password', password)
 
 		with open('/root/.s3ql/authinfo2','wb') as op_fh:
 			op_config.write(op_fh)
@@ -225,3 +225,6 @@ if __name__ == '__main__':
 	log.warn("...")
 	log.info("...")
 	log.error("...")
+	print apply_storage_account("172.16.228.53:8080", "system:root", "testpass")
+	print get_storage_account()
+	print test_storage_account("172.16.228.53:8080", "system:root", "testpass")
