@@ -112,7 +112,7 @@ def timeout(timeout_time):
 			elif it.result[0] == 0:
 				return it.result[1]
 			else:
-				raise e
+				raise it.result[1]
 
 		return wrapper
 	return timeoutDeco

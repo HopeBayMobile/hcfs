@@ -6,6 +6,9 @@ import subprocess
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
+class TestStorageError(Exception):
+	pass
+
 def get_storage_account():
 	log.info("get_storage_account start")
 
@@ -43,7 +46,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 	log.info("apply_storage_account start")
 
 	op_ok = False
-	op_msg = 'Failed to apply Storage account unexpetcedly.'
+	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
 	try:
 		op_config = ConfigParser.ConfigParser()
@@ -87,7 +90,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	log.info("apply_user_enc_key start")
 
 	op_ok = False
-	op_msg = 'Failed to change encryption key unexpetcedly.'
+	op_msg = 'Failed to change encryption keys for unexpetced errors.'
 
 	try:
 		#Check if the new key is of valid format
@@ -173,9 +176,54 @@ def reset_gateway():
 def shutdown_gateway():
 	return json.dumps(return_val)
 
+@common.timeout(180)
+def _test_storage_account(storage_url, account, password):
+	cmd ="curl -k -v -H 'X-Storage-User: %s' -H 'X-Storage-Pass: %s' https://%s/auth/v1.0"%(account, password, storage_url)
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
+        po.wait()
+
+        if po.returncode != 0:
+		op_msg = "Test storage account failed for %s"%output
+               	raise TestStorageError(op_msg)
+
+	if not common.isHttp200(output):
+		op_msg = "Test storage account failed"
+		raise TestStorageError(op_msg)
+
+def test_storage_account(storage_url, account, password):
+	log.info("test_storage_account start")
+
+	op_ok = False
+	op_msg = 'Test storage account failed for unexpetced errors.'
+
+	try:
+		_test_storage_account(storage_url=storage_url, account=account, password=password)
+		op_ok = True
+		op_msg ='Test storage account succeeded'
+			
+	except common.TimeoutError:
+		op_msg ="Test storage account failed due to timeout" 
+		log.error(op_msg)
+	except TestStorageError as e:
+		op_msg = str(e)
+		log.error(op_msg)
+	except Exception as e:
+		log.error(str(e))
+	finally:
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+			      'data'   : {}}
+
+		log.info("test_storage_account end")
+		return json.dumps(return_val)
+
+
 if __name__ == '__main__':
 	#Example of log usage
 	log.debug("...")
 	log.warn("...")
 	log.info("...")
 	log.error("...")
+
+	print test_storage_account("172.16.229.146:8080", "system:root", "testpass")
