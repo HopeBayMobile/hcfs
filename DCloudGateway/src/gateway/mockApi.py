@@ -24,6 +24,13 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     else:
         print('received dns2: %s' % dns2) 
 
+    return_val = {
+            'result': True,
+            'msg' : "This is a mock value for testing purpose",
+            'data': {}
+    }
+    return json.dumps(return_val)
+
 
 def get_storage_account():
 
@@ -39,6 +46,13 @@ def test_storage_account(storage_url, account, password):
     print('received account: %s' % account)
     print('received password: %s' % password)
 
+    return_val = {
+            'result': True,
+            'msg' : "This is a mock value for testing purpose",
+            'data': {}
+    }
+    return json.dumps(return_val)
+
 def apply_storage_account(storage_url, account, password, test = True):
 
     print('received storage_url: %s' % storage_url)
@@ -49,10 +63,26 @@ def apply_storage_account(storage_url, account, password, test = True):
     else:
         print('No need to test account')
 
+    return_val = {
+            'result': True,
+            'msg' : "This is a mock value for testing purpose",
+            'data': {}
+    }
+    return json.dumps(return_val)
+
+
 def apply_user_enc_key(old_key, new_key):
 
     print('received old_key: %s' % old_key)
     print('received new_key: %s' % new_key)
+
+    return_val = {
+            'result': True,
+            'msg' : "This is a mock value for testing purpose",
+            'data': {}
+    }
+    return json.dumps(return_val)
+
 
 def build_gateway():
 	return_val = {
@@ -93,3 +123,40 @@ def shutdown_gateway():
 		'data': {}
 	}
 	return json.dumps(return_val)
+
+def get_scheduling_rules():
+	
+	return_val = {
+		'result': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {'policies' : [{'day' : 0, 'start' : -1, 'stop' : -1},
+                                       {'day' : 1, 'start' : 2, 'stop' : 5}]}
+	}
+	return json.dumps(return_val)
+
+def apply_scheduling_rules( policies ):
+
+        for entry in policies:
+            print('received values: day %d, start %d, stop %d' %
+                  (entry['day'], entry['start'], entry['stop']))
+	
+	return_val = {
+		'result': True,
+		'msg': "This is a mock value for testing purpose.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
+def get_gateway_indicators():
+
+    return_val = {'result' : True,
+                       'msg'    : 'This is a mock value for testing purpose',
+                       'data'   : {'network_ok' : True,
+                                     'system_check' : True,
+                                     'flush_inprogress' : True,
+                                     'dirtycache_nearfull' : True,
+                                     'HDD_ok' : True,
+                                     'NFS_srv' : True,
+                                     'SMB_srv' : True}}
+
+    return json.dumps(return_val)
