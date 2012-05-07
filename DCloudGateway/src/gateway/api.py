@@ -225,5 +225,3 @@ if __name__ == '__main__':
 	log.warn("...")
 	log.info("...")
 	log.error("...")
-
-	print test_storage_account("172.16.229.146:8080", "system:root", "testpass")
