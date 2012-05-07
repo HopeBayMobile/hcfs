@@ -12,9 +12,6 @@ apt-get install build-essential
 dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb 
 dpkg -i debsrc/cython_0.15.1-2_amd64.deb 
 
-#Dependency (methos 2)
-dpkg -i debsrc/*
-
 #Installation steps
 python setup build_cython
 python setup build
