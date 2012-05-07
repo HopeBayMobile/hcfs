@@ -177,6 +177,7 @@ class Operations(llfuse.Operations):
             elif name == b's3qlstat':
                 return self.extstat()
 
+#Added by Jiahong Wu: return current cache status
             elif name == b's3qlcache':
                 return self.extstat_cache()
 
@@ -812,7 +813,7 @@ class Operations(llfuse.Operations):
         return struct.pack('QQQQQQQ', entries, blocks, inodes, fs_size, dedup_size,
                            compr_size, self.db.get_size())
 
-#New function that returns status of local cache
+#Added by Jiahong Wu: New function that returns status of local cache
     def extstat_cache(self):
         '''Return local cache statistics'''
 
@@ -825,9 +826,13 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = self.cache.dirty_entries
         cache_maxsize = self.cache.max_size
         cache_maxentries = self.cache.max_entries
+        if self.cache.do_upload or self.cache.forced_upload:
+            cache_uploading = 1
+        else:
+            cache_uploading = 0
 
-        return struct.pack('QQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries)
+        return struct.pack('QQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading)
 
 
 

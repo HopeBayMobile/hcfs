@@ -4,6 +4,7 @@ statfs.py - this file is part of S3QL (http://s3ql.googlecode.com)
 Copyright (C) 2008-2009 Nikolaus Rath <Nikolaus@rath.org>
 
 This program can be distributed under the terms of the GNU GPLv3.
+File modified by Jiahong Wu to include info on local cache and status
 '''
 
 from __future__ import division, print_function, absolute_import
@@ -65,8 +66,9 @@ def main(args=None):
     (entries, blocks, inodes, fs_size, dedup_size,
      compr_size, db_size)= struct.unpack('QQQQQQQ', buf) 
 
+    # Added by Jiahong Wu: read cache information
     buf = llfuse.getxattr(ctrlfile, b's3qlcache', size_guess=256)
-    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries)= struct.unpack('QQQQQQ', buf)
+    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading)= struct.unpack('QQQQQQQ', buf)
     p_dedup = dedup_size * 100 / fs_size if fs_size else 0
     p_compr_1 = compr_size * 100 / fs_size if fs_size else 0
     p_compr_2 = compr_size * 100 / dedup_size if dedup_size else 0
@@ -85,6 +87,15 @@ def main(args=None):
            'Cache entries: current: %d, max: %d' % (cache_entries,cache_maxentries),
            'Dirty cache status: size: %.2f MB, entries: %d' % ((cache_dirtysize / mb),cache_dirtyentries),
            sep='\n')
+    if cache_uploading == 1:
+        print('Cache uploading: On\n')
+    else:
+        print('Cache uploading: Off\n')
+
+    if (cache_dirtysize > (0.8 * cache_maxsize)) or (cache_dirtyentries > (0.8 * cache_maxentries)):
+        print('Dirty cache near full: True\n')
+    else:
+        print('Dirty cache near full: False\n')
 
 
 if __name__ == '__main__':
