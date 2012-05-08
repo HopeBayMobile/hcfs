@@ -91,17 +91,21 @@ def get_gateway_indicators():
 
 	# HDD check
 
-	cmd ="sudo smartctl -a /dev/sda; sudo smartctl -a /dev/sdb"
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	output = po.stdout.read()
-        po.wait()
+	all_disk = common.getAllDisks()
+	for i in all_disk:
+		print i
+		cmd ="sudo smartctl -a %s"%i
 
-       	if po.returncode == 0:
-		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-			op_HDD_ok = True
-	else:
-		op_msg = output
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+	        po.wait()
 
+       		if po.returncode == 0:
+			if output.find("SMART overall-health self-assessment test result: PASSED") == len(all_disk):
+				op_HDD_ok = True
+		else:
+			op_msg = output
+	
 	# NFS service check
 	cmd ="sudo service nfs-kernel-server status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -557,7 +561,7 @@ if __name__ == '__main__':
 	#mountOpt="GGG ddfd fdsfsd fsdfsd"
 	#cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%("eth0", "swift://%s"%storage_url, mountpoint, mountOpt)
 	#print cmd
-	print build_gateway()
+	print get_gateway_indicators()
 	#	config = ConfigParser.ConfigParser()
        	#	with open('../../Gateway.ini','rb') as op_fh:
 	#		config.readfp(op_fh)
