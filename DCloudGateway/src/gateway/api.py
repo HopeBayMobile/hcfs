@@ -345,6 +345,26 @@ def test_storage_account(storage_url, account, password):
 		log.info("test_storage_account end")
 		return json.dumps(return_val)
 
+def get_network():
+	log.info("get_network start")
+	log.info("get_network end")
+	return json.dumps(return_val)
+
+def apply_network(ip, gateway, mask, dns1, dns2=None):
+	log.info("apply_network start")
+
+	return_val = {}
+	op_ok = False
+	op_msg = "Failed to apply network configuration."
+	
+	return_val = {
+		'result': op_ok,
+		'msg': op_msg,
+		'data': {}
+	}
+	log.info("apply_network end")
+	return json.dumps(return_val)
+
 
 if __name__ == '__main__':
 	#Example of log usage
