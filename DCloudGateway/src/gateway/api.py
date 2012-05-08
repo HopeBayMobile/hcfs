@@ -176,7 +176,7 @@ def _mkfs(storage_url, key):
 			log.info("Found existing file system!")
 
 
-@common.timeout(180)
+@common.timeout(360)
 def _mount(storage_url):
 	try:
 		config = ConfigParser.ConfigParser()
@@ -184,19 +184,19 @@ def _mount(storage_url):
 			config.readfp(fh)
 
 		if not config.has_section("mountpoint"):
-			raise MountError("Failed to find section [mountpoint] in the config file")
+			raise BuildGWError("Failed to find section [mountpoint] in the config file")
 
 		if not config.has_option("mountpoint", "dir"):
-			raise MountError("Failed to find option 'dir'  in section [mountpoint] in the cofig file")
+			raise BuildGWError("Failed to find option 'dir'  in section [mountpoint] in the cofig file")
 
 		mountpoint = config.get("mountpoint", "dir")
 		os.system("mkdir -p %s"%mountpoint)
 		
 		if os.path.ismount(mountpoint):
-			raise MountError("A filesystem is mounted on %s"%mountpoint)
+			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
 
 		if not config.has_section("s3ql"):
-			raise MountError("Failed to find section [s3q] in the config file")
+			raise BuildGWError("Failed to find section [s3q] in the config file")
 
 		mountOpt=""
 		if config.has_option("s3ql", "mountOpt"):
@@ -208,23 +208,29 @@ def _mount(storage_url):
 
 		#TODO: get interface from config file
 		shellDir = "/usr/lib/delta/gateway_scripts/"
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(shellDir, "eth0", "swift://%s"%storage_url, mountpoint, mountOpt)
-		print cmd
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(shellDir, "eth0", "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
         	if po.returncode != 0:
-			raise MountError(output)
+			raise BuildGWError(output)
 
 		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
         	if po.returncode != 0:
-			raise MountError(output)
+			raise BuildGWError(output)
+
 	except IOError as e:
 		op_msg = 'Failed to access /etc/delta/Gateway.ini'
 		log.error(str(e))
+		raise BuildGWError(op_msg)
+	except Exception as e:
+		op_msg = "Failed to mount filesystem for %s"%str(e)
+		log.error(str(e))
+		raise BuildGWError(op_msg)
+		
 
 def build_gateway():
 	log.info("build_gateway start")
@@ -260,11 +266,8 @@ def build_gateway():
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
 	except BuildGWError as e:
 		op_msg = str(e)
-	except MountError as e:
-		op_msg = str(e)
 	except Exception as e:
-		log.error(str(e))
-
+		op_msg = str(e)
 	finally:
 		if op_ok == False:
 			log.error(op_msg)
@@ -424,15 +427,6 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
 
 if __name__ == '__main__':
-	#storage_url ="172.3324343"
-	#mountpoint = "GGGGGGGGGGG"
-	#mountOpt="GGG ddfd fdsfsd fsdfsd"
-	#cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%("eth0", "swift://%s"%storage_url, mountpoint, mountOpt)
-	#print cmd
+	pass
 	print build_gateway()
-	#	config = ConfigParser.ConfigParser()
-       	#	with open('../../Gateway.ini','rb') as op_fh:
-	#		config.readfp(op_fh)
-
-	#	print config.get("s3ql", "mountOpt")
 
