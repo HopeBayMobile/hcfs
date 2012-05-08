@@ -263,6 +263,9 @@ class BlockCache(object):
         self.preload_cache = False
         self.do_upload = False
         self.forced_upload = False
+        #Jiahong: Adding a mechanism to monitor alive upload threads
+        self.last_checked = time.time()
+        self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
 
 
         if os.access(self.path,os.F_OK):
@@ -311,8 +314,29 @@ class BlockCache(object):
             t.start()
             self.removal_threads.append(t)
 
+    #Jiahong Wu (5/7/12): New function for monitoring upload threads
+    def check_alive_threads(self):
+        '''Monitor if the upload threads are alive. Restart them if necessary'''
+
+        finished = False
+
+        while not finished:
+            finished = True
+            for t in self.upload_threads:
+                if not t.isAlive():
+                    log.warning('A upload thread has died. Restarting.')
+                    t.join
+                    t = threading.Thread(target=self._upload_loop)
+                    t.start()
+                    self.upload_threads.append(t)
+                    finished = False
+                    break
+
+
     def destroy(self):
         '''Clean up and stop worker threads'''
+
+        self.going_down = True
 
         with lock_released:
             for t in self.upload_threads:
@@ -336,7 +360,7 @@ class BlockCache(object):
         log.debug('destroy(): close opened cache...')
         self.close_cache()
 
-#Commented out this line (we always want the cache directory)
+        #Jiahong: Commented out the following line (we always want the cache directory)
         #os.rmdir(self.path) 
 
     def _upload_loop(self):
@@ -365,10 +389,22 @@ class BlockCache(object):
         try:
             if log.isEnabledFor(logging.DEBUG):
                 time_ = time.time()
+            
+            #Jiahong Wu (5/8/12): Added retry mechanism for cache upload. Will retry until system umount.
+            while True:
+                try:
+                    with self.bucket_pool() as bucket:
+                        obj_size = bucket.perform_write(do_write, 's3ql_data_%d' % obj_id).get_obj_size()
+                    break
+                except:
+                    if self.going_down:
+                        raise
+                    log.error('Cache upload timed out. Retrying in 10 seconds.')
+                    time.sleep(10)
+                    with self.bucket_pool() as bucket:
+                        bucket.bucket.conn.close()
+                        bucket.bucket.conn = bucket.bucket._get_conn()
 
-#TODO: in the future, may need to do error handling here if a network error occurs during perform_write
-            with self.bucket_pool() as bucket:
-                obj_size = bucket.perform_write(do_write, 's3ql_data_%d' % obj_id).get_obj_size()
 
             if log.isEnabledFor(logging.DEBUG):
                 time_ = time.time() - time_
@@ -394,11 +430,14 @@ class BlockCache(object):
                 self.in_transit.remove((el.inode, el.blockno))
                 self.transfer_completed.notify_all()
 
-        except:
+        except Exception as exc:
             with lock:
                 self.in_transit.remove(obj_id)
                 self.in_transit.remove((el.inode, el.blockno))
                 self.transfer_completed.notify_all()
+
+            #Jiahong Wu: added error message 
+            log.error('Error in cache uploading. Message type %s (%s).' % (type(exc).__name__, exc))
             raise
 
 
@@ -424,6 +463,8 @@ class BlockCache(object):
         '''
 
         log.debug('upload(%s): start', el)
+
+        #Jiahong (5/7/12): Check if the threads are alive
 
         assert (el.inode, el.blockno) not in self.in_transit
         self.in_transit.add((el.inode, el.blockno))
@@ -791,6 +832,15 @@ class BlockCache(object):
         log.debug('expire: start')
 #Jiahong: TODO: put some mechanism here to check for network connection before
 #actually trying to expire any blocks
+
+        try:
+            with self.bucket_pool() as bucket:
+                bucket.store('cloud_gw_test_connection','nodata')
+        except:
+            log.error('Network appears to be down. Failing expire cache.')
+            raise(llfuse.FUSEError(errno.EIO))
+#Implement the rest...
+
 
         did_nothing_count = 0
         while (len(self.entries) > self.max_entries or

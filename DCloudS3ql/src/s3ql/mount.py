@@ -76,7 +76,6 @@ def main(args=None):
     options = parse_args(args)
 
 #Jiahong: added mechanism for raising the file handle limit.
-#Jiahong: TODO: need to check if this mechanism works for upstart mounts
     if options.max_cache_entries > 290000:
         raise QuietError('Too many cache entries (max 290000)')
     resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))
@@ -548,7 +547,14 @@ class MetadataUploadThread(Thread):
 
 
             with self.bucket_pool() as bucket:
-                seq_no = get_seq_no(bucket)
+                #New mod by Jiahong on 5/7/12: check if can successfully get the seq no from the backend before proceeding
+                try:
+                    seq_no = get_seq_no(bucket)
+                except:
+                    log.error('Cannot connect to backend. Skipping metadata upload for now.')
+                    fh.close()
+                    continue
+
                 if seq_no != self.param['seq_no']:
                     log.error('Remote metadata is newer than local (%d vs %d), '
                               'refusing to overwrite!', seq_no, self.param['seq_no'])
@@ -633,7 +639,7 @@ class CommitThread(Thread):
 # Start/stop of dirty cache uploading is controlled by ctrl.py using uploadon / uploadoff parameters
     def run(self):
         log.debug('CommitThread: start')
-
+        
         with llfuse.lock:
             self.block_cache.read_cachefiles()
         while not self.stop_event.is_set():
@@ -646,12 +652,21 @@ class CommitThread(Thread):
                         break;
                     if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
                         continue
+                    #Modified by Jiahong Wu
                     # Wait for one minute since last uploading the block to do it again
                     # TODO: consider new policy on when to upload the block. May need to delay doing
                     # TODO: so if the block or the file is being accessed (either read or write)
                     if stamp - el.last_upload < 60:
                         continue
 
+                    # Jiahong: (5/7/12) delay upload process if network is down
+                    try:
+                        with self.block_cache.bucket_pool() as bucket:
+                            bucket.store('cloud_gw_test_connection','nodata')
+                    except:
+                        log.error('Network appears to be down. Delaying cache upload.')
+                        self.stop_event.wait(60)
+                        break
 
                     # Acquire global lock to access UploadManager instance
                     with llfuse.lock:
@@ -668,6 +683,10 @@ class CommitThread(Thread):
 
             if not did_sth:
                 self.stop_event.wait(5)
+      
+            #Added by Jiahong Wu (5/7/12): Monitor upload threads for alive threads
+            if time.time() - self.block_cache.last_checked > 300:
+                self.block_cache.check_alive_threads()
 
         log.debug('CommitThread: end')
 
