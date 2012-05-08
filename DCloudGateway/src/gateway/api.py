@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import ConfigParser
@@ -9,6 +10,23 @@ from eventlet import Timeout, sleep
 
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
+
+################################################################################
+# Configuration
+
+smb_conf_file = "/etc/samba/smb.conf"
+nfs_hosts_allow_file = "/etc/hosts.allow"
+
+enable_log = True 
+
+default_user_id = "admin"
+default_user_pwd = "admin"
+
+RUN_CMD_TIMEOUT = 15
+
+CMD_CH_SMB_PWD = "./change_smb_pwd.sh"
+
+################################################################################
 
 class BuildGWError(Exception):
 	pass
@@ -94,17 +112,25 @@ def get_gateway_indicators():
 
 	# HDD check
 
-	cmd ="sudo smartctl -a /dev/sda; sudo smartctl -a /dev/sdb"
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	output = po.stdout.read()
-        po.wait()
+	all_disk = common.getAllDisks()
+	nu_all_disk = len(all_disk)
+	op_all_disk = 0
+	for i in all_disk:
+		cmd ="sudo smartctl -a %s"%i
 
-       	if po.returncode == 0:
-		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-			op_HDD_ok = True
-	else:
-		op_msg = output
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+	        po.wait()
 
+       		if po.returncode == 0:
+			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+				op_all_disk += 1 
+		else:
+			op_msg = output
+	
+	if op_all_disk == len(all_disk):
+		op_HDD_ok = True
+	
 	# NFS service check
 	cmd ="sudo service nfs-kernel-server status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -556,38 +582,32 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 	log.info("apply_network end")
 	return json.dumps(return_val)
 
+def get_scheduling_rules():			# by Yen
+	# load config file 
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+		
+	schedule = []
+	for row in fileReader:
+		schedule.append(row)
+	del schedule[0]   # remove header
 
-if __name__ == '__main__':
-	pass
-	print build_gateway()
+	return_val = {
+		'result': True,
+		'msg': "Bandwidth throttling schedule is read.",
+		'data': schedule
+	}
+	return json.dumps(return_val)
 
-'''
-    Security for CIFS (passwd) & NFS (ip allowed) shares
-
-    Notice:
-    * it requires specific smb.conf, hosts.allow, hosts.deny file format.
-      please use the files provided with the code instead  
-
-    author: jashing, 2012/05/08
-'''
-
-
-################################################################################
-# Configuration
-
-smb_conf_file = "/etc/samba/smb.conf"
-nfs_hosts_allow_file = "/etc/hosts.allow"
-
-enable_log = True 
-
-default_user_id = "admin"
-default_user_pwd = "admin"
-
-RUN_CMD_TIMEOUT = 15
-
-CMD_CH_SMB_PWD = "./change_smb_pwd.sh"
-
-################################################################################
 def get_smb_user_list ():
     '''
     read from /etc/samba/smb.conf
@@ -876,7 +896,74 @@ def set_nfs_access_ip_list (array_of_ip):
     
     
 
-if __name__ == '__main__':
-        pass
-        print build_gateway()
+# example schedule: [ [1,0,24,512],[2,0,24,1024], ... ]
+def apply_scheduling_rules(schedule):			# by Yen
+	# write settings to gateway_throttling.cfg
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fptr = csv.writer(open(fpath+fname, "w"))
+		header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+		fptr.writerow(header)
+		for row in schedule:
+			fptr.writerow(row)
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " to write failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+	
+	# apply settings
+	os.system("python update_s3ql_bandwidth.py")
+	
+	return_val = {
+		'result': True,
+		'msg': "Rules of bandwidth schedule are saved.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+	
 
+def force_upload_sync(bw):			# by Yen
+	if (bw<64):
+		return_val = {
+			'result': False,
+			'msg': "Uploading bandwidth has to be larger than 64KB/s.",
+			'data': {}
+		}
+		return json.dumps(return_val)
+		
+	try:
+		bw = str( bw )
+		# clear old tc settings
+		cmd = "tc qdisc del dev eth0 root"
+		os.system(cmd)
+		# set tc
+		cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
+		os.system(cmd)
+		cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
+		os.system(cmd)
+		# set throttling 8080 port in iptables
+		cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
+		os.system(cmd)
+		cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
+		os.system(cmd)
+		print("change bandwidth to " + bw + "kB/s succeeded")
+		cmd = "s3qlctrl uploadon /mnt/cloudgwfiles"
+		os.system(cmd)
+		print "Turn on s3ql upload."
+	except:
+		print "Please check whether s3qlctrl is installed."
+	
+	return_val = {
+		'result': True,
+		'msg': "S3QL upload is turned on.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
+
+if __name__ == '__main__':
+	pass

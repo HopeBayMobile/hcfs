@@ -9,6 +9,7 @@ import struct
 import math
 import pickle
 import time
+import re
 
 from ConfigParser import ConfigParser
 
@@ -77,6 +78,19 @@ def timeout(timeout_time):
 
 		return wrapper
 	return timeoutDeco
+
+def getAllDisks():
+        cmd = "sudo smartctl --scan"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+
+        disks = []
+        for line in lines:
+                match = re.match(r"^/dev/sd\w", line)
+                if match is not None:
+                        disks.append(line.split()[0][:8])
+
+        return disks
 
 def isHttp200(response):
 	if response.find("HTTP/1.1 200")  !=-1:
