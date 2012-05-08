@@ -25,7 +25,7 @@ default_user_pwd = "admin"
 
 RUN_CMD_TIMEOUT = 15
 
-CMD_CH_SMB_PWD = "./change_smb_pwd.sh"
+CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
 
 ################################################################################
 
