@@ -92,8 +92,9 @@ def get_gateway_indicators():
 	# HDD check
 
 	all_disk = common.getAllDisks()
+	nu_all_disk = len(all_disk)
+	op_all_disk = 0
 	for i in all_disk:
-		print i
 		cmd ="sudo smartctl -a %s"%i
 
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -101,10 +102,13 @@ def get_gateway_indicators():
 	        po.wait()
 
        		if po.returncode == 0:
-			if output.find("SMART overall-health self-assessment test result: PASSED") == len(all_disk):
-				op_HDD_ok = True
+			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+				op_all_disk += 1 
 		else:
 			op_msg = output
+	
+	if op_all_disk == len(all_disk):
+		op_HDD_ok = True
 	
 	# NFS service check
 	cmd ="sudo service nfs-kernel-server status"
@@ -653,8 +657,4 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
-	pass
-	print build_gateway()
-
-
-
+	print get_gateway_indicators()
