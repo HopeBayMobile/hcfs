@@ -12,7 +12,7 @@ MOUNTPOINT=$3
 MOUNTOPT=$4
 
 
-cat > /etc/init.d/s3ql.conf <<EOF
+cat > /etc/init/s3ql.conf <<EOF
 description	"S3QL Backup File System"
 author		"Nikolaus Rath <Nikolaus@rath.org>"
 

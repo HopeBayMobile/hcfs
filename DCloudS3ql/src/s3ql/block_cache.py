@@ -401,10 +401,18 @@ class BlockCache(object):
                         raise
                     log.error('Cache upload timed out. Retrying in 10 seconds.')
                     time.sleep(10)
-                    with self.bucket_pool() as bucket:
-                        bucket.bucket.conn.close()
-                        bucket.bucket.conn = bucket.bucket._get_conn()
-
+                    while True:
+                        try:
+                            with self.bucket_pool() as bucket:
+                                bucket.bucket.conn.close()
+                                bucket.bucket.conn = bucket.bucket._get_conn()
+                            break
+                        except:
+                            if self.going_down:
+                                raise
+                            log.error('Network may be disconnected. Retrying in 10 seconds.')
+                            time.sleep(10)
+                    
 
             if log.isEnabledFor(logging.DEBUG):
                 time_ = time.time() - time_
@@ -704,9 +712,13 @@ class BlockCache(object):
                                     if el is not None:
                                         el.unlink()
                                     time.sleep(5)
-                                    with self.bucket_pool() as bucket:
-                                        bucket.bucket.conn.close()
-                                        bucket.bucket.conn = bucket.bucket._get_conn()
+                                    try:
+                                        with self.bucket_pool() as bucket:
+                                            bucket.bucket.conn.close()
+                                            bucket.bucket.conn = bucket.bucket._get_conn()
+                                    except:
+                                        log.error('Network may be down.')
+                                        raise(llfuse.FUSEError(errno.EIO))
                                     
 
                         # Note: We need to do this *before* releasing the global
