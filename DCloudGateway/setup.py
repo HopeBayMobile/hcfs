@@ -3,6 +3,8 @@ from setuptools import setup, find_packages
 CONFDIR='/etc/delta'
 AUTHDIR='/root/.s3ql'
 SHELLDIR='/usr/lib/delta/gateway_scripts'
+SMBDIR='/etc/samba'
+NFSDIR='/etc'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -24,7 +26,11 @@ def main():
     		},
 
 		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2.template']), 
-			     (SHELLDIR,['gateway_scripts/createS3qlconf.sh'])], 
+			     (SHELLDIR,['gateway_scripts/createS3qlconf.sh']),
+			     (SMBDIR, ['config/smb.conf']),
+                             (NFSDIR, ['config/hosts.allow']),
+                             (NFSDIR, ['config/hosts.deny'])
+                           ] 
 		
 		test_suite='unittest',
 		long_description=read('README'),

@@ -4,6 +4,9 @@ import ConfigParser
 import common
 import subprocess
 import time
+import errno
+from eventlet import Timeout, sleep
+
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
@@ -557,4 +560,323 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 if __name__ == '__main__':
 	pass
 	print build_gateway()
+
+'''
+    Security for CIFS (passwd) & NFS (ip allowed) shares
+
+    Notice:
+    * it requires specific smb.conf, hosts.allow, hosts.deny file format.
+      please use the files provided with the code instead  
+
+    author: jashing, 2012/05/08
+'''
+
+
+################################################################################
+# Configuration
+
+smb_conf_file = "/etc/samba/smb.conf"
+nfs_hosts_allow_file = "/etc/hosts.allow"
+
+enable_log = True 
+
+default_user_id = "admin"
+default_user_pwd = "admin"
+
+RUN_CMD_TIMEOUT = 15
+
+CMD_CH_SMB_PWD = "./change_smb_pwd.sh"
+
+################################################################################
+def get_smb_user_list ():
+    '''
+    read from /etc/samba/smb.conf
+    '''
+
+    username = []
+
+    if enable_log:
+        log.info("get_smb_user_list")
+
+    op_ok = False
+    op_msg = 'Smb account read failed unexpectedly.'
+
+    try:
+        parser = ConfigParser.SafeConfigParser() 
+        parser.read(smb_conf_file)
+    except ConfigParser.ParsingError, err:
+        print err
+        op_msg = smb_conf_file + ' is not readable.'
+        
+        if enable_log:
+            log.error(op_msg)
+            
+        username.append(default_user_id) # default
+        
+        #print "file is not readable"
+    else:
+
+        '''
+        #read all info
+        for section_name in parser.sections():
+            print 'Section:', section_name
+            print '  Options:', parser.options(section_name)
+            #for name, value in parser.items(section_name):
+            #    print '  %s = %s' % (name, value)
+            #print
+        '''
+        
+        if parser.has_option("cloudgwshare", "valid users"):
+            user = parser.get("cloudgwshare", "valid users")
+            username = str(user).split(" ") 
+        else:
+            #print "parser read fail"
+            username.append(default_user_id)  # admin as the default user
+
+        op_ok = True
+        op_msg = 'Obtained smb account information'
+
+    
+    return_val = {
+                  'result' : op_ok,
+                  'msg' : op_msg,
+                  'data' : {'accounts' : username}}
+    if enable_log:
+        log.info("get_storage_account end")
+        
+    return json.dumps(return_val)
+
+def set_smb_user_list (username, password):
+    '''
+    update username to /etc/samba/smb.conf and call smbpasswd to set password
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'set Smb account failed unexpectedly.',
+                  'data' : {} }
+
+    if enable_log:
+        log.info("set_smb_user_list starts")
+
+    # currently, only admin can use smb
+    if str(username).lower() != default_user_id:
+        return_val['msg'] = 'invalid user. Only accept ' + default_user_id
+        return json.dumps(return_val)
+    
+    # get current user list
+    try:
+        current_users = get_smb_user_list ()
+        load_userlist = json.loads(current_users)    
+        username_arr = load_userlist["data"]["accounts"]
+        
+        #print username_arr
+    except:
+        if enable_log:
+            log.info("set_smb_user_list fails")
+            
+        return_val['msg'] = 'cannot read current user list.'
+        return json.dumps(return_val)
+    
+    
+    # for new user, add the new user to linux, update smb.conf, and set password
+    # TODO: impl.
+    
+    # admin must in the current user list
+    flag = False
+    for u in username_arr:
+        #print u
+        if u == default_user_id:
+            flag = True
+            
+    if flag == False: # should not happen
+        if enable_log:
+            log.info("set_smb_user_list fails")
+        return_val['msg'] = 'invalid user, and not in current user list.'
+        return json.dumps(return_val)
+        
+    # ok, set the password
+    # notice that only a " " is required btw tokens
+     
+    command = CMD_CH_SMB_PWD + " " + password + " " + username
+    args = str(command).split(" ")
+    
+    try:
+        with Timeout(RUN_CMD_TIMEOUT):
+            #print args
+            proc = subprocess.Popen(args,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
+            
+            results = proc.stdout.read()
+            ret_val = proc.wait() # 0 : success
+            
+            #print results
+            #print ret_val
+
+    except Timeout:
+        #print "Killing long-running %s" % str(args)
+        proc.kill()
+
+        if enable_log:
+            log.info("set_smb_user_list timeout")
+  
+        return_val['msg'] = 'Timeout for changing passwd.'
+        return json.dumps(return_val)
+    
+    
+    # good. all set
+    return_val['result'] = True
+    return_val['msg'] = 'Success to set smb account and passwd'
+
+    if enable_log:
+        log.info("set_smb_user_list end")
+
+    return json.dumps(return_val)
+
+def get_nfs_access_ip_list ():
+    '''
+    read from /etc/hosts.allow
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'get NFS access ip list failed unexpectedly.',
+                  'data' : { "array_of_ip" : [] } }
+
+    if enable_log:
+        log.info("get_nfs_access_ip_list starts")
+
+    try:
+        for line in open(nfs_hosts_allow_file, 'r'):
+            # skip comment lines and empty lines
+            if str(line).startswith("#") or str(line).strip() == None: 
+                continue
+            
+            #print line
+
+            # accepted format:
+            # portmap mountd nfsd statd lockd rquotad : 172.16.229.112 172.16.229.136
+
+            arr = str(line).strip().split(":")
+            #print arr
+
+            # format error
+            if len(arr) < 2:
+                if enable_log:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+          
+                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                return json.dumps(return_val)
+
+            # got good format
+            # key = services allowed, val = ip lists
+            services = str(arr[0]).strip()
+            iplist = arr[1]
+            ips = iplist.strip().split(" ") #
+            
+            #print services
+            #print ips
+            
+            return_val['result'] = True
+            return_val['msg'] = "Get ip list success"
+            return_val['data']["array_of_ip"] = ips
+            
+            #return json.dumps(return_val)
+            
+    except :
+        if enable_log:
+            log.info("cannot parse " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
+        #return json.dumps(return_val)
+    
+    if enable_log:
+        log.info("get_nfs_access_ip_list end")
+        
+    return json.dumps(return_val)
+    
+def set_nfs_access_ip_list (array_of_ip):
+    '''
+    update to /etc/hosts.allow
+    the original ip list will be updated to the new ip list 
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'get NFS access ip list failed unexpectedly.',
+                  'data' : { "array_of_ip" : [] } }
+
+
+    if enable_log:
+        log.info("set_nfs_access_ip_list starts")
+
+    try:
+        # try to get services allowed
+        for line in open(nfs_hosts_allow_file, 'r'):
+            # skip comment lines and empty lines
+            if str(line).startswith("#") or str(line).strip() == None: 
+                continue
+            
+            arr = str(line).strip().split(":")
+
+            # format error
+            if len(arr) < 2:
+                if enable_log:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+          
+                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                return json.dumps(return_val)
+
+            # got good format
+            # key = services allowed, val = ip lists
+            services = str(arr[0]).strip()
+            iplist = arr[1]
+            ips = iplist.strip().split(" ") #
+            
+            #print services
+            #print ips
+            
+            return_val['result'] = True
+            return_val['msg'] = "Get ip list success"
+            return_val['data']["array_of_ip"] = ips
+            
+            #return json.dumps(return_val)
+            
+    except :
+        if enable_log:
+            log.info("cannot parse " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
+        #return json.dumps(return_val)
+
+    # finally, updating the file
+    try:
+        ofile = open(nfs_hosts_allow_file, 'w')
+        output = services + " : " + " ".join(array_of_ip)
+        ofile.write(output)
+        ofile.close()
+
+        return_val['result'] = True
+        return_val['msg'] = "Update ip list successfully"
+        return_val['data']["array_of_ip"] = " ".join(array_of_ip)
+    except:
+        if enable_log:
+            log.info("cannot write to " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
+        
+    if enable_log:
+        log.info("get_nfs_access_ip_list end")
+
+
+
+    
+    return json.dumps(return_val)
+    
+    
+
+if __name__ == '__main__':
+        pass
+        print build_gateway()
 
