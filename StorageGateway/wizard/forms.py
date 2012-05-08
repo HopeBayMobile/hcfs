@@ -71,7 +71,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
     preferred_dns = forms.IPAddressField(label='Preferred DNS server')
     alternate_dns = forms.IPAddressField(label='Alternate DNS server')
     
-    cloud_storage_url = forms.CharField(label='Cloud Storage URL')
+    cloud_storage_ip = forms.IPAddressField(label='Cloud Storage IP')
     cloud_storage_account = forms.CharField()
     cloud_storage_password = forms.CharField(widget=forms.PasswordInput())
     
@@ -96,7 +96,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
                                 'alternate_dns',
                                 ]
                  ),
-                ('3. Cloud Storage', ['cloud_storage_url',
+                ('3. Cloud Storage', ['cloud_storage_ip',
                                      'cloud_storage_account',
                                      'cloud_storage_password',
                                      ]
