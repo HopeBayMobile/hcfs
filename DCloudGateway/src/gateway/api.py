@@ -91,17 +91,21 @@ def get_gateway_indicators():
 
 	# HDD check
 
-	cmd ="sudo smartctl -a /dev/sda; sudo smartctl -a /dev/sdb"
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	output = po.stdout.read()
-        po.wait()
+	all_disk = common.getAllDisks()
+	for i in all_disk:
+		print i
+		cmd ="sudo smartctl -a %s"%i
 
-       	if po.returncode == 0:
-		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-			op_HDD_ok = True
-	else:
-		op_msg = output
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+	        po.wait()
 
+       		if po.returncode == 0:
+			if output.find("SMART overall-health self-assessment test result: PASSED") == len(all_disk):
+				op_HDD_ok = True
+		else:
+			op_msg = output
+	
 	# NFS service check
 	cmd ="sudo service nfs-kernel-server status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -553,13 +557,6 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 	log.info("apply_network end")
 	return json.dumps(return_val)
 
-
-if __name__ == '__main__':
-	pass
-	print build_gateway()
-
-
-
 def get_scheduling_rules():			# by Yen
 	# load config file 
 	fpath = "/etc/delta/"
@@ -653,3 +650,11 @@ def force_upload_sync(bw):			# by Yen
 		'data': {}
 	}
 	return json.dumps(return_val)
+
+
+if __name__ == '__main__':
+	pass
+	print build_gateway()
+
+
+
