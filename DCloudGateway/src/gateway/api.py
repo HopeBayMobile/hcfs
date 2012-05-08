@@ -1,11 +1,33 @@
+import csv
 import json
 import os
 import ConfigParser
 import common
 import subprocess
 import time
+import errno
+from eventlet import Timeout, sleep
+
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
+DIR = os.path.dirname(os.path.realpath(__file__))
+
+################################################################################
+# Configuration
+
+smb_conf_file = "/etc/samba/smb.conf"
+nfs_hosts_allow_file = "/etc/hosts.allow"
+
+enable_log = True 
+
+default_user_id = "admin"
+default_user_pwd = "admin"
+
+RUN_CMD_TIMEOUT = 15
+
+CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
+
+################################################################################
 
 class BuildGWError(Exception):
 	pass
@@ -15,6 +37,142 @@ class MountError(Exception):
 
 class TestStorageError(Exception):
 	pass
+
+def get_gateway_indicators():
+
+	log.info("get_gateway_indicators start")
+	op_ok = False
+	op_msg = 'Gateway indocators read failed unexpetcedly.'
+	op_network_ok = False
+	op_system_check = False
+	op_flush_inprogress = False
+	op_dirtycache_nearfull = False
+	op_HDD_ok = False
+	op_NFS_srv = False
+	op_SMB_srv = False
+
+	# Network check
+
+	try:
+                op_config = ConfigParser.ConfigParser()
+                with open('/root/.s3ql/authinfo2') as op_fh:
+                        op_config.readfp(op_fh)
+
+                section = "CloudStorageGateway"
+                op_storage_url = op_config.get(section, 'storage-url').replace("swift://","")
+		index = op_storage_url.find(":")
+		if index != -1:
+			op_storage_url = op_storage_url[0:index]
+
+		cmd ="ping %s"%op_storage_url
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+
+		if po.returncode == 0:
+                	if output.find("cmp_req" and "ttl" and "time") !=-1:
+				op_network_ok = True
+		else:
+			op_msg = output
+
+
+        except IOError as e:
+                op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+                log.error(str(e))
+        except Exception as e:
+                op_msg = 'Unable to obtain storage url or login info.'
+                log.error(str(e))
+	
+	# System check
+        cmd ="ps aux | grep fsck.s3ql"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
+
+        if po.returncode == 0:
+                if len(lines) > 2:
+                        op_system_check = True
+        else:
+                op_msg = output
+
+	# Flush check & DirtyCache check
+	cmd ="sudo s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("Cache uploading: On") !=-1:
+                        op_flush_inprogress = True
+
+                if output.find("Dirty cache near full: True") !=-1:
+                        op_dirtycache_nearfull = True
+
+        else:
+                op_msg = output
+
+	# HDD check
+
+	all_disk = common.getAllDisks()
+	nu_all_disk = len(all_disk)
+	op_all_disk = 0
+	for i in all_disk:
+		cmd ="sudo smartctl -a %s"%i
+
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+	        po.wait()
+
+       		if po.returncode == 0:
+			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+				op_all_disk += 1 
+		else:
+			op_msg = output
+	
+	if op_all_disk == len(all_disk):
+		op_HDD_ok = True
+	
+	# NFS service check
+	cmd ="sudo service nfs-kernel-server status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("running") !=-1:
+                        op_NFS_srv = True
+        else:
+                op_msg = output
+
+	# SMB service check
+	
+	cmd ="sudo service smbd status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("running") !=-1:
+                        op_SMB_srv = True
+        else:
+                op_msg = output
+
+
+	op_ok = True
+	op_msg = "Gateway indocators read successfully."
+
+	return_val = {'result' : op_ok,
+        	      'msg'    : op_msg,
+		      'data'   : {'network_ok' : op_network_ok,
+				  'system_check' : op_system_check,
+				  'flush_inprogress' : op_flush_inprogress,
+				  'dirtycache_nearfull' : op_dirtycache_nearfull,
+				  'HDD_ok' : op_HDD_ok,
+				  'NFS_srv' : op_NFS_srv,
+				  'SMB_srv' : op_SMB_srv}}
+
+	log.info("get_gateway_indicators end")
+	return json.dumps(return_val)
 
 def get_storage_account():
 	log.info("get_storage_account start")
@@ -176,32 +334,60 @@ def _mkfs(storage_url, key):
 			log.info("Found existing file system!")
 
 
-@common.timeout(180)
-def _mount(storage_url, key):
-
+@common.timeout(360)
+def _mount(storage_url):
 	try:
-		print "Hello"
-		#config = ConfigParser.ConfigParser()
-       		#with open('/etc/delta/Gateway.ini','rb') as fh:
-		#	config.readfp(fh)
+		config = ConfigParser.ConfigParser()
+       		with open('/etc/delta/Gateway.ini','rb') as fh:
+			config.readfp(fh)
 
-		#if not config.has_section("mountpoint"):
-		#	raise MountError("Failed to find mountpoint section in the config file")
+		if not config.has_section("mountpoint"):
+			raise BuildGWError("Failed to find section [mountpoint] in the config file")
 
-		#print config.get("s3ql", "mountOpt")
-		#cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
-		#po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		#(stdout, stderr) = po.communicate(key)
-        	#if po.returncode != 0:
-		#	if stderr.find("existing file system!") == -1:
-		#		op_msg = "Failed to mkfs for %s"%stderr
-               	#		raise BuildGWError(op_msg)
-		#	else:
-		#		log.info("Found existing file system!")
-	
+		if not config.has_option("mountpoint", "dir"):
+			raise BuildGWError("Failed to find option 'dir'  in section [mountpoint] in the cofig file")
+
+		mountpoint = config.get("mountpoint", "dir")
+		os.system("mkdir -p %s"%mountpoint)
+		
+		if os.path.ismount(mountpoint):
+			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
+
+		if not config.has_section("s3ql"):
+			raise BuildGWError("Failed to find section [s3q] in the config file")
+
+		mountOpt=""
+		if config.has_option("s3ql", "mountOpt"):
+			mountOpt = config.get("s3ql", "mountOpt")
+
+
+
+		authfile = "/root/.s3ql/authinfo2"
+
+		#TODO: get interface from config file
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, "eth0", "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+        	if po.returncode != 0:
+			raise BuildGWError(output)
+
+		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+        	if po.returncode != 0:
+			raise BuildGWError(output)
+
 	except IOError as e:
 		op_msg = 'Failed to access /etc/delta/Gateway.ini'
 		log.error(str(e))
+		raise BuildGWError(op_msg)
+	except Exception as e:
+		op_msg = "Failed to mount filesystem for %s"%str(e)
+		log.error(str(e))
+		raise BuildGWError(op_msg)
+		
 
 def build_gateway():
 	log.info("build_gateway start")
@@ -225,7 +411,8 @@ def build_gateway():
 		key = op_config.get(section, 'bucket-passphrase')
 
 		_openContainter(storage_url=url, account=account, password=password)
-		_mkfs(storage_url=url, key = key)
+		_mkfs(storage_url=url, key=key)
+		_mount(storage_url=url)
 
 		op_ok = True
 		op_msg = 'Succeeded to build gateway'
@@ -236,13 +423,10 @@ def build_gateway():
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
 	except BuildGWError as e:
 		op_msg = str(e)
-	except MountError as e:
-		op_msg = str(e)
 	except Exception as e:
-		log.error(str(e))
-
+		op_msg = str(e)
 	finally:
-		if opt_ok == False:
+		if op_ok == False:
 			log.error(op_msg)
 
 		return_val = {'result' : op_ok,
@@ -641,12 +825,388 @@ def _setNameserver(dns1, dns2=None):
 	finally:
 		return op_ok
 
+def get_scheduling_rules():			# by Yen
+	# load config file 
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+		
+	schedule = []
+	for row in fileReader:
+		schedule.append(row)
+	del schedule[0]   # remove header
+
+	return_val = {
+		'result': True,
+		'msg': "Bandwidth throttling schedule is read.",
+		'data': schedule
+	}
+	return json.dumps(return_val)
+
+def get_smb_user_list ():
+    '''
+    read from /etc/samba/smb.conf
+    '''
+
+    username = []
+
+    if enable_log:
+        log.info("get_smb_user_list")
+
+    op_ok = False
+    op_msg = 'Smb account read failed unexpectedly.'
+
+    try:
+        parser = ConfigParser.SafeConfigParser() 
+        parser.read(smb_conf_file)
+    except ConfigParser.ParsingError, err:
+        print err
+        op_msg = smb_conf_file + ' is not readable.'
+        
+        if enable_log:
+            log.error(op_msg)
+            
+        username.append(default_user_id) # default
+        
+        #print "file is not readable"
+    else:
+
+        '''
+        #read all info
+        for section_name in parser.sections():
+            print 'Section:', section_name
+            print '  Options:', parser.options(section_name)
+            #for name, value in parser.items(section_name):
+            #    print '  %s = %s' % (name, value)
+            #print
+        '''
+        
+        if parser.has_option("cloudgwshare", "valid users"):
+            user = parser.get("cloudgwshare", "valid users")
+            username = str(user).split(" ") 
+        else:
+            #print "parser read fail"
+            username.append(default_user_id)  # admin as the default user
+
+        op_ok = True
+        op_msg = 'Obtained smb account information'
+
+    
+    return_val = {
+                  'result' : op_ok,
+                  'msg' : op_msg,
+                  'data' : {'accounts' : username}}
+    if enable_log:
+        log.info("get_storage_account end")
+        
+    return json.dumps(return_val)
+
+def set_smb_user_list (username, password):
+    '''
+    update username to /etc/samba/smb.conf and call smbpasswd to set password
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'set Smb account failed unexpectedly.',
+                  'data' : {} }
+
+    if enable_log:
+        log.info("set_smb_user_list starts")
+
+    # currently, only admin can use smb
+    if str(username).lower() != default_user_id:
+        return_val['msg'] = 'invalid user. Only accept ' + default_user_id
+        return json.dumps(return_val)
+    
+    # get current user list
+    try:
+        current_users = get_smb_user_list ()
+        load_userlist = json.loads(current_users)    
+        username_arr = load_userlist["data"]["accounts"]
+        
+        #print username_arr
+    except:
+        if enable_log:
+            log.info("set_smb_user_list fails")
+            
+        return_val['msg'] = 'cannot read current user list.'
+        return json.dumps(return_val)
+    
+    
+    # for new user, add the new user to linux, update smb.conf, and set password
+    # TODO: impl.
+    
+    # admin must in the current user list
+    flag = False
+    for u in username_arr:
+        #print u
+        if u == default_user_id:
+            flag = True
+            
+    if flag == False: # should not happen
+        if enable_log:
+            log.info("set_smb_user_list fails")
+        return_val['msg'] = 'invalid user, and not in current user list.'
+        return json.dumps(return_val)
+        
+    # ok, set the password
+    # notice that only a " " is required btw tokens
+     
+    command = CMD_CH_SMB_PWD + " " + password + " " + username
+    args = str(command).split(" ")
+    
+    try:
+        with Timeout(RUN_CMD_TIMEOUT):
+            #print args
+            proc = subprocess.Popen(args,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
+            
+            results = proc.stdout.read()
+            ret_val = proc.wait() # 0 : success
+            
+            #print results
+            #print ret_val
+
+    except Timeout:
+        #print "Killing long-running %s" % str(args)
+        proc.kill()
+
+        if enable_log:
+            log.info("set_smb_user_list timeout")
+  
+        return_val['msg'] = 'Timeout for changing passwd.'
+        return json.dumps(return_val)
+    
+    
+    # good. all set
+    return_val['result'] = True
+    return_val['msg'] = 'Success to set smb account and passwd'
+
+    if enable_log:
+        log.info("set_smb_user_list end")
+
+    return json.dumps(return_val)
+
+def get_nfs_access_ip_list ():
+    '''
+    read from /etc/hosts.allow
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'get NFS access ip list failed unexpectedly.',
+                  'data' : { "array_of_ip" : [] } }
+
+    if enable_log:
+        log.info("get_nfs_access_ip_list starts")
+
+    try:
+        for line in open(nfs_hosts_allow_file, 'r'):
+            # skip comment lines and empty lines
+            if str(line).startswith("#") or str(line).strip() == None: 
+                continue
+            
+            #print line
+
+            # accepted format:
+            # portmap mountd nfsd statd lockd rquotad : 172.16.229.112 172.16.229.136
+
+            arr = str(line).strip().split(":")
+            #print arr
+
+            # format error
+            if len(arr) < 2:
+                if enable_log:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+          
+                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                return json.dumps(return_val)
+
+            # got good format
+            # key = services allowed, val = ip lists
+            services = str(arr[0]).strip()
+            iplist = arr[1]
+            ips = iplist.strip().split(" ") #
+            
+            #print services
+            #print ips
+            
+            return_val['result'] = True
+            return_val['msg'] = "Get ip list success"
+            return_val['data']["array_of_ip"] = ips
+            
+            #return json.dumps(return_val)
+            
+    except :
+        if enable_log:
+            log.info("cannot parse " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
+        #return json.dumps(return_val)
+    
+    if enable_log:
+        log.info("get_nfs_access_ip_list end")
+        
+    return json.dumps(return_val)
+    
+def set_nfs_access_ip_list (array_of_ip):
+    '''
+    update to /etc/hosts.allow
+    the original ip list will be updated to the new ip list 
+    '''
+
+    return_val = {
+                  'result' : False,
+                  'msg' : 'get NFS access ip list failed unexpectedly.',
+                  'data' : { "array_of_ip" : [] } }
+
+
+    if enable_log:
+        log.info("set_nfs_access_ip_list starts")
+
+    try:
+        # try to get services allowed
+        for line in open(nfs_hosts_allow_file, 'r'):
+            # skip comment lines and empty lines
+            if str(line).startswith("#") or str(line).strip() == None: 
+                continue
+            
+            arr = str(line).strip().split(":")
+
+            # format error
+            if len(arr) < 2:
+                if enable_log:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+          
+                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                return json.dumps(return_val)
+
+            # got good format
+            # key = services allowed, val = ip lists
+            services = str(arr[0]).strip()
+            iplist = arr[1]
+            ips = iplist.strip().split(" ") #
+            
+            #print services
+            #print ips
+            
+            return_val['result'] = True
+            return_val['msg'] = "Get ip list success"
+            return_val['data']["array_of_ip"] = ips
+            
+            #return json.dumps(return_val)
+            
+    except :
+        if enable_log:
+            log.info("cannot parse " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
+        #return json.dumps(return_val)
+
+    # finally, updating the file
+    try:
+        ofile = open(nfs_hosts_allow_file, 'w')
+        output = services + " : " + " ".join(array_of_ip)
+        ofile.write(output)
+        ofile.close()
+
+        return_val['result'] = True
+        return_val['msg'] = "Update ip list successfully"
+        return_val['data']["array_of_ip"] = " ".join(array_of_ip)
+    except:
+        if enable_log:
+            log.info("cannot write to " + str(nfs_hosts_allow_file))
+          
+        return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
+        
+    if enable_log:
+        log.info("get_nfs_access_ip_list end")
+
+
+
+    
+    return json.dumps(return_val)
+    
+    
+
+# example schedule: [ [1,0,24,512],[2,0,24,1024], ... ]
+def apply_scheduling_rules(schedule):			# by Yen
+	# write settings to gateway_throttling.cfg
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fptr = csv.writer(open(fpath+fname, "w"))
+		header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+		fptr.writerow(header)
+		for row in schedule:
+			fptr.writerow(row)
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " to write failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+	
+	# apply settings
+	os.system("python update_s3ql_bandwidth.py")
+	
+	return_val = {
+		'result': True,
+		'msg': "Rules of bandwidth schedule are saved.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+	
+
+def force_upload_sync(bw):			# by Yen
+	if (bw<64):
+		return_val = {
+			'result': False,
+			'msg': "Uploading bandwidth has to be larger than 64KB/s.",
+			'data': {}
+		}
+		return json.dumps(return_val)
+		
+	try:
+		bw = str( bw )
+		# clear old tc settings
+		cmd = "tc qdisc del dev eth0 root"
+		os.system(cmd)
+		# set tc
+		cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
+		os.system(cmd)
+		cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
+		os.system(cmd)
+		# set throttling 8080 port in iptables
+		cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
+		os.system(cmd)
+		cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
+		os.system(cmd)
+		print("change bandwidth to " + bw + "kB/s succeeded")
+		cmd = "s3qlctrl uploadon /mnt/cloudgwfiles"
+		os.system(cmd)
+		print "Turn on s3ql upload."
+	except:
+		print "Please check whether s3qlctrl is installed."
+	
+	return_val = {
+		'result': True,
+		'msg': "S3QL upload is turned on.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
 
 if __name__ == '__main__':
 	pass
-	#	config = ConfigParser.ConfigParser()
-       	#	with open('../../Gateway.ini','rb') as op_fh:
-	#		config.readfp(op_fh)
-
-	#	print config.get("s3ql", "mountOpt")
-

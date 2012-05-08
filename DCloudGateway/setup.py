@@ -2,6 +2,8 @@ import os
 from setuptools import setup, find_packages
 CONFDIR='/etc/delta'
 AUTHDIR='/root/.s3ql'
+SMBDIR='/etc/samba'
+NFSDIR='/etc'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -19,10 +21,14 @@ def main():
 		package_dir = {'':'src'},   # tell distutils packages are under src
 		package_data = {
         	# If any package contains *.txt or *.rst files, include them:
-        	'': ['*.txt', '*.rst'],
+        	'': ['*.txt', '*.rst', '*.sh'],
     		},
 
-		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2.template'])], 
+		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2.template']), 
+			     (SMBDIR, ['config/smb.conf']),
+                             (NFSDIR, ['config/hosts.allow']),
+                             (NFSDIR, ['config/hosts.deny'])
+                           ] 
 		
 		test_suite='unittest',
 		long_description=read('README'),
