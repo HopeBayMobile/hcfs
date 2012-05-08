@@ -6,6 +6,7 @@ import subprocess
 import time
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
+DIR = os.path.dirname(os.path.realpath(__file__))
 
 class BuildGWError(Exception):
 	pass
@@ -335,8 +336,7 @@ def _mount(storage_url):
 		authfile = "/root/.s3ql/authinfo2"
 
 		#TODO: get interface from config file
-		shellDir = "/usr/lib/delta/gateway_scripts/"
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(shellDir, "eth0", "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, "eth0", "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
