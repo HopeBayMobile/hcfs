@@ -28,7 +28,7 @@ import paramiko
 
 
 class GlusterfsVolumeCreator:
-	def __init__(self, hostList = [], brickPrefix = '/exp', volType = 'replica', count = 3):
+	def __init__(self, hostList = [], brickPrefix = '/GlusterHD/disk', volType = 'replica', count = 3):
 		self.__hostList = hostList
 		self.__volType = volType
 		self.__count = count
@@ -52,10 +52,10 @@ class GlusterfsVolumeCreator:
 		if self.__volType != 'replica' and self.__volType != 'stripe':
 			self.__count = 1
 
-		for index, host in enumerate(self.__hostList):
-			quotient, remainder = divmod(index, self.__count)
-			brickName = host + ":" + self.__brickPrefix + str(quotient) + "_" + str(remainder) + " "
-			brickNameList.append(brickName)
+		for i in range(0, 2):
+			for index, host in enumerate(self.__hostList):
+				brickName = host + ":" + self.__brickPrefix + str(i+1) + " "
+				brickNameList.append(brickName)
 
 		for i in range(len(brickNameList) % self.__count):
 			brickNameList.pop()
@@ -201,7 +201,7 @@ class GlusterfsDeploy:
 			return 0
 	
 
-	def volumeCreate(self, volCreator = GlusterfsVolumeCreator(), volName = 'testVol', brickPrefix = '/exp', volType = 'replica', count = 3, transport = 'tcp'):
+	def volumeCreate(self, volCreator = GlusterfsVolumeCreator(), volName = 'testVol', brickPrefix = '/GlusterHD/disk', volType = 'replica', count = 3, transport = 'tcp'):
 		self.__cfgLog.logEvent("volumeCreate start\n")
 		
 		#TODO: write a function to Check if the input variables are correct

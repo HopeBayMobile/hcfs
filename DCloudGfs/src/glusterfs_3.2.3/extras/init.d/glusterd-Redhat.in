@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# chkconfig: 35 90 12
+# description: Gluster File System service for volume management
+#
+
+# Get function from functions library
+. /etc/rc.d/init.d/functions
+
+BASE=glusterd
+GLUSTERFSD=glusterfsd
+GLUSTERFS=glusterfs
+GLUSTERD_BIN=@prefix@/sbin/$BASE
+GLUSTERD_OPTS=""
+GLUSTERD="$GLUSTERD_BIN $GLUSTERD_OPTS"
+RETVAL=0
+
+# Start the service $BASE
+start()
+{
+       echo -n $"Starting $BASE:"
+       daemon $GLUSTERD
+       RETVAL=$?
+       echo
+       [ $RETVAL -ne 0 ] && exit $RETVAL
+}
+
+# Stop the service $BASE
+stop()
+{
+       echo -n $"Stopping $BASE:"
+       killproc $BASE
+       echo
+       pidof -c -o %PPID -x $GLUSTERFSD &> /dev/null
+       [ $? -eq 0 ] &&  killproc $GLUSTERFSD &> /dev/null
+
+       #pidof -c -o %PPID -x $GLUSTERFS &> /dev/null
+       #[ $? -eq 0 ] &&  killproc $GLUSTERFS &> /dev/null
+       
+       if [ -f /etc/glusterd/nfs/run/nfs.pid ] ;then
+       pid=`cat /etc/glusterd/nfs/run/nfs.pid`;
+       cmd=`ps -p $pid -o comm=`
+
+       if [ $cmd == "glusterfs" ]; then
+       kill `cat /etc/glusterd/nfs/run/nfs.pid` 
+       fi
+       fi 
+}
+
+
+### service arguments ###
+case $1 in
+ start)
+       start
+       ;;
+ stop)
+       stop
+       ;;
+ status)
+       status $BASE
+       ;;
+ restart)
+       $0 stop
+       $0 start
+       ;;
+ *)
+       echo $"Usage: $0 {start|stop|status|restart}."
+       exit 1
+esac
+
+exit 0

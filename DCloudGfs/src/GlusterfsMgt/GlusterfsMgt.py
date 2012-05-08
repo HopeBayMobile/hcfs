@@ -7,6 +7,8 @@ Modified by CW on 2011/11/24
 Modified by CW on 2011/11/25
 Modified by CW on 2011/11/28
 Modified by CW on 2011/11/29
+Modified by CW on 2012/02/06
+Modified by CW on 2012/02/15
 '''
 
 import sys
@@ -22,58 +24,28 @@ from datetime import datetime
 from ConfigParser import ConfigParser
 import uuid
 
-#import from Delta Cloud Manager
-#from task_worker import WorkerTask
-from test import WorkerTask
+from HardDriveChecking import HardDriveChecking
+
+#import from Delta Cloud Manager(PDCM)
+sys.path.append('/var/www/PDCM/task/worker')
+from task_worker import WorkerTask, task_class, task
+#from test import WorkerTask
 
 #Third party packages
 import paramiko
 import pexpect
 
 
-class volumeCreate(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self, params):
-		kwparams = json.loads(params)
-		return self.__mgt.createVolume(**kwparams)
-
-
-class replaceServer(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self, params):
-		kwparams = json.loads(params)
-		return self.__mgt.replaceServer(**kwparams)
-
-
-class triggerSelfHealing(WorkerTask):
-	def __init__(self, task_id):
-		WorkerTask.__init__(self, task_id)
-		self.__taskId = task_id
-		self.__mgt = GlusterfsMgt(self)
-
-	def run(self,params):
-		kwparams = json.loads(params)
-		return self.__mgt.triggerSelfHealing(**kwparams)
-
-
 class GlusterfsMgt:
 	def __init__(self, worker):
 		
 		config = ConfigParser()
-		config.readfp(open("../Global.ini"))
+		config.readfp(open("/etc/DCloud/DCloudGfs/src/Global.ini"))
 		self.__codeDir = config.get('glusterfs', 'codeDir')
 		self.__worker = worker
 
 		config2 = ConfigParser()
-		config2.readfp(open("../DCloudGfs.ini"))
+		config2.readfp(open("/etc/DCloud/DCloudGfs/src/DCloudGfs.ini"))
 		self.__username = config2.get('main', 'username')
 		self.__password = config2.get('main', 'password')
 		self.__taskReceiver = {}
@@ -108,7 +80,7 @@ class GlusterfsMgt:
 		if q is None:
 			return "{}"
 		jsonStr = json.dumps({'taskId':taskId})
-		cmd = "python " + self.__codeDir + "/cmdReceiver.py -r \'" + jsonStr + "\'"
+		cmd = "sudo python " + self.__codeDir + "/cmdReceiver.py -r \'" + jsonStr + "\'"
 		q.sendline(cmd)
 		i = q.expect(['readReport start', 'Usage error'])
 		if i != 0:
@@ -120,7 +92,7 @@ class GlusterfsMgt:
 		return result
 		
 	def createVolume(self, volCreator=None, receiver="", 
-			 hostList=[], volName='testVol', brickPrefix='/exp', 
+			 hostList=[], volName='testVol', brickPrefix='/GlusterHD/disk', 
 			 volType='distribute', count=1, transport='tcp'): 
 		if hostList == []:
 			print "hostList is empty"
@@ -143,7 +115,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python " + self.__codeDir + "/cmdReceiver.py -C \'" + jsonStr + "\'"
+		cmd ="sudo python " + self.__codeDir + "/cmdReceiver.py -C \'" + jsonStr + "\'"
 		p.sendline(cmd)
 		i = p.expect(['createVolume start', 'Usage error'])
 
@@ -216,7 +188,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python "+self.__codeDir+"/cmdReceiver.py -R \'"+jsonStr+"\'"
+		cmd ="sudo python "+self.__codeDir+"/cmdReceiver.py -R \'"+jsonStr+"\'"
 		p.sendline(cmd)
 		i = p.expect(['replaceServer start', 'Usage error'])
 #		p.expect('end')
@@ -303,7 +275,7 @@ class GlusterfsMgt:
 			    'taskId': taskId}
 
 		jsonStr = json.dumps(kwparams)
-		cmd ="python "+self.__codeDir+"/cmdReceiver.py -T \'"+jsonStr+"\'"
+		cmd ="sudo python "+self.__codeDir+"/cmdReceiver.py -T \'"+jsonStr+"\'"
 		p.sendline(cmd)
 		i = p.expect(['triggerSelfHealing start', 'Usage error'])
 #		p.expect('end')
@@ -361,6 +333,44 @@ class GlusterfsMgt:
                         }
 
                 return json.dumps(status, sort_keys=True, indent=4)
+
+
+@task_class
+class volumeCreate(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self, params):
+                kwparams = json.loads(params)
+		
+		checkHostList = kwparams['hostList']
+		resultHostList = []
+		HDCheck = HardDriveChecking(checkHostList)
+		resultHostList = HDCheck.DiskTesting()
+		kwparams['hostList'] = resultHostList
+
+                return self.__mgt.createVolume(**kwparams)
+
+@task_class
+class replaceServer(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self, params):
+                kwparams = json.loads(params)
+                return self.__mgt.replaceServer(**kwparams)
+
+@task_class
+class triggerSelfHealing(WorkerTask):
+        def __init__(self):
+                WorkerTask.__init__(self)
+                self.__mgt = GlusterfsMgt(self)
+
+        def run(self,params):
+		kwparams = json.loads(params)
+                return self.__mgt.triggerSelfHealing(**kwparams)
 
 
 if __name__ == '__main__':

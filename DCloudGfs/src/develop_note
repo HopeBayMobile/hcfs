@@ -9,6 +9,7 @@
     -- dpkg -i python-paramiko_1.7.7.1-2_all.deb
 
   * install python-pexpect
+    -- dpkg -i python-central_0.6.17_all.deb
     -- dpkg -i python-pexpect_2.3-1build1_all.deb
 
 2. Configuration file

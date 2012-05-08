@@ -124,6 +124,11 @@ class GlusterdCfg:
 		cmd = "sudo glusterfs --version"
 		self.__execute(cmd)
 
+	#@cmdDecorator
+	#def diskClearing(self):
+	#	cmd = "./DiskClearing.sh"
+	#	self.__execute(cmd)
+
 
 if __name__ == '__main__':
 	GG = GlusterdCfg("../DCloudGfs.ini", ['ntu09', 'ntu06', 'ntu08', 'ntu07'])

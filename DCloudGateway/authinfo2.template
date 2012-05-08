@@ -1,0 +1,6 @@
+[Cloud Storage Gateway]
+storage-url: swift://172.16.229.111:8080
+backend-login: system:root
+backend-password: testpass
+bucket-passphrase: 123
+
