@@ -263,21 +263,24 @@ def restart_nfs_service():
 		cmd = "/etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
+
 		if po.returncode == 0:
 			op_ok = True
 			op_msg = "Restarting nfs service succeeded."
+
 	except Exception as e:
 		op_ok = False
 		log.error(str(e))
 
-	return_val = {
-		'result': op_ok,
-		'msg': op_msg,
-		'data': {}
-	}
+	finally:
+		return_val = {
+			'result': op_ok,
+			'msg': op_msg,
+			'data': {}
+		}
 
-	log.info("restart_nfs_service end")
-	return json.dumps(return_val)
+		log.info("restart_nfs_service end")
+		return json.dumps(return_val)
 
 def restart_smb_service():
 	log.info("restart_smb_service start")
@@ -290,21 +293,24 @@ def restart_smb_service():
 		cmd = "/etc/init.d/smbd restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
+
 		if po.returncode == 0:
 			op_ok = True
 			op_msg = "Restarting samba service succeeded."
+
 	except Exception as e:
 		op_ok = False
 		log.error(str(e))
 
-	return_val = {
-		'result': op_ok,
-		'msg': op_msg,
-		'data': {}
-	}
+	finally:
+		return_val = {
+			'result': op_ok,
+			'msg': op_msg,
+			'data': {}
+		}
 
-	log.info("restart_smb_service end")
-	return json.dumps(return_val)
+		log.info("restart_smb_service end")
+		return json.dumps(return_val)
 
 def reset_gateway():
 	log.info("reset_gateway start")
@@ -314,6 +320,7 @@ def reset_gateway():
 	op_msg = "Succeeded to reset the gateway."
 	
 	pid = os.fork()
+
 	if pid == 0:
 		time.sleep(10)
 		os.system("reboot")
@@ -329,6 +336,7 @@ def shutdown_gateway():
 	op_msg = "Succeeded to shutdown the gateway."
 
 	pid = os.fork()
+
 	if pid == 0:
 		time.sleep(10)
 		os.system("poweroff")
@@ -380,23 +388,258 @@ def test_storage_account(storage_url, account, password):
 
 def get_network():
 	log.info("get_network start")
-	log.info("get_network end")
-	return json.dumps(return_val)
+
+	info_path = "/etc/delta/network.info"
+	return_val = {}
+	op_ok = False
+	op_msg = "Failed to get network information."
+	op_config = ConfigParser.ConfigParser()
+	network_info = {}
+	
+	try:
+		with open(info_path) as f:
+			op_config.readfp(f)
+			ip = op_config.get('network', 'ip')
+			gateway = op_config.get('network', 'gateway')
+			mask = op_config.get('network', 'mask')
+			dns1 = op_config.get('network', 'dns1')
+			dns2 = op_config.get('network', 'dns2')
+
+		network_info = {
+			'ip': ip,
+			'gateway': gateway,
+			'mask': mask,
+			'dns1': dns1,
+			'dns2': dns2
+		}
+
+		op_ok = True
+		op_msg = "Succeeded to get the network information."
+
+	except IOError as e:
+		op_ok = False
+		op_msg = "Failed to access %s" % info_path
+		log.error(op_msg)
+
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	finally:
+		return_val = {
+			'result': op_ok,
+			'msg': op_msg,
+			'data': network_info
+		}
+
+		log.info("get_network end")
+		return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
 	log.info("apply_network start")
 
-	return_val = {}
+	ini_path = "/etc/delta/Gateway.ini"
 	op_ok = False
 	op_msg = "Failed to apply network configuration."
-	
+	op_config = ConfigParser.ConfigParser()
+
+	try:
+		with open(ini_path) as f:
+			op_config.readfp(f)
+			if ip == "" or ip == None:
+				ip = op_config.get('network', 'ip')
+			if gateway == "" or gateway == None:
+				gateway = op_config.get('network', 'gateway')
+			if mask == "" or mask == None:
+				mask = op_config.get('network', 'mask')
+			if dns1 == "" or dns1 == None:
+				dns1 = op_config.get('network', 'dns1')
+			if dns2 == "" or dns2 == None:
+				dns2 = op_config.get('network', 'dns2')
+
+			op_ok = True
+
+	except IOError as e:
+		op_ok = False
+		log.error("Failed to access %s" % ini_path)
+
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	finally:
+		if op_ok == False:
+
+			return_val = {
+				'result': op_ok,
+				'msg': op_msg,
+				'data': {}
+			}
+
+			return json.dumps(return_val)
+		
+
+	if not _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2):
+
+		return_val = {
+			'result': False,
+			'msg' = "Failed to store the network information",
+			'data' = {}
+		}
+
+		return json.dumps(return_val)
+		
+
+	if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
+		if os.system("/etc/init.d/networking restart") == 0:
+			op_ok = True
+			op_msg = "Succeeded to apply the network configuration."
+		else:
+			op_ok = False
+			log.error("Failed to restart the network.")
+	else:
+		op_ok = False
+		log.error(op_msg)
+
 	return_val = {
 		'result': op_ok,
 		'msg': op_msg,
 		'data': {}
 	}
+
 	log.info("apply_network end")
 	return json.dumps(return_val)
+
+def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
+	op_ok = False
+	op_config = ConfigParser.ConfigParser()
+	info_path = "/etc/delta/network.info"
+
+	try:
+		with open(ini_path) as f:
+			op_config.readfp(f)
+			op_config.set('network', 'ip', ip)
+			op_config.set('network', 'gateway', gateway)
+			op_config.set('network', 'mask', mask)
+			op_config.set('network', 'dns1', dns1)
+
+			if dns2 != None:
+				op_config.set('network', 'dns2', dns2)
+
+		with open(info_path, "wb") as f:
+			op_config.write(f)
+
+		op_ok = True
+		log.info("Succeeded to store the network information.")
+
+	except IOError as e:
+		op_ok = False
+		log.error("Failed to store the network information in %s." % info_path)
+
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	finally:
+		return op_ok
+
+def _setInterfaces(ip, gateway, mask, ini_path):
+	interface_path = "/etc/network/interfaces"
+	op_ok = False
+	op_config = ConfigParser.ConfigParser()
+
+	try:
+                with open(ini_path) as f:
+                        op_config.readfp(f)
+
+                fixedIp = op_config.get('network', 'fixedIp')
+                fixedMask = op_config.get('network', 'fixedMask')
+		fixedGateway = op_config.get('network', 'fixedGateway')
+                op_ok = True
+		log.info("Succeeded to get the fixed network information.")
+
+        except IOError as e:
+		op_ok = False
+                log.error("Failed to access %s" % ini_path)
+		return op_ok
+
+        except Exception as e:
+		op_ok = False
+                log.error(str(e))
+		return op_ok
+
+	if os.path.exists(interface_path):
+		os.system("cp -p %s %s" % (interface_path, interface_path + "_backup"))
+	else:
+		os.system("touch %s" % interface_path)
+		log.warning("File does not exist: %s" % interface_path)
+
+	try:
+		with open(interface_path, "w") as f:
+			f.write("auto lo\niface lo inet loopback\n")
+			f.write("auto eth0\niface eth0 inet static")
+			f.write("address %s" % fixedIp)
+			f.write("netmask %s" % fixedMask)
+			f.write("gateway %s" % fixedGateway)
+			f.write("auto eth1\niface eth1 inet static")
+			f.write("address %s" % ip)
+			f.write("netmask %s" % mask)
+			f.write("gateway %s" % gateway)
+
+		op_ok = True
+		log.info("Succeeded to set the network configuration")
+
+	except IOError as e:
+		op_ok = False
+		log.error("Failed to access %s." % interface_path)
+
+		if os.path.exists(interface_path + "_backup"):
+			if os.system("cp -p %s %s" % (interface_path + "_backup", interface_path)) != 0:
+				log.warning("Failed to recover %s" % interface_path)
+			else:
+				log.info("Succeeded to recover %s" % interface_path)
+
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	finally:
+		return op_ok
+
+def _setNameserver(dns1, dns2=None):
+	nameserver_path = "/etc/resolv.conf"
+	op_ok = False
+
+	if os.system("cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
+		os.system("touch %s" % nameserver_path)
+		log.warning("File does not exist: %s" % nameserver_path)
+
+	try:
+		with open(nameserver_path, "w") as f:
+			f.write("nameserver %s" % dns1)
+
+			if dns2 != None:
+				f.write("nameserver %s" % dns2)
+
+		op_ok = True
+		log.info("Succeeded to set the nameserver.")
+
+	except IOError as e:
+		op_ok = False
+		log.error("Failed to access %s." % nameserver_path)
+
+		if os.path.exists(nameserver_path + "_backup"):
+			if os.system("cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
+				log.warning("Failed to recover %s" % nameserver_path)
+			else:
+				log.info("Succeeded to recover %s" % nameserver_path)
+
+	except Exception as e:
+		op_ok = False
+		log.error(str(e))
+
+	finally:
+		return op_ok
 
 
 if __name__ == '__main__':
