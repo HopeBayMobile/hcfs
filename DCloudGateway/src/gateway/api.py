@@ -16,6 +16,134 @@ class MountError(Exception):
 class TestStorageError(Exception):
 	pass
 
+def get_gateway_indicators():
+
+	log.info("get_gateway_indicators start")
+	op_ok = False
+	op_msg = 'Gateway indocators read failed unexpetcedly.'
+	op_network_ok = False
+	op_system_check = False
+	op_flush_inprogress = False
+	op_dirtycache_nearfull = False
+	op_HDD_ok = False
+	op_NFS_srv = False
+	op_SMB_srv = False
+
+	# Network check
+
+	try:
+                op_config = ConfigParser.ConfigParser()
+                with open('/root/.s3ql/authinfo2') as op_fh:
+                        op_config.readfp(op_fh)
+
+                section = "CloudStorageGateway"
+                op_storage_url = op_config.get(section, 'storage-url').replace("swift://","")
+		index = op_storage_url.find(":")
+		if index != -1:
+			op_storage_url = op_storage_url[0:index]
+
+		cmd ="ping %s"%op_storage_url
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+
+		if po.returncode == 0:
+                	if output.find("cmp_req" and "ttl" and "time") !=-1:
+				op_network_ok = True
+		else:
+			op_msg = output
+
+
+        except IOError as e:
+                op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+                log.error(str(e))
+        except Exception as e:
+                op_msg = 'Unable to obtain storage url or login info.'
+                log.error(str(e))
+	
+	# System check
+        cmd ="ps aux | grep fsck.s3ql"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
+
+        if po.returncode == 0:
+                if len(lines) > 2:
+                        op_system_check = True
+        else:
+                op_msg = output
+
+	# Flush check & DirtyCache check
+	cmd ="sudo s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("Cache uploading: On") !=-1:
+                        op_flush_inprogress = True
+
+                if output.find("Dirty cache near full: True") !=-1:
+                        op_dirtycache_nearfull = True
+
+        else:
+                op_msg = output
+
+	# HDD check
+
+	cmd ="sudo smartctl -a /dev/sda; sudo smartctl -a /dev/sdb"
+	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	output = po.stdout.read()
+        po.wait()
+
+       	if po.returncode == 0:
+		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+			op_HDD_ok = True
+	else:
+		op_msg = output
+
+	# NFS service check
+	cmd ="sudo service nfs-kernel-server status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("running") !=-1:
+                        op_NFS_srv = True
+        else:
+                op_msg = output
+
+	# SMB service check
+	
+	cmd ="sudo service smbd status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("running") !=-1:
+                        op_SMB_srv = True
+        else:
+                op_msg = output
+
+
+	op_ok = True
+	op_msg = "Gateway indocators read successfully."
+
+	return_val = {'result' : op_ok,
+        	      'msg'    : op_msg,
+		      'data'   : {'network_ok' : op_network_ok,
+				  'system_check' : op_system_check,
+				  'flush_inprogress' : op_flush_inprogress,
+				  'dirtycache_nearfull' : op_dirtycache_nearfull,
+				  'HDD_ok' : op_HDD_ok,
+				  'NFS_srv' : op_NFS_srv,
+				  'SMB_srv' : op_SMB_srv}}
+
+	log.info("get_gateway_indicators end")
+	return json.dumps(return_val)
+
 def get_storage_account():
 	log.info("get_storage_account start")
 
