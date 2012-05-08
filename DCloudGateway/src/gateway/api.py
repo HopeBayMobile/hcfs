@@ -558,3 +558,98 @@ if __name__ == '__main__':
 	pass
 	print build_gateway()
 
+
+
+def get_scheduling_rules():			# by Yen
+	# load config file 
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+		
+	schedule = []
+	for row in fileReader:
+		schedule.append(row)
+	del schedule[0]   # remove header
+
+	return_val = {
+		'result': True,
+		'msg': "Bandwidth throttling schedule is read.",
+		'data': schedule
+	}
+	return json.dumps(return_val)
+
+# example schedule: [ [1,0,24,512],[2,0,24,1024], ... ]
+def apply_scheduling_rules(schedule):			# by Yen
+	# write settings to gateway_throttling.cfg
+	fpath = "/etc/delta/"
+	fname = "gw_schedule.conf"
+	try:
+		fptr = csv.writer(open(fpath+fname, "w"))
+		header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+		fptr.writerow(header)
+		for row in schedule:
+			fptr.writerow(row)
+	except:
+		return_val = {
+			'result': False,
+			'msg': "Open " + fname + " to write failed.",
+			'data': []
+		}
+		return json.dumps(return_val)
+	
+	# apply settings
+	os.system("python update_s3ql_bandwidth.py")
+	
+	return_val = {
+		'result': True,
+		'msg': "Rules of bandwidth schedule are saved.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+	
+
+def force_upload_sync(bw):			# by Yen
+	if (bw<64):
+		return_val = {
+			'result': False,
+			'msg': "Uploading bandwidth has to be larger than 64KB/s.",
+			'data': {}
+		}
+		return json.dumps(return_val)
+		
+	try:
+		bw = str( bw )
+		# clear old tc settings
+		cmd = "tc qdisc del dev eth0 root"
+		os.system(cmd)
+		# set tc
+		cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
+		os.system(cmd)
+		cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
+		os.system(cmd)
+		# set throttling 8080 port in iptables
+		cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
+		os.system(cmd)
+		cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
+		os.system(cmd)
+		print("change bandwidth to " + bw + "kB/s succeeded")
+		cmd = "s3qlctrl uploadon /mnt/cloudgwfiles"
+		os.system(cmd)
+		print "Turn on s3ql upload."
+	except:
+		print "Please check whether s3qlctrl is installed."
+	
+	return_val = {
+		'result': True,
+		'msg': "S3QL upload is turned on.",
+		'data': {}
+	}
+	return json.dumps(return_val)
