@@ -9,6 +9,10 @@ log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
 class BuildGWError(Exception):
 	pass
+
+class MountError(Exception):
+	pass
+
 class TestStorageError(Exception):
 	pass
 
@@ -172,6 +176,33 @@ def _mkfs(storage_url, key):
 			log.info("Found existing file system!")
 
 
+@common.timeout(180)
+def _mount(storage_url, key):
+
+	try:
+		print "Hello"
+		#config = ConfigParser.ConfigParser()
+       		#with open('/etc/delta/Gateway.ini','rb') as fh:
+		#	config.readfp(fh)
+
+		#if not config.has_section("mountpoint"):
+		#	raise MountError("Failed to find mountpoint section in the config file")
+
+		#print config.get("s3ql", "mountOpt")
+		#cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+		#po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		#(stdout, stderr) = po.communicate(key)
+        	#if po.returncode != 0:
+		#	if stderr.find("existing file system!") == -1:
+		#		op_msg = "Failed to mkfs for %s"%stderr
+               	#		raise BuildGWError(op_msg)
+		#	else:
+		#		log.info("Found existing file system!")
+	
+	except IOError as e:
+		op_msg = 'Failed to access /etc/delta/Gateway.ini'
+		log.error(str(e))
+
 def build_gateway():
 	log.info("build_gateway start")
 
@@ -201,17 +232,19 @@ def build_gateway():
 
 	except common.TimeoutError:
 		op_msg ="Build Gateway failed due to timeout" 
-		log.error(op_msg)
 	except IOError as e:
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
-		log.error(str(e))
 	except BuildGWError as e:
 		op_msg = str(e)
-		log.error(op_msg)
+	except MountError as e:
+		op_msg = str(e)
 	except Exception as e:
 		log.error(str(e))
 
 	finally:
+		if opt_ok == False:
+			log.error(op_msg)
+
 		return_val = {'result' : op_ok,
 			      'msg'    : op_msg,
                       	      'data'   : {}}
@@ -345,10 +378,32 @@ def test_storage_account(storage_url, account, password):
 		log.info("test_storage_account end")
 		return json.dumps(return_val)
 
+def get_network():
+	log.info("get_network start")
+	log.info("get_network end")
+	return json.dumps(return_val)
+
+def apply_network(ip, gateway, mask, dns1, dns2=None):
+	log.info("apply_network start")
+
+	return_val = {}
+	op_ok = False
+	op_msg = "Failed to apply network configuration."
+	
+	return_val = {
+		'result': op_ok,
+		'msg': op_msg,
+		'data': {}
+	}
+	log.info("apply_network end")
+	return json.dumps(return_val)
+
 
 if __name__ == '__main__':
-	#Example of log usage
-	log.debug("...")
-	log.warn("...")
-	log.info("...")
-	log.error("...")
+	pass
+	#	config = ConfigParser.ConfigParser()
+       	#	with open('../../Gateway.ini','rb') as op_fh:
+	#		config.readfp(op_fh)
+
+	#	print config.get("s3ql", "mountOpt")
+
