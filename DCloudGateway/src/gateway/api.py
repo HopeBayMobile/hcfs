@@ -667,8 +667,8 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
 		return_val = {
 			'result': False,
-			'msg' = "Failed to store the network information",
-			'data' = {}
+			'msg': "Failed to store the network information",
+			'data': {}
 		}
 
 		return json.dumps(return_val)
@@ -761,14 +761,14 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 	try:
 		with open(interface_path, "w") as f:
 			f.write("auto lo\niface lo inet loopback\n")
-			f.write("auto eth0\niface eth0 inet static")
-			f.write("address %s" % fixedIp)
-			f.write("netmask %s" % fixedMask)
-			f.write("gateway %s" % fixedGateway)
-			f.write("auto eth1\niface eth1 inet static")
-			f.write("address %s" % ip)
-			f.write("netmask %s" % mask)
-			f.write("gateway %s" % gateway)
+			f.write("\nauto eth0\niface eth0 inet static")
+			f.write("\naddress %s" % fixedIp)
+			f.write("\nnetmask %s" % fixedMask)
+			f.write("\ngateway %s\n" % fixedGateway)
+			f.write("\nauto eth1\niface eth1 inet static")
+			f.write("\naddress %s" % ip)
+			f.write("\nnetmask %s" % mask)
+			f.write("\ngateway %s" % gateway)
 
 		op_ok = True
 		log.info("Succeeded to set the network configuration")
