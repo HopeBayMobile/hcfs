@@ -28,7 +28,7 @@ def main():
 			     (SMBDIR, ['config/smb.conf']),
                              (NFSDIR, ['config/hosts.allow']),
                              (NFSDIR, ['config/hosts.deny'])
-                           ] 
+                           ], 
 		
 		test_suite='unittest',
 		long_description=read('README'),

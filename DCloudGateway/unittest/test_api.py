@@ -4,6 +4,8 @@ import os
 import json
 import random
 import time
+import threading
+import ctypes
 from ConfigParser import ConfigParser
 
 # Add gateway sources

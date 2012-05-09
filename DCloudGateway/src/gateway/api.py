@@ -6,8 +6,6 @@ import common
 import subprocess
 import time
 import errno
-from eventlet import Timeout, sleep
-
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -18,10 +16,8 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 smb_conf_file = "/etc/samba/smb.conf"
 nfs_hosts_allow_file = "/etc/hosts.allow"
 
-enable_log = True 
-
-default_user_id = "admin"
-default_user_pwd = "admin"
+default_user_id = "superuser"
+default_user_pwd = "superuser"
 
 RUN_CMD_TIMEOUT = 15
 
@@ -667,8 +663,8 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
 		return_val = {
 			'result': False,
-			'msg' = "Failed to store the network information",
-			'data' = {}
+			'msg':  "Failed to store the network information",
+			'data' : {}
 		}
 
 		return json.dumps(return_val)
@@ -858,8 +854,7 @@ def get_smb_user_list ():
 
     username = []
 
-    if enable_log:
-        log.info("get_smb_user_list")
+    log.info("get_smb_user_list")
 
     op_ok = False
     op_msg = 'Smb account read failed unexpectedly.'
@@ -871,8 +866,7 @@ def get_smb_user_list ():
         print err
         op_msg = smb_conf_file + ' is not readable.'
         
-        if enable_log:
-            log.error(op_msg)
+        log.error(op_msg)
             
         username.append(default_user_id) # default
         
@@ -904,23 +898,36 @@ def get_smb_user_list ():
                   'result' : op_ok,
                   'msg' : op_msg,
                   'data' : {'accounts' : username}}
-    if enable_log:
-        log.info("get_storage_account end")
+    log.info("get_storage_account end")
         
     return json.dumps(return_val)
+
+@common.timeout(RUN_CMD_TIMEOUT)
+def _chSmbPasswd(username, password):
+    cmd = ["sh", CMD_CH_SMB_PWD, username, password]
+
+    proc = subprocess.Popen(cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT)
+            
+    results = proc.stdout.read()
+    ret_val = proc.wait() # 0 : success
+
+    if ret_val != 0:
+        log.err("%s"%results)
+
+    return ret_val
 
 def set_smb_user_list (username, password):
     '''
     update username to /etc/samba/smb.conf and call smbpasswd to set password
     '''
-
     return_val = {
                   'result' : False,
                   'msg' : 'set Smb account failed unexpectedly.',
                   'data' : {} }
 
-    if enable_log:
-        log.info("set_smb_user_list starts")
+    log.info("set_smb_user_list starts")
 
     # currently, only admin can use smb
     if str(username).lower() != default_user_id:
@@ -935,12 +942,9 @@ def set_smb_user_list (username, password):
         
         #print username_arr
     except:
-        if enable_log:
-            log.info("set_smb_user_list fails")
-            
+        log.err("set_smb_user_list fails")
         return_val['msg'] = 'cannot read current user list.'
         return json.dumps(return_val)
-    
     
     # for new user, add the new user to linux, update smb.conf, and set password
     # TODO: impl.
@@ -953,37 +957,21 @@ def set_smb_user_list (username, password):
             flag = True
             
     if flag == False: # should not happen
-        if enable_log:
-            log.info("set_smb_user_list fails")
+        log.info("set_smb_user_list fails")
         return_val['msg'] = 'invalid user, and not in current user list.'
         return json.dumps(return_val)
         
     # ok, set the password
     # notice that only a " " is required btw tokens
      
-    command = CMD_CH_SMB_PWD + " " + password + " " + username
-    args = str(command).split(" ")
-    
     try:
-        with Timeout(RUN_CMD_TIMEOUT):
-            #print args
-            proc = subprocess.Popen(args,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT)
-            
-            results = proc.stdout.read()
-            ret_val = proc.wait() # 0 : success
-            
-            #print results
-            #print ret_val
+        ret = _chSmbPasswd(username=username, password=password)
+        if ret != 0:
+            return_val['msg'] = 'Failed to change smb passwd'
+            return json.dumps(return_val)
 
-    except Timeout:
-        #print "Killing long-running %s" % str(args)
-        proc.kill()
-
-        if enable_log:
-            log.info("set_smb_user_list timeout")
-  
+    except common.TimeoutError:
+        log.error("set_smb_user_list timeout")
         return_val['msg'] = 'Timeout for changing passwd.'
         return json.dumps(return_val)
     
@@ -992,8 +980,7 @@ def set_smb_user_list (username, password):
     return_val['result'] = True
     return_val['msg'] = 'Success to set smb account and passwd'
 
-    if enable_log:
-        log.info("set_smb_user_list end")
+    log.info("set_smb_user_list end")
 
     return json.dumps(return_val)
 
@@ -1007,8 +994,7 @@ def get_nfs_access_ip_list ():
                   'msg' : 'get NFS access ip list failed unexpectedly.',
                   'data' : { "array_of_ip" : [] } }
 
-    if enable_log:
-        log.info("get_nfs_access_ip_list starts")
+    log.info("get_nfs_access_ip_list starts")
 
     try:
         for line in open(nfs_hosts_allow_file, 'r'):
@@ -1026,8 +1012,7 @@ def get_nfs_access_ip_list ():
 
             # format error
             if len(arr) < 2:
-                if enable_log:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                log.info(str(nfs_hosts_allow_file) + " format error")
           
                 return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                 return json.dumps(return_val)
@@ -1048,14 +1033,12 @@ def get_nfs_access_ip_list ():
             #return json.dumps(return_val)
             
     except :
-        if enable_log:
-            log.info("cannot parse " + str(nfs_hosts_allow_file))
+        log.info("cannot parse " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
         #return json.dumps(return_val)
     
-    if enable_log:
-        log.info("get_nfs_access_ip_list end")
+    log.info("get_nfs_access_ip_list end")
         
     return json.dumps(return_val)
     
@@ -1071,8 +1054,7 @@ def set_nfs_access_ip_list (array_of_ip):
                   'data' : { "array_of_ip" : [] } }
 
 
-    if enable_log:
-        log.info("set_nfs_access_ip_list starts")
+    log.info("set_nfs_access_ip_list starts")
 
     try:
         # try to get services allowed
@@ -1085,8 +1067,7 @@ def set_nfs_access_ip_list (array_of_ip):
 
             # format error
             if len(arr) < 2:
-                if enable_log:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                log.info(str(nfs_hosts_allow_file) + " format error")
           
                 return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                 return json.dumps(return_val)
@@ -1107,8 +1088,7 @@ def set_nfs_access_ip_list (array_of_ip):
             #return json.dumps(return_val)
             
     except :
-        if enable_log:
-            log.info("cannot parse " + str(nfs_hosts_allow_file))
+        log.info("cannot parse " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
         #return json.dumps(return_val)
@@ -1124,13 +1104,11 @@ def set_nfs_access_ip_list (array_of_ip):
         return_val['msg'] = "Update ip list successfully"
         return_val['data']["array_of_ip"] = " ".join(array_of_ip)
     except:
-        if enable_log:
-            log.info("cannot write to " + str(nfs_hosts_allow_file))
+        log.info("cannot write to " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
         
-    if enable_log:
-        log.info("get_nfs_access_ip_list end")
+    log.info("get_nfs_access_ip_list end")
 
 
 
@@ -1209,4 +1187,6 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
+	
+	print set_smb_user_list ('superuser', 'superuser')
 	pass
