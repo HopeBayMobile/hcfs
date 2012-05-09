@@ -375,6 +375,21 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
+		cmd = "mkdir -p %s/sambashare"%mountpoint
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+        	if po.returncode != 0:
+			raise BuildGWError(output)
+
+
+		cmd = "mkdir -p %s/nfsshare"%mountpoint
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+        	if po.returncode != 0:
+			raise BuildGWError(output)
+
 	except IOError as e:
 		op_msg = 'Failed to access /etc/delta/Gateway.ini'
 		log.error(str(e))
@@ -1205,6 +1220,5 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
-	
 	#print set_smb_user_list ('superuser', 'superuser')
 	pass
