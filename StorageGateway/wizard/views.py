@@ -43,20 +43,28 @@ def index(request):
 
 
 def form_action(request):
+    initial_data = {'ip_address':'192.168.0.1',
+                    'subnet_mask':'255.255.255.0',
+                    'default_gateway':'192.168.0.254',
+                    'preferred_dns':'8.8.8.8',
+                    'alternate_dns':'8.8.4.4',
+                    
+                    'cloud_storage_url':'http://delta.cloud.storage:8080/'
+                    }
     if request.method == 'POST':
         form = Form_All(request.POST)
         if form.is_valid():
             #Save settings into lib_config
             for field in form.fields:
-                c = Config(key=field, value=form.data[field])
+                c = Config(key=field, value=form.cleaned_data[field])
                 c.save()
-            
+
             #execute install_task and save task_id
             result = install_task.delay()
             Config.objects.create(key='wizard', value=result.task_id)    
             return render(request, 'process.html', {'info': 'Save settings and execute setup.'})
     else:
-        form = Form_All()
+        form = Form_All(initial=initial_data)
     
     return render(request, 'form.html', {'header': 'System Installation',
                                          'form': form,

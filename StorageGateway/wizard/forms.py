@@ -73,12 +73,8 @@ class IPAddressInput(Input):
         Given a dictionary of data and this widget's name, returns the value
         of this widget. Returns None if it's not provided.
         """
-        input_list = []
-        for i in range(self.input_number):
-            input = name + u'[%s]' % i
-            input_list.append(data.get(input, None))
+        input_list = data.getlist(name)
         data = self.separator.join(input_list)
-        
         if any(input_list):
             return data
         else:
@@ -87,7 +83,7 @@ class IPAddressInput(Input):
     def render(self, name, value, attrs=None):
         if value is None:
             value = ''
-        final_attrs = self.build_attrs(attrs, type=self.input_type)
+        final_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
         final_attrs['class'] = 'span05'
         
         value_list = [''] * self.input_number
@@ -97,7 +93,6 @@ class IPAddressInput(Input):
         #create 4 input for IP address
         input_list = []
         for i in range(self.input_number):
-            final_attrs['name'] = name + (u'[%s]' % i)
             final_attrs['value'] = force_unicode(self._format_value(value_list[i]))
             if not value_list[i]:
                 del final_attrs['value']
@@ -118,7 +113,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
     preferred_dns = forms.IPAddressField(label='Preferred DNS server', widget=IPAddressInput)
     alternate_dns = forms.IPAddressField(label='Alternate DNS server', widget=IPAddressInput)
     
-    cloud_storage_ip = forms.IPAddressField(label='Cloud Storage IP')
+    cloud_storage_url = forms.CharField(label='Cloud Storage IP')
     cloud_storage_account = forms.CharField()
     cloud_storage_password = forms.CharField(widget=forms.PasswordInput())
     
@@ -143,7 +138,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
                                 'alternate_dns',
                                 ]
                  ),
-                ('3. Cloud Storage', ['cloud_storage_ip',
+                ('3. Cloud Storage', ['cloud_storage_url',
                                      'cloud_storage_account',
                                      'cloud_storage_password',
                                      ]
