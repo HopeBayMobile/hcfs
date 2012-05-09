@@ -34,6 +34,36 @@ class MountError(Exception):
 class TestStorageError(Exception):
 	pass
 
+class GatewayConfError(Exception):
+	pass
+
+def getGatewayConfig():
+	try:
+		config = ConfigParser.ConfigParser()
+       		with open('/etc/delta/Gateway.ini','rb') as fh:
+			config.readfp(fh)
+
+		if not config.has_section("mountpoint"):
+			raise GatewayConfError("Failed to find section [mountpoint] in the config file")
+
+		if not config.has_option("mountpoint", "dir"):
+			raise GatewayConfError("Failed to find option 'dir'  in section [mountpoint] in the config file")
+
+		if not config.has_section("network"):
+			raise GatewayConfError("Failed to find section [network] in the config file")
+
+		if not config.has_option("network", "iface"):
+			raise GatewayConfError("Failed to find option 'iface' in section [network] in the config file")
+
+		if not config.has_section("s3ql"):
+			raise GatewayConfError("Failed to find section [s3q] in the config file")
+
+		return config
+	except IOError as e:
+		op_msg = 'Failed to access /etc/delta/Gateway.ini'
+		raise GatewayConfError(op_msg)
+		
+		
 def get_gateway_indicators():
 
 	log.info("get_gateway_indicators start")
@@ -333,15 +363,7 @@ def _mkfs(storage_url, key):
 @common.timeout(360)
 def _mount(storage_url):
 	try:
-		config = ConfigParser.ConfigParser()
-       		with open('/etc/delta/Gateway.ini','rb') as fh:
-			config.readfp(fh)
-
-		if not config.has_section("mountpoint"):
-			raise BuildGWError("Failed to find section [mountpoint] in the config file")
-
-		if not config.has_option("mountpoint", "dir"):
-			raise BuildGWError("Failed to find option 'dir'  in section [mountpoint] in the cofig file")
+		config = getGatewayConfig()
 
 		mountpoint = config.get("mountpoint", "dir")
 		os.system("mkdir -p %s"%mountpoint)
@@ -349,19 +371,16 @@ def _mount(storage_url):
 		if os.path.ismount(mountpoint):
 			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
 
-		if not config.has_section("s3ql"):
-			raise BuildGWError("Failed to find section [s3q] in the config file")
-
 		mountOpt=""
 		if config.has_option("s3ql", "mountOpt"):
 			mountOpt = config.get("s3ql", "mountOpt")
 
 
-
 		authfile = "/root/.s3ql/authinfo2"
 
 		#TODO: get interface from config file
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, "eth0", "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		iface = config.get("network", "iface")
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -375,10 +394,9 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
-	except IOError as e:
-		op_msg = 'Failed to access /etc/delta/Gateway.ini'
-		log.error(str(e))
-		raise BuildGWError(op_msg)
+	except GatewayConfError as e:
+		raise e, None, sys.exc_info()[2]
+
 	except Exception as e:
 		op_msg = "Failed to mount filesystem for %s"%str(e)
 		log.error(str(e))
@@ -1205,6 +1223,6 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
-	
-	#print set_smb_user_list ('superuser', 'superuser')
 	pass
+	#print build_gateway()
+	#print set_smb_user_list ('superuser', 'superuser')
