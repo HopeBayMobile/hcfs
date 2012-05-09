@@ -24,7 +24,7 @@ def main():
         	'': ['*.txt', '*.rst', '*.sh'],
     		},
 
-		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2.template']), 
+		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2']), 
 			     (SMBDIR, ['config/smb.conf']),
                              (NFSDIR, ['config/hosts.allow']),
                              (NFSDIR, ['config/hosts.deny'])
