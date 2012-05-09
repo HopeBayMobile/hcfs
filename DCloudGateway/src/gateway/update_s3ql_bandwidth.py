@@ -7,19 +7,20 @@ from datetime import datetime
 
 # bw = bandwidth, in kbps
 def set_bandwidth(bw):
+	nic = "eth0"
 	bw = str( bw )
 	# clear old tc settings
-	cmd = "tc qdisc del dev eth0 root"
+	cmd = "tc qdisc del dev "+nic+" root"
 	os.system(cmd)
 	# set tc
-	cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
+	cmd = "tc qdisc add dev "+nic+" root handle 1:0 htb default 10"
 	os.system(cmd)
-	cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
+	cmd = "tc class add dev "+nic+" parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
 	os.system(cmd)
 	# set throttling 8080 port in iptables
 	cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
 	os.system(cmd)
-	cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
+	cmd = "tc filter add dev "+nic+" parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
 	os.system(cmd)
 
 ## =================================================================================================	
