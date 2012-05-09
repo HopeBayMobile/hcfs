@@ -38,8 +38,10 @@ def main():
 		],
 	)
 
+	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
-	os.system("chmod 600 %s/authinfo2"%AUTHDIR)
+	if os.path.exists("%s/authinfo2"%AUTHDIR):
+		os.system("chmod 600 %s/authinfo2"%AUTHDIR)
 
 if __name__ == '__main__':
     main()
