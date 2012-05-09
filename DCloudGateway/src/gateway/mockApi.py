@@ -211,28 +211,36 @@ def set_compression(switch):
     }
     return json.dumps(return_val)
 
-def get_gateway_system_log():
-    #TODO
+def get_gateway_system_log(log_level, number_of_messages, category_mask):
+
+    print('Input parameters: log_level %d, number of messages %d, category_mask %d' % (log_level, number_of_messages, category_mask))
 
     return_val = {
             'result': True,
             'msg': "This is a mock value for testing purpose.",
-            'data': {}
+            'data': {'error_log' : [{ 'category' : 'Samba',
+                                                    'timestamp' : '2012-04-24 14:26:25.749',
+                                                    'msg' : 'smb service start error'}],
+                     'warning_log' : [{ 'category' : 'gateway',
+                                                    'timestamp' : '2012-04-24 14:26:25.749',
+                                                    'msg' : 'Delaying upload due to the weather'}],
+                     'info_log' : []
+                    }
     }
     return json.dumps(return_val)
 
 def get_smb_user_list():
-    #TODO
 
     return_val = {
             'result': True,
             'msg': "This is a mock value for testing purpose.",
-            'data': {}
+            'data': {'username' : 'admin'}
     }
     return json.dumps(return_val)
 
-def set_smb_user_list():
-    #TODO
+def set_smb_user_list(username, password):
+    
+    print("username : %s, password: %s" % (username, password))
 
     return_val = {
             'result': True,
@@ -242,17 +250,18 @@ def set_smb_user_list():
     return json.dumps(return_val)
 
 def get_nfs_access_ip_list():
-    #TODO
 
     return_val = {
             'result': True,
             'msg': "This is a mock value for testing purpose.",
-            'data': {}
+            'data': {'array_of_ip' : ['172.16.228.100','172.16.229.111']}
     }
     return json.dumps(return_val)
 
-def set_nfs_access_ip_list():
-    #TODO
+def set_nfs_access_ip_list(array_of_ip):
+
+    for ip_entry in array_of_ip:
+        print("nfs share can be accessed from %s" % (ip_entry))
 
     return_val = {
             'result': True,
@@ -262,7 +271,6 @@ def set_nfs_access_ip_list():
     return json.dumps(return_val)
 
 def stop_upload_sync():
-    #TODO
 
     return_val = {
             'result': True,
@@ -271,8 +279,9 @@ def stop_upload_sync():
     }
     return json.dumps(return_val)
 
-def force_upload_sync():
-    #TODO
+def force_upload_sync(uplink_bw_limit):
+
+    print('upload bandwidth limit is set at %d KB/sec' % uplink_bw_limit)
 
     return_val = {
             'result': True,

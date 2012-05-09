@@ -663,8 +663,8 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
 		return_val = {
 			'result': False,
-			'msg':  "Failed to store the network information",
-			'data' : {}
+			'msg': "Failed to store the network information",
+			'data': {}
 		}
 
 		return json.dumps(return_val)
@@ -757,14 +757,14 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 	try:
 		with open(interface_path, "w") as f:
 			f.write("auto lo\niface lo inet loopback\n")
-			f.write("auto eth0\niface eth0 inet static")
-			f.write("address %s" % fixedIp)
-			f.write("netmask %s" % fixedMask)
-			f.write("gateway %s" % fixedGateway)
-			f.write("auto eth1\niface eth1 inet static")
-			f.write("address %s" % ip)
-			f.write("netmask %s" % mask)
-			f.write("gateway %s" % gateway)
+			f.write("\nauto eth0\niface eth0 inet static")
+			f.write("\naddress %s" % fixedIp)
+			f.write("\nnetmask %s" % fixedMask)
+			f.write("\ngateway %s\n" % fixedGateway)
+			f.write("\nauto eth1\niface eth1 inet static")
+			f.write("\naddress %s" % ip)
+			f.write("\nnetmask %s" % mask)
+			f.write("\ngateway %s" % gateway)
 
 		op_ok = True
 		log.info("Succeeded to set the network configuration")
@@ -1147,6 +1147,30 @@ def apply_scheduling_rules(schedule):			# by Yen
 	return json.dumps(return_val)
 	
 
+def stop_upload_sync():			# by Yen
+	# generate a new rule set and apply it to the gateway
+	schedule = []
+	for ii in range(1,8):
+		schedule.append( [ii,0,24,0] )
+		
+	try:
+		apply_scheduling_rules(schedule)
+	except:
+		print "Please check whether s3qlctrl is installed."
+		return_val = {
+			'result': False,
+			'msg': "Turn off cache uploading has failed.",
+			'data': {}
+		}
+		return json.dumps(return_val)
+	
+	return_val = {
+		'result': True,
+		'msg': "Cache upload has turned off.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
 def force_upload_sync(bw):			# by Yen
 	if (bw<64):
 		return_val = {
@@ -1155,32 +1179,26 @@ def force_upload_sync(bw):			# by Yen
 			'data': {}
 		}
 		return json.dumps(return_val)
+
+	# generate a new rule set and apply it to the gateway
+	schedule = []
+	for ii in range(1,8):
+		schedule.append( [ii,0,24,bw] )
 		
 	try:
-		bw = str( bw )
-		# clear old tc settings
-		cmd = "tc qdisc del dev eth0 root"
-		os.system(cmd)
-		# set tc
-		cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
-		os.system(cmd)
-		cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
-		os.system(cmd)
-		# set throttling 8080 port in iptables
-		cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
-		os.system(cmd)
-		cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
-		os.system(cmd)
-		print("change bandwidth to " + bw + "kB/s succeeded")
-		cmd = "s3qlctrl uploadon /mnt/cloudgwfiles"
-		os.system(cmd)
-		print "Turn on s3ql upload."
+		apply_scheduling_rules(schedule)
 	except:
 		print "Please check whether s3qlctrl is installed."
+		return_val = {
+			'result': False,
+			'msg': "Turn on cache uploading has failed.",
+			'data': {}
+		}
+		return json.dumps(return_val)
 	
 	return_val = {
 		'result': True,
-		'msg': "S3QL upload is turned on.",
+		'msg': "Cache upload is turned on.",
 		'data': {}
 	}
 	return json.dumps(return_val)
@@ -1188,5 +1206,5 @@ def force_upload_sync(bw):			# by Yen
 
 if __name__ == '__main__':
 	
-	print set_smb_user_list ('superuser', 'superuser')
+	#print set_smb_user_list ('superuser', 'superuser')
 	pass
