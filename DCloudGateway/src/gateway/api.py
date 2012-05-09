@@ -1172,8 +1172,8 @@ def apply_scheduling_rules(schedule):			# by Yen
 def stop_upload_sync():			# by Yen
 	# generate a new rule set and apply it to the gateway
 	schedule = []
-	for ii in range(1,7):
-		schedule.append( [1,0,24,0] )
+	for ii in range(1,8):
+		schedule.append( [ii,0,24,0] )
 		
 	try:
 		apply_scheduling_rules(schedule)
@@ -1204,8 +1204,8 @@ def force_upload_sync(bw):			# by Yen
 
 	# generate a new rule set and apply it to the gateway
 	schedule = []
-	for ii in range(1,7):
-		schedule.append( [1,0,24,bw] )
+	for ii in range(1,8):
+		schedule.append( [ii,0,24,bw] )
 		
 	try:
 		apply_scheduling_rules(schedule)
