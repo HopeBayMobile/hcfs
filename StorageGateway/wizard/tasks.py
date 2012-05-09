@@ -25,7 +25,7 @@ def install_task():
     Config.objects.create(key='step_2', value="{'result': True, 'msg': 'string step_2'}") 
     
     #Step 3, cloud storage settings
-    cloud_storage_ip = Config.objects.get(key='cloud_storage_ip')
+    cloud_storage_url = Config.objects.get(key='cloud_storage_url')
     cloud_storage_account = Config.objects.get(key='cloud_storage_account')
     cloud_storage_password = Config.objects.get(key='cloud_storage_password')
     
