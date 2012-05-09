@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 import ConfigParser
@@ -617,6 +618,30 @@ def apply_scheduling_rules(schedule):			# by Yen
 	return json.dumps(return_val)
 	
 
+def stop_upload_sync():			# by Yen
+	# generate a new rule set and apply it to the gateway
+	schedule = []
+	for ii in range(1,7):
+		schedule.append( [1,0,24,0] )
+		
+	try:
+		apply_scheduling_rules(schedule)
+	except:
+		print "Please check whether s3qlctrl is installed."
+		return_val = {
+			'result': False,
+			'msg': "Turn off cache uploading has failed.",
+			'data': {}
+		}
+		return json.dumps(return_val)
+	
+	return_val = {
+		'result': True,
+		'msg': "Cache upload has turned off.",
+		'data': {}
+	}
+	return json.dumps(return_val)
+
 def force_upload_sync(bw):			# by Yen
 	if (bw<64):
 		return_val = {
@@ -625,32 +650,26 @@ def force_upload_sync(bw):			# by Yen
 			'data': {}
 		}
 		return json.dumps(return_val)
+
+	# generate a new rule set and apply it to the gateway
+	schedule = []
+	for ii in range(1,7):
+		schedule.append( [1,0,24,bw] )
 		
 	try:
-		bw = str( bw )
-		# clear old tc settings
-		cmd = "tc qdisc del dev eth0 root"
-		os.system(cmd)
-		# set tc
-		cmd = "tc qdisc add dev eth0 root handle 1:0 htb default 10"
-		os.system(cmd)
-		cmd = "tc class add dev eth0 parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
-		os.system(cmd)
-		# set throttling 8080 port in iptables
-		cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
-		os.system(cmd)
-		cmd = "tc filter add dev eth0 parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
-		os.system(cmd)
-		print("change bandwidth to " + bw + "kB/s succeeded")
-		cmd = "s3qlctrl uploadon /mnt/cloudgwfiles"
-		os.system(cmd)
-		print "Turn on s3ql upload."
+		apply_scheduling_rules(schedule)
 	except:
 		print "Please check whether s3qlctrl is installed."
+		return_val = {
+			'result': False,
+			'msg': "Turn on cache uploading has failed.",
+			'data': {}
+		}
+		return json.dumps(return_val)
 	
 	return_val = {
 		'result': True,
-		'msg': "S3QL upload is turned on.",
+		'msg': "Cache upload is turned on.",
 		'data': {}
 	}
 	return json.dumps(return_val)
