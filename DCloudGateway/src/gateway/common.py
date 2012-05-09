@@ -14,6 +14,7 @@ import re
 from ConfigParser import ConfigParser
 
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+DIR = os.path.dirname(os.path.realpath(__file__))
 
 # Retry decorator
 def retry(tries, delay=3):
@@ -92,10 +93,35 @@ def getAllDisks():
 
         return disks
 
+def getTestFolder():
+	config = ConfigParser()
+	conf = "%s/test.ini"%DIR
+	try:
+		with open(conf) as fh:
+			config.readfp(fh)
+			val = config.get('main', 'folder')
+			return val
+	except Exception as e:
+		return "/"
+
 def isHttp200(response):
 	if response.find("HTTP/1.1 200")  !=-1:
 		return True
 	else:
+		return False
+
+def isInTestMode():
+	config = ConfigParser()
+	conf = "%s/test.ini"%DIR
+	try:
+		with open(conf) as fh:
+			config.readfp(fh)
+			val = config.get('main', 'test')
+			if val == "on":
+				return True
+			else:
+				return False
+	except Exception as e:
 		return False
 
 def isValidEncKey(key):
@@ -185,6 +211,8 @@ class TimeoutError(Exception):
 			return "TimeoutError"
 
 if __name__ == '__main__':
-	log = getLogger("test", conf="/etc/delta/Gateway.ini")
-	log.info("TEST")
+	#log = getLogger("test", conf="/etc/delta/Gateway.ini")
+	#log.info("TEST")
+	print isInTestMode()
+	print getTestFolder()
 	pass	
