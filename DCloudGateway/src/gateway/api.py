@@ -90,7 +90,7 @@ def get_gateway_indicators():
 		if index != -1:
 			op_storage_url = op_storage_url[0:index]
 
-		cmd ="ping %s"%op_storage_url
+		cmd ="ping -c 5 %s"%op_storage_url
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -142,12 +142,14 @@ def get_gateway_indicators():
 	all_disk = common.getAllDisks()
 	nu_all_disk = len(all_disk)
 	op_all_disk = 0
+
 	for i in all_disk:
 		cmd ="sudo smartctl -a %s"%i
 
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 	        po.wait()
+
 
        		if po.returncode == 0:
 			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
@@ -1238,6 +1240,5 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
-	print build_gateway()
 	pass
 	#print set_smb_user_list ('superuser', 'superuser')
