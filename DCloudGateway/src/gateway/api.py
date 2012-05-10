@@ -659,6 +659,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 	try:
 		with open(ini_path) as f:
 			op_config.readfp(f)
+
 			if ip == "" or ip == None:
 				ip = op_config.get('network', 'ip')
 			if gateway == "" or gateway == None:
@@ -670,7 +671,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 			if dns2 == "" or dns2 == None:
 				dns2 = op_config.get('network', 'dns2')
 
-			op_ok = True
+		op_ok = True
 
 	except IOError as e:
 		op_ok = False
@@ -767,7 +768,7 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 
                 fixedIp = op_config.get('network', 'fixedIp')
                 fixedMask = op_config.get('network', 'fixedMask')
-		fixedGateway = op_config.get('network', 'fixedGateway')
+		#fixedGateway = op_config.get('network', 'fixedGateway')
                 op_ok = True
 		log.info("Succeeded to get the fixed network information.")
 
@@ -792,8 +793,7 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 			f.write("auto lo\niface lo inet loopback\n")
 			f.write("\nauto eth0\niface eth0 inet static")
 			f.write("\naddress %s" % fixedIp)
-			f.write("\nnetmask %s" % fixedMask)
-			f.write("\ngateway %s\n" % fixedGateway)
+			f.write("\nnetmask %s\n" % fixedMask)
 			f.write("\nauto eth1\niface eth1 inet static")
 			f.write("\naddress %s" % ip)
 			f.write("\nnetmask %s" % mask)
