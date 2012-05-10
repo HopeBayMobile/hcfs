@@ -23,7 +23,7 @@ FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
-def tryLock(tries=11):
+def tryLock(tries=11, lockLife=900):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
 	
@@ -31,7 +31,7 @@ def tryLock(tries=11):
 			locked = 1
 			try:
 				os.system("mkdir -p %s"%os.path.dirname(lockFile))
-				cmd = "lockfile -s 11 -r %d -l 660 %s"%(tries, lockFile)
+				cmd = "lockfile -11 -r %d -l %d %s"%(tries, lockLife, lockFile)
 				locked = os.system(cmd)
 				if locked == 0:
 					returnVal = fn(*args, **kwargs) # first attempt
@@ -599,16 +599,16 @@ if __name__ == '__main__':
 #		time.sleep(10)
 #		print "This is not timeout!!!"
 #	printstring()
-#	@tryLock(1)
-#	def testTryLock():
-#		print "Hello"
+	@tryLock(1,1)
+	def testTryLock():
+		print "Hello"
 
-#	@tryLock(2)
-#	def testTryLock2():
-#		print "H"
-#		testTryLock()
+	@tryLock(2,1)
+	def testTryLock2():
+		print "H"
+		testTryLock()
 		
-#	testTryLock2()	
+	testTryLock2()	
 	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"

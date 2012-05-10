@@ -81,7 +81,7 @@ class SwiftMonitor(Daemon):
 			return returncode
 
 	@deferSIGTERM
-	@util.tryLock()
+	@util.tryLock(1)
 	def copyMaterials(self):
 		logger = util.getLogger(name="SwiftMonitor.copymaterials")
 		logger.info("start")

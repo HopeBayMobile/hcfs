@@ -17,7 +17,7 @@ class TryLockError(Exception):
 	pass
 
 # tryLock decorator
-def tryLock(tries=11):
+def tryLock(tries=1, lockTimeout=900):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
 	
@@ -25,7 +25,7 @@ def tryLock(tries=11):
 			locked = 1
 			try:
 				os.system("mkdir -p %s"%os.path.dirname(lockFile))
-				cmd = "lockfile -s 11 -r %d -l 660 %s"%(tries, lockFile)
+				cmd = "lockfile -11 -r %d -l %d %s"%(tries, lockTimeout, lockFile)
 				locked = os.system(cmd)
 				if locked == 0:
 					returnVal = fn(*args, **kwargs) # first attempt
@@ -295,9 +295,8 @@ def readMetadata(disk):
 
 @tryLock(1)
 def main(argv):
-	print "Hello"
-	#if loadScripts() == 0:
-	#	os.system("python /DCloudSwift/util/mountDisks.py -R")
+	if loadScripts() == 0:
+		os.system("python /DCloudSwift/util/mountDisks.py -R")
 
 if __name__ == '__main__':
 	try:
