@@ -4,6 +4,7 @@ CONFDIR='/etc/delta'
 AUTHDIR='/root/.s3ql'
 SMBDIR='/etc/samba'
 NFSDIR='/etc'
+NETDIR='/etc/network'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -27,7 +28,8 @@ def main():
 		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2']), 
 			     (SMBDIR, ['config/smb.conf']),
                              (NFSDIR, ['config/hosts.allow']),
-                             (NFSDIR, ['config/hosts.deny'])
+                             (NFSDIR, ['config/hosts.deny']),
+                             (NETDIR, ['config/interfaces'])
                            ], 
 		
 		test_suite='unittest',
