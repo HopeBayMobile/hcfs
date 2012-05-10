@@ -195,7 +195,7 @@ class SwiftMonitor(Daemon):
 			util.restartMemcached()
 
 		while True:
-			time.sleep(10)
+			time.sleep(60)
 			try:
 				if self.copyMaterials() !=0:
 					logger.error("Failed to copy materilas")

@@ -11,8 +11,34 @@ import threading
 import re
 
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
-EEXIST=17
 lockFile="/etc/delta/swift.lock"
+
+class TryLockError(Exception):
+	pass
+
+# tryLock decorator
+def tryLock(tries=11):
+	def deco_tryLock(fn):
+		def wrapper(*args, **kwargs):
+	
+			returnVal = None
+			locked = 1
+			try:
+				os.system("mkdir -p %s"%os.path.dirname(lockFile))
+				cmd = "lockfile -s 11 -r %d -l 660 %s"%(tries, lockFile)
+				locked = os.system(cmd)
+				if locked == 0:
+					returnVal = fn(*args, **kwargs) # first attempt
+				else:
+					raise TryLockError()
+				return returnVal
+			finally:
+				if locked == 0:
+					os.system("rm -f %s"%lockFile)
+
+  		return wrapper #decorated function
+  	
+  	return deco_tryLock  # @retry(arg[, ...]) -> true decorator
 
 def __loadSwiftMetadata(disk):
         logger = getLogger(name="__loadSwiftMetadata")
@@ -267,30 +293,20 @@ def readMetadata(disk):
 		if lazyUmount(mountpoint)!=0:
 			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
 
-
+@tryLock(1)
 def main(argv):
-	fd =-1
-	try:
-		os.system("mkdir -p %s"%os.path.dirname(lockFile))
-		fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
-		
-		if loadScripts() == 0:
-			os.system("python /DCloudSwift/util/mountDisks.py -R")
-
-	except OSError as e:
-		if e.errno == EEXIST:
-			print >>sys.stderr, "A confilct task is in execution"
-		else:
-			print >>sys.stderr, str(e)
-	except Exception as e:
-		print >>sys.stderr, str(e)
-	finally:
-		if fd != -1:
-			os.close(fd)
-			os.unlink(lockFile)
+	print "Hello"
+	#if loadScripts() == 0:
+	#	os.system("python /DCloudSwift/util/mountDisks.py -R")
 
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	try:
+		main(sys.argv[1:])
+	except TryLockError:
+		print >>sys.stderr, "A confilct task is in execution"
+	except Exception as e:
+		print >>sys.stderr, str(e)
+
 	#print loadScripts()
 	#print getAllDisks()
 	#print getNonRootDisks()

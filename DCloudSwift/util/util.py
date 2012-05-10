@@ -21,33 +21,26 @@ SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 lockFile = "/etc/delta/swift.lock"
-EEXIST=17
 
 # tryLock decorator
-def tryLock(tries=1, delay=3):
+def tryLock(tries=11):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
-			mtries, mdelay = tries, delay # make mutable
 	
-			fd = -1
 			returnVal = None
+			locked = 1
 			try:
 				os.system("mkdir -p %s"%os.path.dirname(lockFile))
-				fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
-				returnVal = fn(*args, **kwargs) # first attempt
-				return returnVal
-			except OSError as e:
-				if e.errno == EEXIST:
-					raise TryLockError()
+				cmd = "lockfile -s 11 -r %d -l 660 %s"%(tries, lockFile)
+				locked = os.system(cmd)
+				if locked == 0:
+					returnVal = fn(*args, **kwargs) # first attempt
 				else:
-					raise
-			except Exception as e:
-				print "%s"%str(e)
-				raise
+					raise TryLockError()
+				return returnVal
 			finally:
-				if fd != -1:
-					os.close(fd)
-					os.unlink(lockFile)
+				if locked == 0:
+					os.system("rm -f %s"%lockFile)
 
   		return wrapper #decorated function
   	
@@ -606,17 +599,22 @@ if __name__ == '__main__':
 #		time.sleep(10)
 #		print "This is not timeout!!!"
 #	printstring()
+#	@tryLock(1)
+#	def testTryLock():
+#		print "Hello"
+
+#	@tryLock(2)
+#	def testTryLock2():
+#		print "H"
+#		testTryLock()
+		
+#	testTryLock2()	
+	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
 	#print sshpass("deltacloud", cmd, timeout=1)
 	#print os.path.dirname(os.path.dirname(os.getcwd()))
-	
-	#@tryLock()
-	#def testTryLock():
-	#	print "Hello"	
-
-	#testTryLock()
 	#print isDaemonAlive("memcached")
-	restartAllServices()
+	#restartAllServices()
 	#print stopAllServices()
 	pass	
