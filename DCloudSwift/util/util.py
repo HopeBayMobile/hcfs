@@ -91,7 +91,7 @@ def timeout(timeout_time):
 						self.result = (0,self.f(*(self.args), **(self.kwargs)))
 						
 					except Exception as e:
-						self.result = (1, e)
+						self.result = (1, e, sys.exc_info()[2])
 		
 			timeout=timeout_time
 			if timeout <=0:
@@ -105,10 +105,11 @@ def timeout(timeout_time):
 			elif it.result[0] == 0:
 				return it.result[1]
 			else:
-				raise it.result[1]
+				raise it.result[1], None, it.result[2]
 
 		return wrapper
 	return timeoutDeco
+
 #TODO: findout a beter way to check if a daemon is alive
 def isDaemonAlive(daemonName):
 	logger = getLogger(name="isDaemonAlive")
