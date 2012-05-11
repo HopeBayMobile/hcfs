@@ -21,7 +21,7 @@ sys.path.append("%s/DCloudSwift/"%BASEDIR)
 from util import util
 from util import mountDisks
 from maintenance import maintenance
-from storage import StorageInstall
+from nodeInstaller import NodeInstaller
 
 Usage = '''
 Usage:
@@ -98,35 +98,11 @@ def triggerProxyDeploy(**kwargs):
 	logger.info("start")
 
 	proxyList = kwargs['proxyList']
-	storageList = kwargs['storageList']
-	numOfReplica = kwargs['numOfReplica']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
 
-	if util.isDaemonAlive("swiftMonitor"):
-		os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
-
-	util.stopAllServices()
-
-	os.system("mkdir -p /etc/swift")
-	os.system("rm -rf /etc/swift")
-	os.system("cp -r %s/swift /etc/"%BASEDIR)
-	os.system("chown -R swift:swift /etc/swift")
-
-	metadata = mountDisks.getLatestMetadata()
-	if metadata is None or metadata["vers"] < util.getSwiftConfVers():
-		ret = mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
-		if BASEDIR != "/":
-			os.system("rm -rf /DCloudSwift")
-			os.system("cp -r %s/DCloudSwift /"%BASEDIR)
-		if ret !=0:
-			logger.warn("Failed to create all swift devices")
-	else:
-		mountDisks.remountDisks()
-
-	util.restartAllServices()
-	if not util.isDaemonAlive("swiftMonitor"):
-		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
+	installer = NodeInstaller(proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
+	installer.install()
 
 	logger.info("end")
 	return 0
@@ -160,20 +136,18 @@ def triggerRmStorage(**kwargs):
 	return (returncode, blackProxyNodes, blackStorageNodes)
 
 def triggerStorageDeploy(**kwargs):
-	proxy = kwargs['proxyList'][0]["ip"]
-	proxyList = kwargs['proxyList']
+	logger = util.getLogger(name = "triggerStorageDeploy")
+	logger.info("start")
 
+	proxyList = kwargs['proxyList']
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
 
-	if util.isDaemonAlive("swiftMonitor"):
-		os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
-
-	installer = StorageInstall.StorageNodeInstaller(proxy=proxy, proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
+	installer = NodeInstaller(proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 
-	if not util.isDaemonAlive("swiftMonitor"):
-		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
+	logger.info("end")
+	return 0
 
 @util.tryLock()
 def main():
