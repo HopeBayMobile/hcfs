@@ -149,10 +149,6 @@ class SwiftDeploy:
 				errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
 				raise DeployProxyError(errMsg)
 
-			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
-				errMsg = "Failed to spread metadata to %s" % proxyIP
-				raise DeployProxyError(errMsg)
-
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
@@ -222,6 +218,15 @@ class SwiftDeploy:
 				logger.error(errMsg)
 				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
 				return -5
+
+			cmd = "scp -r /etc/delta/swift root@%s:%s" %(storageIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
+				logger.error(errMsg)
+				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+				return -5
+
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s"%(storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
@@ -339,7 +344,7 @@ if __name__ == '__main__':
 		time.sleep(5)
 		print progress
 		progress = SD.getDeployProgress()
-	print "Swift deploy process is done!"
+	#print "Swift deploy process is done!"
 	#SD.deploySwift()
 	#SD.rmStorage()
 	#SD.addStorage()
