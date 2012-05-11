@@ -58,7 +58,6 @@ def form_action(request):
             for field in form.fields:
                 c = Config(key=field, value=form.cleaned_data[field])
                 c.save()
-
             #execute install_task and save task_id
             result = install_task.delay()
             Config.objects.create(key='wizard', value=result.task_id)    

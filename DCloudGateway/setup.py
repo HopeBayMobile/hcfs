@@ -25,7 +25,7 @@ def main():
         	'': ['*.txt', '*.rst', '*.sh'],
     		},
 
-		data_files=[ (CONFDIR, ['Gateway.ini']), (AUTHDIR, ['authinfo2']), 
+		data_files=[ (CONFDIR, ['Gateway.ini']),  
 			     (SMBDIR, ['config/smb.conf']),
                              (NFSDIR, ['config/hosts.allow']),
                              (NFSDIR, ['config/hosts.deny']),
@@ -42,8 +42,6 @@ def main():
 
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
-	if os.path.exists("%s/authinfo2"%AUTHDIR):
-		os.system("chmod 600 %s/authinfo2"%AUTHDIR)
 
 if __name__ == '__main__':
     main()
