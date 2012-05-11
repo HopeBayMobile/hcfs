@@ -17,7 +17,7 @@
         <style type="text/css">
 
             body{
-                padding-top: 40px;
+                padding-top: 80px;
             }
 
             .container .content{
@@ -39,44 +39,32 @@
             }
             {% endblock css_style %}
         </style>
-        <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/bootstrap-responsive.css" />
-        <script src="/static/js/bootstrap.js"></script>
         <script src="/static/js/jquery-1.7.min.js"></script>
+        <script src="/static/js/bootstrap.js"></script>
 		{% block javascript %}
 		{% endblock javascript %}
     </head>
 
     <body>
-    <!-- Top Navigation Bar -->
-    <div class="navbar navbar-fixed-top">
-      <div class="navbar-inner">
-        <div class="container">
-          <a href="/" class="brand">Delta Storage Gateway</a>
-          {% if user.is_authenticated %}
-          <p class="navbar-text pull-right">
-              <a href="/logout" class="btn" style="margin: 0;">Louout</a>
-          </p>
-          {% endif %}
-          </div>
-      </div>
-    </div>
-    
-    <div class="container">
 
-    <!-- Inner Navigation Tab -->
-    {% block content_tab %}
-    {% endblock content_tab %}
+
+    <div class="span12" >
+
+    <div style="position: fixed; margin: 0; background-color: black; top: 0; height: 80px;">
+        <p class="navbar-text pull-right">
+                <span> 100 MB/s</span>
+                <a href="#" class="btn btn-warning" style="margin: 0;">Warning</a>
+                <a href="#" class="btn btn-danger" style="margin: 0;">Uploading</a>
+                  {% if user.is_authenticated %}
+                  <a href="/logout" class="btn" style="margin: 0;">Logout</a>
+                  {% endif %}
+              </p>
+    </div>
 
     {% block content %}
 
-    {% endblock content %}    
+    {% endblock content %}
 
-    <footer class="footer">
-        <p class="pull-right">
-         &copy; 2012 Delta Electronics, Inc. All Rights Reserved.
-        </p>
-        <p><a href="#">Back to top</a></p>
-    </footer>
 
     </div> <!-- container -->
     </body>

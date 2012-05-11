@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 
 @login_required
 def index(request):
-    return render(request, 'dashboard.html')
+    return render(request, 'dashboard/container.html')
 
 @login_required
 def account_configuration(request):

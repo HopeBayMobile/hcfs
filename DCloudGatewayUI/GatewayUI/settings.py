@@ -29,7 +29,7 @@ DATABASES = {
 # timezone as the operating system.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = 'America/Chicago'
+TIME_ZONE = 'Asia/Taipei'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -103,10 +103,10 @@ MIDDLEWARE_CLASSES = (
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
 
-ROOT_URLCONF = 'gateway.urls'
+ROOT_URLCONF = 'GatewayUI.urls'
 
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'gateway.wsgi.application'
+WSGI_APPLICATION = 'GatewayUI.wsgi.application'
 
 TEMPLATE_DIRS = (
     os.path.join(os.path.dirname(os.path.abspath(__file__)), 'assets/templates'),
