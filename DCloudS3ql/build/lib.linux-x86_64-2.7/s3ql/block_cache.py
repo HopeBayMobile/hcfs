@@ -295,7 +295,6 @@ class BlockCache(object):
                 else:
                     raise RuntimeError('Strange file in cache directory: %s' % cache_files)
 
-                print(tmp_inode,tmp_block)
                 with self.get(tmp_inode,tmp_block) as fh:
                     pass
 

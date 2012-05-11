@@ -7,7 +7,7 @@ from datetime import datetime
 
 # bw = bandwidth, in kbps
 def set_bandwidth(bw):
-	nic = "eth0"
+	nic = "eth1"
 	bw = str( bw )
 	# clear old tc settings
 	cmd = "tc qdisc del dev "+nic+" root"

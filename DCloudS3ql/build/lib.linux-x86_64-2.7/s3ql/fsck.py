@@ -182,7 +182,7 @@ class Fsck(object):
 
             block_size=os.stat(full_filename).st_size
 
-            log.info("Adding cached data (%d, %d)" % (inode, blockno))
+            log.debug("Adding cached data (%d, %d)" % (inode, blockno))
             self.cached_blocks.add((inode, blockno))
         
             try:
