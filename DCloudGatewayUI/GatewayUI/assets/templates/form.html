@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block javascript %}
+{% endblock javascript %}
+{% block content %}
+<div class="row">
+	<div class="span12">
+		<div class="page-header">
+			<h1>{{header}}</h1>
+		</div>
+		<form id="form" class="form-horizontal" method="POST"
+			action="{{action}}">
+			{% csrf_token %} {{ form.render }}
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+				{% if submit %}
+				{{submit}}
+				{% else %}
+				Submit
+				{% endif %}
+				</button>
+				<span class="label hide"></span>
+			</div>
+		</form>
+	</div>
+</div>
+{% endblock content %}

@@ -108,6 +108,11 @@ def triggerProxyDeploy(**kwargs):
 
 	util.stopAllServices()
 
+	os.system("mkdir -p /etc/swift")
+	os.system("rm -rf /etc/swift")
+	os.system("cp -r %s/swift /etc/"%BASEDIR)
+	os.system("chown -R swift:swift /etc/swift")
+
 	metadata = mountDisks.getLatestMetadata()
 	if metadata is None or metadata["vers"] < util.getSwiftConfVers():
 		ret = mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)

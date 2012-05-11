@@ -21,33 +21,26 @@ SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 
 lockFile = "/etc/delta/swift.lock"
-EEXIST=17
 
 # tryLock decorator
-def tryLock(tries=1, delay=3):
+def tryLock(tries=11, lockLife=900):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
-			mtries, mdelay = tries, delay # make mutable
 	
-			fd = -1
 			returnVal = None
+			locked = 1
 			try:
 				os.system("mkdir -p %s"%os.path.dirname(lockFile))
-				fd = os.open(lockFile, os.O_RDWR| os.O_CREAT | os.O_EXCL, 0444)
-				returnVal = fn(*args, **kwargs) # first attempt
-				return returnVal
-			except OSError as e:
-				if e.errno == EEXIST:
-					raise TryLockError()
+				cmd = "lockfile -11 -r %d -l %d %s"%(tries, lockLife, lockFile)
+				locked = os.system(cmd)
+				if locked == 0:
+					returnVal = fn(*args, **kwargs) # first attempt
 				else:
-					raise
-			except Exception as e:
-				print "%s"%str(e)
-				raise
+					raise TryLockError()
+				return returnVal
 			finally:
-				if fd != -1:
-					os.close(fd)
-					os.unlink(lockFile)
+				if locked == 0:
+					os.system("rm -f %s"%lockFile)
 
   		return wrapper #decorated function
   	
@@ -98,7 +91,7 @@ def timeout(timeout_time):
 						self.result = (0,self.f(*(self.args), **(self.kwargs)))
 						
 					except Exception as e:
-						self.result = (1, e)
+						self.result = (1, e, sys.exc_info()[2])
 		
 			timeout=timeout_time
 			if timeout <=0:
@@ -112,10 +105,11 @@ def timeout(timeout_time):
 			elif it.result[0] == 0:
 				return it.result[1]
 			else:
-				raise it.result[1]
+				raise it.result[1], None, it.result[2]
 
 		return wrapper
 	return timeoutDeco
+
 #TODO: findout a beter way to check if a daemon is alive
 def isDaemonAlive(daemonName):
 	logger = getLogger(name="isDaemonAlive")
@@ -606,17 +600,22 @@ if __name__ == '__main__':
 #		time.sleep(10)
 #		print "This is not timeout!!!"
 #	printstring()
+	@tryLock(1,1)
+	def testTryLock():
+		print "Hello"
+
+	@tryLock(2,1)
+	def testTryLock2():
+		print "H"
+		testTryLock()
+		
+	testTryLock2()	
+	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
 	#print sshpass("deltacloud", cmd, timeout=1)
 	#print os.path.dirname(os.path.dirname(os.getcwd()))
-	
-	#@tryLock()
-	#def testTryLock():
-	#	print "Hello"	
-
-	#testTryLock()
 	#print isDaemonAlive("memcached")
-	restartAllServices()
+	#restartAllServices()
 	#print stopAllServices()
 	pass	

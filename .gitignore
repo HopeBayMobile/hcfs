@@ -3,4 +3,5 @@
 *.swp
 *.swo
 *.log
+*.db
 /DCloudGfs/src/scripts/log

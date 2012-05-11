@@ -24,6 +24,9 @@ from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
 
+class DeployProxyError(Exception):
+	pass
+
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
 		self.__proxyList = proxyList
@@ -113,11 +116,11 @@ class SwiftDeploy:
 	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
 		try:
-			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
-				errMsg = "Failed to spread metadata to %s" % proxyIP
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -2
+			#if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
+			#	errMsg = "Failed to spread metadata to %s" % proxyIP
+			#	logger.error(errMsg)
+			#	self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
+			#	return -2
 
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
@@ -125,44 +128,51 @@ class SwiftDeploy:
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -3
+				raise DeployProxyError(errMsg)
 
 			cmd = "ssh root@%s rm -rf %s/*"%(proxyIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -4
+				raise DeployProxyError(errMsg)
 
-			#TODO: copy to specific directory to avoid confict
+			#copy script and data to a specific directory to avoid conficts
 			cmd = "scp -r %s/DCloudSwift/ root@%s:%s" %(BASEDIR, proxyIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp proxy deploy scripts to %s for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -5
+				raise DeployProxyError(errMsg)
+
+			cmd = "scp -r /etc/delta/swift root@%s:%s" %(proxyIP, pathname)
+			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+			if status != 0:
+				errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
+				raise DeployProxyError(errMsg)
+
+			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
+				errMsg = "Failed to spread metadata to %s" % proxyIP
+				raise DeployProxyError(errMsg)
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
 			print cmd
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
 			if status != 0:
 				errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-				return -6
+				raise DeployProxyError(errMsg)
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
 			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
 			return 0
 
+		except DeployProxyError as err:
+			logger.error(str(err))
+			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
+			return 1
 		except util.TimeoutError as err:
-			logger.error("%s" % err)
-			sys.stderr.write("%s\n" % err)
-			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=err)
+			logger.error("%s" % str(err))
+			sys.stderr.write("%s\n" % str(err))
+			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
+			return 1
 
 	def proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
@@ -318,7 +328,7 @@ class SwiftDeploy:
 if __name__ == '__main__':
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	SD = SwiftDeploy([{"ip":"172.16.229.146"}], [{"ip":"172.16.229.146", "zid":1}])
+	SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
 	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
 	SD.createMetadata()
