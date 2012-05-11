@@ -21,34 +21,6 @@ UNNECESSARYFILES = "cert* backups *.conf"
 class MountSwiftDeviceError(Exception): pass
 class WriteMetadataError(Exception): pass
 
-def getMajorityHostname():
-	logger = util.getLogger(name="getMajorityHostname")
-	logger.debug("start")
-	disks = getNonRootDisks()
-	hostnameCount = {}
-	maxCount =0
-	mojorityHostname=None
-
-       	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret == 0:
-			hostnameCount.setdefault(metadata["hostname"], 0)
-			hostnameCount[metadata["hostname"]] +=1 
-			
-	for hostname in hostnameCount:
-		if hostnameCount[hostname] > maxCount:
-			maxCount = hostnameCount[hostname]
-			majorityHostname = hostname
-
-	latestMetadata = getLatestMetadata()
-
-	if latestMetadata is not None:
-		if (2*maxCount) <= latestMetadata["deviceCnt"]:
-			majorityHostname = None		
-
-	logger.debug("end")
-	return majorityHostname
-
 def getRootDisk():
 	cmd = "mount"
 	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -96,7 +68,6 @@ def getMountedDisks():
 		if disk.startswith("/dev/sd"):
 			mountedDisks.add(disk[0:8])	
 			
-
 	return mountedDisks
 
 def getUmountedDisks():
@@ -119,7 +90,6 @@ def getUnusedDisks(vers):
 
 	return unusedDisks
 		
-	
 
 def getMountedSwiftDevices(devicePrx):
 	cmd = "mount"
@@ -498,8 +468,10 @@ def remountRecognizableDisks():
 def resume():
 	logger = util.getLogger(name="resume")
         logger.info("start")
-	#os.system("sh /etc/DCloud/ServerRegister/autoRun.sh")
-	hostname = socket.gethostname()
+
+		
+	os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+	util.stopAllServices()
 
 	remountDisks()
 	loadSwiftMetadata()	

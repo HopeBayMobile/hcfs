@@ -444,6 +444,22 @@ def build_gateway():
 		_openContainter(storage_url=url, account=account, password=password)
 		_mkfs(storage_url=url, key=key)
 		_mount(storage_url=url)
+ 
+		cmd = "/etc/init.d/smbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+			raise BuildGWError(op_msg)
+
+		cmd = "/etc/init.d/nfs-kernel-server restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start nfs service for %s."%output
+			raise BuildGWError(op_msg)
 
 		op_ok = True
 		op_msg = 'Succeeded to build gateway'

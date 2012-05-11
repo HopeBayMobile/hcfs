@@ -209,6 +209,21 @@ def findLine(filename, line):
 
 	return False
 	
+def getListenPid(address):
+	cmd = "netstat -ntpl | grep %s"%address
+	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+	lines = po.stdout.readlines()
+	pid = None
+	for line in lines:
+		laddress = line.split()[3]
+		lstate = line.split()[5]
+
+		if lstate == "LISTEN" and laddress == address:
+			pid = int(line.split()[6].split('/')[0])
+	po.wait()
+	
+
+	return pid
 def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	Get a file logger using config settings.
@@ -600,16 +615,17 @@ if __name__ == '__main__':
 #		time.sleep(10)
 #		print "This is not timeout!!!"
 #	printstring()
-	@tryLock(1,1)
-	def testTryLock():
-		print "Hello"
+#	@tryLock(1,1)
+#	def testTryLock():
+#		print "Hello"
 
-	@tryLock(2,1)
-	def testTryLock2():
-		print "H"
-		testTryLock()
+#	@tryLock(2,1)
+#	def testTryLock2():
+#		print "H"
+#		testTryLock()
 		
-	testTryLock2()	
+#	testTryLock2()	
+	print getListenPid("0.0.0.0:8080")
 	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"

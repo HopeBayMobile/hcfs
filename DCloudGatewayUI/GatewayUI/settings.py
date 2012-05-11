@@ -130,6 +130,7 @@ INSTALLED_APPS = (
     'wizard',
     'dashboard',
     'djcelery',
+    'DWizard',
 )
 
 # A sample logging configuration. The only tangible logging
