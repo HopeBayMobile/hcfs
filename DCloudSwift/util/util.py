@@ -545,11 +545,6 @@ def stopAllServices():
 	stopDaemon("memcached")
 	os.system("swift-init all stop")
 
-	#Force to stop swift proxy
-	#pid = getListenPid("0.0.0.0:8080")
-	#if pid is not None:
-	#	os.system("kill -9 %d"%pid)
-
 def stopDaemon(daemonName):
 	logger = getLogger(name="stopDaemon")
 
