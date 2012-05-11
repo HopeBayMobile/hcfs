@@ -81,7 +81,7 @@ class SwiftMonitor(Daemon):
 			return returncode
 
 	@deferSIGTERM
-	@util.tryLock()
+	@util.tryLock(1)
 	def copyMaterials(self):
 		logger = util.getLogger(name="SwiftMonitor.copymaterials")
 		logger.info("start")
@@ -195,7 +195,7 @@ class SwiftMonitor(Daemon):
 			util.restartMemcached()
 
 		while True:
-			time.sleep(10)
+			time.sleep(60)
 			try:
 				if self.copyMaterials() !=0:
 					logger.error("Failed to copy materilas")

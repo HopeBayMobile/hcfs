@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-tw">
+    <head>
+        <!--Title-->
+
+        <title>Delta Storage Gateway</title>
+
+        <!--Metadata-->
+
+        <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+
+        <!--CSS-->
+        <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/bootstrap.css" />
+        <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/site.css" />
+        {% block stylesheet %}
+        {% endblock stylesheet %}
+        <style type="text/css">
+
+            body{
+                padding-top: 80px;
+            }
+
+            .container .content{
+                min-height: 500px;
+            }
+
+            .footer{
+                border-top: solid 1px #ddd;
+                padding-top: 20px;
+                margin-top: 60px;
+            }
+
+            {% block css_style %}
+            /* Give a quick and non-cross-browser friendly divider */
+            .content .span4 {
+                margin-left: 0;
+                padding-left: 19px;
+                border-right: 1px solid #eee;
+            }
+            {% endblock css_style %}
+        </style>
+        <script src="/static/js/jquery-1.7.min.js"></script>
+        <script src="/static/js/bootstrap.js"></script>
+		{% block javascript %}
+		{% endblock javascript %}
+    </head>
+
+    <body>
+
+
+    <div class="span12" >
+
+    <div style="position: fixed; margin: 0; background-color: black; top: 0; height: 80px;">
+        <p class="navbar-text pull-right">
+                <span> 100 MB/s</span>
+                <a href="#" class="btn btn-warning" style="margin: 0;">Warning</a>
+                <a href="#" class="btn btn-danger" style="margin: 0;">Uploading</a>
+                  {% if user.is_authenticated %}
+                  <a href="/logout" class="btn" style="margin: 0;">Logout</a>
+                  {% endif %}
+              </p>
+    </div>
+
+    {% block content %}
+
+    {% endblock content %}
+
+
+    </div> <!-- container -->
+    </body>
+</html>
