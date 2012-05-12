@@ -58,12 +58,64 @@ def getGatewayConfig():
 		if not config.has_section("s3ql"):
 			raise GatewayConfError("Failed to find section [s3q] in the config file")
 
+		if not config.has_option("s3ql", "mountOpt"):
+			raise GatewayConfError("Failed to find option 'mountOpt' in section [s3q] in the config file")
+
+		if not config.has_option("s3ql", "compress"):
+			raise GatewayConfError("Failed to find option 'compress' in section [s3q] in the config file")
+
 		return config
 	except IOError as e:
 		op_msg = 'Failed to access /etc/delta/Gateway.ini'
 		raise GatewayConfError(op_msg)
 		
+def getStorageUrl():
+	log.info("getStorageUrl start")
+	storage_url = None
+
+	try:
+		config = ConfigParser.ConfigParser()
+        	with open('/root/.s3ql/authinfo2') as op_fh:
+			config.readfp(op_fh)
+
+		section = "CloudStorageGateway"
+		storage_url = config.get(section, 'storage-url').replace("swift://","")
+	except Exception as e:
+		log.error("Failed to getStorageUrl for %s"%str(e))
+	finally:
+		log.info("getStorageUrl end")
+		return storage_url
 		
+def get_compression():
+	log.info("get_compression start")
+	op_ok = False
+	op_msg = ''
+	op_switch = True
+
+	try:
+		config = getGatewayConfig()
+		compressOpt = config.get("s3ql", "compress")
+		if compressOpt == "false":
+			op_switch = False
+
+		op_ok = True
+		op_msg = "Succeeded to get_compression"
+
+	except GatewayConfError as e:
+		op_msg = str(e)
+	except Exception as e:
+		op_msg = str(e)
+	finally:
+		if op_ok == False:
+			log.error(op_msg)
+
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+                      	      'data'   : {'switch': op_switch}}
+
+		log.info("build_gateway end")
+		return json.dumps(return_val)
+
 def get_gateway_indicators():
 
 	log.info("get_gateway_indicators start")
@@ -330,65 +382,98 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		log.info("apply_user_enc_key end")
 		return json.dumps(return_val)
 
+def _createS3qlConf( storage_url):
+	log.info("_createS3qlConf start")
+	ret = 1
+	try:
+		config = getGatewayConfig()
+		mountpoint = config.get("mountpoint", "dir")
+		mountOpt = config.get("s3ql", "mountOpt")
+		iface = config.get("network", "iface")
+		compress = "lzma" if config.get("s3ql","compress") == "true" else "none"
+		mountOpt = mountOpt + " --compress %s"%compress 
+
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+
+		ret = po.returncode
+		if ret !=0:
+			log.error("Failed to create s3ql config for %s"%output)
+
+	except Exception as e:
+		log.error("Failed to create s3ql config for %s"%str(e))
+	finally:
+		log.info("_createS3qlConf end")
+		return ret
+			
+
 @common.timeout(180)
 def _openContainter(storage_url, account, password):
+	log.info("_openContainer start")
 
-	os.system("touch gatewayContainer.txt")
-	cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	output = po.stdout.read()
-        po.wait()
+	try:
+		os.system("touch gatewayContainer.txt")
+		cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+        	po.wait()
 
-        if po.returncode != 0:
-		op_msg = "Failed to open container for"%output
-               	raise BuildGWError(op_msg)
+        	if po.returncode != 0:
+			op_msg = "Failed to open container for"%output
+               		raise BuildGWError(op_msg)
 	
-	output=output.strip()
-	if output != "gatewayContainer.txt":
-		op_msg = "Failed to open container for %s"%output
-               	raise BuildGWError(op_msg)
-	os.system("rm gatewayContainer.txt")
+		output=output.strip()
+		if output != "gatewayContainer.txt":
+			op_msg = "Failed to open container for %s"%output
+               		raise BuildGWError(op_msg)
+		os.system("rm gatewayContainer.txt")
+	finally:
+		log.info("_openContainer end")
 
 @common.timeout(180)
 def _mkfs(storage_url, key):
-	cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
-	po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	(stdout, stderr) = po.communicate(key)
-        if po.returncode != 0:
-		if stderr.find("existing file system!") == -1:
-			op_msg = "Failed to mkfs for %s"%stderr
-               		raise BuildGWError(op_msg)
-		else:
-			log.info("Found existing file system!")
+	log.info("_mkfs start")
+
+	try:
+		cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdout, stderr) = po.communicate(key)
+        	if po.returncode != 0:
+			if stderr.find("existing file system!") == -1:
+				op_msg = "Failed to mkfs for %s"%stderr
+               			raise BuildGWError(op_msg)
+			else:
+				log.info("Found existing file system!")
+	finally:
+		log.info("_mkfs end")
 
 
 @common.timeout(360)
 def _mount(storage_url):
+	log.info("_mount start")
+
 	try:
 		config = getGatewayConfig()
 
 		mountpoint = config.get("mountpoint", "dir")
+		mountOpt = config.get("s3ql", "mountOpt")
+		compressOpt = "lzma" if config.get("s3ql", "compress") == "true" else "none"		
+		mountOpt = mountOpt + " --compress %s"%compressOpt
+
+
+		authfile = "/root/.s3ql/authinfo2"
+
 		os.system("mkdir -p %s"%mountpoint)
 		
 		if os.path.ismount(mountpoint):
 			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
 
-		mountOpt=""
-		if config.has_option("s3ql", "mountOpt"):
-			mountOpt = config.get("s3ql", "mountOpt")
+		if _createS3qlConf(storage_url) !=0:
+			raise BuildGWError("Failed to create s3ql conf")
 
-
-		authfile = "/root/.s3ql/authinfo2"
-
-		#TODO: get interface from config file
-		iface = config.get("network", "iface")
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		output = po.stdout.read()
-		po.wait()
-        	if po.returncode != 0:
-			raise BuildGWError(output)
-
+		#mount s3ql
 		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
@@ -396,6 +481,7 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
+		#mkdir in the mountpoint for smb share
 		cmd = "mkdir -p %s/sambashare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
@@ -403,7 +489,7 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
-
+		#mkdir in the mountpoint for nfs share
 		cmd = "mkdir -p %s/nfsshare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
@@ -419,6 +505,39 @@ def _mount(storage_url):
 		log.error(str(e))
 		raise BuildGWError(op_msg)
 		
+
+@common.timeout(360)
+def _restartServices():
+	log.info("_restartServices start")
+	try:
+		config = getGatewayConfig()
+
+		cmd = "/etc/init.d/smbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+			raise BuildGWError(op_msg)
+
+		cmd = "/etc/init.d/nfs-kernel-server restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start nfs service for %s."%output
+			raise BuildGWError(op_msg)
+
+	except GatewayConfError as e:
+		raise e, None, sys.exc_info()[2]
+
+	except Exception as e:
+		op_msg = "Failed to restart smb&nfs services for %s"%str(e)
+		log.error(str(e))
+		raise BuildGWError(op_msg)
+	finally:
+		log.info("_restartServices start")
+
 
 def build_gateway():
 	log.info("build_gateway start")
@@ -444,23 +563,8 @@ def build_gateway():
 		_openContainter(storage_url=url, account=account, password=password)
 		_mkfs(storage_url=url, key=key)
 		_mount(storage_url=url)
+		_restartServices()
  
-		cmd = "/etc/init.d/smbd restart"
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		output = po.read()
-                po.wait()
-                if po.returncode != 0:
-                        op_msg = "Failed to start samba service for %s."%output
-			raise BuildGWError(op_msg)
-
-		cmd = "/etc/init.d/nfs-kernel-server restart"
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		output = po.read()
-                po.wait()
-                if po.returncode != 0:
-                        op_msg = "Failed to start nfs service for %s."%output
-			raise BuildGWError(op_msg)
-
 		op_ok = True
 		op_msg = 'Succeeded to build gateway'
 
@@ -493,6 +597,7 @@ def restart_nfs_service():
 	try:
 		cmd = "/etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.read()
 		po.wait()
 
 		if po.returncode == 0:
@@ -1093,6 +1198,54 @@ def get_nfs_access_ip_list ():
         
     return json.dumps(return_val)
     
+
+def set_compression(switch):
+	log.info("set_compression start")
+	op_ok = False
+	op_msg = ''
+	op_switch = True
+
+	try:
+		config = getGatewayConfig()
+
+		if switch == True:
+			config.set("s3ql", "compress", "true")
+		elif switch == False:
+			config.set("s3ql", "compress", "false")
+
+		else:
+			raise Exception("The input argument has to be True or False")
+
+		storage_url = getStorageUrl()
+		if storage_url is None:
+			raise Exception("Failed to get storage url")
+
+		if  _createS3qlConf(storage_url) !=0:
+			raise Exception("Failed to create new s3ql config")
+
+		with open('/etc/delta/Gateway.ini','wb') as op_fh:
+			config.write(op_fh)
+		
+		op_ok = True
+		op_msg = "Succeeded to set_compression"
+
+	except IOError as e:
+		op_msg = str(e)
+	except GatewayConfError as e:
+		op_msg = str(e)
+	except Exception as e:
+		op_msg = str(e)
+	finally:
+		if op_ok == False:
+			log.error(op_msg)
+
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+                      	      'data'   : {}}
+
+		log.info("set_compression end")
+		return json.dumps(return_val)
+
 def set_nfs_access_ip_list (array_of_ip):
     '''
     update to /etc/hosts.allow
@@ -1256,5 +1409,5 @@ def force_upload_sync(bw):			# by Yen
 
 
 if __name__ == '__main__':
+	#print build_gateway()
 	pass
-	#print set_smb_user_list ('superuser', 'superuser')
