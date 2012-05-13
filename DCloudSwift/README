@@ -5,26 +5,35 @@
 	(2) Language: python and bash shell
 	(3) Hardware: AMD 64bit
 
+
 2. How to use the scripts:
 	(1) Copy the folder 'DCloudSwift' to the master node.
 	(2) Change your privilege to root.
-	(3) Execute 'python setup.py install'
-	(4) cd /etc/delta/scripts/DCloudSwift/master
-	(5) In case deb packages are not installed on nodes to be deployed, add the following line to the '__main__' section of /DCloudSwift/master/SwiftDeploy.py:
-	    util.spreadPackages(password, [NODE1_IP, NODE2_IP, ...]
-	(5) Modify the '__main__' section of DCloudSwift/master/SwiftDeploy.py
-	    SD = SwiftDeploy("./Swift.ini", [{"ip":"PROXY_NODE1_IP"},{"ip":"PROXY_NODE2_IP"},...], 
-                                            [{"ip":STORAGE_NODE1_IP, "zid":ZONE_ID}, {"ip":STORAGE_NODE2_IP, "zid":STORAGE_NODE2_ZONE_ID}, ...])
-	    Modify PROXY_NODE_IP and STORAGE_NODE_IP to your proxy node IP and 
-	    storage node IP, respectively.
-	(6) Execute the command: python SwiftDeploy.py
+	(3) Modify the [storage] section in Swift.ini:
+            password = password of root in swift nodes
+            replica = how many replica of data do you want
+            deviceCnt = how many disks to use in each swift node
+`
+	(4) Execute 'python setup.py install'
+	(5) Edit /etc/delta/proxyNodes in the following format:
+              ip1
+              ip2
+              ... 
+        (6) Edit /etc/delta/storageNodes in the following format:
+              ip1 zid1
+              ip2 zid2
+              ...
+            
+            where zid has to be a positive integer less than 10.
+              
+	(7) execute dcloud_swift_deploy
+
 
 
 [Note]:
-1. The existence of the master node is for the use of PDCM. When PDCM is ready, 
-   we don't have to modify the proxy node IP and storage node IP in SwiftDeploy.py. 
-   PDCM will assign the IPs of proxy and storage nodes automatically. However, a 
-   few codes must be writen to connect the scripts with PDCM.
+1. The command "dcloud_swift_deploy" is for the convenience of testing. 
+   Onec PDCM is ready, we don't have to edit /etc/delta/storageNodes and /etc/delta/proxyNodes. 
+   PDCM will assign the IPs of proxy and storage nodes automatically.
 
 2. The logs and error handling are not ready yet! Some logs can be found 
    in /var/log/deltaSwift.

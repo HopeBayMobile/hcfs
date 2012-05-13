@@ -51,7 +51,6 @@ class SwiftDeploy:
 		}
 
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
-		os.system("mkdir -p %s" % self.__kwparams['reportDir'])
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
@@ -329,38 +328,94 @@ class SwiftDeploy:
 		logger.error("Failed to rmStorage\n")
 		return (1, self.__proxyList, self.__storageList)
 
+def main():
+	ret = 1
+
+	proxyList =[]
+	storageList = []
+	
+	try:
+		proxyFile = "/etc/delta/proxyNodes"
+		storageFile = "/etc/delta/storageNodes"
+
+		proxyIpSet = set()
+		with open(proxyFile) as fh:
+			for line in fh.readlines():
+				line = line.strip()
+				if len(line) > 0:
+					try:
+						ip = line.split()[0]
+						socket.inet_aton(ip)
+						proxyList.append({"ip":ip})
+						if ip in proxyIpSet:
+							raise Exception("%s contains duplicate ip"%proxyFile)
+						proxyIpSet.add(ip)
+
+					except socket.error:
+						raise Exception("%s contains a invalid ip %s"%(proxyFile, ip))
+
+
+		storageIpSet = set()
+		with open(storageFile) as fh:
+			for line in fh.readlines():
+				line = line.strip()
+				if len(line) > 0:
+					tokens = line.split()
+					if len(tokens) != 2:
+						raise Exception("%s contains a invalid line %s"%(storageFile, line))
+					try:
+						ip=tokens[0]
+						zid = int(tokens[1])
+						socket.inet_aton(ip)
+
+						if zid < 1 or zid > 9:
+							raise Exception("zid has to be a positive integer < 10")
+						storageList.append({"ip": ip, "zid": zid})
+						if ip in storageIpSet:
+							raise Exception("%s contains duplicate ip"%storageFile)
+
+						storageIpSet.add(ip)
+					except socket.error:
+						raise Exception("%s contains a invalid ip %s"%(storageFile, ip))
+					except ValueError:
+						raise Exception("%s contains a invalid zid %s"%(storageFile, tokens[1]))
+						
+
+		print proxyList
+		print storageList
+		SD = SwiftDeploy(proxyList, storageList)
+		#SD.createMetadata()
+		#t = Thread(target=SD.deploySwift, args=())
+		#t.start()
+		#progress = SD.getDeployProgress()
+		#while progress['finished'] != True:
+		#	time.sleep(5)
+		#	print progress
+		#	progress = SD.getDeployProgress()
+		#print "Swift deploy process is done!"
+
+		return 0
+	except IOError as e:
+		print >>sys.stderr,  "Failed to access input files for %s"%str(e)
+	except Exception as e:
+		print >>sys.stderr, str(e)
+	finally:
+		return ret
 
 if __name__ == '__main__':
+	pass
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-	SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
+	#SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
 	#SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
 	
-	SD.createMetadata()
-	t = Thread(target=SD.deploySwift, args=())
-	t.start()
-	progress = SD.getDeployProgress()
-	while progress['finished'] != True:
-		time.sleep(5)
-		print progress
-		progress = SD.getDeployProgress()
+	#SD.createMetadata()
+	#t = Thread(target=SD.deploySwift, args=())
+	#t.start()
+	#progress = SD.getDeployProgress()
+	#while progress['finished'] != True:
+	#	time.sleep(5)
+	#	print progress
+	#	progress = SD.getDeployProgress()
 	#print "Swift deploy process is done!"
 	#SD.deploySwift()
-	#SD.rmStorage()
-	#SD.addStorage()
-	#SD.proxyDeploy()
-	#SD.storageDeploy()
-	#pool = threadpool.ThreadPool(2)
-	#requests = threadpool.makeRequests(SD.getDeployProgress, [(None, None)])
-	#for req in requests:
-	#	pool.putRequest(req)
-	#requests = threadpool.makeRequests(SD.proxyDeploy, [(None, None)])
-	#for req in requests:
-	#	pool.putRequest(req)
-	#requests = threadpool.makeRequests(SD.storageDeploy, [(None, None)])
-	#for req in requests:
-	#	pool.putRequest(req)
-	#pool.wait()
-	#pool.dismissWorkers(2)
-	#pool.joinAllDismissedWorkers()
-
