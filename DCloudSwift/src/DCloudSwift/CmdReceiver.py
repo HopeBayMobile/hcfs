@@ -15,12 +15,12 @@ from ConfigParser import ConfigParser
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(WORKING_DIR)
-os.chdir(WORKING_DIR)
-sys.path.append("%s/DCloudSwift/"%BASEDIR)
+#os.chdir(WORKING_DIR)
+#sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
+import maintenance
 from util import util
 from util import mountDisks
-from maintenance import maintenance
 from nodeInstaller import NodeInstaller
 
 Usage = '''

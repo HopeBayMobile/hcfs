@@ -52,30 +52,4 @@ def updateMetadata(confDir):
 
 
 if __name__ == '__main__':
-	sys.path.append("%s/DCloudSwift/"%BASEDIR)
-#	print isNewer(confDir="/etc/delta/swift")
-	#updateMetadata(confDir="/etc/delta/swift")
-#	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
-#	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
-#	print installAllDeb("/DCloudSwift/storage/deb_source")
-#	print isLineExistent("/etc/fstab","ddd")
-#	print getStorageNodeIpList()
-#	runPopenCommunicate("cd /etc/swift", inputString='y\n', logger=logger)
-#	runPopenCommunicate("mkfs -t ext4 /dev/sda", inputString='y\n', logger=logger)
-
-#	logger = getLogger(name="Hello")
-#	logger.info("Hello")
-
-#	spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
-
-#	@timeout(5)
-#	def printstring():
-#		print "Start!!"
-#		time.sleep(10)
-#		print "This is not timeout!!!"
-#	printstring()
-	#sendMaterials("deltacloud", "172.16.229.146")
-	#cmd = "ssh root@172.16.229.146 sleep 5"
-	#print sshpass("deltacloud", cmd, timeout=1)
-#	print os.path.dirname(os.path.dirname(os.getcwd()))
 	pass	
