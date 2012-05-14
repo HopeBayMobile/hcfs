@@ -4,6 +4,7 @@ CONFDIR='/etc/delta'
 AUTHDIR='/root/.s3ql'
 SMBDIR='/etc/samba'
 NFSDIR='/etc'
+ETCDIR='/etc'
 NETDIR='/etc/network'
 
 def read(fname):
@@ -29,6 +30,8 @@ def main():
 			     (SMBDIR, ['config/smb.conf']),
                              (NFSDIR, ['config/hosts.allow']),
                              (NFSDIR, ['config/hosts.deny']),
+                             (NFSDIR, ['config/exports']),
+                             (ETCDIR, ['config/rc.local']),
                              (NETDIR, ['config/interfaces'])
                            ], 
 		

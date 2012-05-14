@@ -6,6 +6,8 @@ import common
 import subprocess
 import time
 import errno
+import re
+import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -22,6 +24,45 @@ default_user_pwd = "superuser"
 RUN_CMD_TIMEOUT = 15
 
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
+
+LOGFILES = {
+            "syslog" : "/var/log/syslog",
+            "mount" : "/root/.s3ql/mount.log",
+            "fsck" : "/root/.s3ql/fsck.log"
+            }
+
+LOG_PARSER = {
+             "syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
+             "mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             "fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             }
+
+# if a keywork match a msg, the msg is belong to the class
+# key = level, val = keyword array
+KEYWORD_FILTER = {
+                  "error_log" : ["error", "exception"],
+                  "warring_log" : ["warring"],
+                  "info_log" : ["nfs", "cifs" , "."],
+                  # the pattern . matches any log, 
+                  # that is if a log mismatches 0 or 1, then it will be assigned to 2
+                  }
+
+LOG_LEVEL = {
+            0 : ["error_log", "warring_log", "info_log"],
+            1 : ["error_log", "warring_log"],
+            2 : ["error_log"],
+            }
+
+DEFAULT_SHOW_LOG_LEVEL = 2
+
+enable_log = False
+
+CMD_CHK_STO_CACHE_STATE = "s3qlstat /mnt/cloudgwfiles"
+
+NUM_LOG_LINES = 20
+
+MONITOR_IFACE = "eth0"
+
 
 ################################################################################
 
@@ -488,6 +529,15 @@ def _mount(storage_url):
 		po.wait()
         	if po.returncode != 0:
 			raise BuildGWError(output)
+
+                #change the owner of samba share to default smb account
+                cmd = "chown superuser:superuser %s/sambashare"%mountpoint
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        raise BuildGWError(output)
+
 
 		#mkdir in the mountpoint for nfs share
 		cmd = "mkdir -p %s/nfsshare"%mountpoint
@@ -1406,6 +1456,450 @@ def force_upload_sync(bw):			# by Yen
 		'data': {}
 	}
 	return json.dumps(return_val)
+
+################################################################################
+def month_number(monthabbr):
+    """Return the month number for monthabbr; e.g. "Jan" -> 1."""
+
+    MONTHS = ['',
+              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+              ]
+
+    index = MONTHS.index(monthabbr)
+    return index
+
+def classify_logs (log, keyword_filter=KEYWORD_FILTER):
+    '''
+    give a log msg and a keyword filter {key=category, val = [keyword]}
+    find out which category the log belongs to 
+    assume that keywords are not overlaped 
+    '''
+
+    for category in sorted(keyword_filter.keys()):
+
+        for keyword in keyword_filter[category]:
+            #print "in keyword = " + keyword
+            if re.search(keyword, log):
+                #print "match"
+                return category
+            else:
+                #print "mismatch"
+                pass
+
+    return None
+
+def parse_log (type, log_cnt):
+    '''
+    parse a log line to log_entry data structure 
+    different types require different parser
+    #type = syslog
+    #log_cnt = "May 10 13:43:46 ubuntu dhclient: bound to 172.16.229.78 -- renewal in 277 seconds."
+
+    #type = mount | fsck # i.e.,g from s3ql
+    #log_cnt = "2012-05-07 20:22:22.649 [1666] MainThread: [mount] FUSE main loop terminated."
+    '''
+
+    #print "in parsing log"
+    #print type
+    #print log_cnt
+
+    log_entry = {
+                 "category" : "",
+                 "timestamp" : "",
+                 "msg" : ""
+                 }
+
+    pat = LOG_PARSER[type]
+
+    m = pat.match(log_cnt)
+    if m == None:
+        #print "Not found"
+        return {}
+
+    #print "match"
+    #print m.group()
+    #return 
+
+    minute = int(m.group('minute'))
+    #print minute
+
+    hour = int(m.group('hour'))
+    #print hour
+
+    day = int(m.group('day'))
+    #print day
+
+    second = int(m.group('second'))
+    #print second
+
+    if len(m.group('month')) == 2:
+        month = int(m.group('month'))
+    else:
+        month = month_number(m.group('month'))
+    #print month
+
+    try:
+        # syslog has't year info, try to fetch group("year") will cause exception
+        year = int(m.group('year'))
+    except:
+        # any exception, using this year instead
+        now = datetime.datetime.utcnow()
+        year = now.year
+
+    #print year
+
+    msg = m.group('message')
+    #print msg
+
+    #now = datetime.datetime.utcnow()
+
+    try:
+        timestamp = datetime.datetime(year, month, day, hour, minute, second) # timestamp
+    except Exception:
+        #print "datatime error"
+        #print Exception
+        return {}
+
+    #print "timestamp = "
+    #print timestamp
+    #print "msg = "
+    #print msg
+    log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
+    log_entry["timestamp"] = str(timestamp.now())
+    log_entry["msg"] = msg
+    return log_entry
+
+##########################
+def read_logs(logfiles_dict, offset, num_lines):
+    '''
+    read all files in logfiles_dict, 
+    the log will be reversed since new log line is appended to the tail
+    
+    and then, each log is parsed into log_entry dict.
+    
+    the offset = 0 means that the latest log will be selected
+    num_lines means that how many lines of logs will be returned, 
+              set to "None" for selecting all logs 
+    '''
+
+    ret_log_cnt = {}
+
+    for type in logfiles_dict.keys():
+        ret_log_cnt[type] = []
+
+        log_buf = []
+
+        try:
+            log_buf = [line.strip() for line in open(logfiles_dict[type])]
+            log_buf.reverse()
+
+            #print log_buf
+            #return {}
+
+            # get the log file content
+            #ret_log_cnt[type] = log_buf[ offset : offset + num_lines]
+
+            # parse the log file line by line
+            nums = NUM_LOG_LINES
+            if num_lines == None:
+                nums = len(log_buf) - offset # all
+            else:
+                nums = num_lines
+
+            for log in log_buf[ offset : offset + nums]:
+                log_entry = parse_log(type, log)
+                ret_log_cnt[type].append(log_entry)
+
+        except :
+            pass
+
+            #if enable_log:
+            #    log.info("cannot parse " + logfiles_dict[type])
+            #ret_log_cnt[type] = ["None"]
+            #print "cannot parse"
+
+    return ret_log_cnt
+
+
+##############################    
+def storage_cache_usage():
+    '''
+    read all files in logfiles array, return last n lines
+    format:
+    
+Directory entries:    601
+Inodes:               603
+Data blocks:          1012
+Total data size:      12349.54 MB
+After de-duplication: 7156.38 MB (57.95% of total)
+After compression:    7082.76 MB (57.35% of total, 98.97% of de-duplicated)
+Database size:        0.30 MB (uncompressed)
+(some values do not take into account not-yet-uploaded dirty blocks in cache)
+Cache size: current: 7146.38 MB, max: 20000.00 MB
+Cache entries: current: 1011, max: 250000
+Dirty cache status: size: 0.00 MB, entries: 0
+Cache uploading: Off
+
+Dirty cache near full: False
+    
+    '''
+
+    ret_usage = {
+              "cloud_storage_usage" :  {
+                                    "cloud_data" : 0,
+                                    "cloud_data_dedup" : 0,
+                                    "cloud_data_dedup_compress" : 0
+                                  },
+              "gateway_cache_usage"   :  {
+                                    "max_cache_size" : 0,
+                                    "max_cache_entries" : 0,
+                                    "used_cache_size" : 0,
+                                    "used_cache_entries" : 0,
+                                    "dirty_cache_size" : 0,
+                                    "dirty_cache_entries" : 0
+                                   }
+              }
+
+    # Flush check & DirtyCache check
+    try:
+        #print CMD_CHK_STO_CACHE_STATE
+        args = str(CMD_CHK_STO_CACHE_STATE).split(" ")
+        proc = subprocess.Popen(args,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+
+        results = proc.stdout.read()
+        #print results
+
+        ret_val = proc.wait() # 0 : success
+        #proc.kill()
+
+        #print ret_val
+
+        if ret_val == 0: # success
+            '''
+            very boring string parsing process.
+            the format should be fixed. otherwise, won't work (no error checking)  
+            '''
+
+            for line in results.split("\n"):
+                #print line.strip()
+                if line.startswith("Total data size:"):
+                    tokens = line.split(":")
+                    val = tokens[1].replace("MB", "").strip()
+                    #print int(float(val)/1024.0)
+                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
+                    #print val
+
+                if line.startswith("After de-duplication:"):
+                    tokens = line.split(":")
+                    #print tokens[1]
+                    size = str(tokens[1]).strip().split(" ")
+                    val = size[0]
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024 # MB -> GB 
+                    #print val
+
+                if line.startswith("After compression:"):
+                    tokens = line.split(":")
+                    #print tokens[1]
+                    size = str(tokens[1]).strip().split(" ")
+                    val = size[0]
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024 # MB -> GB 
+                    #print val
+
+                if line.startswith("Cache size: current:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024 # MB -> GB 
+                    #print max_val
+
+                if line.startswith("Cache entries: current:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["used_cache_entries"] = crt_val
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["max_cache_entries"] = max_val
+                    #print max_val
+
+                if line.startswith("Dirty cache status: size:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
+                    #print max_val
+
+    except Exception:
+        #print Exception
+        #print "exception: %s" % CMD_CHK_STO_CACHE_STATE
+
+        if enable_log:
+            log.info(CMD_CHK_STO_CACHE_STATE + " fail")
+
+    return ret_usage
+
+##############################
+def get_network_speed(iface_name): # iface_name = eth1
+    '''
+    call get_network_status to get current nic status
+    wait for 1 second, and all again. 
+    then calculate difference, i.e., up/down link 
+    '''
+
+    ret_val = {
+               "uplink_usage" : 0 ,
+               "downlink_usage" : 0,
+               "uplink_backend_usage" : 0 ,
+               "downlink_backend_usage" : 0
+               }
+
+    pre_status = get_network_status(iface_name)
+    time.sleep(1)
+    next_status = get_network_status(iface_name)
+
+    ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
+    ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
+
+    return ret_val
+
+##############################
+def get_network_status(iface_name): # iface_name = eth1
+    '''
+    so far, cannot get current uplink, downlink numbers,
+    use file /proc/net/dev, i.e., current tx, rx instead of
+
+    if the target iface cannot find, all find ifaces will be returned
+    '''
+    ret_network = {}
+
+    lines = open("/proc/net/dev", "r").readlines()
+
+    columnLine = lines[1]
+    _, receiveCols , transmitCols = columnLine.split("|")
+    receiveCols = map(lambda a:"recv_" + a, receiveCols.split())
+    transmitCols = map(lambda a:"trans_" + a, transmitCols.split())
+
+    cols = receiveCols + transmitCols
+
+    faces = {}
+    for line in lines[2:]:
+        if line.find(":") < 0: continue
+        face, data = line.split(":")
+        faceData = dict(zip(cols, data.split()))
+        face = face.strip()
+        faces[face] = faceData
+
+    try:
+        ret_network = faces[iface_name]
+    except:
+        ret_network = faces # return all
+        pass
+
+    return ret_network
+
+################################################################################
+def get_gateway_status():
+    '''
+    report gateway status
+    '''
+
+    ret_val = {"result" : True,
+               "msg" : "Gateway log & status",
+               "data" : { "error_log" : [],
+                       "cloud_storage_usage" : 0,
+                       "gateway_cache_usage" : 0,
+                       "uplink_usage" : 0,
+                       "downlink_usage" : 0,
+                       "uplink_backend_usage" : 0,
+                       "downlink_backend_usage" : 0,
+                       "network" : {}
+                      }
+            }
+
+    if enable_log:
+        log.info("get_gateway_status")
+
+    # get logs           
+    #ret_log_dict = read_logs(NUM_LOG_LINES)
+    ret_val["data"]["error_log"] = read_logs(logfiles, 0 , NUM_LOG_LINES)
+
+    # get usage
+    usage = storage_cache_usage()
+    ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
+    ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
+
+    # get network statistics
+    network = get_network_speed(MONITOR_IFACE)
+    ret_val["data"]["uplink_usage"] = network["uplink_usage"]
+    ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+
+    return json.dumps(ret_val)
+
+################################################################################
+def get_gateway_system_log (log_level, number_of_msg, category_mask):
+    '''
+    due to there are a few log src, e.g., mount, fsck, syslog, 
+    the number_of_msg will apply to each category.
+    so, 3 x number_of_msg of log may return for each type of log {info, err, war)
+    '''
+
+    ret_val = { "result" : True,
+                "msg" : "gateway system logs",
+                "data" : { "error_log" : [],
+                           "warning_log" : [],
+                           "info_log" : []
+                         }
+               }
+
+    logs = read_logs(LOGFILES, 0 , None) #query all logs
+
+    for level in LOG_LEVEL[log_level]:
+        for logfile in logs: # mount, syslog, ...
+            counter = 0  # for each info src, it has number_of_msg returned
+
+            for log in logs[logfile]: # log entries
+                if counter >= number_of_msg:
+                    break # full, finish this src
+                try:
+                    if log["category"] == level:
+                        ret_val["data"][level].append(log)
+                        counter = counter + 1
+                    else:
+                        pass
+                except:
+                    pass # any except, skip this line
+
+    return json.dumps(ret_val)
+
+#######################################################
+
 
 
 if __name__ == '__main__':
