@@ -338,6 +338,8 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	op_msg = 'Failed to change encryption keys for unexpetced errors.'
 
 	try:
+                #TODO: 1. call s3ql utility to change encryption key after verifying the correctness of old key
+                #TODO: 2. if no existing old key, need to check s3ql bucket for existing FS and check if the entered key is correct (if FS exists)
 		#Check if the new key is of valid format
 		if not common.isValidEncKey(new_key):
 			op_msg = "New encryption Key has to an alphanumeric string of length between 6~20"		
@@ -630,7 +632,13 @@ def restart_smb_service():
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
 
-		if po.returncode == 0:
+                #Jiahong: Adding restarting nmbd as well
+                cmd1 = "/etc/init.d/nmbd restart"
+                po1 = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po1.wait()
+
+
+		if (po.returncode == 0) and (po1.returncode == 0):
 			op_ok = True
 			op_msg = "Restarting samba service succeeded."
 
