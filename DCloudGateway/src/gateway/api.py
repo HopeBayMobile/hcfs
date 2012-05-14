@@ -446,10 +446,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 			      'msg'    : op_msg,
 			      'data'   : {}}
 
-		if op_ok == True:
-			reset_gateway()
-		else:
-			return json.dumps(return_val)
+		return json.dumps(return_val)
 
 def _createS3qlConf( storage_url):
 	log.info("_createS3qlConf start")
