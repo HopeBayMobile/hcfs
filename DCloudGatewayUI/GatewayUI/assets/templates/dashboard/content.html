@@ -1,7 +1,7 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
     <div class="tab-pane active" id="dash" style="overflow-x: hidden;">
-        <p>I'm in dashboard.</p>
+        {% include "dashboard/dashboard.html" %}
     </div>
     <div class="tab-pane" id="account">
         <p>Howdy, I'm in account config.</p>
@@ -106,6 +106,7 @@
                 icon
             </div>
         </div>
+    </div>
     <div class="tab-pane" id="system">
         <p>What up girl, this is sync mgnt.</p>
     </div>
@@ -119,6 +120,6 @@
         <p>What up girl, this is syslog.</p>
     </div>
     <div class="tab-pane" id="power">
-        <p>Do you want to shutdown?</p>
+        {% include "dashboard/power.html" %}
     </div>
 {% endblock tab_content %}
