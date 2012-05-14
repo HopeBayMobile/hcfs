@@ -3,9 +3,8 @@ from setuptools import setup, find_packages
 CONFDIR='/etc/delta'
 AUTHDIR='/root/.s3ql'
 SMBDIR='/etc/samba'
-NFSDIR='/etc'
-ETCDIR='/etc'
 NETDIR='/etc/network'
+ETCDIR='/etc'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -28,11 +27,11 @@ def main():
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
 			     (SMBDIR, ['config/smb.conf']),
-                             (NFSDIR, ['config/hosts.allow']),
-                             (NFSDIR, ['config/hosts.deny']),
-                             (NFSDIR, ['config/exports']),
-                             (ETCDIR, ['config/rc.local']),
-                             (NETDIR, ['config/interfaces'])
+                             (NETDIR, ['config/interfaces']),
+                             (ETCDIR, ['config/hosts.allow']),
+                             (ETCDIR, ['config/hosts.deny']),
+                             (ETCDIR, ['config/exports']),
+                             (ETCDIR, ['config/rc.local'])
                            ], 
 		
 		test_suite='unittest',
@@ -45,6 +44,7 @@ def main():
 
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
+        os.system("cp config/interfaces /etc/network/interfaces")
 
 if __name__ == '__main__':
     main()
