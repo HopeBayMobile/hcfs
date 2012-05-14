@@ -1202,7 +1202,13 @@ def set_smb_user_list (username, password):
         log.error("set_smb_user_list timeout")
         return_val['msg'] = 'Timeout for changing passwd.'
         return json.dumps(return_val)
+
+    #Resetting smb service
+    smb_return_val = json.loads(restart_smb_service())
     
+    if smb_return_val['result'] == False
+        return_val['msg'] = 'Error in restarting smb service.'
+        return json.dumps(return_val) 
     
     # good. all set
     return_val['result'] = True
@@ -1327,7 +1333,7 @@ def set_nfs_access_ip_list (array_of_ip):
     return_val = {
                   'result' : False,
                   'msg' : 'get NFS access ip list failed unexpectedly.',
-                  'data' : { "array_of_ip" : [] } }
+                  'data' : {} }
 
 
     log.info("set_nfs_access_ip_list starts")
@@ -1357,9 +1363,9 @@ def set_nfs_access_ip_list (array_of_ip):
             #print services
             #print ips
             
-            return_val['result'] = True
-            return_val['msg'] = "Get ip list success"
-            return_val['data']["array_of_ip"] = ips
+            #return_val['result'] = True
+            #return_val['msg'] = "Get ip list success"
+            #return_val['data']["array_of_ip"] = ips
             
             #return json.dumps(return_val)
             
@@ -1378,11 +1384,20 @@ def set_nfs_access_ip_list (array_of_ip):
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
-        return_val['data']["array_of_ip"] = " ".join(array_of_ip)
     except:
         log.info("cannot write to " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
+
+
+    #Resetting nfs service
+    nfs_return_val = json.loads(restart_nfs_service())
+
+    if nfs_return_val['result'] == False
+        return_val['result'] = False
+        return_val['msg'] = 'Error in restarting NFS service.'
+        return json.dumps(return_val)
+
         
     log.info("get_nfs_access_ip_list end")
 
