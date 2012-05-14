@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block head %}
+{{ wizard.form.media }}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+	<div class="span12">
+		<div class="page-header">
+			<h1>Step {{ wizard.steps.step1 }} of {{ wizard.steps.count }}</h1>
+		</div>
+		<form id="form" class="form-horizontal" method="POST" action="">
+	{% csrf_token %}	
+	{{ wizard.management_form }}
+	
+	{% if wizard.form.forms %}
+	    {{ wizard.form.management_form }}
+	    {% for form in wizard.form.forms %}
+	        {{ form }}
+	    {% endfor %}
+	{% else %}
+
+{% if wizard.form.fieldset %}
+
+{% for legend, items in wizard.form.fieldset_list %}
+<fieldset>
+	<legend>{{legend}}</legend>
+	{% for field in items %}
+	<div class="control-group">
+	<label class="control-label" for="id_{{field.name_of_field}}">{{field.label}}</label>
+		<div class='controls'>
+			{{ field }}
+			{%if field.help_text %}
+			<span class="help-inline">{{field.help_text}}</span>
+			{% endif %}
+			{% for error in field.errors %}
+			<p class="help-block" style="color:red;">{{ error }}</p>
+			{% endfor %}
+		</div>
+	</div>
+	{% endfor %}
+</fieldset>
+{% endfor %}
+
+{% else %}
+	{% for field in wizard.form %}
+		<div class="control-group">
+		<label class="control-label" for="id_{{field.name_of_field}}">{{field.label}}</label>
+			<div class='controls'>
+				{{ field }}
+				{%if field.help_text %}
+				<span class="help-inline">{{field.help_text}}</span>
+				{% endif %}
+				{% for error in field.errors %}
+				<p class="help-block" style="color:red;">{{ error }}</p>
+				{% endfor %}
+			</div>
+		</div>
+	{% endfor %}
+{% endif %}
+
+
+	{% endif %}			
+			<div class="form-actions">
+				{% if wizard.steps.prev %}
+				{#<button class="btn" name="wizard_goto_step" type="submit" value="{{ wizard.steps.first }}">{% trans "First Step" %}</button>#}
+				<button class="btn" name="back" type="submit" value="{{ wizard.steps.prev }}">{% trans "Back" %}</button>
+				{% endif %}
+				<button class="btn btn-primary" type="submit" name="next">{% trans "Next" %}</button>
+				<span class="label hide"></span>
+			</div>
+		</form>
+	</div>
+</div>
+{% endblock %}
