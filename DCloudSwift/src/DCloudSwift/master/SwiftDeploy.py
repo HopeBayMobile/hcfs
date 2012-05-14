@@ -384,15 +384,15 @@ def main():
 		print proxyList
 		print storageList
 		SD = SwiftDeploy(proxyList, storageList)
-		#SD.createMetadata()
-		#t = Thread(target=SD.deploySwift, args=())
-		#t.start()
-		#progress = SD.getDeployProgress()
-		#while progress['finished'] != True:
-		#	time.sleep(5)
-		#	print progress
-		#	progress = SD.getDeployProgress()
-		#print "Swift deploy process is done!"
+		SD.createMetadata()
+		t = Thread(target=SD.deploySwift, args=())
+		t.start()
+		progress = SD.getDeployProgress()
+		while progress['finished'] != True:
+			time.sleep(5)
+			print progress
+			progress = SD.getDeployProgress()
+		print "Swift deploy process is done!"
 
 		return 0
 	except IOError as e:
