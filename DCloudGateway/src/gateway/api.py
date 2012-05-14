@@ -379,8 +379,6 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	op_msg = 'Failed to change encryption keys for unexpetced errors.'
 
 	try:
-                #TODO: 1. call s3ql utility to change encryption key after verifying the correctness of old key
-                #TODO: 2. if no existing old key, need to check s3ql bucket for existing FS and check if the entered key is correct (if FS exists)
 		#Check if the new key is of valid format
 		if not common.isValidEncKey(new_key):
 			op_msg = "New encryption Key has to an alphanumeric string of length between 6~20"		
@@ -399,12 +397,28 @@ def apply_user_enc_key(old_key=None, new_key=None):
 			op_msg = "Section CloudStorageGateway is not found."
 			raise Exception(op_msg)
 
-		if op_config.has_option(section, 'bucket-passphrase'):
-			key = op_config.get(section, 'bucket-passphrase')
-			if key is not None and  key != old_key:
-				op_msg = "old_key is not correct"
-				raise Exception(op_msg)
+		
+		#TODO: deal with the case where the key stored in /root/.s3ql/authoinfo2 is Wrong
+		key = op_config.get(section, 'bucket-passphrase')
+		if key != old_key:
+			op_msg = "The input old_key is incorrect"
+			raise Exception(op_msg)
 
+		op_config.set(section, 'bucket-passphrase', old_key)
+		with open('/root/.s3ql/authinfo2','wb') as op_fh:
+			op_config.write(op_fh)
+
+		storage_url = op_config.get(section, 'storage-url')
+		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
+		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		(stdout, stderr) = po.communicate(new_key)
+		if po.returncode !=0:
+			if stdout.strip() == "Wrong bucket passphrase":
+				op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
+			else:
+				op_msg = "Failed to change enc_key for %s"%stdout
+			raise Exception(op_msg)
+		
 		op_config.set(section, 'bucket-passphrase', new_key)
 		with open('/root/.s3ql/authinfo2','wb') as op_fh:
 			op_config.write(op_fh)
@@ -1912,4 +1926,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 if __name__ == '__main__':
 	#print build_gateway()
+	print apply_user_enc_key("1234567", "1234567")
 	pass
