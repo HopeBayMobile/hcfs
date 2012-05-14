@@ -53,7 +53,7 @@ input.span05 {
 }
 
 .main-bg{
-	background-color: #74ABCB;
+	background-color: #CFECF2;
 	width: 804px;
 	left: 220px;
 }
@@ -64,10 +64,11 @@ input.span05 {
 }
 
 .main-row{
-	position: relative;
+	position: absolute;
 	left: 220px;
     width: 804px;
-    margin-top: 80px;
+    bottom: 0;
+    top: 80px;
 }
 
 .left-row{
@@ -86,7 +87,6 @@ input.span05 {
 }
 
 .box-body{
-	background-color: #CFECF2;
 	position: relative;
 	top: 50px;
 	bottom: 20px;
@@ -150,4 +150,103 @@ input.span05 {
 	padding: 7px;
 	width: 150px;
 	height: 25px;
+}
+
+.action-btn{
+	position: relative;
+	padding-top: 100px;
+
+}
+
+/*The following are styles for power page.*/
+
+.poweroff{
+	position: absolute;
+	min-width: 250px;
+	padding: 20px;
+	font-size: 28px;
+	text-align: center;
+	left:75px;
+	background-color: #C03556;
+}
+
+.reset{
+	position: absolute;
+	padding: 20px;
+	font-size: 28px;
+	min-width: 250px;
+	text-align: center;
+	right:75px;
+	background-color: #EFA943;
+}
+
+/*The following are styles for usage and status page*/
+
+.storage-usage-info{
+	position: relative;
+	margin-left: 50px;
+	max-width: 300px;
+	float: left;
+}
+
+.storage-usage-info header{
+	background-color: black;
+	color: white;
+	font: 20px bold;
+	padding: 10px 20px;
+}
+
+.storage-usage-info section{
+	border: solid gray 2pt;
+	border-top: none;
+	background-color: white;
+	padding: 10px;
+}
+
+.storage-usage-info .percentage-bar{
+	width: 76%;
+	background-color: navy;
+}
+
+.storage-status{
+	position: relative;
+	float: left;
+	margin-top: 50px;
+	margin-left: 50px;
+}
+
+.storage-status div{
+	background-color: #D47C37;
+	min-width: 75px;
+	min-height: 50px;
+	padding: 10px;
+	text-align: center;
+	margin-bottom: 20px;
+	color: white;
+}
+
+.storage-usage-bar{
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 3px;
+	width: 804px;
+	height: 40px;
+}
+
+.storage-usage-bar .usage-total{
+	position: absolute;
+	background-color: white;
+	border: solid brown 1px;
+	bottom: 1px;
+	min-width: 99%;
+	min-height: 99%;
+}
+.storage-usage-bar .usage-now{
+	position: absolute;
+	background-color: #421B19;
+	border: solid brown 1px;
+	bottom: 1px;
+	width: 30%;
+	min-height: 99%;
 }
