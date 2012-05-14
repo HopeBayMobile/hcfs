@@ -1,4 +1,5 @@
 import os
+import subprocess
 from setuptools import setup, find_packages
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))

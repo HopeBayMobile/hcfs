@@ -184,6 +184,7 @@ def formatNonRootDisks(deviceCnt=1):
 
 def mountDisk(disk, mountpoint):
 	logger = util.getLogger(name="mountDisk")
+	logger.info("mountDisk start")
 
 	returncode = 0
 	try:
@@ -204,8 +205,9 @@ def mountDisk(disk, mountpoint):
         except OSError as e:
                 logger.error("Failed to mount %s for %s"%(disk, e))
                 returncode = 1
-
-	return returncode
+	finally:
+		logger.info("mountDisk end")
+		return returncode
 
 		
 def mountSwiftDevice(disk, devicePrx, deviceNum):
