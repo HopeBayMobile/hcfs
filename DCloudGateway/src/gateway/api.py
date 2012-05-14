@@ -620,6 +620,14 @@ def _restartServices():
                         op_msg = "Failed to start samba service for %s."%output
 			raise BuildGWError(op_msg)
 
+                cmd = "/etc/init.d/nmbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+                        raise BuildGWError(op_msg)
+
 		cmd = "/etc/init.d/nfs-kernel-server restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.read()
@@ -648,7 +656,7 @@ def build_gateway(user_key):
 	try:
 
 		if not common.isValidEncKey(user_key):
-			op_msg = "Encryption Key has to an alphanumeric string of length between 6~20"		
+			op_msg = "Encryption Key has to be an alphanumeric string of length between 6~20"		
 			raise BuildGWError(op_msg)
 
 		op_config = ConfigParser.ConfigParser()
