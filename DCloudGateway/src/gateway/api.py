@@ -81,6 +81,9 @@ class TestStorageError(Exception):
 class GatewayConfError(Exception):
 	pass
 
+class UmountError(Exception):
+	pass
+
 def getGatewayConfig():
 	try:
 		config = ConfigParser.ConfigParser()
@@ -407,6 +410,8 @@ def apply_user_enc_key(old_key=None, new_key=None):
 			op_msg = "The old_key is incorrect"
 			raise Exception(op_msg)
 
+		_umount()
+
 		storage_url = op_config.get(section, 'storage-url')
 		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -428,6 +433,10 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	except IOError as e:
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
 		log.error(str(e))
+	except UmountError as e:
+		op_msg = "Failed to umount s3ql for %s"%str(e)
+	except common.TimeoutError as e:
+		op_msg = "Failed to umount s3ql in 10 minutes."
 	except Exception as e:
 		log.error(str(e))
 	finally:
@@ -505,6 +514,27 @@ def _mkfs(storage_url, key):
 	finally:
 		log.info("_mkfs end")
 
+
+@common.timeout(600)
+def _umount():
+	log.info("_umount start")
+
+	try:
+		config = getGatewayConfig()
+		mountpoint = config.get("mountpoint", "dir")
+		
+		if os.path.ismount(mountpoint):
+			cmd = "umount.s3ql %s"%(mountpoint)
+			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			output = po.stdout.read()
+			po.wait()
+			if po.returncode !=0:
+				raise UmountError(output)
+	except Exception as e:
+		raise UmountError(str(e))
+		
+	finally:
+		log.info("_umount end")
 
 @common.timeout(360)
 def _mount(storage_url):
