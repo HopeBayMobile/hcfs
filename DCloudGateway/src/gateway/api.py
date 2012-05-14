@@ -440,12 +440,16 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	except Exception as e:
 		log.error(str(e))
 	finally:
+		log.info("apply_user_enc_key end")
+
 		return_val = {'result' : op_ok,
 			      'msg'    : op_msg,
 			      'data'   : {}}
 
-		log.info("apply_user_enc_key end")
-		return json.dumps(return_val)
+		if op_ok == True:
+			reset_gateway()
+		else:
+			return json.dumps(return_val)
 
 def _createS3qlConf( storage_url):
 	log.info("_createS3qlConf start")
