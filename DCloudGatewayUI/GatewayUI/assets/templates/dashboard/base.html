@@ -15,50 +15,53 @@
         {% block stylesheet %}
         {% endblock stylesheet %}
         <style type="text/css">
-            .container .content{
-                min-height: 500px;
-            }
-
             {% block css_style %}
             /* Give a quick and non-cross-browser friendly divider */
             {% endblock css_style %}
         </style>
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
+        <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
 		{% block javascript %}
 		{% endblock javascript %}
     </head>
 
     <body>
-    <div style="width: 1024px; margin:0;">
-    <div style="width: 1024px; position: fixed; margin: 0; padding:0; background-color: black; height: 80px;">
+    <div class="site-body">
+    <div class="site-header">
         <p class="navbar-text pull-right hide">
           {% if user.is_authenticated %}
           <a href="/logout" class="btn" style="margin: 0;">Logout</a>
           {% endif %}
         </p>
 
-        <div style="position: relative; top:40px; left:10px; height: 30px; background-color: gray; width: 480px;">
-
+        <div class="refresh_box">
         </div>
-
-        <div style="position: absolute; top:10px; right:150px; background-color: red; width: 60px; height: 60px;">
+        <div id="" class="notify-box-group">
+            <div class="notify-box">
+            Flush
+            </div>
+            <div class="notify-box">
+            Network
+            </div>
+            <div class="notify-box">
             Current 1000/100 KB/Sec
-        </div>
-
-        <div style="position: absolute; top:10px; right:80px; background-color: red; width: 60px; height: 60px;">
-            Warning ICON
-        </div>
-
-        <div style="position: absolute; top:10px; right:10px; background-color: red; width: 60px; height: 60px;">
+            </div>
+            <div class="notify-box">
+            Dirty cache Warning ICON
+            </div>
+            <div class="notify-box">
             Uploading ICON
+            </div>
         </div>
-
     </div>
-
-
-
-    <div class="" style="width: 220px; height:680px; position: fixed; margin-top: 80px; background-color: lightgray;">
+    <div class="left-bg bg-fixed">
+        &nbsp;
+    </div><!-- / -->
+    <div class="main-bg bg-fixed">
+        &nbsp;
+    </div>
+    <div class="left-row">
         <div>
             <ul class="nav nav-pills nav-stacked" style="">
               <li class="active"><a href="#dash" data-toggle="tab">Dashboard</a></li>
@@ -72,24 +75,14 @@
             </ul>
         </div>
     </div>
-    <div style="float: left; width:220px;  margin: 0;">
-        &nbsp;
-    </div><!-- / -->
-    <div style="float: left; width: 804px; margin-top: 80px;">
-        <div id="msgbox" style="width:804px; background-color: #b53569; height:30px;">
-            <a id="errmsg_btn" class="btn btn-danger">Error Message</a>
-            <script type="text/javascript">
-                $("#errmsg_btn").on("click", function(e){
-                    $('#msgbox').animate({height: "1024px"}, 1000)
-                                .css('position', 'fixed');
-                })
-            </script>
-        </div>
-        <div class="tab-content" style="background-color: #CFECF2; height:500px;">
+    <div class="main-row">
+        {% include "dashboard/msgbox.html" %}
+        <div class="tab-content">
             {% block tab_content %}
             {% endblock tab_content %}
         </div>
     </div>
-    </div> <!-- container -->
+
+    </div> <!-- site-body -->
     </body>
 </html>
