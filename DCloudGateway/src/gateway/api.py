@@ -69,6 +69,9 @@ MONITOR_IFACE = "eth0"
 class BuildGWError(Exception):
 	pass
 
+class EncKeyError(Exception):
+	pass
+
 class MountError(Exception):
 	pass
 
@@ -154,7 +157,7 @@ def get_compression():
 			      'msg'    : op_msg,
                       	      'data'   : {'switch': op_switch}}
 
-		log.info("build_gateway end")
+		log.info("get_compression end")
 		return json.dumps(return_val)
 
 def get_gateway_indicators():
@@ -401,19 +404,15 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		#TODO: deal with the case where the key stored in /root/.s3ql/authoinfo2 is Wrong
 		key = op_config.get(section, 'bucket-passphrase')
 		if key != old_key:
-			op_msg = "The input old_key is incorrect"
+			op_msg = "The old_key is incorrect"
 			raise Exception(op_msg)
-
-		op_config.set(section, 'bucket-passphrase', old_key)
-		with open('/root/.s3ql/authinfo2','wb') as op_fh:
-			op_config.write(op_fh)
 
 		storage_url = op_config.get(section, 'storage-url')
 		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		(stdout, stderr) = po.communicate(new_key)
 		if po.returncode !=0:
-			if stdout.strip() == "Wrong bucket passphrase":
+			if stdout.find("Wrong bucket passphrase") !=-1:
 				op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
 			else:
 				op_msg = "Failed to change enc_key for %s"%stdout
@@ -536,6 +535,8 @@ def _mount(storage_url):
 		output = po.stdout.read()
 		po.wait()
         	if po.returncode != 0:
+			if output.find("Wrong bucket passphrase") != -1:
+				raise EncKeyError("The input encryption key is wrong!")
 			raise BuildGWError(output)
 
 		#mkdir in the mountpoint for smb share
@@ -563,9 +564,10 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
-	except GatewayConfError as e:
-		raise e, None, sys.exc_info()[2]
-
+	except GatewayConfError:
+		raise
+	except EncKeyError:
+		raise
 	except Exception as e:
 		op_msg = "Failed to mount filesystem for %s"%str(e)
 		log.error(str(e))
@@ -605,29 +607,33 @@ def _restartServices():
 		log.info("_restartServices start")
 
 
-def build_gateway():
+def build_gateway(user_key):
 	log.info("build_gateway start")
 
 	op_ok = False
 	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
 	try:
+
+		if not common.isValidEncKey(user_key):
+			op_msg = "Encryption Key has to an alphanumeric string of length between 6~20"		
+			raise BuildGWError(op_msg)
+
 		op_config = ConfigParser.ConfigParser()
-		#Create authinfo2 if it doesn't exist
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
 			op_config.readfp(op_fh)
 
 		section = "CloudStorageGateway"
-		if not op_config.has_section(section):
-			op_config.add_section(section)
+		op_config.set(section, 'bucket-passphrase', user_key)
+		with open('/root/.s3ql/authinfo2','wb') as op_fh:
+			op_config.write(op_fh)
 
 		url = op_config.get(section, 'storage-url').replace("swift://","")
 		account = op_config.get(section, 'backend-login')
 		password = op_config.get(section, 'backend-password')
-		key = op_config.get(section, 'bucket-passphrase')
-
+		
 		_openContainter(storage_url=url, account=account, password=password)
-		_mkfs(storage_url=url, key=key)
+		_mkfs(storage_url=url, key=user_key)
 		_mount(storage_url=url)
 		_restartServices()
  
@@ -638,6 +644,8 @@ def build_gateway():
 		op_msg ="Build Gateway failed due to timeout" 
 	except IOError as e:
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
+	except EncKeyError as e:
+		op_msg = str(e)
 	except BuildGWError as e:
 		op_msg = str(e)
 	except Exception as e:
@@ -1925,6 +1933,6 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
-	#print build_gateway()
-	print apply_user_enc_key("1234567", "1234567")
+	#print build_gateway("1234567")
+	#print apply_user_enc_key("1234567", "1234567")
 	pass
