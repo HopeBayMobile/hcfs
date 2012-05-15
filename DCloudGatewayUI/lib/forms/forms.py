@@ -39,19 +39,23 @@ class RenderFormMixinClass(object):
         # TODO: render each fields and return a list.
         pass
 
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     def render(self):
         return render_to_string(self.render_template_name, {"form": self})
-    
+
     def fieldset_list(self):
         group_list = []
         for legend, items in self.fieldset:
             fields_list = []
-            for i in range(len(items)):                
+            for i in range(len(items)):
                 name = items[i]
                 fields_list.append(self[name])
-                
+
             group_list.append((legend, fields_list))
-               
+
         return group_list
 
 

@@ -1,11 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib import auth
 from lib.models.config import Config
+from wizard.urls import InstallWizard
 
 def home(request):
     if Config.objects.all().count() == 0 :
         return redirect('/wizard/welcome')
-    elif Config.objects.filter(key='wizard').count() == 1:
+    elif InstallWizard.is_going():
         return redirect('/wizard/')
     elif request.user.is_authenticated():
         return redirect('/dashboard')
