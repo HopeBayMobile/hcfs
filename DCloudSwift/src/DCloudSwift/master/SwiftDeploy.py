@@ -186,11 +186,11 @@ class SwiftDeploy:
 	def __storageDeploySubtask(self, storageIP):
 		logger = util.getLogger(name="storageDeploySubtask: %s" % storageIP)
 		try:
-			if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[storageIP])[0] != 0:
-				errMsg = "Failed to spread metadata to %s" % storageIP
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -2
+			#if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[storageIP])[0] != 0:
+			#	errMsg = "Failed to spread metadata to %s" % storageIP
+			#	logger.error(errMsg)
+			#	self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
+			#	return -2
 
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
