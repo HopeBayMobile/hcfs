@@ -36,6 +36,9 @@ class CreateCfg:
 	def removeCfgFile(self):
 		os.system("rm ./Cfg.ini")
 
+	def removeLogFile(self):
+		os.system("rm -rf ./%s" % self.cfgKwparams["logDir"])
+
 	def __assignCfgContent(self):
 		for section, field in self.cfgContent.items():
 			for fieldName, item in field.items():
@@ -68,6 +71,7 @@ class Test_getKwparams:
 	def teardown(self):
 		print "End of Unit Test for function getKwparams in SwiftCfg.py\n"
 		self.CC.removeCfgFile()
+		self.CC.removeLogFile()
 
 	def test_ContentIntegrity(self):
 		'''
