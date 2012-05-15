@@ -26,6 +26,7 @@ def main():
     		},
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
+                             (CONFDIR, ['config/gw_schedule.conf']),
 			     (SMBDIR, ['config/smb.conf']),
                              (NETDIR, ['config/interfaces']),
                              (ETCDIR, ['config/hosts.allow']),
