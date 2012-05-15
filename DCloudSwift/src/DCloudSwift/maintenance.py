@@ -10,7 +10,7 @@ import pickle
 import time
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+BASEDIR = os.path.dirname(WORKING_DIR)
 
 from util import util
 from util import diskUtil
