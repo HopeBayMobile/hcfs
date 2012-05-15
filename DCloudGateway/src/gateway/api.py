@@ -340,6 +340,11 @@ def apply_storage_account(storage_url, account, password, test=True):
 	op_ok = False
 	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
+        if test:
+            test_gw_results = json.loads(test_storage_account(storage_url, account, password))
+            if test_gw_results['result'] == False:
+                return json.dumps(test_gw_results)
+
 	try:
 		op_config = ConfigParser.ConfigParser()
 		#Create authinfo2 if it doesn't exist
