@@ -1,10 +1,14 @@
 @site-width: 1024px;
-@site-top-height: 120px;
+@site-top-height: 141px;
 @site-left-width: 220px;
 @site-main-width: @site-width - @site-left-width;
+@tab-height: 106px;
 @base-bg-color: #CFECF2;
 @base-left-bg-color: lightgray;
 @error-msg-bg-color: #C03556;
+@cache-usage-bar-height: 40px;
+@dashboard-image-path: "static/icons/dashboard";
+@dashboard-bg-path: "static/bgs/dashboard";
 /* The following are styles for dashboard views.*/
 
 .site-container{
@@ -20,7 +24,7 @@
     position: fixed;
     top: 0;
     margin: 0; padding:0;
-    background-color: black;
+    background-image: url("/@{dashboard-bg-path}/banner.png");
     width:  @site-width;
     height: @site-top-height;
     z-index: 1000;
@@ -28,31 +32,52 @@
 
 .notify-box{
 	float: left;
-    background-color: red;
     margin-left: 10px;
     margin-bottom: 10px;
-    width: 40px;
-    height: 40px;
+    color: white;
+    width: 50px;
+    height: 50px;
+    background-position: 0;
+	background-repeat: no-repeat;
+}
+.notify-box-row{
+	float: right;
+	margin-top: 10px;
+	margin-right: 10px;
 }
 
-.notify-box-row-count3 .notify-box{
-	width: 75px;
-    height: 40px;
+.notify-box-row2{
+	float: right;
+	clear: both;
+	margin-top: 5px;
+	margin-right: 10px;
+}
+
+.notify-box-row2 .notify-box{
+	width: 72px;
+    height: 32px;
+    text-align: center;
+    vertical-align: middle;
+    line-height: 32px;
 }
 
 .notify-box-group{
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 13px;
+    right: 13px;
+    width: 430px;
+    height: 115px;
+    background-image: url("/@{dashboard-bg-path}/indicator_bg.png");
     display: inline-block;
 }
 
 .logo-box{
     position: absolute;
     top:20px; left:20px;
-    height: 40px;
-    background-color: gray;
-    width: 40px;
+    background-image: url("/@{dashboard-image-path}/delta_logo.png");
+    background-repeat: no-repeat;
+    width: 198px;
+    height: 64px;
 }
 
 .refresh-box{
@@ -94,6 +119,41 @@
     top: @site-top-height;
     position: fixed;
 }
+
+.tab-btn{
+	list-style: none;
+	width: @site-left-width;
+	margin: 0;
+}
+
+.tab-btn li{
+	font-size: 14pt;
+	text-align: center;
+	line-height: @tab-height;
+	vertical-align: middle;
+	height: @tab-height;
+	background-image: url("/@{dashboard-image-path}/tab_normal.png");
+}
+
+.tab-btn img{
+	height: 52px;
+}
+
+.tab-btn span{
+	width: 20px;
+	height: 106px;
+	float: right;
+}
+
+.tab-btn .active{
+	background-image: url("/@{dashboard-image-path}/tab_hover.png");
+}
+
+.tab-btn .active span{
+	//content: "<img src='/@{dashboard-image-path}/tab_hover_arrow.png'>";
+	background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
+}
+
 
 .slide-box{
     /*width: 804px;*/
@@ -199,9 +259,15 @@
 /*The following are styles for usage and status page*/
 
 .storage-usage-info{
-	position: relative;
-	margin-left: 50px;
-	max-width: 300px;
+	position: absolute;
+	top: 50px;
+	left: 50px;
+	right: 50px;
+	bottom: @cache-usage-bar-height + 10;
+	overflow: scroll;
+	border: solid gray 2pt;
+	// margin-left: 50px;
+	// max-width: 300px;
 	float: left;
 }
 
@@ -213,7 +279,6 @@
 }
 
 .storage-usage-info section{
-	border: solid gray 2pt;
 	border-top: none;
 	background-color: white;
 	padding: 10px;
@@ -224,33 +289,16 @@
 	background-color: navy;
 }
 
-.storage-status{
-	position: relative;
-	float: left;
-	margin-top: 50px;
-	margin-left: 50px;
-}
-
-.storage-status div{
-	background-color: #D47C37;
-	min-width: 75px;
-	min-height: 50px;
-	padding: 10px;
-	text-align: center;
-	margin-bottom: 20px;
-	color: white;
-}
-
-.storage-usage-bar{
+.cache-usage-bar{
 	position: absolute;
 	left: 0;
 	right: 0;
 	bottom: 3px;
 	width: @site-main-width;
-	height: 40px;
+	height: @cache-usage-bar-height;
 }
 
-.storage-usage-bar .usage-total{
+.cache-usage-bar .total-usage{
 	position: absolute;
 	background-color: white;
 	border: solid brown 1px;
@@ -258,11 +306,27 @@
 	min-width: 99%;
 	min-height: 99%;
 }
-.storage-usage-bar .usage-now{
+.cache-usage-bar .current-usage{
 	position: absolute;
 	background-color: #421B19;
 	border: solid brown 1px;
 	bottom: 1px;
 	width: 30%;
 	min-height: 99%;
+}
+
+.icon-system-work{
+	background-image: url("/@{dashboard-image-path}/indicator_1_system_work.png");
+}
+.icon-flush-work{
+	background-image: url("/@{dashboard-image-path}/indicator_1_flush_work.png");
+}
+.icon-network-work{
+	background-image: url("/@{dashboard-image-path}/indicator_1_network_work.png");
+}
+.icon-dirtycache-safe{
+	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_safe.png");
+}
+.icon-indicator-normal{
+	background-image: url("/@{dashboard-image-path}/indicator_2_normal.png");
 }
