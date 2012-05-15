@@ -6,6 +6,8 @@ import common
 import subprocess
 import time
 import errno
+import re
+import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -23,9 +25,51 @@ RUN_CMD_TIMEOUT = 15
 
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
 
+LOGFILES = {
+            "syslog" : "/var/log/syslog",
+            "mount" : "/root/.s3ql/mount.log",
+            "fsck" : "/root/.s3ql/fsck.log"
+            }
+
+LOG_PARSER = {
+             "syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
+             "mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             "fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             }
+
+# if a keywork match a msg, the msg is belong to the class
+# key = level, val = keyword array
+KEYWORD_FILTER = {
+                  "error_log" : ["error", "exception"],
+                  "warring_log" : ["warring"],
+                  "info_log" : ["nfs", "cifs" , "."],
+                  # the pattern . matches any log, 
+                  # that is if a log mismatches 0 or 1, then it will be assigned to 2
+                  }
+
+LOG_LEVEL = {
+            0 : ["error_log", "warring_log", "info_log"],
+            1 : ["error_log", "warring_log"],
+            2 : ["error_log"],
+            }
+
+DEFAULT_SHOW_LOG_LEVEL = 2
+
+enable_log = False
+
+CMD_CHK_STO_CACHE_STATE = "s3qlstat /mnt/cloudgwfiles"
+
+NUM_LOG_LINES = 20
+
+MONITOR_IFACE = "eth0"
+
+
 ################################################################################
 
 class BuildGWError(Exception):
+	pass
+
+class EncKeyError(Exception):
 	pass
 
 class MountError(Exception):
@@ -35,6 +79,9 @@ class TestStorageError(Exception):
 	pass
 
 class GatewayConfError(Exception):
+	pass
+
+class UmountError(Exception):
 	pass
 
 def getGatewayConfig():
@@ -58,12 +105,64 @@ def getGatewayConfig():
 		if not config.has_section("s3ql"):
 			raise GatewayConfError("Failed to find section [s3q] in the config file")
 
+		if not config.has_option("s3ql", "mountOpt"):
+			raise GatewayConfError("Failed to find option 'mountOpt' in section [s3q] in the config file")
+
+		if not config.has_option("s3ql", "compress"):
+			raise GatewayConfError("Failed to find option 'compress' in section [s3q] in the config file")
+
 		return config
 	except IOError as e:
 		op_msg = 'Failed to access /etc/delta/Gateway.ini'
 		raise GatewayConfError(op_msg)
 		
+def getStorageUrl():
+	log.info("getStorageUrl start")
+	storage_url = None
+
+	try:
+		config = ConfigParser.ConfigParser()
+        	with open('/root/.s3ql/authinfo2') as op_fh:
+			config.readfp(op_fh)
+
+		section = "CloudStorageGateway"
+		storage_url = config.get(section, 'storage-url').replace("swift://","")
+	except Exception as e:
+		log.error("Failed to getStorageUrl for %s"%str(e))
+	finally:
+		log.info("getStorageUrl end")
+		return storage_url
 		
+def get_compression():
+	log.info("get_compression start")
+	op_ok = False
+	op_msg = ''
+	op_switch = True
+
+	try:
+		config = getGatewayConfig()
+		compressOpt = config.get("s3ql", "compress")
+		if compressOpt == "false":
+			op_switch = False
+
+		op_ok = True
+		op_msg = "Succeeded to get_compression"
+
+	except GatewayConfError as e:
+		op_msg = str(e)
+	except Exception as e:
+		op_msg = str(e)
+	finally:
+		if op_ok == False:
+			log.error(op_msg)
+
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+                      	      'data'   : {'switch': op_switch}}
+
+		log.info("get_compression end")
+		return json.dumps(return_val)
+
 def get_gateway_indicators():
 
 	log.info("get_gateway_indicators start")
@@ -241,6 +340,11 @@ def apply_storage_account(storage_url, account, password, test=True):
 	op_ok = False
 	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
+        if test:
+            test_gw_results = json.loads(test_storage_account(storage_url, account, password))
+            if test_gw_results['result'] == False:
+                return json.dumps(test_gw_results)
+
 	try:
 		op_config = ConfigParser.ConfigParser()
 		#Create authinfo2 if it doesn't exist
@@ -304,12 +408,27 @@ def apply_user_enc_key(old_key=None, new_key=None):
 			op_msg = "Section CloudStorageGateway is not found."
 			raise Exception(op_msg)
 
-		if op_config.has_option(section, 'bucket-passphrase'):
-			key = op_config.get(section, 'bucket-passphrase')
-			if key is not None and  key != old_key:
-				op_msg = "old_key is not correct"
-				raise Exception(op_msg)
+		
+		#TODO: deal with the case where the key stored in /root/.s3ql/authoinfo2 is Wrong
+		key = op_config.get(section, 'bucket-passphrase')
+		if key != old_key:
+			op_msg = "The old_key is incorrect"
+			raise Exception(op_msg)
 
+		_umount()
+
+		storage_url = op_config.get(section, 'storage-url')
+		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
+		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		(stdout, stderr) = po.communicate(new_key)
+                (stdout, stderr) = po.communicate(new_key) #Need to confirm the new passphrase
+		if po.returncode !=0:
+			if stdout.find("Wrong bucket passphrase") !=-1:
+				op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
+			else:
+				op_msg = "Failed to change enc_key for %s"%stdout
+			raise Exception(op_msg)
+		
 		op_config.set(section, 'bucket-passphrase', new_key)
 		with open('/root/.s3ql/authinfo2','wb') as op_fh:
 			op_config.write(op_fh)
@@ -320,82 +439,144 @@ def apply_user_enc_key(old_key=None, new_key=None):
 	except IOError as e:
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
 		log.error(str(e))
+	except UmountError as e:
+		op_msg = "Failed to umount s3ql for %s"%str(e)
+	except common.TimeoutError as e:
+		op_msg = "Failed to umount s3ql in 10 minutes."
 	except Exception as e:
 		log.error(str(e))
 	finally:
+		log.info("apply_user_enc_key end")
+
 		return_val = {'result' : op_ok,
 			      'msg'    : op_msg,
 			      'data'   : {}}
 
-		log.info("apply_user_enc_key end")
 		return json.dumps(return_val)
+
+def _createS3qlConf( storage_url):
+	log.info("_createS3qlConf start")
+	ret = 1
+	try:
+		config = getGatewayConfig()
+		mountpoint = config.get("mountpoint", "dir")
+		mountOpt = config.get("s3ql", "mountOpt")
+		iface = config.get("network", "iface")
+		compress = "lzma" if config.get("s3ql","compress") == "true" else "none"
+		mountOpt = mountOpt + " --compress %s"%compress 
+
+		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+		po.wait()
+
+		ret = po.returncode
+		if ret !=0:
+			log.error("Failed to create s3ql config for %s"%output)
+
+	except Exception as e:
+		log.error("Failed to create s3ql config for %s"%str(e))
+	finally:
+		log.info("_createS3qlConf end")
+		return ret
+			
 
 @common.timeout(180)
 def _openContainter(storage_url, account, password):
+	log.info("_openContainer start")
 
-	os.system("touch gatewayContainer.txt")
-	cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
-	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-	output = po.stdout.read()
-        po.wait()
+	try:
+		os.system("touch gatewayContainer.txt")
+		cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
+		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+		output = po.stdout.read()
+        	po.wait()
 
-        if po.returncode != 0:
-		op_msg = "Failed to open container for"%output
-               	raise BuildGWError(op_msg)
+        	if po.returncode != 0:
+			op_msg = "Failed to open container for"%output
+               		raise BuildGWError(op_msg)
 	
-	output=output.strip()
-	if output != "gatewayContainer.txt":
-		op_msg = "Failed to open container for %s"%output
-               	raise BuildGWError(op_msg)
-	os.system("rm gatewayContainer.txt")
+		output=output.strip()
+		if output != "gatewayContainer.txt":
+			op_msg = "Failed to open container for %s"%output
+               		raise BuildGWError(op_msg)
+		os.system("rm gatewayContainer.txt")
+	finally:
+		log.info("_openContainer end")
 
 @common.timeout(180)
 def _mkfs(storage_url, key):
-	cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
-	po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	(stdout, stderr) = po.communicate(key)
-        if po.returncode != 0:
-		if stderr.find("existing file system!") == -1:
-			op_msg = "Failed to mkfs for %s"%stderr
-               		raise BuildGWError(op_msg)
-		else:
-			log.info("Found existing file system!")
+	log.info("_mkfs start")
 
+	try:
+		cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdout, stderr) = po.communicate(key)
+        	if po.returncode != 0:
+			if stderr.find("existing file system!") == -1:
+				op_msg = "Failed to mkfs for %s"%stderr
+               			raise BuildGWError(op_msg)
+			else:
+				log.info("Found existing file system!")
+	finally:
+		log.info("_mkfs end")
+
+
+@common.timeout(600)
+def _umount():
+	log.info("_umount start")
+
+	try:
+		config = getGatewayConfig()
+		mountpoint = config.get("mountpoint", "dir")
+		
+		if os.path.ismount(mountpoint):
+			cmd = "umount.s3ql %s"%(mountpoint)
+			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			output = po.stdout.read()
+			po.wait()
+			if po.returncode !=0:
+				raise UmountError(output)
+	except Exception as e:
+		raise UmountError(str(e))
+		
+	finally:
+		log.info("_umount end")
 
 @common.timeout(360)
 def _mount(storage_url):
+	log.info("_mount start")
+
 	try:
 		config = getGatewayConfig()
 
 		mountpoint = config.get("mountpoint", "dir")
+		mountOpt = config.get("s3ql", "mountOpt")
+		compressOpt = "lzma" if config.get("s3ql", "compress") == "true" else "none"		
+		mountOpt = mountOpt + " --compress %s"%compressOpt
+
+
+		authfile = "/root/.s3ql/authinfo2"
+
 		os.system("mkdir -p %s"%mountpoint)
 		
 		if os.path.ismount(mountpoint):
 			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
 
-		mountOpt=""
-		if config.has_option("s3ql", "mountOpt"):
-			mountOpt = config.get("s3ql", "mountOpt")
+		if _createS3qlConf(storage_url) !=0:
+			raise BuildGWError("Failed to create s3ql conf")
 
-
-		authfile = "/root/.s3ql/authinfo2"
-
-		#TODO: get interface from config file
-		iface = config.get("network", "iface")
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
-		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-		output = po.stdout.read()
-		po.wait()
-        	if po.returncode != 0:
-			raise BuildGWError(output)
-
+		#mount s3ql
 		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
         	if po.returncode != 0:
+			if output.find("Wrong bucket passphrase") != -1:
+				raise EncKeyError("The input encryption key is wrong!")
 			raise BuildGWError(output)
 
+		#mkdir in the mountpoint for smb share
 		cmd = "mkdir -p %s/sambashare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
@@ -403,7 +584,16 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
+                #change the owner of samba share to default smb account
+                cmd = "chown superuser:superuser %s/sambashare"%mountpoint
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        raise BuildGWError(output)
 
+
+		#mkdir in the mountpoint for nfs share
 		cmd = "mkdir -p %s/nfsshare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
@@ -411,40 +601,87 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
-	except GatewayConfError as e:
-		raise e, None, sys.exc_info()[2]
-
+	except GatewayConfError:
+		raise
+	except EncKeyError:
+		raise
 	except Exception as e:
 		op_msg = "Failed to mount filesystem for %s"%str(e)
 		log.error(str(e))
 		raise BuildGWError(op_msg)
 		
 
-def build_gateway():
+@common.timeout(360)
+def _restartServices():
+	log.info("_restartServices start")
+	try:
+		config = getGatewayConfig()
+
+		cmd = "/etc/init.d/smbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+			raise BuildGWError(op_msg)
+
+                cmd = "/etc/init.d/nmbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+                        raise BuildGWError(op_msg)
+
+		cmd = "/etc/init.d/nfs-kernel-server restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start nfs service for %s."%output
+			raise BuildGWError(op_msg)
+
+	except GatewayConfError as e:
+		raise e, None, sys.exc_info()[2]
+
+	except Exception as e:
+		op_msg = "Failed to restart smb&nfs services for %s"%str(e)
+		log.error(str(e))
+		raise BuildGWError(op_msg)
+	finally:
+		log.info("_restartServices start")
+
+
+def build_gateway(user_key):
 	log.info("build_gateway start")
 
 	op_ok = False
 	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
 	try:
+
+		if not common.isValidEncKey(user_key):
+			op_msg = "Encryption Key has to be an alphanumeric string of length between 6~20"		
+			raise BuildGWError(op_msg)
+
 		op_config = ConfigParser.ConfigParser()
-		#Create authinfo2 if it doesn't exist
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
 			op_config.readfp(op_fh)
 
 		section = "CloudStorageGateway"
-		if not op_config.has_section(section):
-			op_config.add_section(section)
+		op_config.set(section, 'bucket-passphrase', user_key)
+		with open('/root/.s3ql/authinfo2','wb') as op_fh:
+			op_config.write(op_fh)
 
 		url = op_config.get(section, 'storage-url').replace("swift://","")
 		account = op_config.get(section, 'backend-login')
 		password = op_config.get(section, 'backend-password')
-		key = op_config.get(section, 'bucket-passphrase')
-
+		
 		_openContainter(storage_url=url, account=account, password=password)
-		_mkfs(storage_url=url, key=key)
+		_mkfs(storage_url=url, key=user_key)
 		_mount(storage_url=url)
-
+		_restartServices()
+ 
 		op_ok = True
 		op_msg = 'Succeeded to build gateway'
 
@@ -452,6 +689,8 @@ def build_gateway():
 		op_msg ="Build Gateway failed due to timeout" 
 	except IOError as e:
 		op_msg = 'Failed to access /root/.s3ql/authinfo2'
+	except EncKeyError as e:
+		op_msg = str(e)
 	except BuildGWError as e:
 		op_msg = str(e)
 	except Exception as e:
@@ -477,6 +716,7 @@ def restart_nfs_service():
 	try:
 		cmd = "/etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.read()
 		po.wait()
 
 		if po.returncode == 0:
@@ -509,7 +749,13 @@ def restart_smb_service():
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
 
-		if po.returncode == 0:
+                #Jiahong: Adding restarting nmbd as well
+                cmd1 = "/etc/init.d/nmbd restart"
+                po1 = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                po1.wait()
+
+
+		if (po.returncode == 0) and (po1.returncode == 0):
 			op_ok = True
 			op_msg = "Restarting samba service succeeded."
 
@@ -1009,7 +1255,13 @@ def set_smb_user_list (username, password):
         log.error("set_smb_user_list timeout")
         return_val['msg'] = 'Timeout for changing passwd.'
         return json.dumps(return_val)
+
+    #Resetting smb service
+    smb_return_val = json.loads(restart_smb_service())
     
+    if smb_return_val['result'] == False:
+        return_val['msg'] = 'Error in restarting smb service.'
+        return json.dumps(return_val) 
     
     # good. all set
     return_val['result'] = True
@@ -1077,6 +1329,54 @@ def get_nfs_access_ip_list ():
         
     return json.dumps(return_val)
     
+
+def set_compression(switch):
+	log.info("set_compression start")
+	op_ok = False
+	op_msg = ''
+	op_switch = True
+
+	try:
+		config = getGatewayConfig()
+
+		if switch == True:
+			config.set("s3ql", "compress", "true")
+		elif switch == False:
+			config.set("s3ql", "compress", "false")
+
+		else:
+			raise Exception("The input argument has to be True or False")
+
+		storage_url = getStorageUrl()
+		if storage_url is None:
+			raise Exception("Failed to get storage url")
+
+		if  _createS3qlConf(storage_url) !=0:
+			raise Exception("Failed to create new s3ql config")
+
+		with open('/etc/delta/Gateway.ini','wb') as op_fh:
+			config.write(op_fh)
+		
+		op_ok = True
+		op_msg = "Succeeded to set_compression"
+
+	except IOError as e:
+		op_msg = str(e)
+	except GatewayConfError as e:
+		op_msg = str(e)
+	except Exception as e:
+		op_msg = str(e)
+	finally:
+		if op_ok == False:
+			log.error(op_msg)
+
+		return_val = {'result' : op_ok,
+			      'msg'    : op_msg,
+                      	      'data'   : {}}
+
+		log.info("set_compression end")
+		return json.dumps(return_val)
+
 def set_nfs_access_ip_list (array_of_ip):
     '''
     update to /etc/hosts.allow
@@ -1086,7 +1386,7 @@ def set_nfs_access_ip_list (array_of_ip):
     return_val = {
                   'result' : False,
                   'msg' : 'get NFS access ip list failed unexpectedly.',
-                  'data' : { "array_of_ip" : [] } }
+                  'data' : {} }
 
 
     log.info("set_nfs_access_ip_list starts")
@@ -1116,9 +1416,9 @@ def set_nfs_access_ip_list (array_of_ip):
             #print services
             #print ips
             
-            return_val['result'] = True
-            return_val['msg'] = "Get ip list success"
-            return_val['data']["array_of_ip"] = ips
+            #return_val['result'] = True
+            #return_val['msg'] = "Get ip list success"
+            #return_val['data']["array_of_ip"] = ips
             
             #return json.dumps(return_val)
             
@@ -1137,11 +1437,20 @@ def set_nfs_access_ip_list (array_of_ip):
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
-        return_val['data']["array_of_ip"] = " ".join(array_of_ip)
     except:
         log.info("cannot write to " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
+
+
+    #Resetting nfs service
+    nfs_return_val = json.loads(restart_nfs_service())
+
+    if nfs_return_val['result'] == False:
+        return_val['result'] = False
+        return_val['msg'] = 'Error in restarting NFS service.'
+        return json.dumps(return_val)
+
         
     log.info("get_nfs_access_ip_list end")
 
@@ -1238,7 +1547,452 @@ def force_upload_sync(bw):			# by Yen
 	}
 	return json.dumps(return_val)
 
+################################################################################
+def month_number(monthabbr):
+    """Return the month number for monthabbr; e.g. "Jan" -> 1."""
+
+    MONTHS = ['',
+              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+              ]
+
+    index = MONTHS.index(monthabbr)
+    return index
+
+def classify_logs (log, keyword_filter=KEYWORD_FILTER):
+    '''
+    give a log msg and a keyword filter {key=category, val = [keyword]}
+    find out which category the log belongs to 
+    assume that keywords are not overlaped 
+    '''
+
+    for category in sorted(keyword_filter.keys()):
+
+        for keyword in keyword_filter[category]:
+            #print "in keyword = " + keyword
+            if re.search(keyword, log):
+                #print "match"
+                return category
+            else:
+                #print "mismatch"
+                pass
+
+    return None
+
+def parse_log (type, log_cnt):
+    '''
+    parse a log line to log_entry data structure 
+    different types require different parser
+    #type = syslog
+    #log_cnt = "May 10 13:43:46 ubuntu dhclient: bound to 172.16.229.78 -- renewal in 277 seconds."
+
+    #type = mount | fsck # i.e.,g from s3ql
+    #log_cnt = "2012-05-07 20:22:22.649 [1666] MainThread: [mount] FUSE main loop terminated."
+    '''
+
+    #print "in parsing log"
+    #print type
+    #print log_cnt
+
+    log_entry = {
+                 "category" : "",
+                 "timestamp" : "",
+                 "msg" : ""
+                 }
+
+    pat = LOG_PARSER[type]
+
+    m = pat.match(log_cnt)
+    if m == None:
+        #print "Not found"
+        return {}
+
+    #print "match"
+    #print m.group()
+    #return 
+
+    minute = int(m.group('minute'))
+    #print minute
+
+    hour = int(m.group('hour'))
+    #print hour
+
+    day = int(m.group('day'))
+    #print day
+
+    second = int(m.group('second'))
+    #print second
+
+    if len(m.group('month')) == 2:
+        month = int(m.group('month'))
+    else:
+        month = month_number(m.group('month'))
+    #print month
+
+    try:
+        # syslog has't year info, try to fetch group("year") will cause exception
+        year = int(m.group('year'))
+    except:
+        # any exception, using this year instead
+        now = datetime.datetime.utcnow()
+        year = now.year
+
+    #print year
+
+    msg = m.group('message')
+    #print msg
+
+    #now = datetime.datetime.utcnow()
+
+    try:
+        timestamp = datetime.datetime(year, month, day, hour, minute, second) # timestamp
+    except Exception:
+        #print "datatime error"
+        #print Exception
+        return {}
+
+    #print "timestamp = "
+    #print timestamp
+    #print "msg = "
+    #print msg
+    log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
+    log_entry["timestamp"] = str(timestamp.now())
+    log_entry["msg"] = msg
+    return log_entry
+
+##########################
+def read_logs(logfiles_dict, offset, num_lines):
+    '''
+    read all files in logfiles_dict, 
+    the log will be reversed since new log line is appended to the tail
+    
+    and then, each log is parsed into log_entry dict.
+    
+    the offset = 0 means that the latest log will be selected
+    num_lines means that how many lines of logs will be returned, 
+              set to "None" for selecting all logs 
+    '''
+
+    ret_log_cnt = {}
+
+    for type in logfiles_dict.keys():
+        ret_log_cnt[type] = []
+
+        log_buf = []
+
+        try:
+            log_buf = [line.strip() for line in open(logfiles_dict[type])]
+            log_buf.reverse()
+
+            #print log_buf
+            #return {}
+
+            # get the log file content
+            #ret_log_cnt[type] = log_buf[ offset : offset + num_lines]
+
+            # parse the log file line by line
+            nums = NUM_LOG_LINES
+            if num_lines == None:
+                nums = len(log_buf) - offset # all
+            else:
+                nums = num_lines
+
+            for log in log_buf[ offset : offset + nums]:
+                log_entry = parse_log(type, log)
+                ret_log_cnt[type].append(log_entry)
+
+        except :
+            pass
+
+            #if enable_log:
+            #    log.info("cannot parse " + logfiles_dict[type])
+            #ret_log_cnt[type] = ["None"]
+            #print "cannot parse"
+
+    return ret_log_cnt
+
+
+##############################    
+def storage_cache_usage():
+    '''
+    read all files in logfiles array, return last n lines
+    format:
+    
+Directory entries:    601
+Inodes:               603
+Data blocks:          1012
+Total data size:      12349.54 MB
+After de-duplication: 7156.38 MB (57.95% of total)
+After compression:    7082.76 MB (57.35% of total, 98.97% of de-duplicated)
+Database size:        0.30 MB (uncompressed)
+(some values do not take into account not-yet-uploaded dirty blocks in cache)
+Cache size: current: 7146.38 MB, max: 20000.00 MB
+Cache entries: current: 1011, max: 250000
+Dirty cache status: size: 0.00 MB, entries: 0
+Cache uploading: Off
+
+Dirty cache near full: False
+    
+    '''
+
+    ret_usage = {
+              "cloud_storage_usage" :  {
+                                    "cloud_data" : 0,
+                                    "cloud_data_dedup" : 0,
+                                    "cloud_data_dedup_compress" : 0
+                                  },
+              "gateway_cache_usage"   :  {
+                                    "max_cache_size" : 0,
+                                    "max_cache_entries" : 0,
+                                    "used_cache_size" : 0,
+                                    "used_cache_entries" : 0,
+                                    "dirty_cache_size" : 0,
+                                    "dirty_cache_entries" : 0
+                                   }
+              }
+
+    # Flush check & DirtyCache check
+    try:
+        #print CMD_CHK_STO_CACHE_STATE
+        args = str(CMD_CHK_STO_CACHE_STATE).split(" ")
+        proc = subprocess.Popen(args,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT)
+
+        results = proc.stdout.read()
+        #print results
+
+        ret_val = proc.wait() # 0 : success
+        #proc.kill()
+
+        #print ret_val
+
+        if ret_val == 0: # success
+            '''
+            very boring string parsing process.
+            the format should be fixed. otherwise, won't work (no error checking)  
+            '''
+
+            for line in results.split("\n"):
+                #print line.strip()
+                if line.startswith("Total data size:"):
+                    tokens = line.split(":")
+                    val = tokens[1].replace("MB", "").strip()
+                    #print int(float(val)/1024.0)
+                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
+                    #print val
+
+                if line.startswith("After de-duplication:"):
+                    tokens = line.split(":")
+                    #print tokens[1]
+                    size = str(tokens[1]).strip().split(" ")
+                    val = size[0]
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024 # MB -> GB 
+                    #print val
+
+                if line.startswith("After compression:"):
+                    tokens = line.split(":")
+                    #print tokens[1]
+                    size = str(tokens[1]).strip().split(" ")
+                    val = size[0]
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024 # MB -> GB 
+                    #print val
+
+                if line.startswith("Cache size: current:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024 # MB -> GB 
+                    #print max_val
+
+                if line.startswith("Cache entries: current:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["used_cache_entries"] = crt_val
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["max_cache_entries"] = max_val
+                    #print max_val
+
+                if line.startswith("Dirty cache status: size:"):
+                    line = line.replace("," , ":")
+                    tokens = line.split(":")
+                    crt_size = tokens[2]
+                    max_size = tokens[4]
+
+                    crt_tokens = str(crt_size).strip().split(" ")
+                    crt_val = crt_tokens[0]
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    #print crt_val
+
+                    max_tokens = str(max_size).strip().split(" ")
+                    max_val = max_tokens[0]
+                    ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
+                    #print max_val
+
+    except Exception:
+        #print Exception
+        #print "exception: %s" % CMD_CHK_STO_CACHE_STATE
+
+        if enable_log:
+            log.info(CMD_CHK_STO_CACHE_STATE + " fail")
+
+    return ret_usage
+
+##############################
+def get_network_speed(iface_name): # iface_name = eth1
+    '''
+    call get_network_status to get current nic status
+    wait for 1 second, and all again. 
+    then calculate difference, i.e., up/down link 
+    '''
+
+    ret_val = {
+               "uplink_usage" : 0 ,
+               "downlink_usage" : 0,
+               "uplink_backend_usage" : 0 ,
+               "downlink_backend_usage" : 0
+               }
+
+    pre_status = get_network_status(iface_name)
+    time.sleep(1)
+    next_status = get_network_status(iface_name)
+
+    ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
+    ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
+
+    return ret_val
+
+##############################
+def get_network_status(iface_name): # iface_name = eth1
+    '''
+    so far, cannot get current uplink, downlink numbers,
+    use file /proc/net/dev, i.e., current tx, rx instead of
+
+    if the target iface cannot find, all find ifaces will be returned
+    '''
+    ret_network = {}
+
+    lines = open("/proc/net/dev", "r").readlines()
+
+    columnLine = lines[1]
+    _, receiveCols , transmitCols = columnLine.split("|")
+    receiveCols = map(lambda a:"recv_" + a, receiveCols.split())
+    transmitCols = map(lambda a:"trans_" + a, transmitCols.split())
+
+    cols = receiveCols + transmitCols
+
+    faces = {}
+    for line in lines[2:]:
+        if line.find(":") < 0: continue
+        face, data = line.split(":")
+        faceData = dict(zip(cols, data.split()))
+        face = face.strip()
+        faces[face] = faceData
+
+    try:
+        ret_network = faces[iface_name]
+    except:
+        ret_network = faces # return all
+        pass
+
+    return ret_network
+
+################################################################################
+def get_gateway_status():
+    '''
+    report gateway status
+    '''
+
+    ret_val = {"result" : True,
+               "msg" : "Gateway log & status",
+               "data" : { "error_log" : [],
+                       "cloud_storage_usage" : 0,
+                       "gateway_cache_usage" : 0,
+                       "uplink_usage" : 0,
+                       "downlink_usage" : 0,
+                       "uplink_backend_usage" : 0,
+                       "downlink_backend_usage" : 0,
+                       "network" : {}
+                      }
+            }
+
+    if enable_log:
+        log.info("get_gateway_status")
+
+    # get logs           
+    #ret_log_dict = read_logs(NUM_LOG_LINES)
+    ret_val["data"]["error_log"] = read_logs(logfiles, 0 , NUM_LOG_LINES)
+
+    # get usage
+    usage = storage_cache_usage()
+    ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
+    ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
+
+    # get network statistics
+    network = get_network_speed(MONITOR_IFACE)
+    ret_val["data"]["uplink_usage"] = network["uplink_usage"]
+    ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+
+    return json.dumps(ret_val)
+
+################################################################################
+def get_gateway_system_log (log_level, number_of_msg, category_mask):
+    '''
+    due to there are a few log src, e.g., mount, fsck, syslog, 
+    the number_of_msg will apply to each category.
+    so, 3 x number_of_msg of log may return for each type of log {info, err, war)
+    '''
+
+    ret_val = { "result" : True,
+                "msg" : "gateway system logs",
+                "data" : { "error_log" : [],
+                           "warning_log" : [],
+                           "info_log" : []
+                         }
+               }
+
+    logs = read_logs(LOGFILES, 0 , None) #query all logs
+
+    for level in LOG_LEVEL[log_level]:
+        for logfile in logs: # mount, syslog, ...
+            counter = 0  # for each info src, it has number_of_msg returned
+
+            for log in logs[logfile]: # log entries
+                if counter >= number_of_msg:
+                    break # full, finish this src
+                try:
+                    if log["category"] == level:
+                        ret_val["data"][level].append(log)
+                        counter = counter + 1
+                    else:
+                        pass
+                except:
+                    pass # any except, skip this line
+
+    return json.dumps(ret_val)
+
+#######################################################
+
+
 
 if __name__ == '__main__':
+	#print build_gateway("1234567")
+	#print apply_user_enc_key("1234567", "1234567")
 	pass
-	#print set_smb_user_list ('superuser', 'superuser')

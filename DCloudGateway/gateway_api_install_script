@@ -1,0 +1,8 @@
+apt-get install python-setuptools python-software-properties curl portmap nfs-kernel-server
+apt-get install python-profiler
+add-apt-repository ppa:swift-core/release
+apt-get update
+apt-get install swift
+
+python setup.py install
+

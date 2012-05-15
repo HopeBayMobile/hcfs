@@ -12,7 +12,46 @@ __all__ = ['NumberInput',
            'SliderInput',
            'RadioSelect',
            'ButtonBooleanSelect',
-           'CheckboxSelectMultiple']
+           'CheckboxSelectMultiple',
+           'IPAddressInput']
+
+
+class IPAddressInput(TextInput):
+    separator = u'.'
+    input_number = 4
+
+    def value_from_datadict(self, data, files, name):
+        """
+        Given a dictionary of data and this widget's name, returns the value
+        of this widget. Returns None if it's not provided.
+        """
+        input_list = data.getlist(name)
+        data = self.separator.join(input_list)
+        if any(input_list):
+            return data
+        else:
+            return None
+
+    def render(self, name, value, attrs=None):
+        if value is None:
+            value = ''
+        final_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
+        final_attrs['class'] = 'span05'
+
+        value_list = [''] * self.input_number
+        if value != '':
+            value_list = value.split(self.separator)
+
+        #create 4 input for IP address
+        input_list = []
+        for i in range(self.input_number):
+            final_attrs['value'] = force_unicode(self._format_value(value_list[i]))
+            if not value_list[i]:
+                del final_attrs['value']
+            input_list.append(u'<input%s />' % flatatt(final_attrs))
+        render_mark = self.separator.join(input_list)
+
+        return mark_safe(render_mark)
 
 
 class NumberInput(TextInput):
