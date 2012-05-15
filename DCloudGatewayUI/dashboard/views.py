@@ -59,7 +59,7 @@ def sharefolder(request):
 
 @login_required
 def sync(request):
-    return render(request, 'dashboard/content.html', {'tab': 'sync'})
+    return render(request, 'dashboard/sync.html', {'tab': 'sync'})
 
 
 @login_required
