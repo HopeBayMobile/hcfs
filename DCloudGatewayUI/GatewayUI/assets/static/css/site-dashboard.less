@@ -1,0 +1,268 @@
+@site-width: 1024px;
+@site-top-height: 120px;
+@site-left-width: 220px;
+@site-main-width: @site-width - @site-left-width;
+@base-bg-color: #CFECF2;
+@base-left-bg-color: lightgray;
+@error-msg-bg-color: #C03556;
+/* The following are styles for dashboard views.*/
+
+.site-container{
+  	position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    margin:0;
+    width: @site-width;
+}
+
+.site-header{
+    position: fixed;
+    top: 0;
+    margin: 0; padding:0;
+    background-color: black;
+    width:  @site-width;
+    height: @site-top-height;
+    z-index: 1000;
+}
+
+.notify-box{
+	float: left;
+    background-color: red;
+    margin-left: 10px;
+    margin-bottom: 10px;
+    width: 40px;
+    height: 40px;
+}
+
+.notify-box-row-count3 .notify-box{
+	width: 75px;
+    height: 40px;
+}
+
+.notify-box-group{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-block;
+}
+
+.logo-box{
+    position: absolute;
+    top:20px; left:20px;
+    height: 40px;
+    background-color: gray;
+    width: 40px;
+}
+
+.refresh-box{
+    position: absolute;
+    bottom:20px; left:20px;
+    height: 30px;
+    background-color: gray;
+    width: 480px;
+}
+
+.bg-fixed{
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	z-index: -1;
+}
+
+.main-bg{
+	background-color: @base-bg-color;
+	width: @site-main-width;
+	left: @site-left-width;
+}
+
+.left-bg{
+    background-color: @base-left-bg-color;
+    width:@site-left-width;
+}
+
+.main-row{
+  	position: absolute;
+  	left: @site-left-width;
+    width: @site-main-width;
+    top: @site-top-height;
+    bottom: 0;
+}
+
+.left-row{
+    width: @site-left-width;
+    top: @site-top-height;
+    position: fixed;
+}
+
+.slide-box{
+    /*width: 804px;*/
+    /*background-color: purple;*/
+    position: relative;
+    min-height: 50px;
+}
+
+.box-body{
+	position: relative;
+	top: 50px;
+	bottom: 20px;
+}
+.box-footer{
+	position: absolute;
+    width: @site-main-width;
+    top: 0;
+    bottom: auto;
+    margin-bottom: 60px;
+}
+
+.box-footer .msg-status{
+	width: 100%;
+	background-color: @error-msg-bg-color;
+	position: absolute;
+	height: 20px;
+	right: 1px;
+}
+
+.box-footer .msg-btn{
+	width: 60px;
+	height: 23px;
+	background-color: @error-msg-bg-color;
+	position: absolute;
+	top:0;
+	right: 1px;
+	text-align: center;
+	padding: 10px 5px;
+	font-size: 32px;
+}
+
+
+.msg-block{
+	position: relative;
+	padding: 5px;
+	border: double 1px black ;
+}
+
+.msg-block~.msg-block{
+	border-top: none;
+}
+
+.msg-time{
+	position: absolute;
+	top: 18px;
+	right: 20px;
+}
+
+.msg-icon{
+	margin: 2px 10px;
+	width: 35px;
+	height: 35px;
+	background-color: #D03556;
+	font-size: 24pt;
+	float: left;
+}
+
+.msg-title{
+	margin: 2px 10px 2px 100px;
+	padding: 7px;
+	width: 150px;
+	height: 25px;
+}
+
+.action-btn{
+	position: relative;
+	padding-top: 100px;
+
+}
+
+/*The following are styles for power page.*/
+
+.poweroff{
+	position: absolute;
+	min-width: 250px;
+	padding: 20px;
+	font-size: 28px;
+	text-align: center;
+	left:75px;
+	background-color: @error-msg-bg-color;
+}
+
+.reset{
+	position: absolute;
+	padding: 20px;
+	font-size: 28px;
+	min-width: 250px;
+	text-align: center;
+	right:75px;
+	background-color: #EFA943;
+}
+
+/*The following are styles for usage and status page*/
+
+.storage-usage-info{
+	position: relative;
+	margin-left: 50px;
+	max-width: 300px;
+	float: left;
+}
+
+.storage-usage-info header{
+	background-color: black;
+	color: white;
+	font: 20px bold;
+	padding: 10px 20px;
+}
+
+.storage-usage-info section{
+	border: solid gray 2pt;
+	border-top: none;
+	background-color: white;
+	padding: 10px;
+}
+
+.storage-usage-info .percentage-bar{
+	width: 76%;
+	background-color: navy;
+}
+
+.storage-status{
+	position: relative;
+	float: left;
+	margin-top: 50px;
+	margin-left: 50px;
+}
+
+.storage-status div{
+	background-color: #D47C37;
+	min-width: 75px;
+	min-height: 50px;
+	padding: 10px;
+	text-align: center;
+	margin-bottom: 20px;
+	color: white;
+}
+
+.storage-usage-bar{
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 3px;
+	width: @site-main-width;
+	height: 40px;
+}
+
+.storage-usage-bar .usage-total{
+	position: absolute;
+	background-color: white;
+	border: solid brown 1px;
+	bottom: 1px;
+	min-width: 99%;
+	min-height: 99%;
+}
+.storage-usage-bar .usage-now{
+	position: absolute;
+	background-color: #421B19;
+	border: solid brown 1px;
+	bottom: 1px;
+	width: 30%;
+	min-height: 99%;
+}

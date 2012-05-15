@@ -340,6 +340,11 @@ def apply_storage_account(storage_url, account, password, test=True):
 	op_ok = False
 	op_msg = 'Failed to apply storage accounts for unexpetced errors.'
 
+        if test:
+            test_gw_results = json.loads(test_storage_account(storage_url, account, password))
+            if test_gw_results['result'] == False:
+                return json.dumps(test_gw_results)
+
 	try:
 		op_config = ConfigParser.ConfigParser()
 		#Create authinfo2 if it doesn't exist
@@ -416,6 +421,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		(stdout, stderr) = po.communicate(new_key)
+                (stdout, stderr) = po.communicate(new_key) #Need to confirm the new passphrase
 		if po.returncode !=0:
 			if stdout.find("Wrong bucket passphrase") !=-1:
 				op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
@@ -446,10 +452,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 			      'msg'    : op_msg,
 			      'data'   : {}}
 
-		if op_ok == True:
-			reset_gateway()
-		else:
-			return json.dumps(return_val)
+		return json.dumps(return_val)
 
 def _createS3qlConf( storage_url):
 	log.info("_createS3qlConf start")
@@ -622,6 +625,14 @@ def _restartServices():
                         op_msg = "Failed to start samba service for %s."%output
 			raise BuildGWError(op_msg)
 
+                cmd = "/etc/init.d/nmbd restart"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        op_msg = "Failed to start samba service for %s."%output
+                        raise BuildGWError(op_msg)
+
 		cmd = "/etc/init.d/nfs-kernel-server restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.read()
@@ -650,7 +661,7 @@ def build_gateway(user_key):
 	try:
 
 		if not common.isValidEncKey(user_key):
-			op_msg = "Encryption Key has to an alphanumeric string of length between 6~20"		
+			op_msg = "Encryption Key has to be an alphanumeric string of length between 6~20"		
 			raise BuildGWError(op_msg)
 
 		op_config = ConfigParser.ConfigParser()
@@ -1244,7 +1255,13 @@ def set_smb_user_list (username, password):
         log.error("set_smb_user_list timeout")
         return_val['msg'] = 'Timeout for changing passwd.'
         return json.dumps(return_val)
+
+    #Resetting smb service
+    smb_return_val = json.loads(restart_smb_service())
     
+    if smb_return_val['result'] == False:
+        return_val['msg'] = 'Error in restarting smb service.'
+        return json.dumps(return_val) 
     
     # good. all set
     return_val['result'] = True
@@ -1369,7 +1386,7 @@ def set_nfs_access_ip_list (array_of_ip):
     return_val = {
                   'result' : False,
                   'msg' : 'get NFS access ip list failed unexpectedly.',
-                  'data' : { "array_of_ip" : [] } }
+                  'data' : {} }
 
 
     log.info("set_nfs_access_ip_list starts")
@@ -1399,9 +1416,9 @@ def set_nfs_access_ip_list (array_of_ip):
             #print services
             #print ips
             
-            return_val['result'] = True
-            return_val['msg'] = "Get ip list success"
-            return_val['data']["array_of_ip"] = ips
+            #return_val['result'] = True
+            #return_val['msg'] = "Get ip list success"
+            #return_val['data']["array_of_ip"] = ips
             
             #return json.dumps(return_val)
             
@@ -1420,11 +1437,20 @@ def set_nfs_access_ip_list (array_of_ip):
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
-        return_val['data']["array_of_ip"] = " ".join(array_of_ip)
     except:
         log.info("cannot write to " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
+
+
+    #Resetting nfs service
+    nfs_return_val = json.loads(restart_nfs_service())
+
+    if nfs_return_val['result'] == False:
+        return_val['result'] = False
+        return_val['msg'] = 'Error in restarting NFS service.'
+        return json.dumps(return_val)
+
         
     log.info("get_nfs_access_ip_list end")
 
