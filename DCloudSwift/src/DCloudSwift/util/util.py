@@ -321,7 +321,7 @@ def getSwiftNodeIpList():
 		return None
 
 	storageIpList = getStorageNodeIpList()
-	if storageIplist is None:
+	if storageIpList is None:
 		return None
 
 	for ip in storageIpList:
