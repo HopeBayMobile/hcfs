@@ -3,7 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django import forms
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput, NumberInput
-
+from lib.gateway import api
+import json
 
 @login_required
 def index(request):
@@ -13,22 +14,22 @@ def index(request):
 def system(request):
 
     class Network(RenderFormMixinClass, forms.Form):
-        ip_address = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
+        ip = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
         gateway = forms.IPAddressField(label='Gateway Address', widget=IPAddressInput)
-        subnet_mask = forms.IPAddressField(label='Submask', widget=IPAddressInput)
-        primary_dns = forms.IPAddressField(label='Primary DNS server', widget=IPAddressInput)
-        secondary_dns = forms.IPAddressField(label='Secondary DNS server', widget=IPAddressInput)
+        mask = forms.IPAddressField(label='Submask', widget=IPAddressInput)
+        dns1 = forms.IPAddressField(label='Primary DNS server', widget=IPAddressInput)
+        dns2 = forms.IPAddressField(label='Secondary DNS server', widget=IPAddressInput)
 
     class AdminPassword(RenderFormMixinClass, forms.Form):
         password = forms.CharField(widget=forms.PasswordInput)
-        retry_password = forms.CharField(widget=forms.PasswordInput)
+        retype_password = forms.CharField(widget=forms.PasswordInput)
 
-    forms_group = [Network(), AdminPassword()]
+    if request.method == "POST":
+        pass
+    else:
+        network_data = json.loads(api.get_network()).get('data')
+        forms_group = [Network(**network_data), AdminPassword()]
 
-    # if request.method == "POST":
-    #     form = Network(request.POST)
-    # else:
-    #     pass
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group})
 
 
