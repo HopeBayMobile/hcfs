@@ -1,0 +1,25 @@
+#
+# hosts address list
+#
+# variable.
+# -- timeout: pexpect timeout (default: 10)
+# -- username: superuser account (default: root)
+# -- password: superuser password (default: root123)
+# -- action: after process action (default: reboot)
+# -- first_addr: ip address begin range
+# -- final_addr: ip address end range
+# -- count: host count.
+# format:
+# -- <variable name> = <value>
+timeout	= 20
+username = root
+password = deltacloud
+action = reboot
+first_addr = 192.168.2.1
+#final_addr = 192.168.2.10
+count = 10
+# =====================================
+# hostaddr	user	password
+# hostaddr      user
+# hostaddr
+192.168.2.17    root	root123

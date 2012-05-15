@@ -7,16 +7,30 @@ from django.contrib.formtools.wizard.forms import ManagementForm
 from celery.result import AsyncResult
 from celery import states
 from models import Work, Step
+import json
 
 class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
     wizard_step = []
+    wizard_initial = {}
 
     @classmethod
     def patterns(cls):
         return patterns('',
             url(r'^$', cls.as_view(), name='DWizard'),
         )
+    @classmethod
+    def is_going(cls):
+        #Initialize work data
+        work, created = Work.objects.get_or_create(work_name=cls.__name__)
+        if created:
+            return True
+        else:
+            form_list = [(step[0].__name__) for step in cls.wizard_step]
+            if work.current_form == form_list[-1]:
+                return False
+            else:
+                return True
     
     @classmethod
     def as_view(cls, *args, **kwargs):
@@ -27,8 +41,8 @@ class DeltaWizard(SessionWizardView):
 #            work.save()
         
         form_list = [(step[0].__name__, step[0]) for step in cls.wizard_step]
-        named_form = tuple(form_list)   
-        return super(DeltaWizard, cls).as_view(named_form)
+        named_form = tuple(form_list)
+        return super(DeltaWizard, cls).as_view(named_form, initial_dict=cls.wizard_initial)
 
 
     def get(self, request, *args, **kwargs):
@@ -117,7 +131,7 @@ class DeltaWizard(SessionWizardView):
 
 
     def process_step(self, form):
-        data = self.get_form_step_data(form)
+        cleaned_data = form.cleaned_data
         step_index = self.get_step_index()
         
         #save current step
@@ -128,12 +142,13 @@ class DeltaWizard(SessionWizardView):
         #get task and execute
         task = self.wizard_step[step_index][1]
         if task:
-            result = task.delay(data)
+            result = task.delay(cleaned_data)
             #save task_id to model
             Step.objects.create(wizard=work,
                                 form=work.current_form,
-                                data='',
+                                data=json.dumps(cleaned_data),
                                 task_id=result.task_id)
+        data = self.get_form_step_data(form)
         return data
 
 
