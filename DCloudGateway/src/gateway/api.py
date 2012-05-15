@@ -421,7 +421,6 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		(stdout, stderr) = po.communicate(new_key)
-                (stdout, stderr) = po.communicate(new_key) #Need to confirm the new passphrase
 		if po.returncode !=0:
 			if stdout.find("Wrong bucket passphrase") !=-1:
 				op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
@@ -1994,5 +1993,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 if __name__ == '__main__':
 	#print build_gateway("1234567")
-	#print apply_user_enc_key("1234567", "1234567")
+	#print apply_user_enc_key("123456", "1234567")
 	pass
