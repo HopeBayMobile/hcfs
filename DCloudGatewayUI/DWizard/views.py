@@ -72,9 +72,10 @@ class DeltaWizard(SessionWizardView):
                     self.storage.current_step = self.steps.next
                     return self.render(self.get_form())
                 else:
-                    return render_to_response('done.html')
+                    return render_to_response('finish.html')
             else:
-                return render_to_response('doing.html')
+                meta = result.info
+                return render_to_response('doing.html', {'meta':meta})
         else:
             self.storage.current_step = self.steps.next        
             return self.render(self.get_form(), back=True)
@@ -123,7 +124,7 @@ class DeltaWizard(SessionWizardView):
                 
                 if task:
                     #wait task done
-                    return render_to_response('finish.html')
+                    return render_to_response('doing.html')
                 else:
                     # proceed to the next step
                     return self.render_next_step(form, back=True)

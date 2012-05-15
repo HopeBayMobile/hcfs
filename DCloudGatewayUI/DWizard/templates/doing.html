@@ -11,12 +11,9 @@
 	<div class="span6 offset3">
 		<div class="well">
 			<h3>Please wait for applying settings.</h3>
-			{% if error %}
-			<div class="alert alert-error">{{error}}</div>
-			{% endif %}
-			{% if info %}
-			<div class="alert alert-info">{{info}}</div>
-			{% endif %}
+			{% for step in meta.step_list %}
+			<div class="alert alert-info">{{step.msg}}</div>
+			{% endfor %}
 		</div>
 	</div>
 </div>
