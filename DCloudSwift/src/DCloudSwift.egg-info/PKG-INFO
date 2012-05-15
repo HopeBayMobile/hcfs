@@ -1,0 +1,58 @@
+Metadata-Version: 1.0
+Name: DCloudSwift
+Version: 0.1
+Summary: Delta Inc. CTBU Storage Gateway
+Home-page: UNKNOWN
+Author: Cloud Data Team, CTBU, Delta Electronic Inc.
+Author-email: UNKNOWN
+License: Delta Inc.
+Description: [Description]:
+        1. The scripts is used to deploy Swift. The development environment is listed
+           in the following.
+        	(1) OS: Ubuntu 11.04 64 bits
+        	(2) Language: python and bash shell
+        	(3) Hardware: AMD 64bit
+        
+        
+        2. How to use the scripts:
+        	(1) Copy the folder 'DCloudSwift' to the master node.
+        	(2) Change your privilege to root.
+        	(3) Modify the [storage] section in Swift.ini:
+                    password = password of root in swift nodes
+                    replica = how many replica of data do you want
+                    deviceCnt = how many disks to use in each swift node
+        `
+        	(4) Execute 'python setup.py install'
+        	(5) Edit /etc/delta/proxyNodes in the following format:
+                      ip1
+                      ip2
+                      ... 
+                (6) Edit /etc/delta/storageNodes in the following format:
+                      ip1 zid1
+                      ip2 zid2
+                      ...
+                    
+                    where zid has to be a positive integer less than 10.
+                      
+        	(7) execute dcloud_swift_deploy
+        
+        
+        
+        [Note]:
+        1. The command "dcloud_swift_deploy" is for the convenience of testing. 
+           Onec PDCM is ready, we don't have to edit /etc/delta/storageNodes and /etc/delta/proxyNodes. 
+           PDCM will assign the IPs of proxy and storage nodes automatically.
+        
+        2. The logs and error handling are not ready yet! Some logs can be found 
+           in /var/log/deltaSwift.
+        
+        3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
+           Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
+        
+        4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
+           Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py
+        
+Keywords: deploy,swift,cloud
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Topic :: FILESYSTEM

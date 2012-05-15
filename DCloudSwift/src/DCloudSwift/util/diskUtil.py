@@ -10,7 +10,6 @@ import socket
 import util
 import re
 
-
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 
@@ -84,8 +83,8 @@ def getUnusedDisks(vers):
 	disks = getUmountedDisks()
 	unusedDisks = []
 	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret !=0 or not util.isValid(vers, metadata):
+		(ret, fingerprint) = readFingerprint(disk)
+		if ret !=0 or not util.isValid(vers, fingerprint):
 			unusedDisks.append(disk)
 
 	return unusedDisks
@@ -233,13 +232,13 @@ def mountUmountedSwiftDevices():
 	disks = getUmountedDisks()
 
 	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
+		(ret, fingerprint) = readFingerprint(disk)
 		if ret!=0:
-			logger.info("Failed to read metadata from disk %s"%disk)
+			logger.info("Failed to read fingerprint from disk %s"%disk)
 			continue
 
-		deviceNum = metadata["deviceNum"]
-		if util.isValid(vers, metadata) and deviceNum in umountedSwiftDevices:
+		deviceNum = fingerprint["deviceNum"]
+		if util.isValid(vers, fingerprint) and deviceNum in umountedSwiftDevices:
 			if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
 				umountedSwiftDevices.discard(deviceNum)
 
@@ -271,7 +270,7 @@ def createLostSwiftDevices(lostDevices):
 			print "%s\n"%mountpoint
 
                         if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum)!=0:
-                                raise WriteMetadataError("Failed to write metadata into %s"%disk)
+                                raise WriteMetadataError("Failed to write fingerprint into %s"%disk)
 
                         if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=deviceNum)!=0:
                                 raise MountSwiftDeviceError("Failed to mount %s on %s"%(disk, mountpoint))
@@ -313,7 +312,7 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
                 	#line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
 
                         if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count)!=0:
-                                raise WriteMetadataError("Failed to write metadata into %s"%disk)
+                                raise WriteMetadataError("Failed to write fingerprint into %s"%disk)
 
                         if mountSwiftDevice(disk=disk, devicePrx=devicePrx, deviceNum=count)!=0:
                                 raise MountSwiftDeviceError("Failed to mount %s on %s"%(disk, mountpoint))
@@ -333,9 +332,9 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
 	logger.debug("end")
         return deviceCnt-count
 
-def readMetadata(disk):
-        logger = util.getLogger(name="readMetadata")
-	metadata = {}
+def readFingerprint(disk):
+        logger = util.getLogger(name="readFingerprint")
+	fingerprint = {}
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
@@ -343,35 +342,35 @@ def readMetadata(disk):
 	#TODO: chechsum
 	if mountDisk(disk, mountpoint) !=0:
                 logger.debug("Failed to mount %s"%disk)
-                return (1, metadata)
+                return (1, fingerprint)
 
 	try:
-		with open("%s/Metadata"%mountpoint, "rb") as fh:
-			metadata = pickle.load(fh)
+		with open("%s/fingerprint"%mountpoint, "rb") as fh:
+			fingerprint = pickle.load(fh)
 
-		return (0, metadata)
+		return (0, fingerprint)
 	except IOError as e:
-		logger.debug("Failed to read metadata from %s for %s"%(disk, e))
-		return (1, metadata)
+		logger.debug("Failed to read fingerprint from %s for %s"%(disk, e))
+		return (1, fingerprint)
 	finally:
 		if lazyUmount(mountpoint)!=0:
 			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
 
 
-def getLatestMetadata():
-	logger = util.getLogger(name="getLatestMetadata")
-	logger.debug("getLatestMetadata start")
+def getLatestFingerprint():
+	logger = util.getLogger(name="getLatestFingerprint")
+	logger.debug("getLatestFingerprint start")
 	disks = getNonRootDisks()
-	latestMetadata = None
+	latestFingerprint = None
 
        	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
+		(ret, fingerprint) = readFingerprint(disk)
 		if ret == 0:
-			latestMetadata  = metadata  if latestMetadata is None or latestMetadata["vers"] < metadata["vers"]  else latestMetadata
+			latestFingerprint  = fingerprint  if latestFingerprint is None or latestFingerprint["vers"] < fingerprint["vers"]  else latestFingerprint
 			
 
-	logger.debug("getLatestMetadata end")
-	return latestMetadata
+	logger.debug("getLatestFingerprint end")
+	return latestFingerprint
 
 def getLatestVers():
 	logger = util.getLogger(name="getLatestVers")
@@ -380,9 +379,9 @@ def getLatestVers():
 	latestVers = None
 
        	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
+		(ret, fingerprint) = readFingerprint(disk)
 		if ret == 0:
-			latestVers  = metadata["vers"]  if latestVers is None or latestVers < metadata["vers"]  else latestVers
+			latestVers  = fingerprint["vers"]  if latestVers is None or latestVers < fingerprint["vers"]  else latestVers
 			
 
 	logger.info("end")
@@ -390,7 +389,6 @@ def getLatestVers():
 
 def __loadSwiftMetadata(disk):
         logger = util.getLogger(name="__loadSwiftMetadata")
-	metadata = {}
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
@@ -412,7 +410,7 @@ def __loadSwiftMetadata(disk):
 		returncode = 1
 
 	if lazyUmount(mountpoint)!=0:
-		logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
+		logger.warn("Failed to lazy umount disk %s from %s"%(disk, mountpoint))
 
 	return returncode
 
@@ -421,13 +419,13 @@ def loadSwiftMetadata():
 	logger.info("start")
 
         disks = getNonRootDisks()
-	latestMetadata = getLatestMetadata()
+	latestFingerprint = getLatestFingerprint()
 	os.system("mkdir -p /etc/swift")
 	returncode = 1
 
         for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+		(ret, fingerprint) = readFingerprint(disk)
+		if ret==0 and fingerprint["vers"] >= latestFingerprint["vers"]:
 			if __loadSwiftMetadata(disk) ==0:
 				returncode = 0
 				break
@@ -445,21 +443,21 @@ def remountRecognizableDisks():
         unusedDisks = []
 	lostDevices =[]
 
-	latest = getLatestMetadata()	
+	latest = getLatestFingerprint()	
         if latest is None:
                 return (lostDevices, disks)
 
 	seenDevices = set()
         for disk in disks:
-                (ret, metadata) = readMetadata(disk)
-                if ret == 0 and metadata["hostname"] == socket.gethostname() and metadata["vers"] == latest["vers"] and metadata["deviceNum"] not in seenDevices:
-			mountpoint = "/srv/node/%s%d"%(metadata["devicePrx"], metadata["deviceNum"])
-                        if mountSwiftDevice(disk=disk, devicePrx=metadata["devicePrx"], deviceNum=metadata["deviceNum"]) == 0:
-				seenDevices.add(metadata["deviceNum"])
-				print "/srv/node/%s%d is back!"%(metadata["devicePrx"], metadata["deviceNum"])
+                (ret, fingerprint) = readFingerprint(disk)
+                if ret == 0 and fingerprint["hostname"] == socket.gethostname() and fingerprint["vers"] == latest["vers"] and fingerprint["deviceNum"] not in seenDevices:
+			mountpoint = "/srv/node/%s%d"%(fingerprint["devicePrx"], fingerprint["deviceNum"])
+                        if mountSwiftDevice(disk=disk, devicePrx=fingerprint["devicePrx"], deviceNum=fingerprint["deviceNum"]) == 0:
+				seenDevices.add(fingerprint["deviceNum"])
+				print "/srv/node/%s%d is back!"%(fingerprint["devicePrx"], fingerprint["deviceNum"])
 				continue
 			else:
-                                logger.error("Failed to mount disk %s as swift device %s%d"%(disk, metadata["devicePrx"],metadata["deviceNum"]))
+                                logger.error("Failed to mount disk %s as swift device %s%d"%(disk, fingerprint["devicePrx"], fingerprint["deviceNum"]))
 
         	unusedDisks.append(disk)
 
@@ -471,7 +469,7 @@ def remountDisks():
 	logger = util.getLogger(name="remountDisks")
 	logger.info("start")
 	
-	latest = getLatestMetadata()
+	latest = getLatestFingerprint()
 
 	if latest is None:
 		return (0, [])
@@ -555,13 +553,13 @@ def loadScripts():
 	logger.info("start")
 
         disks = getNonRootDisks()
-	latestMetadata = getLatestMetadata()
+	latestVers = getLatestVers()
 	os.system("mkdir -p /etc/swift")
 	returncode = 1
 
         for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+		(ret, fingerprint) = readFingerprint(disk)
+		if ret==0 and fingerprint["vers"] >= latestVers:
 			if __loadScripts(disk) ==0:
 				returncode = 0
 				break
@@ -600,35 +598,6 @@ def dumpSwiftMetadata(destDir):
 	os.system("cd %s; rm -rf %s"%(destDir, UNNECESSARYFILES))
 	return 0
 
-def getDeviceMapping():
-	logger = util.getLogger(name="getDeviceMapping")
-
-        disks = getNonRootDisks()
-
-	deviceMapping = dict()
-	latestMetadata = getLatestMetadata()
-	if latestMetadata is None:
-		return deviceMapping
-	
-	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret !=0:
-			logger.warn("Failed to read metadata from disk %s"%disk)
-			continue
-
-		if metadata["vers"] < latestMetadata["vers"]:
-			logger.warn("Metadata of Disk %s is out of date"%disk)
-			continue
-
-		if metadata["hostname"] != socket.gethostname():
-			logger.warn("Metadata of Disk %s is not valid"%disk)
-			continue
-
-		deviceMapping.setdefault(metadata["deviceNum"], disk)
-
-	return deviceMapping
-
-
 
 def updateMountedSwiftDevices():
 	logger = util.getLogger(name="updateMetadataOnMountedDevices")
@@ -664,13 +633,13 @@ def updateUmountedSwiftDevices(oriVers):
 	disks = getUmountedDisks()
 
 	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
+		(ret, fingerprint) = readFingerprint(disk)
 		if ret!=0:
-			logger.warn("Failed to read metadata from disk %s"%disk)
+			logger.warn("Failed to read fingerprint from disk %s"%disk)
 			continue
 
-		deviceNum = metadata["deviceNum"]
-		if util.isValid(oriVers, metadata) and deviceNum in umountedSwiftDevices:
+		deviceNum = fingerprint["deviceNum"]
+		if util.isValid(oriVers, fingerprint) and deviceNum in umountedSwiftDevices:
 			if writeMetadata(disk=disk, vers=newVers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=deviceNum) == 0:
 				logger.info("Succeed to update metadata on disk %s with deviceNum=%d and vers=%s"%(disk, deviceNum, newVers))
 				umountedSwiftDevices.discard(deviceNum)
@@ -705,12 +674,12 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 
 
 	#TODO: write checksum
-	os.system("touch /%s/Metadata"%mountpoint)
-	metadata = {"hostname":socket.gethostname(), "vers":vers, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
+	os.system("touch /%s/fingerprint"%mountpoint)
+	fingerprint = {"hostname":socket.gethostname(), "vers":vers, "deviceCnt":deviceCnt, "devicePrx":devicePrx, "deviceNum":deviceNum}
 	
 	try:
-		with open("%s/Metadata"%mountpoint, "wb") as fh:
-			pickle.dump(metadata, fh)
+		with open("%s/fingerprint"%mountpoint, "wb") as fh:
+			pickle.dump(fingerprint, fh)
 
 		if dumpSwiftMetadata("/%s/swift"%mountpoint) !=0:
                 	logger.error("Failed to dump swift metadata to %s"%(disk))
@@ -722,11 +691,11 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 
 		return 0
 	except IOError as e:
-		logger.error("Failed to wirte metadata for disk %s"%disk)
+		logger.error("Failed to wirte fingerprint for disk %s"%disk)
 		return 1
 	finally:
 		if lazyUmount(mountpoint)!=0:
-                        logger.warn("Failed to umount disk %s from %s %s"%(disk, mountpoint))
+                        logger.warn("Failed to lazy umount disk %s from %s %s"%(disk, mountpoint))
 	
 
 	

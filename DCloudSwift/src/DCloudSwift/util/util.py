@@ -128,13 +128,13 @@ def isDaemonAlive(daemonName):
 		return False
 	
 
-def isValid(vers, metadata):
+def isValid(vers, fingerprint):
 	retval = True
 
-	if vers != metadata["vers"]:
+	if vers != fingerprint["vers"]:
 		retval=False
 
-	if socket.gethostname()!=metadata["hostname"]:
+	if socket.gethostname()!=fingerprint["hostname"]:
 		retval=False 
 
 	return retval
@@ -290,18 +290,7 @@ def getDeviceCnt():
 
 def getDevicePrx():
 	logger = getLogger(name="getDevicePrx")
-	
-	config = ConfigParser()
-	config.readfp(open(SWIFTCONF))
-
-	try:
-		with open(SWIFTCONF,"rb") as fh:
-			config.readfp(fh)
-	except IOError:
-		logger.error("Failed to load swift.ini")
-		return None
-
-	return config.get('storage', 'devicePrx')
+	return "sdb"
 
 def getIpAddress():
 	logger = getLogger(name="getIpAddress")
