@@ -27,10 +27,11 @@
         <script type="text/javascript">
             $(function(){
                 {% if tab %}
-                $("#site-tab a[href={{tab}}]").tab('show');
+                $("#site-tab li:has(a[href={{tab}}])").addClass('active');
                 {% else %}
-                $("#site-tab a:first").tab('show');
+                $("#site-tab li:first").addClass('active');
                 {% endif %}
+                $('#site-tab li').append('<span></span>')
             })
             {% block javascript %}
             {% endblock javascript %}
@@ -45,35 +46,33 @@
           <a href="/logout" class="btn" style="margin: 0;">Logout</a>
           {% endif %}
         </p>
-        <div class="refresh-box">
+        <div class="logo-box">
         </div>
-        <div id="" class="notify-box-group">
-            <div class="notify-box-row">
-                <div class="notify-box">
-                Flush
-                </div>
-                <div class="notify-box">
-                Network
-                </div>
-                <div class="notify-box">
+
+        <div class="notify-box">
                 Current 1000/100 KB/Sec
                 </div>
-                <div class="notify-box">
-                Dirty cache Warning ICON
+        <div id="" class="notify-box-group">
+
+            <div class="notify-box-row">
+                <div class="notify-box icon-system-work">
                 </div>
-                <div class="notify-box">
-                Uploading ICON
+                <div class="notify-box icon-network-work">
+                </div>
+                <div class="notify-box icon-flush-work">
+                </div>
+                <div class="notify-box icon-dirtycache-safe">
                 </div>
             </div>
-            <div class="notify-box-row-count3">
-                <div class="notify-box">
-                HDD Status
+            <div class="notify-box-row2">
+                <div class="notify-box icon-indicator-normal">
+                HDD
                 </div>
-                <div class="notify-box">
-                NFS Status
+                <div class="notify-box icon-indicator-normal">
+                NFS
                 </div>
-                <div class="notify-box">
-                SMB Status
+                <div class="notify-box icon-indicator-normal">
+                SMB
                 </div>
             </div>
         </div>
@@ -86,8 +85,8 @@
     </div>
     <div class="left-row">
         <div>
-            <ul class="nav nav-pills nav-stacked" id="site-tab">
-              <li class="active"><a href=".">Dashboard</a></li>
+            <ul class="tab-btn" id="site-tab">
+              <li class=""><a href=".">Dashboard</a></li>
               <li class=""><a href="account">Storage Account</a></li>
               <li class=""><a href="system">System</a></li>
               <li class=""><a href="sharefolder">Share Folder</a></li>
