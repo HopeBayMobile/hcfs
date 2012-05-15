@@ -42,7 +42,6 @@ def tryLock(tries=1, lockTimeout=900):
 
 def __loadSwiftMetadata(disk):
         logger = getLogger(name="__loadSwiftMetadata")
-	metadata = {}
         mountpoint = "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
@@ -69,7 +68,6 @@ def __loadSwiftMetadata(disk):
 	return returncode
 def __loadScripts(disk):
         logger = getLogger(name="__loadSripts")
-        metadata = {}
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
@@ -101,13 +99,13 @@ def loadScripts():
 
         disks = getNonRootDisks()
 
-        latestMetadata = getLatestMetadata()
+        latestFingerprint = getLatestFingerprint()
         os.system("mkdir -p /etc/swift")
         returncode = 1
 
         for disk in disks:
-                (ret, metadata) = readMetadata(disk)
-                if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+                (ret, fingerprint) = readFingerprint(disk)
+                if ret==0 and fingerprint["vers"] >= latestFingerprint["vers"]:
                         if __loadScripts(disk) ==0:
                                 returncode = 0
                                 break
@@ -138,20 +136,20 @@ def getRootDisk():
 
 
 
-def getLatestMetadata():
-	logger = getLogger(name="getLatestMetadata")
+def getLatestFingerprint():
+	logger = getLogger(name="getLatestFingerprint")
 	logger.info("start")
 	disks = getNonRootDisks()
-	latestMetadata = None
+	latest = None
 
        	for disk in disks:
-		(ret, metadata) = readMetadata(disk)
+		(ret, fingerprint) = readFingerprint(disk)
 		if ret == 0:
-			latestMetadata  = metadata  if latestMetadata is None or latestMetadata["vers"] < metadata["vers"]  else latestMetadata
+			latest  = fingerprint  if latest is None or latest["vers"] < fingerprint["vers"]  else latest
 			
 
 	logger.info("end")
-	return latestMetadata
+	return latest
 
 def getNonRootDisks():
 	rootDisk = getRootDisk()
@@ -192,13 +190,13 @@ def loadSwiftMetadata():
 	logger.info("start")
 
         disks = getNonRootDisks()
-	latestMetadata = getLatestMetadata()
+	latestFingerprint = getLatestFingerprint()
 	os.system("mkdir -p /etc/swift")
 	returncode = 1
 
         for disk in disks:
-		(ret, metadata) = readMetadata(disk)
-		if ret==0 and metadata["vers"] >= latestMetadata["vers"]:
+		(ret, fingerprint) = readFingerprint(disk)
+		if ret==0 and fingerprint["vers"] >= latestFingerprint["vers"]:
 			if __loadSwiftMetadata(disk) ==0:
 				returncode = 0
 				break
@@ -269,26 +267,25 @@ def mountDisk(disk, mountpoint):
 	return returncode
 
 
-def readMetadata(disk):
-        logger = getLogger(name="readMetadata")
-	metadata = {}
+def readFingerprint(disk):
+        logger = getLogger(name="readFingerprint")
         mountpoint =  "/temp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
-
+	fingerprint = {}
 
 	#TODO: chechsum
 	if mountDisk(disk, mountpoint) !=0:
                 logger.debug("Failed to mount %s"%disk)
-                return (1, metadata)
+                return (1, fingerprint)
 
 	try:
-		with open("%s/Metadata"%mountpoint, "rb") as fh:
-			metadata = pickle.load(fh)
+		with open("%s/fingerprint"%mountpoint, "rb") as fh:
+			fingerprint = pickle.load(fh)
 
-		return (0, metadata)
+		return (0, fingerprint)
 	except IOError as e:
-		logger.debug("Failed to read metadata from %s for %s"%(disk, e))
-		return (1, metadata)
+		logger.debug("Failed to read fingerprint from %s for %s"%(disk, e))
+		return (1, fingerprint)
 	finally:
 		if lazyUmount(mountpoint)!=0:
 			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
