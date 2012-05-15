@@ -337,6 +337,8 @@ class BlockCache(object):
 
         self.going_down = True
 
+        time.sleep(5)
+
         with lock_released:
             for t in self.upload_threads:
                 self.to_upload.put(QuitSentinel)

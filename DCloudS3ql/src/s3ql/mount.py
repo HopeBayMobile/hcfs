@@ -693,6 +693,7 @@ class CommitThread(Thread):
     def stop(self):
         '''Signal thread to terminate'''
 
+        self.block_cache.going_down = True
         self.stop_event.set()
 
 
