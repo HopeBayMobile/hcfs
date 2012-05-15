@@ -1,20 +1,22 @@
-{% extends "base.html" %}
-{% block javascript %}
-
-{% endblock javascript %}
-{% block content %}
+{% extends "base.html" %} {% block javascript %}
+<script type="text/javascript">
+	$(document).ready(function() {
+		var refreshId = window.setInterval(function() {
+			window.location.assign('.');
+		}, 3000);
+	});
+</script>
+{% endblock javascript %} {% block content %}
 <div class="row" style="padding: 30px 0;">
 	<div class="span6 offset3">
 		<div class="well">
+			<h3>Finished</h3>
 			{% if error %}
 			<div class="alert alert-error">{{error}}</div>
 			{% endif %}
 			{% if info %}
 			<div class="alert alert-info">{{info}}</div>
 			{% endif %}
-			<div style="height: 40px;">
-				<a class="btn btn-primary btn-large pull-right" href="{{next}}">Next</a>
-			</div>
 		</div>
 	</div>
 </div>
