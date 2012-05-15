@@ -625,7 +625,7 @@ if __name__ == '__main__':
 #		testTryLock()
 		
 #	testTryLock2()	
-	print getListenPid("0.0.0.0:8080")
+	#print getListenPid("0.0.0.0:8080")
 	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
@@ -634,4 +634,5 @@ if __name__ == '__main__':
 	#print isDaemonAlive("memcached")
 	#restartAllServices()
 	#print stopAllServices()
+	#generateSwiftConfig()
 	pass	

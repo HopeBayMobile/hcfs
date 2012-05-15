@@ -467,22 +467,6 @@ def remountRecognizableDisks():
 	return (lostDevices, unusedDisks)
 
 
-def resume():
-	logger = util.getLogger(name="resume")
-        logger.info("start")
-
-		
-	os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
-	util.stopAllServices()
-
-	remountDisks()
-	loadSwiftMetadata()	
-
-	util.restartAllServices()
-	os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
-
-	logger.info("end")
-
 def remountDisks():
 	logger = util.getLogger(name="remountDisks")
 	logger.info("start")
@@ -746,23 +730,8 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	
 
 	
-
-def main(argv):
-	ret = 0
-	if len(argv) > 0:
-		if sys.argv[1]=="-r":
-			remountDisks()
-		elif sys.argv[1]=="-l":
-			loadSwiftMetadata()
-		elif sys.argv[1]=="-R":
-			resume()
-		else:
-			sys.exit(-1)
-	
-	return ret
-
 if __name__ == '__main__':
-	main(sys.argv[1:])
+	pass
 	#print getUmountedDisks()
 	#print getUmountedSwiftDevices(deviceCnt=5, devicePrx="sdb")
 	#util.generateSwiftConfig()
@@ -790,5 +759,3 @@ if __name__ == '__main__':
 	#print "/dev/sdf %s"%str(readMetadata(disk="/dev/sdf"))
 	#mountUmountedSwiftDevices()
 	#print remountDisks()
-	#print int(time.time())
-	#resume()
