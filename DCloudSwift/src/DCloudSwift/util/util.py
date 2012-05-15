@@ -309,7 +309,7 @@ def getIpAddress():
 
 def getSwiftNodeIpList():
 	logger = getLogger(name="getSwiftNodeIpList")
-	storageIpList = getStorageNodeIpList()
+
 	proxyList =[]
 	ipSet = set()
 	
@@ -318,6 +318,11 @@ def getSwiftNodeIpList():
 			proxyList = pickle.load(fh)
 	except IOError:
 		logger.warn("Failed to load proxyList")
+		return None
+
+	storageIpList = getStorageNodeIpList()
+	if storageIplist is None:
+		return None
 
 	for ip in storageIpList:
 		ipSet.add(ip)
@@ -371,6 +376,7 @@ def getStorageNodeIpList():
 	po.wait()
 	
 	if po.returncode != 0:
+		logger.error("Failed to obtain storage node list from object.builder")
 		return None
 
 	i = 0
