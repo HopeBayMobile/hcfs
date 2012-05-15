@@ -1500,7 +1500,7 @@ def stop_upload_sync():			# by Yen
 	try:
 		apply_scheduling_rules(schedule)
 	except:
-		print "Please check whether s3qlctrl is installed."
+		#print "Please check whether s3qlctrl is installed."
 		return_val = {
 			'result': False,
 			'msg': "Turn off cache uploading has failed.",
@@ -1532,7 +1532,7 @@ def force_upload_sync(bw):			# by Yen
 	try:
 		apply_scheduling_rules(schedule)
 	except:
-		print "Please check whether s3qlctrl is installed."
+		#print "Please check whether s3qlctrl is installed."
 		return_val = {
 			'result': False,
 			'msg': "Turn on cache uploading has failed.",
