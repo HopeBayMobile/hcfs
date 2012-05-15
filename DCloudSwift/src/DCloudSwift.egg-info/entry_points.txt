@@ -1,3 +1,0 @@
-[console_scripts]
-dcloud_swift_deploy = DCloudSwift.master.SwiftDeploy:deploy
-
