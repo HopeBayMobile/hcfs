@@ -1,0 +1,38 @@
+{% extends "dashboard/base.html" %}
+{% block tab_content %}
+
+<div class="formset">
+	<ul class="nav nav-tabs">
+	{% for form in forms_group %}
+          <li class=""><a href="#{{form.name}}" data-toggle="tab">{{form.name}}</a></li>
+	{% endfor %}
+	</ul>
+	<div class="tab-content">
+	{% for form in forms_group %}
+		<div class="tab-pane" id="{{form.name}}">
+		<form id="{{form.name}}" class="form-horizontal" method="POST"
+			action="{{action}}">
+			{% csrf_token %} {{ form.render }}
+			<div class="form-actions">
+				<button type="submit" class="btn btn-primary">
+				{% if submit %}
+				{{submit}}
+				{% else %}
+				Submit
+				{% endif %}
+				</button>
+				<span class="label hide"></span>
+			</div>
+		</form>
+		</div>
+	{% endfor %}
+	</div>
+	<script type="text/javascript">
+		$(function(){
+			$("div.formset li:first").addClass('active');
+			$("div.formset .tab-pane:first").addClass('active');
+		});
+	</script>
+</div>
+
+{% endblock tab_content %}

@@ -1,11 +1,5 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
-    <div class="tab-pane active" id="dash" style="overflow-x: hidden;">
-        {% include "dashboard/dashboard.html" %}
-    </div>
-    <div class="tab-pane" id="account">
-        <p>Howdy, I'm in account config.</p>
-    </div>
 <style type='text/css'>
 .sync_bar_main {
     width: 700px;
@@ -35,7 +29,7 @@
     height: 45px;
 }
 </style>
-    <div class="tab-pane" id="sync">
+    <div id="sync">
         <div id="main" class="sync_bar_main">
             <div id="sidebar" class="sync_bar_left">
                 <div id="infont" class="sync_bar_infont">
@@ -106,20 +100,5 @@
                 icon
             </div>
         </div>
-    </div>
-    <div class="tab-pane" id="system">
-        {% include "dashboard/system.html" %}
-    </div>
-    <div class="tab-pane" id="sharefolder">
-        <p>What up girl, this is share folders.</p>
-    </div>
-    <div class="tab-pane" id="sync">
-        <p>What up girl, this is syslog.</p>
-    </div>
-    <div class="tab-pane" id="syslog">
-        <p>What up girl, this is syslog.</p>
-    </div>
-    <div class="tab-pane" id="power">
-        {% include "dashboard/power.html" %}
     </div>
 {% endblock tab_content %}
