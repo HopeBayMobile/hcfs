@@ -2,11 +2,12 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django import forms
 from lib.forms import RenderFormMixinClass
-from lib.forms import IPAddressInput
+from lib.forms import IPAddressInput, NumberInput
+
 
 @login_required
 def index(request):
-    return render(request, 'dashboard/content.html')
+    return render(request, 'dashboard/dashboard.html')
 
 
 def system(request):
@@ -28,19 +29,44 @@ def system(request):
     #     form = Network(request.POST)
     # else:
     #     pass
-    return render(request, 'dashboard/content.html', {'tab': 'system', 'forms_group': forms_group})
+    return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group})
 
 
 @login_required
-def account_configuration(request):
-    return render(request, 'account_configuration.html')
+def account(request):
+
+    class Gateway(RenderFormMixinClass, forms.Form):
+        username = forms.CharField()
+        password = forms.CharField(widget=forms.PasswordInput)
+        verify_password = forms.CharField(widget=forms.PasswordInput)
+        retype_password = forms.CharField(widget=forms.PasswordInput)
+
+    class EncryptionKey(RenderFormMixinClass, forms.Form):
+        ip_address = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
+        port = forms.IntegerField(widget=NumberInput)
+        username = forms.CharField()
+        password = forms.CharField(widget=forms.PasswordInput)
+
+    forms_group = [Gateway(), EncryptionKey()]
+
+    return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group})
 
 
 @login_required
-def sync_management(request):
-    return render(request, 'sync_management.html')
+def sharefolder(request):
+    return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder'})
 
 
 @login_required
-def system_log(request):
-    return render(request, 'system_log.html')
+def sync(request):
+    return render(request, 'dashboard/sync.html', {'tab': 'sync'})
+
+
+@login_required
+def syslog(request):
+    return render(request, 'dashboard/syslog.html', {'tab': 'syslog'})
+
+
+@login_required
+def power(request):
+    return render(request, 'dashboard/power.html', {'tab': 'power'})

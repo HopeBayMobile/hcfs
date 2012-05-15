@@ -10,10 +10,10 @@ import pickle
 import time
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+BASEDIR = os.path.dirname(WORKING_DIR)
 
 from util import util
-from util import mountDisks
+from util import diskUtil
 
 def isNewer(confDir):
 	logger = util.getLogger(name="isNewer")
@@ -38,18 +38,42 @@ def updateMetadata(confDir):
 	deviceCnt = util.getDeviceCnt()
 	devicePrx = util.getDevicePrx()
 
-	oriVers = mountDisks.getLatestVers()
+	oriVers = diskUtil.getLatestVers()
 	if oriVers is None:
 		util.stopAllServices() #prevent services from occupying disks
-		mountDisks.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+		diskUtil.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
 	else:
-		mountDisks.updateMetadataOnDisks(oriVers=oriVers)
-		mountDisks.mountUmountedSwiftDevices()
+		diskUtil.updateMetadataOnDisks(oriVers=oriVers)
+		diskUtil.mountUmountedSwiftDevices()
 		
 	util.restartAllServices()
 	return 0
 
 
+def resume():
+	logger = util.getLogger(name="resume")
+        logger.info("start")
+
+		
+	os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+	util.stopAllServices()
+
+	diskUtil.remountDisks()
+	diskUtil.loadSwiftMetadata()	
+
+	util.restartAllServices()
+	os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
+
+	logger.info("end")
+
+def main(argv):
+	ret = 0
+	if len(argv) > 0:
+		if sys.argv[1]=="-R":
+			resume()
+		else:
+			sys.exit(-1)
+	return ret
 
 if __name__ == '__main__':
-	pass	
+	main(sys.argv[1:])

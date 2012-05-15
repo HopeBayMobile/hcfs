@@ -27,7 +27,7 @@
         <script type="text/javascript">
             $(function(){
                 {% if tab %}
-                $("#site-tab a[href=#{{tab}}]").tab('show');
+                $("#site-tab a[href={{tab}}]").tab('show');
                 {% else %}
                 $("#site-tab a:first").tab('show');
                 {% endif %}
@@ -87,14 +87,13 @@
     <div class="left-row">
         <div>
             <ul class="nav nav-pills nav-stacked" id="site-tab">
-              <li class="active"><a href="#dash" data-toggle="tab">Dashboard</a></li>
-              <li class=""><a href="#account" data-toggle="tab">Storage Account</a></li>
-              <li class=""><a href="#system" data-toggle="tab">System</a></li>
-              <li class=""><a href="#sharefolder" data-toggle="tab">Share Folder</a></li>
-              <li class=""><a href="#sync" data-toggle="tab">Sync</a></li>
-
-              <li class=""><a href="#syslog" data-toggle="tab">System Log</a></li>
-              <li class=""><a href="#power" data-toggle="tab">Power On/Off</a></li>
+              <li class="active"><a href=".">Dashboard</a></li>
+              <li class=""><a href="account">Storage Account</a></li>
+              <li class=""><a href="system">System</a></li>
+              <li class=""><a href="sharefolder">Share Folder</a></li>
+              <li class=""><a href="sync">Sync</a></li>
+              <li class=""><a href="syslog">System Log</a></li>
+              <li class=""><a href="power">Power On/Off</a></li>
             </ul>
         </div>
     </div>

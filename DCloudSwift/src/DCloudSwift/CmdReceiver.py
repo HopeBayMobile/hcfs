@@ -20,7 +20,7 @@ BASEDIR = os.path.dirname(WORKING_DIR)
 
 import maintenance
 from util import util
-from util import mountDisks
+from util import diskUtil
 from nodeInstaller import NodeInstaller
 
 Usage = '''
@@ -79,12 +79,12 @@ def triggerUpdateMetadata(confDir):
 		logger.info("Already the latest metadata")
 	
 	else:
-		versOnDisks = mountDisks.getLatestVers()
+		versOnDisks = diskUtil.getLatestVers()
 		newVers = util.getSwiftConfVers(confDir=confDir)
 	
-		if versOnDisks is not None and versOnDisks > newVers and mountDisks.loadScripts()==0:
+		if versOnDisks is not None and versOnDisks > newVers and diskUtil.loadScripts()==0:
 			logger.info("Resume servcies from metadata on disks")
-			mountDisks.resume()
+			diskUtil.resume()
 		else:
 			maintenance.updateMetadata(confDir=confDir)
 			if not util.isDaemonAlive("swiftMonitor"):

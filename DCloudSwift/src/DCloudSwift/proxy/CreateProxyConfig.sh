@@ -33,7 +33,7 @@ mv cert.key /etc/swift
 mv cert.crt /etc/swift
 
 
-perl -pi -e "s/-l 127.0.0.1/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
+perl -pi -e "s/-l *.*.*.*/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
 
 cat >/etc/swift/proxy-server.conf <<EOF
 [DEFAULT]

@@ -40,3 +40,6 @@
 
 3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
    Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
+
+4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
+   Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py

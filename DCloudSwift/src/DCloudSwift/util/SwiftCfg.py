@@ -11,7 +11,6 @@ from ConfigParser import ConfigParser
 
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-os.chdir(WORKING_DIR)
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 
 class SwiftCfg:
