@@ -67,7 +67,9 @@
 			<div class="form-actions">
 				{% if wizard.steps.prev %}
 				{#<button class="btn" name="wizard_goto_step" type="submit" value="{{ wizard.steps.first }}">{% trans "First Step" %}</button>#}
-				<button class="btn" name="back" type="submit" value="{{ wizard.steps.prev }}">{% trans "Back" %}</button>
+				{% if params.back %}
+				<button class="btn" name="wizard_goto_step" type="submit" value="{{ wizard.steps.prev }}">{% trans "Back" %}</button>
+				{% endif %}
 				{% endif %}
 				<button class="btn btn-primary" type="submit" name="next">{% trans "Next" %}</button>
 				<span class="label hide"></span>

@@ -296,7 +296,7 @@ def readMetadata(disk):
 @tryLock(1)
 def main(argv):
 	if loadScripts() == 0:
-		os.system("python /DCloudSwift/util/mountDisks.py -R")
+		os.system("python /DCloudSwift/maintenance.py -R")
 
 if __name__ == '__main__':
 	try:
@@ -306,14 +306,3 @@ if __name__ == '__main__':
 	except Exception as e:
 		print >>sys.stderr, str(e)
 
-	#print loadScripts()
-	#print getAllDisks()
-	#print getNonRootDisks()
-	#print readMetadata("/dev/sdc")
-	#print getLatestMetadata()	
-	#print getMajorityHostname()
-	#print loadSwiftMetadata()
-	#print readMetadata(disk="/dev/sdb")
-	#print remountDisks()
-	#print int(time.time())
-	#resume()
