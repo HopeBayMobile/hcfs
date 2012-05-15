@@ -15,82 +15,13 @@
         {% block stylesheet %}
         {% endblock stylesheet %}
         <style type="text/css">
-            .site-body{
-                width: 1024px; margin:0;
-            }
-
-            .site-header{
-                width: 1024px;
-                position: fixed;
-                margin: 0; padding:0;
-                background-color: black;
-                height: 80px;
-            }
-            .notify-box{
-                background-color: red;
-                width: 60px;
-                height: 60px;
-                margin-left: 10px;
-                float: left;
-            }
-
-            .notify-box-group{
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                display: inline-block;
-            }
-
-            .refresh_box{
-                position: relative;
-                top:40px; left:10px;
-                height: 30px;
-                background-color: gray;
-                width: 480px;
-            }
-
-            .left-row{
-                width: 220px;
-                height:1024px;
-                position: fixed;
-                margin-top: 80px;
-                background-color: lightgray;
-            }
-
-            .left-row-background{
-                float: left;
-                width:220px;
-                height:1024px;
-                margin: 0;
-            }
-
-            .main-row{
-                float: left;
-                width: 804px;
-                margin-top: 80px;
-            }
-
-            #msgbox{
-                width:804px;
-                overflow-y: hidden;
-                background-color: #b53569;
-            }
-
-            .box-body{
-                background-color: yellow;
-                height: 0px;
-            }
-            .box-footer{
-                background-color: green; position: relative;
-                width:804px;
-                bottom: 0px;
-            }
             {% block css_style %}
             /* Give a quick and non-cross-browser friendly divider */
             {% endblock css_style %}
         </style>
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
+        <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
 		{% block javascript %}
 		{% endblock javascript %}
     </head>
@@ -108,17 +39,28 @@
         </div>
         <div id="" class="notify-box-group">
             <div class="notify-box">
+            Flush
+            </div>
+            <div class="notify-box">
+            Network
+            </div>
+            <div class="notify-box">
             Current 1000/100 KB/Sec
             </div>
             <div class="notify-box">
-                Warning ICON
+            Dirty cache Warning ICON
             </div>
             <div class="notify-box">
-                Uploading ICON
+            Uploading ICON
             </div>
         </div>
     </div>
-
+    <div class="left-bg bg-fixed">
+        &nbsp;
+    </div><!-- / -->
+    <div class="main-bg bg-fixed">
+        &nbsp;
+    </div>
     <div class="left-row">
         <div>
             <ul class="nav nav-pills nav-stacked" style="">
@@ -126,42 +68,21 @@
               <li class=""><a href="#account" data-toggle="tab">Storage Account</a></li>
               <li class=""><a href="#system" data-toggle="tab">System</a></li>
               <li class=""><a href="#sharefolder" data-toggle="tab">Share Folder</a></li>
-              <li class=""><a href="#syn" data-toggle="tab">Sync</a></li>
+              <li class=""><a href="#sync" data-toggle="tab">Sync</a></li>
 
               <li class=""><a href="#syslog" data-toggle="tab">System Log</a></li>
               <li class=""><a href="#power" data-toggle="tab">Power On/Off</a></li>
             </ul>
         </div>
     </div>
-    <div class="left-row-background">
-        &nbsp;
-    </div><!-- / -->
     <div class="main-row">
-        <div id="msgbox">
-            <div id="msgbox-body" class="box-body">
-                &nbsp;
-            </div>
-            <div class="box-footer">
-                <a id="errmsg_btn" class="btn btn-danger pull-right">Error Message</a>
-            </div>
-            <script type="text/javascript">
-                (function(){
-                    var box_init_height = $('#msgbox-body').css('height');
-                    $("#errmsg_btn").on("click", function(e){
-                        if ( $('#msgbox-body').css('height') == box_init_height){
-                            $('#msgbox-body').animate({height: "+=400px"}, 500);
-                        } else {
-                            $('#msgbox-body').animate({height: box_init_height}, 500);
-                        }
-                    });
-                })();
-            </script>
-        </div>
-        <div class="tab-content" style="background-color: #CFECF2; height:500px;">
+        {% include "dashboard/msgbox.html" %}
+        <div class="tab-content">
             {% block tab_content %}
             {% endblock tab_content %}
         </div>
     </div>
-    </div> <!-- container -->
+
+    </div> <!-- site-body -->
     </body>
 </html>

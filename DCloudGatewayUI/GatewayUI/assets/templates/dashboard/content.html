@@ -1,10 +1,111 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
     <div class="tab-pane active" id="dash" style="overflow-x: hidden;">
-        <p>I'm in dashboard.</p>
+        {% include "dashboard/dashboard.html" %}
     </div>
     <div class="tab-pane" id="account">
         <p>Howdy, I'm in account config.</p>
+    </div>
+<style type='text/css'>
+.sync_bar_main {
+    width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+.sync_bar_left {
+    height: 45px;
+    background-color: orange;
+    width: 100px;
+    float: left;
+    border:1px solid black;
+    border-right-style: none;
+}
+.sync_bar_infont {
+    padding-left: 12px;
+    padding-top: 12px;
+}
+.sync_bar_span {
+    color: white;
+    font-size: 20px;
+}
+.sync_bar_right {
+    border:1px solid black;
+    border-left-style: none;
+    text-align: center;
+    height: 45px;
+}
+</style>
+    <div class="tab-pane" id="sync">
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Mon</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Tue</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Wed</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Thu</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Fri</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Sat</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
+        <div id="main" class="sync_bar_main">
+            <div id="sidebar" class="sync_bar_left">
+                <div id="infont" class="sync_bar_infont">
+                    <span class="sync_bar_span">Sun</span>
+                </div>
+            </div>
+            <div id="containe" class="sync_bar_right" >
+                icon
+            </div>
+        </div>
     </div>
     <div class="tab-pane" id="system">
         <p>What up girl, this is sync mgnt.</p>
@@ -19,6 +120,6 @@
         <p>What up girl, this is syslog.</p>
     </div>
     <div class="tab-pane" id="power">
-        <p>Do you want to shutdown?</p>
+        {% include "dashboard/power.html" %}
     </div>
 {% endblock tab_content %}
