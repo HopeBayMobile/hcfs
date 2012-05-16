@@ -1,3 +1,5 @@
+import os.path
+import sys
 import csv
 import json
 import os
@@ -8,6 +10,7 @@ import time
 import errno
 import re
 import datetime
+from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -24,7 +27,6 @@ default_user_pwd = "superuser"
 RUN_CMD_TIMEOUT = 15
 
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
-BW_UPDATE_CMD = "/etc/cron.hourly/update_bandwidth"
 
 LOGFILES = {
             "syslog" : "/var/log/syslog",
@@ -1107,7 +1109,8 @@ def get_scheduling_rules():			# by Yen
 	fpath = "/etc/delta/"
 	fname = "gw_schedule.conf"
 	try:
-		fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
+                with open(fpath+fname, 'r') as fh:
+		    fileReader = csv.reader(fh, delimiter=',', quotechar='"')
 	except:
 		return_val = {
 			'result': False,
@@ -1284,40 +1287,41 @@ def get_nfs_access_ip_list ():
     log.info("get_nfs_access_ip_list starts")
 
     try:
-        for line in open(nfs_hosts_allow_file, 'r'):
-            # skip comment lines and empty lines
-            if str(line).startswith("#") or str(line).strip() == None: 
-                continue
+        with open(nfs_hosts_allow_file, 'r') as fh:
+            for line in fh:
+                # skip comment lines and empty lines
+                if str(line).startswith("#") or str(line).strip() == None: 
+                    continue
             
-            #print line
+                #print line
 
-            # accepted format:
-            # portmap mountd nfsd statd lockd rquotad : 172.16.229.112 172.16.229.136
+                # accepted format:
+                # portmap mountd nfsd statd lockd rquotad : 172.16.229.112 172.16.229.136
 
-            arr = str(line).strip().split(":")
-            #print arr
+                arr = str(line).strip().split(":")
+                #print arr
 
-            # format error
-            if len(arr) < 2:
-                log.info(str(nfs_hosts_allow_file) + " format error")
+                # format error
+                if len(arr) < 2:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
           
-                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
-                return json.dumps(return_val)
+                    return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                    return json.dumps(return_val)
 
-            # got good format
-            # key = services allowed, val = ip lists
-            services = str(arr[0]).strip()
-            iplist = arr[1]
-            ips = iplist.strip().split(" ") #
+                # got good format
+                # key = services allowed, val = ip lists
+                services = str(arr[0]).strip()
+                iplist = arr[1]
+                ips = iplist.strip().split(" ") #
             
-            #print services
-            #print ips
+                #print services
+                #print ips
             
-            return_val['result'] = True
-            return_val['msg'] = "Get ip list success"
-            return_val['data']["array_of_ip"] = ips
+                return_val['result'] = True
+                return_val['msg'] = "Get ip list success"
+                return_val['data']["array_of_ip"] = ips
             
-            #return json.dumps(return_val)
+                #return json.dumps(return_val)
             
     except :
         log.info("cannot parse " + str(nfs_hosts_allow_file))
@@ -1393,34 +1397,27 @@ def set_nfs_access_ip_list (array_of_ip):
 
     try:
         # try to get services allowed
-        for line in open(nfs_hosts_allow_file, 'r'):
-            # skip comment lines and empty lines
-            if str(line).startswith("#") or str(line).strip() == None: 
-                continue
+        with open(nfs_hosts_allow_file, 'r') as fh:
+            for line in fh:
+                # skip comment lines and empty lines
+                if str(line).startswith("#") or str(line).strip() == None: 
+                    continue
             
-            arr = str(line).strip().split(":")
+                arr = str(line).strip().split(":")
 
-            # format error
-            if len(arr) < 2:
-                log.info(str(nfs_hosts_allow_file) + " format error")
+                # format error
+                if len(arr) < 2:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
           
-                return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
-                return json.dumps(return_val)
+                    return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                    return json.dumps(return_val)
 
             # got good format
             # key = services allowed, val = ip lists
-            services = str(arr[0]).strip()
-            iplist = arr[1]
-            ips = iplist.strip().split(" ") #
+                services = str(arr[0]).strip()
+                iplist = arr[1]
+                ips = iplist.strip().split(" ") #
             
-            #print services
-            #print ips
-            
-            #return_val['result'] = True
-            #return_val['msg'] = "Get ip list success"
-            #return_val['data']["array_of_ip"] = ips
-            
-            #return json.dumps(return_val)
             
     except :
         log.info("cannot parse " + str(nfs_hosts_allow_file))
@@ -1467,10 +1464,11 @@ def apply_scheduling_rules(schedule):			# by Yen
 	fpath = "/etc/delta/"
 	fname = "gw_schedule.conf"
 	try:
-		fptr = csv.writer(open(fpath+fname, "w"))
-		header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
-		fptr.writerow(header)
-		for row in schedule:
+                with open(fpath+fname, "w") as fh:
+		    fptr = csv.writer(fh)
+		    header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+		    fptr.writerow(header)
+		    for row in schedule:
 			fptr.writerow(row)
 	except:
 		return_val = {
@@ -1481,10 +1479,9 @@ def apply_scheduling_rules(schedule):			# by Yen
 		return json.dumps(return_val)
 	
 	# apply settings
-        po  = subprocess.Popen(BW_UPDATE_CMD, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-        log.info(output)
+        #change_bw(schedule)        
+
+        os.system("/etc/cron.hourly/hourly_run_this")
 
 	
 	return_val = {
@@ -1993,6 +1990,83 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
     return json.dumps(ret_val)
 
 #######################################################
+
+# bw = bandwidth, in kbps
+def set_bandwidth(bw):
+        nic = "eth1"
+        bw = str( bw )
+        # clear old tc settings
+        cmd = "tc qdisc del dev "+nic+" root"
+        os.system(cmd)
+        # set tc
+        cmd = "tc qdisc add dev "+nic+" root handle 1:0 htb default 10"
+        os.system(cmd)
+        cmd = "tc class add dev "+nic+" parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
+        os.system(cmd)
+        # set throttling 8080 port in iptables
+        cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
+        os.system(cmd)
+        cmd = "tc filter add dev "+nic+" parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
+        os.system(cmd)
+
+## =================================================================================================    
+def get_scheduled_bandwidth(weekday, hour, schedule):
+        for ii in range(1,len(schedule)):
+                row = schedule[ii]
+                wd = int(row[0])        ## weekday
+                if (wd==weekday):   ## weekday match
+                        sh = int(row[1]);       eh = int(row[2]);  ## start and end hour
+                        bw = int(row[3])
+                        if (sh<=eh):   # format 1, e.g 6:00 to 21:00
+                                if (hour>=sh and hour<=eh):
+                                        return bw
+                        if (sh>eh):   # format 2, e.g 22:00 to 05:00
+                                if (hour>=sh or hour<=eh):
+                                        return bw
+
+        return -1;  # -1 means not found
+
+def change_bw(schedule):
+# get current day of week and hour of time
+    d = datetime.now()
+    print d
+    weekday = d.isoweekday()
+    print weekday
+    hour = d.hour
+    print hour
+
+# find the scheduled bandwidth for now
+    bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
+    bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
+    os.system('touch /etc/delta/testthisout%s'%bw2)
+    if bw2 < 0:
+        bw2 = bw
+    if (bw2 == 0):              # bandwidth is set to 0 means the client wants to turn-off uploading
+        try:
+                #cmd = "/usr/local/bin/s3qlctrl uploadoff /mnt/cloudgwfiles"
+                cmd = "/etc/delta/uploadoff"
+                os.system(cmd)
+
+                print("Turn off s3ql data upload succeeded")
+        except:
+                print "Please check whether s3qlctrl is installed."
+
+    if bw2>0:   # bandwidth setting is found in the configuration file
+        if bw2>=64:             # we set upload speed should be at least 64kbps as default 
+                bw = bw2
+
+        try:
+                set_bandwidth(bw)  # apply scheduled bandwidth
+                print("change bandwidth to " + str(bw) + "kB/s succeeded")
+                #cmd = "/usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles"
+                cmd = "sudo /etc/delta/uploadon"
+                os.system(cmd)
+
+                print "Turn on s3ql upload."
+        except:
+                print "Please check whether s3qlctrl is installed."
+
+    return
 
 
 

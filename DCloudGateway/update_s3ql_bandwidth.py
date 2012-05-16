@@ -58,10 +58,12 @@ def main():
 ## read in CSV file
     fpath = "/etc/delta/"
     fname = "gw_schedule.conf"
-    fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
-    schedule = []
-    for row in fileReader:
-	schedule.append(row)
+    #fileReader = csv.reader(open(fpath+fname, 'r'), delimiter=',', quotechar='"')
+    with open('/etc/delta/gw_schedule.conf', 'r') as fh:
+        fileReader = csv.reader(fh, delimiter=',', quotechar='"')
+        schedule = []
+        for row in fileReader:
+	    schedule.append(row)
 
 # get current day of week and hour of time
     d = datetime.now()
@@ -71,23 +73,27 @@ def main():
 # find the scheduled bandwidth for now
     bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
     bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
+    if bw2 < 0:
+        bw2 = bw
     if (bw2 == 0):		# bandwidth is set to 0 means the client wants to turn-off uploading
 	try:
-		cmd = "/usr/local/bin/s3qlctrl uploadoff /mnt/cloudgwfiles"
+		#cmd = "/usr/local/bin/s3qlctrl uploadoff /mnt/cloudgwfiles"
+                cmd = "/etc/delta/uploadoff"
                 os.system(cmd)
 
 		print("Turn off s3ql data upload succeeded")
 	except:
 		print "Please check whether s3qlctrl is installed."
-	
+
     if bw2>0:   # bandwidth setting is found in the configuration file
-	if bw2>=64:		# we set upload speed should be at least 128kbps as default 
+	if bw2>=64:		# we set upload speed should be at least 64kbps as default 
 		bw = bw2
 	
 	try:
 		set_bandwidth(bw)  # apply scheduled bandwidth
 		print("change bandwidth to " + str(bw) + "kB/s succeeded")
-		cmd = "/usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles"
+		#cmd = "/usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles"
+                cmd = "/etc/delta/uploadon"
                 os.system(cmd)
 
 		print "Turn on s3ql upload."
