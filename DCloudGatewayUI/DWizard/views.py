@@ -13,6 +13,7 @@ class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
     wizard_step = []
     wizard_initial = {}
+    exit_url = '/'
 
     @classmethod
     def patterns(cls):
@@ -69,10 +70,15 @@ class DeltaWizard(SessionWizardView):
             result = AsyncResult(step.task_id)
             if result.state == states.SUCCESS:
                 if self.steps.next:
-                    self.storage.current_step = self.steps.next
-                    return self.render(self.get_form())
+                    if request.GET.get('next') is None:
+                        return render_to_response('done.html')
+                    else:
+                        self.storage.current_step = self.steps.next
+                        return self.render(self.get_form())
                 else:
-                    return render_to_response('finish.html')
+                    meta = result.info
+                    return render_to_response('finish.html', {'meta':meta,
+                                                              'exit':self.exit_url})
             else:
                 meta = result.info
                 return render_to_response('doing.html', {'meta':meta})
