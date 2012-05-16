@@ -155,17 +155,17 @@ class SwiftDeploy:
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
 			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
-			return 0
 
 		except DeployProxyError as err:
 			logger.error(str(err))
 			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
-			return 1
 		except util.TimeoutError as err:
 			logger.error("%s" % str(err))
-			sys.stderr.write("%s\n" % str(err))
 			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
-			return 1
+		except Exception as err:
+			msg = "Failed to deploy %s for %s"%(proxyIP,str(err))
+			logger.error(msg)
+			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=msg)
 
 	def proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
@@ -220,7 +220,6 @@ class SwiftDeploy:
 
 			logger.info("Succeeded to deploy storage %s" % storageIP)
 			self.__updateProgress(success=True, ip=storageIP, swiftType="storage", msg="")
-			return 0
 
 		except DeployStorageError as err:
 			logger.error(str(err))
@@ -228,8 +227,11 @@ class SwiftDeploy:
 
 		except util.TimeoutError as err:
 			logger.error("%s" % err)
-			sys.stderr.write("%s\n" % err)
 			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=err)
+		except Exception as err:
+			msg = "Failed to deploy %s for %s"%(storageIP,str(err))
+			logger.error(msg)
+			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=msg)
 
 	def storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
