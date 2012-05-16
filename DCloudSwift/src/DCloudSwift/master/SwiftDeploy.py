@@ -124,7 +124,7 @@ class SwiftDeploy:
 			cmd = "ssh root@%s mkdir -p %s"%(proxyIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
-				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				errMsg = "Failed to mkdir root@%s:/etc/delta/master for %s" % (proxyIP, stderr)
 				raise DeployProxyError(errMsg)
 
 			cmd = "ssh root@%s rm -rf %s/*"%(proxyIP, pathname)
@@ -189,13 +189,13 @@ class SwiftDeploy:
 			cmd = "ssh root@%s mkdir -p %s"%(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
-				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
+				errMsg = "Failed to mkdir root@%s:/etc/delta/master for %s" % (storageIP, stderr)
 				raise DeployStorageError(errMsg)
 
 			cmd = "ssh root@%s rm -rf %s/*"%(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
-				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
+				errMsg = "Failed to clear /etc/delta/master for %s" % (storageIP, stderr)
 				raise DeployStorageError(errMsg)
 
 			cmd = "scp -r %s/DCloudSwift/ root@%s:%s" % (BASEDIR, storageIP, pathname)
@@ -207,7 +207,7 @@ class SwiftDeploy:
 			cmd = "scp -r /etc/delta/swift root@%s:%s" %(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
-				errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
+				errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
 				raise DeployStorageError(errMsg)
 
 
