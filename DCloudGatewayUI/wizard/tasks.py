@@ -1,45 +1,82 @@
 from django.contrib.auth.models import User
 from celery.task import task
+from celery import states
 from lib.models.config import Config
 import time
+from lib.gateway import api
+import json
 
 @task
 def install_task(data):
+    meta = {'step_list':[]}
+    step_list = meta['step_list']
+    
     #save data in lib_config table
     for k, v in data.iteritems():
         c = Config(key=k, value=v)
         c.save()
-    
     #Step 1, save password of administrator
-    new_password = Config.objects.get(key='new_password')
+    new_password = data['new_password']
     admin = User.objects.get(username='admin')
-    admin.set_password(new_password.value)
+    admin.set_password(new_password)
     admin.save()
-        
-    #Step 2, apply network settings
-    ip_address = Config.objects.get(key='ip_address')
-    subnet_mask = Config.objects.get(key='subnet_mask')
-    default_gateway = Config.objects.get(key='default_gateway')
-    preferred_dns = Config.objects.get(key='preferred_dns')
-    alternate_dns = Config.objects.get(key='alternate_dns')
     
-    #call API: apply_network
-        
+    response_str = '{"result":true, "msg":"Password changed successful.","data":{} }'
+    response = json.loads(response_str)
+    step_list.append(response)
+    
+    install_task.update_state(state=states.STARTED, meta=meta)
+
+    #Step 2, apply network settings
+    ip_address = data['ip_address']
+    subnet_mask = data['subnet_mask']
+    default_gateway = data['default_gateway']
+    preferred_dns = data['preferred_dns']
+    alternate_dns = data['alternate_dns']
+    
+    #call API: apply_network    
+    response_str = api.apply_network(ip_address, default_gateway, subnet_mask, preferred_dns, alternate_dns)
+    response = json.loads(response_str)
+    step_list.append(response)    
+    
+    if response['result']:        
+        install_task.update_state(state=states.STARTED, meta=meta)
+    else:
+        install_task.update_state(state=states.FAILURE, meta=meta)
+        return meta
+
     #Step 3, cloud storage settings
-    cloud_storage_url = Config.objects.get(key='cloud_storage_url')
-    cloud_storage_account = Config.objects.get(key='cloud_storage_account')
-    cloud_storage_password = Config.objects.get(key='cloud_storage_password')
+    cloud_storage_url = data['cloud_storage_url']
+    cloud_storage_account = data['cloud_storage_account']
+    cloud_storage_password = data['cloud_storage_password']
     
     #call API: test_storage_account
-    
+    response_str = api.apply_storage_account(cloud_storage_url, cloud_storage_account, cloud_storage_password)
+    response = json.loads(response_str)
+    step_list.append(response)       
+
+    if response['result']:        
+        install_task.update_state(state=states.STARTED, meta=meta)
+    else:
+        install_task.update_state(state=states.FAILURE, meta=meta)
+        return meta
+
     #Step 4, encryption key
-    encryption_key = Config.objects.get(key='encryption_key')
+    encryption_key = data['encryption_key']
     
     #call API: apply_user_enc_key
+    response_str = api.build_gateway(encryption_key)
+    response = json.loads(response_str)
+    step_list.append(response)
     
+    if response['result']:        
+        install_task.update_state(state=states.STARTED, meta=meta)
+    else:
+        install_task.update_state(state=states.FAILURE, meta=meta)
+        return meta
     
-    time.sleep(7)
-    return True
+    #end of installation
+    return meta
 
 @task
 def step_1_task():

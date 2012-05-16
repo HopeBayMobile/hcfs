@@ -20,7 +20,7 @@ BASEDIR = os.path.dirname(WORKING_DIR)
 
 import maintenance
 from util import util
-from util import mountDisks
+from util import diskUtil
 from nodeInstaller import NodeInstaller
 
 Usage = '''
@@ -75,23 +75,30 @@ def triggerUpdateMetadata(confDir):
 	logger = util.getLogger(name="triggerUpdateMetadata")
 	logger.info("start")
 
-	if not maintenance.isNewer(confDir=confDir):
-		logger.info("Already the latest metadata")
+	try:
+		if not maintenance.isNewer(confDir=confDir):
+			logger.info("Already the latest metadata")
 	
-	else:
-		versOnDisks = mountDisks.getLatestVers()
-		newVers = util.getSwiftConfVers(confDir=confDir)
-	
-		if versOnDisks is not None and versOnDisks > newVers and mountDisks.loadScripts()==0:
-			logger.info("Resume servcies from metadata on disks")
-			mountDisks.resume()
 		else:
-			maintenance.updateMetadata(confDir=confDir)
-			if not util.isDaemonAlive("swiftMonitor"):
-				os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
+			versOnDisks = diskUtil.getLatestVers()
+			newVers = util.getSwiftConfVers(confDir=confDir)
+	
+			if versOnDisks is not None and versOnDisks > newVers and diskUtil.loadScripts()==0:
+				logger.info("Resume servcies from metadata on disks")
+				diskUtil.resume()
+			else:
+				maintenance.updateMetadata(confDir=confDir)
+				if not util.isDaemonAlive("swiftMonitor"):
+					os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
-	logger.info("end")
-	return 0
+	except maintenance.UpdateMedatataError:
+		raise
+	except Exception as e:
+		msg = "Failed update Metadata for unexpected exception %s"%str(e)
+		logger.error(msg)
+		raise 
+	finally:
+		logger.info("end")
 
 def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")

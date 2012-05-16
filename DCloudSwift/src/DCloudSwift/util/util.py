@@ -128,13 +128,13 @@ def isDaemonAlive(daemonName):
 		return False
 	
 
-def isValid(vers, metadata):
+def isValid(vers, fingerprint):
 	retval = True
 
-	if vers != metadata["vers"]:
+	if vers != fingerprint["vers"]:
 		retval=False
 
-	if socket.gethostname()!=metadata["hostname"]:
+	if socket.gethostname()!=fingerprint["hostname"]:
 		retval=False 
 
 	return retval
@@ -290,18 +290,7 @@ def getDeviceCnt():
 
 def getDevicePrx():
 	logger = getLogger(name="getDevicePrx")
-	
-	config = ConfigParser()
-	config.readfp(open(SWIFTCONF))
-
-	try:
-		with open(SWIFTCONF,"rb") as fh:
-			config.readfp(fh)
-	except IOError:
-		logger.error("Failed to load swift.ini")
-		return None
-
-	return config.get('storage', 'devicePrx')
+	return "sdb"
 
 def getIpAddress():
 	logger = getLogger(name="getIpAddress")
@@ -320,7 +309,7 @@ def getIpAddress():
 
 def getSwiftNodeIpList():
 	logger = getLogger(name="getSwiftNodeIpList")
-	storageIpList = getStorageNodeIpList()
+
 	proxyList =[]
 	ipSet = set()
 	
@@ -329,6 +318,11 @@ def getSwiftNodeIpList():
 			proxyList = pickle.load(fh)
 	except IOError:
 		logger.warn("Failed to load proxyList")
+		return None
+
+	storageIpList = getStorageNodeIpList()
+	if storageIpList is None:
+		return None
 
 	for ip in storageIpList:
 		ipSet.add(ip)
@@ -382,6 +376,7 @@ def getStorageNodeIpList():
 	po.wait()
 	
 	if po.returncode != 0:
+		logger.error("Failed to obtain storage node list from object.builder")
 		return None
 
 	i = 0
@@ -625,7 +620,7 @@ if __name__ == '__main__':
 #		testTryLock()
 		
 #	testTryLock2()	
-	print getListenPid("0.0.0.0:8080")
+	#print getListenPid("0.0.0.0:8080")
 	
 	#sendMaterials("deltacloud", "172.16.229.146")
 	#cmd = "ssh root@172.16.229.146 sleep 5"
@@ -634,4 +629,5 @@ if __name__ == '__main__':
 	#print isDaemonAlive("memcached")
 	#restartAllServices()
 	#print stopAllServices()
+	#generateSwiftConfig()
 	pass	

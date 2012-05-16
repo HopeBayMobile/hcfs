@@ -11,7 +11,6 @@ from ConfigParser import ConfigParser
 
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
-os.chdir(WORKING_DIR)
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 
 class SwiftCfg:
@@ -44,8 +43,8 @@ class SwiftCfg:
 			'deviceCnt': self.__deviceCnt,
 		}
 
-		os.system("mkdir -p "+self.__kwparams['logDir'])
-		os.system("touch "+ self.__kwparams['logDir'] + self.__kwparams['logName'])
+		os.system("mkdir -p " + self.__kwparams['logDir'])
+		os.system("touch " + self.__kwparams['logDir'] + "/" + self.__kwparams['logName'])
 		logging.basicConfig(level = logging.DEBUG,
 			format = '[%(levelname)s on %(asctime)s] %(message)s',
 			filename = self.__kwparams['logDir'] + self.__kwparams['logName']

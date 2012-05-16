@@ -27,6 +27,9 @@ from util.SwiftCfg import SwiftCfg
 class DeployProxyError(Exception):
 	pass
 
+class DeployStorageError(Exception):
+	pass
+
 class SwiftDeploy:
 	def __init__(self, proxyList = [], storageList = []):
 		self.__proxyList = proxyList
@@ -115,11 +118,6 @@ class SwiftDeploy:
 	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
 		try:
-			#if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[proxyIP])[0] != 0:
-			#	errMsg = "Failed to spread metadata to %s" % proxyIP
-			#	logger.error(errMsg)
-			#	self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=errMsg)
-			#	return -2
 
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
@@ -149,7 +147,7 @@ class SwiftDeploy:
 				raise DeployProxyError(errMsg)
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
-			print cmd
+			print "Start deploying proxy node %s"%proxyIP
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
 			if status != 0:
 				errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
@@ -186,59 +184,47 @@ class SwiftDeploy:
 	def __storageDeploySubtask(self, storageIP):
 		logger = util.getLogger(name="storageDeploySubtask: %s" % storageIP)
 		try:
-			#if util.spreadMetadata(password=self.__kwparams['password'], sourceDir='/etc/delta/swift', nodeList=[storageIP])[0] != 0:
-			#	errMsg = "Failed to spread metadata to %s" % storageIP
-			#	logger.error(errMsg)
-			#	self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-			#	return -2
-
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
 			cmd = "ssh root@%s mkdir -p %s"%(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to mkdir /etc/delta/master for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -3
+				raise DeployStorageError(errMsg)
 
 			cmd = "ssh root@%s rm -rf %s/*"%(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to clear /etc/delta/master for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -4
+				raise DeployStorageError(errMsg)
 
 			cmd = "scp -r %s/DCloudSwift/ root@%s:%s" % (BASEDIR, storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp storage scripts to %s for %s" % (storageIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -5
+				raise DeployStorageError(errMsg)
 
 			cmd = "scp -r /etc/delta/swift root@%s:%s" %(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -5
+				raise DeployStorageError(errMsg)
 
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s"%(storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
-			print cmd
+			print "Start deploying storage node %s"%storageIP
 			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
 				errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
-				logger.error(errMsg)
-				self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=errMsg)
-				return -6
+				raise DeployStorageError(errMsg)
 
 			logger.info("Succeeded to deploy storage %s" % storageIP)
 			self.__updateProgress(success=True, ip=storageIP, swiftType="storage", msg="")
 			return 0
+
+		except DeployStorageError as err:
+			logger.error(str(err))
+			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=str(err))
 
 		except util.TimeoutError as err:
 			logger.error("%s" % err)
@@ -328,7 +314,10 @@ class SwiftDeploy:
 		logger.error("Failed to rmStorage\n")
 		return (1, self.__proxyList, self.__storageList)
 
-def main():
+def deploy():
+	'''
+	Command line implementation of swift deployment
+	'''
 	ret = 1
 
 	proxyList =[]
@@ -338,6 +327,7 @@ def main():
 		proxyFile = "/etc/delta/proxyNodes"
 		storageFile = "/etc/delta/storageNodes"
 
+		#Parse proxyFile to get proxy node list
 		proxyIpSet = set()
 		with open(proxyFile) as fh:
 			for line in fh.readlines():
@@ -354,7 +344,7 @@ def main():
 					except socket.error:
 						raise Exception("%s contains a invalid ip %s"%(proxyFile, ip))
 
-
+		#Parse storageFile to get storage node list
 		storageIpSet = set()
 		with open(storageFile) as fh:
 			for line in fh.readlines():
@@ -381,8 +371,6 @@ def main():
 						raise Exception("%s contains a invalid zid %s"%(storageFile, tokens[1]))
 						
 
-		print proxyList
-		print storageList
 		SD = SwiftDeploy(proxyList, storageList)
 		SD.createMetadata()
 		t = Thread(target=SD.deploySwift, args=())

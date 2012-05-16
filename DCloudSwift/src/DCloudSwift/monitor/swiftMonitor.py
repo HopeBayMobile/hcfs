@@ -156,8 +156,9 @@ class SwiftMonitor(Daemon):
 
 			myIp = util.getIpAddress()
 			ipList = util.getSwiftNodeIpList()
-                	if len(ipList) == 0:
-               			logger.info("The swift cluster is empty!")
+
+                	if ipList is None or len(ipList) == 0:
+               			logger.error("Failed to find peer list!")
 				return
 
                 	peerIp = random.choice(ipList)

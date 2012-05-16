@@ -13,7 +13,7 @@ BASEDIR = os.path.dirname(WORKING_DIR)
 #sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
 from util import util
-from util import mountDisks
+from util import diskUtil
 import maintenance
 
 class NodeInstaller:
@@ -41,14 +41,14 @@ class NodeInstaller:
 	def install(self):
 		self.__logger.info("start install")
 
-		metadata = mountDisks.getLatestMetadata()
-		if metadata is None or metadata["vers"] < util.getSwiftConfVers():
-			mountDisks.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
+		fingerprint = diskUtil.getLatestFingerprint()
+		if fingerprint is None or fingerprint["vers"] < util.getSwiftConfVers():
+			diskUtil.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
 			if BASEDIR != "/":
 				os.system("rm -rf /DCloudSwift")
 				os.system("cp -r %s/DCloudSwift /"%BASEDIR)
 		else:
-			mountDisks.remountDisks()
+			diskUtil.remountDisks()
 
 		os.system("chown -R swift:swift /srv/node/ ")
 		util.generateSwiftConfig()
