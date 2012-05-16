@@ -27,7 +27,7 @@
         <script type="text/javascript">
             $(function(){
                 {% if tab %}
-                $("#site-tab li:has(a[href={{tab}}])").addClass('active');
+                $("#site-tab li:has(a[href='\/dashboard\/{{tab}}\/'])").addClass('active');
                 {% else %}
                 $("#site-tab li:first").addClass('active');
                 {% endif %}
@@ -86,13 +86,13 @@
     <div class="left-row">
         <div>
             <ul class="tab-btn" id="site-tab">
-              <li class=""><a href=".">Dashboard</a></li>
-              <li class=""><a href="account">Storage Account</a></li>
-              <li class=""><a href="system">System</a></li>
-              <li class=""><a href="sharefolder">Share Folder</a></li>
-              <li class=""><a href="sync">Sync</a></li>
-              <li class=""><a href="syslog">System Log</a></li>
-              <li class=""><a href="power">Power On/Off</a></li>
+              <li class=""><a href="{% url dashboard:index %}">Dashboard</a></li>
+              <li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>
+              <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
+              <li class=""><a href="{% url dashboard:sharefolder %}">Share Folder</a></li>
+              <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
+              <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
+              <li class=""><a href="{% url dashboard:power %}">Power</a></li>
             </ul>
         </div>
     </div>

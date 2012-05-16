@@ -1,5 +1,6 @@
 @site-width: 1024px;
-@site-top-height: 141px;
+@site-top-height: 132px;
+@notify-group-height: 115px;
 @site-left-width: 220px;
 @site-main-width: @site-width - @site-left-width;
 @tab-height: 52px;
@@ -62,10 +63,10 @@
 
 .notify-box-group{
     position: absolute;
-    top: 13px;
-    right: 13px;
+    top: (@site-top-height - @notify-group-height)/2;
+    right: (@site-top-height - @notify-group-height)/2;
     width: 430px;
-    height: 115px;
+    height: @notify-group-height;
     background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
 }
@@ -95,13 +96,18 @@
 }
 
 .main-bg{
-	background-color: @base-bg-color;
+	background-image: url("/@{dashboard-image-path}/1_container_bg.png");
+	background-position: 0 @site-top-height + 20px; // Add the height of msg-status bar.
+	background-repeat: repeat-x;
+	background-color: white;
 	width: @site-main-width;
 	left: @site-left-width;
 }
 
 .left-bg{
-    background-color: @base-left-bg-color;
+	background-image: url("/@{dashboard-image-path}/tab_bg.png");
+	background-repeat: repeat-x;
+	background-color: white;
     width:@site-left-width;
 }
 
