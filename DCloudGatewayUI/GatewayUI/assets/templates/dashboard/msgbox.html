@@ -1,5 +1,5 @@
 <div id="msgbox" class="slide-box">
-    <div id="msgbox-body" class="box-body" style="display: none;">
+    <div id="msgbox-body" class="slide-box-body">
         {% for msg in msgs %}
 
         {% empty %}
@@ -20,22 +20,25 @@
         </div>
         {% endfor %}
     </div>
-    <div class="box-footer">
-        <div class="msg-status">You have slain an enemy.</div>
-        <div id="msg_btn" class="msg-btn">▼</div>
+    <div class="slide-box-footer">
+        <div id="msg_btn" class="toggle-btn"></div>
     </div>
     <script type="text/javascript">
         (function(){
             // var box_init_height = $('#msgbox-body').css('height') || "0px";
             $("#msg_btn").on("click", function(e){
-                if ($(".box-body").is(":visible")){
-                    $(".box-body").hide()
-                    $(".tab-content").show()
-                    $('#msg_btn').text('▼')
+                var margin_height = $(".slide-box-body").height();
+                if ($(".slide-box-body").is(":visible")){
+                    $(".slide-box").animate({"top": "-="+margin_height+"px"}, 1000, function(){
+                        $(".slide-box-body").hide()
+                        $(".slide-box").css("top", "+="+margin_height+"px")
+                    })
+                    $(".tab-content").show(1000)
                 } else {
-                    $(".box-body").show()
-                    $(".tab-content").hide()
-                    $('#msg_btn').text('▲')
+                    $(".slide-box").css("top", "-="+margin_height+"px")
+                    $(".slide-box-body").show()
+                    $(".slide-box").animate({"top": "+="+margin_height+"px"}, 1000)
+                    $(".tab-content").hide(1000)
                 }
             });
         })();
