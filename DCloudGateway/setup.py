@@ -5,6 +5,7 @@ AUTHDIR='/root/.s3ql'
 SMBDIR='/etc/samba'
 NETDIR='/etc/network'
 ETCDIR='/etc'
+CRONDIR='/etc/cron.hourly'
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -26,13 +27,11 @@ def main():
     		},
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
-                             (CONFDIR, ['config/gw_schedule.conf']),
 			     (SMBDIR, ['config/smb.conf']),
-                             (NETDIR, ['config/interfaces']),
-                             (ETCDIR, ['config/hosts.allow']),
                              (ETCDIR, ['config/hosts.deny']),
                              (ETCDIR, ['config/exports']),
-                             (ETCDIR, ['config/rc.local'])
+                             (ETCDIR, ['config/rc.local']),
+                             (ETCDIR, ['config/crontab'])
                            ], 
 		
 		test_suite='unittest',
@@ -46,6 +45,10 @@ def main():
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
         os.system("cp config/interfaces /etc/network/interfaces")
+        os.system("cp config/hosts.allow /etc")
+        os.system("cp config/gw_schedule.conf %s/"%CONFDIR)
+        os.system("cp update_bandwidth %s/"%CRONDIR) 
+        os.system("cp update_s3ql_bandwidth.py %s/"%CRONDIR)
 
 if __name__ == '__main__':
     main()

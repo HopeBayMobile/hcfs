@@ -25,7 +25,7 @@ stop on starting rc RUNLEVEL=[016]
 
 # Time to wait before sending SIGKILL to the daemon and
 # pre-stop script
-kill timeout 300
+kill timeout 30
 
 env STORAGE_URL="$URL"
 env MOUNTPOINT="$MOUNTPOINT"

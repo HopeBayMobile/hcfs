@@ -826,7 +826,7 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = self.cache.dirty_entries
         cache_maxsize = self.cache.max_size
         cache_maxentries = self.cache.max_entries
-        if self.cache.do_upload or self.cache.forced_upload:
+        if (self.cache.do_upload or self.cache.forced_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
             cache_uploading = 0

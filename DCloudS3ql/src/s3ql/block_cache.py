@@ -318,8 +318,9 @@ class BlockCache(object):
         '''Monitor if the upload threads are alive. Restart them if necessary'''
 
         finished = False
+        self.last_checked = time.time()
 
-        while not finished:
+        while (not finished) and (not self.going_down):
             finished = True
             for t in self.upload_threads:
                 if not t.isAlive():

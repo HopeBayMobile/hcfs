@@ -14,5 +14,6 @@
 /etc/init.d/smbd restart
 /etc/init.d/nmbd restart
 /etc/init.d/nfs-kernel-server restart
+/etc/cron.hourly/update_bandwidth
 
 exit 0

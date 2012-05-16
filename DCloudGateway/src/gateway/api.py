@@ -24,6 +24,7 @@ default_user_pwd = "superuser"
 RUN_CMD_TIMEOUT = 15
 
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
+BW_UPDATE_CMD = "/etc/cron.hourly/update_bandwidth"
 
 LOGFILES = {
             "syslog" : "/var/log/syslog",
@@ -1480,7 +1481,11 @@ def apply_scheduling_rules(schedule):			# by Yen
 		return json.dumps(return_val)
 	
 	# apply settings
-	os.system("python update_s3ql_bandwidth.py")
+        po  = subprocess.Popen(BW_UPDATE_CMD, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        log.info(output)
+
 	
 	return_val = {
 		'result': True,
