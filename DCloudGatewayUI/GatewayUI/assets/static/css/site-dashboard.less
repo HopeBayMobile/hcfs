@@ -1,10 +1,13 @@
 @site-width: 1024px;
-@site-top-height: 141px;
+@site-top-height: 132px;
+@notify-group-height: 115px;
 @site-left-width: 220px;
 @site-main-width: @site-width - @site-left-width;
 @tab-height: 52px;
 @base-bg-color: #CFECF2;
 @base-left-bg-color: lightgray;
+@slide-box-footer-height: 24px;
+@slide-box-toggle-btn: 44px;
 @error-msg-bg-color: #C03556;
 @cache-usage-bar-height: 40px;
 @dashboard-image-path: "static/img/dashboard";
@@ -62,10 +65,10 @@
 
 .notify-box-group{
     position: absolute;
-    top: 13px;
-    right: 13px;
+    top: (@site-top-height - @notify-group-height)/2;
+    right: (@site-top-height - @notify-group-height)/2;
     width: 430px;
-    height: 115px;
+    height: @notify-group-height;
     background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
 }
@@ -95,13 +98,18 @@
 }
 
 .main-bg{
-	background-color: @base-bg-color;
+	background-image: url("/@{dashboard-image-path}/1_container_bg.png");
+	background-position: 0 @site-top-height + 24px; // Add the height of msg-status bar.
+	background-repeat: repeat-x;
+	background-color: white;
 	width: @site-main-width;
 	left: @site-left-width;
 }
 
 .left-bg{
-    background-color: @base-left-bg-color;
+	background-image: url("/@{dashboard-image-path}/tab_bg.png");
+	background-repeat: repeat-x;
+	background-color: white;
     width:@site-left-width;
 }
 
@@ -163,43 +171,39 @@
 
 .slide-box{
     /*width: 804px;*/
-    /*background-color: purple;*/
     position: relative;
-    min-height: 50px;
-}
-
-.box-body{
-	position: relative;
-	top: 50px;
-	bottom: 20px;
-}
-.box-footer{
-	position: absolute;
-    width: @site-main-width;
+    background-color: purple;
+    max-height: 500px;
+    z-index: 20;
     top: 0;
-    bottom: auto;
-    margin-bottom: 60px;
-    background-image: url("/@{dashboard-image-path}/1_errormsg.png");
 }
 
-.box-footer .msg-status{
+.slide-box-body{
+	display: none;
+	position: relative;
+}
+.slide-box-footer{
+	position: relative;
+    width: @site-main-width;
+    height: @slide-box-footer-height;
+    margin-bottom: @slide-box-toggle-btn;
+    background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
+}
+
+.slide-box-footer .msg-status{
 	width: 100%;
-	background-color: @error-msg-bg-color;
 	position: absolute;
-	height: 20px;
+	height: 24px;
 	right: 1px;
 }
 
-.box-footer .msg-btn{
-	width: 60px;
-	height: 23px;
-	background-color: @error-msg-bg-color;
-	position: absolute;
-	top:0;
-	right: 1px;
-	text-align: center;
-	padding: 10px 5px;
-	font-size: 32px;
+.slide-box-footer .toggle-btn{
+	position: relative;
+	top: @slide-box-footer-height;
+	left: (@site-main-width - 45px) / 2;
+	width: 45px;
+	height: @slide-box-toggle-btn;
+	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_down.png");
 }
 
 

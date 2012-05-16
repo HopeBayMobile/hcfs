@@ -2,16 +2,20 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django import forms
 from lib.forms import RenderFormMixinClass
-from lib.forms import IPAddressInput, NumberInput
-from lib.gateway import api
+from lib.forms import IPAddressInput
+from gateway import api
 import json
+
 
 @login_required
 def index(request):
     return render(request, 'dashboard/dashboard.html')
 
 
-def system(request):
+def system(request, action=None):
+
+    forms_group = {}
+    network_data = {}
 
     class Network(RenderFormMixinClass, forms.Form):
         ip = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
@@ -24,31 +28,95 @@ def system(request):
         password = forms.CharField(widget=forms.PasswordInput)
         retype_password = forms.CharField(widget=forms.PasswordInput)
 
-    if request.method == "POST":
-        pass
-    else:
-        network_data = json.loads(api.get_network()).get('data')
-        forms_group = [Network(**network_data), AdminPassword()]
+        def clean(self):
+            cleaned_data = super(AdminPassword, self).clean()
+            new_passord = cleaned_data.get('password')
+            if new_passord:
+                if new_passord == cleaned_data['retype_password']:
+                    del cleaned_data['retype_password']
+                else:
+                    raise forms.ValidationError("The password are different!")
+            return cleaned_data
 
+    if request.method == "POST":
+        if action == "network":
+            form = Network(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.apply_network(**form.cleaned_data))
+                if not update_return['result']:
+                    print update_return['msg']
+            else:
+                forms_group[action] = form
+        elif action == "admin_pass":
+            network_data = json.loads(api.get_network()).get('data')
+            form = AdminPassword(request.POST)
+            if form.is_valid():
+                request.user.set_password(form['password'].data)
+            else:
+                forms_group[action] = form
+
+    forms_group['network'] = forms_group.get('network', Network(initial=network_data))
+    forms_group['admin_pass'] = forms_group.get('admin_pass', AdminPassword())
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group})
 
 
 @login_required
-def account(request):
+def account(request, action=None):
+
+    forms_group = {}
+    gateway_data = {}
 
     class Gateway(RenderFormMixinClass, forms.Form):
-        username = forms.CharField()
+        storage_url = forms.CharField()
+        account = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
-        verify_password = forms.CharField(widget=forms.PasswordInput)
         retype_password = forms.CharField(widget=forms.PasswordInput)
 
-    class EncryptionKey(RenderFormMixinClass, forms.Form):
-        ip_address = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
-        port = forms.IntegerField(widget=NumberInput)
-        username = forms.CharField()
-        password = forms.CharField(widget=forms.PasswordInput)
+        def clean(self):
+            cleaned_data = super(Gateway, self).clean()
+            new_passord = cleaned_data.get('password')
+            if new_passord:
+                if new_passord == cleaned_data['retype_password']:
+                    del cleaned_data['retype_password']
+                else:
+                    raise forms.ValidationError("The password are different!")
+            return cleaned_data
 
-    forms_group = [Gateway(), EncryptionKey()]
+    class EncryptionKey(RenderFormMixinClass, forms.Form):
+        password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        retype_password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+
+        def clean(self):
+            cleaned_data = super(EncryptionKey, self).clean()
+            new_passord = cleaned_data.get('password')
+            if new_passord:
+                if new_passord == cleaned_data['retype_password']:
+                    del cleaned_data['retype_password']
+                else:
+                    raise forms.ValidationError("The password are different!")
+            return cleaned_data
+
+    if request.method == "POST":
+        if action == "gateway":
+            form = Gateway(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
+                if not update_return['result']:
+                    print update_return['msg']
+            else:
+                forms_group[action] = form
+        elif action == "encrypt":
+            gateway_data = json.loads(api.get_storage_account()).get('data')
+            form = EncryptionKey(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.apply_user_enc_key(form['password'].data))
+                if not update_return['result']:
+                    print update_return['msg']
+            else:
+                forms_group[action] = form
+
+    forms_group['gateway'] = forms_group.get('gateway', Gateway(initial=gateway_data))
+    forms_group['encrypt'] = forms_group.get('encrypt', EncryptionKey())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group})
 

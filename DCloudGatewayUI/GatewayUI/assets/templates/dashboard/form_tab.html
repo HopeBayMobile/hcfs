@@ -3,15 +3,15 @@
 
 <div class="formset">
 	<ul class="nav nav-tabs">
-	{% for form in forms_group %}
+	{% for form in forms_group.values %}
           <li class=""><a href="#{{form.name}}" data-toggle="tab">{{form.name}}</a></li>
 	{% endfor %}
 	</ul>
 	<div class="tab-content">
-	{% for form in forms_group %}
+	{% for name, form in forms_group.iteritems %}
 		<div class="tab-pane" id="{{form.name}}">
 		<form id="{{form.name}}" class="form-horizontal" method="POST"
-			action="{{action}}">
+			action="{{name}}">
 			{% csrf_token %} {{ form.render }}
 			<div class="form-actions">
 				<button type="submit" class="btn btn-primary">
