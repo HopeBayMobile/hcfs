@@ -266,6 +266,7 @@ class BlockCache(object):
         #Jiahong: Adding a mechanism to monitor alive upload threads
         self.last_checked = time.time()
         self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
+        self.thread_checking = False #Jiahong: New flag for knowing if the upload thread respawning check is in progress
 
 
         if os.access(self.path,os.F_OK):
@@ -317,12 +318,15 @@ class BlockCache(object):
     def check_alive_threads(self):
         '''Monitor if the upload threads are alive. Restart them if necessary'''
 
+        self.thread_checking = True
         finished = False
         self.last_checked = time.time()
 
         while (not finished) and (not self.going_down):
             finished = True
             for t in self.upload_threads:
+                if self.going_down:
+                    break
                 if not t.isAlive():
                     log.warning('A upload thread has died. Restarting.')
                     t.join
@@ -332,11 +336,17 @@ class BlockCache(object):
                     finished = False
                     break
 
+        self.thread_checking = False
+
 
     def destroy(self):
         '''Clean up and stop worker threads'''
 
         self.going_down = True
+
+        time.sleep(2) #Checking if thread spawning check is in progress
+        while self.thread_checking:
+            time.sleep(1)
 
         with lock_released:
             for t in self.upload_threads:
