@@ -2,13 +2,12 @@
 @site-top-height: 141px;
 @site-left-width: 220px;
 @site-main-width: @site-width - @site-left-width;
-@tab-height: 106px;
+@tab-height: 52px;
 @base-bg-color: #CFECF2;
 @base-left-bg-color: lightgray;
 @error-msg-bg-color: #C03556;
 @cache-usage-bar-height: 40px;
-@dashboard-image-path: "static/icons/dashboard";
-@dashboard-bg-path: "static/bgs/dashboard";
+@dashboard-image-path: "static/img/dashboard";
 /* The following are styles for dashboard views.*/
 
 .site-container{
@@ -24,7 +23,7 @@
     position: fixed;
     top: 0;
     margin: 0; padding:0;
-    background-image: url("/@{dashboard-bg-path}/banner.png");
+    background-image: url("/@{dashboard-image-path}/banner.png");
     width:  @site-width;
     height: @site-top-height;
     z-index: 1000;
@@ -67,13 +66,13 @@
     right: 13px;
     width: 430px;
     height: 115px;
-    background-image: url("/@{dashboard-bg-path}/indicator_bg.png");
+    background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
 }
 
 .logo-box{
     position: absolute;
-    top:20px; left:20px;
+    top:13px; left:13px;
     background-image: url("/@{dashboard-image-path}/delta_logo.png");
     background-repeat: no-repeat;
     width: 198px;
@@ -127,6 +126,7 @@
 }
 
 .tab-btn li{
+	position: relative;
 	font-size: 14pt;
 	text-align: center;
 	line-height: @tab-height;
@@ -135,18 +135,24 @@
 	background-image: url("/@{dashboard-image-path}/tab_normal.png");
 }
 
-.tab-btn img{
-	height: 52px;
+.tab-btn a{
+	color: gray;
+	text-decoration: none;
 }
 
 .tab-btn span{
 	width: 20px;
-	height: 106px;
-	float: right;
+	height: @tab-height;
+	position: absolute;
+	right: 0;
 }
 
 .tab-btn .active{
 	background-image: url("/@{dashboard-image-path}/tab_hover.png");
+}
+
+.tab-btn .active a{
+	color: #4D8FE5;
 }
 
 .tab-btn .active span{
@@ -173,6 +179,7 @@
     top: 0;
     bottom: auto;
     margin-bottom: 60px;
+    background-image: url("/@{dashboard-image-path}/1_errormsg.png");
 }
 
 .box-footer .msg-status{
