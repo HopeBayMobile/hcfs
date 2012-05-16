@@ -7,24 +7,30 @@
     padding: 5px;
 }
 .sync_bar_left {
-    width: 50px;
+    width: 35px;
     float: left;
+    height: 28px;
+    border:1px solid black;
+}
+.sync_bar_right {
+    width: 570px;
+    float: left;
+    height: 28px;
+    border:1px solid black;
+}
+.sync_24div {
+    width: 21px;
+    float: left;
+    height: 28px;
     border:1px solid black;
 }
 .sync_bar_link {
     float: left;
     border:1px solid black;
 }
-.sync_bar_infont {
-}
 .sync_bar_span {
     color: white;
     font-size: 20px;
-}
-.sync_bar_right {
-    border:1px solid black;
-    border-left-style: none;
-    height: 20px;
 }
 </style>
 <div class="modal hide fade" id="myModal" style="display: none;">
@@ -35,10 +41,6 @@
     <div class="modal-body">
         <form class="well form-horizontal">
             <div class="controls">
-                <p>
-                <input type="radio" name="optionsRadios" id="optionsRadios1" value="option1" checked="">
-                Turn off sync
-                </p>
                 <p>
                 <input type="radio" name="optionsRadios" id="optionsRadios2" value="option2" checked="">
                 No limit
@@ -91,12 +93,34 @@
                 <a class="btn" data-toggle="modal" href="#myModal" >Set</a>
             </div>
             <div id="sidebar" class="sync_bar_left">
-                <div id="infont" class="sync_bar_infont">
+                <div id="infont">
                     Mon
                 </div>
             </div>
-            <div class="progress progress-striped active">
-                <div class="bar" style="height 45px; width: 20%;"></div>
+            <div id="sidebar" class="sync_bar_right">
+                <div id="24div" class="sync_24div">1</div>
+                <div id="24div" class="sync_24div">2</div>
+                <div id="24div" class="sync_24div">3</div>
+                <div id="24div" class="sync_24div">4</div>
+                <div id="24div" class="sync_24div">5</div>
+                <div id="24div" class="sync_24div">6</div>
+                <div id="24div" class="sync_24div">7</div>
+                <div id="24div" class="sync_24div">8</div>
+                <div id="24div" class="sync_24div">9</div>
+                <div id="24div" class="sync_24div">11</div>
+                <div id="24div" class="sync_24div">12</div>
+                <div id="24div" class="sync_24div">13</div>
+                <div id="24div" class="sync_24div">14</div>
+                <div id="24div" class="sync_24div">15</div>
+                <div id="24div" class="sync_24div">16</div>
+                <div id="24div" class="sync_24div">17</div>
+                <div id="24div" class="sync_24div">18</div>
+                <div id="24div" class="sync_24div">19</div>
+                <div id="24div" class="sync_24div">20</div>
+                <div id="24div" class="sync_24div">21</div>
+                <div id="24div" class="sync_24div">22</div>
+                <div id="24div" class="sync_24div">23</div>
+                <div id="24div" class="sync_24div">24</div>
             </div>
         </div>
     </div>
