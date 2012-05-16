@@ -3,7 +3,7 @@ from celery.task import task
 from celery import states
 from lib.models.config import Config
 import time
-from lib.gateway import api
+from gateway import api
 import json
 
 @task

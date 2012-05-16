@@ -3,7 +3,7 @@
 	$(document).ready(function() {
 		var refreshId = window.setInterval(function() {
 			window.location.assign('.');
-		}, 3000);
+		}, 1333);
 	});
 </script>
 {% endblock javascript %} {% block content %}
@@ -11,6 +11,7 @@
 	<div class="span6 offset3">
 		<div class="well">
 			<h3>Please wait for applying settings.</h3>
+			
 			{% for step in meta.step_list %}
 			<div class="alert alert-info">{{step.msg}}</div>
 			{% endfor %}
