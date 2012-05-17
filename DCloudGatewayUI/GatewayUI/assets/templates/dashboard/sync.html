@@ -2,35 +2,43 @@
 {% block tab_content %}
 <style type='text/css'>
 .sync_bar_main {
-    width: 700px;
+    height: 55px;
+    width: 720px;
     margin: 0 auto;
-    padding: 5px;
 }
 .sync_bar_left {
-    width: 35px;
+    width: 80px;
     float: left;
-    height: 28px;
-    border:1px solid black;
-}
-.sync_bar_right {
-    width: 570px;
-    float: left;
-    height: 28px;
-    border:1px solid black;
+    height: 41px;
+    border: 0;
+    background-image:url("/static/img/dashboard/weekday_bg.png");
 }
 .sync_24div {
-    width: 21px;
+    width: 24px;
     float: left;
-    height: 28px;
-    border:1px solid black;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_unit.png");
 }
-.sync_bar_link {
+.sync_24div_last {
+    width: 24px;
     float: left;
-    border:1px solid black;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_unit_last.png");
 }
-.sync_bar_span {
-    color: white;
-    font-size: 20px;
+.sync_edit_img {
+    float:left; margin-top: 6px;
+}
+.sync_span {
+    margin-top: 4px;
+    margin-left: 10px;
+}
+.sync_time_img {
+    float: right;
+}
+.sync_time_div {
+    height: 16px;
 }
 </style>
 <div class="modal hide fade" id="myModal" style="display: none;">
@@ -51,26 +59,16 @@
                 </p>
                 <p>
                 Start <select id="select01" class="span1">
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                    <option>5</option>
-                    <option>6</option>
-                    <option>7</option>
-                    <option>8</option>
+                    {% for i in hours %}
+                    <option>{{ i }}</option>
+                    {% endfor %}
                 </select>
                 </p>
                 <p>
                 End <select id="select01" class="span1">
-                    <option>1</option>
-                    <option>2</option>
-                    <option>3</option>
-                    <option>4</option>
-                    <option>5</option>
-                    <option>6</option>
-                    <option>7</option>
-                    <option>8</option>
+                    {% for i in hours %}
+                    <option>{{ i }}</option>
+                    {% endfor %}
                 </select>
                 </p>
                 <p>
@@ -87,41 +85,36 @@
         <a href="#" class="btn btn-primary">Save changes</a>
     </div>
 </div>
-    <div id="sync">
-        <div id="main" class="sync_bar_main">
-            <div id="link" class="sync_bar_link">
-                <a class="btn" data-toggle="modal" href="#myModal" >Set</a>
-            </div>
-            <div id="sidebar" class="sync_bar_left">
-                <div id="infont">
-                    Mon
-                </div>
-            </div>
-            <div id="sidebar" class="sync_bar_right">
-                <div id="24div" class="sync_24div">1</div>
-                <div id="24div" class="sync_24div">2</div>
-                <div id="24div" class="sync_24div">3</div>
-                <div id="24div" class="sync_24div">4</div>
-                <div id="24div" class="sync_24div">5</div>
-                <div id="24div" class="sync_24div">6</div>
-                <div id="24div" class="sync_24div">7</div>
-                <div id="24div" class="sync_24div">8</div>
-                <div id="24div" class="sync_24div">9</div>
-                <div id="24div" class="sync_24div">11</div>
-                <div id="24div" class="sync_24div">12</div>
-                <div id="24div" class="sync_24div">13</div>
-                <div id="24div" class="sync_24div">14</div>
-                <div id="24div" class="sync_24div">15</div>
-                <div id="24div" class="sync_24div">16</div>
-                <div id="24div" class="sync_24div">17</div>
-                <div id="24div" class="sync_24div">18</div>
-                <div id="24div" class="sync_24div">19</div>
-                <div id="24div" class="sync_24div">20</div>
-                <div id="24div" class="sync_24div">21</div>
-                <div id="24div" class="sync_24div">22</div>
-                <div id="24div" class="sync_24div">23</div>
-                <div id="24div" class="sync_24div">24</div>
-            </div>
+<div id="sync">
+    {% for x in weeks %}
+    <div id="main" class="sync_bar_main">
+        {% if forloop.first %}
+        <div id="top" class="sync_time_div">
+            <img src="/static/img/dashboard/time.png" class="sync_time_img"/>
         </div>
+        {% else %}
+        <div id="top" class="sync_time_div">
+        </div>
+        {% endif %}
+        <div style="">
+            <a data-toggle="modal" href="#myModal" >
+                <img class="sync_edit_img" src="/static/img/dashboard/edit_normal.png" />
+            </a>
+            <div class="sync_bar_left"><span class="sync_span"><h2>{{ x }}</h2></span></div>
+            {% for i in hours %}
+            {% if forloop.last %}
+            <div id="24div" class="sync_24div_last"></div>
+            {% else %}
+            <div id="24div" class="sync_24div"></div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% if forloop.last %}
+        <div id="top" class="sync_time_div">
+            <img src="/static/img/dashboard/time.png" class="sync_time_img"/>
+        </div>
+        {% endif %}
     </div>
+    {% endfor %}
+</div>
 {% endblock tab_content %}
