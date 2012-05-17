@@ -1,5 +1,5 @@
 <div id="msgbox" class="slide-box">
-    <div id="msgbox-body" class="box-body" style="display: none;">
+    <div id="msgbox-body" class="slide-box-body">
         {% for msg in msgs %}
 
         {% empty %}
@@ -8,34 +8,26 @@
             <div class="msg-title">2</div>
             <div class="msg-time">2012-05-14</div>
         </div>
-        <div class="msg-block">
-            <div class="msg-icon">1</div>
-            <div class="msg-title">2</div>
-            <div class="msg-time">2012-05-14</div>
-        </div>
-        <div class="msg-block">
-            <div class="msg-icon">1</div>
-            <div class="msg-title">2</div>
-            <div class="msg-time">2012-05-14</div>
-        </div>
         {% endfor %}
     </div>
-    <div class="box-footer">
-        <div class="msg-status">You have slain an enemy.</div>
-        <div id="msg_btn" class="msg-btn">▼</div>
+    <div class="slide-box-footer-bg"></div>
+    <div class="slide-box-footer">
+        Error messages
+        <div id="msg_btn" class="toggle-btn"></div>
     </div>
     <script type="text/javascript">
         (function(){
-            // var box_init_height = $('#msgbox-body').css('height') || "0px";
+            var sign = 0;
+            var margin_top = $(".slide-box").css('margin-top');
             $("#msg_btn").on("click", function(e){
-                if ($(".box-body").is(":visible")){
-                    $(".box-body").hide()
-                    $(".tab-content").show()
-                    $('#msg_btn').text('▼')
+                if (sign){
+                    sign = 0
+                    $(".slide-box").css({"margin-top": margin_top})
+                    $(".tab-content").show(1000)
                 } else {
-                    $(".box-body").show()
-                    $(".tab-content").hide()
-                    $('#msg_btn').text('▲')
+                    sign = 1
+                    $(".slide-box").css({"margin-top": "0px"})
+                    $(".tab-content").hide(1000)
                 }
             });
         })();

@@ -47,8 +47,12 @@ def main():
         os.system("cp config/interfaces /etc/network/interfaces")
         os.system("cp config/hosts.allow /etc")
         os.system("cp config/gw_schedule.conf %s/"%CONFDIR)
-        os.system("cp update_bandwidth %s/"%CRONDIR) 
-        os.system("cp update_s3ql_bandwidth.py %s/"%CRONDIR)
+        os.system("cp hourly_run_this %s/"%CRONDIR) 
+        os.system("cp update_bandwidth %s/"%CONFDIR) 
+        os.system("cp update_s3ql_bandwidth.py %s/"%CONFDIR)
+        os.system("cp uploadon %s/"%CONFDIR)
+        os.system("cp uploadoff %s/"%CONFDIR)
+
 
 if __name__ == '__main__':
     main()

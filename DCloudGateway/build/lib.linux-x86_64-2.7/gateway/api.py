@@ -603,15 +603,6 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
-                #change the owner of nfs share to nobody:nogroup
-                cmd = "chown nobody:nogroup %s/nfsshare"%mountpoint
-                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                output = po.stdout.read()
-                po.wait()
-                if po.returncode != 0:
-                        raise BuildGWError(output)
-
-
 	except GatewayConfError:
 		raise
 	except EncKeyError:

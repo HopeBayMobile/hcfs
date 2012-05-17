@@ -73,7 +73,6 @@ def main():
 # find the scheduled bandwidth for now
     bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
     bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
-    os.system('touch /etc/delta/testthisout%s'%bw2)
     if bw2 < 0:
         bw2 = bw
     if (bw2 == 0):		# bandwidth is set to 0 means the client wants to turn-off uploading

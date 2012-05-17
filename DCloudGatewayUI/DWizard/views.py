@@ -1,13 +1,17 @@
+import json
+
 from django.contrib.formtools.wizard.views import SessionWizardView
 from django.conf.urls import url, patterns
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, redirect
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import ValidationError
 from django.contrib.formtools.wizard.forms import ManagementForm
+
 from celery.result import AsyncResult
 from celery import states
+
 from models import Work, Step
-import json
+
 
 class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
@@ -20,10 +24,19 @@ class DeltaWizard(SessionWizardView):
         return patterns('',
             url(r'^$', cls.as_view(), name='DWizard'),
         )
+
     @classmethod
     def is_going(cls):
         #Initialize work data
         work, created = Work.objects.get_or_create(work_name=cls.__name__)
+        try:
+            current_step = Step.objects.get(form=work.current_form)
+            result = AsyncResult(current_step.task_id)
+            if result.status == states.FAILURE:
+                return True
+        except Step.DoesNotExist:
+            pass  # do nothing since no current step exist
+
         if created:
             return True
         else:
@@ -32,60 +45,66 @@ class DeltaWizard(SessionWizardView):
                 return False
             else:
                 return True
-    
+
     @classmethod
     def as_view(cls, *args, **kwargs):
         #Initialize work data
         work, created = Work.objects.get_or_create(work_name=cls.__name__)
-#        if created:
-#            work.current_form = cls.wizard_step[0][0].__name__
-#            work.save()
-        
+
         form_list = [(step[0].__name__, step[0]) for step in cls.wizard_step]
         named_form = tuple(form_list)
         return super(DeltaWizard, cls).as_view(named_form, initial_dict=cls.wizard_initial)
 
-
     def get(self, request, *args, **kwargs):
         #set current step from model
         work = Work.objects.get(work_name=self.__class__.__name__)
+
+        if 'reset' in request.GET:
+            # reset all the steps for this wizard
+            Step.objects.filter(wizard=work).delete()
+            work.current_form = ''
+            work.save()
+            return redirect('.')
+
         #first init
         if work.current_form == '':
             self.storage.current_step = self.steps.first
             return self.render(self.get_form())
-        
+
         self.storage.current_step = work.current_form
-        
+
         #check if current step have task
         step_index = self.get_step_index()
         task = self.wizard_step[step_index][1]
-        
+
         if task:
             try:
                 step = Step.objects.get(form=self.steps.current)
             except ObjectDoesNotExist:
                 return self.render(self.get_form())
-            
+
             #check task status
             result = AsyncResult(step.task_id)
             if result.state == states.SUCCESS:
                 if self.steps.next:
-                    if request.GET.get('next') is None:
+                    if 'next' in request.GET:
                         return render_to_response('done.html')
                     else:
                         self.storage.current_step = self.steps.next
                         return self.render(self.get_form())
                 else:
                     meta = result.info
-                    return render_to_response('finish.html', {'meta':meta,
-                                                              'exit':self.exit_url})
+                    return render_to_response('finish.html', {'meta': meta,
+                                                              'exit': self.exit_url})
+            elif result.state == states.FAILURE:
+                meta = result.info
+                return render_to_response('failure.html', {'meta': meta})
             else:
                 meta = result.info
-                return render_to_response('doing.html', {'meta':meta})
+                return render_to_response('doing.html', {'meta': meta})
         else:
-            self.storage.current_step = self.steps.next        
+            self.storage.current_step = self.steps.next
             return self.render(self.get_form(), back=True)
-
 
     def post(self, *args, **kwargs):
         # Look for a wizard_goto_step element in the posted data which
@@ -127,7 +146,7 @@ class DeltaWizard(SessionWizardView):
             else:
                 step_index = self.get_step_index()
                 task = self.wizard_step[step_index][1]
-                
+
                 if task:
                     #wait task done
                     return render_to_response('doing.html')
@@ -136,16 +155,15 @@ class DeltaWizard(SessionWizardView):
                     return self.render_next_step(form, back=True)
         return self.render(form)
 
-
     def process_step(self, form):
         cleaned_data = form.cleaned_data
         step_index = self.get_step_index()
-        
+
         #save current step
         work = Work.objects.get(work_name=self.__class__.__name__)
         work.current_form = self.wizard_step[step_index][0].__name__
         work.save()
-        
+
         #get task and execute
         task = self.wizard_step[step_index][1]
         if task:
@@ -158,11 +176,10 @@ class DeltaWizard(SessionWizardView):
         data = self.get_form_step_data(form)
         return data
 
-
     def done(self, form_list, **kwargs):
         step_index = self.get_step_index()
         task = self.wizard_step[step_index][1]
-        
+
         if task:
             #wait task done
             return render_to_response('doing.html')
