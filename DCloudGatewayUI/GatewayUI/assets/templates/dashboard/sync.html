@@ -27,8 +27,17 @@
     border: 0px;
     background-image:url("/static/img/dashboard/hour_unit_last.png");
 }
-.sync_edit_img {
-    float:left; margin-top: 6px;
+.sync_edit_link {
+    display: block;
+    margin-top: 7px;
+    height: 41px;
+    width: 57px;
+    float: left;
+    background: url('/static/img/dashboard/edit_normal.png') no-repeat;
+    text-indent: -99999px;
+}
+.sync_edit_link:hover {
+    background: url('/static/img/dashboard/edit_hover.png') no-repeat;
 }
 .sync_span {
     margin-top: 4px;
@@ -97,9 +106,7 @@
         </div>
         {% endif %}
         <div style="">
-            <a data-toggle="modal" href="#myModal" >
-                <img class="sync_edit_img" src="/static/img/dashboard/edit_normal.png" />
-            </a>
+            <a data-toggle="modal" href="#myModal" class="sync_edit_link">edit</a>
             <div class="sync_bar_left"><span class="sync_span"><h2>{{ x }}</h2></span></div>
             {% for i in hours %}
             {% if forloop.last %}
