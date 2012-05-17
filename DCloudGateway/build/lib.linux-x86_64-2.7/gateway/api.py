@@ -1363,12 +1363,12 @@ def set_compression(switch):
 		if storage_url is None:
 			raise Exception("Failed to get storage url")
 
+                with open('/etc/delta/Gateway.ini','wb') as op_fh:
+                        config.write(op_fh)
+
 		if  _createS3qlConf(storage_url) !=0:
 			raise Exception("Failed to create new s3ql config")
 
-		with open('/etc/delta/Gateway.ini','wb') as op_fh:
-			config.write(op_fh)
-		
 		op_ok = True
 		op_msg = "Succeeded to set_compression"
 
