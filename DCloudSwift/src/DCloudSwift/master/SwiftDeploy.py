@@ -31,16 +31,10 @@ class DeployStorageError(Exception):
 	pass
 
 class SwiftDeploy:
-	def __init__(self, proxyList = [], storageList = []):
-		self.__proxyList = proxyList
-		self.__storageList = storageList
-		self.__mentor = proxyList[0]
-
+	def __init__(self):
+		self.__deltaDir = "/etc/delta"
 		self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 		self.__kwparams = self.__SC.getKwparams()
-		self.__kwparams['proxyList'] = self.__proxyList
-		self.__kwparams['storageList'] = self.__storageList
-		self.__cnt = self.__kwparams['deviceCnt'] 
 
 		self.__deployProgress = {
 			'proxyProgress': 0,
@@ -81,10 +75,8 @@ class SwiftDeploy:
 		finally:
 			lock.release()
 
-	def createMetadata(self):
+	def __createMetadata(self, proxyList, storageList):
 		logger = util.getLogger(name = "createMetadata")
-		proxyList = self.__kwparams['proxyList']
-		storageList = self.__kwparams['storageList']
 		numOfReplica = self.__kwparams['numOfReplica']
 		deviceCnt = self.__kwparams['deviceCnt']
 		devicePrx = self.__kwparams['devicePrx']
@@ -167,7 +159,7 @@ class SwiftDeploy:
 			logger.error(msg)
 			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=msg)
 
-	def proxyDeploy(self):
+	def __proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
 		argumentList = []
 		for i in [node["ip"] for node in self.__proxyList]:
@@ -233,7 +225,7 @@ class SwiftDeploy:
 			logger.error(msg)
 			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=msg)
 
-	def storageDeploy(self):
+	def __storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
 		argumentList = []
                 for i in [node["ip"] for node in self.__storageList]:
@@ -246,10 +238,14 @@ class SwiftDeploy:
                 pool.dismissWorkers(20)
                 pool.joinAllDismissedWorkers()
 
-	def deploySwift(self):
+	def deploySwift(self, proxyList=[], storageList=[]):
 		logger = util.getLogger(name="deploySwift")
-		self.proxyDeploy()
-		self.storageDeploy()
+
+		self.__createMetadata(proxyList, storageList)
+		self.__proxyList = proxyList
+		self.__storageList = storageList
+		self.__proxyDeploy()
+		self.__storageDeploy()
 
 		#create a defautl account:user 
 		cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"])	
@@ -258,63 +254,9 @@ class SwiftDeploy:
 
 	def addStorage(self):
 		logger = util.getLogger(name="addStorage")
-		self.storageDeploy()
-
-		for i in [node["ip"] for node in self.__proxyList]:
-			try:
-				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
-				if status !=0:
-					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr))
-					continue
-			
-				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -a %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-				print cmd
-
-				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
-			
-				if status != 0:
-					logger.error("Failed to addStorage from proxy %s for %s"%(i, stderr))
-					continue
-
-				#TODO: Return black list
-				return (0,[],[])
-			except util.TimeoutError as err:
-				logger.error("%s"%err)
-                        	sys.stderr.write("%s\n"%err)
-		
-		logger.error("Failed to addStorage\n")
-		return (1, self.__proxyList, self.__storageList)
 
 	def rmStorage(self):
 		logger = util.getLogger(name="rmStorage")
-
-		for i in [node["ip"] for node in self.__proxyList]:
-			try:
-				cmd = "scp -r /DCloudSwift/ root@%s:/"%i
-				(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
-				if status !=0:
-					logger.error("Failed to scp proxy scrips to %s for %s"%(i, stderr))
-					continue
-			
-				#TODO: Monitor Progress report
-				cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -r %s"%(i, util.jsonStr2SshpassArg(self.__jsonStr))
-				print cmd
-
-				(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd)
-				if status != 0:
-					logger.error("Failed to rmStorage from proxy %s for %s"%(i, stderr))
-					continue
-
-				#TODO: Return black list
-				return (0,[],[])
-			except util.TimeoutError as err:
-				logger.error("%s"%err)
-                        	sys.stderr.write("%s\n"%err)
-
-		logger.error("Failed to rmStorage\n")
-		return (1, self.__proxyList, self.__storageList)
 
 def deploy():
 	'''
@@ -373,9 +315,8 @@ def deploy():
 						raise Exception("%s contains a invalid zid %s"%(storageFile, tokens[1]))
 						
 
-		SD = SwiftDeploy(proxyList, storageList)
-		SD.createMetadata()
-		t = Thread(target=SD.deploySwift, args=())
+		SD = SwiftDeploy()
+		t = Thread(target=SD.deploySwift, args=(proxyList, storageList))
 		t.start()
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
