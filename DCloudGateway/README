@@ -17,3 +17,13 @@ Storage Gateway:
 6) The network information assigned by GUI will be stored in /etc/delta/network.info
 
 7) The fixed IP will use eth0, while the IP assigned by GUI will use eth1.
+
+8) To reset gateway to its original status, execute a script like:
+cd /home/nii/DCloudGateway-git/StorageAppliance/DCloudGateway/
+sudo python setup.py install
+sudo s3qladm clear swift://172.16.228.53:8080/gateway/delta
+sudo rm -rf /root/.s3ql/authinfo2
+sudo rm -rf /root/init/s3ql.conf
+sudo rm -rf /etc/delta/network.info
+sudo route add -net 172.16.228.0 netmask 255.255.255.0 gw 172.16.229.252 eth1
+

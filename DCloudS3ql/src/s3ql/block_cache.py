@@ -440,6 +440,8 @@ class BlockCache(object):
                     self.dirty_entries -= 1
                     if self.dirty_size < 0:
                         self.dirty_size = 0 
+                    if self.dirty_entries < 0:
+                        self.dirty_entries = 0
                     if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
                         self.forced_upload = False
                 el.dirty = False
@@ -534,6 +536,8 @@ class BlockCache(object):
                         self.dirty_entries -= 1
                         if self.dirty_size < 0:
                             self.dirty_size = 0
+                        if self.dirty_entries < 0:
+                            self.dirty_entries = 0
                     el.dirty = False
                     el.last_upload = time.time()
                     self.in_transit.remove((el.inode, el.blockno))
@@ -550,6 +554,8 @@ class BlockCache(object):
                     self.dirty_entries -= 1
                     if self.dirty_size < 0:
                         self.dirty_size = 0
+                    if self.dirty_entries < 0:
+                        self.dirty_entries = 0
 
                 el.dirty = False
                 el.last_upload = time.time()
@@ -781,6 +787,9 @@ class BlockCache(object):
                 self.dirty_entries += 1
             if self.dirty_size < 0:
                 self.dirty_size = 0
+            if self.dirty_entries < 0:
+                self.dirty_entries = 0
+
 #TODO: the parameter value 0.8 may be adjustable by users in the future
             if self.dirty_size > 0.8*self.max_size or self.dirty_entries > 0.8*self.max_entries:
                 self.forced_upload = True
@@ -960,6 +969,9 @@ class BlockCache(object):
                     self.dirty_entries -= 1
                     if self.dirty_size < 0:
                         self.dirty_size = 0
+                    if self.dirty_entries < 0:
+                        self.dirty_entries = 0
+
 
                 el.unlink()
 

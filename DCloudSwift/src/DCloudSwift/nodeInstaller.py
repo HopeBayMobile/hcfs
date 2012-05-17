@@ -17,8 +17,7 @@ from util import diskUtil
 import maintenance
 
 class NodeInstaller:
-	def __init__(self, proxyList, devicePrx="sdb", deviceCnt=1):
-		self.__proxyList = proxyList
+	def __init__(self, devicePrx="sdb", deviceCnt=1):
 		self.__devicePrx = devicePrx
 		self.__deviceCnt = deviceCnt
 		self.__privateIP = socket.gethostbyname(socket.gethostname())

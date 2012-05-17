@@ -1,3 +1,4 @@
+// The following are predefined variables and functions for less
 @site-width: 1024px;
 @site-top-height: 132px;
 @notify-group-height: 115px;
@@ -6,11 +7,20 @@
 @tab-height: 52px;
 @base-bg-color: #CFECF2;
 @base-left-bg-color: lightgray;
-@slide-box-footer-height: 24px;
-@slide-box-toggle-btn: 44px;
+@slide-box-footer-bar-height: 24px;
+@slide-box-toggle-btn-height: 44px;
+@slide-box-footer-height: @slide-box-footer-bar-height + @slide-box-toggle-btn-height;
 @error-msg-bg-color: #C03556;
 @cache-usage-bar-height: 40px;
 @dashboard-image-path: "static/img/dashboard";
+.css3-transform (@times){
+    -moz-transition: all @times ease-in-out;
+	-webkit-transition: all @times ease-in-out;
+	-o-transition: all @times ease-in-out;
+	transition: all @times ease-in-out;
+}
+
+
 /* The following are styles for dashboard views.*/
 
 .site-container{
@@ -168,25 +178,40 @@
 	background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
 }
 
-
-.slide-box{
-    /*width: 804px;*/
-    position: relative;
-    background-color: purple;
-    max-height: 500px;
-    z-index: 20;
-    top: 0;
+@media screen and (max-height: 600px)
+{
+	.slide-box{
+	    .css3-transform(1s);
+	    position: relative;
+	    height: 580px - @site-top-height;
+	    margin-top: -(580px - @site-top-height) + @slide-box-footer-height ;
+	    z-index: 20;
+	}
 }
 
 .slide-box-body{
-	display: none;
 	position: relative;
+	background-color: purple;
+	height: 580px - @site-top-height - @slide-box-footer-height;
+	overflow-y: scroll;
 }
-.slide-box-footer{
+
+.slide-box-footer-bg{
 	position: relative;
+	height: @slide-box-footer-height;
+}
+
+.slide-box-footer{
+	position: absolute;
     width: @site-main-width;
-    height: @slide-box-footer-height;
-    margin-bottom: @slide-box-toggle-btn;
+    height: @slide-box-footer-bar-height;
+    line-height: @slide-box-footer-bar-height;
+    text-align: center;
+    vertical-align: middle;
+    color: white;
+    font-weight: bold;
+    bottom: 0;
+    margin-bottom: @slide-box-toggle-btn-height;
     background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
 }
 
@@ -199,13 +224,12 @@
 
 .slide-box-footer .toggle-btn{
 	position: relative;
-	top: @slide-box-footer-height;
+	// top: @slide-box-footer-bar-height;
 	left: (@site-main-width - 45px) / 2;
 	width: 45px;
-	height: @slide-box-toggle-btn;
+	height: @slide-box-toggle-btn-height;
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_down.png");
 }
-
 
 .msg-block{
 	position: relative;

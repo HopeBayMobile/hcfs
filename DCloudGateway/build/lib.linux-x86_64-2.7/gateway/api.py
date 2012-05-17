@@ -9,7 +9,6 @@ import subprocess
 import time
 import errno
 import re
-import datetime
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -44,15 +43,15 @@ LOG_PARSER = {
 # key = level, val = keyword array
 KEYWORD_FILTER = {
                   "error_log" : ["error", "exception"],
-                  "warring_log" : ["warring"],
+                  "warning_log" : ["warning"],
                   "info_log" : ["nfs", "cifs" , "."],
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
 
 LOG_LEVEL = {
-            0 : ["error_log", "warring_log", "info_log"],
-            1 : ["error_log", "warring_log"],
+            0 : ["error_log", "warning_log", "info_log"],
+            1 : ["error_log", "warning_log"],
             2 : ["error_log"],
             }
 
@@ -64,7 +63,7 @@ CMD_CHK_STO_CACHE_STATE = "s3qlstat /mnt/cloudgwfiles"
 
 NUM_LOG_LINES = 20
 
-MONITOR_IFACE = "eth0"
+MONITOR_IFACE = "eth1"
 
 
 ################################################################################
@@ -603,6 +602,15 @@ def _mount(storage_url):
         	if po.returncode != 0:
 			raise BuildGWError(output)
 
+                #change the owner of nfs share to nobody:nogroup
+                cmd = "chown nobody:nogroup %s/nfsshare"%mountpoint
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+                if po.returncode != 0:
+                        raise BuildGWError(output)
+
+
 	except GatewayConfError:
 		raise
 	except EncKeyError:
@@ -718,7 +726,7 @@ def restart_nfs_service():
 	try:
 		cmd = "/etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		output = po.read()
+		output = po.stdout.read()
 		po.wait()
 
 		if po.returncode == 0:
@@ -1355,12 +1363,12 @@ def set_compression(switch):
 		if storage_url is None:
 			raise Exception("Failed to get storage url")
 
+                with open('/etc/delta/Gateway.ini','wb') as op_fh:
+                        config.write(op_fh)
+
 		if  _createS3qlConf(storage_url) !=0:
 			raise Exception("Failed to create new s3ql config")
 
-		with open('/etc/delta/Gateway.ini','wb') as op_fh:
-			config.write(op_fh)
-		
 		op_ok = True
 		op_msg = "Succeeded to set_compression"
 
@@ -1428,7 +1436,7 @@ def set_nfs_access_ip_list (array_of_ip):
     # finally, updating the file
     try:
         ofile = open(nfs_hosts_allow_file, 'w')
-        output = services + " : " + " ".join(array_of_ip)
+        output = services + " : " + ", ".join(array_of_ip) + "\n"
         ofile.write(output)
         ofile.close()
 
@@ -1635,7 +1643,7 @@ def parse_log (type, log_cnt):
         year = int(m.group('year'))
     except:
         # any exception, using this year instead
-        now = datetime.datetime.utcnow()
+        now = datetime.utcnow()
         year = now.year
 
     #print year
@@ -1646,10 +1654,11 @@ def parse_log (type, log_cnt):
     #now = datetime.datetime.utcnow()
 
     try:
-        timestamp = datetime.datetime(year, month, day, hour, minute, second) # timestamp
-    except Exception:
+        timestamp = datetime(year, month, day, hour, minute, second) # timestamp
+    except Exception as err:
         #print "datatime error"
         #print Exception
+        print err
         return {}
 
     #print "timestamp = "
@@ -1939,7 +1948,7 @@ def get_gateway_status():
 
     # get logs           
     #ret_log_dict = read_logs(NUM_LOG_LINES)
-    ret_val["data"]["error_log"] = read_logs(logfiles, 0 , NUM_LOG_LINES)
+    ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
     # get usage
     usage = storage_cache_usage()

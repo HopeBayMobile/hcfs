@@ -104,11 +104,10 @@ def triggerProxyDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerProxyDeploy")
 	logger.info("start")
 
-	proxyList = kwargs['proxyList']
 	deviceCnt = kwargs['deviceCnt']
 	devicePrx = kwargs['devicePrx']
 
-	installer = NodeInstaller(proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
+	installer = NodeInstaller(devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 
 	logger.info("end")
@@ -146,11 +145,10 @@ def triggerStorageDeploy(**kwargs):
 	logger = util.getLogger(name = "triggerStorageDeploy")
 	logger.info("start")
 
-	proxyList = kwargs['proxyList']
 	devicePrx = kwargs['devicePrx']
 	deviceCnt = kwargs['deviceCnt']
 
-	installer = NodeInstaller(proxyList=proxyList, devicePrx=devicePrx, deviceCnt=deviceCnt)
+	installer = NodeInstaller(devicePrx=devicePrx, deviceCnt=deviceCnt)
 	installer.install()
 
 	logger.info("end")

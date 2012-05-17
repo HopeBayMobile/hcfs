@@ -1,16 +1,14 @@
 #!/bin/bash
 # The shell script is used to add the storage device of ring. (OS: Ubuntu 11.04)
-# History:
-# 2012/03/01 first release by CW
 
-if [ $# != 3 ]; then
+if [ $# != 4 ]; then
         echo "Please enter the correct parameters!"
         echo "For example:"
-        echo "./AddRingDevice.sh ZoneNumber StorageIP DeviceName"
+        echo "./AddRingDevice.sh ZoneNumber StorageIP DeviceName SwiftDir"
         exit 1
 fi
 
-cd /etc/swift
+cd $4
 
 ZoneNumber=$1
 StorageIP=$2

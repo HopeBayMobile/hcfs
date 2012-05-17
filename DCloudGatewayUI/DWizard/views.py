@@ -1,13 +1,17 @@
+import json
+
 from django.contrib.formtools.wizard.views import SessionWizardView
 from django.conf.urls import url, patterns
 from django.shortcuts import render_to_response, redirect
 from django.core.exceptions import ObjectDoesNotExist
 from django.forms import ValidationError
 from django.contrib.formtools.wizard.forms import ManagementForm
+
 from celery.result import AsyncResult
 from celery import states
+
 from models import Work, Step
-import json
+
 
 class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
@@ -25,11 +29,13 @@ class DeltaWizard(SessionWizardView):
     def is_going(cls):
         #Initialize work data
         work, created = Work.objects.get_or_create(work_name=cls.__name__)
-        current_step = Step.objects.get(form=work.current_form)
-        result = AsyncResult(current_step.task_id)
-
-        if result.status == states.FAILURE:
-            return True
+        try:
+            current_step = Step.objects.get(form=work.current_form)
+            result = AsyncResult(current_step.task_id)
+            if result.status == states.FAILURE:
+                return True
+        except Step.DoesNotExist:
+            pass  # do nothing since no current step exist
 
         if created:
             return True
@@ -149,7 +155,6 @@ class DeltaWizard(SessionWizardView):
                     return self.render_next_step(form, back=True)
         return self.render(form)
 
-
     def process_step(self, form):
         cleaned_data = form.cleaned_data
         step_index = self.get_step_index()
@@ -170,7 +175,6 @@ class DeltaWizard(SessionWizardView):
                                 task_id=result.task_id)
         data = self.get_form_step_data(form)
         return data
-
 
     def done(self, form_list, **kwargs):
         step_index = self.get_step_index()

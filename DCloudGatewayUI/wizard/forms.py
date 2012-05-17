@@ -1,8 +1,5 @@
 from django import forms
-from django.forms.widgets import Input
-from django.forms.util import flatatt
-from django.utils.safestring import mark_safe
-from django.utils.encoding import StrAndUnicode, force_unicode
+
 from lib.forms import RenderFormMixinClass
 from lib.forms.widgets import *
 
@@ -17,7 +14,7 @@ class Form_1(RenderFormMixinClass, forms.Form):
                                                 'new_password',
                                                 'retype_new_password',
                                                 ]
-                 )]
+                )]
 
     def clean(self):
         cleaned_data = super(Form_All, self).clean()
@@ -70,8 +67,6 @@ class Form_4(RenderFormMixinClass, forms.Form):
 
 
 class Form_All(RenderFormMixinClass, forms.Form):
-#    username = forms.CharField()
-#    password = forms.CharField(widget=forms.PasswordInput())
     new_password = forms.CharField(widget=forms.PasswordInput())
     retype_new_password = forms.CharField(widget=forms.PasswordInput())
 
@@ -81,7 +76,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
     preferred_dns = forms.IPAddressField(label='Preferred DNS server', widget=IPAddressInput)
     alternate_dns = forms.IPAddressField(label='Alternate DNS server', widget=IPAddressInput)
 
-    cloud_storage_url = forms.CharField(label='Cloud Storage IP')
+    cloud_storage_url = forms.CharField(label='Cloud Storage Address')
     cloud_storage_account = forms.CharField()
     cloud_storage_password = forms.CharField(widget=forms.PasswordInput())
 
@@ -93,8 +88,7 @@ class Form_All(RenderFormMixinClass, forms.Form):
                                              max_length=20,
                                              widget=forms.PasswordInput())
 
-    fieldset = [('1. Password', [#'username',
-                                #'password',
+    fieldset = [('1. Password', [
                                 'new_password',
                                 'retype_new_password',
                                 ]
