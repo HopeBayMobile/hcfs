@@ -128,7 +128,10 @@ def sharefolder(request):
 
 @login_required
 def sync(request):
-    return render(request, 'dashboard/sync.html', {'tab': 'sync'})
+    hours = range(0, 24)
+    weeks = ['Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.', 'Sun.']
+    return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
+        hours, 'weeks': weeks})
 
 
 @login_required
