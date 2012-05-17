@@ -307,20 +307,20 @@ def getIpAddress():
     	return ipaddr
 
 
-def getSwiftNodeIpList():
+def getSwiftNodeIpList(swiftDir="/etc/swift"):
 	logger = getLogger(name="getSwiftNodeIpList")
 
 	proxyList =[]
 	ipSet = set()
 	
 	try:
-		with open("/etc/swift/proxyList","rb") as fh:
+		with open("%s/proxyList"%swiftDir,"rb") as fh:
 			proxyList = pickle.load(fh)
 	except IOError:
-		logger.warn("Failed to load proxyList")
+		logger.warn("Failed to load proxyList from %s/proxyList"%swiftDir)
 		return None
 
-	storageIpList = getStorageNodeIpList()
+	storageIpList = getStorageNodeIpList(swiftDir=swiftDir)
 	if storageIpList is None:
 		return None
 
@@ -363,20 +363,20 @@ def getSwiftConfVers(confDir="/etc/swift"):
 	return vers+versBase
 	
 
-def getStorageNodeIpList():
+def getStorageNodeIpList(swiftDir="/etc/swift"):
 	'''
 	Collect ip list of all storge nodes  
 	'''
 
 	logger = getLogger(name='SwiftInfo')
 
-	cmd = 'cd /etc/swift; swift-ring-builder object.builder'
+	cmd = 'cd %s; swift-ring-builder object.builder'%swiftDir
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	lines = po.stdout.readlines()
 	po.wait()
 	
 	if po.returncode != 0:
-		logger.error("Failed to obtain storage node list from object.builder")
+		logger.error("Failed to obtain storage node list from %s/object.builder"%swiftDir)
 		return None
 
 	i = 0
@@ -630,4 +630,5 @@ if __name__ == '__main__':
 	#restartAllServices()
 	#print stopAllServices()
 	#generateSwiftConfig()
+	print getSwiftNodeIpList()
 	pass	
