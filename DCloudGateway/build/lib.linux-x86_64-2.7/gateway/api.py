@@ -718,7 +718,7 @@ def restart_nfs_service():
 	try:
 		cmd = "/etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		output = po.read()
+		output = po.stdout.read()
 		po.wait()
 
 		if po.returncode == 0:
@@ -1428,7 +1428,7 @@ def set_nfs_access_ip_list (array_of_ip):
     # finally, updating the file
     try:
         ofile = open(nfs_hosts_allow_file, 'w')
-        output = services + " : " + " ".join(array_of_ip)
+        output = services + " : " + ", ".join(array_of_ip) + "\n"
         ofile.write(output)
         ofile.close()
 
