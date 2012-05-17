@@ -140,6 +140,7 @@ def isValid(vers, fingerprint):
 	return retval
 def restartAllServices():
 	logger = getLogger(name="restartAllServices")
+	stopAllServices()
 	generateSwiftConfig()
 	os.system("chown -R swift:swift /etc/swift")	
 

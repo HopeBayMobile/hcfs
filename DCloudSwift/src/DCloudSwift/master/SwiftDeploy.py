@@ -98,7 +98,8 @@ class SwiftDeploy:
 		lock.acquire()
 		try:
 			#TODO: change to funcion attribute
-			numOfNodes = len(util.getSwiftNodeIpList())
+			swiftDir = "%s/swift"%self.__deltaDir
+			numOfNodes = len(util.getSwiftNodeIpList(swiftDir))
 
 			self.__spreadProgress['informedNodes'] += 1
 			self.__spreadProgress['progress'] = (float(self.__spreadProgress['informedNodes'])/numOfNodes) * 100.0
@@ -362,7 +363,7 @@ class SwiftDeploy:
 			logger.error("%s"%str(err))
 			self.__updateSpreadProgress(success=False, ip=nodeIP, msg=str(err))
 		except util.TimeoutError as err:
-			msg="Failed to update ring files on %s for %s"%(nodeIp, std(err))
+			msg="Failed to update ring files on %s for %s"%(nodeIP, std(err))
 			logger.error("%s" % err)
 			self.__updateSpreadProgress(success=False, ip=nodeIP, msg=msg)
 		except Exception as err:
