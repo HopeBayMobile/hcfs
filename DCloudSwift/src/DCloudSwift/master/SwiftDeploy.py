@@ -57,7 +57,7 @@ class SwiftDeploy:
 
 		self.__spreadProgress = {
 			'progress': 0,
-			'informedNodes':0,
+			'updatedNodes':0,
 			'finished': False,
 			'code': 0,
 			'blackList': [],
@@ -97,19 +97,17 @@ class SwiftDeploy:
 	def __updateSpreadProgress(self, success=False, ip="", msg=""):
 		lock.acquire()
 		try:
-			#TODO: change to funcion attribute
-			swiftDir = "%s/swift"%self.__deltaDir
-			numOfNodes = len(util.getSwiftNodeIpList(swiftDir))
+			numOfTasks = len(self.__nodes2Update)
 
-			self.__spreadProgress['informedNodes'] += 1
-			self.__spreadProgress['progress'] = (float(self.__spreadProgress['informedNodes'])/numOfNodes) * 100.0
+			self.__spreadProgress['updatedNodes'] += 1
+			self.__spreadProgress['progress'] = (float(self.__spreadProgress['updatedNodes'])/numOfTasks) * 100.0
 
 			if success == False:
 				self.__spreadProgress['blackList'].append(ip)
 				self.__spreadProgress['message'].append(msg)
 				self.__spreadProgress['code'] += 1
 
-			if self.__spreadProgress['informedNodes'] == numOfNodes:
+			if self.__spreadProgress['updatedNodes'] == numOfTasks:
 				self.__spreadProgress['finished'] = True
 		finally:
 			lock.release()
@@ -185,6 +183,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
 		try:
 
+			print "Start deploying proxy node %s"%proxyIP
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
 			cmd = "ssh root@%s mkdir -p %s"%(proxyIP, pathname)
@@ -213,7 +212,6 @@ class SwiftDeploy:
 				raise DeployProxyError(errMsg)
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
-			print "Start deploying proxy node %s"%proxyIP
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
 			if status != 0:
 				errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
@@ -251,6 +249,7 @@ class SwiftDeploy:
 		try:
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
+			print "Start deploying storage node %s"%storageIP
 			cmd = "ssh root@%s mkdir -p %s"%(storageIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
@@ -277,7 +276,6 @@ class SwiftDeploy:
 
 
 			cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s"%(storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
-			print "Start deploying storage node %s"%storageIP
 			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
 				errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
@@ -330,11 +328,12 @@ class SwiftDeploy:
 		try:
 			pathname = "/etc/delta/master/%s"%socket.gethostname()
 
+			print "Start updating ring files on node %s"%nodeIP
 			cmd = "ssh root@%s mkdir -p %s"%(nodeIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
 			if status != 0:
 				errMsg = "Failed to mkdir root@%s:/etc/delta/master for %s" % (nodeIP, stderr)
-				raise SpreadRinfFilesError(errMsg)
+				raise SpreadRingFilesError(errMsg)
 
 			cmd = "ssh root@%s rm -rf %s/*"%(nodeIP, pathname)
 			(status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
@@ -350,7 +349,6 @@ class SwiftDeploy:
 
 
 			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -u %s/swift"%(nodeIP, pathname)
-			print "Start update ring files on node %s"%nodeIP
 			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
 			if status != 0:
 				errMsg = "Failed to update ring files on %s for %s" % (nodeIP, stderr)
@@ -374,6 +372,8 @@ class SwiftDeploy:
 	def spreadRingFiles(self):
 		swiftDir = "%s/swift"%self.__deltaDir
 		swiftNodeIpList = util.getSwiftNodeIpList(swiftDir)
+
+		self.__nodes2Update = swiftNodeIpList
 
 		argumentList = []
                 for i in swiftNodeIpList:
@@ -471,7 +471,7 @@ def addNodes():
 		t.start()
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
-			time.sleep(5)
+			time.sleep(10)
 			print progress
 			progress = SD.getDeployProgress()
 		print "Swift deploy is done!"
@@ -480,7 +480,7 @@ def addNodes():
 
 		spreadProgress = SD.getSpreadProgress()
 		while spreadProgress['finished'] != True:
-			time.sleep(5)
+			time.sleep(8)
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
@@ -510,7 +510,7 @@ def deploy():
 		t.start()
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
-			time.sleep(5)
+			time.sleep(8)
 			print progress
 			progress = SD.getDeployProgress()
 		print "Swift deploy process is done!"
@@ -522,9 +522,16 @@ def deploy():
 		return ret
 
 if __name__ == '__main__':
-	SD = SwiftDeploy()
-	SD.spreadRingFiles()
-	#SD.updateMetadata2AddNodes(proxyList=[{"ip":"172.16.229.49"}], storageList=[{"ip":"172.16.229.42", "zid":5}])
+	#SD = SwiftDeploy()
+	#t = Thread(target=SD.spreadRingFiles, args=())
+	#t.start()
+	#progress = SD.getSpreadProgress()
+	#while progress['finished'] != True:
+	#	time.sleep(10)
+	#	print progress
+	#	progress = SD.getSpreadProgress()
+
+	#spreadProgress = SD.getSpreadProgress()
 	pass
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
