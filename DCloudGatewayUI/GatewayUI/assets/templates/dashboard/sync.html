@@ -27,8 +27,44 @@
     border: 0px;
     background-image:url("/static/img/dashboard/hour_unit_last.png");
 }
-.sync_edit_img {
-    float:left; margin-top: 6px;
+.sync_24div_block {
+    width: 24px;
+    float: left;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_bg_1.png");
+}
+.sync_24div_none {
+    width: 24px;
+    float: left;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_bg_2.png");
+}
+.sync_edit_link {
+    display: block;
+    margin-top: 7px;
+    height: 41px;
+    width: 57px;
+    float: left;
+    background: url('/static/img/dashboard/edit_normal.png') no-repeat;
+    text-indent: -99999px;
+}
+.sync_edit_link:hover {
+    background: url('/static/img/dashboard/edit_hover.png') no-repeat;
+}
+.sync_add_link {
+    display: block;
+    margin-top: 5px;
+    margin-left: 13px;
+    height: 30px;
+    width: 44px;
+    float: left;
+    background: url('/static/img/dashboard/add_normal.png') no-repeat;
+    text-indent: -99999px;
+}
+.sync_add_link:hover {
+    background: url('/static/img/dashboard/add_hover.png') no-repeat;
 }
 .sync_span {
     margin-top: 4px;
@@ -40,53 +76,58 @@
 .sync_time_div {
     height: 16px;
 }
+.sync_font_size {
+    font-size: 23px;
+}
 </style>
 <div class="modal hide fade" id="myModal" style="display: none;">
     <div class="modal-header">
         <button class="close" data-dismiss="modal">×</button>
-        <h3>Setting Mon</h3>
+        <h3>Setting</h3>
     </div>
-    <div class="modal-body">
-        <form class="well form-horizontal">
-            <div class="controls">
-                <p>
-                <input type="radio" name="optionsRadios" id="optionsRadios2" value="option2" checked="">
+    <div class="modal-body" >
+        <form class="well form-horizontal" action="/dashboard/sync/" method="POST" >
+            {% csrf_token %}
+            <div class="">
+                <p class="sync_font_size">
+                <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1" checked="">
                 No limit
                 </p>
-                <p>
-                <input type="radio" name="optionsRadios" id="optionsRadios3" value="option3" checked="">
-                Schedule
+                <hr/>
+                <p class="sync_font_size">
+                <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2" checked="">
+                All Day
                 </p>
-                <p>
-                Start <select id="select01" class="span1">
+                <hr/>
+                <p class="sync_font_size">
+                <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3" checked="">
+                Interval <select id="select01" name="interval_from" class="span1">
+                    {% for i in hours %}
+                    <option>{{ i }}</option>
+                    {% endfor %}
+                </select>
+                <i class="icon-play"></i>
+                <select id="select01" name="interval_to" class="span1">
                     {% for i in hours %}
                     <option>{{ i }}</option>
                     {% endfor %}
                 </select>
                 </p>
-                <p>
-                End <select id="select01" class="span1">
-                    {% for i in hours %}
-                    <option>{{ i }}</option>
-                    {% endfor %}
-                </select>
-                </p>
-                <p>
-                Up <input type="text" class="span1" id="input01"> KB
-                </p>
-                <p>
-                Down <input type="text" class="span1" id="input01"> KB
+                <hr/>
+                <p class="sync_font_size">
+                Bandwidth <input type="text" class="span1" id="input01" name="bandwidth_upload"> /
+                <input type="text" name="bandwidth_download" class="span1" id="input01">
                 </p>
             </div>
-        </form>
     </div>
     <div class="modal-footer">
         <a href="#" class="btn" data-dismiss="modal">Close</a>
-        <a href="#" class="btn btn-primary">Save changes</a>
+        <button type="submit" class="btn btn-primary">Save changes</a>
     </div>
+    </form>
 </div>
 <div id="sync">
-    {% for x in weeks %}
+    {% for key, value in weeks_data.items %}
     <div id="main" class="sync_bar_main">
         {% if forloop.first %}
         <div id="top" class="sync_time_div">
@@ -97,16 +138,32 @@
         </div>
         {% endif %}
         <div style="">
-            <a data-toggle="modal" href="#myModal" >
-                <img class="sync_edit_img" src="/static/img/dashboard/edit_normal.png" />
-            </a>
-            <div class="sync_bar_left"><span class="sync_span"><h2>{{ x }}</h2></span></div>
-            {% for i in hours %}
-            {% if forloop.last %}
-            <div id="24div" class="sync_24div_last"></div>
+            {% if value == "none" %}
+                <a data-toggle="modal" href="#myModal" class="sync_add_link">add</a>
             {% else %}
-            <div id="24div" class="sync_24div"></div>
+                <a data-toggle="modal" href="#myModal" class="sync_edit_link">edit</a>
             {% endif %}
+            <div class="sync_bar_left"><span class="sync_span"><h2>{{ key }}</h2></span></div>
+            {% for i in hours %}
+                {% if value == "all" %}
+                    {% if forloop.last %}
+                        <div id="24div" class="sync_24div_last"></div>
+                    {% else %}
+                        <div id="24div" class="sync_24div"></div>
+                    {% endif %}
+                {% elif value == "none" %}
+                    <div id="24div" class="sync_24div_none"></div>
+                {% else  %}
+                    {% if i in value  %}
+                        <div id="24div" class="sync_24div_block"></div>
+                    {% else %}
+                        {% if forloop.last %}
+                            <div id="24div" class="sync_24div_last"></div>
+                        {% else %}
+                            <div id="24div" class="sync_24div"></div>
+                        {% endif %}
+                    {% endif %}
+                {% endif %}
             {% endfor %}
         </div>
         {% if forloop.last %}

@@ -510,7 +510,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+		cmd = "mkfs.s3ql --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -1487,7 +1487,6 @@ def apply_scheduling_rules(schedule):			# by Yen
 		return json.dumps(return_val)
 	
 	# apply settings
-        #change_bw(schedule)        
 
         os.system("/etc/cron.hourly/hourly_run_this")
 
@@ -1525,10 +1524,10 @@ def stop_upload_sync():			# by Yen
 	return json.dumps(return_val)
 
 def force_upload_sync(bw):			# by Yen
-	if (bw<64):
+	if (bw<256):
 		return_val = {
 			'result': False,
-			'msg': "Uploading bandwidth has to be larger than 64KB/s.",
+			'msg': "Uploading bandwidth has to be larger than 256KB/s.",
 			'data': {}
 		}
 		return json.dumps(return_val)
@@ -1999,84 +1998,6 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
     return json.dumps(ret_val)
 
 #######################################################
-
-# bw = bandwidth, in kbps
-def set_bandwidth(bw):
-        nic = "eth1"
-        bw = str( bw )
-        # clear old tc settings
-        cmd = "tc qdisc del dev "+nic+" root"
-        os.system(cmd)
-        # set tc
-        cmd = "tc qdisc add dev "+nic+" root handle 1:0 htb default 10"
-        os.system(cmd)
-        cmd = "tc class add dev "+nic+" parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
-        os.system(cmd)
-        # set throttling 8080 port in iptables
-        cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
-        os.system(cmd)
-        cmd = "tc filter add dev "+nic+" parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
-        os.system(cmd)
-
-## =================================================================================================    
-def get_scheduled_bandwidth(weekday, hour, schedule):
-        for ii in range(1,len(schedule)):
-                row = schedule[ii]
-                wd = int(row[0])        ## weekday
-                if (wd==weekday):   ## weekday match
-                        sh = int(row[1]);       eh = int(row[2]);  ## start and end hour
-                        bw = int(row[3])
-                        if (sh<=eh):   # format 1, e.g 6:00 to 21:00
-                                if (hour>=sh and hour<=eh):
-                                        return bw
-                        if (sh>eh):   # format 2, e.g 22:00 to 05:00
-                                if (hour>=sh or hour<=eh):
-                                        return bw
-
-        return -1;  # -1 means not found
-
-def change_bw(schedule):
-# get current day of week and hour of time
-    d = datetime.now()
-    print d
-    weekday = d.isoweekday()
-    print weekday
-    hour = d.hour
-    print hour
-
-# find the scheduled bandwidth for now
-    bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
-    bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
-    os.system('touch /etc/delta/testthisout%s'%bw2)
-    if bw2 < 0:
-        bw2 = bw
-    if (bw2 == 0):              # bandwidth is set to 0 means the client wants to turn-off uploading
-        try:
-                #cmd = "/usr/local/bin/s3qlctrl uploadoff /mnt/cloudgwfiles"
-                cmd = "/etc/delta/uploadoff"
-                os.system(cmd)
-
-                print("Turn off s3ql data upload succeeded")
-        except:
-                print "Please check whether s3qlctrl is installed."
-
-    if bw2>0:   # bandwidth setting is found in the configuration file
-        if bw2>=64:             # we set upload speed should be at least 64kbps as default 
-                bw = bw2
-
-        try:
-                set_bandwidth(bw)  # apply scheduled bandwidth
-                print("change bandwidth to " + str(bw) + "kB/s succeeded")
-                #cmd = "/usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles"
-                cmd = "sudo /etc/delta/uploadon"
-                os.system(cmd)
-
-                print "Turn on s3ql upload."
-        except:
-                print "Please check whether s3qlctrl is installed."
-
-    return
-
 
 
 if __name__ == '__main__':

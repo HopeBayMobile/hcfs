@@ -9,21 +9,13 @@ from datetime import datetime
 
 # bw = bandwidth, in kbps
 def set_bandwidth(bw):
-	nic = "eth1"
-	bw = str( bw )
-	# clear old tc settings
-	cmd = "tc qdisc del dev "+nic+" root"
-	os.system(cmd)
-	# set tc
-	cmd = "tc qdisc add dev "+nic+" root handle 1:0 htb default 10"
-	os.system(cmd)
-	cmd = "tc class add dev "+nic+" parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
-	os.system(cmd)
-	# set throttling 8080 port in iptables
-	cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
-	os.system(cmd)
-	cmd = "tc filter add dev "+nic+" parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
-	os.system(cmd)
+        nic = "eth1"
+        bw_s = str( bw )
+        # clear old tc settings
+        cmd = "bash /etc/delta/shaping_port_8080.sh " + nic + " " + bw_s
+        #~ print cmd
+        os.system(cmd)
+
 
 ## =================================================================================================	
 def get_scheduled_bandwidth(weekday, hour, schedule):
@@ -54,7 +46,7 @@ def main():
         
 	
 ## =================================================================================================	
-# load config file (gateway_throttling.cfg)
+# load config file (gw_schedule.conf)
 ## read in CSV file
     fpath = "/etc/delta/"
     fname = "gw_schedule.conf"
@@ -86,7 +78,7 @@ def main():
 		print "Please check whether s3qlctrl is installed."
 
     if bw2>0:   # bandwidth setting is found in the configuration file
-	if bw2>=64:		# we set upload speed should be at least 64kbps as default 
+	if bw2>=256:		# we set upload speed should be at least 256KByte/sec as default 
 		bw = bw2
 	
 	try:

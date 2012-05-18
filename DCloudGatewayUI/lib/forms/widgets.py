@@ -3,8 +3,8 @@
 """
 from django.forms.widgets import TextInput, RadioInput, RadioSelect, CheckboxSelectMultiple, RadioFieldRenderer, CheckboxInput
 from django.utils.safestring import mark_safe
-from django.utils.encoding import StrAndUnicode, force_unicode
-from django.utils.html import escape, conditional_escape
+from django.utils.encoding import force_unicode
+from django.utils.html import conditional_escape
 from itertools import chain
 from django.forms.util import flatatt
 

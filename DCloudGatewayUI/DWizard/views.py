@@ -20,10 +20,15 @@ class DeltaWizard(SessionWizardView):
     exit_url = '/'
 
     @classmethod
-    def patterns(cls):
-        return patterns('',
-            url(r'^$', cls.as_view(), name='DWizard'),
-        )
+    def patterns(cls, path=None):
+        if path:
+            return patterns('',
+                url(r'^%s/$' % path, cls.as_view(), name='DWizard'),
+            )
+        else:
+            return patterns('',
+                url(r'^$', cls.as_view(), name='DWizard'),
+            )
 
     @classmethod
     def is_going(cls):

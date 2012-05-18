@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django import forms
+from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 from gateway import api
@@ -128,10 +129,21 @@ def sharefolder(request):
 
 @login_required
 def sync(request):
+    if request.method == "POST" :
+        print request.POST
+
     hours = range(0, 24)
-    weeks = ['Mon.', 'Tue.', 'Wed.', 'Thu.', 'Fri.', 'Sat.', 'Sun.']
+    weeks_data = SortedDict()
+    weeks_data['Mon.'] = "all"
+    weeks_data['Tue.'] = "all"
+    weeks_data['Wed.'] = "all"
+    weeks_data['Thu.'] = "all"
+    weeks_data['Fri.'] = "all"
+    weeks_data['Sat.'] = "none"
+    weeks_data['Sun.'] = range(6, 18)
+
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
-        hours, 'weeks': weeks})
+        hours, 'weeks_data': weeks_data})
 
 
 @login_required
