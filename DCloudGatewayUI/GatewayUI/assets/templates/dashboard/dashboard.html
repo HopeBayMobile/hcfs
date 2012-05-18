@@ -2,35 +2,51 @@
 {% block tab_content %}
 
 <div class="storage-usage-info">
-	<header>Storage space usage</header>
+	<h2>Storage space usage</h2>
+	<hr />
 	<section>
 		<p>Total amount of data stored</p>
 		<div class="percentage-bar">
-			&nbsp;
+			<div class="total-usage"></div>
+			<div class="current-usage"></div>
 		</div>
 	</section>
 	<section>
 		<p>Total amount of data stored</p>
 		<div class="percentage-bar">
-			&nbsp;
+			<div class="total-usage"></div>
+			<div class="current-usage"></div>
 		</div>
 	</section>
 	<section>
 		<p>Total amount of data stored</p>
 		<div class="percentage-bar">
-			&nbsp;
-		</div>
-	</section>
-	<section>
-		<p>Total amount of data stored</p>
-		<div class="percentage-bar">
-			&nbsp;
+			<div class="total-usage"></div>
+			<div class="current-usage"></div>
 		</div>
 	</section>
 </div>
-
 <div class="cache-usage-bar">
-<div class="total-usage"></div>
-<div class="current-usage"></div>
+	<div class="indicator">
+		<div>
+			<img src="/static/img/dashboard/1_capacity_icon_1.png" alt="">
+			<p>Dirty cache: 100GB</p>
+			<p>Dirty entries: 10</p>
+		</div>
+		<div>
+			<img src="/static/img/dashboard/1_capacity_icon_2.png" alt="">
+			<p>Used cache: 100GB</p>
+			<p>Used entries: 15</p>
+		</div>
+		<div>
+			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
+			<p>Max cache: 1000GB</p>
+			<p>Max entries: 100</p>
+		</div>
+	</div>
+	<div class="usage">
+		<div class="total"></div>
+		<div class="current"></div>
+	</div>
 </div>
 {% endblock tab_content %}
