@@ -9,7 +9,6 @@ import subprocess
 import time
 import errno
 import re
-import datetime
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -44,15 +43,15 @@ LOG_PARSER = {
 # key = level, val = keyword array
 KEYWORD_FILTER = {
                   "error_log" : ["error", "exception"],
-                  "warring_log" : ["warring"],
+                  "warning_log" : ["warning"],
                   "info_log" : ["nfs", "cifs" , "."],
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
 
 LOG_LEVEL = {
-            0 : ["error_log", "warring_log", "info_log"],
-            1 : ["error_log", "warring_log"],
+            0 : ["error_log", "warning_log", "info_log"],
+            1 : ["error_log", "warning_log"],
             2 : ["error_log"],
             }
 
@@ -64,7 +63,7 @@ CMD_CHK_STO_CACHE_STATE = "s3qlstat /mnt/cloudgwfiles"
 
 NUM_LOG_LINES = 20
 
-MONITOR_IFACE = "eth0"
+MONITOR_IFACE = "eth1"
 
 
 ################################################################################
@@ -511,7 +510,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql swift://%s/gateway/delta"%(storage_url)
+		cmd = "mkfs.s3ql --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -1364,12 +1363,12 @@ def set_compression(switch):
 		if storage_url is None:
 			raise Exception("Failed to get storage url")
 
+                with open('/etc/delta/Gateway.ini','wb') as op_fh:
+                        config.write(op_fh)
+
 		if  _createS3qlConf(storage_url) !=0:
 			raise Exception("Failed to create new s3ql config")
 
-		with open('/etc/delta/Gateway.ini','wb') as op_fh:
-			config.write(op_fh)
-		
 		op_ok = True
 		op_msg = "Succeeded to set_compression"
 
@@ -1488,7 +1487,6 @@ def apply_scheduling_rules(schedule):			# by Yen
 		return json.dumps(return_val)
 	
 	# apply settings
-        #change_bw(schedule)        
 
         os.system("/etc/cron.hourly/hourly_run_this")
 
@@ -1526,10 +1524,10 @@ def stop_upload_sync():			# by Yen
 	return json.dumps(return_val)
 
 def force_upload_sync(bw):			# by Yen
-	if (bw<64):
+	if (bw<256):
 		return_val = {
 			'result': False,
-			'msg': "Uploading bandwidth has to be larger than 64KB/s.",
+			'msg': "Uploading bandwidth has to be larger than 256KB/s.",
 			'data': {}
 		}
 		return json.dumps(return_val)
@@ -1644,7 +1642,7 @@ def parse_log (type, log_cnt):
         year = int(m.group('year'))
     except:
         # any exception, using this year instead
-        now = datetime.datetime.utcnow()
+        now = datetime.utcnow()
         year = now.year
 
     #print year
@@ -1655,10 +1653,11 @@ def parse_log (type, log_cnt):
     #now = datetime.datetime.utcnow()
 
     try:
-        timestamp = datetime.datetime(year, month, day, hour, minute, second) # timestamp
-    except Exception:
+        timestamp = datetime(year, month, day, hour, minute, second) # timestamp
+    except Exception as err:
         #print "datatime error"
         #print Exception
+        print err
         return {}
 
     #print "timestamp = "
@@ -1948,7 +1947,7 @@ def get_gateway_status():
 
     # get logs           
     #ret_log_dict = read_logs(NUM_LOG_LINES)
-    ret_val["data"]["error_log"] = read_logs(logfiles, 0 , NUM_LOG_LINES)
+    ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
     # get usage
     usage = storage_cache_usage()
@@ -1999,84 +1998,6 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
     return json.dumps(ret_val)
 
 #######################################################
-
-# bw = bandwidth, in kbps
-def set_bandwidth(bw):
-        nic = "eth1"
-        bw = str( bw )
-        # clear old tc settings
-        cmd = "tc qdisc del dev "+nic+" root"
-        os.system(cmd)
-        # set tc
-        cmd = "tc qdisc add dev "+nic+" root handle 1:0 htb default 10"
-        os.system(cmd)
-        cmd = "tc class add dev "+nic+" parent 1:0 classid 1:10 htb rate "+bw+"kbps ceil "+bw+"kbps prio 0"
-        os.system(cmd)
-        # set throttling 8080 port in iptables
-        cmd = "iptables -A OUTPUT -t mangle -p tcp --sport 8080 -j MARK --set-mark 10"
-        os.system(cmd)
-        cmd = "tc filter add dev "+nic+" parent 1:0 prio 0 protocol ip handle 10 fw flowid 1:10"
-        os.system(cmd)
-
-## =================================================================================================    
-def get_scheduled_bandwidth(weekday, hour, schedule):
-        for ii in range(1,len(schedule)):
-                row = schedule[ii]
-                wd = int(row[0])        ## weekday
-                if (wd==weekday):   ## weekday match
-                        sh = int(row[1]);       eh = int(row[2]);  ## start and end hour
-                        bw = int(row[3])
-                        if (sh<=eh):   # format 1, e.g 6:00 to 21:00
-                                if (hour>=sh and hour<=eh):
-                                        return bw
-                        if (sh>eh):   # format 2, e.g 22:00 to 05:00
-                                if (hour>=sh or hour<=eh):
-                                        return bw
-
-        return -1;  # -1 means not found
-
-def change_bw(schedule):
-# get current day of week and hour of time
-    d = datetime.now()
-    print d
-    weekday = d.isoweekday()
-    print weekday
-    hour = d.hour
-    print hour
-
-# find the scheduled bandwidth for now
-    bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
-    bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
-    os.system('touch /etc/delta/testthisout%s'%bw2)
-    if bw2 < 0:
-        bw2 = bw
-    if (bw2 == 0):              # bandwidth is set to 0 means the client wants to turn-off uploading
-        try:
-                #cmd = "/usr/local/bin/s3qlctrl uploadoff /mnt/cloudgwfiles"
-                cmd = "/etc/delta/uploadoff"
-                os.system(cmd)
-
-                print("Turn off s3ql data upload succeeded")
-        except:
-                print "Please check whether s3qlctrl is installed."
-
-    if bw2>0:   # bandwidth setting is found in the configuration file
-        if bw2>=64:             # we set upload speed should be at least 64kbps as default 
-                bw = bw2
-
-        try:
-                set_bandwidth(bw)  # apply scheduled bandwidth
-                print("change bandwidth to " + str(bw) + "kB/s succeeded")
-                #cmd = "/usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles"
-                cmd = "sudo /etc/delta/uploadon"
-                os.system(cmd)
-
-                print "Turn on s3ql upload."
-        except:
-                print "Please check whether s3qlctrl is installed."
-
-    return
-
 
 
 if __name__ == '__main__':

@@ -27,6 +27,7 @@ class CreateCfg:
 	def createCfgFile(self):
 		fd = open("./Cfg.ini", "w")
 		self.__assignCfgContent()
+
 		for section, field in self.cfgContent.items():
 			fd.write("%s\n" % section)
 			for fieldName, item in field.items():
@@ -63,13 +64,13 @@ class Test_getKwparams:
 	Test the function getKwparams() in SwiftCfg.py
 	'''
 	def setup(self):
-		print "Start of Unit Test for function getKwparams in SwiftCfg.py\n"
+		print "Start of unit test for function getKwparams in SwiftCfg.py\n"
 		self.CC = CreateCfg()
 		self.CC.createCfgFile()
 		self.SwCfg = SwiftCfg("./Cfg.ini")
 
 	def teardown(self):
-		print "End of Unit Test for function getKwparams in SwiftCfg.py\n"
+		print "End of unit test for function getKwparams in SwiftCfg.py\n"
 		self.CC.removeCfgFile()
 		self.CC.removeLogFile()
 
@@ -78,6 +79,7 @@ class Test_getKwparams:
 		Check the integrity of the configuration file parsed by getKwparams()
 		'''
 		result = self.SwCfg.getKwparams()
+
 		for fieldName, item in self.CC.cfgKwparams.items():
 				nose.tools.eq_(result[fieldName], self.CC.cfgKwparams[fieldName], "getKwparams Error!")
 
@@ -87,9 +89,14 @@ class Test_getKwparams:
 		'''
 		SC = SwiftCfg("../Swift.ini")
 		result = SC.getKwparams()
-		nose.tools.ok_(result['password'] != None, "Field \'password\' does not exist!")
-		nose.tools.ok_(result['numOfReplica'] != None, "Field \'replica\' does not exist!")
-		nose.tools.ok_(result['deviceCnt'] != None, "Field \'deviceCnt\' does not exist!")
+
+		nose.tools.ok_(result['password'] != None, "Field \'password\' does not exist in section [storage]!")
+		nose.tools.ok_(result['numOfReplica'] != None, "Field \'replica\' does not exist in section [storage]!")
+		nose.tools.ok_(result['deviceCnt'] != None, "Field \'deviceCnt\' does not exist in section [storage]!")
+		nose.tools.ok_(result['logDir'] != None, "Field \'dir\' does not exist in section [log]!")
+		nose.tools.ok_(result['logLevel'] != None, "Field \'level\' does not exist in section [log]!")
+		nose.tools.ok_(result['logName'] != None, "Field \'name\' does not exist in section [log]!")
+		#os.system("rm %s/%s" % (result['logDir'], result['logName']))
 
 
 

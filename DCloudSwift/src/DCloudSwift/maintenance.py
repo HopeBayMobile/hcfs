@@ -33,12 +33,13 @@ def updateMetadata(confDir):
 	logger.info("updateMetadata start")
 	try:
 
-		os.system("rm -rf /etc/swift")
-		os.system("rm -rf /DCloudSwift")
 		os.system("mkdir -p /etc/swift")
 		os.system("cp -r %s/* /etc/swift/"%confDir)
-		os.system("cp -r %s/DCloudSwift /"%BASEDIR)
-		os.system("chown -R swift:swift /etc/swift")
+		if BASEDIR != "/":
+			os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+			os.system("rm -rf /DCloudSwift")
+			os.system("cp -r %s/DCloudSwift /"%BASEDIR)
+			os.system("chown -R swift:swift /etc/swift")
 
 		deviceCnt = util.getDeviceCnt()
 		devicePrx = util.getDevicePrx()
@@ -47,11 +48,13 @@ def updateMetadata(confDir):
 		if oriVers is None:
 			util.stopAllServices() #prevent services from occupying disks
 			diskUtil.createSwiftDevices(deviceCnt=deviceCnt,devicePrx=devicePrx)
+			util.restartAllServices()
 		else:
 			diskUtil.updateMetadataOnDisks(oriVers=oriVers)
 			diskUtil.mountUmountedSwiftDevices()
 		
-		util.restartAllServices()
+		util.startAllServices()
+		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
 	except Exception:
 		raise

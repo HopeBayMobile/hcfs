@@ -50,6 +50,7 @@ def main():
         os.system("cp hourly_run_this %s/"%CRONDIR) 
         os.system("cp update_bandwidth %s/"%CONFDIR) 
         os.system("cp update_s3ql_bandwidth.py %s/"%CONFDIR)
+        os.system("cp shaping_port_8080.sh %s/"%CONFDIR)
         os.system("cp uploadon %s/"%CONFDIR)
         os.system("cp uploadoff %s/"%CONFDIR)
 
