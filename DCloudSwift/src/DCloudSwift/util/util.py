@@ -153,8 +153,12 @@ def restartAllServices():
 	os.system("chown -R swift:swift /srv/node/ ")
 	restartSwiftServices()
 
-	#Read password from config
-	#os.system("swauth-prep -K deltacloud -A https://127.0.0.1:8080/auth/")	
+
+def startAllServices():
+	logger = getLogger(name="startAllServices")
+	startRsync()
+	startMemcached()
+	startSwiftServices()
 
 def restartRsync():
 	logger = getLogger(name="restartRsync")	
@@ -162,6 +166,15 @@ def restartRsync():
 	os.system("rm /var/run/rsyncd.pid")
 
 	cmd = "/etc/init.d/rsync restart"
+	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+	output = po.stdout.read()
+	po.wait()
+
+	return po.returncode
+
+def startRsync():
+	cmd = "/etc/init.d/rsync start"
 	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
 	output = po.stdout.read()
@@ -183,11 +196,27 @@ def restartMemcached():
 
 	return po.returncode
 
+def startMemcached():
+	
+	cmd = "/etc/init.d/memcached start"
+	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+
+	output = po.stdout.read()
+	po.wait()
+
+	return po.returncode
+
 def restartSwiftServices():
 	'''
 	start appropriate swift services
 	'''
 	os.system("swift-init all restart")
+
+def startSwiftServices():
+	'''
+	start appropriate swift services
+	'''
+	os.system("swift-init all start")
 
 def runPopenCommunicate(cmd, inputString, logger):
 	po = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -591,6 +620,7 @@ class TryLockError(Exception):
 		return "Failed to tryLock lockFile"
 
 if __name__ == '__main__':
+	startAllServices()
 #	print getSwiftConfVers()
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
@@ -631,5 +661,5 @@ if __name__ == '__main__':
 	#restartAllServices()
 	#print stopAllServices()
 	#generateSwiftConfig()
-	print getSwiftNodeIpList()
+	#print getSwiftNodeIpList()
 	pass	

@@ -53,7 +53,7 @@ def updateMetadata(confDir):
 			diskUtil.updateMetadataOnDisks(oriVers=oriVers)
 			diskUtil.mountUmountedSwiftDevices()
 		
-		util.restartAllServices()
+		util.startAllServices()
 		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
 	except Exception:
