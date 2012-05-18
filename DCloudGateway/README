@@ -21,9 +21,10 @@ Storage Gateway:
 8) To reset gateway to its original status, execute a script like:
 cd /home/nii/DCloudGateway-git/StorageAppliance/DCloudGateway/
 sudo python setup.py install
+sudo umount.s3ql /mnt/cloudgwfiles
 sudo s3qladm clear swift://172.16.228.53:8080/gateway/delta
 sudo rm -rf /root/.s3ql/authinfo2
-sudo rm -rf /root/init/s3ql.conf
+sudo rm -rf /etc/init/s3ql.conf
 sudo rm -rf /etc/delta/network.info
 sudo route add -net 172.16.228.0 netmask 255.255.255.0 gw 172.16.229.252 eth1
 
