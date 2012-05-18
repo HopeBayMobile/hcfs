@@ -129,6 +129,9 @@ def sharefolder(request):
 
 @login_required
 def sync(request):
+    if request.method == "POST" :
+        print request.POST
+
     hours = range(0, 24)
     weeks_data = SortedDict()
     weeks_data['Mon.'] = "all"

@@ -85,42 +85,46 @@
         <button class="close" data-dismiss="modal">×</button>
         <h3>Setting</h3>
     </div>
-    <div class="modal-body">
-        <form class="well form-horizontal">
-            <div class="controls">
+    <div class="modal-body" >
+        <form class="well form-horizontal" action="/dashboard/sync/" method="POST" >
+            {% csrf_token %}
+            <div class="">
                 <p class="sync_font_size">
-                <input type="radio" name="optionsRadios" id="optionsRadios1" value="option2" checked="">
+                <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1" checked="">
                 No limit
                 </p>
+                <hr/>
                 <p class="sync_font_size">
-                <input type="radio" name="optionsRadios" id="optionsRadios2" value="option3" checked="">
+                <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2" checked="">
                 All Day
                 </p>
+                <hr/>
                 <p class="sync_font_size">
-                <input type="radio" name="optionsRadios" id="optionsRadios3" value="option3" checked="">
-                Interval <select id="select01" class="span1">
+                <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3" checked="">
+                Interval <select id="select01" name="interval_from" class="span1">
                     {% for i in hours %}
                     <option>{{ i }}</option>
                     {% endfor %}
                 </select>
                 <i class="icon-play"></i>
-                <select id="select01" class="span1">
+                <select id="select01" name="interval_to" class="span1">
                     {% for i in hours %}
                     <option>{{ i }}</option>
                     {% endfor %}
                 </select>
                 </p>
+                <hr/>
                 <p class="sync_font_size">
-                Bandwidth <input type="text" class="span1" id="input01"> /
-                <input type="text" class="span1" id="input01">
+                Bandwidth <input type="text" class="span1" id="input01" name="bandwidth_upload"> /
+                <input type="text" name="bandwidth_download" class="span1" id="input01">
                 </p>
             </div>
-        </form>
     </div>
     <div class="modal-footer">
         <a href="#" class="btn" data-dismiss="modal">Close</a>
-        <a href="#" class="btn btn-primary">Save changes</a>
+        <button type="submit" class="btn btn-primary">Save changes</a>
     </div>
+    </form>
 </div>
 <div id="sync">
     {% for key, value in weeks_data.items %}
