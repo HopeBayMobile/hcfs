@@ -820,12 +820,12 @@ class Operations(llfuse.Operations):
         log.debug('extstat_cache(%d): start')
 
         #return additional information re cache
-        cache_size = self.cache.size
-        cache_dirtysize = self.cache.dirty_size
-        cache_entries = len(self.cache.entries)
-        cache_dirtyentries = self.cache.dirty_entries
-        cache_maxsize = self.cache.max_size
-        cache_maxentries = self.cache.max_entries
+        cache_size = max(self.cache.size,0)
+        cache_dirtysize = max(self.cache.dirty_size,0)
+        cache_entries = max(len(self.cache.entries),0)
+        cache_dirtyentries = max(self.cache.dirty_entries,0)
+        cache_maxsize = max(self.cache.max_size,0)
+        cache_maxentries = max(self.cache.max_entries,0)
         if (self.cache.do_upload or self.cache.forced_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
