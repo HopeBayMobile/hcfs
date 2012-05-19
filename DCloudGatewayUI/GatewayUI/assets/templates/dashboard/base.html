@@ -32,6 +32,25 @@
                 $("#site-tab li:first").addClass('active');
                 {% endif %}
                 $('#site-tab li').append('<span></span>')
+
+                function setIndicator(name, status){
+                    if (status){
+                        $('#'+name).addClass('work');
+                    } else {
+                        $('#'+name).removeClass('work');
+                    }
+                }
+
+                function update_indicator(){
+                    $.get('/dashboard/indicator', function(content, success, opts){
+                        var indic;
+                        var data = JSON.parse(content);
+                        for (indic in data){
+                            setIndicator(indic, data[indic])
+                        }
+                    });
+                }
+                update_indicator()
             })
             {% block javascript %}
             {% endblock javascript %}
@@ -48,32 +67,36 @@
         </p>
         <div class="logo-box">
         </div>
-
-        <div class="notify-box">
-                Current 1000/100 KB/Sec
-                </div>
         <div id="" class="notify-box-group">
-
             <div class="notify-box-row">
-                <div class="notify-box icon-system-work">
+                <div id="system_check" class="notify-box img-system">
                 </div>
-                <div class="notify-box icon-network-work">
+                <div id="network_ok" class="notify-box img-network">
                 </div>
-                <div class="notify-box icon-flush-work">
+                <div id="flush_inprogress" class="notify-box img-flush">
                 </div>
-                <div class="notify-box icon-dirtycache-safe">
+                <div id="dirtycache_nearfull" class="notify-box img-dirtycache">
                 </div>
             </div>
+            <div class="notify-box-row3">
+                Jim Yeh
+                <img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt="">
+
+            </div>
             <div class="notify-box-row2">
-                <div class="notify-box icon-indicator-normal">
+                <div id="HDD_ok" class="notify-box img-indicator">
                 HDD
                 </div>
-                <div class="notify-box icon-indicator-normal">
+                <div id="NFS_srv" class="notify-box img-indicator">
                 NFS
                 </div>
-                <div class="notify-box icon-indicator-normal">
+                <div id="SMB_srv" class="notify-box img-indicator">
                 SMB
                 </div>
+            </div>
+            <div class="notify-box-row4">
+                <p>20 / 100</p>
+                <p>100 KB / 20 Sec</p>
             </div>
         </div>
     </div>
@@ -89,7 +112,7 @@
               <li class=""><a href="{% url dashboard:index %}">Dashboard</a></li>
               <li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>
               <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
-              <li class=""><a href="{% url dashboard:sharefolder %}">Share Folder</a></li>
+              <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
               <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
               <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
               <li class=""><a href="{% url dashboard:power %}">Power</a></li>

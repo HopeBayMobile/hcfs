@@ -123,8 +123,30 @@ def account(request, action=None):
 
 
 @login_required
-def sharefolder(request):
-    return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder'})
+def sharefolder(request, action):
+
+    forms_group = {}
+    smb_data = {}
+
+    class SMBSetting(RenderFormMixinClass, forms.Form):
+        username = forms.CharField()
+        password = forms.CharField(widget=forms.PasswordInput)
+
+    class NFSSetting(RenderFormMixinClass, forms.Form):
+        username = forms.CharField()
+        password = forms.CharField(widget=forms.PasswordInput)
+
+    if request.method == "POST":
+        if action == "smb_setting":
+            pass
+        elif action == "nfs_setting":
+            smb_data = json.loads(api.get_storage_account()).get('data')
+            pass
+
+    forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
+    forms_group['nfs_setting'] = forms_group.get('nfs_setting', NFSSetting())
+
+    return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group})
 
 
 @login_required
@@ -154,3 +176,12 @@ def syslog(request):
 @login_required
 def power(request):
     return render(request, 'dashboard/power.html', {'tab': 'power'})
+
+@login_required
+def indicator(request):
+    indicator_data = json.loads(api.get_gateway_indicators())
+    if indicator_data['result']:
+        result_data = json.dumps(indicator_data['data'])
+        return HttpResponse(result_data)
+    else:
+        return HttpResponse(indicator_data['msg'], status=500)

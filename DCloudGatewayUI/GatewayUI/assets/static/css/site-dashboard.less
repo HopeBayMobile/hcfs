@@ -138,16 +138,41 @@
 	background-repeat: no-repeat;
 }
 .notify-box-row{
-	float: right;
+	float: left;
 	margin-top: 10px;
-	margin-right: 10px;
+	margin-left: 5px;
 }
 
 .notify-box-row2{
-	float: right;
+	float: left;
 	clear: both;
 	margin-top: 5px;
+	margin-left: 5px;
+}
+
+.notify-box-row3{
+	float: right;
+	width: 140px;
+	margin-top: 10px;
 	margin-right: 10px;
+	line-height: 32px;
+	vertical-align: middle;
+	font-weight: bold;
+}
+
+.notify-box-row3 .logout{
+	float: right;
+}
+
+.notify-box-row4{
+	float: right;
+	width: 140px;
+	margin-right: 10px;
+	margin-top: -5px;
+}
+
+.notify-box-row4 p{
+	margin: 0;
 }
 
 .notify-box-row2 .notify-box{
@@ -507,18 +532,33 @@
 }
 
 
-.icon-system-work{
+.img-system{
+	background-image: url("/@{dashboard-image-path}/indicator_1_system_notwork.png");
+}
+.img-flush{
+	background-image: url("/@{dashboard-image-path}/indicator_1_flush_notwork.png");
+}
+.img-network{
+	background-image: url("/@{dashboard-image-path}/indicator_1_network_notwork.png");
+}
+.img-dirtycache{
+	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_full.png");
+}
+.img-system.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_system_work.png");
 }
-.icon-flush-work{
+.img-flush.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_flush_work.png");
 }
-.icon-network-work{
+.img-network.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_network_work.png");
 }
-.icon-dirtycache-safe{
+.img-dirtycache.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_safe.png");
 }
-.icon-indicator-normal{
+.img-indicator.work{
 	background-image: url("/@{dashboard-image-path}/indicator_2_normal.png");
+}
+.img-indicator{
+	background-image: url("/@{dashboard-image-path}/indicator_2_abnormal.png");
 }
