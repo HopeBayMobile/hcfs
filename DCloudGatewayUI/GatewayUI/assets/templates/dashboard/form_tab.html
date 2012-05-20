@@ -13,7 +13,7 @@
 		<form id="{{form.name}}" class="form-horizontal" method="POST"
 			action="{{name}}">
 			{% csrf_token %} {{ form.render }}
-			<div class="form-actions">
+			<div class="controls">
 				<button type="submit" class="btn btn-primary">
 				{% if submit %}
 				{{submit}}
@@ -28,9 +28,31 @@
 	{% endfor %}
 	</div>
 	<script type="text/javascript">
+		function setIPSelect(){
+			$("#id_array_of_ip option").attr({'disabled': true, 'selected': true})
+		}
 		$(function(){
 			$("div.formset li:first").addClass('active');
 			$("div.formset .tab-pane:first").addClass('active');
+			setIPSelect()
+
+			// setup the multiple selector
+			var ip_add = $('<span class="label label-success">').text('+').on("click", function(e){
+				var ip = prompt("Insert a ip");
+				var option = $("<option>").val(ip).text(ip);
+				$(e.target).siblings('select').append(option)
+				setIPSelect()
+			});
+
+			var ip_del = $('<span class="label label-important">').text('-').on("click", function(e){
+				var ip = prompt("Insert a ip");
+				var option = $("<option>").val(ip).text(ip);
+				$(e.target).siblings('select').append(option)
+				setIPSelect()
+			});
+
+			$("#id_array_of_ip").closest('.controls').append(ip_add);
+			$("#id_array_of_ip").closest('.controls').append(ip_del);
 		});
 	</script>
 </div>

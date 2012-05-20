@@ -16,7 +16,8 @@ def index(request):
 def system(request, action=None):
 
     forms_group = {}
-    network_data = {}
+    network_data = json.loads(api.get_network()).get('data')
+    print network_data
 
     class Network(RenderFormMixinClass, forms.Form):
         ip = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
@@ -49,10 +50,10 @@ def system(request, action=None):
             else:
                 forms_group[action] = form
         elif action == "admin_pass":
-            network_data = json.loads(api.get_network()).get('data')
             form = AdminPassword(request.POST)
             if form.is_valid():
                 request.user.set_password(form['password'].data)
+                request.user.save()
             else:
                 forms_group[action] = form
 
@@ -65,7 +66,8 @@ def system(request, action=None):
 def account(request, action=None):
 
     forms_group = {}
-    gateway_data = {}
+    gateway_data = json.loads(api.get_storage_account()).get('data')
+    print gateway_data
 
     class Gateway(RenderFormMixinClass, forms.Form):
         storage_url = forms.CharField()
@@ -107,7 +109,6 @@ def account(request, action=None):
             else:
                 forms_group[action] = form
         elif action == "encrypt":
-            gateway_data = json.loads(api.get_storage_account()).get('data')
             form = EncryptionKey(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['password'].data))
@@ -126,32 +127,41 @@ def account(request, action=None):
 def sharefolder(request, action):
 
     forms_group = {}
-    smb_data = {}
+    smb_data = json.loads(api.get_smb_user_list()).get('data')
+    smb_data['username'] = smb_data['accounts'][0]
+    print smb_data
+    nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
+    if nfs_ip_query['result']:
+        nfs_data = nfs_ip_query.data
+    else:
+        nfs_data = {'array_of_ip': ['192.168.1.1', '192.168.1.1']}
 
     class SMBSetting(RenderFormMixinClass, forms.Form):
         username = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
 
     class NFSSetting(RenderFormMixinClass, forms.Form):
-        username = forms.CharField()
-        password = forms.CharField(widget=forms.PasswordInput)
+        array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in nfs_data['array_of_ip']]))
 
     if request.method == "POST":
         if action == "smb_setting":
-            pass
+            form = SMBSetting(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.set_smb_user_list(**form.cleaned_data))
+                if not update_return['result']:
+                    print update_return['msg']
         elif action == "nfs_setting":
-            smb_data = json.loads(api.get_storage_account()).get('data')
-            pass
+            print request.POST
 
     forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
-    forms_group['nfs_setting'] = forms_group.get('nfs_setting', NFSSetting())
+    forms_group['nfs_setting'] = forms_group.get('nfs_setting', NFSSetting(initial=nfs_data))
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group})
 
 
 @login_required
 def sync(request):
-    if request.method == "POST" :
+    if request.method == "POST":
         print request.POST
 
     hours = range(0, 24)

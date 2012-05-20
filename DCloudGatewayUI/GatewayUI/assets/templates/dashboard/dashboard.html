@@ -62,7 +62,6 @@
 	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%")
 				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size'])
 				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%")
-	            console.log(data)
 	        });
 	    }
 	    update_cache()
