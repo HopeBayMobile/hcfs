@@ -177,6 +177,7 @@ def syslog(request):
 def power(request):
     return render(request, 'dashboard/power.html', {'tab': 'power'})
 
+
 @login_required
 def indicator(request):
     indicator_data = json.loads(api.get_gateway_indicators())
@@ -185,3 +186,18 @@ def indicator(request):
         return HttpResponse(result_data)
     else:
         return HttpResponse(indicator_data['msg'], status=500)
+
+
+@login_required
+def gateway_status(request):
+    try:
+        data = json.loads(api.get_gateway_status())
+    except:
+        data = {}
+    data['cache_usage'] = {"max_cache_size": 1000,
+                           "max_cache_entries": 100,
+                           "used_cache_size": 500,
+                           "used_cache_entries": 50,
+                           "dirty_cache_size": 100,
+                           "dirty_cache_entries": 10}
+    return HttpResponse(json.dumps(data['cache_usage']))

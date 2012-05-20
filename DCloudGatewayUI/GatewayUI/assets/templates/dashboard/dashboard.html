@@ -1,6 +1,5 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
-
 <div class="storage-usage-info">
 	<h2>Storage space usage</h2>
 	<hr />
@@ -30,23 +29,43 @@
 	<div class="indicator">
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_1.png" alt="">
-			<p>Dirty cache: 100GB</p>
-			<p>Dirty entries: 10</p>
+			<p id="dirty_cache_size">Dirty cache: <span></span>GB</p>
+			<p id="dirty_cache_entries">Dirty entries: <span></span></p>
 		</div>
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_2.png" alt="">
-			<p>Used cache: 100GB</p>
-			<p>Used entries: 15</p>
+			<p id="used_cache_size">Used cache: <span></span>GB</p>
+			<p id="used_cache_entries">Used entries: <span></span></p>
 		</div>
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
-			<p>Max cache: 1000GB</p>
-			<p>Max entries: 100</p>
+			<p id="max_cache_size">Max cache: <span></span>GB</p>
+			<p id="max_cache_entries">Max entries: <span></span></p>
 		</div>
 	</div>
 	<div class="usage">
 		<div class="total"></div>
-		<div class="current"></div>
+		<div class="used"></div>
+		<div class="dirty"></div>
 	</div>
 </div>
+
+<script type="text/javascript">
+	$(function(){
+		function update_cache(){
+	        $.get('/dashboard/gateway_status/', function(ctnt, stat, opts){
+	            var data = JSON.parse(ctnt);
+	            for (key in data){
+	            	$('#'+key).find('span').text(data[key])
+	            }
+	            used_cache_percentage = Math.round(data['used_cache_size'] * 100 / data['max_cache_size'])
+	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%")
+				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size'])
+				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%")
+	            console.log(data)
+	        });
+	    }
+	    update_cache()
+	})
+</script>
 {% endblock tab_content %}

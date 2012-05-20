@@ -41,14 +41,18 @@
                     }
                 }
 
+                // Update the indicator icons
                 function update_indicator(){
-                    $.get('/dashboard/indicator', function(content, success, opts){
-                        var indic;
-                        var data = JSON.parse(content);
-                        for (indic in data){
-                            setIndicator(indic, data[indic])
+                    $.get('/dashboard/indicator/', function(ctnt, stat, opts){
+                        if (stat == 'success'){
+                            var indic;
+                            var data = JSON.parse(ctnt);
+                            for (indic in data){
+                                setIndicator(indic, data[indic])
+                            }
                         }
                     });
+                    setTimeout(update_indicator, 5000)
                 }
                 update_indicator()
             })
@@ -79,9 +83,8 @@
                 </div>
             </div>
             <div class="notify-box-row3">
-                Jim Yeh
-                <img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt="">
-
+                {{ user.username }}
+                <a href="/logout"><img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a>
             </div>
             <div class="notify-box-row2">
                 <div id="HDD_ok" class="notify-box img-indicator">

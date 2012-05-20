@@ -9,4 +9,5 @@ urlpatterns = patterns("dashboard.views",
     url(r'^syslog/$', "syslog", name="syslog"),
     url(r'^power/$', "power", name="power"),
     url(r'^indicator/$', "indicator", name="indicator"),
+    url(r'^gateway_status/$', "gateway_status", name="gateway_status"),
 )
