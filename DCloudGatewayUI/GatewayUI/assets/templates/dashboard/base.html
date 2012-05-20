@@ -48,14 +48,20 @@
                             var indic;
                             var data = JSON.parse(ctnt);
                             for (indic in data){
-                                setIndicator(indic, data[indic])
+                                setIndicator(indic, data[indic]);
                             }
                         }
                     });
-                    setTimeout(update_indicator, 5000)
+                    setTimeout(update_indicator, 5000);
                 }
-                update_indicator()
-            })
+                update_indicator();
+
+                $(function(){
+                    $(".msg-detail").on('click', function(){
+                        $(this).siblings('.msg-content').toggle(500);
+                    });
+                });
+            });
             {% block javascript %}
             {% endblock javascript %}
         </script>
@@ -118,7 +124,9 @@
               <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
               <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
               <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
-              <li class=""><a href="{% url dashboard:power %}">Power</a></li>
+              <li class=""><a href="{% url dashboard:power %}">
+                  <img src="/static/img/dashboard/power_icon.png" alt="">
+              </a></li>
             </ul>
             <div class="left-bg-tail"></div>
         </div>

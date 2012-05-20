@@ -1,6 +1,40 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
-    <div class="" id="dash" style="overflow-x: hidden;">
-        Syslog
+    <div id="syslog">
+        {% for msg in msgs %}
+
+        {% empty %}
+        <div class="msg-block">
+            <span>a</span>
+            <span>b</span>
+            <span>c</span>
+            <span>d</span>
+        </div>
+        <div class="msg-block">
+            <div class="msg-icon">&nbsp;</div>
+            <div class="msg-title">This is a fake message.</div>
+            <div class="msg-time">2012-05-20</div>
+            <div class="msg-detail">▽</div>
+            <div class="msg-content">
+            	rkeopwkroewpkroewprkepwo<br>
+            	werlwerlewkrl;ewl;rkew<br>
+            	kgkotjiojiojnoiik<br>
+            </div>
+        </div>
+        <div class="msg-block">
+            <div class="msg-icon">&nbsp;</div>
+            <div class="msg-title">This is a fake message.</div>
+            <div class="msg-time">2012-05-20</div>
+            <div class="msg-detail">▽</div>
+        </div>
+        <div class="msg-pagination">
+            <span>1</span>
+            <span>2</span>
+            <span>3</span>
+            <span>4</span>
+            <span>5</span>
+            <span>6</span>
+        </div>
+        {% endfor %}
     </div>
 {% endblock tab_content %}
