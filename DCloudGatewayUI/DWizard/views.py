@@ -67,7 +67,8 @@ class DeltaWizard(SessionWizardView):
 
     def get(self, request, *args, **kwargs):
         #set current step from model
-        work = Work.objects.get(work_name=self.__class__.__name__)
+        work, created = Work.objects.get_or_create(work_name=self.__class__.__name__)
+        #work = Work.objects.get(work_name=self.__class__.__name__)
 
         if 'reset' in request.GET:
             # reset all the steps for this wizard
