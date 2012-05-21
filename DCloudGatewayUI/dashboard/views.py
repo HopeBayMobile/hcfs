@@ -17,6 +17,7 @@ def system(request, action=None):
 
     forms_group = {}
     network_data = json.loads(api.get_network()).get('data')
+    action_error = {}
     print network_data
 
     class Network(RenderFormMixinClass, forms.Form):
@@ -46,6 +47,7 @@ def system(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
                 if not update_return['result']:
+                    action_error[action] = update_return['msg']
                     print update_return['msg']
             else:
                 forms_group[action] = form
@@ -59,7 +61,7 @@ def system(request, action=None):
 
     forms_group['network'] = forms_group.get('network', Network(initial=network_data))
     forms_group['admin_pass'] = forms_group.get('admin_pass', AdminPassword())
-    return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group})
+    return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 
 
 @login_required
@@ -67,6 +69,7 @@ def account(request, action=None):
 
     forms_group = {}
     gateway_data = json.loads(api.get_storage_account()).get('data')
+    action_error = {}
     print gateway_data
 
     class Gateway(RenderFormMixinClass, forms.Form):
@@ -105,6 +108,7 @@ def account(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
                 if not update_return['result']:
+                    action_error[action] = update_return['msg']
                     print update_return['msg']
             else:
                 forms_group[action] = form
@@ -113,6 +117,7 @@ def account(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['password'].data))
                 if not update_return['result']:
+                    action_error[action] = update_return['msg']
                     print update_return['msg']
             else:
                 forms_group[action] = form
@@ -120,7 +125,7 @@ def account(request, action=None):
     forms_group['gateway'] = forms_group.get('gateway', Gateway(initial=gateway_data))
     forms_group['encrypt'] = forms_group.get('encrypt', EncryptionKey())
 
-    return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group})
+    return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group, 'action_error': action_error})
 
 
 @login_required
@@ -128,35 +133,45 @@ def sharefolder(request, action):
 
     forms_group = {}
     smb_data = json.loads(api.get_smb_user_list()).get('data')
+    action_error = {}
     smb_data['username'] = smb_data['accounts'][0]
-    print smb_data
+    # print smb_data
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
         nfs_data = nfs_ip_query.data
     else:
-        nfs_data = {'array_of_ip': ['192.168.1.1', '192.168.1.1']}
+        nfs_data = {'array_of_ip': ['8.8.8.8']}
 
     class SMBSetting(RenderFormMixinClass, forms.Form):
         username = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
 
-    class NFSSetting(RenderFormMixinClass, forms.Form):
-        array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in nfs_data['array_of_ip']]))
+    def nfs_setting_generator(ip_list):
+        class NFSSetting(RenderFormMixinClass, forms.Form):
+            array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in ip_list]))
+        return NFSSetting
 
+    print action
     if request.method == "POST":
         if action == "smb_setting":
             form = SMBSetting(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.set_smb_user_list(**form.cleaned_data))
                 if not update_return['result']:
+                    action_error[action] = update_return['msg']
                     print update_return['msg']
         elif action == "nfs_setting":
-            print request.POST
+            ip_list = request.POST.getlist('array_of_ip')
+            update_return = json.loads(api.set_nfs_access_ip_list(ip_list))
+            if not update_return['result']:
+                action_error[action] = update_return['msg']
+                form = nfs_setting_generator(set(nfs_data['array_of_ip'] + ip_list))
+                forms_group['nfs_setting'] = form
 
     forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
-    forms_group['nfs_setting'] = forms_group.get('nfs_setting', NFSSetting(initial=nfs_data))
+    forms_group['nfs_setting'] = forms_group.get('nfs_setting', nfs_setting_generator(nfs_data['array_of_ip'])())
 
-    return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group})
+    return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group, 'action_error': action_error})
 
 
 @login_required
@@ -180,7 +195,8 @@ def sync(request):
 
 @login_required
 def syslog(request):
-    return render(request, 'dashboard/syslog.html', {'tab': 'syslog'})
+    log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    return render(request, 'dashboard/syslog.html', {'tab': 'syslog', 'msgs': log_data})
 
 
 @login_required
@@ -196,6 +212,12 @@ def indicator(request):
         return HttpResponse(result_data)
     else:
         return HttpResponse(indicator_data['msg'], status=500)
+
+
+@login_required
+def get_syslog(request, category, level):
+    log_data = json.loads(api.get_gateway_system_log(int(level), 100, category))
+    return HttpResponse(json.dumps(log_data['data']))
 
 
 @login_required
