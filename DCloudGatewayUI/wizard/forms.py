@@ -88,30 +88,83 @@ class Form_All(RenderFormMixinClass, forms.Form):
                                              max_length=20,
                                              widget=forms.PasswordInput())
 
-    fieldset = [('1. Password', [
+    fieldset = [('1. Your New Password', [
                                 'new_password',
                                 'retype_new_password',
                                 ]
                  ),
-                ('2. Network', ['ip_address',
+                ('2. Network Configuration', ['ip_address',
                                 'subnet_mask',
                                 'default_gateway',
                                 'preferred_dns',
                                 'alternate_dns',
                                 ]
                  ),
-                ('3. Cloud Storage', ['cloud_storage_url',
+                ('3. Cloud Storage Configuration', ['cloud_storage_url',
                                      'cloud_storage_account',
                                      'cloud_storage_password',
                                      ]
                  ),
-                ('4. Encryption', ['encryption_key',
+                ('4. Encryption Key', ['encryption_key',
                                   'confirm_encryption_key',
                                   ]
                  )]
 
     def clean(self):
         cleaned_data = super(Form_All, self).clean()
+        new_password = cleaned_data.get('new_password')
+        retype_new_password = cleaned_data.get('retype_new_password')
+        if new_password and retype_new_password:
+            if new_password != retype_new_password:
+                self._errors['retype_new_password'] = self.error_class(["New passwords don't match."])
+        return cleaned_data
+
+class Test_Form_All(RenderFormMixinClass, forms.Form):
+    new_password = forms.CharField()
+    retype_new_password = forms.CharField()
+
+    ip_address = forms.IPAddressField(label='IP address', widget=IPAddressInput)
+    subnet_mask = forms.IPAddressField(widget=IPAddressInput)
+    default_gateway = forms.IPAddressField(widget=IPAddressInput)
+    preferred_dns = forms.IPAddressField(label='Preferred DNS server', widget=IPAddressInput)
+    alternate_dns = forms.IPAddressField(label='Alternate DNS server', widget=IPAddressInput)
+
+    cloud_storage_url = forms.CharField(label='Cloud Storage Address')
+    cloud_storage_account = forms.CharField()
+    cloud_storage_password = forms.CharField()
+
+    encryption_key = forms.CharField(help_text='Input 6-20 alphanumeric characters',
+                                     min_length=6,
+                                     max_length=20,
+                                     )
+    confirm_encryption_key = forms.CharField(min_length=6,
+                                             max_length=20,
+                                             )
+
+    fieldset = [('1. Your New Password', [
+                                'new_password',
+                                'retype_new_password',
+                                ]
+                 ),
+                ('2. Network Configuration', ['ip_address',
+                                'subnet_mask',
+                                'default_gateway',
+                                'preferred_dns',
+                                'alternate_dns',
+                                ]
+                 ),
+                ('3. Cloud Storage Configuration', ['cloud_storage_url',
+                                     'cloud_storage_account',
+                                     'cloud_storage_password',
+                                     ]
+                 ),
+                ('4. Encryption Key', ['encryption_key',
+                                  'confirm_encryption_key',
+                                  ]
+                 )]
+
+    def clean(self):
+        cleaned_data = super(Test_Form_All, self).clean()
         new_password = cleaned_data.get('new_password')
         retype_new_password = cleaned_data.get('retype_new_password')
         if new_password and retype_new_password:
