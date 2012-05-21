@@ -20,6 +20,5 @@ urlpatterns = patterns('',
     url(r'^logout$', 'views.logout', name='logout'),
     url(r'^wizard/', include('wizard.urls', namespace="wizard")),
     url(r'^dashboard/', include('dashboard.urls', namespace="dashboard")),
-    url(r'^test_form/$', "test_view.test_form"),
     url(r'^dwizard/', include('DWizard.urls', namespace="DWizard")),
 ) + staticfiles_urlpatterns()

@@ -37,6 +37,7 @@ class IPAddressInput(TextInput):
             value = ''
         final_attrs = self.build_attrs(attrs, type=self.input_type, name=name)
         final_attrs['class'] = 'span05'
+        final_attrs['maxlength'] = '3'
 
         value_list = [''] * self.input_number
         if value != '':

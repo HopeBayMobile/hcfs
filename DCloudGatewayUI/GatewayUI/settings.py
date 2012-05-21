@@ -168,9 +168,9 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 #Celery settings
 BROKER_TRANSPORT = "sqlalchemy"
-BROKER_URL = "sqlite:///broker.db"
+BROKER_URL = "sqlite:///"+os.path.dirname(os.path.abspath(__file__))+"/broker.db"
 CELERY_RESULT_BACKEND = "database"
-CELERY_RESULT_DBURI = "sqlite:///broker.db"
+CELERY_RESULT_DBURI = BROKER_URL
 CELERYD_CONCURRENCY = 1
 
 import djcelery

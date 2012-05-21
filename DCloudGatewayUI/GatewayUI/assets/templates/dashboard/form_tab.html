@@ -10,10 +10,17 @@
 	<div class="tab-content">
 	{% for name, form in forms_group.iteritems %}
 		<div class="tab-pane" id="{{form.name}}">
-		<form id="{{form.name}}" class="form-horizontal" method="POST"
+		<form id="{{form.name}}_form" class="form-horizontal" method="POST"
 			action="{{name}}">
 			{% csrf_token %} {{ form.render }}
 			<div class="controls">
+				<p class="help-block" style="color: red;">
+					{% for error, val in action_error.iteritems %}
+					{% if error == name %}
+						{{ val }}
+					{% endif %}
+					{% endfor %}
+				</p>
 				<button type="submit" class="btn btn-primary">
 				{% if submit %}
 				{{submit}}
@@ -29,27 +36,32 @@
 	</div>
 	<script type="text/javascript">
 		function setIPSelect(){
-			$("#id_array_of_ip option").attr({'disabled': true, 'selected': true})
+			$("#id_array_of_ip option").attr({'disabled': true, 'selected': true});
 		}
 		$(function(){
 			$("div.formset li:first").addClass('active');
 			$("div.formset .tab-pane:first").addClass('active');
-			setIPSelect()
+			setIPSelect();
 
 			// setup the multiple selector
 			var ip_add = $('<span class="label label-success">').text('+').on("click", function(e){
 				var ip = prompt("Insert a ip");
 				var option = $("<option>").val(ip).text(ip);
-				$(e.target).siblings('select').append(option)
-				setIPSelect()
+				$(e.target).siblings('select').append(option);
+				setIPSelect();
 			});
 
 			var ip_del = $('<span class="label label-important">').text('-').on("click", function(e){
 				var ip = prompt("Insert a ip");
-				var option = $("<option>").val(ip).text(ip);
-				$(e.target).siblings('select').append(option)
-				setIPSelect()
+				$(e.target).siblings('select')
+						   .find('option[value="' + ip + '"]').remove();
+				setIPSelect();
 			});
+
+			$("#NFSSetting_form").submit(function(e){
+				form = $(this);
+				form.find('option').attr({'disabled': false});
+			})
 
 			$("#id_array_of_ip").closest('.controls').append(ip_add);
 			$("#id_array_of_ip").closest('.controls').append(ip_del);
