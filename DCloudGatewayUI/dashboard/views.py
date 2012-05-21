@@ -138,7 +138,7 @@ def sharefolder(request, action):
     # print smb_data
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
-        nfs_data = nfs_ip_query.data
+        nfs_data = nfs_ip_query['data']
     else:
         nfs_data = {'array_of_ip': ['8.8.8.8']}
 
