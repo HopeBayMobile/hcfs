@@ -47,7 +47,7 @@ touch $LOGFOLDER/errors
 chown -R www-data:www-data $LOGFOLDER
 
 # Move Delta Cloud Manager Django app to /var/www
-mv $BASEPATH /var/www/$BASENAME
+cp -r $BASEPATH /var/www/$BASENAME
 
 # Add Delta Cloud Manager .conf to apache2
 echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apache2.conf
