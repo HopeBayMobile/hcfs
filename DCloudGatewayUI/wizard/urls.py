@@ -27,14 +27,14 @@ class InstallWizard(DeltaWizard):
             'new_password': '1234',
             'retype_new_password':'1234',
                      
-            'ip_address': '171.16.229.154',
+            'ip_address': '172.16.229.154',
             'subnet_mask': '255.255.255.0',
             'default_gateway': '172.16.229.1',
             'preferred_dns': '8.8.8.8',
             'alternate_dns': '8.8.4.4',
 
             'cloud_storage_url': '172.168.288.53:8080',
-            'cloud_storage_account': 'system.root',
+            'cloud_storage_account': 'system:root',
             'cloud_storage_password': 'testpass',
             
             'encryption_key':'123456',
