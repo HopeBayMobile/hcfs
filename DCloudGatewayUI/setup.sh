@@ -36,11 +36,7 @@ pip install $BASEPATH/deploy/externals/kombu-2.1.6.tar.gz
 pip install $BASEPATH/deploy/externals/ordereddict-1.1.tar.gz
 pip install $BASEPATH/deploy/externals/python-dateutil-1.5.tar.gz
 pip install $BASEPATH/deploy/externals/SQLAlchemy-0.7.7.tar.gz
-
-# Close the debug mode of PDCM when deploy
-sed -e "s,DEBUG = True,DEBUG = False,g" -ie $BASEPATH/GatewayUI/settings.py
-
-# Create the log file
+# Close the debug mode of PDCM when deploy sed -e "s,DEBUG = True,DEBUG = False,g" -ie $BASEPATH/GatewayUI/settings.py # Create the log file
 LOGFOLDER=$BASEPATH/lib/logs
 mkdir -p $LOGFOLDER
 touch $LOGFOLDER/errors
@@ -54,7 +50,7 @@ apt-get install -y --force-yes libapache2-mod-wsgi
 a2enmod wsgi
 
 # Copy Delta Cloud Manager Django app to /var/www
-cp -r $BASEPATH /var/www/$BASENAME
+cp -f -r $BASEPATH /var/www/$BASENAME
 
 # Add Delta Cloud Manager .conf to apache2, skip if already exists
 INCLUDE_CONF="Include /var/www/$BASENAME/deploy/apache/dcloud.conf"
@@ -68,8 +64,8 @@ fi
 # initialize django database stuff
 python /var/www/$BASENAME/manage.py syncdb --noinput
 
-cp /var/www/$BASENAME/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
-cp /var/www/$BASENAME/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
+cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
+cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
 
 /etc/init.d/celeryd start
 
