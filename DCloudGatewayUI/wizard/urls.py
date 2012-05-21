@@ -33,7 +33,7 @@ class InstallWizard(DeltaWizard):
             'preferred_dns': '8.8.8.8',
             'alternate_dns': '8.8.4.4',
 
-            'cloud_storage_url': '172.168.288.53:8080',
+            'cloud_storage_url': '172.16.228.53:8080',
             'cloud_storage_account': 'system:root',
             'cloud_storage_password': 'testpass',
             
