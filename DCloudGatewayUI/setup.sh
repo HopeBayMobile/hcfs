@@ -63,12 +63,12 @@ fi
 # initialize django database stuff
 python /var/www/$BASENAME/manage.py syncdb --noinput
 
-chmod 777 -R /var/www/$BASENAME/GatewayUI/
-chmod 777 -R /var/log/delta/
-
 cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
 
 /etc/init.d/celeryd start
+
+chmod 777 -R /var/www/$BASENAME/GatewayUI/
+chmod 777 -R /var/log/delta/
 
 echo "DCloudGatewayUI setup completed..."
