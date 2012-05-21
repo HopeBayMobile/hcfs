@@ -177,17 +177,29 @@ def sharefolder(request, action):
 @login_required
 def sync(request):
     if request.method == "POST":
-        print request.POST
+        query = request.POST
+        day = query['day']
+        print day
+        bandwidth_option = query['bandwidth_option']
+        interval_to = query['interval_to']
+        interval_from = query['interval_from']
+        bandwidth_download = query['bandwidth_download']
+        bandwidth_upload = query['bandwidth_upload']
+
+
+    load_data = json.loads(api.get_scheduling_rules())
+    print load_data
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data['Mon.'] = "all"
-    weeks_data['Tue.'] = "all"
-    weeks_data['Wed.'] = "all"
-    weeks_data['Thu.'] = "all"
-    weeks_data['Fri.'] = "all"
-    weeks_data['Sat.'] = "none"
-    weeks_data['Sun.'] = range(6, 18)
+    weeks_data['1'] = { 'name': 'Mon.', 'range': "all" }
+    weeks_data['2'] = { 'name': 'Thu.', 'range': "all" }
+    weeks_data['3'] = { 'name': 'Wed.', 'range': "all" }
+    weeks_data['4'] = { 'name': 'Thu.', 'range': "all" }
+    weeks_data['5'] = { 'name': 'Fri.', 'range': "all" }
+    weeks_data['6'] = { 'name': 'Sat.', 'range': "none" }
+    weeks_data['7'] = { 'name': 'Sun.', 'range': range(6, 18) }
+
 
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
