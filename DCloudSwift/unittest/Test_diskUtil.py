@@ -67,7 +67,7 @@ class Test_getAllDisks:
 
 	def test_DisksExistence(self):
 		'''
-		Check the existence of the disks returned by getAllDisks()
+		Check the existence of the disks returned by getAllDisks().
 		'''
 		for item in self.__result:
 			nose.tools.ok_((item.startswith("/dev/sd") or item.startswith("/dev/hd")), "Device %s is not a disk!" % item)
@@ -79,6 +79,49 @@ class Test_getAllDisks:
 		'''
 		unique_result = list(set(self.__result))
 		nose.tools.eq_(len(self.__result), len(unique_result), "The disks returned by getAllDisks() are repeated!")
+
+
+class Test_getNonRootDisks:
+	'''
+	Test the function getNonRootDisks() in diskUtil.py
+	'''
+	def setup(self):
+		print "Start of unit test for function getNonRootDisks() in diskUtil.py\n"
+		self.__disk = ""
+		self.__result = []
+
+		cmd = "df -P / | grep /"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		result = po.stdout.readlines()
+		po.wait()
+
+		self.__disk = result[0].split()[0][0:8]
+		self.__result = diskUtil.getNonRootDisks()
+
+	def teardown(self):
+		print "End of unit test for function getNonRootDisks() in diskUtil.py\n"
+
+	def test_IsNonRootDisks(self):
+		'''
+		Check whether the disks returned by getNonRootDisks() are non-root disks.
+		'''
+		for disk in self.__result:
+			nose.tools.ok_(disk != self.__disk, "Root disk %s is inside the disks returned by getNonRootDisks()!" % self.__disk)
+
+	def test_DiskExistence(self):
+		'''
+		Check the existence of the disks returned by getNonRootDisks().
+		'''
+		for item in self.__result:
+			nose.tools.ok_((item.startswith("/dev/sd") or item.startswith("/dev/hd")), "Device %s is not a disk!" % item)
+			nose.tools.ok_(os.path.exists(item), "Disk %s does not exist!" % item)
+
+	def IsRepeated(self):
+		'''
+		Check whether the disks returned by getNonRootDisks() are repeated.
+		'''
+		unique_result = list(set(self.__result))
+		nose.tools.eq_(len(self.__result), len(unique_result), "The disks returned by getNonRootDisks() are repeated!")
 
 
 class Test_getMountedDisks:
