@@ -46,14 +46,22 @@ mkdir -p $LOGFOLDER
 touch $LOGFOLDER/errors
 chown -R www-data:www-data $LOGFOLDER
 
-# install apache
+# install apache and mod_wsgi
 apt-get install -y --force-yes apache2
+apt-get install -y --force-yes libapache2-mod-wsgi
+
+# enable mod_wsgi
+a2enmod wsgi
 
 # Copy Delta Cloud Manager Django app to /var/www
 cp -r $BASEPATH /var/www/$BASENAME
 
-# Add Delta Cloud Manager .conf to apache2
-echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apache2.conf
+# Add Delta Cloud Manager .conf to apache2, skip if already exists
+INCLUDE_CONF="Include /var/www/$BASENAME/deploy/apache/dcloud.conf"
+grep $INCLUDE_CONF /etc/apache2/apache2.conf > /dev/null
+if [ "$?" -ne "0" ]; then
+   echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apache2.conf
+fi
 
 /etc/init.d/apache2 restart
 
