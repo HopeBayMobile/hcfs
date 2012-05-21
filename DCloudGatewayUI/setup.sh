@@ -1,8 +1,7 @@
 #!/bin/sh
 
 # Make sure only root can run this script
-if [ "$(id -u)" -ne "0" ]; then
-   echo "This script must be run as root, use 'sudo'" 1>&2
+if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo'" 1>&2
    exit 1
 fi
 
@@ -64,8 +63,8 @@ fi
 # initialize django database stuff
 python /var/www/$BASENAME/manage.py syncdb --noinput
 
-chmod 666 /var/www/$BASENAME/GatewayUI/gateway.db
-chmod 666 -R /var/log/delta/
+chmod 777 -R /var/www/$BASENAME/GatewayUI/
+chmod 777 -R /var/log/delta/
 
 cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
