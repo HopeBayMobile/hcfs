@@ -1119,6 +1119,11 @@ def get_scheduling_rules():			# by Yen
 	try:
                 with open(fpath+fname, 'r') as fh:
 		    fileReader = csv.reader(fh, delimiter=',', quotechar='"')
+                    schedule = []
+                    for row in fileReader:
+                        schedule.append(row)
+                    del schedule[0]   # remove header
+
 	except:
 		return_val = {
 			'result': False,
@@ -1127,11 +1132,6 @@ def get_scheduling_rules():			# by Yen
 		}
 		return json.dumps(return_val)
 		
-	schedule = []
-	for row in fileReader:
-		schedule.append(row)
-	del schedule[0]   # remove header
-
 	return_val = {
 		'result': True,
 		'msg': "Bandwidth throttling schedule is read.",
