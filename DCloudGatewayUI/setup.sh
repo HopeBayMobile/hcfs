@@ -55,7 +55,7 @@ cp -f -r $BASEPATH /var/www/$BASENAME
 # Add Delta Cloud Manager .conf to apache2, skip if already exists
 INCLUDE_CONF="Include /var/www/$BASENAME/deploy/apache/dcloud.conf"
 grep $INCLUDE_CONF /etc/apache2/apache2.conf > /dev/null
-if [ "$?" -ne "0" ]; then
+if [ "$?" -ne "1" ]; then
    echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apache2.conf
 fi
 
@@ -63,6 +63,9 @@ fi
 
 # initialize django database stuff
 python /var/www/$BASENAME/manage.py syncdb --noinput
+
+chmod 666 /var/www/$BASENAME/GatewayUI/gateway.db
+chmod 666 -R /var/log/delta/
 
 cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
