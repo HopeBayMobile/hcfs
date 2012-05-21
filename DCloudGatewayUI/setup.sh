@@ -46,7 +46,10 @@ mkdir -p $LOGFOLDER
 touch $LOGFOLDER/errors
 chown -R www-data:www-data $LOGFOLDER
 
-# Move Delta Cloud Manager Django app to /var/www
+# install apache
+apt-get install -y --force-yes apache2
+
+# Copy Delta Cloud Manager Django app to /var/www
 cp -r $BASEPATH /var/www/$BASENAME
 
 # Add Delta Cloud Manager .conf to apache2
@@ -55,7 +58,7 @@ echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apac
 /etc/init.d/apache2 restart
 
 # initialize django database stuff
-python /var/www/$BASENAME/deploy/manage.py syncdb --noinput
+python /var/www/$BASENAME/manage.py syncdb --noinput
 
 cp /var/www/$BASENAME/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp /var/www/$BASENAME/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
