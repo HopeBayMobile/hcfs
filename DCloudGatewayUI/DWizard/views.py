@@ -15,6 +15,11 @@ from models import Work, Step
 
 class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
+    doing_template = 'doing.html'
+    done_template = 'done.html'
+    failure_template = 'failure.html'
+    finish_template = 'finish.html'
+
     wizard_step = []
     wizard_initial = {}
     exit_url = '/'
@@ -93,20 +98,20 @@ class DeltaWizard(SessionWizardView):
             if result.state == states.SUCCESS:
                 if self.steps.next:
                     if 'next' in request.GET:
-                        return render_to_response('done.html')
+                        return render_to_response(self.done_template)
                     else:
                         self.storage.current_step = self.steps.next
                         return self.render(self.get_form())
                 else:
                     meta = result.info
-                    return render_to_response('finish.html', {'meta': meta,
+                    return render_to_response(self.finish_template, {'meta': meta,
                                                               'exit': self.exit_url})
             elif result.state == states.FAILURE:
                 meta = result.info
-                return render_to_response('failure.html', {'meta': meta})
+                return render_to_response(self.failure_template, {'meta': meta})
             else:
                 meta = result.info
-                return render_to_response('doing.html', {'meta': meta})
+                return render_to_response(self.doing_template, {'meta': meta})
         else:
             self.storage.current_step = self.steps.next
             return self.render(self.get_form(), back=True)
@@ -154,7 +159,7 @@ class DeltaWizard(SessionWizardView):
 
                 if task:
                     #wait task done
-                    return render_to_response('doing.html')
+                    return render_to_response(self.doing_template)
                 else:
                     # proceed to the next step
                     return self.render_next_step(form, back=True)
@@ -187,6 +192,6 @@ class DeltaWizard(SessionWizardView):
 
         if task:
             #wait task done
-            return render_to_response('doing.html')
+            return render_to_response(self.doing_template)
         else:
-            return render_to_response('done.html')
+            return render_to_response(self.done_template)

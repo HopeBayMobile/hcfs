@@ -6,6 +6,11 @@ from tasks import install_task
 
 class InstallWizard(DeltaWizard):
     template_name = 'wizard/form.html'
+    doing_template = 'wizard/doing.html'
+    done_template = 'wizard/done.html'
+    failure_template = 'wizard/failure.html'
+    finish_template = 'wizard/finish.html'
+    
     wizard_step = [
 #        (Form_All, install_task)
         (Test_Form_All, install_task)
@@ -29,7 +34,7 @@ class InstallWizard(DeltaWizard):
                      
             'ip_address': '172.16.229.154',
             'subnet_mask': '255.255.255.0',
-            'default_gateway': '172.16.229.1',
+            'default_gateway': '172.16.229.252',
             'preferred_dns': '8.8.8.8',
             'alternate_dns': '8.8.4.4',
 

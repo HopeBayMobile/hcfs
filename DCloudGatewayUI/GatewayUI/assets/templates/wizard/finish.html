@@ -1,0 +1,19 @@
+{% extends "wizard/base.html" %} {% block javascript %}
+
+{% endblock javascript %} {% block content %}
+<div class="row" style="padding: 120px 0;">
+	<div style="width:560px; margin: 0 auto;">
+		<div class="well">
+			<h3>Finished</h3>
+			
+			{% for step in meta.step_list %}
+			<div class="alert alert-info">{{step.msg}}</div>
+			{% endfor %}
+			
+			<div style="height: 40px;">
+				<a class="btn btn-primary btn-large pull-right" href="{{exit}}">Exit</a>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock content %}
