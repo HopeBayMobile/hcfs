@@ -57,4 +57,9 @@ echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apac
 # initialize django database stuff
 python /var/www/$BASENAME/deploy/manage.py syncdb --noinput
 
+cp /var/www/$BASENAME/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
+cp /var/www/$BASENAME/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
+
+/etc/init.d/celeryd start
+
 echo "DCloudGatewayUI setup completed..."
