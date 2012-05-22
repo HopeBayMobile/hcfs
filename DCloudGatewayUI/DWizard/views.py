@@ -72,7 +72,11 @@ class DeltaWizard(SessionWizardView):
 
         if 'reset' in request.GET:
             # reset all the steps for this wizard
-            Step.objects.filter(wizard=work).delete()
+            steps = Step.objects.filter(wizard=work)
+            for step in steps:
+                step.task_id = ''
+                step.save()
+            
             work.current_form = ''
             work.save()
             return redirect('.')
@@ -165,6 +169,18 @@ class DeltaWizard(SessionWizardView):
                     # proceed to the next step
                     return self.render_next_step(form, back=True)
         return self.render(form)
+
+    def get_form(self, step=None, data=None, files=None):
+        form = super(DeltaWizard, self).get_form(step, data, files)
+        #reload the form data
+        try:
+            step = Step.objects.get(form=self.steps.current)
+            initial_data = json.loads(step.data)
+            form.initial = initial_data
+        except ObjectDoesNotExist:
+            pass
+        
+        return form
 
     def process_step(self, form):
         cleaned_data = form.cleaned_data
