@@ -1,34 +1,23 @@
 <div id="msgbox" class="slide-box">
     <div id="msgbox-body" class="slide-box-body">
-        {% for msg in msgs %}
-
-        {% empty %}
-        <div class="msg-block">
-            <span>a</span>
-            <span>b</span>
-            <span>c</span>
-            <span>d</span>
-        </div>
-        <div class="msg-block">
-            <div class="msg-icon">&nbsp;</div>
-            <div class="msg-title">This is a fake message.</div>
-            <div class="msg-time">2012-05-20</div>
-            <div class="msg-detail">▽</div>
-            <div class="msg-content">
-                rkeopwkroewpkroewprkepwo<br>
-                werlwerlewkrl;ewl;rkew<br>
-                kgkotjiojiojnoiik<br>
-            </div>
-        </div>
-        <div class="msg-pagination">
-            <span>1</span>
-            <span>2</span>
-            <span>3</span>
-            <span>4</span>
-            <span>5</span>
-            <span>6</span>
-        </div>
-        {% endfor %}
+        <ul class="msg-block" style="margin-top: 30px;">
+            <li class="msg-content">This is a fake message. This is a fake message. This is a fake message.werlwerlewkrl;ewl;rkewkgkotjiojiojnoiik
+                <div class="msg-time">2012-05-20</div>
+                <div class="msg-detail"></div>
+            </li>
+        </ul>
+        <ul class="msg-block">
+            <li class="msg-content">This is a fake message. This is a fake message.
+                <div class="msg-time">2012-05-20</div>
+                <div class="msg-detail"></div>
+            </li>
+        </ul>
+        <ul class="msg-block">
+            <li class="msg-content">This is a fake message. This is a fake message. This is a fake message.
+                <div class="msg-time">2012-05-20</div>
+                <div class="msg-detail"></div>
+            </li>
+        </ul>
     </div>
     <div class="slide-box-footer-bg"></div>
     <div class="slide-box-footer">
@@ -42,10 +31,12 @@
             $("#msg_btn").on("click", function(e){
                 if (sign){
                     sign = 0
+                    $(this).toggleClass('active')
                     $(".slide-box").css({"margin-top": margin_top})
                     $(".tab-content").show(1000)
                 } else {
                     sign = 1
+                    $(this).toggleClass('active')
                     $(".slide-box").css({"margin-top": "0px"})
                     $(".tab-content").hide(1000)
                 }

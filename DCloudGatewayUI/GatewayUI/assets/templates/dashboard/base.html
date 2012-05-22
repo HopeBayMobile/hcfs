@@ -56,11 +56,14 @@
                 }
                 update_indicator();
 
-                $(function(){
-                    $(".msg-detail").on('click', function(){
-                        $(this).siblings('.msg-content').toggle(500);
-                    });
-                });
+                $(".msg-detail").toggle(
+                    function(){
+                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'normal');
+                    },
+                    function(){
+                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'nowrap');
+                    }
+                );
             });
             {% block javascript %}
             {% endblock javascript %}

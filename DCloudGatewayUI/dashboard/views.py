@@ -72,9 +72,9 @@ def system(request, action=None):
             form = Network(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
         elif action == "admin_pass":
@@ -133,18 +133,18 @@ def account(request, action=None):
             form = Gateway(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
         elif action == "encrypt":
             form = EncryptionKey(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['password'].data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
 
@@ -161,7 +161,7 @@ def sharefolder(request, action):
     smb_data = json.loads(api.get_smb_user_list()).get('data')
     action_error = {}
     smb_data['username'] = smb_data['accounts'][0]
-    # print smb_data
+    print smb_data
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
         nfs_data = nfs_ip_query['data']
@@ -177,18 +177,18 @@ def sharefolder(request, action):
             array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in ip_list]))
         return NFSSetting
 
-    print action
     if request.method == "POST":
         if action == "smb_setting":
             form = SMBSetting(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.set_smb_user_list(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
         elif action == "nfs_setting":
             ip_list = request.POST.getlist('array_of_ip')
             update_return = json.loads(api.set_nfs_access_ip_list(ip_list))
+            print update_return
             if not update_return['result']:
                 action_error[action] = update_return['msg']
                 form = nfs_setting_generator(set(nfs_data['array_of_ip'] + ip_list))
@@ -231,10 +231,76 @@ def sync(request):
         hours, 'weeks_data': weeks_data})
 
 
+fake_syslog = {
+    "msg": "GOGOGO",
+    "data": {
+        "error_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-01",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-04",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-07",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ],
+        "warning_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-02",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-05",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-08",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ],
+        "info_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-03",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-06",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-09",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ]
+    },
+    "result": True
+}
+
+
 @login_required
 def syslog(request):
-    log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
-    return render(request, 'dashboard/syslog.html', {'tab': 'syslog', 'msgs': log_data})
+    return_val = fake_syslog
+    # FIXME: Replace the fake logs
+    # log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    if return_val['result'] == True:
+        log_data = return_val['data']
+
+    return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
+                                                     'log_data': log_data
+                                                     })
 
 
 @login_required
