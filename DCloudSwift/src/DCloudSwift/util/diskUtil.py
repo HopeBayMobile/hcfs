@@ -244,6 +244,44 @@ def mountUmountedSwiftDevices():
 
 	return umountedSwiftDevices	
 
+def cleanMetadata(disk):
+        logger = util.getLogger(name="cleanFingerprint")
+        mountpoint =  "/temp/%s"%disk
+
+	ret = 1
+	if mountDisk(disk, mountpoint) !=0:
+                logger.error("Failed to mount %s"%disk)
+                return ret
+
+	try:
+		ret = os.system("rm -rf %s/fingerprint"%mountpoint)
+		ret += os.system("rm -rf %s/swift"%mountpoint)
+		ret += os.system("rm -rf %s/DCloudSwift"%mountpoint)
+	
+	except Exception as e:
+		logger.error("Failed to clean fingerprint for %s"%str(e))
+		
+	finally:
+		if lazyUmount(mountpoint)!=0:
+			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
+
+		return ret
+
+def cleanMetadataOnDisks():
+	logger = util.getLogger(name="cleanMetadata")
+	logger.info("start")
+
+	disks = getNonRootDisks()
+	returncode=0
+
+	for disk in disks:
+		if cleanMetadata(disk) !=0:
+			returncode += 1
+
+	return returncode
+
+	logger.info("end")
+
 def createLostSwiftDevices(lostDevices):
         logger = util.getLogger(name="createLostSwiftDevices")
 	logger.info("start")
@@ -701,6 +739,7 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
 	
 if __name__ == '__main__':
 	pass
+	print cleanMetadataOnDisks()
 	#print getUmountedDisks()
 	#print getUmountedSwiftDevices(deviceCnt=5, devicePrx="sdb")
 	#util.generateSwiftConfig()

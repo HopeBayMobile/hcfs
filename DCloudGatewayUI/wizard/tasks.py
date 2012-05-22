@@ -45,8 +45,7 @@ def install_task(data):
     if response['result']:
         install_task.update_state(state=states.STARTED, meta=meta)
     else:
-        install_task.update_state(state=states.FAILURE, meta=meta)
-        return meta
+        raise Exception, meta
 
     #Step 3, cloud storage settings
     cloud_storage_url = data['cloud_storage_url']
@@ -61,9 +60,8 @@ def install_task(data):
     if response['result']:
         install_task.update_state(state=states.STARTED, meta=meta)
     else:
-        install_task.update_state(state=states.FAILURE, meta=meta)
-        return meta
-
+        raise Exception, meta
+    
     #Step 4, encryption key
     encryption_key = data['encryption_key']
 
@@ -75,8 +73,7 @@ def install_task(data):
     if response['result']:
         install_task.update_state(state=states.STARTED, meta=meta)
     else:
-        install_task.update_state(state=states.FAILURE, meta=meta)
-        return meta
+        raise Exception, meta
 
     #end of installation
     return meta

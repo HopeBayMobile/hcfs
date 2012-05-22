@@ -72,7 +72,11 @@ class DeltaWizard(SessionWizardView):
 
         if 'reset' in request.GET:
             # reset all the steps for this wizard
-            Step.objects.filter(wizard=work).delete()
+            steps = Step.objects.filter(wizard=work)
+            for step in steps:
+                step.task_id = ''
+                step.save()
+            
             work.current_form = ''
             work.save()
             return redirect('.')
@@ -108,7 +112,7 @@ class DeltaWizard(SessionWizardView):
                     return render_to_response(self.finish_template, {'meta': meta,
                                                               'exit': self.exit_url})
             elif result.state == states.FAILURE:
-                meta = result.info
+                meta = result.info.args[0]
                 return render_to_response(self.failure_template, {'meta': meta})
             else:
                 meta = result.info
@@ -166,6 +170,18 @@ class DeltaWizard(SessionWizardView):
                     return self.render_next_step(form, back=True)
         return self.render(form)
 
+    def get_form(self, step=None, data=None, files=None):
+        form = super(DeltaWizard, self).get_form(step, data, files)
+        #reload the form data
+        try:
+            step = Step.objects.get(form=self.steps.current)
+            initial_data = json.loads(step.data)
+            form.initial = initial_data
+        except ObjectDoesNotExist:
+            pass
+        
+        return form
+
     def process_step(self, form):
         cleaned_data = form.cleaned_data
         step_index = self.get_step_index()
@@ -180,10 +196,15 @@ class DeltaWizard(SessionWizardView):
         if task:
             result = task.delay(cleaned_data)
             #save task_id to model
-            Step.objects.create(wizard=work,
-                                form=work.current_form,
-                                data=json.dumps(cleaned_data),
-                                task_id=result.task_id)
+            try:
+                step = Step.objects.get(wizard=work, form=work.current_form)
+            except ObjectDoesNotExist:
+                step = Step.objects.create(wizard=work,
+                                    form=work.current_form)
+            step.data = json.dumps(cleaned_data)
+            step.task_id = result.task_id
+            step.save()
+            
         data = self.get_form_step_data(form)
         return data
 
