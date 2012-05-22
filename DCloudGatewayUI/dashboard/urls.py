@@ -9,6 +9,6 @@ urlpatterns = patterns("dashboard.views",
     url(r'^syslog/$', "syslog", name="syslog"),
     url(r'^power/$', "power", name="power"),
     url(r'^indicator/$', "indicator", name="indicator"),
-    url(r'^gateway_status/$', "gateway_status", name="gateway_status"),
+    url(r'^gateway_cache_usage/$', "gateway_cache_usage", name="gateway_cache_usage"),
     url(r'^get_syslog/(?P<category>\w+)/(?P<level>[0,1,2]{1})$', "get_syslog", name="get_syslog"),
 )

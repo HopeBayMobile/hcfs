@@ -109,13 +109,13 @@
                     <div id="24div" class="sync_24div_none"></div>
                 {% else  %}
                     {% if i in value.range  %}
-                        <div id="24div" class="sync_24div_block"></div>
-                    {% else %}
                         {% if forloop.last %}
                             <div id="24div" class="sync_24div_last"></div>
                         {% else %}
                             <div id="24div" class="sync_24div"></div>
                         {% endif %}
+                    {% else %}
+                        <div id="24div" class="sync_24div_block"></div>
                     {% endif %}
                 {% endif %}
             {% endfor %}
@@ -138,17 +138,29 @@
                 <input type="hidden" name="day" value="{{ key }}">
                 <div class="">
                     <p class="sync_font_size">
-                    <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1" checked="">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1"
+                    {% if value.option == 1 %}
+                        checked
+                    {% endif %}
+                    >
                     No limit
                     </p>
                     <hr/>
                     <p class="sync_font_size">
-                    <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2" checked="">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2"
+                    {% if value.option == 2 %}
+                        checked
+                    {% endif %}
+                    >
                     All Day
                     </p>
                     <hr/>
                     <p class="sync_font_size">
-                    <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3" checked="">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3"
+                    {% if value.option == 3 %}
+                        checked
+                    {% endif %}
+                    >
                     Interval <select id="select01" name="interval_from" class="span1">
                         {% for i in hours %}
                         <option>{{ i }}</option>
@@ -163,8 +175,7 @@
                     </p>
                     <hr/>
                     <p class="sync_font_size">
-                    Bandwidth <input type="text" class="span1" id="input01" name="bandwidth_download"> /
-                    <input type="text" name="bandwidth_upload" class="span1" id="input01">
+                    Bandwidth <input type="text" class="span1" id="input01" name="bandwidth" value="{{ value.bandwidth }}"> KB
                     </p>
                 </div>
             </div>
