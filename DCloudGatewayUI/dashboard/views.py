@@ -227,16 +227,15 @@ def sync(request):
 
         api.apply_scheduling_rules(data)
 
-
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data[1] = { 'name': 'Mon.', 'range': "all" }
-    weeks_data[2] = { 'name': 'Thu.', 'range': "all" }
-    weeks_data[3] = { 'name': 'Wed.', 'range': "all" }
-    weeks_data[4] = { 'name': 'Thu.', 'range': "all" }
-    weeks_data[5] = { 'name': 'Fri.', 'range': "all" }
-    weeks_data[6] = { 'name': 'Sat.', 'range': "all" }
-    weeks_data[7] = { 'name': 'Sun.', 'range': "all" }
+    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0'}
 
     for value in data:
         day = int(value[0])
@@ -251,6 +250,7 @@ def sync(request):
         else:
             weeks_data[day]['range'] = range(rstart, rend)
 
+        weeks_data[day]['bandwidth'] = upload_limit
 
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
