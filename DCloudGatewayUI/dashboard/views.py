@@ -202,30 +202,58 @@ def sharefolder(request, action):
 
 @login_required
 def sync(request):
+    load_data = json.loads(api.get_scheduling_rules())
+    data = load_data['data']
+
     if request.method == "POST":
         query = request.POST
         day = query['day']
-        print day
         bandwidth_option = query['bandwidth_option']
         interval_to = query['interval_to']
         interval_from = query['interval_from']
-        bandwidth_download = query['bandwidth_download']
-        bandwidth_upload = query['bandwidth_upload']
+        bandwidth = query['bandwidth']
 
+        for value in data:
+            if value[0] == day:
+                now = int(value[0]) - 1
+                array = []
+                if bandwidth_option == "1":
+                    array = [day, 0, 24, -1]
+                elif bandwidth_option == "2":
+                    array = [day, 0, 24, 0]
+                else:
+                    array = [day, interval_from, interval_to, bandwidth]
+                data[now] = array
 
-    load_data = json.loads(api.get_scheduling_rules())
-    print load_data
+        api.apply_scheduling_rules(data)
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data['1'] = { 'name': 'Mon.', 'range': "all" }
-    weeks_data['2'] = { 'name': 'Thu.', 'range': "all" }
-    weeks_data['3'] = { 'name': 'Wed.', 'range': "all" }
-    weeks_data['4'] = { 'name': 'Thu.', 'range': "all" }
-    weeks_data['5'] = { 'name': 'Fri.', 'range': "all" }
-    weeks_data['6'] = { 'name': 'Sat.', 'range': "none" }
-    weeks_data['7'] = { 'name': 'Sun.', 'range': range(6, 18) }
+    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0', 'option': 1}
 
+    for value in data:
+        day = int(value[0])
+        rstart = int(value[1])
+        rend = int(value[2])
+        upload_limit = int(value[3])
+
+        if upload_limit == 0 and rstart == 0 and rend == 24:
+            weeks_data[day]['range'] = "all"
+            weeks_data[day]['option'] = 2
+        elif upload_limit < 0:
+            weeks_data[day]['range'] = "none"
+            weeks_data[day]['option'] = 1
+        else:
+            weeks_data[day]['range'] = range(rstart, rend)
+            weeks_data[day]['option'] = 3
+
+        weeks_data[day]['bandwidth'] = upload_limit
 
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
