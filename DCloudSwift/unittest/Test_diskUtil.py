@@ -337,7 +337,7 @@ class Test_mountDisk:
 
 	def teardown(self):
 		print "End of unit test for function mountDisk() in diskUtil.py\n"
-		time.sleep(1)
+		time.sleep(2)
 		cmd1 = "umount %s" % self.__loopDevice
 		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.readlines()
@@ -391,13 +391,13 @@ class Test_lazyUmount:
 		os.system(cmd4)
 		nose.tools.ok_(os.path.ismount(self.__mountDir), "Failed to mount the disk image %s!" % self.__mountDir)
 
-		time.sleep(1)
+		time.sleep(2)
 		returncode = diskUtil.lazyUmount(self.__mountDir)
 		nose.tools.ok_(returncode == 0, "Function lazyUmount() failed to unmount the disk image %s!" % self.__diskImage)
 
 	def teardown(self):
 		print "End of unit test for function lazyUmount() in diskUtil.py\n"
-		time.sleep(1)
+		time.sleep(2)
 		cmd1 = "umount %s" % self.__mountDir
 		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.readlines()
