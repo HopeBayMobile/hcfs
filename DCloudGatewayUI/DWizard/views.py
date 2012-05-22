@@ -108,7 +108,7 @@ class DeltaWizard(SessionWizardView):
                     return render_to_response(self.finish_template, {'meta': meta,
                                                               'exit': self.exit_url})
             elif result.state == states.FAILURE:
-                meta = result.info
+                meta = result.info.args[0]
                 return render_to_response(self.failure_template, {'meta': meta})
             else:
                 meta = result.info
