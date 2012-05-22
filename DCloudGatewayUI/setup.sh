@@ -68,6 +68,8 @@ cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
 
 /etc/init.d/celeryd start
 
+sleep 5
+
 chmod 777 -R /var/www/$BASENAME/GatewayUI/
 chmod 777 -R /var/log/delta/
 
