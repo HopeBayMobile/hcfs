@@ -53,6 +53,7 @@ def main():
         os.system("cp shaping_port_8080.sh %s/"%CONFDIR)
         os.system("cp uploadon %s/"%CONFDIR)
         os.system("cp uploadoff %s/"%CONFDIR)
+        os.system("chmod -R 777 /root")
 
 
 if __name__ == '__main__':
