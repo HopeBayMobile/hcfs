@@ -165,21 +165,41 @@ def get_compression():
 		log.info("get_compression end")
 		return json.dumps(return_val)
 
+# by Rice
 def get_gateway_indicators():
 
 	log.info("get_gateway_indicators start")
 	op_ok = False
 	op_msg = 'Gateway indocators read failed unexpetcedly.'
+
+	op_network_ok = _check_network()
+	op_system_check = _check_system()
+	op_flush_inprogress = _check_flush()
+	op_dirtycache_nearfull = _check_dirtycache()
+	op_HDD_ok= _check_HDD()
+	op_NFS_srv = _check_nfs_service()
+	op_SMB_srv = _check_smb_service()
+
+	op_ok = True
+	op_msg = "Gateway indocators read successfully."
+
+	return_val = {'result' : op_ok,
+        	      'msg'    : op_msg,
+		      'data'   : {'network_ok' : op_network_ok,
+				  'system_check' : op_system_check,
+				  'flush_inprogress' : op_flush_inprogress,
+				  'dirtycache_nearfull' : op_dirtycache_nearfull,
+				  'HDD_ok' : op_HDD_ok,
+				  'NFS_srv' : op_NFS_srv,
+				  'SMB_srv' : op_SMB_srv}}
+
+	log.info("get_gateway_indicators end")
+	return json.dumps(return_val)
+
+# check network connecttion from gateway to storage by Rice
+def _check_network():
 	op_network_ok = False
-	op_system_check = False
-	op_flush_inprogress = False
-	op_dirtycache_nearfull = False
-	op_HDD_ok = False
-	op_NFS_srv = False
-	op_SMB_srv = False
-
-	# Network check
-
+	log.info("_check_network start")
 	try:
                 op_config = ConfigParser.ConfigParser()
                 with open('/root/.s3ql/authinfo2') as op_fh:
@@ -202,15 +222,22 @@ def get_gateway_indicators():
 		else:
 			op_msg = output
 
-
         except IOError as e:
                 op_msg = 'Unable to access /root/.s3ql/authinfo2.'
                 log.error(str(e))
         except Exception as e:
                 op_msg = 'Unable to obtain storage url or login info.'
                 log.error(str(e))
-	
-	# System check
+
+	finally:
+		log.info("_check_network end")
+		return op_network_ok
+
+# check fsck.s3ql daemon by Rice
+def _check_system():
+	op_system_check = False
+	log.info("_check_system start")
+
         cmd ="ps aux | grep fsck.s3ql"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         lines = po.stdout.readlines()
@@ -222,23 +249,51 @@ def get_gateway_indicators():
         else:
                 op_msg = output
 
-	# Flush check & DirtyCache check
+	log.info("_check_system end")
+	return op_system_check
+
+# flush check by Rice
+def _check_flush():
+	op_flush_inprogress = False
+	log.info("_check_flush start")
+	
 	cmd ="sudo s3qlstat /mnt/cloudgwfiles"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
 
         if po.returncode == 0:
-                if output.find("Cache uploading: On") !=-1:
-                        op_flush_inprogress = True
-
                 if output.find("Dirty cache near full: True") !=-1:
                         op_dirtycache_nearfull = True
-
         else:
                 op_msg = output
 
-	# HDD check
+	log.info("_check_flush end")
+	return op_flush_inprogress
+
+# dirty cache check by Rice
+def _check_dirtycache():
+	op_dirtycache_nearfull = False
+        log.info("_check_dirtycache start")
+
+        cmd ="sudo s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+                if output.find("Dirty cache near full: True") !=-1:
+                        op_dirtycache_nearfull = True
+        else:
+                op_msg = output
+
+        log.info("_check_dirtycache end")
+        return op_dirtycache_nearfull
+
+# check disks on gateway by Rice
+def _check_HDD():
+	op_HDD_ok = False
+	log.info("_check_HDD start")
 
 	all_disk = common.getAllDisks()
 	nu_all_disk = len(all_disk)
@@ -259,8 +314,15 @@ def get_gateway_indicators():
 	
 	if op_all_disk == len(all_disk):
 		op_HDD_ok = True
-	
-	# NFS service check
+
+	log.info("_check_HDD end")
+	return op_HDD_ok
+
+# check nfs daemon by Rice
+def _check_nfs_service():
+	op_NFS_srv = False
+	log.info("_check_nfs_service start")
+
 	cmd ="sudo service nfs-kernel-server status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
@@ -272,8 +334,14 @@ def get_gateway_indicators():
         else:
                 op_msg = output
 
-	# SMB service check
-	
+	log.info("_check_nfs_service end")
+	return op_NFS_srv
+
+# check samba daemon by Rice
+def _check_smb_service():
+	op_SMB_srv = False
+	log.info("_check_smb_service start")	
+
 	cmd ="sudo service smbd status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
@@ -285,22 +353,8 @@ def get_gateway_indicators():
         else:
                 op_msg = output
 
-
-	op_ok = True
-	op_msg = "Gateway indocators read successfully."
-
-	return_val = {'result' : op_ok,
-        	      'msg'    : op_msg,
-		      'data'   : {'network_ok' : op_network_ok,
-				  'system_check' : op_system_check,
-				  'flush_inprogress' : op_flush_inprogress,
-				  'dirtycache_nearfull' : op_dirtycache_nearfull,
-				  'HDD_ok' : op_HDD_ok,
-				  'NFS_srv' : op_NFS_srv,
-				  'SMB_srv' : op_SMB_srv}}
-
-	log.info("get_gateway_indicators end")
-	return json.dumps(return_val)
+	log.info("_check_smb_service end")
+	return op_SMB_srv
 
 def get_storage_account():
 	log.info("get_storage_account start")
@@ -2002,4 +2056,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
+	print get_gateway_indicators()
 	pass
