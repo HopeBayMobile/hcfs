@@ -229,13 +229,13 @@ def sync(request):
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0'}
-    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0'}
+    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0', 'option': 1}
 
     for value in data:
         day = int(value[0])
@@ -245,10 +245,13 @@ def sync(request):
 
         if upload_limit == 0 and rstart == 0 and rend == 24:
             weeks_data[day]['range'] = "all"
+            weeks_data[day]['option'] = 2
         elif upload_limit < 0:
             weeks_data[day]['range'] = "none"
+            weeks_data[day]['option'] = 1
         else:
             weeks_data[day]['range'] = range(rstart, rend)
+            weeks_data[day]['option'] = 3
 
         weeks_data[day]['bandwidth'] = upload_limit
 
