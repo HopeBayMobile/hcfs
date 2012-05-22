@@ -251,12 +251,11 @@ def get_gateway_indicators():
 		output = po.stdout.read()
 	        po.wait()
 
-
-       		if po.returncode == 0:
-			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-				op_all_disk += 1 
+#      		if po.returncode == 0:
+		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+			op_all_disk += 1 
 		else:
-			op_msg = output
+			op_msg = "%s test result: NOT PASSED"%i
 	
 	if op_all_disk == len(all_disk):
 		op_HDD_ok = True
