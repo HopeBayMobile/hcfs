@@ -196,10 +196,15 @@ class DeltaWizard(SessionWizardView):
         if task:
             result = task.delay(cleaned_data)
             #save task_id to model
-            Step.objects.create(wizard=work,
-                                form=work.current_form,
-                                data=json.dumps(cleaned_data),
-                                task_id=result.task_id)
+            try:
+                step = Step.objects.get(wizard=work, form=work.current_form)
+            except ObjectDoesNotExist:
+                step = Step.objects.create(wizard=work,
+                                    form=work.current_form)
+            step.data = json.dumps(cleaned_data)
+            step.task_id = result.task_id
+            step.save()
+            
         data = self.get_form_step_data(form)
         return data
 
