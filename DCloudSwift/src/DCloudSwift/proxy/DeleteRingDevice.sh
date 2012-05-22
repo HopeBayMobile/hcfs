@@ -1,16 +1,13 @@
 #!/bin/bash
-# The shell script is used to remove a device from the ring. (OS: Ubuntu 11.04)
-# History:
-# 2012/03/15 first release by Ken
 
-if [ $# != 2 ]; then
+if [ $# != 3 ]; then
         echo "Please enter the correct parameters!"
         echo "For example:"
-        echo "./RmRingDevice.sh StorageIP DeviceName"
+        echo "sh DeleteRingDevice.sh StorageIP DeviceName SwiftDir"
         exit 1
 fi
 
-cd /etc/swift
+cd $3
 
 StorageIP=$1
 DeviceName=$2

@@ -24,16 +24,17 @@ from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
 
+class CleanNodeError(Exception):
+	pass
+
 class DeployProxyError(Exception):
 	pass
 
 class DeployStorageError(Exception):
 	pass
 
-
 class UpdateMetadataError(Exception):
 	pass
-
 
 class SpreadRingFilesError(Exception):
 	pass
@@ -44,25 +45,10 @@ class SwiftDeploy:
 		self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 		self.__kwparams = self.__SC.getKwparams()
 
-		self.__deployProgress = {
-			'proxyProgress': 0,
-			'storageProgress': 0,
-			'finished': False,
-			'code': 0,
-			'deployedProxy': 0,
-			'deployedStorage': 0,
-			'blackList': [],
-			'message': []
-		}
+		self.__setDeployProgress()
+		self.__setSpreadProgress() 
+		self.__setCleanProgress()
 
-		self.__spreadProgress = {
-			'progress': 0,
-			'updatedNodes':0,
-			'finished': False,
-			'code': 0,
-			'blackList': [],
-			'message': []
-		}
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
 		self.__jsonStr = json.dumps(self.__kwparams)
@@ -76,9 +62,62 @@ class SwiftDeploy:
 	def getSpreadProgress(self):
 		return self.__spreadProgress
 
-	def __updateProgress(self, success=False, ip="", swiftType="proxy", msg=""):
+	def getCleanProgress(self):
+		return self.__cleanProgress
+
+	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
 		try:
+			self.__deployProgress = {
+				'proxyProgress': proxyProgress,
+				'storageProgress': storageProgress,
+				'finished': finished,
+				'code': code,
+				'deployedProxy': deployedProxy,
+				'deployedStorage': deployedStorage,
+				'blackList': blackList,
+				'message': message
+			}
+
+		finally:
+			lock.release()
+
+	def __setSpreadProgress(self, progress=0, doneTasks=0, finished=False, code=0, blackList=[], message=[]):
+		lock.acquire()
+		try:
+
+			self.__spreadProgress = {
+				'progress': progress,
+				'doneTasks': doneTasks,
+				'finished': finished,
+				'code': code,
+				'blackList': blackList,
+				'message': message
+			}
+
+		finally:
+			lock.release()
+
+	def __setCleanProgress(self, progress=0, doneTasks=0, finished=False, code=0, blackList=[], message=[]):
+		lock.acquire()
+		try:
+
+			self.__cleanProgress = {
+				'progress': progress,
+				'doneTasks': doneTasks,
+				'finished': finished,
+				'code': code,
+				'blackList': blackList,
+				'message': message
+			}
+
+		finally:
+			lock.release()
+
+	def __updateDeployProgress(self, success=False, ip="", swiftType="proxy", msg=""):
+		lock.acquire()
+		try:
+			
 			if swiftType == "proxy":
 				self.__deployProgress['deployedProxy'] += 1
 				self.__deployProgress['proxyProgress'] = (float(self.__deployProgress['deployedProxy'])/len(self.__proxyList)) * 100.0
@@ -97,18 +136,38 @@ class SwiftDeploy:
 	def __updateSpreadProgress(self, success=False, ip="", msg=""):
 		lock.acquire()
 		try:
-			numOfTasks = len(self.__nodes2Update)
+			numOfTasks = len(self.__nodes2Process)
 
-			self.__spreadProgress['updatedNodes'] += 1
-			self.__spreadProgress['progress'] = (float(self.__spreadProgress['updatedNodes'])/numOfTasks) * 100.0
+			self.__spreadProgress['doneTasks'] += 1
+			self.__spreadProgress['progress'] = (float(self.__spreadProgress['doneTasks'])/numOfTasks) * 100.0
+			
 
 			if success == False:
 				self.__spreadProgress['blackList'].append(ip)
 				self.__spreadProgress['message'].append(msg)
 				self.__spreadProgress['code'] += 1
 
-			if self.__spreadProgress['updatedNodes'] == numOfTasks:
+			if self.__spreadProgress['doneTasks'] == numOfTasks:
 				self.__spreadProgress['finished'] = True
+		finally:
+			lock.release()
+
+	def __updateCleanProgress(self, success=False, ip="", msg=""):
+		lock.acquire()
+		try:
+			numOfTasks = len(self.__nodes2Process)
+
+			self.__cleanProgress['doneTasks'] += 1
+			self.__cleanProgress['progress'] = (float(self.__cleanProgress['doneTasks'])/numOfTasks) * 100.0
+			
+
+			if success == False:
+				self.__cleanProgress['blackList'].append(ip)
+				self.__cleanProgress['message'].append(msg)
+				self.__cleanProgress['code'] += 1
+
+			if self.__cleanProgress['doneTasks'] == numOfTasks:
+				self.__cleanProgress['finished'] = True
 		finally:
 			lock.release()
 
@@ -179,6 +238,44 @@ class SwiftDeploy:
 		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
 		os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
 
+	def __updateMetadata2DeleteNodes(self, proxyList, storageList):
+		logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
+		numOfReplica = self.__kwparams['numOfReplica']
+		deviceCnt = self.__kwparams['deviceCnt']
+		devicePrx = self.__kwparams['devicePrx']
+
+		swiftDir = "%s/swift"%self.__deltaDir
+		
+		oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+		oriProxyList = []
+		with open("%s/proxyList"%swiftDir, "rb") as fh:
+			oriProxyList=pickle.load(fh)
+
+		for node in proxyList:
+			if not node["ip"] in oriSwiftNodeIpSet:
+				raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
+				
+			
+
+		completeProxyList =[node for node in oriProxyList if node not in proxyList]
+
+		for node in storageList:
+			if not node["ip"] in oriSwiftNodeIpSet:
+				raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
+			
+		with open("%s/proxyList"%swiftDir, "wb") as fh:
+			pickle.dump(completeProxyList, fh)
+
+		for node in storageList: 
+			for j in range(deviceCnt):
+				deviceName = devicePrx + str(j+1)
+				cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s"% (BASEDIR, node["ip"], deviceName, swiftDir)
+				logger.info(cmd)
+				os.system(cmd)
+
+		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
+		os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+
 	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
 		try:
@@ -218,18 +315,18 @@ class SwiftDeploy:
 				raise DeployProxyError(errMsg)
 
 			logger.info("Succeeded to deploy proxy %s" % proxyIP)
-			self.__updateProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
+			self.__updateDeployProgress(success=True, ip=proxyIP, swiftType="proxy", msg="")
 
 		except DeployProxyError as err:
 			logger.error(str(err))
-			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
+			self.__updateDeployProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
 		except util.TimeoutError as err:
 			logger.error("%s" % str(err))
-			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
+			self.__updateDeployProgress(success=False, ip=proxyIP, swiftType="proxy", msg=str(err))
 		except Exception as err:
 			msg = "Failed to deploy %s for %s"%(proxyIP,str(err))
 			logger.error(msg)
-			self.__updateProgress(success=False, ip=proxyIP, swiftType="proxy", msg=msg)
+			self.__updateDeployProgress(success=False, ip=proxyIP, swiftType="proxy", msg=msg)
 
 	def __proxyDeploy(self):
 		logger = util.getLogger(name="proxyDeploy")
@@ -282,19 +379,19 @@ class SwiftDeploy:
 				raise DeployStorageError(errMsg)
 
 			logger.info("Succeeded to deploy storage %s" % storageIP)
-			self.__updateProgress(success=True, ip=storageIP, swiftType="storage", msg="")
+			self.__updateDeployProgress(success=True, ip=storageIP, swiftType="storage", msg="")
 
 		except DeployStorageError as err:
 			logger.error(str(err))
-			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=str(err))
+			self.__updateDeployProgress(success=False, ip=storageIP, swiftType="storage", msg=str(err))
 
 		except util.TimeoutError as err:
 			logger.error("%s" % err)
-			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=err)
+			self.__updateDeployProgress(success=False, ip=storageIP, swiftType="storage", msg=err)
 		except Exception as err:
 			msg = "Failed to deploy %s for %s"%(storageIP,str(err))
 			logger.error(msg)
-			self.__updateProgress(success=False, ip=storageIP, swiftType="storage", msg=msg)
+			self.__updateDeployProgress(success=False, ip=storageIP, swiftType="storage", msg=msg)
 
 	def __storageDeploy(self):
 		logger = util.getLogger(name="storageDeploy")
@@ -313,6 +410,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 
 		self.__createMetadata(proxyList, storageList)
+		self.__setDeployProgress()
 		self.__proxyList = proxyList
 		self.__storageList = storageList
 		self.__proxyDeploy()
@@ -369,11 +467,42 @@ class SwiftDeploy:
 			logger.error(msg)
 			self.__updateSpreadProgress(success=False, ip=nodeIP, msg=msg)
 
+	def __cleanNodesSubtask(self, nodeIp):
+		'''
+		Stop swift services and clear related metadata from memory and disks.
+		'''
+		logger = util.getLogger(name="cleanNodeSubtask: %s" % nodeIp)
+		try:
+
+			cmd = "ssh root@%s python /DCloudSwift/CmdReceiver.py -c %s"%(nodeIp, util.jsonStr2SshpassArg("{}"))
+			(status, stdout, stderr)  = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+			if status != 0:
+				errMsg = "Failed to clean %s for %s" % (nodeIp, stderr)
+				raise CleanNodeError(errMsg)
+
+			logger.info("Succeeded to clean node %s" % nodeIp)
+			self.__updateCleanProgress(success=True, ip=nodeIp, msg="")
+
+		except CleanNodeError as err:
+			logger.error(str(err))
+			self.__updateCleanProgress(success=False, ip=nodeIp, msg=str(err))
+
+		except util.TimeoutError as err:
+			logger.error("%s" % err)
+			self.__updateCleanProgress(success=False, ip=nodeIp, msg=err)
+
+		except Exception as err:
+			msg = "Failed to clean %s for %s"%(nodeIp, str(err))
+			logger.error(msg)
+			self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
+
 	def spreadRingFiles(self):
 		swiftDir = "%s/swift"%self.__deltaDir
 		swiftNodeIpList = util.getSwiftNodeIpList(swiftDir)
 
-		self.__nodes2Update = swiftNodeIpList
+		self.__nodes2Process = swiftNodeIpList
+
+		self.__setSpreadProgress()
 
 		argumentList = []
                 for i in swiftNodeIpList:
@@ -388,15 +517,62 @@ class SwiftDeploy:
 
 	def addNodes(self, proxyList=[], storageList=[]):
 		logger = util.getLogger(name="addStorage")
-		self.__updateMetadata2AddNodes(proxyList=proxyList, storageList=storageList)
-		self.__proxyList = proxyList
-		self.__storageList = storageList
-		self.__proxyDeploy()
-		self.__storageDeploy()
-		self.spreadRingFiles()
+		try:
+			self.__updateMetadata2AddNodes(proxyList=proxyList, storageList=storageList)
+			self.__setDeployProgress()
+			self.__proxyList = proxyList
+			self.__storageList = storageList
+			self.__proxyDeploy()
+			self.__storageDeploy()
+		except Exception as e:
+			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
+			return
+
+		try:
+			self.spreadRingFiles()
+		except Exception as e:
+			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
+			
 		
-	def rmNodes(self):
-		logger = util.getLogger(name="rmStorage")
+	def cleanNodes(self, ipList):
+		logger = util.getLogger(name="cleanNodes")
+
+		self.__setCleanProgress()
+		self.__nodes2Process = ipList
+		argumentList = []
+                for i in ipList:
+                        argumentList.append(([i], None))
+
+                pool = threadpool.ThreadPool(20)
+                requests = threadpool.makeRequests(self.__cleanNodesSubtask, argumentList)
+                for req in requests:
+                        pool.putRequest(req)
+                pool.wait()
+                pool.dismissWorkers(20)
+                pool.joinAllDismissedWorkers()
+
+	def deleteNodes(self, proxyList=[], storageList=[]):
+		logger = util.getLogger(name="deleteStorage")
+
+		try:
+			self.__updateMetadata2DeleteNodes(proxyList=proxyList, storageList=storageList)
+			self.__setSpreadProgress()
+			self.spreadRingFiles()
+		except Exception as e:
+			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
+			return
+
+		try:
+			
+			deletedProxyIpSet = set([node["ip"] for node in proxyList])
+			deletedStorageIpSet = set([node["ip"] for node in storageList])
+			deletedNodeIpList = list(deletedProxyIpSet | deletedStorageIpSet)
+			self.cleanNodes(deletedNodeIpList)
+
+		except Exception as e:
+			self.__setCleanProgress(finished=True, code=1, message=[str(e)])
+
+		
 
 
 def parseNodeFiles(proxyFile, storageFile):
@@ -455,7 +631,7 @@ def parseNodeFiles(proxyFile, storageFile):
 
 def addNodes():
 	'''
-	Command line implementation of swift deployment
+	Command line implementation of adding swift nodes
 	'''
 	ret = 1
 
@@ -484,8 +660,47 @@ def addNodes():
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
-
 		print "Finished to spread ring files"
+		return 0
+	except Exception as e:
+		print >>sys.stderr, str(e)
+	finally:
+		return ret
+
+def deleteNodes():
+	'''
+	Command line implementation of deleting swift nodes
+	'''
+	ret = 1
+
+	proxyFile = "/etc/delta/deleteProxyNodes"
+	storageFile = "/etc/delta/deleteStorageNodes"
+	try:
+						
+		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+		print proxyList, storageList
+
+		SD = SwiftDeploy()
+		t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
+		t.start()
+
+		print "Start to spread ring files"
+		spreadProgress = SD.getSpreadProgress()
+		print spreadProgress
+		while spreadProgress['finished'] != True:
+			time.sleep(8)
+			print  spreadProgress
+			spreadProgress = SD.getSpreadProgress()
+
+
+		print "Start to clean nodes"
+		cleanProgress = SD.getCleanProgress()
+		print cleanProgress
+		while cleanProgress['finished'] != True:
+			time.sleep(8)
+			cleanProgress = SD.getCleanProgress()
+			print cleanProgress
+
 		return 0
 	except Exception as e:
 		print >>sys.stderr, str(e)
@@ -522,17 +737,18 @@ def deploy():
 		return ret
 
 if __name__ == '__main__':
-	#SD = SwiftDeploy()
+	SD = SwiftDeploy()
+	#t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
 	#t = Thread(target=SD.spreadRingFiles, args=())
 	#t.start()
-	#progress = SD.getSpreadProgress()
+	#progress = SD.getCleanProgress()
 	#while progress['finished'] != True:
 	#	time.sleep(10)
 	#	print progress
-	#	progress = SD.getSpreadProgress()
+	#	progress = SD.getCleanProgress()
 
+	
 	#spreadProgress = SD.getSpreadProgress()
-	pass
 	#util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
 	#util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
 	#SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
