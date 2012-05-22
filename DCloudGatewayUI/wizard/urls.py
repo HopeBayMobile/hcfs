@@ -34,7 +34,7 @@ class InstallWizard(DeltaWizard):
                      
             'ip_address': '172.16.229.154',
             'subnet_mask': '255.255.255.0',
-            'default_gateway': '172.16.229.252',
+            'default_gateway': '172.16.229.1',
             'preferred_dns': '8.8.8.8',
             'alternate_dns': '8.8.4.4',
 
