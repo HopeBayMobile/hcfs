@@ -8,9 +8,35 @@ from gateway import api
 import json
 
 
+def gateway_status():
+    """
+    This function retrive all gateway status from api and return a mock data
+    if the query is failed.
+    """
+    try:
+        data = json.loads(api.get_gateway_status())
+        print data
+    except Exception as inst:
+        print inst
+        data = {}
+    data['cache_usage'] = {"max_cache_size": 1000,
+                           "max_cache_entries": 100,
+                           "used_cache_size": 500,
+                           "used_cache_entries": 50,
+                           "dirty_cache_size": 100,
+                           "dirty_cache_entries": 10}
+    return data
+
+
 @login_required
 def index(request):
-    return render(request, 'dashboard/dashboard.html')
+    data = gateway_status()
+    cache_usage = data['cache_usage']
+    maxcache = cache_usage["max_cache_size"]
+    context = {"cache_usage": cache_usage,
+               "dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
+               "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
+    return render(request, 'dashboard/dashboard.html', context)
 
 
 def system(request, action=None):
@@ -233,15 +259,6 @@ def get_syslog(request, category, level):
 
 
 @login_required
-def gateway_status(request):
-    try:
-        data = json.loads(api.get_gateway_status())
-    except:
-        data = {}
-    data['cache_usage'] = {"max_cache_size": 1000,
-                           "max_cache_entries": 100,
-                           "used_cache_size": 500,
-                           "used_cache_entries": 50,
-                           "dirty_cache_size": 100,
-                           "dirty_cache_entries": 10}
+def gateway_cache_usage(request):
+    data = gateway_status()
     return HttpResponse(json.dumps(data['cache_usage']))
