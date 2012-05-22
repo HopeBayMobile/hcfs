@@ -509,7 +509,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "python /usr/local/bin/mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -531,7 +531,7 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
-			cmd = "umount.s3ql %s"%(mountpoint)
+			cmd = "python /usr/local/bin/umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()
 			po.wait()
@@ -567,7 +567,7 @@ def _mount(storage_url):
 			raise BuildGWError("Failed to create s3ql conf")
 
 		#mount s3ql
-		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		cmd = "python /usr/local/bin/mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
