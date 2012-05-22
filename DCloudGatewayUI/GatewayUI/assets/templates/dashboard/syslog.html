@@ -1,40 +1,50 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
     <div id="syslog">
-        {% for msg in msgs %}
-
-        {% empty %}
-        <div class="msg-block">
-            <span>a</span>
-            <span>b</span>
-            <span>c</span>
-            <span>d</span>
+        <div class="msg-type">
+            <span class="all"></span>
+            <span class="warn"></span>
+            <span class="error"></span>
+            <span class="opera"></span>
         </div>
-        <div class="msg-block">
-            <div class="msg-icon">&nbsp;</div>
-            <div class="msg-title">This is a fake message.</div>
-            <div class="msg-time">2012-05-20</div>
-            <div class="msg-detail">▽</div>
-            <div class="msg-content">
-            	rkeopwkroewpkroewprkepwo<br>
-            	werlwerlewkrl;ewl;rkew<br>
-            	kgkotjiojiojnoiik<br>
-            </div>
-        </div>
-        <div class="msg-block">
-            <div class="msg-icon">&nbsp;</div>
-            <div class="msg-title">This is a fake message.</div>
-            <div class="msg-time">2012-05-20</div>
-            <div class="msg-detail">▽</div>
-        </div>
-        <div class="msg-pagination">
-            <span>1</span>
-            <span>2</span>
-            <span>3</span>
-            <span>4</span>
-            <span>5</span>
-            <span>6</span>
-        </div>
+        {% for msg in log_data.error_log %}
+            <ul class="msg-block">
+                <li class="msg-content error">{{ msg.msg }}
+                    <div class="msg-time">{{ msg.timestamp }}</div>
+                    <div class="msg-detail"></div>
+                </li>
+            </ul>
+        {% endfor %}
+        {% for msg in log_data.warning_log %}
+            <ul class="msg-block">
+                <li class="msg-content warn">{{ msg.msg }}
+                    <div class="msg-time">{{ msg.timestamp }}</div>
+                    <div class="msg-detail"></div>
+                </li>
+            </ul>
+        {% endfor %}
+        {% for msg in log_data.info_log %}
+            <ul class="msg-block">
+                <li class="msg-content opera">{{ msg.msg }}
+                    <div class="msg-time">{{ msg.timestamp }}</div>
+                    <div class="msg-detail"></div>
+                </li>
+            </ul>
         {% endfor %}
     </div>
+    <script>
+        $(function(){
+            $(".msg-type").on("click", "span", function(){
+                console.log(this)
+                debugger
+                if ($(this).attr("class") != 'all'){
+                    $(".msg-block").has($('li.'+ $(this).attr("class")))
+                                   .show()
+                    $('.msg-block').not($(".msg-block").has($('li.'+ $(this).attr("class")))).hide()
+                } else {
+                    $('.msg-block').show()
+                }
+            })
+        })
+    </script>
 {% endblock tab_content %}

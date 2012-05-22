@@ -15,6 +15,11 @@ from models import Work, Step
 
 class DeltaWizard(SessionWizardView):
     template_name = 'bootstrap_form.html'
+    doing_template = 'doing.html'
+    done_template = 'done.html'
+    failure_template = 'failure.html'
+    finish_template = 'finish.html'
+
     wizard_step = []
     wizard_initial = {}
     exit_url = '/'
@@ -62,11 +67,16 @@ class DeltaWizard(SessionWizardView):
 
     def get(self, request, *args, **kwargs):
         #set current step from model
-        work = Work.objects.get(work_name=self.__class__.__name__)
+        work, created = Work.objects.get_or_create(work_name=self.__class__.__name__)
+        #work = Work.objects.get(work_name=self.__class__.__name__)
 
         if 'reset' in request.GET:
             # reset all the steps for this wizard
-            Step.objects.filter(wizard=work).delete()
+            steps = Step.objects.filter(wizard=work)
+            for step in steps:
+                step.task_id = ''
+                step.save()
+            
             work.current_form = ''
             work.save()
             return redirect('.')
@@ -93,20 +103,20 @@ class DeltaWizard(SessionWizardView):
             if result.state == states.SUCCESS:
                 if self.steps.next:
                     if 'next' in request.GET:
-                        return render_to_response('done.html')
+                        return render_to_response(self.done_template)
                     else:
                         self.storage.current_step = self.steps.next
                         return self.render(self.get_form())
                 else:
                     meta = result.info
-                    return render_to_response('finish.html', {'meta': meta,
+                    return render_to_response(self.finish_template, {'meta': meta,
                                                               'exit': self.exit_url})
             elif result.state == states.FAILURE:
-                meta = result.info
-                return render_to_response('failure.html', {'meta': meta})
+                meta = result.info.args[0]
+                return render_to_response(self.failure_template, {'meta': meta})
             else:
                 meta = result.info
-                return render_to_response('doing.html', {'meta': meta})
+                return render_to_response(self.doing_template, {'meta': meta})
         else:
             self.storage.current_step = self.steps.next
             return self.render(self.get_form(), back=True)
@@ -154,11 +164,23 @@ class DeltaWizard(SessionWizardView):
 
                 if task:
                     #wait task done
-                    return render_to_response('doing.html')
+                    return render_to_response(self.doing_template)
                 else:
                     # proceed to the next step
                     return self.render_next_step(form, back=True)
         return self.render(form)
+
+    def get_form(self, step=None, data=None, files=None):
+        form = super(DeltaWizard, self).get_form(step, data, files)
+        #reload the form data
+        try:
+            step = Step.objects.get(form=self.steps.current)
+            initial_data = json.loads(step.data)
+            form.initial = initial_data
+        except ObjectDoesNotExist:
+            pass
+        
+        return form
 
     def process_step(self, form):
         cleaned_data = form.cleaned_data
@@ -174,10 +196,15 @@ class DeltaWizard(SessionWizardView):
         if task:
             result = task.delay(cleaned_data)
             #save task_id to model
-            Step.objects.create(wizard=work,
-                                form=work.current_form,
-                                data=json.dumps(cleaned_data),
-                                task_id=result.task_id)
+            try:
+                step = Step.objects.get(wizard=work, form=work.current_form)
+            except ObjectDoesNotExist:
+                step = Step.objects.create(wizard=work,
+                                    form=work.current_form)
+            step.data = json.dumps(cleaned_data)
+            step.task_id = result.task_id
+            step.save()
+            
         data = self.get_form_step_data(form)
         return data
 
@@ -187,6 +214,6 @@ class DeltaWizard(SessionWizardView):
 
         if task:
             #wait task done
-            return render_to_response('doing.html')
+            return render_to_response(self.doing_template)
         else:
-            return render_to_response('done.html')
+            return render_to_response(self.done_template)

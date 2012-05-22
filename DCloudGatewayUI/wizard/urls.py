@@ -6,6 +6,11 @@ from tasks import install_task
 
 class InstallWizard(DeltaWizard):
     template_name = 'wizard/form.html'
+    doing_template = 'wizard/doing.html'
+    done_template = 'wizard/done.html'
+    failure_template = 'wizard/failure.html'
+    finish_template = 'wizard/finish.html'
+    
     wizard_step = [
 #        (Form_All, install_task)
         (Test_Form_All, install_task)

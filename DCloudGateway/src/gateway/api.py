@@ -251,12 +251,11 @@ def get_gateway_indicators():
 		output = po.stdout.read()
 	        po.wait()
 
-
-       		if po.returncode == 0:
-			if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-				op_all_disk += 1 
+#      		if po.returncode == 0:
+		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+			op_all_disk += 1 
 		else:
-			op_msg = output
+			op_msg = "%s test result: NOT PASSED"%i
 	
 	if op_all_disk == len(all_disk):
 		op_HDD_ok = True
@@ -510,7 +509,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:

@@ -1,0 +1,21 @@
+{% extends "wizard/base.html" %} {% block javascript %}
+<script type="text/javascript">
+	$(document).ready(function() {
+		var refreshId = window.setInterval(function() {
+			window.location.assign('.');
+		}, 1333);
+	});
+</script>
+{% endblock javascript %} {% block content %}
+<div class="row" style="padding: 120px 0;">
+	<div style="width:560px; margin: 0 auto;">
+		<div class="well">
+			<h3>Please wait for applying settings.</h3>
+			
+			{% for step in meta.step_list %}
+			<div class="alert alert-info">{{step.msg}}</div>
+			{% endfor %}
+		</div>
+	</div>
+</div>
+{% endblock content %}
