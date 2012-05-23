@@ -406,6 +406,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 		if not os.path.exists('/root/.s3ql/authinfo2'):
 			os.system("mkdir -p /root/.s3ql")
 			os.system("touch /root/.s3ql/authinfo2")
+                        os.system("chown www-data:www-data /root/.s3ql/authinfo2")
 			os.system("chmod 600 /root/.s3ql/authinfo2")
 
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
@@ -1259,7 +1260,7 @@ def _chSmbPasswd(username, password):
     ret_val = proc.wait() # 0 : success
 
     if ret_val != 0:
-        log.err("%s"%results)
+        log.error("%s"%results)
 
     return ret_val
 
@@ -1287,7 +1288,7 @@ def set_smb_user_list (username, password):
         
         #print username_arr
     except:
-        log.err("set_smb_user_list fails")
+        log.error("set_smb_user_list fails")
         return_val['msg'] = 'cannot read current user list.'
         return json.dumps(return_val)
     
