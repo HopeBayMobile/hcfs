@@ -563,7 +563,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "python /usr/local/bin/mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -585,7 +585,7 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
-			cmd = "umount.s3ql %s"%(mountpoint)
+			cmd = "python /usr/local/bin/umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()
 			po.wait()
@@ -621,7 +621,7 @@ def _mount(storage_url):
 			raise BuildGWError("Failed to create s3ql conf")
 
 		#mount s3ql
-		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		cmd = "python /usr/local/bin/mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -1831,6 +1831,7 @@ Dirty cache near full: False
         #proc.kill()
 
         #print ret_val
+        real_cloud_data = 0
 
         if ret_val == 0: # success
             '''
@@ -1844,6 +1845,7 @@ Dirty cache near full: False
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
                     #print int(float(val)/1024.0)
+                    real_cloud_data = float(val)
                     ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
                     #print val
 
@@ -1903,6 +1905,7 @@ Dirty cache near full: False
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
+                    real_cloud_data = real_cloud_data - float(crt_val)
                     ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
                     #print crt_val
 
@@ -1910,6 +1913,7 @@ Dirty cache near full: False
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
                     #print max_val
+                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
 
     except Exception:
         #print Exception
@@ -2064,6 +2068,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-    print get_gateway_indicators()
     #print get_gateway_status()
     pass
