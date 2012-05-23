@@ -31,6 +31,24 @@ fieldset {
 input {
 	color: #0087DC;
 	letter-spacing: 1px;
+	margin-bottom: 5px;
+}
+p.help-block {
+	background-image:url('/static/img/wizard/wizard_error_icon.png');
+	background-repeat:no-repeat;
+	text-indent: 20px;
+	height: 20px;
+}
+span.help-block {
+	color: green;
+}
+#OK {
+	width:138px;
+	height:47px;
+	border: 0px;
+	padding: 0px;
+	background-image:url('/static/img/wizard/wizard_button.png');
+	background-repeat:no-repeat;
 }
 </style>
 {% endblock %}
@@ -66,7 +84,7 @@ input {
 		<div class='controls'>
 			{{ field }}
 			{%if field.help_text %}
-			<span class="help-inline">{{field.help_text}}</span>
+			<span class="help-block">{{field.help_text}}</span>
 			{% endif %}
 			{% for error in field.errors %}
 			<p class="help-block" style="color:red;">{{ error }}</p>
@@ -84,7 +102,7 @@ input {
 			<div class='controls'>
 				{{ field }}
 				{%if field.help_text %}
-				<span class="help-inline">{{field.help_text}}</span>
+				<span class="help-block">{{field.help_text}}</span>
 				{% endif %}
 				{% for error in field.errors %}
 				<p class="help-block" style="color:red;">{{ error }}</p>
@@ -103,7 +121,7 @@ input {
 				<button class="btn" name="wizard_goto_step" type="submit" value="{{ wizard.steps.prev }}">{% trans "Back" %}</button>
 				{% endif %}
 				{% endif %}
-				<button class="btn btn-primary" type="submit" name="next">{% trans "Next" %}</button>
+				<button id="OK" type="submit" name="next">OK</button>
 				<span class="label hide"></span>
 			</div>
 		</form>
