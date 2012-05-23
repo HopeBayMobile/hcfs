@@ -220,7 +220,7 @@ def sync(request):
                 if bandwidth_option == "1":
                     array = [day, 0, 24, -1]
                 elif bandwidth_option == "2":
-                    array = [day, 0, 24, 0]
+                    array = [day, 0, 24, bandwidth]
                 else:
                     array = [day, interval_from, interval_to, bandwidth]
                 data[now] = array
@@ -229,13 +229,22 @@ def sync(request):
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+
+    for i in range(1, 8):
+        weeks_data[i] = {'name': '',
+                         'range': 'all',
+                         'bandwidth': '0',
+                         'interval_from': '-1',
+                         'interval_to': '-1',
+                         'option': 1}
+
+    weeks_data[1]['name'] = 'Mon.'
+    weeks_data[2]['name'] = 'Tue.'
+    weeks_data[3]['name'] = 'Wed.'
+    weeks_data[4]['name'] = 'Thu.'
+    weeks_data[5]['name'] = 'Fri.'
+    weeks_data[6]['name'] = 'Sat.'
+    weeks_data[7]['name'] = 'Sun.'
 
     for value in data:
         day = int(value[0])
@@ -243,15 +252,17 @@ def sync(request):
         rend = int(value[2])
         upload_limit = int(value[3])
 
-        if upload_limit == 0 and rstart == 0 and rend == 24:
+        if upload_limit > 0 and rstart == 0 and rend == 24:
             weeks_data[day]['range'] = "all"
             weeks_data[day]['option'] = 2
         elif upload_limit < 0:
             weeks_data[day]['range'] = "none"
             weeks_data[day]['option'] = 1
         else:
-            weeks_data[day]['range'] = range(rstart, rend)
+            weeks_data[day]['range'] = range(rstart, rend + 1)
             weeks_data[day]['option'] = 3
+            weeks_data[day]['interval_from'] = rstart
+            weeks_data[day]['interval_to'] = rend
 
         weeks_data[day]['bandwidth'] = upload_limit
 

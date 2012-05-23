@@ -191,13 +191,21 @@
                     >
                     Interval <select id="select01" name="interval_from" class="span1">
                         {% for i in hours %}
-                        <option>{{ i }}</option>
+                            {% if i == value.interval_from %}
+                                <option selected="selected">{{ i }}</option>
+                            {% else %}
+                                <option>{{ i }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                     <i class="icon-play"></i>
                     <select id="select01" name="interval_to" class="span1">
                         {% for i in hours %}
-                        <option>{{ i }}</option>
+                            {% if i == value.interval_to %}
+                                <option selected="selected">{{ i }}</option>
+                            {% else %}
+                                <option>{{ i }}</option>
+                            {% endif %}
                         {% endfor %}
                     </select>
                     </p>
