@@ -1,7 +1,37 @@
 {% extends "base.html" %}
 {% block stylesheet %}
 <style type="text/css">
-
+legend {
+	color: #666;
+	margin-bottom: 0px;
+	border-bottom: 2px solid #CCC;
+	height: 40px;
+}
+legend p {
+	position: absolute;
+	line-height: 50px;
+	font-size: 20px;
+	vertical-align: text-top;	
+	margin: 0px;
+	margin-left: 20px;
+	text-indent: -62px;
+}
+legend p:first-letter {
+	font-size: 300%;
+	font-weight: bolder;
+	vertical-align: text-top;
+	margin-right: 5px;
+}
+fieldset {
+	margin-bottom: 20px;
+}
+.control-group {
+	margin-left: 170px;
+}
+input {
+	color: #0087DC;
+	letter-spacing: 1px;
+}
 </style>
 {% endblock %}
 
@@ -12,9 +42,9 @@
 {% endblock %}
 
 {% block content %}
-<div class="row" style="margin: 10px 30px">
-	<div class="span12">
-		<form id="form" class="form-horizontal" method="POST" action="">
+<div class="row" style="padding: 60px 0;">
+	<div style="width:560px; margin: 0 auto;">
+		<form id="form" method="POST" action="">
 	{% csrf_token %}	
 	{{ wizard.management_form }}
 	
@@ -29,7 +59,7 @@
 
 {% for legend, items in wizard.form.fieldset_list %}
 <fieldset>
-	<legend>{{legend}}</legend>
+	<legend><p>{{legend}}</p></legend>
 	{% for field in items %}
 	<div class="control-group">
 	<label class="control-label" for="id_{{field.name_of_field}}">{{field.label}}</label>
@@ -66,7 +96,7 @@
 
 
 	{% endif %}			
-			<div class="form-actions">
+			<div class="control-group">
 				{% if wizard.steps.prev %}
 				{#<button class="btn" name="wizard_goto_step" type="submit" value="{{ wizard.steps.first }}">{% trans "First Step" %}</button>#}
 				{% if params.back %}

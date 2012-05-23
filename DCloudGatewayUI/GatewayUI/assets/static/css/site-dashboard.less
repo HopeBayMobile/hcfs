@@ -361,6 +361,9 @@
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
 }
 
+#msgbox-body ul:first-child{
+	margin-top: 30px;
+}
 
 .msg-block{
 	position: relative;
@@ -412,6 +415,7 @@
 	position: absolute;
 	top: 0;
 	right: 45px;
+	width: 170px;
 	height: @msg-content-height;
 	font-size: 18px;
 	line-height: @msg-content-height;
@@ -420,7 +424,7 @@
 
 .msg-content{
 	margin: 5px 0;
-	width: @site-main-width - 225px;
+	width: @site-main-width - 300px;
 	font-size: 20px;
 	// height: @msg-title-height;
 	line-height: @msg-content-height;
