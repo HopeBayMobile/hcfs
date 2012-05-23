@@ -41,17 +41,33 @@
     border: 0px;
     background-image:url("/static/img/dashboard/hour_bg_2.png");
 }
-.sync_edit_link {
+.sync_edit_link1 {
     display: block;
     margin-top: 7px;
     height: 41px;
-    width: 57px;
+    width: 28px;
     float: left;
     background: url('/static/img/dashboard/edit_normal.png') no-repeat;
+    background-position: left 0px;
     text-indent: -99999px;
 }
-.sync_edit_link:hover {
+.sync_edit_link1:hover {
     background: url('/static/img/dashboard/edit_hover.png') no-repeat;
+    background-position: left 0px;
+}
+.sync_edit_link2 {
+    display: block;
+    margin-top: 7px;
+    height: 41px;
+    width: 28px;
+    float: left;
+    background: url('/static/img/dashboard/edit_normal.png') no-repeat;
+    background-position: right 0px;
+    text-indent: -99999px;
+}
+.sync_edit_link2:hover {
+    background: url('/static/img/dashboard/edit_hover.png') no-repeat;
+    background-position: right 0px;
 }
 .sync_add_link {
     display: block;
@@ -95,7 +111,19 @@
             {% if value.range == "none" %}
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_add_link">add</a>
             {% else %}
-                <a data-toggle="modal" href="#myModal{{ key }}" class="sync_edit_link">edit</a>
+                <div style="display: none">
+                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" name="modal-for-{{ key }}" id="modal-for-{{ key }}">
+                {% csrf_token %}
+                <input type="hidden" name="day" value="{{ key }}">
+                <input type="hidden" name="bandwidth_option" value="1">
+                <input type="hidden" name="interval_from" value="0">
+                <input type="hidden" name="interval_to" value="24">
+                <input type="hidden" name="bandwidth" value="-1">
+                </form>
+                </div>
+                <a href="#" class="sync_edit_link1"
+                    onclick="javascript:document.getElementById('modal-for-{{ key }}').submit();">drop</a>
+                <a data-toggle="modal" href="#myModal{{ key }}" class="sync_edit_link2">edit</a>
             {% endif %}
             <div class="sync_bar_left"><span class="sync_span"><h2>{{ value.name }}</h2></span></div>
             {% for i in hours %}
@@ -133,7 +161,7 @@
             <h3>Setting {{ value.name }}</h3>
         </div>
         <div class="modal-body" >
-            <form class="well form-horizontal" action="/dashboard/sync/" method="POST" >
+            <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="modal-for-{{ key }}">
                 {% csrf_token %}
                 <input type="hidden" name="day" value="{{ key }}">
                 <div class="">
