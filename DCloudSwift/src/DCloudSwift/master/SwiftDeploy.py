@@ -7,6 +7,7 @@ import threading
 import datetime
 import logging
 import pickle
+import collections
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
@@ -40,9 +41,13 @@ class SpreadRingFilesError(Exception):
 	pass
 
 class SwiftDeploy:
-	def __init__(self):
+	def __init__(self, conf=None):
 		self.__deltaDir = "/etc/delta"
-		self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		if conf is None:
+			self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		else:
+			self.__SC = SwiftCfg(conf)
+
 		self.__kwparams = self.__SC.getKwparams()
 
 		self.__setDeployProgress()
@@ -67,7 +72,6 @@ class SwiftDeploy:
 	def __unsetMetadataFlag(self):
 		self.__metadataFlag = False
 
-
 	def getDeployProgress(self):
 		return self.__deployProgress
 
@@ -77,6 +81,8 @@ class SwiftDeploy:
 	def getCleanProgress(self):
 		return self.__cleanProgress
 
+	def getNumOfReplica(self):
+		return	self.__kwparams['numOfReplica']
 
 	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
@@ -140,8 +146,15 @@ class SwiftDeploy:
 			if success == False:
 				self.__deployProgress['blackList'].append(ip)
 				self.__deployProgress['message'].append(msg)
-				self.__deployProgress['code'] += 1
 			if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
+
+				ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'])
+				if ret.val == False:
+					self.__deployProgress['code'] = 1
+					self.__deployProgress['message'].append(ret.msg)
+				else:
+					self.__deployProgress['code'] = 0
+
 				self.__deployProgress['finished'] = True
 		finally:
 			lock.release()
@@ -436,17 +449,23 @@ class SwiftDeploy:
 	def deploySwift(self, proxyList, storageList):
 		logger = util.getLogger(name="deploySwift")
 
-		self.__createMetadata(proxyList, storageList)
-		self.__setDeployProgress()
-		self.__proxyList = proxyList
-		self.__storageList = storageList
-		self.__proxyDeploy()
-		self.__storageDeploy()
+		try:
+			self.__createMetadata(proxyList, storageList)
+			self.__setDeployProgress()
+			self.__proxyList = proxyList
+			self.__storageList = storageList
+			self.__proxyDeploy()
+			self.__storageDeploy()
+		except Exception as e:
+			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
+			return
 
-		#create a defautl account:user 
-		cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"])	
-		os.system(cmd)	
-		os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (self.__proxyList[0]["ip"], self.__kwparams['password']))
+			deployProgress = self.getDeployProgress()
+			if deployProgress['code'] == 0:
+				#create a defautl account:user 
+				cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"])	
+				os.system(cmd)	
+				os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (self.__proxyList[0]["ip"], self.__kwparams['password']))
 
 	def __spreadRingFilesSubtask(self, nodeIP):
 		logger = util.getLogger(name="spreadRingFilesSubtask: %s" % nodeIP)
@@ -522,6 +541,61 @@ class SwiftDeploy:
 			msg = "Failed to clean %s for %s"%(nodeIp, str(err))
 			logger.error(msg)
 			self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
+
+
+	def __isDeploymentOk(self, proxyList, storageList, blackList):
+		numOfReplica = self.__kwparams['numOfReplica']
+
+		zidSet = set()
+		failedZones = set()
+		proxyIpSet = set()
+		failedProxyIpSet = set()
+		ip2Zid ={}
+		val = False 
+		msg = ""
+
+		try:
+			#Criteria1: number of zones has to be greater than or equal to number of replica
+			for node in storageList:
+				zidSet.add(node["zid"])
+
+			if len(zidSet) < numOfReplica:
+				raise Exception("Number of zones is less than number of replica.")		
+
+
+			#Criteria2: number of zones containing failed nodes has to be less than number of replica
+			for node in storageList:
+				ip2Zid.setdefault(node["ip"], node["zid"])
+
+			for ip in blackList:
+				if ip2Zid.get(ip) is not None:
+					failedZones.add(ip2Zid[ip])
+
+			if len(failedZones) >= numOfReplica:
+				raise Exception("More than %d (number of replica) zones containing failed nodes"%numOfReplica) 
+
+			#Criteria3: at least one proxy node is healthy
+			for node in proxyList:
+				proxyIpSet.add(node["ip"])
+		
+			for ip in blackList:
+				if ip in proxyIpSet:
+					failedProxyIpSet.add(ip)
+
+			if len(proxyIpSet) == len(failedProxyIpSet):
+				raise Exception("No proxy node is successfully deployed")
+
+			val = True
+
+		except Exception as e:
+			val = False
+			msg = str(e)
+		finally:
+			Bool = collections.namedtuple("Bool", "val msg")
+			return Bool(val, msg)
+
+
+
 
 	def spreadRingFiles(self):
 		swiftDir = "%s/swift"%self.__deltaDir
@@ -601,7 +675,6 @@ class SwiftDeploy:
 
 		
 
-
 def parseNodeFiles(proxyFile, storageFile):
 	proxyList =[]
 	storageList = []
@@ -677,23 +750,20 @@ def addNodes():
 		while SD.getMetadataFlag() == True:
 			time.sleep(10)
 		
-
+		print "Deploy new nodes..."
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
 			time.sleep(10)
 			print progress
 			progress = SD.getDeployProgress()
-		print "Swift deploy is done!"
 
-		print "Start to spread ring files"
-
+		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
 		while spreadProgress['finished'] != True:
 			time.sleep(8)
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
-		print "Finished to spread ring files"
 		return 0
 	except Exception as e:
 		print >>sys.stderr, str(e)
@@ -721,7 +791,7 @@ def deleteNodes():
 		while SD.getMetadataFlag() == True:
 			time.sleep(10)
 
-		print "Start to spread ring files"
+		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
 		print spreadProgress
 		while spreadProgress['finished'] != True:
@@ -729,8 +799,7 @@ def deleteNodes():
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
-
-		print "Start to clean nodes"
+		print "Clean nodes..."
 		cleanProgress = SD.getCleanProgress()
 		print cleanProgress
 		while cleanProgress['finished'] != True:
@@ -770,7 +839,10 @@ def deploy():
 			time.sleep(8)
 			print progress
 			progress = SD.getDeployProgress()
-		print "Swift deploy process is done!"
+		if progress['code'] == 0:
+			print "Swift deploy process is done!"
+		else:
+			print "Swift deploy failed"
 
 		return 0
 	except Exception as e:
