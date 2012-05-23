@@ -322,9 +322,12 @@ fake_syslog = {
 def syslog(request):
     return_val = fake_syslog
     # FIXME: Replace the fake logs
-    # log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    # return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
     if return_val['result'] == True:
         log_data = return_val['data']
+
+    if request.is_ajax():
+        return HttpResponse(json.dumps(log_data['error_log']))
 
     return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
                                                      'log_data': log_data
@@ -332,7 +335,14 @@ def syslog(request):
 
 
 @login_required
-def power(request):
+def power(request, action=None):
+    if request.method == 'POST':
+        if action == 'off':
+            result = json.loads(api.shutdown_gateway())
+        elif action == 'reset':
+            result = json.loads(api.reset_gateway())
+        return HttpResponse(result)
+
     return render(request, 'dashboard/power.html', {'tab': 'power'})
 
 
@@ -353,6 +363,6 @@ def get_syslog(request, category, level):
 
 
 @login_required
-def gateway_cache_usage(request):
+def cache_usage(request):
     data = gateway_status()
     return HttpResponse(json.dumps(data['cache_usage']))
