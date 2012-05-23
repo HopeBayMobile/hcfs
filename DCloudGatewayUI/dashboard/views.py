@@ -14,17 +14,21 @@ def gateway_status():
     if the query is failed.
     """
     try:
-        data = json.loads(api.get_gateway_status())
-        print data
+        data = json.loads(api.get_gateway_status())['data']
     except Exception as inst:
         print inst
         data = {}
-    data['cache_usage'] = {"max_cache_size": 1000,
-                           "max_cache_entries": 100,
-                           "used_cache_size": 500,
-                           "used_cache_entries": 50,
-                           "dirty_cache_size": 100,
-                           "dirty_cache_entries": 10}
+        data['cache_usage'] = {"max_cache_size": 1000,
+                               "max_cache_entries": 100,
+                               "used_cache_size": 500,
+                               "used_cache_entries": 50,
+                               "dirty_cache_size": 100,
+                               "dirty_cache_entries": 10}
+        data['storage_usage'] = {"cloud_data": "1024",
+                                 "cloud_data_dedup": "1024",
+                                 "cloud_data_dedup_compress": "1024"}
+        data["uplink_usage"] = 100
+        data["downlink_usage"] = 1000
     return data
 
 
@@ -33,9 +37,9 @@ def index(request):
     data = gateway_status()
     cache_usage = data['cache_usage']
     maxcache = cache_usage["max_cache_size"]
-    context = {"cache_usage": cache_usage,
-               "dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
+    context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
+    context.update(data)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -356,10 +360,9 @@ def indicator(request):
         return HttpResponse(indicator_data['msg'], status=500)
 
 
-@login_required
-def get_syslog(request, category, level):
-    log_data = json.loads(api.get_gateway_system_log(int(level), 100, category))
-    return HttpResponse(json.dumps(log_data['data']))
+def status(request):
+    status_data = gateway_status()
+    return HttpResponse(json.dumps(status_data))
 
 
 @login_required
