@@ -458,14 +458,6 @@ class SwiftDeploy:
 			self.__storageDeploy()
 		except Exception as e:
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
-			return
-
-			deployProgress = self.getDeployProgress()
-			if deployProgress['code'] == 0:
-				#create a defautl account:user 
-				cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"])	
-				os.system(cmd)	
-				os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (self.__proxyList[0]["ip"], self.__kwparams['password']))
 
 	def __spreadRingFilesSubtask(self, nodeIP):
 		logger = util.getLogger(name="spreadRingFilesSubtask: %s" % nodeIP)
@@ -593,8 +585,6 @@ class SwiftDeploy:
 		finally:
 			Bool = collections.namedtuple("Bool", "val msg")
 			return Bool(val, msg)
-
-
 
 
 	def spreadRingFiles(self):
@@ -826,6 +816,10 @@ def deploy():
 						
 		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
 
+		#TODO: read config from /etc/delta/
+		SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		password = SC.getKwparams()['password']
+
 		SD = SwiftDeploy()
 		t = Thread(target=SD.deploySwift, args=(proxyList, storageList))
 		t.start()
@@ -839,8 +833,14 @@ def deploy():
 			time.sleep(8)
 			print progress
 			progress = SD.getDeployProgress()
+
 		if progress['code'] == 0:
 			print "Swift deploy process is done!"
+			#create a default account:user
+			print "Create a default user..."
+			cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(password, proxyList[0]["ip"])	
+			os.system(cmd)	
+			os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (proxyList[0]["ip"], password))
 		else:
 			print "Swift deploy failed"
 
