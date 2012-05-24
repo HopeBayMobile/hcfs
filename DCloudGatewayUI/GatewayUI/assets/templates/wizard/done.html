@@ -1,21 +1,39 @@
 {% extends "base.html" %}
-{% block javascript %}
 
-{% endblock javascript %}
-{% block content %}
-<div class="row" style="padding: 120px 0;">
-	<div style="width:560px; margin: 0 auto;">
-		<div class="well">
-			<h3>The task of this step has done.</h3>
+{% if params.is_ajax %}
+	
+	{% block ajax %}
+	<h3>The task of this step has done.</h3>
+	
+	{% for step in meta.step_list %}
+	<div class="alert alert-info">{{step.msg}}</div>
+	{% endfor %}
 
-			{% for step in meta.step_list %}
-			<div class="alert alert-info">{{step.msg}}</div>
-			{% endfor %}
+	<div style="height: 40px;">
+		<a class="btn btn-primary btn-large pull-right" href="?next">Next</a>
+	</div>
+	{% endblock ajax %}
+	
+{% else %}
 
-			<div style="height: 40px;">
-				<a class="btn btn-primary btn-large pull-right" href="?next">Next</a>
+	{% block javascript %}
+	{% endblock javascript %}
+	{% block content %}
+	<div class="row" style="padding: 120px 0;">
+		<div style="width:560px; margin: 0 auto;">
+			<div class="well">
+				<h3>The task of this step has done.</h3>
+	
+				{% for step in meta.step_list %}
+				<div class="alert alert-info">{{step.msg}}</div>
+				{% endfor %}
+	
+				<div style="height: 40px;">
+					<a class="btn btn-primary btn-large pull-right" href="?next">Next</a>
+				</div>
 			</div>
 		</div>
 	</div>
-</div>
-{% endblock content %}
+	{% endblock content %}
+
+{% endif %}
