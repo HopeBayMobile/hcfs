@@ -11,7 +11,8 @@
 @slide-box-footer-bar-height: 24px;
 @slide-box-toggle-btn-height: 44px;
 @slide-box-footer-height: @slide-box-footer-bar-height + @slide-box-toggle-btn-height;
-@msg-title-height: 25px;
+@msg-icon-height: 25px;
+@msg-content-height: 30px;
 @error-msg-bg-color: #C03556;
 @space-bar-left-width: 17px;
 @cache-usage-bar-width: @site-main-width - 100px;
@@ -351,75 +352,96 @@
 
 .slide-box-footer .toggle-btn{
 	position: relative;
-	// top: @slide-box-footer-bar-height;
 	left: (@site-main-width - 45px) / 2;
 	width: 45px;
 	height: @slide-box-toggle-btn-height;
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_down.png");
 }
-
-#syslog .msg-pagination{
-	position: fixed;
-	bottom: 0;
-	width: @site-main-width;
+.slide-box-footer .toggle-btn.active{
+	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
 }
 
-#msgbox-body .msg-pagination{
-	position: absolute;
-	bottom: 0;
-	width: @site-main-width;
+#msgbox-body ul:first-child{
+	margin-top: 30px;
 }
 
 .msg-block{
 	position: relative;
-	padding: 5px;
 	margin: 0 20px;
 	border-bottom: solid 1px gray;
 }
 
-.msg-pagination{
-	text-align: center;
-	vertical-align: middle;
-	// background-color: yellow;
+.msg-type{
+	.msg-block;
 }
 
-.msg-content{
-	margin-top: 5px;
-	clear: both;
-	display: none;
+
+.msg-type span{
+	display: inline-block;
+	width: @msg-icon-height;
+	height: @msg-icon-height;
+}
+
+.msg-type .all{
+	background-image: url("/@{dashboard-image-path}/info_all.png");
+}
+
+.msg-type .warn, .msg-content.warn{
+	background-image: url("/@{dashboard-image-path}/info_warn.png");
+}
+
+.msg-type .error, .msg-content.error{
+	background-image: url("/@{dashboard-image-path}/info_error.png");
+}
+
+.msg-type .opera, .msg-content.opera{
+	background-image: url("/@{dashboard-image-path}/info_oper.png");
 }
 
 .msg-detail{
 	position: absolute;
-	top: 5px;
+	top: 3px;
 	right: 0px;
-	width: 25px;
-	height: @msg-title-height;
-	background-color: red;
+	width: @msg-icon-height;
+	height: @msg-icon-height;
+	background-image: url("/@{dashboard-image-path}/info_more.png");
+}
+
+.msg-detail.active{
+	background-image: url("/@{dashboard-image-path}/info_less.png");
 }
 
 .msg-time{
 	position: absolute;
-	top: 05px;
+	top: 0;
 	right: 45px;
-	height: @msg-title-height;
-	line-height: @msg-title-height;
-	vertical-align: middle;
+	width: 170px;
+	height: @msg-content-height;
+	font-size: 18px;
+	line-height: @msg-content-height;
+	vertical-align: text-bottom;
 }
 
-.msg-icon{
-	width: 25px;
-	height: @msg-title-height;
-	background-color: #D03556;
-	float: left;
+.msg-content{
+	margin: 5px 0;
+	width: @site-main-width - 300px;
+	font-size: 20px;
+	// height: @msg-title-height;
+	line-height: @msg-content-height;
+	vertical-align: middle;
+	// Fake list-style
+	list-style:none;
+    padding-left: 30px;
+    background-position: left 3px;
+    background-repeat: no-repeat;
+	// Text truncation
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
-.msg-title{
-	margin: 0 50px;
-	width: 150px;
-	height: @msg-title-height;
-	line-height: @msg-title-height;
-	vertical-align: middle;
+#msgbox .msg-content{
+	background: url("/@{dashboard-image-path}/info_error.png") no-repeat left 3px;
 }
 
 .action-btn{

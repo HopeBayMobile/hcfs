@@ -42,9 +42,9 @@ LOG_PARSER = {
 # if a keywork match a msg, the msg is belong to the class
 # key = level, val = keyword array
 KEYWORD_FILTER = {
-                  "error_log" : ["error", "exception"], # 0
-                  "warning_log" : ["warning"], # 1
-                  "info_log" : ["nfs", "cifs" , "."], #2
+                  "error_log" : ["error", "exception"],
+                  "warning_log" : ["warning"],
+                  "info_log" : ["nfs", "cifs" , "."],
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
@@ -165,41 +165,21 @@ def get_compression():
 		log.info("get_compression end")
 		return json.dumps(return_val)
 
-# by Rice
 def get_gateway_indicators():
 
 	log.info("get_gateway_indicators start")
 	op_ok = False
 	op_msg = 'Gateway indocators read failed unexpetcedly.'
-
-	op_network_ok = _check_network()
-	op_system_check = _check_system()
-	op_flush_inprogress = _check_flush()
-	op_dirtycache_nearfull = _check_dirtycache()
-	op_HDD_ok= _check_HDD()
-	op_NFS_srv = _check_nfs_service()
-	op_SMB_srv = _check_smb_service()
-
-	op_ok = True
-	op_msg = "Gateway indocators read successfully."
-
-	return_val = {'result' : op_ok,
-        	      'msg'    : op_msg,
-		      'data'   : {'network_ok' : op_network_ok,
-				  'system_check' : op_system_check,
-				  'flush_inprogress' : op_flush_inprogress,
-				  'dirtycache_nearfull' : op_dirtycache_nearfull,
-				  'HDD_ok' : op_HDD_ok,
-				  'NFS_srv' : op_NFS_srv,
-				  'SMB_srv' : op_SMB_srv}}
-
-	log.info("get_gateway_indicators end")
-	return json.dumps(return_val)
-
-# check network connecttion from gateway to storage by Rice
-def _check_network():
 	op_network_ok = False
-	log.info("_check_network start")
+	op_system_check = False
+	op_flush_inprogress = False
+	op_dirtycache_nearfull = False
+	op_HDD_ok = False
+	op_NFS_srv = False
+	op_SMB_srv = False
+
+	# Network check
+
 	try:
                 op_config = ConfigParser.ConfigParser()
                 with open('/root/.s3ql/authinfo2') as op_fh:
@@ -222,22 +202,15 @@ def _check_network():
 		else:
 			op_msg = output
 
+
         except IOError as e:
                 op_msg = 'Unable to access /root/.s3ql/authinfo2.'
                 log.error(str(e))
         except Exception as e:
                 op_msg = 'Unable to obtain storage url or login info.'
                 log.error(str(e))
-
-	finally:
-		log.info("_check_network end")
-		return op_network_ok
-
-# check fsck.s3ql daemon by Rice
-def _check_system():
-	op_system_check = False
-	log.info("_check_system start")
-
+	
+	# System check
         cmd ="ps aux | grep fsck.s3ql"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         lines = po.stdout.readlines()
@@ -249,51 +222,23 @@ def _check_system():
         else:
                 op_msg = output
 
-	log.info("_check_system end")
-	return op_system_check
-
-# flush check by Rice
-def _check_flush():
-	op_flush_inprogress = False
-	log.info("_check_flush start")
-	
+	# Flush check & DirtyCache check
 	cmd ="sudo s3qlstat /mnt/cloudgwfiles"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
 
         if po.returncode == 0:
+                if output.find("Cache uploading: On") !=-1:
+                        op_flush_inprogress = True
+
                 if output.find("Dirty cache near full: True") !=-1:
                         op_dirtycache_nearfull = True
+
         else:
                 op_msg = output
 
-	log.info("_check_flush end")
-	return op_flush_inprogress
-
-# dirty cache check by Rice
-def _check_dirtycache():
-	op_dirtycache_nearfull = False
-        log.info("_check_dirtycache start")
-
-        cmd ="sudo s3qlstat /mnt/cloudgwfiles"
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-
-        if po.returncode == 0:
-                if output.find("Dirty cache near full: True") !=-1:
-                        op_dirtycache_nearfull = True
-        else:
-                op_msg = output
-
-        log.info("_check_dirtycache end")
-        return op_dirtycache_nearfull
-
-# check disks on gateway by Rice
-def _check_HDD():
-	op_HDD_ok = False
-	log.info("_check_HDD start")
+	# HDD check
 
 	all_disk = common.getAllDisks()
 	nu_all_disk = len(all_disk)
@@ -314,15 +259,8 @@ def _check_HDD():
 	
 	if op_all_disk == len(all_disk):
 		op_HDD_ok = True
-
-	log.info("_check_HDD end")
-	return op_HDD_ok
-
-# check nfs daemon by Rice
-def _check_nfs_service():
-	op_NFS_srv = False
-	log.info("_check_nfs_service start")
-
+	
+	# NFS service check
 	cmd ="sudo service nfs-kernel-server status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
@@ -334,14 +272,8 @@ def _check_nfs_service():
         else:
                 op_msg = output
 
-	log.info("_check_nfs_service end")
-	return op_NFS_srv
-
-# check samba daemon by Rice
-def _check_smb_service():
-	op_SMB_srv = False
-	log.info("_check_smb_service start")	
-
+	# SMB service check
+	
 	cmd ="sudo service smbd status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
@@ -353,8 +285,22 @@ def _check_smb_service():
         else:
                 op_msg = output
 
-	log.info("_check_smb_service end")
-	return op_SMB_srv
+
+	op_ok = True
+	op_msg = "Gateway indocators read successfully."
+
+	return_val = {'result' : op_ok,
+        	      'msg'    : op_msg,
+		      'data'   : {'network_ok' : op_network_ok,
+				  'system_check' : op_system_check,
+				  'flush_inprogress' : op_flush_inprogress,
+				  'dirtycache_nearfull' : op_dirtycache_nearfull,
+				  'HDD_ok' : op_HDD_ok,
+				  'NFS_srv' : op_NFS_srv,
+				  'SMB_srv' : op_SMB_srv}}
+
+	log.info("get_gateway_indicators end")
+	return json.dumps(return_val)
 
 def get_storage_account():
 	log.info("get_storage_account start")
@@ -406,7 +352,6 @@ def apply_storage_account(storage_url, account, password, test=True):
 		if not os.path.exists('/root/.s3ql/authinfo2'):
 			os.system("mkdir -p /root/.s3ql")
 			os.system("touch /root/.s3ql/authinfo2")
-                        os.system("chown www-data:www-data /root/.s3ql/authinfo2")
 			os.system("chmod 600 /root/.s3ql/authinfo2")
 
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
@@ -564,7 +509,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "python /usr/local/bin/mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "mkfs.s3ql --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -586,7 +531,7 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
-			cmd = "python /usr/local/bin/umount.s3ql %s"%(mountpoint)
+			cmd = "umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()
 			po.wait()
@@ -622,7 +567,7 @@ def _mount(storage_url):
 			raise BuildGWError("Failed to create s3ql conf")
 
 		#mount s3ql
-		cmd = "python /usr/local/bin/mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -1260,7 +1205,7 @@ def _chSmbPasswd(username, password):
     ret_val = proc.wait() # 0 : success
 
     if ret_val != 0:
-        log.error("%s"%results)
+        log.err("%s"%results)
 
     return ret_val
 
@@ -1288,7 +1233,7 @@ def set_smb_user_list (username, password):
         
         #print username_arr
     except:
-        log.error("set_smb_user_list fails")
+        log.err("set_smb_user_list fails")
         return_val['msg'] = 'cannot read current user list.'
         return json.dumps(return_val)
     
@@ -1645,8 +1590,6 @@ def parse_log (type, log_cnt):
     '''
     parse a log line to log_entry data structure 
     different types require different parser
-    if a log line doesn't match the pattern, it return None
-    
     #type = syslog
     #log_cnt = "May 10 13:43:46 ubuntu dhclient: bound to 172.16.229.78 -- renewal in 277 seconds."
 
@@ -1669,7 +1612,7 @@ def parse_log (type, log_cnt):
     m = pat.match(log_cnt)
     if m == None:
         #print "Not found"
-        return None
+        return {}
 
     #print "match"
     #print m.group()
@@ -1713,15 +1656,15 @@ def parse_log (type, log_cnt):
     except Exception as err:
         #print "datatime error"
         #print Exception
-        #print err
-        return None
+        print err
+        return {}
 
     #print "timestamp = "
     #print timestamp
     #print "msg = "
     #print msg
     log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
-    log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
+    log_entry["timestamp"] = str(timestamp.now())
     log_entry["msg"] = msg
     return log_entry
 
@@ -1764,8 +1707,7 @@ def read_logs(logfiles_dict, offset, num_lines):
 
             for log in log_buf[ offset : offset + nums]:
                 log_entry = parse_log(type, log)
-                if not log_entry == None: #ignore invalid log line 
-                    ret_log_cnt[type].append(log_entry)
+                ret_log_cnt[type].append(log_entry)
 
         except :
             pass
@@ -1832,7 +1774,6 @@ Dirty cache near full: False
         #proc.kill()
 
         #print ret_val
-        real_cloud_data = 0
 
         if ret_val == 0: # success
             '''
@@ -1846,7 +1787,6 @@ Dirty cache near full: False
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
                     #print int(float(val)/1024.0)
-                    real_cloud_data = float(val)
                     ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
                     #print val
 
@@ -1906,7 +1846,6 @@ Dirty cache near full: False
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
-                    real_cloud_data = real_cloud_data - float(crt_val)
                     ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
                     #print crt_val
 
@@ -1914,7 +1853,6 @@ Dirty cache near full: False
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
                     #print max_val
-                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
 
     except Exception:
         #print Exception
@@ -1944,13 +1882,8 @@ def get_network_speed(iface_name): # iface_name = eth1
     time.sleep(1)
     next_status = get_network_status(iface_name)
 
-    try:
-        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
-        ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
-    except:
-        ret_val["downlink_usage"] = 0 
-        ret_val["uplink_usage"] = 0
-        
+    ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
+    ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
 
     return ret_val
 
@@ -2069,5 +2002,4 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-    #print get_gateway_status()
-    pass
+	pass

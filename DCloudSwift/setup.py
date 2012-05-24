@@ -59,7 +59,8 @@ def main():
 		entry_points = {
        			 'console_scripts': [
             				     'dcloud_swift_deploy = DCloudSwift.master.SwiftDeploy:deploy',
-					     'dcloud_swift_addNodes = DCloudSwift.master.SwiftDeploy:addNodes'
+					     'dcloud_swift_addNodes = DCloudSwift.master.SwiftDeploy:addNodes',
+					     'dcloud_swift_deleteNodes = DCloudSwift.master.SwiftDeploy:deleteNodes'
         		 ]
     		},		
 

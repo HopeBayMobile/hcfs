@@ -80,52 +80,6 @@
     font-size: 23px;
 }
 </style>
-<div class="modal hide fade" id="myModal" style="display: none;">
-    <div class="modal-header">
-        <button class="close" data-dismiss="modal">×</button>
-        <h3>Setting</h3>
-    </div>
-    <div class="modal-body" >
-        <form class="well form-horizontal" action="/dashboard/sync/" method="POST" >
-            {% csrf_token %}
-            <div class="">
-                <p class="sync_font_size">
-                <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1" checked="">
-                No limit
-                </p>
-                <hr/>
-                <p class="sync_font_size">
-                <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2" checked="">
-                All Day
-                </p>
-                <hr/>
-                <p class="sync_font_size">
-                <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3" checked="">
-                Interval <select id="select01" name="interval_from" class="span1">
-                    {% for i in hours %}
-                    <option>{{ i }}</option>
-                    {% endfor %}
-                </select>
-                <i class="icon-play"></i>
-                <select id="select01" name="interval_to" class="span1">
-                    {% for i in hours %}
-                    <option>{{ i }}</option>
-                    {% endfor %}
-                </select>
-                </p>
-                <hr/>
-                <p class="sync_font_size">
-                Bandwidth <input type="text" class="span1" id="input01" name="bandwidth_upload"> /
-                <input type="text" name="bandwidth_download" class="span1" id="input01">
-                </p>
-            </div>
-    </div>
-    <div class="modal-footer">
-        <a href="#" class="btn" data-dismiss="modal">Close</a>
-        <button type="submit" class="btn btn-primary">Save changes</a>
-    </div>
-    </form>
-</div>
 <div id="sync">
     {% for key, value in weeks_data.items %}
     <div id="main" class="sync_bar_main">
@@ -138,30 +92,30 @@
         </div>
         {% endif %}
         <div style="">
-            {% if value == "none" %}
-                <a data-toggle="modal" href="#myModal" class="sync_add_link">add</a>
+            {% if value.range == "none" %}
+                <a data-toggle="modal" href="#myModal{{ key }}" class="sync_add_link">add</a>
             {% else %}
-                <a data-toggle="modal" href="#myModal" class="sync_edit_link">edit</a>
+                <a data-toggle="modal" href="#myModal{{ key }}" class="sync_edit_link">edit</a>
             {% endif %}
-            <div class="sync_bar_left"><span class="sync_span"><h2>{{ key }}</h2></span></div>
+            <div class="sync_bar_left"><span class="sync_span"><h2>{{ value.name }}</h2></span></div>
             {% for i in hours %}
-                {% if value == "all" %}
+                {% if value.range == "all" %}
                     {% if forloop.last %}
                         <div id="24div" class="sync_24div_last"></div>
                     {% else %}
                         <div id="24div" class="sync_24div"></div>
                     {% endif %}
-                {% elif value == "none" %}
+                {% elif value.range == "none" %}
                     <div id="24div" class="sync_24div_none"></div>
                 {% else  %}
-                    {% if i in value  %}
-                        <div id="24div" class="sync_24div_block"></div>
-                    {% else %}
+                    {% if i in value.range  %}
                         {% if forloop.last %}
                             <div id="24div" class="sync_24div_last"></div>
                         {% else %}
                             <div id="24div" class="sync_24div"></div>
                         {% endif %}
+                    {% else %}
+                        <div id="24div" class="sync_24div_block"></div>
                     {% endif %}
                 {% endif %}
             {% endfor %}
@@ -172,6 +126,66 @@
         </div>
         {% endif %}
     </div>
+    <!--start Modal -->
+    <div class="modal hide fade" id="myModal{{ key }}" style="display: none;">
+        <div class="modal-header">
+            <button class="close" data-dismiss="modal">×</button>
+            <h3>Setting {{ value.name }}</h3>
+        </div>
+        <div class="modal-body" >
+            <form class="well form-horizontal" action="/dashboard/sync/" method="POST" >
+                {% csrf_token %}
+                <input type="hidden" name="day" value="{{ key }}">
+                <div class="">
+                    <p class="sync_font_size">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1"
+                    {% if value.option == 1 %}
+                        checked
+                    {% endif %}
+                    >
+                    No limit
+                    </p>
+                    <hr/>
+                    <p class="sync_font_size">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios2" value="2"
+                    {% if value.option == 2 %}
+                        checked
+                    {% endif %}
+                    >
+                    All Day
+                    </p>
+                    <hr/>
+                    <p class="sync_font_size">
+                    <input type="radio" name="bandwidth_option" id="optionsRadios3" value="3"
+                    {% if value.option == 3 %}
+                        checked
+                    {% endif %}
+                    >
+                    Interval <select id="select01" name="interval_from" class="span1">
+                        {% for i in hours %}
+                        <option>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                    <i class="icon-play"></i>
+                    <select id="select01" name="interval_to" class="span1">
+                        {% for i in hours %}
+                        <option>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                    </p>
+                    <hr/>
+                    <p class="sync_font_size">
+                    Bandwidth <input type="text" class="span1" id="input01" name="bandwidth" value="{{ value.bandwidth }}"> KB
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn" data-dismiss="modal">Close</a>
+                <button type="submit" class="btn btn-primary">Save changes</a>
+            </div>
+        </form>
+    </div>
+    <!-- end modal-->
     {% endfor %}
 </div>
 {% endblock tab_content %}

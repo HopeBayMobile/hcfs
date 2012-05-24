@@ -8,9 +8,39 @@ from gateway import api
 import json
 
 
+def gateway_status():
+    """
+    This function retrive all gateway status from api and return a mock data
+    if the query is failed.
+    """
+    try:
+        data = json.loads(api.get_gateway_status())['data']
+    except Exception as inst:
+        print inst
+        data = {}
+        data['cache_usage'] = {"max_cache_size": 1000,
+                               "max_cache_entries": 100,
+                               "used_cache_size": 500,
+                               "used_cache_entries": 50,
+                               "dirty_cache_size": 100,
+                               "dirty_cache_entries": 10}
+        data['storage_usage'] = {"cloud_data": "1024",
+                                 "cloud_data_dedup": "1024",
+                                 "cloud_data_dedup_compress": "1024"}
+        data["uplink_usage"] = 100
+        data["downlink_usage"] = 1000
+    return data
+
+
 @login_required
 def index(request):
-    return render(request, 'dashboard/dashboard.html')
+    data = gateway_status()
+    cache_usage = data['cache_usage']
+    maxcache = cache_usage["max_cache_size"]
+    context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
+               "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
+    context.update(data)
+    return render(request, 'dashboard/dashboard.html', context)
 
 
 def system(request, action=None):
@@ -46,9 +76,9 @@ def system(request, action=None):
             form = Network(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
         elif action == "admin_pass":
@@ -107,18 +137,18 @@ def account(request, action=None):
             form = Gateway(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
         elif action == "encrypt":
             form = EncryptionKey(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['password'].data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
             else:
                 forms_group[action] = form
 
@@ -135,7 +165,7 @@ def sharefolder(request, action):
     smb_data = json.loads(api.get_smb_user_list()).get('data')
     action_error = {}
     smb_data['username'] = smb_data['accounts'][0]
-    # print smb_data
+    print smb_data
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
         nfs_data = nfs_ip_query['data']
@@ -151,18 +181,18 @@ def sharefolder(request, action):
             array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in ip_list]))
         return NFSSetting
 
-    print action
     if request.method == "POST":
         if action == "smb_setting":
             form = SMBSetting(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.set_smb_user_list(**form.cleaned_data))
+                print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
-                    print update_return['msg']
         elif action == "nfs_setting":
             ip_list = request.POST.getlist('array_of_ip')
             update_return = json.loads(api.set_nfs_access_ip_list(ip_list))
+            print update_return
             if not update_return['result']:
                 action_error[action] = update_return['msg']
                 form = nfs_setting_generator(set(nfs_data['array_of_ip'] + ip_list))
@@ -176,31 +206,147 @@ def sharefolder(request, action):
 
 @login_required
 def sync(request):
+    load_data = json.loads(api.get_scheduling_rules())
+    data = load_data['data']
+
     if request.method == "POST":
-        print request.POST
+        query = request.POST
+        day = query['day']
+        bandwidth_option = query['bandwidth_option']
+        interval_to = query['interval_to']
+        interval_from = query['interval_from']
+        bandwidth = query['bandwidth']
+
+        for value in data:
+            if value[0] == day:
+                now = int(value[0]) - 1
+                array = []
+                if bandwidth_option == "1":
+                    array = [day, 0, 24, -1]
+                elif bandwidth_option == "2":
+                    array = [day, 0, 24, 0]
+                else:
+                    array = [day, interval_from, interval_to, bandwidth]
+                data[now] = array
+
+        api.apply_scheduling_rules(data)
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data['Mon.'] = "all"
-    weeks_data['Tue.'] = "all"
-    weeks_data['Wed.'] = "all"
-    weeks_data['Thu.'] = "all"
-    weeks_data['Fri.'] = "all"
-    weeks_data['Sat.'] = "none"
-    weeks_data['Sun.'] = range(6, 18)
+    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+
+    for value in data:
+        day = int(value[0])
+        rstart = int(value[1])
+        rend = int(value[2])
+        upload_limit = int(value[3])
+
+        if upload_limit == 0 and rstart == 0 and rend == 24:
+            weeks_data[day]['range'] = "all"
+            weeks_data[day]['option'] = 2
+        elif upload_limit < 0:
+            weeks_data[day]['range'] = "none"
+            weeks_data[day]['option'] = 1
+        else:
+            weeks_data[day]['range'] = range(rstart, rend)
+            weeks_data[day]['option'] = 3
+
+        weeks_data[day]['bandwidth'] = upload_limit
 
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
 
 
+fake_syslog = {
+    "msg": "GOGOGO",
+    "data": {
+        "error_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-01",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-04",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-07",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ],
+        "warning_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-02",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-05",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-08",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ],
+        "info_log": [
+            {
+                "category": "gateway",
+                "timestamp": "2012-05-03",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "NFS",
+                "timestamp": "2012-05-06",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            },
+            {
+                "category": "SMB",
+                "timestamp": "2012-05-09",
+                "msg": "stringstringstringstringstringstringstringstringstringstring"
+            }
+        ]
+    },
+    "result": True
+}
+
+
 @login_required
 def syslog(request):
-    log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
-    return render(request, 'dashboard/syslog.html', {'tab': 'syslog', 'msgs': log_data})
+    return_val = fake_syslog
+    # FIXME: Replace the fake logs
+    # return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    if return_val['result'] == True:
+        log_data = return_val['data']
+
+    if request.is_ajax():
+        return HttpResponse(json.dumps(log_data['error_log']))
+
+    return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
+                                                     'log_data': log_data
+                                                     })
 
 
 @login_required
-def power(request):
+def power(request, action=None):
+    if request.method == 'POST':
+        if action == 'off':
+            result = json.loads(api.shutdown_gateway())
+        elif action == 'reset':
+            result = json.loads(api.reset_gateway())
+        return HttpResponse(result)
+
     return render(request, 'dashboard/power.html', {'tab': 'power'})
 
 
@@ -214,22 +360,12 @@ def indicator(request):
         return HttpResponse(indicator_data['msg'], status=500)
 
 
-@login_required
-def get_syslog(request, category, level):
-    log_data = json.loads(api.get_gateway_system_log(int(level), 100, category))
-    return HttpResponse(json.dumps(log_data['data']))
+def status(request):
+    status_data = gateway_status()
+    return HttpResponse(json.dumps(status_data))
 
 
 @login_required
-def gateway_status(request):
-    try:
-        data = json.loads(api.get_gateway_status())
-    except:
-        data = {}
-    data['cache_usage'] = {"max_cache_size": 1000,
-                           "max_cache_entries": 100,
-                           "used_cache_size": 500,
-                           "used_cache_entries": 50,
-                           "dirty_cache_size": 100,
-                           "dirty_cache_entries": 10}
+def cache_usage(request):
+    data = gateway_status()
     return HttpResponse(json.dumps(data['cache_usage']))

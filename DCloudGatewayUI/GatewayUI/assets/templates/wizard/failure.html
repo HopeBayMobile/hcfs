@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block javascript %}
+
+{% endblock javascript %}
+{% block content %}
+<div class="row" style="padding: 120px 0;">
+	<div style="width:560px; margin: 0 auto;">
+		<div class="well">
+			<h3>The background task for this step has failed.</h3>
+
+			{% for step in meta.step_list %}
+				{% if step.result %}
+				<div class="alert alert-info">{{step.msg}}</div>
+				{% else %}
+				<div class="alert alert-error">{{step.msg}}</div>
+				{% endif %}
+			{% endfor %}
+			
+			<div style="height: 40px;">
+				<a class="btn btn-primary btn-large pull-right" href="?reset">Reset</a>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock content %}

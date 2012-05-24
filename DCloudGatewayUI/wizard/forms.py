@@ -141,30 +141,30 @@ class Test_Form_All(RenderFormMixinClass, forms.Form):
                                              max_length=20,
                                              )
 
-    fieldset = [('1. Your New Password', [
+    fieldset = [('1 Your New Password', [
                                 'new_password',
                                 'retype_new_password',
                                 ]
                  ),
-                ('2. Network Configuration', ['ip_address',
+                ('2 Network Configuration', ['ip_address',
                                 'subnet_mask',
                                 'default_gateway',
                                 'preferred_dns',
                                 'alternate_dns',
                                 ]
                  ),
-                ('3. Cloud Storage Configuration', ['cloud_storage_url',
+                ('3 Cloud Storage Configuration', ['cloud_storage_url',
                                      'cloud_storage_account',
                                      'cloud_storage_password',
                                      ]
                  ),
-                ('4. Encryption Key', ['encryption_key',
+                ('4 Encryption Key', ['encryption_key',
                                   'confirm_encryption_key',
                                   ]
                  )]
 
     def clean(self):
-        cleaned_data = super(Form_All, self).clean()
+        cleaned_data = super(Test_Form_All, self).clean()
         new_password = cleaned_data.get('new_password')
         retype_new_password = cleaned_data.get('retype_new_password')
         if new_password and retype_new_password:
