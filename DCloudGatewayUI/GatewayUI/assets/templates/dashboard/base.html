@@ -73,6 +73,10 @@
                         $(this).toggleClass('active').parent('.msg-content').css('white-space', 'nowrap');
                     }
                 );
+
+                $(".tab-btn").on('click', 'li', function(){
+                    window.location = $(this).find('a').attr('href')
+                })
             });
             {% block javascript %}
             {% endblock javascript %}
