@@ -1269,6 +1269,7 @@ def _chSmbPasswd(username, password):
     results = proc.stdout.read()
     ret_val = proc.wait() # 0 : success
 
+    log.info("change smb val: %d, message %s"%(ret_val,results))
     if ret_val != 0:
         log.error("%s"%results)
 
