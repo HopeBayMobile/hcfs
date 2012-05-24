@@ -4,5 +4,7 @@ add-apt-repository ppa:swift-core/release
 apt-get update
 apt-get install swift
 
+sudo dpkg -i ./sudo_1.8.5-2_amd64.deb
+
 python setup.py install
 

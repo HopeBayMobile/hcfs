@@ -35,11 +35,8 @@
     <script>
         $(function(){
             $(".msg-type").on("click", "span", function(){
-                console.log(this)
-                debugger
                 if ($(this).attr("class") != 'all'){
-                    $(".msg-block").has($('li.'+ $(this).attr("class")))
-                                   .show()
+                    $(".msg-block").has($('li.'+ $(this).attr("class"))).show()
                     $('.msg-block').not($(".msg-block").has($('li.'+ $(this).attr("class")))).hide()
                 } else {
                     $('.msg-block').show()

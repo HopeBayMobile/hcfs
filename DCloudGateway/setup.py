@@ -43,7 +43,7 @@ def main():
 	)
 
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
-	os.system("chmod 600 %s/Gateway.ini"%CONFDIR)
+	os.system("chmod 666 %s/Gateway.ini"%CONFDIR)
         os.system("cp config/interfaces /etc/network/interfaces")
         os.system("cp config/hosts.allow /etc")
         os.system("cp config/gw_schedule.conf %s/"%CONFDIR)
@@ -55,7 +55,7 @@ def main():
         os.system("cp uploadoff %s/"%CONFDIR)
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
-        os.system("chown -R www-data:www-data /root/.s3ql")
+        os.system("chown -R www-data:www-data %s"%CONFDIR)
 
 if __name__ == '__main__':
     main()

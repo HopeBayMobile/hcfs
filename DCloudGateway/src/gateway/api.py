@@ -59,7 +59,7 @@ DEFAULT_SHOW_LOG_LEVEL = 2
 
 enable_log = False
 
-CMD_CHK_STO_CACHE_STATE = "s3qlstat /mnt/cloudgwfiles"
+CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
 
 NUM_LOG_LINES = 20
 
@@ -205,16 +205,17 @@ def _check_network():
                 with open('/root/.s3ql/authinfo2') as op_fh:
                         op_config.readfp(op_fh)
 
+	
                 section = "CloudStorageGateway"
                 op_storage_url = op_config.get(section, 'storage-url').replace("swift://","")
 		index = op_storage_url.find(":")
 		if index != -1:
 			op_storage_url = op_storage_url[0:index]
 
-		cmd ="ping -c 5 %s"%op_storage_url
+		cmd ="sudo ping -c 5 %s"%op_storage_url
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
-		po.wait()
+                po.wait()
 
 		if po.returncode == 0:
                 	if output.find("cmp_req" and "ttl" and "time") !=-1:
@@ -238,7 +239,7 @@ def _check_system():
 	op_system_check = False
 	log.info("_check_system start")
 
-        cmd ="ps aux | grep fsck.s3ql"
+        cmd ="sudo ps aux | grep fsck.s3ql"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         lines = po.stdout.readlines()
         po.wait()
@@ -257,14 +258,15 @@ def _check_flush():
 	op_flush_inprogress = False
 	log.info("_check_flush start")
 	
-	cmd ="sudo s3qlstat /mnt/cloudgwfiles"
+	cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
 
         if po.returncode == 0:
-                if output.find("Dirty cache near full: True") !=-1:
-                        op_dirtycache_nearfull = True
+		 if output.find("Cache uploading: On") !=-1:
+                        op_flush_inprogress = True
+
         else:
                 op_msg = output
 
@@ -276,7 +278,7 @@ def _check_dirtycache():
 	op_dirtycache_nearfull = False
         log.info("_check_dirtycache start")
 
-        cmd ="sudo s3qlstat /mnt/cloudgwfiles"
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -404,10 +406,10 @@ def apply_storage_account(storage_url, account, password, test=True):
 		op_config = ConfigParser.ConfigParser()
 		#Create authinfo2 if it doesn't exist
 		if not os.path.exists('/root/.s3ql/authinfo2'):
-			os.system("mkdir -p /root/.s3ql")
-			os.system("touch /root/.s3ql/authinfo2")
-                        os.system("chown www-data:www-data /root/.s3ql/authinfo2")
-			os.system("chmod 600 /root/.s3ql/authinfo2")
+			os.system("sudo mkdir -p /root/.s3ql")
+			os.system("sudo touch /root/.s3ql/authinfo2")
+                        os.system("sudo chown www-data:www-data /root/.s3ql/authinfo2")
+			os.system("sudo chmod 600 /root/.s3ql/authinfo2")
 
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
 			op_config.readfp(op_fh)
@@ -474,7 +476,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 		_umount()
 
 		storage_url = op_config.get(section, 'storage-url')
-		cmd = "s3qladm passphrase %s/gateway/delta"%(storage_url)
+		cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		(stdout, stderr) = po.communicate(new_key)
 		if po.returncode !=0:
@@ -520,7 +522,7 @@ def _createS3qlConf( storage_url):
 		compress = "lzma" if config.get("s3ql","compress") == "true" else "none"
 		mountOpt = mountOpt + " --compress %s"%compress 
 
-		cmd ='sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
+		cmd ='sudo sh %s/createS3qlconf.sh %s %s %s "%s"'%(DIR, iface, "swift://%s/gateway/delta"%storage_url, mountpoint, mountOpt)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -541,8 +543,8 @@ def _openContainter(storage_url, account, password):
 	log.info("_openContainer start")
 
 	try:
-		os.system("touch gatewayContainer.txt")
-		cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
+		os.system("sudo touch gatewayContainer.txt")
+		cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt"%(storage_url, account, password)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
         	po.wait()
@@ -555,7 +557,7 @@ def _openContainter(storage_url, account, password):
 		if output != "gatewayContainer.txt":
 			op_msg = "Failed to open container for %s"%output
                		raise BuildGWError(op_msg)
-		os.system("rm gatewayContainer.txt")
+		os.system("sudo rm gatewayContainer.txt")
 	finally:
 		log.info("_openContainer end")
 
@@ -564,7 +566,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "python /usr/local/bin/mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -586,7 +588,7 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
-			cmd = "python /usr/local/bin/umount.s3ql %s"%(mountpoint)
+			cmd = "sudo python /usr/local/bin/umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()
 			po.wait()
@@ -613,7 +615,7 @@ def _mount(storage_url):
 
 		authfile = "/root/.s3ql/authinfo2"
 
-		os.system("mkdir -p %s"%mountpoint)
+		os.system("sudo mkdir -p %s"%mountpoint)
 		
 		if os.path.ismount(mountpoint):
 			raise BuildGWError("A filesystem is mounted on %s"%mountpoint)
@@ -622,7 +624,7 @@ def _mount(storage_url):
 			raise BuildGWError("Failed to create s3ql conf")
 
 		#mount s3ql
-		cmd = "python /usr/local/bin/mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -632,7 +634,7 @@ def _mount(storage_url):
 			raise BuildGWError(output)
 
 		#mkdir in the mountpoint for smb share
-		cmd = "mkdir -p %s/sambashare"%mountpoint
+		cmd = "sudo mkdir -p %s/sambashare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -640,7 +642,7 @@ def _mount(storage_url):
 			raise BuildGWError(output)
 
                 #change the owner of samba share to default smb account
-                cmd = "chown superuser:superuser %s/sambashare"%mountpoint
+                cmd = "sudo chown superuser:superuser %s/sambashare"%mountpoint
                 po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 output = po.stdout.read()
                 po.wait()
@@ -649,7 +651,7 @@ def _mount(storage_url):
 
 
 		#mkdir in the mountpoint for nfs share
-		cmd = "mkdir -p %s/nfsshare"%mountpoint
+		cmd = "sudo mkdir -p %s/nfsshare"%mountpoint
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -657,7 +659,7 @@ def _mount(storage_url):
 			raise BuildGWError(output)
 
                 #change the owner of nfs share to nobody:nogroup
-                cmd = "chown nobody:nogroup %s/nfsshare"%mountpoint
+                cmd = "sudo chown nobody:nogroup %s/nfsshare"%mountpoint
                 po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 output = po.stdout.read()
                 po.wait()
@@ -681,7 +683,7 @@ def _restartServices():
 	try:
 		config = getGatewayConfig()
 
-		cmd = "/etc/init.d/smbd restart"
+		cmd = "sudo /etc/init.d/smbd restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.read()
                 po.wait()
@@ -689,7 +691,7 @@ def _restartServices():
                         op_msg = "Failed to start samba service for %s."%output
 			raise BuildGWError(op_msg)
 
-                cmd = "/etc/init.d/nmbd restart"
+                cmd = "sudo /etc/init.d/nmbd restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 output = po.stdout.read()
                 po.wait()
@@ -697,7 +699,7 @@ def _restartServices():
                         op_msg = "Failed to start samba service for %s."%output
                         raise BuildGWError(op_msg)
 
-		cmd = "/etc/init.d/nfs-kernel-server restart"
+		cmd = "sudo /etc/init.d/nfs-kernel-server restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.read()
                 po.wait()
@@ -744,6 +746,7 @@ def build_gateway(user_key):
 		_openContainter(storage_url=url, account=account, password=password)
 		_mkfs(storage_url=url, key=user_key)
 		_mount(storage_url=url)
+                set_smb_user_list(default_user_id,default_user_pwd)
 		_restartServices()
  
 		op_ok = True
@@ -778,7 +781,7 @@ def restart_nfs_service():
 	op_msg = "Restarting nfs service failed."
 
 	try:
-		cmd = "/etc/init.d/nfs-kernel-server restart"
+		cmd = "sudo /etc/init.d/nfs-kernel-server restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.read()
 		po.wait()
@@ -809,12 +812,12 @@ def restart_smb_service():
 	op_msg = "Restarting samba service failed."
 
 	try:
-		cmd = "/etc/init.d/smbd restart"
+		cmd = "sudo /etc/init.d/smbd restart"
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		po.wait()
 
                 #Jiahong: Adding restarting nmbd as well
-                cmd1 = "/etc/init.d/nmbd restart"
+                cmd1 = "sudo /etc/init.d/nmbd restart"
                 po1 = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 po1.wait()
 
@@ -848,7 +851,7 @@ def reset_gateway():
 
 	if pid == 0:
 		time.sleep(10)
-		os.system("reboot")
+		os.system("sudo reboot")
 	else:
 		log.info("The gateway will restart after ten seconds.")
 		return json.dumps(return_val)
@@ -864,14 +867,14 @@ def shutdown_gateway():
 
 	if pid == 0:
 		time.sleep(10)
-		os.system("poweroff")
+		os.system("sudo poweroff")
 	else:
 		log.info("The gateway will shutdown after ten seconds.")
 		return json.dumps(return_val)
 
 @common.timeout(180)
 def _test_storage_account(storage_url, account, password):
-	cmd ="curl -k -v -H 'X-Storage-User: %s' -H 'X-Storage-Pass: %s' https://%s/auth/v1.0"%(account, password, storage_url)
+	cmd ="sudo curl -k -v -H 'X-Storage-User: %s' -H 'X-Storage-Pass: %s' https://%s/auth/v1.0"%(account, password, storage_url)
 	po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 	output = po.stdout.read()
         po.wait()
@@ -1017,7 +1020,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 		
 
 	if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
-		if os.system("/etc/init.d/networking restart") == 0:
+		if os.system("sudo /etc/init.d/networking restart") == 0:
 			op_ok = True
 			op_msg = "Succeeded to apply the network configuration."
 		else:
@@ -1055,6 +1058,8 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
 		with open(info_path, "wb") as f:
 			op_config.write(f)
 
+                os.system('sudo chown www-data:www-data %s'%info_path)
+
 		op_ok = True
 		log.info("Succeeded to store the network information.")
 
@@ -1071,6 +1076,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
 
 def _setInterfaces(ip, gateway, mask, ini_path):
 	interface_path = "/etc/network/interfaces"
+        interface_path_temp = "/etc/delta/network_interfaces"
 	op_ok = False
 	op_config = ConfigParser.ConfigParser()
 
@@ -1095,13 +1101,13 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 		return op_ok
 
 	if os.path.exists(interface_path):
-		os.system("cp -p %s %s" % (interface_path, interface_path + "_backup"))
+		os.system("sudo cp -p %s %s" % (interface_path, interface_path + "_backup"))
 	else:
-		os.system("touch %s" % interface_path)
+		os.system("sudo touch %s" % interface_path)
 		log.warning("File does not exist: %s" % interface_path)
 
 	try:
-		with open(interface_path, "w") as f:
+		with open(interface_path_temp, "w") as f:
 			f.write("auto lo\niface lo inet loopback\n")
 			f.write("\nauto eth0\niface eth0 inet static")
 			f.write("\naddress %s" % fixedIp)
@@ -1110,6 +1116,7 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 			f.write("\naddress %s" % ip)
 			f.write("\nnetmask %s" % mask)
 			f.write("\ngateway %s" % gateway)
+                os.system('sudo cp %s %s'%(interface_path_temp,interface_path))
 
 		op_ok = True
 		log.info("Succeeded to set the network configuration")
@@ -1119,7 +1126,7 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 		log.error("Failed to access %s." % interface_path)
 
 		if os.path.exists(interface_path + "_backup"):
-			if os.system("cp -p %s %s" % (interface_path + "_backup", interface_path)) != 0:
+			if os.system("sudo cp -p %s %s" % (interface_path + "_backup", interface_path)) != 0:
 				log.warning("Failed to recover %s" % interface_path)
 			else:
 				log.info("Succeeded to recover %s" % interface_path)
@@ -1133,18 +1140,21 @@ def _setInterfaces(ip, gateway, mask, ini_path):
 
 def _setNameserver(dns1, dns2=None):
 	nameserver_path = "/etc/resolv.conf"
+        nameserver_path_temp = "/etc/delta/temp_resolv.conf"
 	op_ok = False
 
-	if os.system("cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
-		os.system("touch %s" % nameserver_path)
+	if os.system("sudo cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
+		os.system("sudo touch %s" % nameserver_path)
 		log.warning("File does not exist: %s" % nameserver_path)
 
 	try:
-		with open(nameserver_path, "w") as f:
+		with open(nameserver_path_temp, "w") as f:
 			f.write("nameserver %s\n" % dns1)
 
 			if dns2 != None:
 				f.write("nameserver %s\n" % dns2)
+
+                os.system('sudo cp %s %s'%(nameserver_path_temp,nameserver_path))
 
 		op_ok = True
 		log.info("Succeeded to set the nameserver.")
@@ -1154,7 +1164,7 @@ def _setNameserver(dns1, dns2=None):
 		log.error("Failed to access %s." % nameserver_path)
 
 		if os.path.exists(nameserver_path + "_backup"):
-			if os.system("cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
+			if os.system("sudo cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
 				log.warning("Failed to recover %s" % nameserver_path)
 			else:
 				log.info("Succeeded to recover %s" % nameserver_path)
@@ -1250,7 +1260,7 @@ def get_smb_user_list ():
 
 @common.timeout(RUN_CMD_TIMEOUT)
 def _chSmbPasswd(username, password):
-    cmd = ["sh", CMD_CH_SMB_PWD, username, password]
+    cmd = ["sudo", "sh", CMD_CH_SMB_PWD, username, password]
 
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
@@ -1259,12 +1269,13 @@ def _chSmbPasswd(username, password):
     results = proc.stdout.read()
     ret_val = proc.wait() # 0 : success
 
+    log.info("change smb val: %d, message %s"%(ret_val,results))
     if ret_val != 0:
         log.error("%s"%results)
 
     return ret_val
 
-def set_smb_user_list (username, password):
+def set_smb_user_list(username, password):
     '''
     update username to /etc/samba/smb.conf and call smbpasswd to set password
     '''
@@ -1488,11 +1499,13 @@ def set_nfs_access_ip_list (array_of_ip):
         #return json.dumps(return_val)
 
     # finally, updating the file
+    nfs_hosts_allow_file_temp = '/etc/delta/hosts_allows_temp'
     try:
-        ofile = open(nfs_hosts_allow_file, 'w')
+        ofile = open(nfs_hosts_allow_file_temp, 'w')
         output = services + " : " + ", ".join(array_of_ip) + "\n"
         ofile.write(output)
         ofile.close()
+        os.system('sudo cp %s %s'%(nfs_hosts_allow_file_temp,nfs_hosts_allow_file))
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
@@ -1542,7 +1555,7 @@ def apply_scheduling_rules(schedule):			# by Yen
 	
 	# apply settings
 
-        os.system("/etc/cron.hourly/hourly_run_this")
+        os.system("sudo /etc/cron.hourly/hourly_run_this")
 
 	
 	return_val = {
@@ -1820,28 +1833,33 @@ Dirty cache near full: False
     # Flush check & DirtyCache check
     try:
         #print CMD_CHK_STO_CACHE_STATE
-        args = str(CMD_CHK_STO_CACHE_STATE).split(" ")
-        proc = subprocess.Popen(args,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT)
+        #proc  = subprocess.Popen("sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #args = str(CMD_CHK_STO_CACHE_STATE).split(" ")
+        #proc = subprocess.Popen(args,
+        #                        stdout=subprocess.PIPE,
+        #                        stderr=subprocess.STDOUT)
 
-        results = proc.stdout.read()
+        #results = proc.stdout.read()
         #print results
 
-        ret_val = proc.wait() # 0 : success
+        #ret_val = proc.wait() # 0 : success
         #proc.kill()
+
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        results = po.stdout.read()
+        po.wait()
 
         #print ret_val
         real_cloud_data = 0
 
-        if ret_val == 0: # success
+        if po.returncode == 0: # success
             '''
             very boring string parsing process.
             the format should be fixed. otherwise, won't work (no error checking)  
             '''
 
             for line in results.split("\n"):
-                #print line.strip()
                 if line.startswith("Total data size:"):
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
@@ -2069,5 +2087,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-    #print get_gateway_status()
+    print get_gateway_status()
     pass
