@@ -10,16 +10,15 @@
 
         var msg_template = Hogan.compile('{% templatetag openvariable %}#msgs{% templatetag closevariable %}<ul class="msg-block"><li class="msg-content error">{% templatetag openvariable %} msg {% templatetag closevariable %}<div class="msg-time">{% templatetag openvariable %} timestamp {% templatetag closevariable %}</div><div class="msg-detail"></div></li></ul>{% templatetag openvariable %}/msgs{% templatetag closevariable %}');
         (function(){
-            var sign = 0;
-            var margin_top = $(".slide-box").css('margin-top');
+            var open = false;
             $("#msg_btn").on("click", function(e){
-                if (sign){
-                    sign = 0
+                if (open){
+                    open = false
                     $(this).toggleClass('active')
-                    $(".slide-box").css({"margin-top": margin_top})
+                    $(".slide-box").css({"margin-top": ""})
                     $(".tab-content").show(1000)
                 } else {
-                    sign = 1
+                    open = true
                     $(this).toggleClass('active')
                     $(".slide-box").css({"margin-top": "0px"})
                     $(".tab-content").hide(1000)
