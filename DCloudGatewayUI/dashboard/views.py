@@ -68,7 +68,7 @@ def system(request, action=None):
                 if new_passord == cleaned_data['retype_password']:
                     del cleaned_data['retype_password']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The password does not match the retype password!")
             return cleaned_data
 
     if request.method == "POST":
@@ -115,21 +115,22 @@ def account(request, action=None):
                 if new_passord == cleaned_data['retype_password']:
                     del cleaned_data['retype_password']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The password does not match the retype password!")
             return cleaned_data
 
     class EncryptionKey(RenderFormMixinClass, forms.Form):
-        password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
-        retype_password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        old_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        retype_new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
 
         def clean(self):
             cleaned_data = super(EncryptionKey, self).clean()
-            new_passord = cleaned_data.get('password')
-            if new_passord:
-                if new_passord == cleaned_data['retype_password']:
-                    del cleaned_data['retype_password']
+            new_key = cleaned_data.get('new_key')
+            if new_key:
+                if new_key == cleaned_data['retype_new_key']:
+                    del cleaned_data['retype_new_key']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The newkey does not match the retype key!")
             return cleaned_data
 
     if request.method == "POST":
@@ -145,7 +146,7 @@ def account(request, action=None):
         elif action == "encrypt":
             form = EncryptionKey(request.POST)
             if form.is_valid():
-                update_return = json.loads(api.apply_user_enc_key(form['password'].data))
+                update_return = json.loads(api.apply_user_enc_key(form['old_key'].data, form['new_key'].data))
                 print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
@@ -274,70 +275,9 @@ def sync(request):
         hours, 'weeks_data': weeks_data})
 
 
-fake_syslog = {
-    "msg": "GOGOGO",
-    "data": {
-        "error_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-01",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-04",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-07",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ],
-        "warning_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-02",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-05",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-08",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ],
-        "info_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-03",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-06",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-09",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ]
-    },
-    "result": True
-}
-
-
 @login_required
 def syslog(request):
-    return_val = fake_syslog
-    # FIXME: Replace the fake logs
-    # return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
     if return_val['result'] == True:
         log_data = return_val['data']
 
