@@ -35,7 +35,11 @@ pip install $BASEPATH/deploy/externals/kombu-2.1.6.tar.gz
 pip install $BASEPATH/deploy/externals/ordereddict-1.1.tar.gz
 pip install $BASEPATH/deploy/externals/python-dateutil-1.5.tar.gz
 pip install $BASEPATH/deploy/externals/SQLAlchemy-0.7.7.tar.gz
-# Close the debug mode of PDCM when deploy sed -e "s,DEBUG = True,DEBUG = False,g" -ie $BASEPATH/GatewayUI/settings.py # Create the log file
+
+# Close the debug mode of PDCM when deploy
+sed -e "s,DEBUG = True,DEBUG = False,g" -ie $BASEPATH/GatewayUI/settings.py
+
+# Create the log file
 LOGFOLDER=$BASEPATH/lib/logs
 mkdir -p $LOGFOLDER
 touch $LOGFOLDER/errors

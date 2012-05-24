@@ -305,22 +305,40 @@
 	background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
 }
 
+
+.slide-box{
+	position: fixed;
+    width: @site-main-width;
+	z-index: 20;
+}
+
 @media screen and (max-height: 900px)
 {
 	.slide-box{
 	    .css3-transform(1s);
-	    position: fixed;
-	    width: @site-main-width;
 	    height: 580px - @site-top-height;
 	    margin-top: -(580px - @site-top-height) + @slide-box-footer-height ;
-	    z-index: 20;
+	}
+	.slide-box-body{
+		height: 580px - @site-top-height - @slide-box-footer-height;
+	}
+}
+
+@media screen and (min-height: 900px)
+{
+	.slide-box{
+	    .css3-transform(1s);
+	    height: 880px - @site-top-height;
+	    margin-top: -(880px - @site-top-height) + @slide-box-footer-height ;
+	}
+	.slide-box-body{
+		height: 880px - @site-top-height - @slide-box-footer-height;
 	}
 }
 
 .slide-box-body{
 	position: relative;
 	background-color: white;
-	height: 580px - @site-top-height - @slide-box-footer-height;
 	overflow-y: scroll;
 }
 
@@ -361,6 +379,9 @@
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
 }
 
+#msgbox-body ul:first-child{
+	margin-top: 30px;
+}
 
 .msg-block{
 	position: relative;
@@ -412,6 +433,7 @@
 	position: absolute;
 	top: 0;
 	right: 45px;
+	width: 170px;
 	height: @msg-content-height;
 	font-size: 18px;
 	line-height: @msg-content-height;
@@ -420,7 +442,7 @@
 
 .msg-content{
 	margin: 5px 0;
-	width: @site-main-width - 225px;
+	width: @site-main-width - 300px;
 	font-size: 20px;
 	// height: @msg-title-height;
 	line-height: @msg-content-height;

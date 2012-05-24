@@ -24,6 +24,8 @@
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
         <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
+        <script src="/static/js/hogan.js"></script>
+        <script src="/static/js/plugins.js"></script>
         <script type="text/javascript">
             $(function(){
                 {% if tab %}
@@ -52,7 +54,14 @@
                             }
                         }
                     });
-                    setTimeout(update_indicator, 5000);
+                    $.get('/dashboard/status/', function(ctnt, stat, opts){
+                        if (stat == 'success'){
+                            var data = JSON.parse(ctnt);
+                            $("#basic_bandwidth .down").text(data.downlink_usage);
+                            $("#basic_bandwidth .up").text(data.uplink_usage);
+                        }
+                    });
+                    setTimeout(update_indicator, 10000);
                 }
                 update_indicator();
 
@@ -107,8 +116,11 @@
                 </div>
             </div>
             <div class="notify-box-row4">
-                <p>20 / 100</p>
-                <p>100 KB / 20 Sec</p>
+                <p id="basic_bandwidth">
+                    Download / Upload:<br/>
+                    <span class="down">0</span> / <span class="up">0</span>
+                    (KB/Sec)
+                </p>
             </div>
         </div>
     </div>
@@ -127,7 +139,7 @@
               <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
               <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
               <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
-              <li class=""><a href="{% url dashboard:power %}">
+              <li class=""><a href="{% url dashboard:power action=None %}">
                     <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/" version="1.2" baseProfile="tiny" x="0px" y="0px" width="42px" height="42px" viewBox="-0.8 -50 177 250" xml:space="preserve" xmlns:xml="http://www.w3.org/XML/1998/namespace">
                     <defs>
                     </defs>

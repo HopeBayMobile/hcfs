@@ -7,6 +7,7 @@ import threading
 import datetime
 import logging
 import pickle
+import collections
 from decimal import *
 from datetime import datetime
 from ConfigParser import ConfigParser
@@ -40,21 +41,36 @@ class SpreadRingFilesError(Exception):
 	pass
 
 class SwiftDeploy:
-	def __init__(self):
+	def __init__(self, conf=None):
 		self.__deltaDir = "/etc/delta"
-		self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		if conf is None:
+			self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		else:
+			self.__SC = SwiftCfg(conf)
+
 		self.__kwparams = self.__SC.getKwparams()
 
 		self.__setDeployProgress()
 		self.__setSpreadProgress() 
 		self.__setCleanProgress()
-
+	
+		self.__setMetadataFlag()
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
 		self.__jsonStr = json.dumps(self.__kwparams)
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+
+
+	def getMetadataFlag(self):
+		return self.__metadataFlag
+
+	def __setMetadataFlag(self):
+		self.__metadataFlag = True
+
+	def __unsetMetadataFlag(self):
+		self.__metadataFlag = False
 
 	def getDeployProgress(self):
 		return self.__deployProgress
@@ -64,6 +80,9 @@ class SwiftDeploy:
 
 	def getCleanProgress(self):
 		return self.__cleanProgress
+
+	def getNumOfReplica(self):
+		return	self.__kwparams['numOfReplica']
 
 	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
@@ -127,8 +146,15 @@ class SwiftDeploy:
 			if success == False:
 				self.__deployProgress['blackList'].append(ip)
 				self.__deployProgress['message'].append(msg)
-				self.__deployProgress['code'] += 1
 			if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
+
+				ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'])
+				if ret.val == False:
+					self.__deployProgress['code'] = 1
+					self.__deployProgress['message'].append(ret.msg)
+				else:
+					self.__deployProgress['code'] = 0
+
 				self.__deployProgress['finished'] = True
 		finally:
 			lock.release()
@@ -173,108 +199,122 @@ class SwiftDeploy:
 
 	def __createMetadata(self, proxyList, storageList):
 		logger = util.getLogger(name = "createMetadata")
-		numOfReplica = self.__kwparams['numOfReplica']
-		deviceCnt = self.__kwparams['deviceCnt']
-		devicePrx = self.__kwparams['devicePrx']
-		versBase = int(time.time())*100000
-		swiftDir = "%s/swift"%self.__deltaDir
+		
+		try:
+			self.__setMetadataFlag()
+			numOfReplica = self.__kwparams['numOfReplica']
+			deviceCnt = self.__kwparams['deviceCnt']
+			devicePrx = self.__kwparams['devicePrx']
+			versBase = int(time.time())*100000
+			swiftDir = "%s/swift"%self.__deltaDir
 
-		if os.path.isdir(swiftDir):
-			os.system("rm -rf %s"%swiftDir)
+			if os.path.isdir(swiftDir):
+				os.system("rm -rf %s"%swiftDir)
 
-		os.system("mkdir -p %s"%swiftDir)
-		os.system("touch %s/proxyList"%swiftDir)
-		os.system("touch %s/versBase"%swiftDir)
-		with open("%s/proxyList"%swiftDir, "wb") as fh:
-			pickle.dump(proxyList, fh)
+			os.system("mkdir -p %s"%swiftDir)
+			os.system("touch %s/proxyList"%swiftDir)
+			os.system("touch %s/versBase"%swiftDir)
+			with open("%s/proxyList"%swiftDir, "wb") as fh:
+				pickle.dump(proxyList, fh)
 			
-		with open("%s/versBase"%swiftDir, "wb") as fh:
-			pickle.dump(versBase, fh)
+			with open("%s/versBase"%swiftDir, "wb") as fh:
+				pickle.dump(versBase, fh)
 
-		os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
-		for node in storageList: 
-			for j in range(deviceCnt):
-				deviceName = devicePrx + str(j+1)
-				cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s"% (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
-				logger.info(cmd)
-				os.system(cmd)
+			os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
+			for node in storageList: 
+				for j in range(deviceCnt):
+					deviceName = devicePrx + str(j+1)
+					cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s"% (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
+					logger.info(cmd)
+					os.system(cmd)
 
-		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR,swiftDir))
-		os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR,swiftDir))
+			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+		finally:
+			self.__unsetMetadataFlag()
 
 	def __updateMetadata2AddNodes(self, proxyList, storageList):
-		logger = util.getLogger(name = "__updateMetadata2AddNodes")
-		numOfReplica = self.__kwparams['numOfReplica']
-		deviceCnt = self.__kwparams['deviceCnt']
-		devicePrx = self.__kwparams['devicePrx']
+		try:
+			logger = util.getLogger(name = "__updateMetadata2AddNodes")
+			self.__setMetadataFlag()
+			numOfReplica = self.__kwparams['numOfReplica']
+			deviceCnt = self.__kwparams['deviceCnt']
+			devicePrx = self.__kwparams['devicePrx']
 
-		swiftDir = "%s/swift"%self.__deltaDir
+			swiftDir = "%s/swift"%self.__deltaDir
 		
-		oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
-		oriProxyList = []
-		with open("%s/proxyList"%swiftDir, "rb") as fh:
-			oriProxyList=pickle.load(fh)
+			oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+			oriProxyList = []
+			with open("%s/proxyList"%swiftDir, "rb") as fh:
+				oriProxyList=pickle.load(fh)
 
-		for node in proxyList:
-			if node["ip"] in oriSwiftNodeIpSet:
-				raise UpdateMetadataError("Node %s already exists"%node["ip"])
+			for node in proxyList:
+				if node["ip"] in oriSwiftNodeIpSet:
+					raise UpdateMetadataError("Node %s already exists"%node["ip"])
 			
-		completeProxyList = oriProxyList + proxyList
+			completeProxyList = oriProxyList + proxyList
 
-		for node in storageList:
-			if node["ip"] in oriSwiftNodeIpSet:
-				raise UpdateMetadataError("Node %s already exists"%node["ip"])
+			for node in storageList:
+				if node["ip"] in oriSwiftNodeIpSet:
+					raise UpdateMetadataError("Node %s already exists"%node["ip"])
 			
-		with open("%s/proxyList"%swiftDir, "wb") as fh:
-			pickle.dump(completeProxyList, fh)
+			with open("%s/proxyList"%swiftDir, "wb") as fh:
+				pickle.dump(completeProxyList, fh)
 
-		for node in storageList: 
-			for j in range(deviceCnt):
-				deviceName = devicePrx + str(j+1)
-				cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s"% (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
-				logger.info(cmd)
-				os.system(cmd)
+			for node in storageList: 
+				for j in range(deviceCnt):
+					deviceName = devicePrx + str(j+1)
+					cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s"% (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
+					logger.info(cmd)
+					os.system(cmd)
 
-		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
-		os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
+			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+		finally:
+			self.__unsetMetadataFlag()
+
 
 	def __updateMetadata2DeleteNodes(self, proxyList, storageList):
-		logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
-		numOfReplica = self.__kwparams['numOfReplica']
-		deviceCnt = self.__kwparams['deviceCnt']
-		devicePrx = self.__kwparams['devicePrx']
+		try:
+			logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
+			self.__setMetadataFlag()
+			numOfReplica = self.__kwparams['numOfReplica']
+			deviceCnt = self.__kwparams['deviceCnt']
+			devicePrx = self.__kwparams['devicePrx']
 
-		swiftDir = "%s/swift"%self.__deltaDir
+			swiftDir = "%s/swift"%self.__deltaDir
 		
-		oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
-		oriProxyList = []
-		with open("%s/proxyList"%swiftDir, "rb") as fh:
-			oriProxyList=pickle.load(fh)
+			oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+			oriProxyList = []
+			with open("%s/proxyList"%swiftDir, "rb") as fh:
+				oriProxyList=pickle.load(fh)
 
-		for node in proxyList:
-			if not node["ip"] in oriSwiftNodeIpSet:
-				raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
+			for node in proxyList:
+				if not node["ip"] in oriSwiftNodeIpSet:
+					raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
 				
 			
 
-		completeProxyList =[node for node in oriProxyList if node not in proxyList]
+			completeProxyList =[node for node in oriProxyList if node not in proxyList]
 
-		for node in storageList:
-			if not node["ip"] in oriSwiftNodeIpSet:
-				raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
+			for node in storageList:
+				if not node["ip"] in oriSwiftNodeIpSet:
+					raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
 			
-		with open("%s/proxyList"%swiftDir, "wb") as fh:
-			pickle.dump(completeProxyList, fh)
+			with open("%s/proxyList"%swiftDir, "wb") as fh:
+				pickle.dump(completeProxyList, fh)
 
-		for node in storageList: 
-			for j in range(deviceCnt):
-				deviceName = devicePrx + str(j+1)
-				cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s"% (BASEDIR, node["ip"], deviceName, swiftDir)
-				logger.info(cmd)
-				os.system(cmd)
+			for node in storageList: 
+				for j in range(deviceCnt):
+					deviceName = devicePrx + str(j+1)
+					cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s"% (BASEDIR, node["ip"], deviceName, swiftDir)
+					logger.info(cmd)
+					os.system(cmd)
 
-		os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
-		os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
+			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
+		finally:
+			self.__unsetMetadataFlag()
 
 	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
@@ -409,17 +449,15 @@ class SwiftDeploy:
 	def deploySwift(self, proxyList, storageList):
 		logger = util.getLogger(name="deploySwift")
 
-		self.__createMetadata(proxyList, storageList)
-		self.__setDeployProgress()
-		self.__proxyList = proxyList
-		self.__storageList = storageList
-		self.__proxyDeploy()
-		self.__storageDeploy()
-
-		#create a defautl account:user 
-		cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(self.__kwparams['password'], self.__proxyList[0]["ip"])	
-		os.system(cmd)	
-		os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (self.__proxyList[0]["ip"], self.__kwparams['password']))
+		try:
+			self.__createMetadata(proxyList, storageList)
+			self.__setDeployProgress()
+			self.__proxyList = proxyList
+			self.__storageList = storageList
+			self.__proxyDeploy()
+			self.__storageDeploy()
+		except Exception as e:
+			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
 
 	def __spreadRingFilesSubtask(self, nodeIP):
 		logger = util.getLogger(name="spreadRingFilesSubtask: %s" % nodeIP)
@@ -495,6 +533,59 @@ class SwiftDeploy:
 			msg = "Failed to clean %s for %s"%(nodeIp, str(err))
 			logger.error(msg)
 			self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
+
+
+	def __isDeploymentOk(self, proxyList, storageList, blackList):
+		numOfReplica = self.__kwparams['numOfReplica']
+
+		zidSet = set()
+		failedZones = set()
+		proxyIpSet = set()
+		failedProxyIpSet = set()
+		ip2Zid ={}
+		val = False 
+		msg = ""
+
+		try:
+			#Criteria1: number of zones has to be greater than or equal to number of replica
+			for node in storageList:
+				zidSet.add(node["zid"])
+
+			if len(zidSet) < numOfReplica:
+				raise Exception("Number of zones is less than number of replica.")		
+
+
+			#Criteria2: number of zones containing failed nodes has to be less than number of replica
+			for node in storageList:
+				ip2Zid.setdefault(node["ip"], node["zid"])
+
+			for ip in blackList:
+				if ip2Zid.get(ip) is not None:
+					failedZones.add(ip2Zid[ip])
+
+			if len(failedZones) >= numOfReplica:
+				raise Exception("More than %d (number of replica) zones containing failed nodes"%numOfReplica) 
+
+			#Criteria3: at least one proxy node is healthy
+			for node in proxyList:
+				proxyIpSet.add(node["ip"])
+		
+			for ip in blackList:
+				if ip in proxyIpSet:
+					failedProxyIpSet.add(ip)
+
+			if len(proxyIpSet) == len(failedProxyIpSet):
+				raise Exception("No proxy node is successfully deployed")
+
+			val = True
+
+		except Exception as e:
+			val = False
+			msg = str(e)
+		finally:
+			Bool = collections.namedtuple("Bool", "val msg")
+			return Bool(val, msg)
+
 
 	def spreadRingFiles(self):
 		swiftDir = "%s/swift"%self.__deltaDir
@@ -574,7 +665,6 @@ class SwiftDeploy:
 
 		
 
-
 def parseNodeFiles(proxyFile, storageFile):
 	proxyList =[]
 	storageList = []
@@ -645,22 +735,25 @@ def addNodes():
 		SD = SwiftDeploy()
 		t = Thread(target=SD.addNodes, args=(proxyList, storageList))
 		t.start()
+
+		print "Updating Metadata..."
+		while SD.getMetadataFlag() == True:
+			time.sleep(10)
+		
+		print "Deploy new nodes..."
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
 			time.sleep(10)
 			print progress
 			progress = SD.getDeployProgress()
-		print "Swift deploy is done!"
 
-		print "Start to spread ring files"
-
+		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
 		while spreadProgress['finished'] != True:
 			time.sleep(8)
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
-		print "Finished to spread ring files"
 		return 0
 	except Exception as e:
 		print >>sys.stderr, str(e)
@@ -684,7 +777,11 @@ def deleteNodes():
 		t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
 		t.start()
 
-		print "Start to spread ring files"
+		print "Updating Metadata..."
+		while SD.getMetadataFlag() == True:
+			time.sleep(10)
+
+		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
 		print spreadProgress
 		while spreadProgress['finished'] != True:
@@ -692,8 +789,7 @@ def deleteNodes():
 			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
 
-
-		print "Start to clean nodes"
+		print "Clean nodes..."
 		cleanProgress = SD.getCleanProgress()
 		print cleanProgress
 		while cleanProgress['finished'] != True:
@@ -720,15 +816,33 @@ def deploy():
 						
 		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
 
+		#TODO: read config from /etc/delta/
+		SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		password = SC.getKwparams()['password']
+
 		SD = SwiftDeploy()
 		t = Thread(target=SD.deploySwift, args=(proxyList, storageList))
 		t.start()
+
+		print "Creating Metadata..."
+		while SD.getMetadataFlag() == True:
+			time.sleep(10)
+
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
 			time.sleep(8)
 			print progress
 			progress = SD.getDeployProgress()
-		print "Swift deploy process is done!"
+
+		if progress['code'] == 0:
+			print "Swift deploy process is done!"
+			#create a default account:user
+			print "Create a default user..."
+			cmd = "swauth-prep -K %s -A https://%s:8080/auth/"%(password, proxyList[0]["ip"])	
+			os.system(cmd)	
+			os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass"% (proxyList[0]["ip"], password))
+		else:
+			print "Swift deploy failed"
 
 		return 0
 	except Exception as e:

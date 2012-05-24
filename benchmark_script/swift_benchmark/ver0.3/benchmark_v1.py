@@ -16,8 +16,8 @@ fnc_create_a_folder()
 fnc_write_a_file(tmp_dir)
 
 #------------------
-while True:
-#~ for i in range(200):
+#~ while True:
+for i in range(30):
 	action = random.choice('WWWWWWRRRD')
 	if action=="W":
 		fnc_write_a_file(tmp_dir)

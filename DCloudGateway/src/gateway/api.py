@@ -407,7 +407,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 		if not os.path.exists('/root/.s3ql/authinfo2'):
 			os.system("sudo mkdir -p /root/.s3ql")
 			os.system("sudo touch /root/.s3ql/authinfo2")
-                        os.system("chown www-data:www-data /root/.s3ql/authinfo2")
+                        os.system("sudo chown www-data:www-data /root/.s3ql/authinfo2")
 			os.system("sudo chmod 600 /root/.s3ql/authinfo2")
 
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:

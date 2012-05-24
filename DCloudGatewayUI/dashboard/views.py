@@ -14,17 +14,21 @@ def gateway_status():
     if the query is failed.
     """
     try:
-        data = json.loads(api.get_gateway_status())
-        print data
+        data = json.loads(api.get_gateway_status())['data']
     except Exception as inst:
         print inst
         data = {}
-    data['cache_usage'] = {"max_cache_size": 1000,
-                           "max_cache_entries": 100,
-                           "used_cache_size": 500,
-                           "used_cache_entries": 50,
-                           "dirty_cache_size": 100,
-                           "dirty_cache_entries": 10}
+        data['cache_usage'] = {"max_cache_size": 1000,
+                               "max_cache_entries": 100,
+                               "used_cache_size": 500,
+                               "used_cache_entries": 50,
+                               "dirty_cache_size": 100,
+                               "dirty_cache_entries": 10}
+        data['storage_usage'] = {"cloud_data": "1024",
+                                 "cloud_data_dedup": "1024",
+                                 "cloud_data_dedup_compress": "1024"}
+        data["uplink_usage"] = 100
+        data["downlink_usage"] = 1000
     return data
 
 
@@ -33,9 +37,9 @@ def index(request):
     data = gateway_status()
     cache_usage = data['cache_usage']
     maxcache = cache_usage["max_cache_size"]
-    context = {"cache_usage": cache_usage,
-               "dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
+    context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
+    context.update(data)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -220,7 +224,7 @@ def sync(request):
                 if bandwidth_option == "1":
                     array = [day, 0, 24, -1]
                 elif bandwidth_option == "2":
-                    array = [day, 0, 24, 0]
+                    array = [day, 0, 24, bandwidth]
                 else:
                     array = [day, interval_from, interval_to, bandwidth]
                 data[now] = array
@@ -229,13 +233,22 @@ def sync(request):
 
     hours = range(0, 24)
     weeks_data = SortedDict()
-    weeks_data[1] = {'name': 'Mon.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[2] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[3] = {'name': 'Wed.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[4] = {'name': 'Thu.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[5] = {'name': 'Fri.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[6] = {'name': 'Sat.', 'range': 'all', 'bandwidth': '0', 'option': 1}
-    weeks_data[7] = {'name': 'Sun.', 'range': 'all', 'bandwidth': '0', 'option': 1}
+
+    for i in range(1, 8):
+        weeks_data[i] = {'name': '',
+                         'range': 'all',
+                         'bandwidth': '0',
+                         'interval_from': '-1',
+                         'interval_to': '-1',
+                         'option': 1}
+
+    weeks_data[1]['name'] = 'Mon.'
+    weeks_data[2]['name'] = 'Tue.'
+    weeks_data[3]['name'] = 'Wed.'
+    weeks_data[4]['name'] = 'Thu.'
+    weeks_data[5]['name'] = 'Fri.'
+    weeks_data[6]['name'] = 'Sat.'
+    weeks_data[7]['name'] = 'Sun.'
 
     for value in data:
         day = int(value[0])
@@ -243,15 +256,17 @@ def sync(request):
         rend = int(value[2])
         upload_limit = int(value[3])
 
-        if upload_limit == 0 and rstart == 0 and rend == 24:
+        if upload_limit > 0 and rstart == 0 and rend == 24:
             weeks_data[day]['range'] = "all"
             weeks_data[day]['option'] = 2
         elif upload_limit < 0:
             weeks_data[day]['range'] = "none"
             weeks_data[day]['option'] = 1
         else:
-            weeks_data[day]['range'] = range(rstart, rend)
+            weeks_data[day]['range'] = range(rstart, rend + 1)
             weeks_data[day]['option'] = 3
+            weeks_data[day]['interval_from'] = rstart
+            weeks_data[day]['interval_to'] = rend
 
         weeks_data[day]['bandwidth'] = upload_limit
 
@@ -322,9 +337,12 @@ fake_syslog = {
 def syslog(request):
     return_val = fake_syslog
     # FIXME: Replace the fake logs
-    # log_data = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    # return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
     if return_val['result'] == True:
         log_data = return_val['data']
+
+    if request.is_ajax():
+        return HttpResponse(json.dumps(log_data['error_log']))
 
     return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
                                                      'log_data': log_data
@@ -332,7 +350,14 @@ def syslog(request):
 
 
 @login_required
-def power(request):
+def power(request, action=None):
+    if request.method == 'POST':
+        if action == 'off':
+            result = json.loads(api.shutdown_gateway())
+        elif action == 'reset':
+            result = json.loads(api.reset_gateway())
+        return HttpResponse(result)
+
     return render(request, 'dashboard/power.html', {'tab': 'power'})
 
 
@@ -346,13 +371,12 @@ def indicator(request):
         return HttpResponse(indicator_data['msg'], status=500)
 
 
-@login_required
-def get_syslog(request, category, level):
-    log_data = json.loads(api.get_gateway_system_log(int(level), 100, category))
-    return HttpResponse(json.dumps(log_data['data']))
+def status(request):
+    status_data = gateway_status()
+    return HttpResponse(json.dumps(status_data))
 
 
 @login_required
-def gateway_cache_usage(request):
+def cache_usage(request):
     data = gateway_status()
     return HttpResponse(json.dumps(data['cache_usage']))

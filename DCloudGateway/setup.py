@@ -57,6 +57,5 @@ def main():
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)
 
-
 if __name__ == '__main__':
     main()
