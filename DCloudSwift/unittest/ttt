@@ -1,8 +1,0 @@
-[storage]
-password = deltacloud
-deviceCnt = 6
-
-[log]
-level = DEBUG
-dir = /var/log/deltaSwift/
-name = deltaSwift.log
