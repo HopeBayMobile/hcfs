@@ -575,6 +575,18 @@ def _mkfs(storage_url, key):
                			raise BuildGWError(op_msg)
 			else:
 				log.info("Found existing file system!")
+                                log.info("Conducting forced file system check")
+                                cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/gateway/delta"%(storage_url)
+                                po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                                output = po.stdout.read()
+                                po.wait()
+
+                                if po.returncode != 0:
+                                    log.error("[error] Error found during fsck (%s)"%output)
+                                else:
+                                    log.info("fsck completed")
+
+ 
 	finally:
 		log.info("_mkfs end")
 
