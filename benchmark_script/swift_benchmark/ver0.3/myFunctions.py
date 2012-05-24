@@ -37,7 +37,7 @@ def get_random_word(wordLen):
 def fnc_pick_a_file_size():
 	file_size = (4, 32, 256, 1024, 4096, 16384, 131072, 1048576, 8388608)  # unit = KB
 	#weight = (4,8,16,32,64,32,8,4,1)
-	weight =    (4, 8,  16,  32,    16,    8,    4,       0,       0)
+	weight =    (4, 8,  16,  32,    16,    8,    1,       0,       0)
 	total = sum(weight);	idx=0
 	r = random.randint(0,total)  # pick a file size where weight is used for likelihood
 	for x in weight:
@@ -108,7 +108,7 @@ def fnc_read_all_files(tmp_dir):
 	# read all files in the list
 	row = cursor.fetchall()	
 	for r in row:
-		fpath = r[2];		fname = r[1];		file_size = r[3]
+		fpath = r[2];		fname = r[1];		fs = r[3]
 		qstr = "INSERT INTO Operation_Log SET action='read file', start_time=NOW(),\
 		file_size="+ str(fs) +", success=0, verify_checksum=0, note='"  
 		qstr += fpath + fname + "'"
@@ -387,3 +387,19 @@ def fnc_delete_a_file():
 	cursor.close()
 	db.commit()
 	db.close()
+
+##--------------------------------------------------------------------------------------------
+## clean up previous test containers
+def clean_test_containers():
+	cmd = 'swift -A https://' + SWIFT_IP + ':8080/auth/v1.0 -U ' + SWIFT_USER + ' -K ' + SWIFT_PW + ' list'
+	p = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+	p.wait()
+	while True:
+		container = p.stdout.readline()
+		if not container:
+			break
+		container = container.split()[0];
+		if container.find('test_')==0:		# clean up containers with name initial "test_"
+			print "		deleting container: " + container
+			cmd = 'swift -A https://' + SWIFT_IP + ':8080/auth/v1.0 -U ' + SWIFT_USER + ' -K ' + SWIFT_PW + ' delete ' + container
+			os.system(cmd)

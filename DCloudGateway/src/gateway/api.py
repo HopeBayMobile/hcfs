@@ -42,9 +42,9 @@ LOG_PARSER = {
 # if a keywork match a msg, the msg is belong to the class
 # key = level, val = keyword array
 KEYWORD_FILTER = {
-                  "error_log" : ["error", "exception"],
-                  "warning_log" : ["warning"],
-                  "info_log" : ["nfs", "cifs" , "."],
+                  "error_log" : ["error", "exception"], # 0
+                  "warning_log" : ["warning"], # 1
+                  "info_log" : ["nfs", "cifs" , "."], #2
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
@@ -406,6 +406,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 		if not os.path.exists('/root/.s3ql/authinfo2'):
 			os.system("mkdir -p /root/.s3ql")
 			os.system("touch /root/.s3ql/authinfo2")
+                        os.system("chown www-data:www-data /root/.s3ql/authinfo2")
 			os.system("chmod 600 /root/.s3ql/authinfo2")
 
         	with open('/root/.s3ql/authinfo2','rb') as op_fh:
@@ -563,7 +564,7 @@ def _mkfs(storage_url, key):
 	log.info("_mkfs start")
 
 	try:
-		cmd = "mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
+		cmd = "python /usr/local/bin/mkfs.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta"%(storage_url)
 		po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdout, stderr) = po.communicate(key)
         	if po.returncode != 0:
@@ -585,7 +586,7 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
-			cmd = "umount.s3ql %s"%(mountpoint)
+			cmd = "python /usr/local/bin/umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()
 			po.wait()
@@ -621,7 +622,7 @@ def _mount(storage_url):
 			raise BuildGWError("Failed to create s3ql conf")
 
 		#mount s3ql
-		cmd = "mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
+		cmd = "python /usr/local/bin/mount.s3ql %s --authfile %s swift://%s/gateway/delta %s"%(mountOpt, authfile, storage_url, mountpoint)
 		po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 		output = po.stdout.read()
 		po.wait()
@@ -1259,7 +1260,7 @@ def _chSmbPasswd(username, password):
     ret_val = proc.wait() # 0 : success
 
     if ret_val != 0:
-        log.err("%s"%results)
+        log.error("%s"%results)
 
     return ret_val
 
@@ -1287,7 +1288,7 @@ def set_smb_user_list (username, password):
         
         #print username_arr
     except:
-        log.err("set_smb_user_list fails")
+        log.error("set_smb_user_list fails")
         return_val['msg'] = 'cannot read current user list.'
         return json.dumps(return_val)
     
@@ -1644,6 +1645,8 @@ def parse_log (type, log_cnt):
     '''
     parse a log line to log_entry data structure 
     different types require different parser
+    if a log line doesn't match the pattern, it return None
+    
     #type = syslog
     #log_cnt = "May 10 13:43:46 ubuntu dhclient: bound to 172.16.229.78 -- renewal in 277 seconds."
 
@@ -1666,7 +1669,7 @@ def parse_log (type, log_cnt):
     m = pat.match(log_cnt)
     if m == None:
         #print "Not found"
-        return {}
+        return None
 
     #print "match"
     #print m.group()
@@ -1710,15 +1713,15 @@ def parse_log (type, log_cnt):
     except Exception as err:
         #print "datatime error"
         #print Exception
-        print err
-        return {}
+        #print err
+        return None
 
     #print "timestamp = "
     #print timestamp
     #print "msg = "
     #print msg
     log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
-    log_entry["timestamp"] = str(timestamp.now())
+    log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
     log_entry["msg"] = msg
     return log_entry
 
@@ -1761,7 +1764,8 @@ def read_logs(logfiles_dict, offset, num_lines):
 
             for log in log_buf[ offset : offset + nums]:
                 log_entry = parse_log(type, log)
-                ret_log_cnt[type].append(log_entry)
+                if not log_entry == None: #ignore invalid log line 
+                    ret_log_cnt[type].append(log_entry)
 
         except :
             pass
@@ -1828,6 +1832,7 @@ Dirty cache near full: False
         #proc.kill()
 
         #print ret_val
+        real_cloud_data = 0
 
         if ret_val == 0: # success
             '''
@@ -1841,6 +1846,7 @@ Dirty cache near full: False
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
                     #print int(float(val)/1024.0)
+                    real_cloud_data = float(val)
                     ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
                     #print val
 
@@ -1900,6 +1906,7 @@ Dirty cache near full: False
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
+                    real_cloud_data = real_cloud_data - float(crt_val)
                     ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
                     #print crt_val
 
@@ -1907,6 +1914,7 @@ Dirty cache near full: False
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
                     #print max_val
+                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
 
     except Exception:
         #print Exception
@@ -1936,8 +1944,13 @@ def get_network_speed(iface_name): # iface_name = eth1
     time.sleep(1)
     next_status = get_network_status(iface_name)
 
-    ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
-    ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
+    try:
+        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
+        ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
+    except:
+        ret_val["downlink_usage"] = 0 
+        ret_val["uplink_usage"] = 0
+        
 
     return ret_val
 
@@ -2056,5 +2069,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-	print get_gateway_indicators()
-	pass
+    #print get_gateway_status()
+    pass

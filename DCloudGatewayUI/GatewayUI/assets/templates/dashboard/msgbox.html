@@ -1,23 +1,5 @@
 <div id="msgbox" class="slide-box">
     <div id="msgbox-body" class="slide-box-body">
-        <ul class="msg-block" style="margin-top: 30px;">
-            <li class="msg-content">This is a fake message. This is a fake message. This is a fake message.werlwerlewkrl;ewl;rkewkgkotjiojiojnoiik
-                <div class="msg-time">2012-05-20</div>
-                <div class="msg-detail"></div>
-            </li>
-        </ul>
-        <ul class="msg-block">
-            <li class="msg-content">This is a fake message. This is a fake message.
-                <div class="msg-time">2012-05-20</div>
-                <div class="msg-detail"></div>
-            </li>
-        </ul>
-        <ul class="msg-block">
-            <li class="msg-content">This is a fake message. This is a fake message. This is a fake message.
-                <div class="msg-time">2012-05-20</div>
-                <div class="msg-detail"></div>
-            </li>
-        </ul>
     </div>
     <div class="slide-box-footer-bg"></div>
     <div class="slide-box-footer">
@@ -25,6 +7,8 @@
         <div id="msg_btn" class="toggle-btn"></div>
     </div>
     <script type="text/javascript">
+
+        var msg_template = Hogan.compile('{% templatetag openvariable %}#msgs{% templatetag closevariable %}<ul class="msg-block"><li class="msg-content error">{% templatetag openvariable %} msg {% templatetag closevariable %}<div class="msg-time">{% templatetag openvariable %} timestamp {% templatetag closevariable %}</div><div class="msg-detail"></div></li></ul>{% templatetag openvariable %}/msgs{% templatetag closevariable %}');
         (function(){
             var sign = 0;
             var margin_top = $(".slide-box").css('margin-top');
@@ -40,6 +24,10 @@
                     $(".slide-box").css({"margin-top": "0px"})
                     $(".tab-content").hide(1000)
                 }
+            });
+            $.get('/dashboard/syslog/', function(ctnt, success, opt){
+                var msgs = JSON.parse(ctnt)
+                $(msg_template.render({'msgs': msgs})).appendTo('#msgbox-body')
             });
         })();
     </script>

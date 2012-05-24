@@ -4,25 +4,16 @@
 	<h2>Storage space usage</h2>
 	<hr />
 	<section>
-		<p>Total amount of data stored</p>
-		<div class="percentage-bar">
-			<div class="total-usage"></div>
-			<div class="current-usage"></div>
-		</div>
+		<h3>Cloud Data</h3>
+		<p>{{ storage_usage.cloud_data }} KB</p>
 	</section>
 	<section>
-		<p>Total amount of data stored</p>
-		<div class="percentage-bar">
-			<div class="total-usage"></div>
-			<div class="current-usage"></div>
-		</div>
+		<h3>Cloud Data Dedup</h3>
+		<p>{{ storage_usage.cloud_data_dedup }} KB</p>
 	</section>
 	<section>
-		<p>Total amount of data stored</p>
-		<div class="percentage-bar">
-			<div class="total-usage"></div>
-			<div class="current-usage"></div>
-		</div>
+		<h3>Cloud Data Dedup Compress</h3>
+		<p>{{ storage_usage.cloud_data_dedup_compress }} KB</p>
 	</section>
 </div>
 <div class="cache-usage-bar">
@@ -53,7 +44,7 @@
 <script type="text/javascript">
 	$(function(){
 		function update_cache(){
-	        $.get('/dashboard/gateway_cache_usage/', function(ctnt, stat, opts){
+	        $.get('/dashboard/cache_usage/', function(ctnt, stat, opts){
 	            var data = JSON.parse(ctnt);
 	            for (key in data){
 	            	$('#'+key).find('span').text(data[key])

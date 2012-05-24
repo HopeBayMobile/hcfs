@@ -1,0 +1,1 @@
+mv: cannot stat `abc': No such file or directory

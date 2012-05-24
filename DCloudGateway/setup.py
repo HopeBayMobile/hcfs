@@ -53,7 +53,9 @@ def main():
         os.system("cp shaping_port_8080.sh %s/"%CONFDIR)
         os.system("cp uploadon %s/"%CONFDIR)
         os.system("cp uploadoff %s/"%CONFDIR)
-
+        os.system("rm -rf /root/.s3ql/*")
+        os.system("chmod -R 777 /root")
+        os.system("chown -R www-data:www-data /root/.s3ql")
 
 if __name__ == '__main__':
     main()
