@@ -264,8 +264,9 @@ def _check_flush():
         po.wait()
 
         if po.returncode == 0:
-                if output.find("Dirty cache near full: True") !=-1:
-                        op_dirtycache_nearfull = True
+		 if output.find("Cache uploading: On") !=-1:
+                        op_flush_inprogress = True
+
         else:
                 op_msg = output
 
