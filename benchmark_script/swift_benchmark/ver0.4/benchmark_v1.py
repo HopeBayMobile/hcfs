@@ -17,15 +17,18 @@ fnc_write_a_file(tmp_dir)
 
 #------------------
 #~ while True:
-for i in range(30):
-	action = random.choice('WWWWWWRRRD')
+for i in range(100):
+	action = random.choice('WWWWWWWWWWWWWWWWWWRRRD')
 	if action=="W":
 		fnc_write_a_file(tmp_dir)
 	elif action=="R":
-		fnc_read_a_file(tmp_dir)
+		## pick up a file from the File_List table
+		res = fnc_pick_a_file()
+		fpath = res[0];		fname = res[1];		fs = res[2]
+		fnc_read_a_file(tmp_dir, fpath, fname, fs)
 	elif action=="D":
-		fnc_delete_a_file()
+		fnc_delete_a_file(tmp_dir)
+		
 	time.sleep(1)
-	# delete log file
-	os.system("rm "+tmp_dir+"log*.txt")
+	
 
