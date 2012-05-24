@@ -5,33 +5,33 @@
 	<hr />
 	<section>
 		<h3>Cloud Data</h3>
-		<p>{{ storage_usage.cloud_data }} KB</p>
+		<p>{{ cloud_storage_usage.cloud_data }} GB</p>
 	</section>
 	<section>
 		<h3>Cloud Data Dedup</h3>
-		<p>{{ storage_usage.cloud_data_dedup }} KB</p>
+		<p>{{ cloud_storage_usage.cloud_data_dedup }} GB</p>
 	</section>
 	<section>
 		<h3>Cloud Data Dedup Compress</h3>
-		<p>{{ storage_usage.cloud_data_dedup_compress }} KB</p>
+		<p>{{ cloud_storage_usage.cloud_data_dedup_compress }} GB</p>
 	</section>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_1.png" alt="">
-			<p id="dirty_cache_size">Dirty cache: <span>{{cache_usage.dirty_cache_size}}</span>GB</p>
-			<p id="dirty_cache_entries">Dirty entries: <span>{{cache_usage.dirty_cache_entries}}</span></p>
+			<p id="dirty_cache_size">Dirty cache: <span>{{gateway_cache_usage.dirty_cache_size}}</span>GB</p>
+			<p id="dirty_cache_entries">Dirty entries: <span>{{gateway_cache_usage.dirty_cache_entries}}</span></p>
 		</div>
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_2.png" alt="">
-			<p id="used_cache_size">Used cache: <span>{{cache_usage.used_cache_size}}</span>GB</p>
-			<p id="used_cache_entries">Used entries: <span>{{cache_usage.used_cache_entries}}</span></p>
+			<p id="used_cache_size">Used cache: <span>{{gateway_cache_usage.used_cache_size}}</span>GB</p>
+			<p id="used_cache_entries">Used entries: <span>{{gateway_cache_usage.used_cache_entries}}</span></p>
 		</div>
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
-			<p id="max_cache_size">Max cache: <span>{{cache_usage.max_cache_size}}</span>GB</p>
-			<p id="max_cache_entries">Max entries: <span>{{cache_usage.max_cache_entries}}</span></p>
+			<p id="max_cache_size">Max cache: <span>{{gateway_cache_usage.max_cache_size}}</span>GB</p>
+			<p id="max_cache_entries">Max entries: <span>{{gateway_cache_usage.max_cache_entries}}</span></p>
 		</div>
 	</div>
 	<div class="usage">

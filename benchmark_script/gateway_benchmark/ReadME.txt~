@@ -1,0 +1,6 @@
+Change Log
+
+ver0.2:
+	1. Enable connecting to remote mysql server.
+	2. Enalbe inputting BaseDirectory to "create_DB_tables.py."
+	3. Speed up file generation by sampling from a seed file.
