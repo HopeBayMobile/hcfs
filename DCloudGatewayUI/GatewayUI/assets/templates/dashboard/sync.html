@@ -96,6 +96,9 @@
     font-size: 23px;
 }
 </style>
+<script type="text/javascript">
+
+</script>
 <div id="sync">
     {% for key, value in weeks_data.items %}
     <div id="main" class="sync_bar_main">
@@ -112,7 +115,7 @@
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_add_link">add</a>
             {% else %}
                 <div style="display: none">
-                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" name="modal-for-{{ key }}" id="modal-for-{{ key }}">
+                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" name="drop-for-{{ key }}" id="drop-for-{{ key }}">
                 {% csrf_token %}
                 <input type="hidden" name="day" value="{{ key }}">
                 <input type="hidden" name="bandwidth_option" value="1">
@@ -122,7 +125,7 @@
                 </form>
                 </div>
                 <a href="#" class="sync_edit_link1"
-                    onclick="javascript:document.getElementById('modal-for-{{ key }}').submit();">drop</a>
+                    onclick="javascript:document.getElementById('drop-for-{{ key }}').submit();">drop</a>
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_edit_link2">edit</a>
             {% endif %}
             <div class="sync_bar_left"><span class="sync_span"><h2>{{ value.name }}</h2></span></div>
