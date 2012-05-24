@@ -18,13 +18,13 @@ def gateway_status():
     except Exception as inst:
         print inst
         data = {}
-        data['cache_usage'] = {"max_cache_size": 1000,
+        data['gateway_cache_usage'] = {"max_cache_size": 1000,
                                "max_cache_entries": 100,
                                "used_cache_size": 500,
                                "used_cache_entries": 50,
                                "dirty_cache_size": 100,
                                "dirty_cache_entries": 10}
-        data['storage_usage'] = {"cloud_data": "1024",
+        data['cloud_storage_usage'] = {"cloud_data": "1024",
                                  "cloud_data_dedup": "1024",
                                  "cloud_data_dedup_compress": "1024"}
         data["uplink_usage"] = 100
@@ -35,7 +35,7 @@ def gateway_status():
 @login_required
 def index(request):
     data = gateway_status()
-    cache_usage = data['cache_usage']
+    cache_usage = data['gateway_cache_usage']
     maxcache = cache_usage["max_cache_size"]
     context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
@@ -379,4 +379,4 @@ def status(request):
 @login_required
 def cache_usage(request):
     data = gateway_status()
-    return HttpResponse(json.dumps(data['cache_usage']))
+    return HttpResponse(json.dumps(data['gateway_cache_usage']))
