@@ -26,5 +26,44 @@ sudo s3qladm clear swift://172.16.228.53:8080/gateway/delta
 sudo rm -rf /root/.s3ql/authinfo2
 sudo rm -rf /etc/init/s3ql.conf
 sudo rm -rf /etc/delta/network.info
-sudo route add -net 172.16.228.0 netmask 255.255.255.0 gw 172.16.229.252 eth1
+
+9) Please install the latest "sudo" package (>=1.8.x)
+
+10) Since GUI is running in www-data account, please use sudo for shell calls and change /etc/sudoers to allow
+no password sudo for www-data
+
+Example /etc/sudoers:
+======================================================================
+
+#
+# This file MUST be edited with the 'visudo' command as root.
+#
+# Please consider adding local content in /etc/sudoers.d/ instead of
+# directly modifying this file.
+#
+# See the man page for details on how to write a sudoers file.
+#
+Defaults	env_reset
+
+# Host alias specification
+
+# User alias specification
+
+# Cmnd alias specification
+
+# User privilege specification
+root	ALL=(ALL:ALL) ALL
+www-data ALL=(ALL) NOPASSWD:ALL
+
+# Members of the admin group may gain root privileges
+%admin ALL=(ALL) ALL
+
+# Allow members of group sudo to execute any command
+%sudo	ALL=(ALL:ALL) ALL
+
+
+
+#includedir /etc/sudoers.d
+
+===================================================================
 

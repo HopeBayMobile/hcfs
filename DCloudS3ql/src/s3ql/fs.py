@@ -809,6 +809,13 @@ class Operations(llfuse.Operations):
         fs_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
         dedup_size = self.db.get_val('SELECT SUM(size) FROM blocks') or 0
         compr_size = self.db.get_val('SELECT SUM(size) FROM objects') or 0
+        
+        entries = max(entries,0)
+        blocks = max(blocks,0)
+        inodes = max(inodes,0)
+        fs_size = max(fs_size,0)
+        dedup_size = max(dedup_size,0)
+        compr_size = max(compr_size,0)
 
         return struct.pack('QQQQQQQ', entries, blocks, inodes, fs_size, dedup_size,
                            compr_size, self.db.get_size())
