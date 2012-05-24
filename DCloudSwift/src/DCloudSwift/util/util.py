@@ -238,7 +238,8 @@ def findLine(filename, line):
 			return True
 
 	return False
-	
+
+'''	
 def getListenPid(address):
 	cmd = "netstat -ntpl | grep %s"%address
 	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -254,6 +255,8 @@ def getListenPid(address):
 	
 
 	return pid
+'''
+
 def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	Get a file logger using config settings.
