@@ -1845,9 +1845,8 @@ Dirty cache near full: False
 
         cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
+        results = po.stdout.read()
         po.wait()
-
 
         #print ret_val
         real_cloud_data = 0
@@ -1859,7 +1858,6 @@ Dirty cache near full: False
             '''
 
             for line in results.split("\n"):
-                #print line.strip()
                 if line.startswith("Total data size:"):
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
@@ -2087,5 +2085,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-    #print get_gateway_status()
+    print get_gateway_status()
     pass

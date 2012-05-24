@@ -623,8 +623,29 @@ class BlockCache(object):
     def _do_removal(self, obj_id):
         '''Remove object'''
 
-        with self.bucket_pool() as bucket:
-            bucket.delete('s3ql_data_%d' % obj_id)
+#Jiahong: adding exception handling.....
+        while True:
+            try:
+                with self.bucket_pool() as bucket:
+                    bucket.delete('s3ql_data_%d' % obj_id)
+                break
+            except:
+                if self.going_down:
+                    raise
+                log.warning('warning: Block delete timed out. Retrying in 10 seconds.')
+                time.sleep(10)
+                while True:
+                    try:
+                        with self.bucket_pool() as bucket:
+                            bucket.bucket.conn.close()
+                            bucket.bucket.conn = bucket.bucket._get_conn()
+                        break
+                    except:
+                        if self.going_down:
+                            raise
+                        log.error('Network may be disconnected. Retrying in 10 seconds.')
+                        time.sleep(10)
+
 
 
     @contextmanager
