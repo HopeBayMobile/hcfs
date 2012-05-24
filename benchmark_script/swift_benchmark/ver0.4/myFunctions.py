@@ -14,19 +14,20 @@ DB_USER = "db_client"
 DB_PW = "deltacloud"
 
 SWIFT_IP = '172.16.228.53'
-SWIFT_USER = 'system:root'
-SWIFT_PW = 'testpass'
+SWIFT_USER = 'storage:yen'
+SWIFT_PW = 'abcd'
 
-def read_command_log(log_file_name):
+def read_command_log(tmp_dir, log_file_name):
+	fname = tmp_dir + log_file_name
 	try:
-		fileIN = open(log_file_name, "r")
-		line = fileIN.readline()
-		line = line.rstrip('\n')
-		line = line.replace("'","")   # strip ' char
+		fileIN = open(fname, "r")
+		fc = fileIN.read()
+		fc = fc.replace("\n"," & ")
+		fc = fc.replace("'","")   # strip ' char
 	except:
-		line = ''
+		fc = ''
 
-	return line
+	return fc
 	
 def get_random_word(wordLen):
     word = ''
@@ -109,57 +110,8 @@ def fnc_read_all_files(tmp_dir):
 	row = cursor.fetchall()	
 	for r in row:
 		fpath = r[2];		fname = r[1];		fs = r[3]
-		qstr = "INSERT INTO Operation_Log SET action='read file', start_time=NOW(),\
-		file_size="+ str(fs) +", success=0, verify_checksum=0, note='"  
-		qstr += fpath + fname + "'"
-		#~ print(qstr)
-		cursor.execute(qstr)
-		t1 = time.time()
+		fnc_read_a_file(tmp_dir, fpath, fname, fs)
 		
-		try:
-			## download the file from Swift
-			log_fname = "log_" + get_random_word(4) + ".txt" 
-			cmd = 'cd '+ tmp_dir + ';'
-			cmd += ' swift -A https://' + SWIFT_IP + ':8080/auth/v1.0 -U ' + SWIFT_USER + ' -K ' + SWIFT_PW
-			cmd += ' download ' + fpath + ' ' + fname + " 2> " + log_fname
-			#~ print(cmd)
-			a = os.system(cmd)
-			if a>0:
-				## update this transaction in DB
-				msg = read_command_log(log_fname)
-				qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +"\
-				, success=1, verify_checksum="+ str(ver_cs) + ", error_msg='" + msg + "' WHERE note='"  
-				qstr += fpath+fname + "' AND action='read file'"
-				cursor.execute(qstr)
-				1/0   # raise an exception if 
-
-			et = time.time()-t1
-			# verify file's checksum
-			cmd = 'sha256sum '+ tmp_dir + fname
-			p = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-			p.wait()
-			checksum = p.stdout.readline();		checksum = checksum.split()[0];
-			checksum = checksum.decode("utf-8");	checksum += '.dat'
-			print(checksum)
-			if (checksum==fname):
-				ver_cs = 1	# verify checksum = true
-			else:
-				ver_cs = 0
-			#print(checksum)
-			
-			## update this transaction in DB
-			msg = read_command_log(log_fname)
-			qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +"\
-			, success=1, verify_checksum="+ str(ver_cs) + ", error_msg='" + msg + "' WHERE note='"  
-			qstr += fpath+fname + "' AND action='read file'"
-			cursor.execute(qstr)
-
-			# clean temporary directory
-			cmd = "rm " + tmp_dir + fname
-			os.system(cmd)
-		except:
-			print "** ERROR ** in reading a file"
-	
 	# close db connection
 	cursor.close()
 	db.commit()
@@ -210,18 +162,15 @@ def fnc_write_a_file(tmp_dir):
 		cmd += ' upload ' + dest_folder + ' ' + fname2 + " 2> " + log_fname
 		#~ print(cmd)
 		a = os.system(cmd)
-		if a>0:
+		msg = read_command_log(tmp_dir,log_fname)
+		if a>0 or len(msg)>0:
 			# update this transaction in DB
 			et = time.time()-t1
-			msg = read_command_log(log_fname)
-			qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=0, error_msg='" +msg+ "' WHERE note='"  
-			qstr += dest_folder + fname2 + "'"
-			cursor.execute(qstr)
-			1/0   # raise an exception if 
+			raise Error   # raise an exception
 
 		# update this transaction in DB
 		et = time.time()-t1
-		msg = read_command_log(log_fname)
+		msg = read_command_log(tmp_dir,log_fname)
 		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=1, error_msg='" +msg+ "' WHERE note='"  
 		qstr += dest_folder + fname2 + "'"
 		cursor.execute(qstr)
@@ -231,6 +180,10 @@ def fnc_write_a_file(tmp_dir):
 		cursor.execute(qstr)
 	except:
 		print "** ERROR ** in writting a file"
+		msg = read_command_log(tmp_dir,log_fname)
+		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=0, error_msg='" +msg+ "' WHERE note='"  
+		qstr += dest_folder + fname2 + "'"
+		cursor.execute(qstr)
 	
 	# clean tmp file
 	cmd = "rm " + tmp_dir + fname2
@@ -240,6 +193,9 @@ def fnc_write_a_file(tmp_dir):
 	cursor.close()
 	db.commit()
 	db.close()
+
+	# clean the log file
+	os.system("rm " + tmp_dir+log_fname)
 
 ##--------------------------------------------------------------------------------------------
 def fnc_create_a_folder():
@@ -264,12 +220,8 @@ def fnc_create_a_folder():
 	return(new_folder)
 
 ##--------------------------------------------------------------------------------------------
-def fnc_read_a_file(tmp_dir):
+def fnc_read_a_file(tmp_dir, fpath, fname, fs):
 	print("I will read a file:")
-
-	## pick up a file from the File_List table
-	res = fnc_pick_a_file()
-	fpath = res[0];		fname = res[1];		fs = res[2]
 	print(fname)
 	
 	## open a transaction in db
@@ -290,18 +242,14 @@ def fnc_read_a_file(tmp_dir):
 		cmd += ' download ' + fpath + ' ' + fname + " 2> " + log_fname
 		#~ print(cmd)
 		a = os.system(cmd)
-		if a>0:
-			## update this transaction in DB
-			msg = read_command_log(log_fname)
-			qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +"\
-			, success=1, verify_checksum="+ str(ver_cs) + ", error_msg='" + msg + "' WHERE note='"  
-			qstr += fpath+fname + "' AND action='read file'"
-			cursor.execute(qstr)
-			1/0   # raise an exception if 
+		msg = read_command_log(tmp_dir,log_fname)
+		if a>0 or len(msg)>0:
+			et = time.time()-t1
+			raise Error   # raise an exception if 
 
 		et = time.time()-t1
 		# verify file's checksum
-		cmd = 'sha256sum '+ tmp_dir + fname
+		cmd = 'sha256sum '+ tmp_dir + fname + " 2>&1 |tee -a " + tmp_dir+log_fname
 		p = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		p.wait()
 		checksum = p.stdout.readline();		checksum = checksum.split()[0];
@@ -314,26 +262,38 @@ def fnc_read_a_file(tmp_dir):
 		#print(checksum)
 		
 		## update this transaction in DB
-		msg = read_command_log(log_fname)
+		msg = read_command_log(tmp_dir, log_fname)
+			# filter out messages having file name
+		msg = msg.replace(tmp_dir,'')
+		msg = msg.replace(fname,'')
+		msg = msg.replace(fname.rstrip('.dat'),'')		
 		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +"\
 		, success=1, verify_checksum="+ str(ver_cs) + ", error_msg='" + msg + "' WHERE note='"  
 		qstr += fpath+fname + "' AND action='read file'"
 		cursor.execute(qstr)
 
-		# clean temporary directory
+		# clean temporary file
 		cmd = "rm " + tmp_dir + fname
 		os.system(cmd)
 	except:
 		print "** ERROR ** in reading a file"
-	
+		## update this transaction in DB
+		msg = read_command_log(tmp_dir, log_fname)
+		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +"\
+		, success=0, verify_checksum=0, error_msg='" + msg + "' WHERE note='"  
+		qstr += fpath+fname + "' AND action='read file'"
+		cursor.execute(qstr)
+
 	# close db connection
 	cursor.close()
 	db.commit()
 	db.close()
 	
+	# clean the log file
+	os.system("rm " + tmp_dir+log_fname)
 	
 ##--------------------------------------------------------------------------------------------
-def fnc_delete_a_file():
+def fnc_delete_a_file(tmp_dir):
 	print("I will delete a file:")
 
 	## pick up a file from the File_List table
@@ -353,23 +313,20 @@ def fnc_delete_a_file():
 	try:
 		## delete the file from the gateway
 		log_fname = "log_" + get_random_word(4) + ".txt"
-		cmd = 'swift -A https://' + SWIFT_IP + ':8080/auth/v1.0 -U ' + SWIFT_USER + ' -K ' + SWIFT_PW
+		cmd = 'cd '+ tmp_dir + ';'
+		cmd += 'swift -A https://' + SWIFT_IP + ':8080/auth/v1.0 -U ' + SWIFT_USER + ' -K ' + SWIFT_PW
 		cmd += ' delete ' + fpath + ' ' + fname+ " 2> " + log_fname
 		#~ print cmd
 		a = os.system(cmd)
-		if a>0:
+		msg = read_command_log(tmp_dir,log_fname)
+		if a>0 or len(msg)>0:
 			#~ # update this transaction in DB
 			et = time.time()-t1
-			msg = read_command_log(log_fname)
-			qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=0, "
-			qstr += "error_msg='" +msg +"' WHERE note='"  
-			qstr += fpath+fname + "' AND action='delete file'"
-			cursor.execute(qstr)
-			1/0   # raise an exception if 
+			raise Error   # raise an exception if 
 
 		#~ # update this transaction in DB
 		et = time.time()-t1
-		msg = read_command_log(log_fname)
+		msg = read_command_log(tmp_dir,log_fname)
 		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=1,"
 		qstr += "error_msg='" +msg +"' WHERE note='"  
 		qstr += fpath+fname + "' AND action='delete file'"
@@ -382,11 +339,18 @@ def fnc_delete_a_file():
 	
 	except:
 		print "** ERROR ** in deleting a file"
+		msg = read_command_log(tmp_dir,log_fname)
+		qstr = "UPDATE Operation_Log SET elapsed_time="+ str(et) +", success=0, "
+		qstr += "error_msg='" +msg +"' WHERE note='"  
+		qstr += fpath+fname + "' AND action='delete file'"
+		cursor.execute(qstr)
 	
 	# close db connection
 	cursor.close()
 	db.commit()
 	db.close()
+	# clean the log file
+	os.system("rm " + tmp_dir+log_fname)
 
 ##--------------------------------------------------------------------------------------------
 ## clean up previous test containers

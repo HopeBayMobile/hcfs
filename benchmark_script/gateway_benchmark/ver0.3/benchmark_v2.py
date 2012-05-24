@@ -1,31 +1,27 @@
 #!/usr/bin/python
 
-# 04.30.2012 written by Yen
-# updated from ver0.2
+# 03.29.2012 written by Yen
+# 04.13.2012 copied on BAC0090 to test (and refined)
+# 05.10.2012 change to ver0.3
 
 from myFunctions import *
 import sys
-
-print("Example usage: python benchmark_v?.py /tmp/")
 
 # define parameters
 tmp_dir = sys.argv[1]   # temporary directory for file creation, and read back.
 
 # write a file first to prevent empty directory
-fnc_create_a_folder()
 fnc_write_a_file(tmp_dir)
 
 #------------------
-#~ while True:
-for i in range(30):
-	action = random.choice('WWWWWWRRRD')
-	if action=="W":
+while True:
+	action = random.choice('WWWWRCD')
+	if action=="C":
+		fnc_create_a_folder()
+	elif action=="W":
 		fnc_write_a_file(tmp_dir)
 	elif action=="R":
 		fnc_read_a_file(tmp_dir)
 	elif action=="D":
 		fnc_delete_a_file()
 	time.sleep(1)
-	# delete log file
-	os.system("rm "+tmp_dir+"log*.txt")
-
