@@ -3,4 +3,4 @@ USER=$1
 PASS=$2
 
 #sudo pdbedit -x -u $USER
-sudo echo $PASS'\n'$PASS |  pdbedit $USER -a -t
+sudo echo -ne $PASS'\n'$PASS | pdbedit $USER -a -t

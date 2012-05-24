@@ -588,6 +588,27 @@ def _umount():
 		mountpoint = config.get("mountpoint", "dir")
 		
 		if os.path.ismount(mountpoint):
+                        cmd = "sudo /etc/init.d/smbd stop"
+                        po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                        output = po.stdout.read()
+                        po.wait()
+                        if po.returncode !=0:
+                                raise UmountError(output)
+
+                        cmd = "sudo /etc/init.d/nmbd stop"
+                        po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                        output = po.stdout.read()
+                        po.wait()
+                        if po.returncode !=0:
+                                raise UmountError(output)
+
+                        cmd = "sudo /etc/init.d/nfs-kernel-server stop"
+                        po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                        output = po.stdout.read()
+                        po.wait()
+                        if po.returncode !=0:
+                                raise UmountError(output)
+
 			cmd = "sudo python /usr/local/bin/umount.s3ql %s"%(mountpoint)
 			po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 			output = po.stdout.read()

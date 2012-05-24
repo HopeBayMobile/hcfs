@@ -53,7 +53,7 @@ apt-get install -y --force-yes libapache2-mod-wsgi
 a2enmod wsgi
 
 # Copy Delta Cloud Manager Django app to /var/www
-cp -f -r $BASEPATH /var/www/$BASENAME
+cp -f -r $BASEPATH /var/www/
 
 # Add Delta Cloud Manager .conf to apache2, skip if already exists
 INCLUDE_CONF="Include /var/www/$BASENAME/deploy/apache/dcloud.conf"
