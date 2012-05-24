@@ -215,7 +215,7 @@ class Test_getUmountedDisks:
 				if line.split()[0][0:8] == disk:
 					mount_flag = 1
 					
-			nose.tools.ok_(mount_flag == 0, "Device %s is mounted!" % item)
+			nose.tools.ok_(mount_flag == 0, "Device %s is mounted!" % line)
 
 	def test_DisksExistence(self):
 		'''

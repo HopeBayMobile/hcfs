@@ -52,6 +52,57 @@ class DaemonStatus:
 		return self.__pid
 
 
+class SwiftDaemonStatus:
+	def __init__(self):
+		self.__daemonStatus = {
+			'account-auditor': [False, "NoSuchPid"],
+			'account-reaper': [False, "NoSuchPid"],
+			'account-replicator': [False, "NoSuchPid"],
+			'account-server': [False, "NoSuchPid"],
+			'container-auditor': [False, "NoSuchPid"],
+			'container-replicator': [False, "NoSuchPid"],
+			'container-server': [False, "NoSuchPid"],
+			'container-updater': [False, "NoSuchPid"],
+			'object-auditor': [False, "NoSuchPid"],
+			'object-replicator': [False, "NoSuchPid"],
+			'object-server': [False, "NoSuchPid"],
+			'object-updater': [False, "NoSuchPid"],
+			'proxy-server': [False, "NoSuchPid"]
+		}
+
+	def __checkDaemonStatus(self):
+		for daemon_name, status in self.__daemonStatus.items():
+			if os.path.exists("/var/run/swift/%s.pid" % daemon_name):
+				cmd = "cat /var/run/swift/%s.pid" % daemon_name
+				po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				output = po.stdout.readlines()
+				po.wait()
+
+				if po.returncode == 0:
+					output = output[0].split()[0]
+					if os.path.exists("/proc/%s" % output):
+						status[0] = True
+						status[1] = output
+				else:
+					status[0] = False
+
+	def getSwiftHealth(self):
+		black_list = 0
+
+		for daemon_name, status in self.__daemonStatus.items():
+			if status[0] == False:
+				black_list += 1
+
+		if black_list == 0:
+			return True
+		else:
+			return False
+
+	def getDaemonStatus(self):
+		self.__checkDaemonStatus()
+		return self.__daemonStatus
+
+
 class Test_isDaemonAlive:
 	'''
 	Test the function isDaemonAlive() in util.py.
@@ -512,6 +563,180 @@ class Test_stopDaemon:
 
 		nose.tools.ok_(output == 0, "The execution of stopDaemon() failed!")
 		nose.tools.ok_(not test_started, "Daemon rsyslog can not be stopped by stopDaemon()!")
+
+
+class Test_generateSwiftConfig:
+	'''
+	Test the function generateSwiftConfig() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function generateSwiftConfig() in util.py\n"
+		self.__rsync_config = False
+
+		if os.path.exists("/etc/rsyncd.conf"):
+			self.__rsync_config = True
+			cmd = "mkdir -p /etc/tmp_backup; mv /etc/swift/* /etc/rsyncd.conf /etc/tmp_backup"
+		else:
+			self.__rsync_config = False
+			cmd = "mkdir -p /etc/tmp_backup; mv /etc/swift/* /etc/tmp_backup"
+
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to backup original Swift configuration files!")
+
+	def teardown(self):
+		print "End of unit test for function generateSwiftConfig() in util.py\n"
+		if self.__rsync_config == True:
+			cmd = "rm -rf /etc/swift/*; mv /etc/tmp_backup/rsyncd.conf /etc; cp -r /etc/tmp_backup/* /etc/swift; rm -rf /etc/tmp_backup"
+		else:
+			cmd = "rm -rf /etc/swift/*; cp -r /etc/tmp_backup/* /etc/swift; rm -rf /etc/tmp_backup"
+
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to recover original Swift configuration files!")
+
+	def test_ConfigExistence(self):
+		'''
+		Check the existence of Swift configuration files.
+		'''
+		swift_config_list = {
+			'swift.conf': '/etc/swift/',
+			'cert.key': '/etc/swift/',
+			'cert.crt': '/etc/swift/',
+			'proxy-server.conf': '/etc/swift/',
+			'rsyncd.conf': '/etc/',
+			'account-server.conf': '/etc/swift/',
+			'container-server.conf': '/etc/swift/',
+			'object-server.conf': '/etc/swift/'
+		}
+
+		util.generateSwiftConfig()
+
+		for file_name, path in swift_config_list.items():
+			nose.tools.ok_(os.path.exists(path + file_name), "Configuration file %s does not exist!" % file_name)
+
+
+class Test_restartAllServices:
+	'''
+	Test the function restartAllServices() in util.py.
+	'''
+	def setup(self):
+		return
+		print "Start of unit test for function restartAllServices() in util.py\n"
+		self.__rsync_daemon = {
+			'name': 'rsync',
+			'config': '/etc/rsyncd.conf',
+			'config_name': 'rsyncd.conf',
+			'config_dir': '/etc/',
+			'path': '/etc/init.d/rsync',
+			'test_config': './test_config/rsyncd.conf'
+		}
+
+		self.__memcached_daemon = {
+			'name': 'memcached',
+			'config': '/etc/memcached.conf',
+			'config_name': 'memcached.conf',
+			'config_dir': '/etc/',
+			'path': '/etc/init.d/memcached',
+			'test_config': './test_config/memcached.conf'
+		}
+
+		self.__swift_daemon = {
+			'name': 'swift',
+			'config': '/etc/swift/',
+			'config_name': 'swift',
+			'config_dir': '/etc/',
+			'path': 'swift-init all',
+			'test_config': './test_config/swift'
+		}
+
+		self.__service_list = [self.__rsync_daemon, self.__memcached_daemon, self.__swift_daemon]
+
+		cmd1 = "mkdir -p /etc/tmp_backup"
+		returncode = os.system(cmd1)
+		nose.tools.ok_(returncode == 0, "Failed to make the directory to backup the configuration files!")
+
+		for item in self.__service_list:
+			cmd2 = "mv %s /etc/tmp_backup" % item['config']
+			cmd3 = "cp -r %s %s" % (item['test_config'], item['config_dir'])
+			cmd4 = cmd2 + "; " + cmd3
+			po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to backup the configuration files of %s!" % item['name'])
+
+			cmd5 = item['path'] + " start"
+			po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to start %s daemon!" % item['name'])
+
+		ori_rsync_status = DaemonStatus('rsync')
+		self.__rsync_started = ori_rsync_status.isAlive()
+		self.__rsync_pid = ori_rsync_status.daemonPid()
+
+		ori_memcached_status = DaemonStatus('memcached')
+		self.__memcached_started = ori_memcached_status.isAlive()
+		self.__memcached_pid = ori_memcached_status.daemonPid()
+
+		ori_swift_status = SwiftDaemonStatus()
+		self.__swift_pid = ori_swift_status.getDaemonStatus()
+		self.__swift_started = ori_swift_status.getSwiftHealth()
+
+		util.restartAllServices()
+
+	def teardown(self):
+		return
+		print "End of unit test for function restartAllServices() in util.py\n"
+		for item in self.__service_list:
+			cmd1 = "rm -rf %s" % item['config']
+			cmd2 = "cp -r /etc/tmp_backup/%s %s" % (item['config_name'], item['config_dir'])
+			cmd3 = "rm -rf /etc/tmp_backup"
+			cmd = cmd1 + "; " + cmd2 + "; " + cmd3
+			po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
+			cmd4 = item['path'] + " restart"
+			po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to restart %s daemon!" % item['name'])
+
+	def test_RsyncStarted(self):
+		'''
+		Check the restart operation of daemon rsync triggered by restartAllServices().
+		'''
+		return
+		test_rsync_status = DaemonStatus('rsync')
+                test_rsync_started = test_rsync_status.isAlive()
+                test_rsync_pid = test_rsync_status.daemonPid()
+
+		nose.tools.ok_(test_rsync_started, "Daemon rsync does not be started by restartAllServices()!")
+		nose.tools.ok_(test_rsync_pid != self.__rsync_pid, "Failed to restart rsync daemon by invoking restartAllServices()!")
+
+	'''
+	def test_MemcachedStarted(self):
+		
+		Check the restart operatoin of daemon memcached triggered by restartAllServices().
+		
+		pass
+
+	def test_SwiftStarted(self):
+		
+		Check the restart operation of Swift daemons triggered by restartAllServices().
+		
+		pass
+	'''
 
 
 if __name__ == "__main__":
