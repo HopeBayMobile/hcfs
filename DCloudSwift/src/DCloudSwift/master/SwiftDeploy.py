@@ -18,12 +18,13 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 sys.path.append("%s/DCloudSwift/"%BASEDIR)
 
-UNNECESSARYFILES="cert* *.conf backups"
-lock = threading.Lock()
-
 from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
+from util.util import GlobalVar
+
+UNNECESSARYFILES="cert* *.conf backups"
+lock = threading.Lock()
 
 class CleanNodeError(Exception):
 	pass
@@ -41,23 +42,42 @@ class SpreadRingFilesError(Exception):
 	pass
 
 class SwiftDeploy:
-	def __init__(self, conf=None):
-		self.__deltaDir = "/etc/delta"
-		if conf is None:
-			self.__SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+	def __init__(self, conf=GlobalVar.ORI_SWIFTCONF):
+		logger = util.getLogger(name="SwiftDeploy.__init__")
+		self.__deltaDir = GlobalVar.DELTADIR
+		os.system("mkdir -p %s"%self.__deltaDir)
+
+		if os.path.isfile(conf):
+			cmd = "cp %s %s"%(conf, GlobalVar.SWIFTCONF)
+			os.system(cmd)
+		elif not os.path.isfile(GlobalVar.SWIFTCONF):
+			print >> sys.stderr, "Confing %s does not exist"%conf
+			sys.exit(1)
+
+		self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
+		
+		if os.path.isfile(GlobalVar.SWIFTINFO):
+			if self.__loadSwiftInfo() == False:
+				msg = "Faild to load swift info from %s"%GlobalVar.SWIFTINFO
+				print >> sys.stderr, msg
+				logger.error(msg)
+                        	sys.exit(1)
 		else:
-			self.__SC = SwiftCfg(conf)
+			self.__swiftInfo= {"numOfReplica":0}
+			if self.__dumpSwiftInfo() == False:
+				msg = "Faild to dump swift info to %s"%GlobalVar.SWIFTINFO
+				print >> sys.stderr, msg
+				logger.error(msg)
+				sys.exit(1)
 
 		self.__kwparams = self.__SC.getKwparams()
+		self.__jsonStr = json.dumps(self.__kwparams)
+		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
 		self.__setDeployProgress()
 		self.__setSpreadProgress() 
 		self.__setCleanProgress()
-	
 		self.__setMetadataFlag()
-		os.system("mkdir -p %s" % self.__kwparams['logDir'])
-
-		self.__jsonStr = json.dumps(self.__kwparams)
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -82,7 +102,42 @@ class SwiftDeploy:
 		return self.__cleanProgress
 
 	def getNumOfReplica(self):
-		return	self.__kwparams['numOfReplica']
+		return	self.__swiftInfo['numOfReplica']
+
+	def updateNumOfReplica(self, numOfReplica):
+		oriVal = self.__swiftInfo['numOfReplica']
+		self.__swiftInfo['numOfReplica'] = numOfReplica
+		if self.__dumpSwiftInfo() == False:
+			self.__swiftInfo['numOfReplica'] = oriVal
+			
+		return self.__swiftInfo['numOfReplica']
+			
+		
+
+	def __loadSwiftInfo(self):
+		ret = False
+		try:
+			with open(GlobalVar.SWIFTINFO, "rb") as fh:
+				self.__swiftInfo = pickle.load(fh)
+			ret = True
+		except:
+			ret = False
+
+		finally:
+			return ret
+
+	def __dumpSwiftInfo(self):
+		ret = False
+
+		try:
+			with open(GlobalVar.SWIFTINFO, "wb") as fh:
+				pickle.dump(self.__swiftInfo, fh)
+			ret = True
+		except:
+			ret = False
+
+		finally:
+			return ret
 
 	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
@@ -202,7 +257,7 @@ class SwiftDeploy:
 		
 		try:
 			self.__setMetadataFlag()
-			numOfReplica = self.__kwparams['numOfReplica']
+			numOfReplica = self.__swiftInfo['numOfReplica']
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 			versBase = int(time.time())*100000
@@ -237,7 +292,6 @@ class SwiftDeploy:
 		try:
 			logger = util.getLogger(name = "__updateMetadata2AddNodes")
 			self.__setMetadataFlag()
-			numOfReplica = self.__kwparams['numOfReplica']
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 
@@ -278,7 +332,6 @@ class SwiftDeploy:
 		try:
 			logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
 			self.__setMetadataFlag()
-			numOfReplica = self.__kwparams['numOfReplica']
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 
@@ -446,10 +499,16 @@ class SwiftDeploy:
                 pool.dismissWorkers(20)
                 pool.joinAllDismissedWorkers()
 
-	def deploySwift(self, proxyList, storageList):
+	def deploySwift(self, proxyList, storageList, numOfReplica):
 		logger = util.getLogger(name="deploySwift")
 
 		try:
+			self.__swiftInfo["numOfReplica"] = numOfReplica
+			if self.__dumpSwiftInfo() == False:
+				msg = "Failed to dump swift info"
+				logger.error(msg)
+				raise Exception(msg)
+
 			self.__createMetadata(proxyList, storageList)
 			self.__setDeployProgress()
 			self.__proxyList = proxyList
@@ -536,7 +595,7 @@ class SwiftDeploy:
 
 
 	def __isDeploymentOk(self, proxyList, storageList, blackList):
-		numOfReplica = self.__kwparams['numOfReplica']
+		numOfReplica = self.__swiftInfo['numOfReplica']
 
 		zidSet = set()
 		failedZones = set()
@@ -616,12 +675,14 @@ class SwiftDeploy:
 			self.__proxyDeploy()
 			self.__storageDeploy()
 		except Exception as e:
+			logger.error(str(e))
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
 			return
 
 		try:
 			self.spreadRingFiles()
 		except Exception as e:
+			logger.error(str(e))
 			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
 			
 		
@@ -650,6 +711,7 @@ class SwiftDeploy:
 			self.__setSpreadProgress()
 			self.spreadRingFiles()
 		except Exception as e:
+			logger.error(str(e))
 			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
 			return
 
@@ -661,6 +723,7 @@ class SwiftDeploy:
 			self.cleanNodes(deletedNodeIpList)
 
 		except Exception as e:
+			logger.error(str(e))
 			self.__setCleanProgress(finished=True, code=1, message=[str(e)])
 
 		
@@ -810,18 +873,35 @@ def deploy():
 
 	ret = 1
 
+	Usage = '''
+	Usage:
+		dcloud_swift_deploy numOfReplica
+	arguments:
+		numOfReplica: a positive integer less than 10
+	Examples:
+		dcloud_swift_deploy 3
+	'''
+
+	if (len(sys.argv) != 2) or not sys.argv[1].isdigit():
+		print >>sys.stderr, Usage
+		sys.exit(1)
+
+	numOfReplica = int(sys.argv[1])
+	if numOfReplica <1 or numOfReplica > 9:
+		print >>sys.stderr, Usage
+                sys.exit(1)
+
 	proxyFile = "/etc/delta/proxyNodes"
 	storageFile = "/etc/delta/storageNodes"
 	try:
 						
 		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
 
-		#TODO: read config from /etc/delta/
-		SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
+		SC = SwiftCfg(GlobalVar.SWIFTCONF)
 		password = SC.getKwparams()['password']
 
 		SD = SwiftDeploy()
-		t = Thread(target=SD.deploySwift, args=(proxyList, storageList))
+		t = Thread(target=SD.deploySwift, args=(proxyList, storageList, numOfReplica))
 		t.start()
 
 		print "Creating Metadata..."

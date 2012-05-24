@@ -10,16 +10,25 @@ import struct
 import math
 import pickle
 import time
+from ConfigParser import ConfigParser
+from SwiftCfg import SwiftCfg
+
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 
-from ConfigParser import ConfigParser
-from SwiftCfg import SwiftCfg
+def enum(**enums):
+	return type('Enum', (), enums)
 
-SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
-FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
+		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
+	         DELTADIR='/etc/delta',
+                 ORI_SWIFTCONF='/etc/delta/Swift.ini',
+		 SWIFTINFO='/etc/delta/Swift.info')
 
+
+SWIFTCONF = GlobalVar.SWIFTCONF
+FORMATTER = GlobalVar.FORMATTER
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator

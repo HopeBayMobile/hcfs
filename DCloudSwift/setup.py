@@ -37,7 +37,6 @@ def read(fname):
 
 def main():
 
-	os.system("cp Swift.ini src/DCloudSwift/")
 	if not isAllDebInstalled("misc/deb_src"):
 		os.system("cd misc/deb_src; dpkg -i *.deb")
 
@@ -64,7 +63,7 @@ def main():
         		 ]
     		},		
 
-		data_files=[ (DATADIR, ['proxyNodes.sample', 'storageNodes.sample']),  
+		data_files=[ (DATADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini']),  
                            ], 
 		
 		test_suite='unittest',

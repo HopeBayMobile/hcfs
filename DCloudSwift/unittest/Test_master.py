@@ -17,6 +17,7 @@ class Test_isDeploymentOk:
 	'''
 	def setup(self):
 		self.SD = SwiftDeploy(WORKING_DIR+"/fake.ini")
+		self.SD.updateNumOfReplica(3)
 		self.numOfReplica = self.SD.getNumOfReplica()
 		nose.tools.ok_(self.numOfReplica > 0, msg="number of Replica has to be greater than zero")
 
