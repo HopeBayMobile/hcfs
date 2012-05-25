@@ -31,17 +31,27 @@
                 </li>
             </ul>
         {% endfor %}
+            <ul class="msg-block hide">
+                <li class="msg-content">
+                    <div class="msg-time"></div>
+                </li>
+            </ul>
     </div>
     <script>
         $(function(){
-            $(".msg-type").on("click", "span", function(){
-                if ($(this).attr("class") != 'all'){
-                    $(".msg-block").has($('li.'+ $(this).attr("class"))).show()
-                    $('.msg-block').not($(".msg-block").has($('li.'+ $(this).attr("class")))).hide()
-                } else {
-                    $('.msg-block').show()
-                }
-            })
-        })
+            if ($(".msg-block").length == 1){
+                $(".msg-block").show()
+                $(".msg-content").prepend("You don't have any messages.");
+            } else {
+                $(".msg-type").on("click", "span", function(){
+                    if ($(this).attr("class") != 'all'){
+                        $(".msg-block").has($('li.'+ $(this).attr("class"))).show();
+                        $('.msg-block').not($(".msg-block").has($('li.'+ $(this).attr("class")))).hide();
+                    } else {
+                        $('.msg-block').show();
+                    }
+                });
+            }
+        });
     </script>
 {% endblock tab_content %}

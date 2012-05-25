@@ -1,4 +1,4 @@
-from django.shortcuts import render, HttpResponse
+from django.shortcuts import render, HttpResponse, redirect
 from django.contrib.auth.decorators import login_required
 from django import forms
 from django.utils.datastructures import SortedDict
@@ -86,6 +86,7 @@ def system(request, action=None):
             if form.is_valid():
                 request.user.set_password(form['password'].data)
                 request.user.save()
+                return redirect('/logout')
             else:
                 forms_group[action] = form
 
