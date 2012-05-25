@@ -299,7 +299,7 @@ class SwiftDeploy:
 			devicePrx = self.__kwparams['devicePrx']
 
 			swiftDir = "%s/swift"%self.__deltaDir
-		
+
 			oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
 			oriProxyList = []
 			with open("%s/proxyList"%swiftDir, "rb") as fh:
@@ -309,7 +309,6 @@ class SwiftDeploy:
 				if not node["ip"] in oriSwiftNodeIpSet:
 					raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
 				
-			
 
 			completeProxyList =[node for node in oriProxyList if node not in proxyList]
 
@@ -317,6 +316,12 @@ class SwiftDeploy:
 				if not node["ip"] in oriSwiftNodeIpSet:
 					raise UpdateMetadataError("Node %s does not exist!"%node["ip"])
 			
+
+			deletedIpList = [node["ip"] for node in storageList] + [node["ip"] for node in proxyList]
+			safe = self.isDeletionOfNodesSafe(deletedIpList, swiftDir)
+			if safe.val == False:
+				raise UpdateMetadataError("Unsafe to delete nodes for %s"%safe.msg)
+
 			with open("%s/proxyList"%swiftDir, "wb") as fh:
 				pickle.dump(completeProxyList, fh)
 
@@ -550,6 +555,44 @@ class SwiftDeploy:
 			logger.error(msg)
 			self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
 
+	def isDeletionOfNodesSafe(self,ipList, swiftDir=None):
+		zidSet = set()
+		ip2Zid ={}
+		val = False 
+		msg = ""
+
+		if swiftDir is None:
+			swiftDir = "%s/swift"%self.__deltaDir
+
+		try:
+
+			ip2Zid = util.getIp2Zid(swiftDir)
+			if ip2Zid is None:
+				raise Exception("Failed to get ip to zid mapping from %s/object.builder"%swiftDir)
+
+			numOfReplica = util.getNumOfReplica(swiftDir)
+			if numOfReplica is None:
+                                raise Exception("Failed to get number of replica from %s/object.builder"%swiftDir)
+
+			#Criteria: the remaining number of zones has to >= the number of replica
+			for ip in ipList:
+				ip2Zid[ip] = None
+
+			for ip in ip2Zid:
+				if ip2Zid[ip] is not None:
+					zidSet.add(ip)
+
+			if len(zidSet) >= numOfReplica:
+				val = True
+			else:
+				msg = "Number of zones has to be greater than or equal to number of replica"
+			
+		except Exception as e:
+			val = False
+			msg = str(e)
+		finally:
+			Bool = collections.namedtuple("Bool", "val msg")
+			return Bool(val, msg)
 
 	def __isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
 		zidSet = set()
@@ -632,6 +675,7 @@ class SwiftDeploy:
 		except Exception as e:
 			logger.error(str(e))
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
+			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
 			return
 
 		try:
@@ -668,6 +712,7 @@ class SwiftDeploy:
 		except Exception as e:
 			logger.error(str(e))
 			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
+			self.__setCleanProgress(finished=True, code=1, message=[str(e)])
 			return
 
 		try:

@@ -15,7 +15,8 @@ import socket
 # Import packages to be tested
 sys.path.append('../src/DCloudSwift/util')
 import util
-
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+SWIFTCONFDIR =WORKING_DIR+"/test_config/swift/"
 
 class DaemonStatus:
 	def __init__(self, daemon_name):
@@ -1055,6 +1056,64 @@ class Test_sshpass:
 
 		nose.tools.ok_(os.path.exists(self.__file), "Function sshpass() failed to execute the command: %s" % test_cmd)
 
+class Test_getNumOfReplica:
+	'''
+	Test the function of getNumOfReplica() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getNumOfReplica in util.py\n"
+
+	def teardown(self):
+		print "End of unit test for function getNumOfReplica() in util.py\n"
+
+	def test_ReturnNumber(self):
+		'''
+		Check if the return number is correct in the normal case.
+		'''
+		numOfReplica = util.getNumOfReplica(SWIFTCONFDIR)
+		nose.tools.ok_(numOfReplica==3)
+
+
+class Test_getNumOfZones:
+	'''
+	Test the function of getNumOfZones() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getNumOfZones() in util.py\n"
+
+	def teardown(self):
+		print "End of unit test for function getNumOfZones() in util.py\n"
+
+	def test_ReturnNumber(self):
+		'''
+		Check if the return number is correct in the normal case.
+		'''
+		numOfZones = util.getNumOfZones(SWIFTCONFDIR)
+		nose.tools.ok_(numOfZones==5)
+
+class Test_getIp2Zid:
+	'''
+	Test the function of getIp2Zid() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getIp2Zid() in util.py\n"
+
+	def teardown(self):
+		print "End of unit test for function getIp2Zid() in util.py\n"
+
+	def test_ReturnMapping(self):
+		'''
+		Check if the return number of zones is correct in the normal case.
+		'''
+		ip2Zid = util.getIp2Zid(SWIFTCONFDIR)
+		nose.tools.ok_(len(ip2Zid)==5)
+
+		zidSet = set()
+		for ip in ip2Zid:
+			zid = ip2Zid[ip]
+			nose.tools.ok_(zid not in zidSet)
+			zidSet.add(zid)
+		
 
 if __name__ == "__main__":
 	#ds = DaemonStatus("rsync")
@@ -1063,7 +1122,7 @@ if __name__ == "__main__":
 	#ip = Test_getIpAddress()
 	#ip.setup()
 	#ip.test_Correctness()
-	tr = Test_restartAllServices()
+	tr = Test_getIp2Zid()
 	tr.setup()
-	tr.test_RsyncStarted()
+	tr.test_ReturnMapping()
 	tr.teardown()

@@ -145,5 +145,53 @@ class Test_isDeploymentOk:
 	def teardown(self):
 		pass
 
+class Test_isDeletionOfNodesSafe:
+	'''
+	Test the function swiftDeploy.isDeletionOfNodesSafe in swiftDeploy.py
+	'''
+	def setup(self):
+		self.SD = SwiftDeploy(WORKING_DIR+"/fake.ini")
+		self.swiftDir = WORKING_DIR+'/test_config/swift'
+
+	def test_unSafeDeletion(self):
+		ipList=["192.168.11.6", "192.168.11.7", "192.168.11.10"]
+		
+
+		result = self.SD.isDeletionOfNodesSafe(ipList, self.swiftDir)
+
+		nose.tools.ok_(result.val==False)
+
+	def test_safeDeletion(self):
+		ipList=["192.168.11.6", "192.168.11.10"]
+		
+
+		result = self.SD.isDeletionOfNodesSafe(ipList, self.swiftDir)
+		nose.tools.ok_(result.val==True)
+
+	def test_emptyIpList(self):
+		ipList=[]
+		
+		result = self.SD.isDeletionOfNodesSafe(ipList, self.swiftDir)
+		nose.tools.ok_(result.val==True)
+
+
+	def test_nonExistentIp(self):
+		ipList=["192.16.11.19", "192.168.11.6"]
+		
+		result = self.SD.isDeletionOfNodesSafe(ipList, self.swiftDir)
+		nose.tools.ok_(result.val==True)
+
+	def test_duplicateIp(self):
+		ipList=["192.168.11.6", "192.168.11.6", "192.168.11.7"]
+		
+		result = self.SD.isDeletionOfNodesSafe(ipList, self.swiftDir)
+		nose.tools.ok_(result.val==True)
+	def test_nonExistentSwiftDir(self):
+		ipList=["192.168.11.6", "192.168.11.6", "192.168.11.7"]
+		
+		result = self.SD.isDeletionOfNodesSafe(ipList, "/nonExistentSwiftDir")
+		nose.tools.ok_(result.val==False)
+	def teardown(self):
+		pass
 if __name__ == "__main__":
 	pass

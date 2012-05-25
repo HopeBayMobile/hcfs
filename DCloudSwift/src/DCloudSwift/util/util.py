@@ -375,6 +375,31 @@ def getNumOfReplica(swiftDir="/etc/swift"):
 
 	return	numOfReplica
 
+def getNumOfZones(swiftDir="/etc/swift"):
+	logger = getLogger(name="getNumOfZones")
+	builderFile = swiftDir+"/"+GlobalVar.OBJBUILDER
+	if not os.path.exists(builderFile):
+		logger.error("Cannont find %s"%builderFile)
+		return None
+
+	cmd = 'swift-ring-builder %s'%builderFile
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+	
+	if po.returncode !=0:
+		logger.error("Failed to run %s"%cmd)
+		return None
+
+	try:
+		token = lines[1].split(',')[2]
+		numOfZones = int(token.split()[0])
+	except Exception as e:
+		logger.error("Failed to parse the output of %s"%cmd)
+		return None
+
+	return	numOfZones
+
 def getSwiftNodeIpList(swiftDir="/etc/swift"):
 	logger = getLogger(name="getSwiftNodeIpList")
 
@@ -431,12 +456,49 @@ def getSwiftConfVers(confDir="/etc/swift"):
 	return vers+versBase
 	
 
+def getIp2Zid(swiftDir="/etc/swift"):
+	'''
+	Collect ip 2 zone_id mapping
+	'''
+
+	logger = getLogger(name='getIp2Zid')
+
+	builderFile = swiftDir+"/"+GlobalVar.OBJBUILDER
+	if not os.path.exists(builderFile):
+		logger.error("Cannont find %s"%builderFile)
+		return None
+
+	cmd = 'swift-ring-builder %s'%builderFile
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+	
+	if po.returncode !=0:
+		logger.error("Failed to run %s"%cmd)
+		return None
+
+	ip2Zid={}
+	try:
+		if len(lines) < 5:
+			return ip2Zid
+		for line in lines[4:]:
+			tokens = line.split()
+			zid = int(tokens[1])
+			ip = tokens[2]
+
+			ip2Zid[ip] = zid
+	except Exception as e:
+		logger.error("Failed to parse the output of %s"%cmd)
+		return None
+
+	return ip2Zid	
+
 def getStorageNodeIpList(swiftDir="/etc/swift"):
 	'''
 	Collect ip list of all storge nodes  
 	'''
 
-	logger = getLogger(name='SwiftInfo')
+	logger = getLogger(name='getStorageNodeIpList')
 
 	cmd = 'cd %s; swift-ring-builder object.builder'%swiftDir
 	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
