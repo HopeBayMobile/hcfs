@@ -334,8 +334,10 @@ def get_metadata(bucket, cachepath):
                          'S3QL installation.')
 
     # Check that the fs itself is clean
+    #Jiahong: Adding customized messages....
     if param['needs_fsck']:
-        raise QuietError("File system damaged or not unmounted cleanly, run fsck!")
+        log.error("[error] File system damaged or not unmounted cleanly, reboot gateway to initiate fsck!")
+        raise QuietError("File system damaged or not unmounted cleanly, reboot gateway to initiate fsck!")
     if time.time() - param['last_fsck'] > 60 * 60 * 24 * 31:
         log.warn('Last file system check was more than 1 month ago, '
                  'running fsck.s3ql is recommended.')

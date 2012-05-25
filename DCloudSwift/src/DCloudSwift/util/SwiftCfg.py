@@ -28,7 +28,6 @@ class SwiftCfg:
 		self.__username = "root"
 
 		self.__password = config.get('storage', 'password')
-		self.__numOfReplica = int(config.get('storage', 'replica'))
 		self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
 		self.__devicePrx = "sdb"
 
@@ -38,7 +37,6 @@ class SwiftCfg:
 			'logName': self.__logName,
 			'username': self.__username,
 			'password': self.__password,
-			'numOfReplica': self.__numOfReplica,
 			'devicePrx': self.__devicePrx,
 			'deviceCnt': self.__deviceCnt,
 		}

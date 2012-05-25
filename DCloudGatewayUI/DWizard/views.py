@@ -80,43 +80,50 @@ class DeltaWizard(SessionWizardView):
             work.current_form = ''
             work.save()
             return redirect('.')
-
+        
+        is_ajax = request.is_ajax()
         #first init
         if work.current_form == '':
             self.storage.current_step = self.steps.first
-            return self.render(self.get_form())
+            return self.render(self.get_form(), is_ajax=is_ajax)
 
         self.storage.current_step = work.current_form
 
         #check if current step have task
         step_index = self.get_step_index()
         task = self.wizard_step[step_index][1]
-
+        
         if task:
             try:
                 step = Step.objects.get(form=self.steps.current)
             except ObjectDoesNotExist:
-                return self.render(self.get_form())
+                return self.render(self.get_form(), is_ajax=is_ajax)
 
             #check task status
             result = AsyncResult(step.task_id)
             if result.state == states.SUCCESS:
                 if self.steps.next:
                     if 'next' in request.GET:
-                        return render_to_response(self.done_template)
+                        return render_to_response(self.done_template, {'params':{'is_ajax':is_ajax}})
                     else:
                         self.storage.current_step = self.steps.next
-                        return self.render(self.get_form())
+                        return self.render(self.get_form(), is_ajax=is_ajax)
                 else:
                     meta = result.info
                     return render_to_response(self.finish_template, {'meta': meta,
-                                                              'exit': self.exit_url})
+                                                                     'exit': self.exit_url,
+                                                                     'params':{'is_ajax':is_ajax}
+                                                                     })
             elif result.state == states.FAILURE:
                 meta = result.info.args[0]
-                return render_to_response(self.failure_template, {'meta': meta})
+                return render_to_response(self.failure_template, {'meta': meta,
+                                                                  'params':{'is_ajax':is_ajax}
+                                                                  })
             else:
                 meta = result.info
-                return render_to_response(self.doing_template, {'meta': meta})
+                return render_to_response(self.doing_template, {'meta': meta,
+                                                                'params':{'is_ajax':is_ajax}
+                                                                })
         else:
             self.storage.current_step = self.steps.next
             return self.render(self.get_form(), back=True)

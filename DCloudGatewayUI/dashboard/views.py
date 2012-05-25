@@ -1,4 +1,4 @@
-from django.shortcuts import render, HttpResponse
+from django.shortcuts import render, HttpResponse, redirect
 from django.contrib.auth.decorators import login_required
 from django import forms
 from django.utils.datastructures import SortedDict
@@ -18,13 +18,13 @@ def gateway_status():
     except Exception as inst:
         print inst
         data = {}
-        data['cache_usage'] = {"max_cache_size": 1000,
+        data['gateway_cache_usage'] = {"max_cache_size": 1000,
                                "max_cache_entries": 100,
                                "used_cache_size": 500,
                                "used_cache_entries": 50,
                                "dirty_cache_size": 100,
                                "dirty_cache_entries": 10}
-        data['storage_usage'] = {"cloud_data": "1024",
+        data['cloud_storage_usage'] = {"cloud_data": "1024",
                                  "cloud_data_dedup": "1024",
                                  "cloud_data_dedup_compress": "1024"}
         data["uplink_usage"] = 100
@@ -35,7 +35,7 @@ def gateway_status():
 @login_required
 def index(request):
     data = gateway_status()
-    cache_usage = data['cache_usage']
+    cache_usage = data['gateway_cache_usage']
     maxcache = cache_usage["max_cache_size"]
     context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
@@ -68,7 +68,7 @@ def system(request, action=None):
                 if new_passord == cleaned_data['retype_password']:
                     del cleaned_data['retype_password']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The password does not match the retype password!")
             return cleaned_data
 
     if request.method == "POST":
@@ -86,6 +86,7 @@ def system(request, action=None):
             if form.is_valid():
                 request.user.set_password(form['password'].data)
                 request.user.save()
+                return redirect('/logout')
             else:
                 forms_group[action] = form
 
@@ -115,21 +116,22 @@ def account(request, action=None):
                 if new_passord == cleaned_data['retype_password']:
                     del cleaned_data['retype_password']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The password does not match the retype password!")
             return cleaned_data
 
     class EncryptionKey(RenderFormMixinClass, forms.Form):
-        password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
-        retype_password = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        old_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        retype_new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
 
         def clean(self):
             cleaned_data = super(EncryptionKey, self).clean()
-            new_passord = cleaned_data.get('password')
-            if new_passord:
-                if new_passord == cleaned_data['retype_password']:
-                    del cleaned_data['retype_password']
+            new_key = cleaned_data.get('new_key')
+            if new_key:
+                if new_key == cleaned_data['retype_new_key']:
+                    del cleaned_data['retype_new_key']
                 else:
-                    raise forms.ValidationError("The password are different!")
+                    raise forms.ValidationError("The newkey does not match the retype key!")
             return cleaned_data
 
     if request.method == "POST":
@@ -145,7 +147,7 @@ def account(request, action=None):
         elif action == "encrypt":
             form = EncryptionKey(request.POST)
             if form.is_valid():
-                update_return = json.loads(api.apply_user_enc_key(form['password'].data))
+                update_return = json.loads(api.apply_user_enc_key(form['old_key'].data, form['new_key'].data))
                 print update_return
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
@@ -176,11 +178,6 @@ def sharefolder(request, action):
         username = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
 
-    def nfs_setting_generator(ip_list):
-        class NFSSetting(RenderFormMixinClass, forms.Form):
-            array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in ip_list]))
-        return NFSSetting
-
     if request.method == "POST":
         if action == "smb_setting":
             form = SMBSetting(request.POST)
@@ -190,18 +187,17 @@ def sharefolder(request, action):
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
         elif action == "nfs_setting":
-            ip_list = request.POST.getlist('array_of_ip')
+            ip_list = json.loads(request.POST.get('array_of_ip'))
             update_return = json.loads(api.set_nfs_access_ip_list(ip_list))
             print update_return
             if not update_return['result']:
                 action_error[action] = update_return['msg']
-                form = nfs_setting_generator(set(nfs_data['array_of_ip'] + ip_list))
-                forms_group['nfs_setting'] = form
+            nfs_data['array_of_ip'] = ip_list
 
     forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
-    forms_group['nfs_setting'] = forms_group.get('nfs_setting', nfs_setting_generator(nfs_data['array_of_ip'])())
 
-    return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group, 'action_error': action_error})
+    return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
+                                                          'action_error': action_error, "nfs_data": nfs_data})
 
 
 @login_required
@@ -274,70 +270,9 @@ def sync(request):
         hours, 'weeks_data': weeks_data})
 
 
-fake_syslog = {
-    "msg": "GOGOGO",
-    "data": {
-        "error_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-01",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-04",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-07",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ],
-        "warning_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-02",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-05",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-08",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ],
-        "info_log": [
-            {
-                "category": "gateway",
-                "timestamp": "2012-05-03",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "NFS",
-                "timestamp": "2012-05-06",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            },
-            {
-                "category": "SMB",
-                "timestamp": "2012-05-09",
-                "msg": "stringstringstringstringstringstringstringstringstringstring"
-            }
-        ]
-    },
-    "result": True
-}
-
-
 @login_required
 def syslog(request):
-    return_val = fake_syslog
-    # FIXME: Replace the fake logs
-    # return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
+    return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
     if return_val['result'] == True:
         log_data = return_val['data']
 
@@ -352,9 +287,9 @@ def syslog(request):
 @login_required
 def power(request, action=None):
     if request.method == 'POST':
-        if action == 'off':
+        if action == 'poweroff':
             result = json.loads(api.shutdown_gateway())
-        elif action == 'reset':
+        elif action == 'restart':
             result = json.loads(api.reset_gateway())
         return HttpResponse(result)
 
@@ -379,4 +314,4 @@ def status(request):
 @login_required
 def cache_usage(request):
     data = gateway_status()
-    return HttpResponse(json.dumps(data['cache_usage']))
+    return HttpResponse(json.dumps(data['gateway_cache_usage']))

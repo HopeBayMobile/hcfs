@@ -30,6 +30,7 @@ kill timeout 30
 env STORAGE_URL="$URL"
 env MOUNTPOINT="$MOUNTPOINT"
 env AUTHFILE="/root/.s3ql/authinfo2"
+env CACHEDIR="/root/.s3ql"
 
 expect stop
 
@@ -44,9 +45,9 @@ script
 
     # Check and mount file system
     su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
-        fsck.s3ql --batch --authfile "\$AUTHFILE" "\$STORAGE_URL"
+        fsck.s3ql --batch --authfile "\$AUTHFILE" --cachedir "\$CACHEDIR" "\$STORAGE_URL"
     exec su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
-        mount.s3ql $MOUNTOPT --upstart --authfile "\$AUTHFILE" "\$STORAGE_URL" "\$MOUNTPOINT"
+        mount.s3ql $MOUNTOPT --upstart --authfile "\$AUTHFILE" --cachedir "\$CACHEDIR" "\$STORAGE_URL" "\$MOUNTPOINT"
 end script
 
 pre-stop script

@@ -1196,21 +1196,23 @@ def main(args=None):
         raise QuietError('File system revision too new, please update your '
                          'S3QL installation.')
 
+    #Jiahong: modifying the messages to suite gateway usage
     if param['seq_no'] < seq_no:
-        print(textwrap.fill(textwrap.dedent('''\
-              Backend reports that file system is still mounted elsewhere. Either the file system
-              has not been unmounted cleanly or the data has not yet propagated through the backend.
-              In the later case, waiting for a while should fix the problem, in the former case you
-              should try to run fsck on the computer where the file system has been mounted most
-              recently. 
-              ''')))
+        #print(textwrap.fill(textwrap.dedent('''\
+        #      Backend reports that file system is still mounted elsewhere. Either the file system
+        #      has not been unmounted cleanly or the data has not yet propagated through the backend.
+        #      In the later case, waiting for a while should fix the problem, in the former case you
+        #      should try to run fsck on the computer where the file system has been mounted most
+        #      recently. 
+        #      ''')))
+        log.warning('[warning] Is the gateway a replacement? Some data in the old gateway might be lost. Proceeding to recover data from the cloud.')
 
-        print('Enter "continue" to use the outdated data anyway:',
-              '> ', sep='\n', end='')
-        if options.batch:
-            raise QuietError('(in batch mode, exiting)')
-        if sys.stdin.readline().strip() != 'continue':
-            raise QuietError()
+        #print('Enter "continue" to use the outdated data anyway:',
+        #      '> ', sep='\n', end='')
+        #if options.batch:
+        #    raise QuietError('(in batch mode, exiting)')
+        #if sys.stdin.readline().strip() != 'continue':
+        #    raise QuietError()
 
         param['seq_no'] = seq_no
         param['needs_fsck'] = True

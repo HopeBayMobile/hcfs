@@ -66,14 +66,18 @@
                 }
                 update_indicator();
 
-                $(".msg-detail").toggle(
-                    function(){
-                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'normal');
-                    },
-                    function(){
-                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'nowrap');
+                $("body").on('click', ".msg-detail", function(){
+                    $(this).toggleClass('active')
+                    if ($(this).hasClass('active')){
+                        $(this).parent('.msg-content').css('white-space', 'normal')
+                    } else {
+                        $(this).parent('.msg-content').css('white-space', 'nowrap');
                     }
-                );
+                });
+
+                $(".tab-btn").on('click', 'li', function(){
+                    window.location = $(this).find('a').attr('href')
+                })
             });
             {% block javascript %}
             {% endblock javascript %}
@@ -83,11 +87,6 @@
     <body>
     <div class="site-container">
     <div class="site-header">
-        <p class="navbar-text pull-right hide">
-          {% if user.is_authenticated %}
-          <a href="/logout" class="btn" style="margin: 0;">Logout</a>
-          {% endif %}
-        </p>
         <div class="logo-box">
         </div>
         <div id="" class="notify-box-group">

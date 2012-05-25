@@ -10,16 +10,26 @@ import struct
 import math
 import pickle
 import time
+from ConfigParser import ConfigParser
+from SwiftCfg import SwiftCfg
+
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 
-from ConfigParser import ConfigParser
-from SwiftCfg import SwiftCfg
+def enum(**enums):
+	return type('Enum', (), enums)
 
-SWIFTCONF = '%s/DCloudSwift/Swift.ini'%BASEDIR
-FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
+		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
+	         DELTADIR='/etc/delta',
+                 ORI_SWIFTCONF='/etc/delta/Swift.ini',
+		 SWIFTINFO='/etc/delta/Swift.info',
+		 OBJBUILDER='object.builder')
 
+
+SWIFTCONF = GlobalVar.SWIFTCONF
+FORMATTER = GlobalVar.FORMATTER
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
@@ -270,11 +280,15 @@ def getLogger(name=None, conf=SWIFTCONF):
 		if logger in getLogger.handler4Logger:
 			return logger
 
-		kwparams = SwiftCfg(conf).getKwparams()
-	
-		logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
-		logName = kwparams.get('logName', 'deltaSwift.log')
-		logLevel = kwparams.get('logLevel', 'INFO')
+		if os.path.isfile(conf):
+			kwparams = SwiftCfg(conf).getKwparams()
+			logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
+			logName = kwparams.get('logName', 'deltaSwift.log')
+			logLevel = kwparams.get('logLevel', 'INFO')
+		else:
+			logDir = '/var/log/deltaSwift/'
+			logName = 'deltaSwift.log'
+			logLevel = 'INFO'
 
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
@@ -336,6 +350,30 @@ def getIpAddress():
     	#netdev = sdata[ sdata.index('dev')+1 ]
     	return ipaddr
 
+def getNumOfReplica(swiftDir="/etc/swift"):
+	logger = getLogger(name="getNumOfReplica")
+	builderFile = swiftDir+"/"+GlobalVar.OBJBUILDER
+	if not os.path.exists(builderFile):
+		logger.error("Cannont find %s"%builderFile)
+		return None
+
+	cmd = 'swift-ring-builder %s'%builderFile
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+	
+	if po.returncode !=0:
+		logger.error("Failed to run %s"%cmd)
+		return None
+
+	try:
+		token = lines[1].split(',')[1]
+		numOfReplica = int(token.split()[0])
+	except Exception as e:
+		logger.error("Failed to parse the output of %s"%cmd)
+		return None
+
+	return	numOfReplica
 
 def getSwiftNodeIpList(swiftDir="/etc/swift"):
 	logger = getLogger(name="getSwiftNodeIpList")

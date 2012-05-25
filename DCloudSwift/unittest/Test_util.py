@@ -625,7 +625,6 @@ class Test_restartAllServices:
 	Test the function restartAllServices() in util.py.
 	'''
 	def setup(self):
-		return
 		print "Start of unit test for function restartAllServices() in util.py\n"
 		self.__rsync_daemon = {
 			'name': 'rsync',
@@ -689,34 +688,44 @@ class Test_restartAllServices:
 		self.__swift_pid = ori_swift_status.getDaemonStatus()
 		self.__swift_started = ori_swift_status.getSwiftHealth()
 
+		#ori_stdout = sys.stdout
+		#sys.stdout = open(os.devnull, "w")
 		util.restartAllServices()
+		#sys.stdout.close()
+		#sys.stdout = ori_stdout
 
 	def teardown(self):
-		return
 		print "End of unit test for function restartAllServices() in util.py\n"
+
 		for item in self.__service_list:
 			cmd1 = "rm -rf %s" % item['config']
+			po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+			nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
 			cmd2 = "cp -r /etc/tmp_backup/%s %s" % (item['config_name'], item['config_dir'])
-			cmd3 = "rm -rf /etc/tmp_backup"
-			cmd = cmd1 + "; " + cmd2 + "; " + cmd3
-			po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+                        nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
+			cmd3 = "rm -rf /etc/tmp_backup/%s" % item['config_name']
+			po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
 			po.wait()
-
 			nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
 
 			cmd4 = item['path'] + " restart"
 			po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
 			po.wait()
-
 			nose.tools.ok_(po.returncode == 0, "Failed to restart %s daemon!" % item['name'])
 
-	def test_RsyncStarted(self):
+	def test_RestartOperation(self):
 		'''
-		Check the restart operation of daemon rsync triggered by restartAllServices().
+		Check whether the restart operation triggered by restartAllServices() is done successfully..
 		'''
-		return
 		test_rsync_status = DaemonStatus('rsync')
                 test_rsync_started = test_rsync_status.isAlive()
                 test_rsync_pid = test_rsync_status.daemonPid()
@@ -724,25 +733,337 @@ class Test_restartAllServices:
 		nose.tools.ok_(test_rsync_started, "Daemon rsync does not be started by restartAllServices()!")
 		nose.tools.ok_(test_rsync_pid != self.__rsync_pid, "Failed to restart rsync daemon by invoking restartAllServices()!")
 
-	'''
-	def test_MemcachedStarted(self):
-		
-		Check the restart operatoin of daemon memcached triggered by restartAllServices().
-		
-		pass
+		test_memcached_status = DaemonStatus('memcached')
+		test_memcached_started = test_memcached_status.isAlive()
+		test_memcached_pid = test_memcached_status.daemonPid()
 
-	def test_SwiftStarted(self):
-		
-		Check the restart operation of Swift daemons triggered by restartAllServices().
-		
-		pass
+		nose.tools.ok_(test_memcached_started, "Daemon memcached does not be started by restartAllServices()!")
+		nose.tools.ok_(test_memcached_pid != self.__memcached_pid, "Failed to restart memcached daemon by invoking restartAllServices()!")
+
+		test_swift_status = SwiftDaemonStatus()
+		test_swift_pid = test_swift_status.getDaemonStatus()
+		test_swift_started = test_swift_status.getSwiftHealth()
+		swift_restart_flag = True
+
+		for daemon_name, status in test_swift_pid.items():
+			if test_swift_pid[daemon_name][1] == self.__swift_pid[daemon_name][1]:
+				swift_restart_flag = False
+				break
+
+		nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by restartAllServices()!")
+		nose.tools.ok_(swift_restart_flag, "Failed to restart Swift daemon by invoking restartAllServices()!")
+
+
+class Test_startAllServices:
 	'''
+	Test the function startAllServices() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function startAllServices() in util.py\n"
+		self.__rsync_daemon = {
+                        'name': 'rsync',
+                        'config': '/etc/rsyncd.conf',
+                        'config_name': 'rsyncd.conf',
+                        'config_dir': '/etc/',
+                        'path': '/etc/init.d/rsync',
+                        'test_config': './test_config/rsyncd.conf'
+                }
+
+                self.__memcached_daemon = {
+                        'name': 'memcached',
+                        'config': '/etc/memcached.conf',
+                        'config_name': 'memcached.conf',
+                        'config_dir': '/etc/',
+                        'path': '/etc/init.d/memcached',
+                        'test_config': './test_config/memcached.conf'
+                }
+
+                self.__swift_daemon = {
+                        'name': 'swift',
+                        'config': '/etc/swift/',
+                        'config_name': 'swift',
+                        'config_dir': '/etc/',
+                        'path': 'swift-init all',
+                        'test_config': './test_config/swift'
+                }
+
+                self.__service_list = [self.__rsync_daemon, self.__memcached_daemon, self.__swift_daemon]
+
+                cmd1 = "mkdir -p /etc/tmp_backup"
+                returncode = os.system(cmd1)
+                nose.tools.ok_(returncode == 0, "Failed to make the directory to backup the configuration files!")
+
+		for item in self.__service_list:
+                        cmd2 = "mv %s /etc/tmp_backup" % item['config']
+                        cmd3 = "cp -r %s %s" % (item['test_config'], item['config_dir'])
+                        cmd4 = cmd2 + "; " + cmd3
+                        po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+
+                        nose.tools.ok_(po.returncode == 0, "Failed to backup the configuration files of %s!" % item['name'])
+
+                        cmd5 = item['path'] + " stop"
+                        po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                        output = po.stdout.readlines()
+                        po.wait()
+
+                        nose.tools.ok_(po.returncode == 0, "Failed to stop %s daemon!" % item['name'])
+
+                ori_rsync_status = DaemonStatus('rsync')
+                self.__rsync_started = ori_rsync_status.isAlive()
+                self.__rsync_pid = ori_rsync_status.daemonPid()
+
+                ori_memcached_status = DaemonStatus('memcached')
+                self.__memcached_started = ori_memcached_status.isAlive()
+                self.__memcached_pid = ori_memcached_status.daemonPid()
+
+                ori_swift_status = SwiftDaemonStatus()
+                self.__swift_pid = ori_swift_status.getDaemonStatus()
+                self.__swift_started = ori_swift_status.getSwiftHealth()
+
+                util.restartAllServices()
+
+	def teardown(self):
+		print "End of unit test for function startAllServices() in util.py\n"
+		for item in self.__service_list:
+                        cmd1 = "rm -rf %s" % item['config']
+                        po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+                        nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
+                        cmd2 = "cp -r /etc/tmp_backup/%s %s" % (item['config_name'], item['config_dir'])
+                        po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+                        nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
+                        cmd3 = "rm -rf /etc/tmp_backup/%s" % item['config_name']
+                        po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+                        nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
+
+                        cmd4 = item['path'] + " restart"
+                        po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        output = po.stdout.readlines()
+                        po.wait()
+                        nose.tools.ok_(po.returncode == 0, "Failed to restart %s daemon!" % item['name'])
+
+	def test_StartOperation(self):
+		'''
+		Check whether the start operation triggered by startAllServices() is done successfully.
+		'''
+		test_rsync_status = DaemonStatus('rsync')
+                test_rsync_started = test_rsync_status.isAlive()
+                test_rsync_pid = test_rsync_status.daemonPid()
+
+                nose.tools.ok_(test_rsync_started, "Daemon rsync does not be started by restartAllServices()!")
+
+                test_memcached_status = DaemonStatus('memcached')
+                test_memcached_started = test_memcached_status.isAlive()
+                test_memcached_pid = test_memcached_status.daemonPid()
+
+                nose.tools.ok_(test_memcached_started, "Daemon memcached does not be started by restartAllServices()!")
+
+                test_swift_status = SwiftDaemonStatus()
+                test_swift_pid = test_swift_status.getDaemonStatus()
+                test_swift_started = test_swift_status.getSwiftHealth()
+
+                nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by restartAllServices()!")
+
+
+class Test_findLine:
+	'''
+	Test the function findLine() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function findLine() in util.py\n"
+		self.__file_str = "This file is for unit test of function findLine()."
+		self.__test_file = "./tmp_file"
+		self.__test_positive = self.__file_str
+		self.__test_negative = "This is a negative case."
+
+		try:
+			with open(self.__test_file, "w") as f:
+				f.write(self.__file_str)
+		except Exception as e:
+			nose.tools.ok_(False, str(e))
+
+	def teardown(self):
+		print "End of unit test for function findLine() in util.py\n"
+		cmd = "rm %s" % self.__test_file
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the temp file for unit test of findLine()!")
+
+	def test_PositiveCase(self):
+		'''
+		Use positive inputs to test the correctness of findLine().
+		'''
+		result = util.findLine(self.__test_file, self.__test_positive)
+		nose.tools.ok_(result, "Function findLine() does not pass the positive case!")
+
+	def test_NegativeCase(self):
+		'''
+		Use negative inputs to test the correctness of findLine().
+		'''
+		result = util.findLine(self.__test_file, self.__test_negative)
+		nose.tools.ok_(not result, "Function findLine() does not pass the negative case!")
+
+
+class Test_getLogger:
+	'''
+	Test the function getLogger() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getLogger() in util.py\n"
+		self.__random_str = ''.join(random.choice(string.letters + string.digits) for x in range(8))
+		self.__logger = util.getLogger(name="Test_getLogger")
+
+		self.__test_bank = {
+			'info': "Test_getLogger_INFO_%s" % self.__random_str,
+			'debug': "Test_getLogger_DEBUG_%s" % self.__random_str,
+			'warning': "Test_getLogger_WARNING_%s" % self.__random_str,
+			'error': "Test_getLogger_ERROR_%s" % self.__random_str,
+			'critical': "Test_getLogger_CRITICAL_%s" % self.__random_str,
+			'exception': "Test_getLogger_EXCEPTION_%s" % self.__random_str
+		}
+
+	def teardown(self):
+		print "End of unit test for function getLogger() in util.py\n"
+
+	def test_LogOperation(self):
+		'''
+		Check the log operation executed by getLogger() is successfully done.
+		'''
+		self.__logger.info(self.__test_bank['info'])
+		self.__logger.debug(self.__test_bank['debug'])
+		self.__logger.warning(self.__test_bank['warning'])
+		self.__logger.error(self.__test_bank['error'])
+		self.__logger.critical(self.__test_bank['critical'])
+		self.__logger.exception(self.__test_bank['exception'])
+
+		cmd = "cat /var/log/deltaSwift/deltaSwift.log"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to access the log file!")
+
+		log_count = 0
+
+		for level, content in self.__test_bank.items():
+			for line in output:
+				for item in line.split():
+					if item == self.__test_bank[level]:
+						log_count += 1
+
+		nose.tools.ok_(log_count == 6, "Function getLogger() can not log correctly!")
+
+
+class Test_getSwiftNodeIpList:
+	'''
+	Test the function getSwiftNodeIpList() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getSwiftNodeIpList() in util.py\n"
+		self.__test_file = "./test_config/swift/"
+		self.__test_bank = ['192.168.11.6', '192.168.11.7', '192.168.11.8', '192.168.11.9', '192.168.11.10']
+		self.__test_bank = set(self.__test_bank)
+
+	def teardown(self):
+		print "End of unit test for function getSwiftNodeIpList() in util.py\n"
+
+	def test_Correctness(self):
+		'''
+		Check the correctness of the output returned by getSwiftNodeIpList().
+		'''
+		result = util.getSwiftNodeIpList(self.__test_file)
+		result = set(result)
+		nose.tools.ok_(result == self.__test_bank, "IP list returned by getSwiftNodeIpList() is not correct!")
+
+
+class Test_getSwiftConfVers:
+	'''
+	Test the function getSwiftConfVers() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getSwiftConfVers() in util.py\n"
+		self.__test_folder = "./test_config/swift"
+		self.__test_bank = 133774392700030
+
+	def teardown(self):
+		print "End of unit test for function getSwiftConfVers() in util.py\n"
+
+	def test_Correctness(self):
+		'''
+		Check the correctness of the output returned by getSwiftConfVers().
+		'''
+		result = util.getSwiftConfVers(self.__test_folder)
+		nose.tools.ok_(result == self.__test_bank, "The version returned by getSwiftConfVers() is not correct!")
+
+
+class Test_getStorageNodeIpList:
+	'''
+	Test the function of getStorageNodeIpList() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getStorageNodeIpList() in util.py\n"
+		self.__test_folder = "./test_config/swift"
+		self.__test_bank = ['192.168.11.6', '192.168.11.7', '192.168.11.8', '192.168.11.9', '192.168.11.10']
+		self.__test_bank = set(self.__test_bank)
+
+	def teardown(self):
+		print "End of unit test for function getStorageNodeIpList() in util.py\n"
+
+	def test_Correctness(self):
+		'''
+		Check the correctness of the output returned by getStorageNodeIpList().
+		'''
+		result = util.getStorageNodeIpList(self.__test_folder)
+		result = set(result)
+		nose.tools.ok_(result == self.__test_bank, "IP list returned by getStorageNodeIpList is not correct!")
+
+
+class Test_sshpass:
+	'''
+	Test the function of sshpass() in util.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function sshpass() in util.py\n"
+		self.__file = "/JustATest"
+
+	def teardown(self):
+		print "End of unit test for function sshpass() in util.py\n"
+		cmd = "rm %s" % self.__file
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the test file for sshpass()!")
+
+	def test_TouchOperation(self):
+		'''
+		Check whether the operation executed by sshpass() is successfully done.
+		'''
+		test_cmd = "touch %s" % self.__file
+		util.sshpass("deltacloud", test_cmd)
+
+		nose.tools.ok_(os.path.exists(self.__file), "Function sshpass() failed to execute the command: %s" % test_cmd)
 
 
 if __name__ == "__main__":
 	#ds = DaemonStatus("rsync")
 	#print ds.isAlive()
 	#print ds.daemonPid()
-	ip = Test_getIpAddress()
-	ip.setup()
-	ip.test_Correctness()
+	#ip = Test_getIpAddress()
+	#ip.setup()
+	#ip.test_Correctness()
+	tr = Test_restartAllServices()
+	tr.setup()
+	tr.test_RsyncStarted()
+	tr.teardown()

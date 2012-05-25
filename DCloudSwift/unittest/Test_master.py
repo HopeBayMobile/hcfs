@@ -17,8 +17,7 @@ class Test_isDeploymentOk:
 	'''
 	def setup(self):
 		self.SD = SwiftDeploy(WORKING_DIR+"/fake.ini")
-		self.numOfReplica = self.SD.getNumOfReplica()
-		nose.tools.ok_(self.numOfReplica > 0, msg="number of Replica has to be greater than zero")
+		self.numOfReplica = 3
 
 	def test_noEnoughZones(self):
 		proxyList = []
@@ -35,7 +34,7 @@ class Test_isDeploymentOk:
 			node = {"ip":ip, "zid":i}
 			storageList.append(node)
 
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==False)
 
@@ -54,7 +53,7 @@ class Test_isDeploymentOk:
 			node = {"ip":ip, "zid":i}
 			storageList.append(node)
 
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==True)
 
@@ -76,7 +75,7 @@ class Test_isDeploymentOk:
 		for i in range(self.numOfReplica):
 			blackList.append("192.168.12.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==False)
 
@@ -98,7 +97,7 @@ class Test_isDeploymentOk:
 		for i in range(self.numOfReplica-1):
 			blackList.append("192.168.12.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==True, result.msg)
 
 	def test_allProxyFailed(self):
@@ -119,7 +118,7 @@ class Test_isDeploymentOk:
 		for i in range(2):
 			blackList.append("192.168.13.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==False)
 
 	def test_someProxyFailed(self):
@@ -140,7 +139,7 @@ class Test_isDeploymentOk:
 		for i in range(1):
 			blackList.append("192.168.13.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList)
+		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==True, result.msg)
 
 	def teardown(self):

@@ -1,0 +1,108 @@
+{% extends "dashboard/base.html" %}
+{% block tab_content %}
+
+<div class="formset">
+	<ul class="nav nav-tabs">
+	{% for form in forms_group.values %}
+        <li class=""><a href="#{{form.name}}" data-toggle="tab">{{form.name}}</a></li>
+	{% endfor %}
+		<li class=""><a href="#NFSSetting" data-toggle="tab">NFSSetting</a></li>
+	</ul>
+	<div class="tab-content">
+	{% for name, form in forms_group.iteritems %}
+		<div class="tab-pane" id="{{form.name}}">
+		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{name}}">
+			{% csrf_token %} {{ form.render }}
+			<div class="controls">
+				<p class="help-block" style="color: red;">
+					{% for error, val in action_error.iteritems %}
+					{% if error == name %}
+						{{ val }}
+					{% endif %}
+					{% endfor %}
+				</p>
+				<button type="submit" class="btn btn-primary">
+				{% if submit %}
+				{{submit}}
+				{% else %}
+				Submit
+				{% endif %}
+				</button>
+				<span class="label hide"></span>
+			</div>
+		</form>
+		</div>
+	{% endfor %}
+		<div class="tab-pane" id="NFSSetting">
+			<div class="ip-listbox">
+				<div class="">
+					<input id="add-ip-address">
+					<span class="label lable-success delete">&plus;</span>
+				</div>
+				<div id="ip-address-lists">
+					{% for ip in nfs_data.array_of_ip %}
+					<div class="ip-block">
+					<div class="ip-address" value="{{ ip }}">{{ ip }}</div>
+					<span class="label label-important delete">&times;</span>
+					</div>
+					{% endfor %}
+				</div>
+			</div>
+			<form id="NFSSetting_form" class="form-horizontal" method="POST" action="nfs_setting">
+				{% csrf_token %} {{ form.render }}
+				<div class="controls hide">
+					<input id="array_of_ip" name="array_of_ip" >
+				</div>
+				<div class="controls">
+				<p class="help-block" style="color: red;">
+				{% for error, val in action_error.iteritems %}
+				{% if error == "nfs_setting" %}
+					{{ val }}
+				{% endif %}
+				{% endfor %}
+				</p>
+				<button type="submit" class="btn btn-primary">
+				{% if submit %}
+				{{submit}}
+				{% else %}
+				Submit
+				{% endif %}
+				</button>
+				</div>
+			</form>
+		</div>
+		<script type="text/javascript">
+		$(function(){
+
+			var ValidIpAddressRegex = /^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$/
+
+			$("div.formset li:first").addClass('active');
+			$("div.formset .tab-pane:first").addClass('active');
+
+			$("#NFSSetting_form").submit(function(e){
+				form = $(this);
+				var ip_address_lists = [];
+				$(".ip-address").each(function(idx, item, others){
+					ip_address_lists.push($(item).text())
+				});
+				$("#array_of_ip").val(JSON.stringify(ip_address_lists))
+			})
+
+			$("#add-ip-address").next('span').on('click', function(){
+				var ip = $("#add-ip-address").val();
+				// Check the input is an ip address and it has not been appended.
+				if (ip.match(ValidIpAddressRegex) && (!$('.ip-address[value="'+ip+'"]').length)){
+					$('<div class="ip-block"><div class="ip-address" value="'+ ip +'">'+ ip +'</div><span class="label label-important delete">&times;</span></div></div>').appendTo("#ip-address-lists")
+					$("#add-ip-address").val("")
+				}
+			});
+
+			$("#ip-address-lists").on('click', "span.delete", function(){
+				$(this).parent('div').remove()
+			});
+		});
+		</script>
+	</div>
+</div>
+
+{% endblock tab_content %}
