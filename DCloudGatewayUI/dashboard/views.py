@@ -287,9 +287,9 @@ def syslog(request):
 @login_required
 def power(request, action=None):
     if request.method == 'POST':
-        if action == 'off':
+        if action == 'poweroff':
             result = json.loads(api.shutdown_gateway())
-        elif action == 'reset':
+        elif action == 'restart':
             result = json.loads(api.reset_gateway())
         return HttpResponse(result)
 

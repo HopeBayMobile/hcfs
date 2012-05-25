@@ -1,12 +1,16 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
     <div class="action-btn">
-		<div class="btn btn-danger poweroff" action="off">Power Off</div>
-		<div class="btn btn-warning reset" action="reset">Reset</div>
+		<div class="btn btn-danger poweroff" action="poweroff">Power Off</div>
+		<div class="btn btn-warning reset" action="restart">Reset</div>
 	</div>
 	<script>
 		$('.action-btn .btn').on('click', function(){
-			a = $.post($(this).attr('action'))
-		})
+			action = $(this).attr('action');
+			sure = confirm("Confirm: The server will be "+ action + ".");
+			if (sure){
+				$.post(action);
+			}
+		});
 	</script>
 {% endblock tab_content %}

@@ -107,12 +107,12 @@
         <div id="top" class="sync_time_div">
         </div>
         {% endif %}
-        <div style="">
+        <div>
             {% if value.range == "none" %}
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_add_link">add</a>
             {% else %}
                 <div style="display: none">
-                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" name="modal-for-{{ key }}" id="modal-for-{{ key }}">
+                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="drop-for-{{ key }}">
                 {% csrf_token %}
                 <input type="hidden" name="day" value="{{ key }}">
                 <input type="hidden" name="bandwidth_option" value="1">
@@ -122,7 +122,7 @@
                 </form>
                 </div>
                 <a href="#" class="sync_edit_link1"
-                    onclick="javascript:document.getElementById('modal-for-{{ key }}').submit();">drop</a>
+                    onclick="javascript:document.getElementById('drop-for-{{ key }}').submit();">drop</a>
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_edit_link2">edit</a>
             {% endif %}
             <div class="sync_bar_left"><span class="sync_span"><h2>{{ value.name }}</h2></span></div>
@@ -155,16 +155,23 @@
         {% endif %}
     </div>
     <!--start Modal -->
+    <!-- js -->
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("#modal-for-{{ key }}").validate();
+        });
+    </script>
+    <!-- js -->
     <div class="modal hide fade" id="myModal{{ key }}" style="display: none;">
-        <div class="modal-header">
-            <button class="close" data-dismiss="modal">×</button>
-            <h3>Setting {{ value.name }}</h3>
-        </div>
-        <div class="modal-body" >
-            <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="modal-for-{{ key }}">
+        <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="modal-for-{{ key }}">
+            <div class="modal-header">
+                <button class="close" data-dismiss="modal">×</button>
+                <h3>Setting {{ value.name }}</h3>
+            </div>
+            <div class="modal-body">
                 {% csrf_token %}
                 <input type="hidden" name="day" value="{{ key }}">
-                <div class="">
+                <div>
                     <p class="sync_font_size">
                     <input type="radio" name="bandwidth_option" id="optionsRadios1" value="1"
                     {% if value.option == 1 %}
@@ -211,17 +218,18 @@
                     </p>
                     <hr/>
                     <p class="sync_font_size">
-                    Bandwidth <input type="text" class="span1" id="input01" name="bandwidth" value="{{ value.bandwidth }}"> KB
+                    Bandwidth <input type="text" class="span1 digits" id="bandwidth_input{{ key }}"
+                    name="bandwidth" value="{{ value.bandwidth }}"
+                    min="64" max="1024" > KB
                     </p>
                 </div>
             </div>
             <div class="modal-footer">
                 <a href="#" class="btn" data-dismiss="modal">Close</a>
-                <button type="submit" class="btn btn-primary">Save changes</a>
+                <button type="submit" class="btn btn-primary">Save changes</button>
             </div>
         </form>
-    </div>
-    <!-- end modal-->
+    </div> <!-- end modal-->
     {% endfor %}
 </div>
 {% endblock tab_content %}

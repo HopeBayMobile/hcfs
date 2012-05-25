@@ -1,8 +1,3 @@
-{% if params.is_ajax %}
-	
-	{% block ajax %}{% endblock ajax %}   
-
-{% else %}
 <!DOCTYPE html>
 <html lang="zh-tw">
     <head>
@@ -20,14 +15,20 @@
         <link rel="stylesheet/less" type="text/css" href="/static/css/site-dashboard.less">
         {% block stylesheet %}
         {% endblock stylesheet %}
-
-        <!--JavaScript-->
+        <style type="text/css">
+            {% block css_style %}
+            /* Give a quick and non-cross-browser friendly divider */
+            {% endblock css_style %}
+        </style>
         <script src="/static/js/less-1.3.0.min.js" type="text/javascript"></script>
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
         <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
-        {% block javascript %}
-        {% endblock javascript %}
+        <script src="/static/js/plugins.js"></script>
+        <script type="text/javascript">
+            {% block javascript %}
+            {% endblock javascript %}
+        </script>
     </head>
 
     <body>
@@ -36,12 +37,11 @@
         <div class="logo-box">
         </div>
     </div>
-    <div style="position:absolute; top:132px; width:1024px; margin:0px; min-height:636px; background-image:url('/static/img/wizard/wizard_bg.png'); background-repeat:no-repeat;">
-    {% block content %}
+    <div class="error-content bg-fixed">
+        {% block content %}
 
-    {% endblock content %}    
+        {% endblock content %}
     </div>
     </div> <!-- site-body -->
     </body>
 </html>
-{% endif %}

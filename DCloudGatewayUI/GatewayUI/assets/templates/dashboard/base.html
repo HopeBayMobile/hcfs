@@ -24,6 +24,7 @@
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
         <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
+        <script src="/static/js/jquery.validate.min.js"></script>
         <script src="/static/js/hogan.js"></script>
         <script src="/static/js/plugins.js"></script>
         <script type="text/javascript">
@@ -86,11 +87,6 @@
     <body>
     <div class="site-container">
     <div class="site-header">
-        <p class="navbar-text pull-right hide">
-          {% if user.is_authenticated %}
-          <a href="/logout" class="btn" style="margin: 0;">Logout</a>
-          {% endif %}
-        </p>
         <div class="logo-box">
         </div>
         <div id="" class="notify-box-group">
