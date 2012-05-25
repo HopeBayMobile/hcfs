@@ -781,6 +781,8 @@ def build_gateway(user_key):
 		_mount(storage_url=url)
                 set_smb_user_list(default_user_id,default_user_pwd)
 		_restartServices()
+                log.info("setting upload speed")
+                os.system("sudo /etc/cron.hourly/hourly_run_this") 
  
 		op_ok = True
 		op_msg = 'Succeeded to build gateway'
