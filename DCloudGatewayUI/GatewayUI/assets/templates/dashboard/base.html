@@ -65,14 +65,14 @@
                 }
                 update_indicator();
 
-                $(".msg-detail").toggle(
-                    function(){
-                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'normal');
-                    },
-                    function(){
-                        $(this).toggleClass('active').parent('.msg-content').css('white-space', 'nowrap');
+                $("body").on('click', ".msg-detail", function(){
+                    $(this).toggleClass('active')
+                    if ($(this).hasClass('active')){
+                        $(this).parent('.msg-content').css('white-space', 'normal')
+                    } else {
+                        $(this).parent('.msg-content').css('white-space', 'nowrap');
                     }
-                );
+                });
 
                 $(".tab-btn").on('click', 'li', function(){
                     window.location = $(this).find('a').attr('href')
