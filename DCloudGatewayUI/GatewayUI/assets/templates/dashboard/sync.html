@@ -96,9 +96,6 @@
     font-size: 23px;
 }
 </style>
-<script type="text/javascript">
-
-</script>
 <div id="sync">
     {% for key, value in weeks_data.items %}
     <div id="main" class="sync_bar_main">
@@ -115,7 +112,7 @@
                 <a data-toggle="modal" href="#myModal{{ key }}" class="sync_add_link">add</a>
             {% else %}
                 <div style="display: none">
-                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" name="drop-for-{{ key }}" id="drop-for-{{ key }}">
+                <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="drop-for-{{ key }}">
                 {% csrf_token %}
                 <input type="hidden" name="day" value="{{ key }}">
                 <input type="hidden" name="bandwidth_option" value="1">
@@ -158,6 +155,13 @@
         {% endif %}
     </div>
     <!--start Modal -->
+    <!-- js -->
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("#modal-for-{{ key }}").validate();
+        });
+    </script>
+    <!-- js -->
     <div class="modal hide fade" id="myModal{{ key }}" style="display: none;">
         <div class="modal-header">
             <button class="close" data-dismiss="modal">×</button>
@@ -214,7 +218,9 @@
                     </p>
                     <hr/>
                     <p class="sync_font_size">
-                    Bandwidth <input type="text" class="span1" id="input01" name="bandwidth" value="{{ value.bandwidth }}"> KB
+                    Bandwidth <input type="text" class="span1 digits" id="bandwidth_input{{ key }}"
+                    name="bandwidth" value="{{ value.bandwidth }}"
+                    min="64" max="1024" > KB
                     </p>
                 </div>
             </div>
