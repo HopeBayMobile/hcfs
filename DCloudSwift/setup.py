@@ -6,7 +6,7 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 os.chdir(WORKING_DIR)
 
-DATADIR = "/etc/delta"
+DELTADIR = "/etc/delta"
 
 def isAllDebInstalled(debSrc):
 	cmd = "find %s -maxdepth 1 -name \'*.deb\'  "%debSrc
@@ -36,6 +36,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 def main():
+	os.system("mkdir -p %s"%DELTADIR)
 
 	if not isAllDebInstalled("misc/deb_src"):
 		os.system("cd misc/deb_src; dpkg -i *.deb")
@@ -63,7 +64,7 @@ def main():
         		 ]
     		},		
 
-		data_files=[ (DATADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini']),  
+		data_files=[ (DELTADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini']),  
                            ], 
 		
 		test_suite='unittest',

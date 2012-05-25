@@ -44,32 +44,26 @@ class SpreadRingFilesError(Exception):
 class SwiftDeploy:
 	def __init__(self, conf=GlobalVar.ORI_SWIFTCONF):
 		logger = util.getLogger(name="SwiftDeploy.__init__")
-		self.__deltaDir = GlobalVar.DELTADIR
-		os.system("mkdir -p %s"%self.__deltaDir)
 
 		if os.path.isfile(conf):
 			cmd = "cp %s %s"%(conf, GlobalVar.SWIFTCONF)
 			os.system(cmd)
-		elif not os.path.isfile(GlobalVar.SWIFTCONF):
-			print >> sys.stderr, "Confing %s does not exist"%conf
+		else:
+			msg = "Confing %s does not exist"%conf
+			print >> sys.stderr, msg
+			logger.warn(msg)
+
+		if not os.path.isfile(GlobalVar.SWIFTCONF):
+			msg ="Config %s does not exist"%GlobalVar.SWIFTCONF
+			print >> sys.stderr, msg
+			logger.error(msg)
 			sys.exit(1)
 
-		self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
-		
-		if os.path.isfile(GlobalVar.SWIFTINFO):
-			if self.__loadSwiftInfo() == False:
-				msg = "Faild to load swift info from %s"%GlobalVar.SWIFTINFO
-				print >> sys.stderr, msg
-				logger.error(msg)
-                        	sys.exit(1)
-		else:
-			self.__swiftInfo= {"numOfReplica":0}
-			if self.__dumpSwiftInfo() == False:
-				msg = "Faild to dump swift info to %s"%GlobalVar.SWIFTINFO
-				print >> sys.stderr, msg
-				logger.error(msg)
-				sys.exit(1)
 
+		self.__deltaDir = GlobalVar.DELTADIR
+		os.system("mkdir -p %s"%self.__deltaDir)
+
+		self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
 		self.__kwparams = self.__SC.getKwparams()
 		self.__jsonStr = json.dumps(self.__kwparams)
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
@@ -100,44 +94,6 @@ class SwiftDeploy:
 
 	def getCleanProgress(self):
 		return self.__cleanProgress
-
-	def getNumOfReplica(self):
-		return	self.__swiftInfo['numOfReplica']
-
-	def updateNumOfReplica(self, numOfReplica):
-		oriVal = self.__swiftInfo['numOfReplica']
-		self.__swiftInfo['numOfReplica'] = numOfReplica
-		if self.__dumpSwiftInfo() == False:
-			self.__swiftInfo['numOfReplica'] = oriVal
-			
-		return self.__swiftInfo['numOfReplica']
-			
-		
-
-	def __loadSwiftInfo(self):
-		ret = False
-		try:
-			with open(GlobalVar.SWIFTINFO, "rb") as fh:
-				self.__swiftInfo = pickle.load(fh)
-			ret = True
-		except:
-			ret = False
-
-		finally:
-			return ret
-
-	def __dumpSwiftInfo(self):
-		ret = False
-
-		try:
-			with open(GlobalVar.SWIFTINFO, "wb") as fh:
-				pickle.dump(self.__swiftInfo, fh)
-			ret = True
-		except:
-			ret = False
-
-		finally:
-			return ret
 
 	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
@@ -202,13 +158,21 @@ class SwiftDeploy:
 				self.__deployProgress['blackList'].append(ip)
 				self.__deployProgress['message'].append(msg)
 			if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
+				
+				swiftDir = self.__deltaDir+'/swift'
+				numOfReplica = util.getNumOfReplica(swiftDir)
 
-				ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'])
-				if ret.val == False:
+				if numOfReplica is None:
 					self.__deployProgress['code'] = 1
-					self.__deployProgress['message'].append(ret.msg)
+                                        self.__deployProgress['message'].append("Failed to get numOfReplica")
+					
 				else:
-					self.__deployProgress['code'] = 0
+					ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'], numOfReplica)
+					if ret.val == False:
+						self.__deployProgress['code'] = 1
+						self.__deployProgress['message'].append(ret.msg)
+					else:
+						self.__deployProgress['code'] = 0
 
 				self.__deployProgress['finished'] = True
 		finally:
@@ -252,12 +216,11 @@ class SwiftDeploy:
 		finally:
 			lock.release()
 
-	def __createMetadata(self, proxyList, storageList):
+	def __createMetadata(self, proxyList, storageList, numOfReplica):
 		logger = util.getLogger(name = "createMetadata")
 		
 		try:
 			self.__setMetadataFlag()
-			numOfReplica = self.__swiftInfo['numOfReplica']
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 			versBase = int(time.time())*100000
@@ -503,13 +466,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 
 		try:
-			self.__swiftInfo["numOfReplica"] = numOfReplica
-			if self.__dumpSwiftInfo() == False:
-				msg = "Failed to dump swift info"
-				logger.error(msg)
-				raise Exception(msg)
-
-			self.__createMetadata(proxyList, storageList)
+			self.__createMetadata(proxyList, storageList, numOfReplica)
 			self.__setDeployProgress()
 			self.__proxyList = proxyList
 			self.__storageList = storageList
@@ -594,9 +551,7 @@ class SwiftDeploy:
 			self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
 
 
-	def __isDeploymentOk(self, proxyList, storageList, blackList):
-		numOfReplica = self.__swiftInfo['numOfReplica']
-
+	def __isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
 		zidSet = set()
 		failedZones = set()
 		proxyIpSet = set()
@@ -932,6 +887,7 @@ def deploy():
 
 if __name__ == '__main__':
 	SD = SwiftDeploy()
+	print util.getNumOfReplica("/etc/delta/swift")
 	#t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
 	#t = Thread(target=SD.spreadRingFiles, args=())
 	#t.start()

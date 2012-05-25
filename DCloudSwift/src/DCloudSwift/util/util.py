@@ -24,7 +24,8 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
 	         DELTADIR='/etc/delta',
                  ORI_SWIFTCONF='/etc/delta/Swift.ini',
-		 SWIFTINFO='/etc/delta/Swift.info')
+		 SWIFTINFO='/etc/delta/Swift.info',
+		 OBJBUILDER='object.builder')
 
 
 SWIFTCONF = GlobalVar.SWIFTCONF
@@ -247,8 +248,7 @@ def findLine(filename, line):
 			return True
 
 	return False
-
-'''	
+	
 def getListenPid(address):
 	cmd = "netstat -ntpl | grep %s"%address
 	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
@@ -264,8 +264,6 @@ def getListenPid(address):
 	
 
 	return pid
-'''
-
 def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	Get a file logger using config settings.
@@ -282,11 +280,15 @@ def getLogger(name=None, conf=SWIFTCONF):
 		if logger in getLogger.handler4Logger:
 			return logger
 
-		kwparams = SwiftCfg(conf).getKwparams()
-	
-		logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
-		logName = kwparams.get('logName', 'deltaSwift.log')
-		logLevel = kwparams.get('logLevel', 'INFO')
+		if os.path.isfile(conf):
+			kwparams = SwiftCfg(conf).getKwparams()
+			logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
+			logName = kwparams.get('logName', 'deltaSwift.log')
+			logLevel = kwparams.get('logLevel', 'INFO')
+		else:
+			logDir = '/var/log/deltaSwift/'
+			logName = 'deltaSwift.log'
+			logLevel = 'INFO'
 
 		os.system("mkdir -p "+logDir)
 		os.system("touch "+logDir+'/'+logName)
@@ -348,6 +350,30 @@ def getIpAddress():
     	#netdev = sdata[ sdata.index('dev')+1 ]
     	return ipaddr
 
+def getNumOfReplica(swiftDir="/etc/swift"):
+	logger = getLogger(name="getNumOfReplica")
+	builderFile = swiftDir+"/"+GlobalVar.OBJBUILDER
+	if not os.path.exists(builderFile):
+		logger.error("Cannont find %s"%builderFile)
+		return None
+
+	cmd = 'swift-ring-builder %s'%builderFile
+	po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+	lines = po.stdout.readlines()
+	po.wait()
+	
+	if po.returncode !=0:
+		logger.error("Failed to run %s"%cmd)
+		return None
+
+	try:
+		token = lines[1].split(',')[1]
+		numOfReplica = int(token.split()[0])
+	except Exception as e:
+		logger.error("Failed to parse the output of %s"%cmd)
+		return None
+
+	return	numOfReplica
 
 def getSwiftNodeIpList(swiftDir="/etc/swift"):
 	logger = getLogger(name="getSwiftNodeIpList")
