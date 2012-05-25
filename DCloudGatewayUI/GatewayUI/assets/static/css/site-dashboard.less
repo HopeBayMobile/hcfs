@@ -127,6 +127,16 @@
     z-index: 1000;
 }
 
+.notify-box-group{
+    position: absolute;
+    top: (@site-top-height - @notify-group-height)/2;
+    right: (@site-top-height - @notify-group-height)/2;
+    width: 448px;
+    height: @notify-group-height;
+    background-image: url("/@{dashboard-image-path}/indicator_bg.png");
+    display: inline-block;
+}
+
 .notify-box{
 	float: left;
     margin-left: 10px;
@@ -148,6 +158,13 @@
 	clear: both;
 	margin-top: 5px;
 	margin-left: 5px;
+	.notify-box{
+		width: 72px;
+	    height: 32px;
+	    text-align: center;
+	    vertical-align: middle;
+	    line-height: 32px;
+	}
 }
 
 .notify-box-row3{
@@ -158,10 +175,9 @@
 	line-height: 32px;
 	vertical-align: middle;
 	font-weight: bold;
-}
-
-.notify-box-row3 .logout{
-	float: right;
+	.logout{
+		float: right;
+	}
 }
 
 .notify-box-row4{
@@ -169,28 +185,9 @@
 	width: 140px;
 	margin-right: 10px;
 	margin-top: -5px;
-}
-
-.notify-box-row4 p{
-	margin: 0;
-}
-
-.notify-box-row2 .notify-box{
-	width: 72px;
-    height: 32px;
-    text-align: center;
-    vertical-align: middle;
-    line-height: 32px;
-}
-
-.notify-box-group{
-    position: absolute;
-    top: (@site-top-height - @notify-group-height)/2;
-    right: (@site-top-height - @notify-group-height)/2;
-    width: 448px;
-    height: @notify-group-height;
-    background-image: url("/@{dashboard-image-path}/indicator_bg.png");
-    display: inline-block;
+	p{
+		margin: 0;
+	}
 }
 
 .logo-box{
@@ -268,44 +265,38 @@
 	list-style: none;
 	width: @site-left-width;
 	margin: 0;
-}
 
-.tab-btn li{
-	position: relative;
-	font-size: 14pt;
-	text-align: center;
-	line-height: @tab-height;
-	vertical-align: middle;
-	height: @tab-height;
-	background-image: url("/@{dashboard-image-path}/tab_normal.png");
-}
-
-.tab-btn li:hover{
-	cursor: pointer;
-}
-
-.tab-btn a{
-	color: gray;
-	text-decoration: none;
-}
-
-.tab-btn span{
-	width: 20px;
-	height: @tab-height;
-	position: absolute;
-	right: 0;
-}
-
-.tab-btn .active{
-	background-image: url("/@{dashboard-image-path}/tab_hover.png");
-}
-
-.tab-btn .active a{
-	color: #4D8FE5;
-}
-
-.tab-btn .active span{
-	background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
+	li{
+		position: relative;
+		font-size: 14pt;
+		text-align: center;
+		line-height: @tab-height;
+		vertical-align: middle;
+		height: @tab-height;
+		background-image: url("/@{dashboard-image-path}/tab_normal.png");
+	}
+	li:hover{
+		cursor: pointer;
+	}
+	a{
+		color: gray;
+		text-decoration: none;
+	}
+	span{
+		width: 20px;
+		height: @tab-height;
+		position: absolute;
+		right: 0;
+	}
+	.active{
+		background-image: url("/@{dashboard-image-path}/tab_hover.png");
+		a{
+			color: #4D8FE5;
+		}
+		span{
+			background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
+		}
+	}
 }
 
 .slide-box{
@@ -393,13 +384,11 @@
 
 .msg-type{
 	.msg-block;
-}
-
-
-.msg-type span{
-	display: inline-block;
-	width: @msg-icon-height;
-	height: @msg-icon-height;
+	span{
+		display: inline-block;
+		width: @msg-icon-height;
+		height: @msg-icon-height;
+	}
 }
 
 .msg-type .all{
@@ -561,20 +550,18 @@
 
 .cache-usage-bar .indicator{
 	position: relative;
-}
-
-.cache-usage-bar .indicator div{
-	float: left;
-	margin: 0 25px;
-	width: @cache-usage-bar-width / 4;
-}
-.cache-usage-bar .indicator img{
-	float: left;
-	margin-right: 10px;
-}
-
-.cache-usage-bar .indicator p{
-	margin: 0;
+	div{
+		float: left;
+		margin: 0 25px;
+		width: @cache-usage-bar-width / 4;
+	}
+	img{
+		float: left;
+		margin-right: 10px;
+	}
+	p{
+		margin: 0;
+	}
 }
 
 .usage{
@@ -583,34 +570,31 @@
 	height: @cache-usage-bar-height;
 	top: 20px;
 	clear: both;
-}
 
-.usage div{
-	.corner-radius (20px);
-	position: absolute;
-	width: @cache-usage-bar-width;
-	height: @cache-usage-bar-height;
-	background-repeat: no-repeat;
-}
+	div{
+		.corner-radius (20px);
+		position: absolute;
+		width: @cache-usage-bar-width;
+		height: @cache-usage-bar-height;
+		background-repeat: no-repeat;
+	}
 
-.usage .total{
-	.css3-progress-bar-gray;
-	background-size: 100% 100%;
-	background-repeat: no-repeat;
+	.total{
+		.css3-progress-bar-gray;
+		background-size: 100% 100%;
+		background-repeat: no-repeat;
+	}
+	.used{
+		.css3-progress-bar-blue;
+		background-size: 66% 100%;
+		background-repeat: no-repeat;
+	}
+	.dirty{
+		.css3-progress-bar-darkblue;
+		background-size: 33% 100%;
+		background-repeat: no-repeat;
+	}
 }
-
-.usage .used{
-	.css3-progress-bar-blue;
-	background-size: 66% 100%;
-	background-repeat: no-repeat;
-}
-
-.usage .dirty{
-	.css3-progress-bar-darkblue;
-	background-size: 33% 100%;
-	background-repeat: no-repeat;
-}
-
 
 .ip-listbox{
 	.css3-shadow(1px 1px 3px #aaa);
@@ -624,23 +608,21 @@
 .ip-block{
 	position: relative;
 	margin: 5px 0;
+	.ip-address{
+		margin: 0;
+		font-size: 16px;
+		width: 208px;
+		display: inline-block;
+		.corner-radius(2px);
+	}
+	.delete{
+		position: absolute;
+		right: 0;
+	}
 }
 
 .ip-block:hover{
 	background-color: #e5e5e5;
-}
-
-.ip-block .ip-address{
-	margin: 0;
-	font-size: 16px;
-	width: 208px;
-	display: inline-block;
-	.corner-radius(2px);
-}
-
-.ip-block .delete{
-	position: absolute;
-	right: 0;
 }
 
 .img-system{
@@ -677,15 +659,12 @@
 // styles for 404 and 500 pages
 
 .error-content{
-	background-image: url("/@{dashboard-image-path}/1_container_bg.png");
+	.main-bg;
 	background-position: 0 @site-top-height;
-	background-repeat: repeat-x;
-	background-color: white;
 	width: @site-width;
 	left: 0;
-	.css3-shadow (3px 0px 3px #aaa);
+	border-right: none;
 }
-
 
 #http-error{
 	position: absolute;
@@ -713,17 +692,15 @@
 	padding-top: 75px;
 	background-image: url("/@{dashboard-image-path}/error_page404_bubble.png");
 	background-repeat: no-repeat;
-}
 
-#error-bubble h1{
-	color: #4AA6DF;
-}
-
-#error-bubble p{
-	font-size: 16px;
-	margin-right: 100px;
-}
-
-#error-bubble h1, #error-bubble p{
-	margin-left: 150px;
+	h1{
+		color: #4AA6DF;
+	}
+	p{
+		font-size: 16px;
+		margin-right: 100px;
+	}
+	h1, p{
+		margin-left: 150px;
+	}
 }
