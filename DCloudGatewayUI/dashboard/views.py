@@ -177,11 +177,6 @@ def sharefolder(request, action):
         username = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
 
-    def nfs_setting_generator(ip_list):
-        class NFSSetting(RenderFormMixinClass, forms.Form):
-            array_of_ip = forms.MultipleChoiceField(choices=tuple([(ip, ip) for ip in ip_list]))
-        return NFSSetting
-
     if request.method == "POST":
         if action == "smb_setting":
             form = SMBSetting(request.POST)
@@ -191,18 +186,17 @@ def sharefolder(request, action):
                 if not update_return['result']:
                     action_error[action] = update_return['msg']
         elif action == "nfs_setting":
-            ip_list = request.POST.getlist('array_of_ip')
+            ip_list = json.loads(request.POST.get('array_of_ip'))
             update_return = json.loads(api.set_nfs_access_ip_list(ip_list))
             print update_return
             if not update_return['result']:
                 action_error[action] = update_return['msg']
-                form = nfs_setting_generator(set(nfs_data['array_of_ip'] + ip_list))
-                forms_group['nfs_setting'] = form
+            nfs_data['array_of_ip'] = ip_list
 
     forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
-    forms_group['nfs_setting'] = forms_group.get('nfs_setting', nfs_setting_generator(nfs_data['array_of_ip'])())
 
-    return render(request, 'dashboard/form_tab.html', {'tab': 'sharefolder', 'forms_group': forms_group, 'action_error': action_error})
+    return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
+                                                          'action_error': action_error, "nfs_data": nfs_data})
 
 
 @login_required
