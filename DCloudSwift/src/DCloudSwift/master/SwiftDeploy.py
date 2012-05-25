@@ -68,23 +68,17 @@ class SwiftDeploy:
 		self.__jsonStr = json.dumps(self.__kwparams)
 		os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
+		self.__setUpdateMetadataProgress()
 		self.__setDeployProgress()
 		self.__setSpreadProgress() 
 		self.__setCleanProgress()
-		self.__setMetadataFlag()
 
 		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
 			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
 
-	def getMetadataFlag(self):
-		return self.__metadataFlag
-
-	def __setMetadataFlag(self):
-		self.__metadataFlag = True
-
-	def __unsetMetadataFlag(self):
-		self.__metadataFlag = False
+	def getUpdateMetadataProgress(self):
+		return self.__updateMetadataProgress
 
 	def getDeployProgress(self):
 		return self.__deployProgress
@@ -94,6 +88,19 @@ class SwiftDeploy:
 
 	def getCleanProgress(self):
 		return self.__cleanProgress
+
+	def __setUpdateMetadataProgress(self, progress=0, finished=False, message=[], code=0):
+		lock.acquire()
+		try:
+			self.__updateMetadataProgress = {
+				'progress': progress,
+				'finished': finished,
+				'code': code,
+				'message': message
+			}
+
+		finally:
+			lock.release()
 
 	def __setDeployProgress(self, proxyProgress=0, storageProgress=0, finished=False, message=[], code=0, deployedProxy=0, deployedStorage=0, blackList=[]):
 		lock.acquire()
@@ -220,7 +227,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name = "createMetadata")
 		
 		try:
-			self.__setMetadataFlag()
+			self.__setUpdateMetadataProgress()
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 			versBase = int(time.time())*100000
@@ -248,13 +255,17 @@ class SwiftDeploy:
 
 			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR,swiftDir))
 			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
-		finally:
-			self.__unsetMetadataFlag()
+			self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
+		except Exception as e:
+			logger.error(str(e))
+			self.__setUpdateMetadataProgress(finished=True, code=1, message=[str(e)])
+			raise UpdateMetadataError(str(e))
 
 	def __updateMetadata2AddNodes(self, proxyList, storageList):
+		logger = util.getLogger(name = "__updateMetadata2AddNodes")
 		try:
-			logger = util.getLogger(name = "__updateMetadata2AddNodes")
-			self.__setMetadataFlag()
+			self.__setUpdateMetadataProgress()
+
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 
@@ -287,14 +298,17 @@ class SwiftDeploy:
 
 			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
 			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
-		finally:
-			self.__unsetMetadataFlag()
+			self.__setUpdateMetadataProgress(code=0, finished=True, progress=100)
+
+		except Exception as e:
+			self.__setUpdateMetadataProgress(finished=True, code=1, message=[str(e)])
+			raise UpdateMetadataError(str(e))
 
 
 	def __updateMetadata2DeleteNodes(self, proxyList, storageList):
+		logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
 		try:
-			logger = util.getLogger(name = "__updateMetadata2DeleteNodes")
-			self.__setMetadataFlag()
+			self.__setUpdateMetadataProgress()
 			deviceCnt = self.__kwparams['deviceCnt']
 			devicePrx = self.__kwparams['devicePrx']
 
@@ -334,8 +348,11 @@ class SwiftDeploy:
 
 			os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s"%(BASEDIR, swiftDir))
 			os.system("cd %s; rm -rf %s"%(swiftDir,UNNECESSARYFILES))
-		finally:
-			self.__unsetMetadataFlag()
+
+			self.__setUpdateMetadataProgress(finished=True, code=0)
+		except Exception as e:
+			self.__setUpdateMetadataProgress(finished=True, code=1, message=[str(e)])
+			raise UpdateMetadataError(str(e))
 
 	def __proxyDeploySubtask(self, proxyIP):
 		logger = util.getLogger(name="proxyDeploySubtask: %s" % proxyIP)
@@ -477,7 +494,10 @@ class SwiftDeploy:
 			self.__storageList = storageList
 			self.__proxyDeploy()
 			self.__storageDeploy()
+		except UpdateMetadataError as e:
+			logger.error(str(e))
 		except Exception as e:
+			logger.error(str(e))
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
 
 	def __spreadRingFilesSubtask(self, nodeIP):
@@ -667,6 +687,11 @@ class SwiftDeploy:
 		logger = util.getLogger(name="addStorage")
 		try:
 			self.__updateMetadata2AddNodes(proxyList=proxyList, storageList=storageList)
+		except UpdateMetadataError as e:
+			logger.error(str(e))
+			return
+
+		try:
 			self.__setDeployProgress()
 			self.__proxyList = proxyList
 			self.__storageList = storageList
@@ -675,8 +700,7 @@ class SwiftDeploy:
 		except Exception as e:
 			logger.error(str(e))
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
-			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
-			return
+
 
 		try:
 			self.spreadRingFiles()
@@ -707,13 +731,16 @@ class SwiftDeploy:
 
 		try:
 			self.__updateMetadata2DeleteNodes(proxyList=proxyList, storageList=storageList)
+		except UpdateMetadataError as e:
+			logger.error(str(e))
+			return
+
+		try:
 			self.__setSpreadProgress()
 			self.spreadRingFiles()
 		except Exception as e:
 			logger.error(str(e))
 			self.__setSpreadProgress(finished=True, code=1, message=[str(e)])
-			self.__setCleanProgress(finished=True, code=1, message=[str(e)])
-			return
 
 		try:
 			
@@ -800,22 +827,28 @@ def addNodes():
 		t.start()
 
 		print "Updating Metadata..."
-		while SD.getMetadataFlag() == True:
+		progress = SD.getUpdateMetadataProgress()
+		while progress['finished'] != True:
 			time.sleep(10)
+			progress = SD.getUpdateMetadataProgress()
+
+		if progress['code'] !=0:
+			print "Failed to update metadata for %s"%progress["message"]
+			sys.exit(1)
 		
 		print "Deploy new nodes..."
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
 			time.sleep(10)
-			print progress
 			progress = SD.getDeployProgress()
+			print progress
 
 		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
 		while spreadProgress['finished'] != True:
 			time.sleep(8)
-			print  spreadProgress
 			spreadProgress = SD.getSpreadProgress()
+			print  spreadProgress
 
 		return 0
 	except Exception as e:
@@ -841,8 +874,14 @@ def deleteNodes():
 		t.start()
 
 		print "Updating Metadata..."
-		while SD.getMetadataFlag() == True:
+		progress = SD.getUpdateMetadataProgress()
+		while progress['finished'] != True:
 			time.sleep(10)
+			progress = SD.getUpdateMetadataProgress()
+
+		if progress['code'] !=0:
+			print "Failed to update metadata for %s"%progress["message"]
+			sys.exit(1)
 
 		print "Spread ring files..."
 		spreadProgress = SD.getSpreadProgress()
@@ -905,8 +944,14 @@ def deploy():
 		t.start()
 
 		print "Creating Metadata..."
-		while SD.getMetadataFlag() == True:
+		progress = SD.getUpdateMetadataProgress()
+		while progress['finished'] != True:
 			time.sleep(10)
+			progress = SD.getUpdateMetadataProgress()
+
+		if progress['code'] !=0:
+			print "Failed to create metadata for %s"%progress["message"]
+			sys.exit(1)
 
 		progress = SD.getDeployProgress()
 		while progress['finished'] != True:
