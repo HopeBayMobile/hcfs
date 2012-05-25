@@ -187,7 +187,7 @@
     position: absolute;
     top: (@site-top-height - @notify-group-height)/2;
     right: (@site-top-height - @notify-group-height)/2;
-    width: 430px;
+    width: 448px;
     height: @notify-group-height;
     background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
@@ -305,10 +305,8 @@
 }
 
 .tab-btn .active span{
-	//content: "<img src='/@{dashboard-image-path}/tab_hover_arrow.png'>";
 	background: url("/@{dashboard-image-path}/tab_hover_arrow.png");
 }
-
 
 .slide-box{
 	position: fixed;
@@ -448,7 +446,6 @@
 	margin: 5px 0;
 	width: @site-main-width - 300px;
 	font-size: 20px;
-	// height: @msg-title-height;
 	line-height: @msg-content-height;
 	vertical-align: middle;
 	// Fake list-style
@@ -558,7 +555,6 @@
 	position: relative;
 	top: 35px;
 	left: 50px;
-	// background-color: red;
 	width: @cache-usage-bar-width;
 	height: @cache-usage-bar-height + 75px;
 }
@@ -676,4 +672,58 @@
 }
 .img-indicator{
 	background-image: url("/@{dashboard-image-path}/indicator_2_abnormal.png");
+}
+
+// styles for 404 and 500 pages
+
+.error-content{
+	background-image: url("/@{dashboard-image-path}/1_container_bg.png");
+	background-position: 0 @site-top-height;
+	background-repeat: repeat-x;
+	background-color: white;
+	width: @site-width;
+	left: 0;
+	.css3-shadow (3px 0px 3px #aaa);
+}
+
+
+#http-error{
+	position: absolute;
+	top: 400px;
+	left: 100px;
+	width: 225px;
+	height: 225px;
+	background-repeat: no-repeat;
+}
+
+#http-error.error-404{
+	background-image: url("/@{dashboard-image-path}/error_page404_icon.png");
+}
+
+#http-error.error-500{
+	background-image: url("/@{dashboard-image-path}/error_page500_icon.png");
+}
+
+#error-bubble{
+	position: absolute;
+	top: 150px;
+	left: 225px;
+	width: 628px;
+	height: 323px;
+	padding-top: 75px;
+	background-image: url("/@{dashboard-image-path}/error_page404_bubble.png");
+	background-repeat: no-repeat;
+}
+
+#error-bubble h1{
+	color: #4AA6DF;
+}
+
+#error-bubble p{
+	font-size: 16px;
+	margin-right: 100px;
+}
+
+#error-bubble h1, #error-bubble p{
+	margin-left: 150px;
 }
