@@ -35,6 +35,9 @@ class DeployProxyError(Exception):
 class DeployStorageError(Exception):
 	pass
 
+class DeploySwiftError(Exception):
+	pass
+
 class UpdateMetadataError(Exception):
 	pass
 
@@ -484,21 +487,27 @@ class SwiftDeploy:
                 pool.dismissWorkers(20)
                 pool.joinAllDismissedWorkers()
 
-	def deploySwift(self, proxyList, storageList, numOfReplica):
-		logger = util.getLogger(name="deploySwift")
-
-		try:
-			self.__createMetadata(proxyList, storageList, numOfReplica)
+	def __deploySwift(self, proxyList, storageList):
+		logger = util.getLogger(name="__deploySwift")
+		try: 
 			self.__setDeployProgress()
 			self.__proxyList = proxyList
 			self.__storageList = storageList
 			self.__proxyDeploy()
 			self.__storageDeploy()
-		except UpdateMetadataError as e:
-			logger.error(str(e))
 		except Exception as e:
 			logger.error(str(e))
 			self.__setDeployProgress(finished=True, code=1, message=[str(e)])
+			raise DeploySwiftError(str(e))
+	
+	def deploySwift(self, proxyList, storageList, numOfReplica):
+		logger = util.getLogger(name="deploySwift")
+
+		try:
+			self.__createMetadata(proxyList, storageList, numOfReplica)
+			self.__deploySwift(proxyList, storageList)
+		except UpdateMetadataError, DeploySwiftError: 
+			return
 
 	def __spreadRingFilesSubtask(self, nodeIP):
 		logger = util.getLogger(name="spreadRingFilesSubtask: %s" % nodeIP)
