@@ -108,91 +108,122 @@
 
 /* The following are styles for dashboard views.*/
 
+html, body{
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+}
+
+tr, td{
+	margin: 0;
+	padding: 0;
+}
+
+table{
+	width: 1024px;
+}
+
+tr{
+	width: @site-width;
+}
+
 .site-container{
-  	position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    margin:0;
-    width: @site-width;
+	position: absolute;
+	height: 100%;
+	border-right: solid #ccc @site-left-main-seperator;
 }
 
 .site-header{
-    position: fixed;
+    position: relative;
     top: 0;
     margin: 0; padding:0;
-    background-image: url("/@{dashboard-image-path}/banner.png");
     width:  @site-width;
     height: @site-top-height;
-    z-index: 1000;
+    .center{
+    	z-index: 1000;
+    	width: @site-width;
+		height: @site-top-height;
+		background-image: url("/@{dashboard-image-path}/banner.png");
+		-webkit-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
+    }
+
+}
+
+.site-body {
+	.center{
+		width: @site-width;
+		height: 100%;
+		overflow-y: hidden;
+		-webkit-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
+	}
 }
 
 .notify-box-group{
-    position: absolute;
-    top: (@site-top-height - @notify-group-height)/2;
-    right: (@site-top-height - @notify-group-height)/2;
+   	float: right;
+    margin-top: (@site-top-height - @notify-group-height)/2;
+    margin-right: (@site-top-height - @notify-group-height)/2;
     width: 448px;
     height: @notify-group-height;
     background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
-}
 
-.notify-box{
-	float: left;
-    margin-left: 10px;
-    margin-bottom: 10px;
-    color: white;
-    width: 50px;
-    height: 50px;
-    background-position: 0;
-	background-repeat: no-repeat;
-}
-.notify-box-row{
-	float: left;
-	margin-top: 10px;
-	margin-left: 5px;
-}
-
-.notify-box-row2{
-	float: left;
-	clear: both;
-	margin-top: 5px;
-	margin-left: 5px;
-	.notify-box{
-		width: 72px;
-	    height: 32px;
-	    text-align: center;
-	    vertical-align: middle;
-	    line-height: 32px;
+    .notify-box-row-NW{
+		float: left;
+		margin-top: 10px;
+		margin-left: 5px;
 	}
-}
-
-.notify-box-row3{
-	float: right;
-	width: 140px;
-	margin-top: 10px;
-	margin-right: 10px;
-	line-height: 32px;
-	vertical-align: middle;
-	font-weight: bold;
-	.logout{
+	.notify-box-row-SW{
+		float: left;
+		clear: both;
+		margin-top: 5px;
+		margin-left: 5px;
+		.notify-box{
+			width: 72px;
+		    height: 32px;
+		    text-align: center;
+		    vertical-align: middle;
+		    line-height: 32px;
+		}
+	}
+	.notify-box-row-NE{
 		float: right;
+		width: 140px;
+		margin-top: 10px;
+		margin-right: 10px;
+		line-height: 32px;
+		vertical-align: middle;
+		font-weight: bold;
+		.logout{
+			float: right;
+		}
 	}
-}
-
-.notify-box-row4{
-	float: right;
-	width: 140px;
-	margin-right: 10px;
-	margin-top: -5px;
-	p{
-		margin: 0;
+	.notify-box-row-SE{
+		float: right;
+		width: 140px;
+		margin-right: 10px;
+		margin-top: -5px;
+		p{
+			margin: 0;
+		}
+	}
+	.notify-box{
+		float: left;
+	    margin-left: 10px;
+	    margin-bottom: 10px;
+	    color: white;
+	    width: 50px;
+	    height: 50px;
+	    background-position: 0;
+		background-repeat: no-repeat;
 	}
 }
 
 .logo-box{
-    position: absolute;
-    top:13px; left:13px;
+	float: left;
+	margin-top: 33px;
+	margin-left: 23px;
     background-image: url("/@{dashboard-image-path}/delta_logo.png");
     background-repeat: no-repeat;
     width: 198px;
@@ -216,13 +247,10 @@
 
 .main-bg{
 	background-image: url("/@{dashboard-image-path}/1_container_bg.png");
-	background-position: 0 @site-top-height + 24px; // Add the height of msg-status bar.
 	background-repeat: repeat-x;
 	background-color: white;
 	width: @site-main-width - @site-left-main-seperator;
 	left: @site-left-width + @site-left-main-seperator;
-	border-right: solid #ccc @site-left-main-seperator;
-	.css3-shadow (3px 0px 3px #aaa)
 }
 
 .left-bg{
@@ -230,7 +258,6 @@
 	background-repeat: repeat-x;
     width:@site-left-width;
     border-right: solid #ccc @site-left-main-seperator;
-
 }
 
 .left-bg-tail{
@@ -241,24 +268,23 @@
 }
 
 .main-row{
-  	position: absolute;
-  	left: @site-left-width;
-    width: @site-main-width;
-    top: @site-top-height;
-    bottom: 0;
+    float: right;
+    height: 100%;
+    overflow: auto;
 }
 
 .left-row{
+	float:left;
     width: @site-left-width;
-    top: @site-top-height;
-    position: fixed;
+    height: 100%;
+    overflow-y: hidden;
 }
 
 .tab-content{
-	overflow-y: scroll;
-	position: absolute;
-	top: @slide-box-footer-height;
-	bottom: 0;
+	position: relative;
+	width: @site-main-width - 40px;
+	margin: 40px 20px 0 20px;
+	text-align:left;
 }
 
 .tab-btn{
@@ -299,86 +325,37 @@
 	}
 }
 
-.slide-box{
-	position: fixed;
-    width: @site-main-width;
-	z-index: 20;
-}
-
-@media screen and (max-height: 900px)
-{
-	.slide-box{
-	    .css3-transform(1s);
-	    height: 580px - @site-top-height;
-	    margin-top: -(580px - @site-top-height) + @slide-box-footer-height ;
-	}
-	.slide-box-body{
-		height: 580px - @site-top-height - @slide-box-footer-height;
-	}
-}
-
-@media screen and (min-height: 900px)
-{
-	.slide-box{
-	    .css3-transform(1s);
-	    height: 880px - @site-top-height;
-	    margin-top: -(880px - @site-top-height) + @slide-box-footer-height ;
-	}
-	.slide-box-body{
-		height: 880px - @site-top-height - @slide-box-footer-height;
-	}
-}
-
-.slide-box-body{
-	position: relative;
-	background-color: white;
-	overflow-y: scroll;
-}
-
-.slide-box-footer-bg{
-	position: relative;
-	height: @slide-box-footer-height;
-}
-
-.slide-box-footer{
-	position: absolute;
-    width: @site-main-width;
+.statusbar-header{
     height: @slide-box-footer-bar-height;
     line-height: @slide-box-footer-bar-height;
     text-align: center;
     vertical-align: middle;
     color: white;
     font-weight: bold;
-    bottom: 0;
-    margin-bottom: @slide-box-toggle-btn-height;
+    cursor:pointer;
+    // overflow:hidden;
     background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
 }
 
-.slide-box-footer .msg-status{
-	width: 100%;
-	position: absolute;
-	height: 24px;
-	right: 1px;
+.statusbar-content{
+	text-align: left;
 }
 
-.slide-box-footer .toggle-btn{
+.statusbar-header .toggle-btn{
 	position: relative;
 	left: (@site-main-width - 45px) / 2;
 	width: 45px;
 	height: @slide-box-toggle-btn-height;
+	z-index: 1;
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_down.png");
 }
-.slide-box-footer .toggle-btn.active{
+.statusbar-header .toggle-btn.active{
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
-}
-
-#msgbox-body ul:first-child{
-	margin-top: 30px;
 }
 
 .msg-block{
 	position: relative;
-	margin: 0 20px;
+	margin: 0;
 	border-bottom: solid 1px gray;
 }
 
@@ -447,10 +424,6 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	word-wrap: break-word;
-}
-
-#msgbox .msg-content{
-	background: url("/@{dashboard-image-path}/info_error.png") no-repeat left 3px;
 }
 
 .action-btn{

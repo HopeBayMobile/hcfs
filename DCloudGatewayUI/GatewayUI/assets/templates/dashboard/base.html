@@ -24,6 +24,7 @@
         <script src="/static/js/jquery-1.7.min.js"></script>
         <script src="/static/js/bootstrap.js"></script>
         <script src="/static/js/jquery-ui-1.8.18.custom.min.js"></script>
+        <script src="/static/js/jquery.statusbar.js"></script>
         <script src="/static/js/jquery.validate.min.js"></script>
         <script src="/static/js/hogan.js"></script>
         <script src="/static/js/plugins.js"></script>
@@ -78,87 +79,106 @@
                 $(".tab-btn").on('click', 'li', function(){
                     window.location = $(this).find('a').attr('href')
                 })
+
+                var bar = $.statusbar({
+                    onClick:function(arg) //add onclick function
+                    {
+                        alert("Argument= "+arg);
+                    }
+                });
+
+                var msg_template = Hogan.compile('{% templatetag openvariable %}#msgs{% templatetag closevariable %}<ul class="msg-block"><li class="msg-content error">{% templatetag openvariable %} msg {% templatetag closevariable %}<div class="msg-time">{% templatetag openvariable %} timestamp {% templatetag closevariable %}</div><div class="msg-detail"></div></li></ul>{% templatetag openvariable %}/msgs{% templatetag closevariable %}');
+
+                $.get('/dashboard/syslog/', function(ctnt, success, opt){
+                    var msgs = JSON.parse(ctnt)
+                    $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content')
+                });
             });
+
             {% block javascript %}
             {% endblock javascript %}
         </script>
     </head>
 
     <body>
-    <div class="site-container">
-    <div class="site-header">
-        <div class="logo-box">
-        </div>
-        <div id="" class="notify-box-group">
-            <div class="notify-box-row">
-                <div id="system_check" class="notify-box img-system">
+    <div style="text-align:center; width: 1024px; margin: 0 auto;"><table class="site-container">
+        <tr class="site-header">
+            <td width="1024">
+            <div class="center">
+                <div class="logo-box">
                 </div>
-                <div id="network_ok" class="notify-box img-network">
+                <div id="" class="notify-box-group">
+                    <div class="notify-box-row-NW">
+                        <div id="system_check" class="notify-box img-system">
+                        </div>
+                        <div id="network_ok" class="notify-box img-network">
+                        </div>
+                        <div id="flush_inprogress" class="notify-box img-flush">
+                        </div>
+                        <div id="dirtycache_nearfull" class="notify-box img-dirtycache">
+                        </div>
+                    </div>
+                    <div class="notify-box-row-NE">
+                        {{ user.username }}
+                        <a href="/logout"><img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a>
+                    </div>
+                    <div class="notify-box-row-SW">
+                        <div id="HDD_ok" class="notify-box img-indicator">
+                        HDD
+                        </div>
+                        <div id="NFS_srv" class="notify-box img-indicator">
+                        NFS
+                        </div>
+                        <div id="SMB_srv" class="notify-box img-indicator">
+                        SMB
+                        </div>
+                    </div>
+                    <div class="notify-box-row-SE">
+                        <p id="basic_bandwidth">
+                            Download / Upload:<br/>
+                            <span class="down">0</span> / <span class="up">0</span>
+                            (KB/Sec)
+                        </p>
+                    </div>
                 </div>
-                <div id="flush_inprogress" class="notify-box img-flush">
-                </div>
-                <div id="dirtycache_nearfull" class="notify-box img-dirtycache">
-                </div>
-            </div>
-            <div class="notify-box-row3">
-                {{ user.username }}
-                <a href="/logout"><img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a>
-            </div>
-            <div class="notify-box-row2">
-                <div id="HDD_ok" class="notify-box img-indicator">
-                HDD
-                </div>
-                <div id="NFS_srv" class="notify-box img-indicator">
-                NFS
-                </div>
-                <div id="SMB_srv" class="notify-box img-indicator">
-                SMB
-                </div>
-            </div>
-            <div class="notify-box-row4">
-                <p id="basic_bandwidth">
-                    Download / Upload:<br/>
-                    <span class="down">0</span> / <span class="up">0</span>
-                    (KB/Sec)
-                </p>
-            </div>
-        </div>
-    </div>
-    <div class="left-bg bg-fixed">
-        &nbsp;
-    </div><!-- / -->
-    <div class="main-bg bg-fixed">
-        &nbsp;
-    </div>
-    <div class="left-row">
-        <div>
-            <ul class="tab-btn" id="site-tab">
-              <li class=""><a href="{% url dashboard:index %}">Dashboard</a></li>
-              <li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>
-              <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
-              <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
-              <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
-              <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
-              <li class=""><a href="{% url dashboard:power action=None %}">
-                    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/" version="1.2" baseProfile="tiny" x="0px" y="0px" width="42px" height="42px" viewBox="-0.8 -50 177 250" xml:space="preserve" xmlns:xml="http://www.w3.org/XML/1998/namespace">
-                    <defs>
-                    </defs>
-                    <path fill="none" stroke="#808080" stroke-width="30" stroke-linecap="round" d="M33.7,64.3C22.1,77.2,15,94.3,15,113  c0,40.1,32.5,72.7,72.7,72.7c40.1,0,72.7-32.5,72.7-72.7c0-18.7-7.1-35.8-18.7-48.7"/>
-                    <line fill="none" stroke="#808080" stroke-width="30" stroke-linecap="round" x1="87.8" y1="15" x2="87.8" y2="113"/>
-                    </svg>
-              </a></li>
-            </ul>
-            <div class="left-bg-tail"></div>
-        </div>
-    </div>
-    <div class="main-row">
-        {% include "dashboard/msgbox.html" %}
-        <div class="tab-content">
-            {% block tab_content %}
-            {% endblock tab_content %}
-        </div>
-    </div>
+            </div><!-- / -->
+            </td>
+        </tr>
 
-    </div> <!-- site-body -->
+        <tr>
+
+        <td class="site-body">
+        <div class="center">
+        <div class="left-row left-bg">
+            <div>
+                <ul class="tab-btn" id="site-tab">
+                  <li class=""><a href="{% url dashboard:index %}">Dashboard</a></li>
+                  <li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>
+                  <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
+                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
+                  <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
+                  <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
+                  <li class=""><a href="{% url dashboard:power action=None %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:a="http://ns.adobe.com/AdobeSVGViewerExtensions/3.0/" version="1.2" baseProfile="tiny" x="0px" y="0px" width="42px" height="42px" viewBox="-0.8 -50 177 250" xml:space="preserve" xmlns:xml="http://www.w3.org/XML/1998/namespace">
+                        <defs>
+                        </defs>
+                        <path fill="none" stroke="#808080" stroke-width="30" stroke-linecap="round" d="M33.7,64.3C22.1,77.2,15,94.3,15,113  c0,40.1,32.5,72.7,72.7,72.7c40.1,0,72.7-32.5,72.7-72.7c0-18.7-7.1-35.8-18.7-48.7"/>
+                        <line fill="none" stroke="#808080" stroke-width="30" stroke-linecap="round" x1="87.8" y1="15" x2="87.8" y2="113"/>
+                        </svg>
+                  </a></li>
+                </ul>
+                <div class="left-bg-tail"></div>
+            </div>
+        </div>
+        <div class="main-row main-bg">
+            <div class="tab-content">
+                {% block tab_content %}
+                {% endblock tab_content %}
+            </div>
+        </div>
+        </div><!-- / -->
+        </td>
+        </tr>
+        </table> <!-- site-body --></div>
     </body>
 </html>
