@@ -3,7 +3,7 @@
 <style type='text/css'>
 .sync_bar_main {
     height: 55px;
-    width: 720px;
+    width: 721px;
     margin: 0 auto;
 }
 .sync_bar_left {
@@ -33,6 +33,20 @@
     height: 41px;
     border: 0px;
     background-image:url("/static/img/dashboard/hour_bg_1.png");
+}
+.sync_24div_block_last1 {
+    width: 24px;
+    float: left;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_bg_1.png");
+}
+.sync_24div_block_last2 {
+    width: 9px;
+    float: left;
+    height: 41px;
+    border: 0px;
+    background-image:url("/static/img/dashboard/hour_bg_1_right.png") no-repeat;
 }
 .sync_24div_none {
     width: 24px;
@@ -129,21 +143,26 @@
             {% for i in hours %}
                 {% if value.range == "all" %}
                     {% if forloop.last %}
-                        <div id="24div" class="sync_24div_last"></div>
+                        <div class="sync_24div_last"></div>
                     {% else %}
-                        <div id="24div" class="sync_24div"></div>
+                        <div class="sync_24div"></div>
                     {% endif %}
                 {% elif value.range == "none" %}
-                    <div id="24div" class="sync_24div_none"></div>
+                    <div class="sync_24div_none"></div>
                 {% else  %}
                     {% if i in value.range  %}
                         {% if forloop.last %}
-                            <div id="24div" class="sync_24div_last"></div>
+                            <div class="sync_24div_last"></div>
                         {% else %}
-                            <div id="24div" class="sync_24div"></div>
+                            <div class="sync_24div"></div>
                         {% endif %}
                     {% else %}
-                        <div id="24div" class="sync_24div_block"></div>
+                        {% if forloop.last %}
+                            <div id="24div" class="sync_24div_block_last1"></div>
+                            <div id="24div" class="sync_24div_block_last2"></div>
+                        {% else %}
+                            <div id="24div" class="sync_24div_block"></div>
+                        {% endif %}
                     {% endif %}
                 {% endif %}
             {% endfor %}
