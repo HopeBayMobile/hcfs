@@ -101,10 +101,10 @@
     </head>
 
     <body>
-    <div style="text-align:center; width: 1024px; margin: 0 auto;"><table class="site-container">
+    <div  class="site-container">
+        <table>
         <tr class="site-header">
             <td width="1024">
-            <div class="center">
                 <div class="logo-box">
                 </div>
                 <div id="" class="notify-box-group">
@@ -140,7 +140,6 @@
                             (KB/Sec)
                         </p>
                     </div>
-                </div>
             </div><!-- / -->
             </td>
         </tr>
@@ -148,7 +147,6 @@
         <tr>
 
         <td class="site-body">
-        <div class="center">
         <div class="left-row left-bg">
             <div>
                 <ul class="tab-btn" id="site-tab">
@@ -170,13 +168,13 @@
                 <div class="left-bg-tail"></div>
             </div>
         </div>
+        <div id="errormsgbox" style="float: right; width: 803px; height: 0;"></div>
         <div class="main-row main-bg">
             <div class="tab-content">
                 {% block tab_content %}
                 {% endblock tab_content %}
             </div>
         </div>
-        </div><!-- / -->
         </td>
         </tr>
         </table> <!-- site-body --></div>

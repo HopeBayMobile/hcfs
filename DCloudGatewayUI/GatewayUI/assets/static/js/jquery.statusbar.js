@@ -18,8 +18,8 @@
 	function createBar() //creates the html for the bar
 	{
 		//create the bar
-		var statusbar = $("<div \"style=\";position:relative; top:0px; left:0px; width:100%\" class=\"ui-widget statusbar-wrapper\"><div style=\"overflow:auto;\" class=\"ui-widget-content statusbar-content\"></div><div class=\"ui-widget-header statusbar-header\">Error Message<div class=\"toggle-btn\"></div></div></div>");
-		$('.main-row').prepend(statusbar);
+		var statusbar = $("<div style=\"z-index: 2;position:relative; width:100%\" class=\"ui-widget statusbar-wrapper\"><div style=\"overflow:auto;\" class=\"ui-widget-content statusbar-content\"></div><div class=\"ui-widget-header statusbar-header\">Error Message<div class=\"toggle-btn\"></div></div></div>");
+		$('#errormsgbox').prepend(statusbar);
 		// $('html').css("margin-top","26px");
 		$('.statusbar-content').hide();
 		// var btnRemoveAll = $('<button style="margin:5px;" class="statusbar-content-button-remove-all">Remove all</button>').button().click(removeAll);
@@ -35,17 +35,21 @@
 	{
 		if(!slided)
 		{
-			$('.statusbar-content').height($(".main-row").height() - 70 -$('.statusbar-header').outerHeight()-($('.statusbar-content').outerHeight()-$('.statusbar-content').height()));
+			$('.tab-content').hide();
+			var slide_height = $(".main-row").height() - 70 -$('.statusbar-header').outerHeight()-($('.statusbar-content').outerHeight()-$('.statusbar-content').height());
+			if (navigator.appName == 'Microsoft Internet Explorer'){
+				slide_height -= 132;
+			}
+			$('.statusbar-content').height(slide_height);
 			$('.statusbar-content').slideDown(function(){
-				$('.tab-content').hide();
 				$(".toggle-btn").toggleClass("active");
 			});
-
 		}else
 		{
-			$('.statusbar-content').slideUp();
-			$('.tab-content').show();
-			$(".toggle-btn").toggleClass("active");
+			$('.statusbar-content').slideUp(function(){
+				$(".toggle-btn").toggleClass("active");
+				$('.tab-content').show(1);
+			});
 		}
 		slided = !slided;
 	}

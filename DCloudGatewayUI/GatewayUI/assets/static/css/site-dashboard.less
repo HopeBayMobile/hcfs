@@ -123,6 +123,7 @@ tr, td{
 
 table{
 	width: 1024px;
+	height: 100%;
 }
 
 tr{
@@ -130,9 +131,13 @@ tr{
 }
 
 .site-container{
-	position: absolute;
+	width: 1024px;
+	margin: 0 auto;
 	height: 100%;
 	border-right: solid #ccc @site-left-main-seperator;
+	-webkit-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
+	-moz-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
+	box-shadow: -3px 0px 10px 0px #aaa, 3px 0px 10px 0px #aaa;
 }
 
 .site-header{
@@ -141,17 +146,11 @@ tr{
     margin: 0; padding:0;
     width:  @site-width;
     height: @site-top-height;
-    .center{
-    	z-index: 1000;
-    	width: @site-width;
-		height: @site-top-height;
-		background-image: url("/@{dashboard-image-path}/banner.png");
-		-webkit-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
-    }
-
+	background-image: url("/@{dashboard-image-path}/banner.png");
 }
 
 .site-body {
+	height: 100%;
 	.center{
 		width: @site-width;
 		height: 100%;
@@ -283,7 +282,7 @@ tr{
 .tab-content{
 	position: relative;
 	width: @site-main-width - 40px;
-	margin: 40px 20px 0 20px;
+	margin: 68px 20px 0 20px;
 	text-align:left;
 }
 
