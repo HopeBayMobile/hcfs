@@ -1,6 +1,6 @@
 {% if params.is_ajax %}
-	
-	{% block ajax %}{% endblock ajax %}   
+
+	{% block ajax %}{% endblock ajax %}
 
 {% else %}
 <!DOCTYPE html>
@@ -17,7 +17,7 @@
         <!--CSS-->
         <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/bootstrap.css" />
         <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/site.css" />
-        <link rel="stylesheet/less" type="text/css" href="/static/css/site-dashboard.less">
+        <link rel="stylesheet/less" type="text/css" href="/static/css/site-wizard.less">
         {% block stylesheet %}
         {% endblock stylesheet %}
 
@@ -31,15 +31,15 @@
     </head>
 
     <body>
-    <div class="site-container">
+    <div class="site-container" style="height: auto;">
     <div class="site-header">
         <div class="logo-box">
         </div>
     </div>
-    <div style="position:absolute; top:132px; width:1024px; margin:0px; min-height:636px; background-image:url('/static/img/wizard/wizard_bg.png'); background-repeat:no-repeat;">
+    <div style="width:1024px; margin:0px; min-height:636px; background-image:url('/static/img/wizard/wizard_bg.png'); background-repeat:no-repeat;">
     {% block content %}
 
-    {% endblock content %}    
+    {% endblock content %}
     </div>
     </div> <!-- site-body -->
     </body>
