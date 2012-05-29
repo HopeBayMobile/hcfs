@@ -1420,7 +1420,7 @@ def get_nfs_access_ip_list ():
                 # key = services allowed, val = ip lists
                 services = str(arr[0]).strip()
                 iplist = arr[1]
-                ips = iplist.strip().split(" ") #
+                ips = iplist.strip().split(", ") #
             
                 #print services
                 #print ips
@@ -1524,7 +1524,7 @@ def set_nfs_access_ip_list (array_of_ip):
             # key = services allowed, val = ip lists
                 services = str(arr[0]).strip()
                 iplist = arr[1]
-                ips = iplist.strip().split(" ") #
+                ips = iplist.strip().split(", ") #
             
             
     except :
@@ -2122,5 +2122,4 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
-    print get_gateway_status()
     pass
