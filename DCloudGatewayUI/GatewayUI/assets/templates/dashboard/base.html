@@ -63,9 +63,9 @@
                             $("#basic_bandwidth .up").text(data.uplink_usage);
                         }
                     });
-                    setTimeout(update_indicator, 10000);
+                    setInterval(update_indicator, 10000);
                 }
-                update_indicator();
+                // update_indicator();
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active')
@@ -109,13 +109,13 @@
                 </div>
                 <div id="" class="notify-box-group">
                     <div class="notify-box-row-NW">
-                        <div id="system_check" class="notify-box img-system">
+                        <div id="system_check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                         </div>
-                        <div id="network_ok" class="notify-box img-network">
+                        <div id="network_ok" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
                         </div>
-                        <div id="flush_inprogress" class="notify-box img-flush">
+                        <div id="flush_inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
                         </div>
-                        <div id="dirtycache_nearfull" class="notify-box img-dirtycache">
+                        <div id="dirtycache_nearfull" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
                         </div>
                     </div>
                     <div class="notify-box-row-NE">
@@ -123,13 +123,13 @@
                         <a href="/logout"><img class="logout" src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a>
                     </div>
                     <div class="notify-box-row-SW">
-                        <div id="HDD_ok" class="notify-box img-indicator">
+                        <div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
                         HDD
                         </div>
-                        <div id="NFS_srv" class="notify-box img-indicator">
+                        <div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">
                         NFS
                         </div>
-                        <div id="SMB_srv" class="notify-box img-indicator">
+                        <div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">
                         SMB
                         </div>
                     </div>
