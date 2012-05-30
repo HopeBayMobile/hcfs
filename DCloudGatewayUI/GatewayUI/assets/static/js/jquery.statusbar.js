@@ -36,7 +36,7 @@
 		if(!slided)
 		{
 			$('.tab-content').hide();
-			var slide_height = $(".main-row").height() - 70 -$('.statusbar-header').outerHeight()-($('.statusbar-content').outerHeight()-$('.statusbar-content').height());
+			var slide_height = $(".main-row").height() - 110 -$('.statusbar-header').outerHeight()-($('.statusbar-content').outerHeight()-$('.statusbar-content').height());
 			if (navigator.appName == 'Microsoft Internet Explorer'){
 				slide_height -= 132;
 			}

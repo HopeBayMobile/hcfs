@@ -15,7 +15,7 @@
 @msg-content-height: 30px;
 @error-msg-bg-color: #C03556;
 @space-bar-left-width: 17px;
-@cache-usage-bar-width: @site-main-width - 100px;
+@site-main-content-width: @site-main-width - 60px;
 @cache-usage-bar-height: 25px;
 @dashboard-image-path: "static/img/dashboard";
 .css3-transform (@times){
@@ -282,8 +282,11 @@ tr{
 .tab-content{
 	position: relative;
 	width: @site-main-width - 40px;
-	margin: 68px 20px 0 20px;
-	text-align:left;
+	margin: 68px 20px 20px 0;
+	&:first-child{
+		position: relative;
+		left: 30px;
+	}
 }
 
 .tab-btn{
@@ -300,8 +303,13 @@ tr{
 		height: @tab-height;
 		background-image: url("/@{dashboard-image-path}/tab_normal.png");
 	}
-	li:hover{
-		cursor: pointer;
+	li{
+		&:hover{
+			cursor: pointer;
+		}
+		img{
+			width: 30px;
+		}
 	}
 	a{
 		color: gray;
@@ -332,12 +340,12 @@ tr{
     color: white;
     font-weight: bold;
     cursor:pointer;
-    // overflow:hidden;
     background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
 }
 
 .statusbar-content{
-	text-align: left;
+	margin-top: 40px;
+	margin-left: 30px;
 }
 
 .statusbar-header .toggle-btn{
@@ -352,9 +360,17 @@ tr{
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
 }
 
+
+#errormsgbox{
+	float: right;
+	width: 803px;
+	height: 0;
+}
+
 .msg-block{
 	position: relative;
 	margin: 0;
+	width: @site-main-content-width;
 	border-bottom: solid 1px gray;
 }
 
@@ -362,6 +378,7 @@ tr{
 	.msg-block;
 	span{
 		display: inline-block;
+		cursor: pointer;
 		width: @msg-icon-height;
 		height: @msg-icon-height;
 	}
@@ -409,7 +426,7 @@ tr{
 
 .msg-content{
 	margin: 5px 0;
-	width: @site-main-width - 300px;
+	width: @site-main-width - 330px;
 	font-size: 20px;
 	line-height: @msg-content-height;
 	vertical-align: middle;
@@ -458,10 +475,9 @@ tr{
 .storage-usage-info{
 	position: relative;
 	top: 10px;
-	left: 50px;
-	max-width: @site-main-width - 140px;
+	max-width: @site-main-width - 100px;
 	background-color: #EBEDED;
-	padding: 5px 20px 50px 20px;
+	padding: 5px 20px 20px 20px;
 	.corner-radius (20px);
 	.css3-shadow (2px 2px 5px gray)
 }
@@ -505,7 +521,7 @@ tr{
 }
 
 .storage-usage-info .percentage-bar .current-usage{
-	max-width: @cache-usage-bar-width;
+	max-width: @site-main-content-width;
 	.css3-progress-bar-skyblue;
 	background-size: 50% 100%;
 	background-repeat: no-repeat;
@@ -515,8 +531,7 @@ tr{
 .cache-usage-bar{
 	position: relative;
 	top: 35px;
-	left: 50px;
-	width: @cache-usage-bar-width;
+	width: @site-main-content-width;
 	height: @cache-usage-bar-height + 75px;
 }
 
@@ -525,7 +540,7 @@ tr{
 	div{
 		float: left;
 		margin: 0 25px;
-		width: @cache-usage-bar-width / 4;
+		width: @site-main-content-width / 4;
 	}
 	img{
 		float: left;
@@ -538,7 +553,7 @@ tr{
 
 .usage{
 	position: relative;
-	width: @cache-usage-bar-width;
+	width: @site-main-content-width;
 	height: @cache-usage-bar-height;
 	top: 20px;
 	clear: both;
@@ -546,7 +561,7 @@ tr{
 	div{
 		.corner-radius (20px);
 		position: absolute;
-		width: @cache-usage-bar-width;
+		width: @site-main-content-width;
 		height: @cache-usage-bar-height;
 		background-repeat: no-repeat;
 	}
