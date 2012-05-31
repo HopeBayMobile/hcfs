@@ -233,6 +233,123 @@ class Test_getUmountedDisks:
 		nose.tools.eq_(len(unique_result), len(self.__result), "The disks returned by getUmountedDisks() are repeated!")
 
 
+class Test_getMountedSwiftDevices:
+	'''
+	Test the function getMountedSwiftDevices() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getMountedSwiftDevices() in diskUtil.py\n"
+		self.__mount_dir = "test_mount1"
+		self.__prefix = "test_mount"
+		self.__disk = "./test_disk"
+		self.__loop_device = ""
+
+		cmd1 = "mkdir -p /srv/node/%s" % self.__mount_dir
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to create Swift folders!")
+
+		cmd2 = "dd if=/dev/zero of=%s bs=1M count=10" % self.__disk
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to create the disk image!")
+
+		cmd3 = "losetup -f"
+		po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to find the loop device!")
+
+		self.__loop_device = output[0].split()[0]
+
+		cmd4 = "losetup %s %s" % (self.__loop_device, self.__disk)
+		po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to launch a loop device!")
+
+		cmd5 = "mkfs -F -t ext4 %s" % self.__loop_device
+                po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to make file system for the disk image!")
+
+		cmd6 = "mount %s /srv/node/%s" % (self.__loop_device, self.__mount_dir)
+		po = subprocess.Popen(cmd6, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to mount the disk image!")
+
+	def teardown(self):
+		print "End of unit test for function getMountedSwiftDevices() in diskUtil.py\n"
+		cmd1 = "umount /srv/node/%s" % self.__mount_dir
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to umount the disk image!")
+
+		cmd2= "losetup -d %s" % self.__loop_device
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to detach the loop device")
+
+		cmd3 = "rm %s; rm -rf /srv" % self.__disk
+		po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the disk image and Swift folders!")
+
+	def test_Correctness(self):
+		'''
+		Check whether the result returned by getMountedSwiftDevices() is correct.
+		'''
+		result = diskUtil.getMountedSwiftDevices(self.__prefix)
+		nose.tools.ok_(len(result) == 1, "The number of mounted Swift devices returned by getMountedSwiftDevices() is not correct!")
+		nose.tools.ok_(result[1] == self.__loop_device, "The devices returned by getMountedSwiftDevices() are not correct!")
+
+
+class Test_getUmountedSwiftDevices:
+	'''
+	Test the function getUmountedSwiftDevices() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getUmountedSwiftDevices() in diskUtil.py\n"
+		self.__prefix = "test_dir"
+		cmd = "mkdir -p /srv/node/%s1; mkdir -p /srv/node/%s2" % (self.__prefix, self.__prefix)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to create Swift folders!")
+
+	def teardown(self):
+		print "End of unit test for function getUmountedSwiftDevices() in diskUtil.py\n"
+		cmd = "rm -rf /srv"
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove Swift folders!")
+
+	def test_Correctness(self):
+		'''
+		Check whether the result returned by getUmountedSwiftDevices() is correct.
+		'''
+		result = diskUtil.getUmountedSwiftDevices(2, self.__prefix)
+
+
 class Test_formatDisks:
 	'''
 	Test the function formatDisks() in diskUtil.py
@@ -362,6 +479,180 @@ class Test_mountDisk:
 		nose.tools.ok_(os.path.ismount(self.__mountDir), "The loop device is not mounted after invoking mountDisk()!")
 
 
+class Test_mountSwiftDevice:
+	'''
+	Test the function mountSwiftDevice() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function mountSwiftDevice() in diskUtil.py\n"
+		self.__prefix = "test_dir"
+		self.__deviceNum = 1
+		self.__disk = "./test.img"
+		self.__loop_device = ""
+
+                cmd1 = "mkdir -p /srv/node/%s%d" % (self.__prefix, self.__deviceNum)
+                po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create Swift folders!")
+
+		cmd2 = "dd if=/dev/zero of=%s bs=1M count=10" % self.__disk
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create the disk image!")
+
+                cmd3 = "losetup -f"
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to find the loop device!")
+
+                self.__loop_device = output[0].split()[0]
+
+                cmd4 = "losetup %s %s" % (self.__loop_device, self.__disk)
+                po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to launch a loop device!")
+
+                cmd5 = "mkfs -F -t ext4 %s" % self.__loop_device
+                po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to make file system for the disk image!")
+
+	def teardown(self):
+		print "End of unit test for function mountSwiftDevice() in diskUtil.py\n"
+		if os.path.ismount("/srv/node/%s%d" % (self.__prefix, self.__deviceNum)):
+			cmd1 = "umount /srv/node/%s%d" % (self.__prefix, self.__deviceNum)
+                	po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                	output = po.stdout.readlines()
+                	po.wait()
+
+                	nose.tools.ok_(po.returncode == 0, "Failed to umount the disk image!")
+
+                cmd2= "losetup -d %s" % self.__loop_device
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to detach the loop device")
+
+                cmd3 = "rm %s; rm -rf /srv" % self.__disk
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to remove the disk image and Swift folders!")
+
+	def test_MountOperation(self):
+		'''
+		Check whether the mount operation is done by mountSwiftDevice().
+		'''
+		result = diskUtil.mountSwiftDevice(self.__loop_device, self.__prefix, self.__deviceNum)
+		nose.tools.ok_(result == 0, "Failed to execute the mount operation performed mountSwiftDevice()!")
+		nose.tools.ok_(os.path.ismount("/srv/node/%s%d" % (self.__prefix, self.__deviceNum)), "Failed to mount Swift device by mountSwiftDevice()!")
+
+
+class Test_readFingerprint:
+	'''
+	Test the function readFingerprint() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function readFingerprint() in diskUtil.py\n"
+                self.__disk = "./test.img"
+                self.__loop_device = ""
+
+                cmd2 = "dd if=/dev/zero of=%s bs=1M count=10" % self.__disk
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create the disk image!")
+
+                cmd3 = "losetup -f"
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to find the loop device!")
+
+                self.__loop_device = output[0].split()[0]
+
+                cmd4 = "losetup %s %s" % (self.__loop_device, self.__disk)
+                po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to launch a loop device!")
+
+		cmd5 = "mkfs -F -t ext4 %s" % self.__loop_device
+                po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to make file system for the disk image!")
+
+	def teardown(self):
+		print "End of unit test for function readFingerprint() in diskUtil.py\n"
+                cmd2= "losetup -d %s" % self.__loop_device
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to detach the loop device")
+
+                cmd3 = "rm %s" % self.__disk
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to remove the disk image and Swift folders!")
+
+	def test_RaiseIOError(self):
+		'''
+		Check whether IOError is raised by readFingerprint() when fingerprint does not exist.
+		'''
+		result = diskUtil.readFingerprint(self.__loop_device)
+		nose.tools.raises(IOError)
+
+	def test_ReadOperatoin(self):
+		'''
+		Check the read operation performed by readFingerprint() when fingerprint exists.
+		'''
+		mount_dir = "./tmp_dir"
+		cmd1 = "mkdir -p %s; mount %s %s; cp ./test_config/fingerprint %s" % (mount_dir, self.__loop_device, mount_dir, mount_dir)
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to copy the test fingerprint!")
+
+		cmd2 = "umount %s" % mount_dir
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to unmount the loop device!")
+
+		cmd3 = "rm -rf %s" % mount_dir
+		po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove %s" % mount_dir)
+
+		result = diskUtil.readFingerprint(self.__loop_device)
+		nose.tools.ok_(result[0] == 0, "The read operation performed by readFingerprint() failed!")
+		nose.tools.ok_(result[1] != None, "The content returned by readFingerprint() is not correct!")
+
+
 class Test_lazyUmount:
 	'''
 	Test the function lazyUmount() in diskUtil.py
@@ -414,6 +705,89 @@ class Test_lazyUmount:
 		Check whether the disk image is unmounted after invoking lazyUmount().
 		'''
 		nose.tools.ok_(not os.path.ismount(self.__mountDir), "The disk image is still mounted after invoking lazyUmount()!")
+
+
+class Test_dumpScripts:
+	'''
+	Test the function dumpScripts() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function dumpScripts() in diskUtil.py\n"
+		self.__dump_dir = "./dump_dir"
+		cmd = "mkdir -p %s" % self.__dump_dir
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to create the folder for dump!")
+
+	def teardown(self):
+		print "End of unit test for function dumpScripts() in diskUtil.py\n"
+		cmd = "rm -rf %s" % self.__dump_dir
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the folder for dump!")
+
+	def test_DumpOperation(self):
+		'''
+		Check whether the dump operation is successfully done by dumpScripts().
+		'''
+		result = diskUtil.dumpScripts(self.__dump_dir)
+		nose.tools.ok_(result == 0, "The execution of dumpScripts() failed!")
+		nose.tools.ok_(os.listdir(self.__dump_dir) != [], "The dump operation performed by dumpScripts() failed!")
+
+
+class Test_dumpSwiftMetadata:
+	'''
+	Test the function dumpSwiftMetadata() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function dumpSwiftMetadata() in diskUtil.py\n"
+		self.__backup_dir = "/backup_dir"
+		self.__test_metadata = "test_metadata"
+		self.__dump_dir = "./dump_dir"
+
+		cmd1 = "mkdir -p %s; cp -r /etc/swift/* %s" % (self.__backup_dir, self.__backup_dir)
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to backup original Swift configuration files!")
+
+		cmd2 = "rm -rf /etc/swift/*; touch /etc/swift/%s; mkdir -p %s" % (self.__test_metadata, self.__dump_dir)
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to prepare the metadata for test!")
+
+	def teardown(self):
+		print "End of unit test for function dumpSwiftMetadata() in diskUtil.py\n"
+		cmd1 = "rm -rf /etc/swift/*; cp -r %s /etc/swift" % self.__backup_dir
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to recover original Swift configuration files!")
+
+		cmd2 = "rm -rf %s; rm -rf %s" % (self.__backup_dir, self.__dump_dir)
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the backup of original Swift configuration files!")
+
+	def test_DumpOperation(self):
+		'''
+		Check whether the dump operation is successfully done by dumpSwiftMetadata().
+		'''
+		result = diskUtil.dumpSwiftMetadata(self.__dump_dir)
+		nose.tools.ok_(result == 0, "The execution of dumpSwiftMetadata() failed!")
+		test_file_path = self.__dump_dir + "/" + self.__test_metadata
+		nose.tools.ok_(os.path.exists(test_file_path), "The dump operation performed by dumpSwiftMetadata() failed!")
+
 
 
 if __name__ == "__main__":
