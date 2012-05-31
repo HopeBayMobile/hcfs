@@ -10,7 +10,7 @@ class InstallWizard(DeltaWizard):
     done_template = 'wizard/done.html'
     failure_template = 'wizard/failure.html'
     finish_template = 'wizard/finish.html'
-    
+
     wizard_step = [
 #        (Form_All, install_task)
         (Test_Form_All, install_task)
@@ -27,25 +27,25 @@ class InstallWizard(DeltaWizard):
 #        }
 
     #Testing Usage
-    wizard_initial = {
-        'Test_Form_All': {
-            'new_password': '1234',
-            'retype_new_password':'1234',
-                     
-            'ip_address': '172.16.229.154',
-            'subnet_mask': '255.255.255.0',
-            'default_gateway': '172.16.229.1',
-            'preferred_dns': '8.8.8.8',
-            'alternate_dns': '8.8.4.4',
+    # wizard_initial = {
+    #     'Test_Form_All': {
+    #         'new_password': '1234',
+    #         'retype_new_password':'1234',
 
-            'cloud_storage_url': '172.16.228.53:8080',
-            'cloud_storage_account': 'system:root',
-            'cloud_storage_password': 'testpass',
-            
-            'encryption_key':'123456',
-            'confirm_encryption_key':'123456',
-        }
-    }
+    #         'ip_address': '172.16.229.154',
+    #         'subnet_mask': '255.255.255.0',
+    #         'default_gateway': '172.16.229.1',
+    #         'preferred_dns': '8.8.8.8',
+    #         'alternate_dns': '8.8.4.4',
+
+    #         'cloud_storage_url': '172.16.228.53:8080',
+    #         'cloud_storage_account': 'system:root',
+    #         'cloud_storage_password': 'testpass',
+
+    #         'encryption_key':'123456',
+    #         'confirm_encryption_key':'123456',
+    #     }
+    # }
 
 urlpatterns = patterns("wizard.views",
     url(r'^welcome$', "welcome"),

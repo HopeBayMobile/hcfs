@@ -63,9 +63,8 @@
                             $("#basic_bandwidth .up").text(data.uplink_usage);
                         }
                     });
-                    setInterval(update_indicator, 10000);
                 }
-                // update_indicator();
+                setInterval(update_indicator, 3000);
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active')
@@ -136,7 +135,7 @@
                     <div class="notify-box-row-SE">
                         <p id="basic_bandwidth">
                             Download / Upload:<br/>
-                            <span class="down">0</span> / <span class="up">0</span>
+                            <span class="down">{{ result_data.downlink_usage }}</span> / <span class="up">{{ result_data.uplink_usage }}</span>
                             (KB/Sec)
                         </p>
                     </div>
