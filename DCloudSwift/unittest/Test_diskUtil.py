@@ -10,8 +10,8 @@ import time
 import subprocess
 
 # Import packages to be tested
-sys.path.append('../src/DCloudSwift/util')
-import diskUtil
+sys.path.append('../src/DCloudSwift/')
+from util import diskUtil
 
 
 class Test_getRootDisk:

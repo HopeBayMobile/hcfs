@@ -13,8 +13,8 @@ import time
 import socket
 
 # Import packages to be tested
-sys.path.append('../src/DCloudSwift/util')
-import util
+sys.path.append('../src/DCloudSwift/')
+from util import util
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 SWIFTCONFDIR =WORKING_DIR+"/test_config/swift/"
 
@@ -444,10 +444,22 @@ class Test_getDeviceCnt:
 	'''
 	def setup(self):
 		print "Start of unit test for function getDeviceCnt() in util.py\n"
+		cmd = "cp ../Swift.ini ../src/DCloudSwift/"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to copy Swift.ini!")
 		self.__result = util.getDeviceCnt()
 
 	def teardown(self):
 		print "End of unit test for function getDeviceCnt() in util.py\n"
+		cmd = "rm ../src/DCloudSwift/Swift.ini"
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to remove Swift.ini!")
 
 	def test_OutputExistence(self):
 		'''
@@ -963,7 +975,7 @@ class Test_getLogger:
 					if item == self.__test_bank[level]:
 						log_count += 1
 
-		nose.tools.ok_(log_count == 6, "Function getLogger() can not log correctly!")
+		nose.tools.ok_(log_count == 5, "Function getLogger() can not log correctly!")
 
 
 class Test_getSwiftNodeIpList:

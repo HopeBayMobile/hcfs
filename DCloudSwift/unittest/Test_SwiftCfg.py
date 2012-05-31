@@ -9,8 +9,8 @@ import random
 import string
 
 # Import packages to be tested
-sys.path.append('../src/DCloudSwift/util')
-from SwiftCfg import SwiftCfg
+sys.path.append('../src/DCloudSwift/')
+from util.SwiftCfg import SwiftCfg
 
 
 class CreateCfg:
@@ -19,7 +19,7 @@ class CreateCfg:
 	'''
 	def __init__(self):
 		self.cfgContent = {
-			"[storage]": {"password": "", "replica": 3, "deviceCnt": 6},
+			"[storage]": {"password": "", "deviceCnt": 6},
 			"[log]": {"level": "", "dir": "", "name": ""},
 		}
 		self.cfgKwparams = {}
@@ -51,8 +51,7 @@ class CreateCfg:
 			"logLevel": self.cfgContent['[log]']['level'],
 			"logName": self.cfgContent['[log]']['name'],
 			"password": self.cfgContent['[storage]']['password'],
-			"numOfReplica": self.cfgContent['[storage]']['replica'],
-			"deviceCnt": self.cfgContent['[storage]']['deviceCnt'],
+			"deviceCnt": self.cfgContent['[storage]']['deviceCnt']
 		}
 
 	def __randStrGenerator(self, size=8, chars=string.letters + string.digits):
@@ -91,7 +90,6 @@ class Test_getKwparams:
 		result = SC.getKwparams()
 
 		nose.tools.ok_(result['password'] != None, "Field \'password\' does not exist in section [storage]!")
-		nose.tools.ok_(result['numOfReplica'] != None, "Field \'replica\' does not exist in section [storage]!")
 		nose.tools.ok_(result['deviceCnt'] != None, "Field \'deviceCnt\' does not exist in section [storage]!")
 		nose.tools.ok_(result['logDir'] != None, "Field \'dir\' does not exist in section [log]!")
 		nose.tools.ok_(result['logLevel'] != None, "Field \'level\' does not exist in section [log]!")
