@@ -560,6 +560,119 @@ class Test_mountSwiftDevice:
 		nose.tools.ok_(os.path.ismount("/srv/node/%s%d" % (self.__prefix, self.__deviceNum)), "Failed to mount Swift device by mountSwiftDevice()!")
 
 
+class Test_cleanMetadata:
+	'''
+	Test the function cleanMetadata() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function cleanMetadata() in diskUtil.py\n"
+		self.__prefix = "/test_dir"
+                self.__disk = "./test.img"
+                self.__loop_device = ""
+
+                cmd1 = "mkdir -p %s" % self.__prefix
+                po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create a temp folder!")
+
+                cmd2 = "dd if=/dev/zero of=%s bs=1M count=10" % self.__disk
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create the disk image!")
+
+                cmd3 = "losetup -f"
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to find the loop device!")
+
+                self.__loop_device = output[0].split()[0]
+
+                cmd4 = "losetup %s %s" % (self.__loop_device, self.__disk)
+                po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to launch a loop device!")
+
+                cmd5 = "mkfs -F -t ext4 %s" % self.__loop_device
+                po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to make file system for the loop device!")
+
+		cmd6 = "mount %s %s" % (self.__loop_device, self.__prefix)
+		po = subprocess.Popen(cmd6, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to mount the loop device!")
+
+		cmd7 = "touch %s/fingerprint; mkdir -p %s/swift; mkdir -p %s/DCloudSwift" % (self.__prefix, self.__prefix, self.__prefix) 
+		po = subprocess.Popen(cmd7, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to create fake metadata!")
+
+		cmd8 = "umount %s" % self.__prefix
+		po = subprocess.Popen(cmd8, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to unmount the loop device!")
+
+	def teardown(self):
+		print "End of unit test for function cleanMetadata() in diskUtil.py\n"
+                cmd2= "losetup -d %s" % self.__loop_device
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to detach the loop device!")
+
+                cmd3 = "rm %s; rm -rf %s" % (self.__disk, self.__prefix)
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to remove the disk image and Swift folders!")
+
+	def test_CleanOperation(self):
+		'''
+		Check whether the clean operation is successfully done by cleanMetadata().
+		'''
+		result = diskUtil.cleanMetadata(self.__loop_device)
+		nose.tools.ok_(result == 0, "The execution of cleanMetadata() failed!")
+
+		fingerprint_path = self.__prefix + "/fingerprint"
+		swift_path = self.__prefix + "/swift"
+		src_path = self.__prefix + "/DCloudSwift"
+
+		try:
+			cmd1 = "mount %s %s" % (self.__loop_device, self.__prefix)
+			po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(not os.path.exists(fingerprint_path), "Function cleanMetadata() failed! Metadata %s exists!" % fingerprint_path)
+			nose.tools.ok_(not os.path.exists(swift_path), "Function cleanMetadata() failed! Metadata %s exists!" % swift_path)
+			nose.tools.ok_(not os.path.exists(src_path), "Function cleanMetadata() failed! Metadata %s exists!" % src_path)
+		finally:
+			cmd2 = "umount %s" % self.__prefix
+			po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to umount the loop device!")
+
+
 class Test_readFingerprint:
 	'''
 	Test the function readFingerprint() in diskUtil.py.
@@ -765,7 +878,7 @@ class Test_dumpSwiftMetadata:
 
 	def teardown(self):
 		print "End of unit test for function dumpSwiftMetadata() in diskUtil.py\n"
-		cmd1 = "rm -rf /etc/swift/*; cp -r %s /etc/swift" % self.__backup_dir
+		cmd1 = "rm -rf /etc/swift/*; cp -r %s/* /etc/swift" % self.__backup_dir
 		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		output = po.stdout.readlines()
 		po.wait()
@@ -788,6 +901,123 @@ class Test_dumpSwiftMetadata:
 		test_file_path = self.__dump_dir + "/" + self.__test_metadata
 		nose.tools.ok_(os.path.exists(test_file_path), "The dump operation performed by dumpSwiftMetadata() failed!")
 
+
+class Test_writeMetadata:
+	'''
+	Test the function writeMetadata() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function writeMetadata() in diskUtil.py\n"
+		self.__backup_dir = "/backup_dir"
+		self.__mount_dir = "/mount_dir"
+                self.__disk = "./test.img"
+		self.__test_swift_config = "/etc/swift/test_swift.conf"
+                self.__loop_device = ""
+
+		# Create a loop device as a disk
+                cmd1 = "mkdir -p %s; mkdir -p %s" % (self.__backup_dir, self.__mount_dir)
+                po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create a temp folder!")
+
+                cmd2 = "dd if=/dev/zero of=%s bs=1M count=10" % self.__disk
+                po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to create the disk image!")
+
+                cmd3 = "losetup -f"
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to find the loop device!")
+
+                self.__loop_device = output[0].split()[0]
+
+                cmd4 = "losetup %s %s" % (self.__loop_device, self.__disk)
+                po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to launch a loop device!")
+
+		cmd5 = "mkfs -F -t ext4 %s" % self.__loop_device
+                po = subprocess.Popen(cmd5, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to make file system for the loop device!")
+
+		# Backup original Swift configuration files
+		cmd6 = "cp -r /etc/swift/* %s; rm -rf /etc/swift/*; touch %s" % (self.__backup_dir, self.__test_swift_config)
+		po = subprocess.Popen(cmd6, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to backup original Swift configurations and to create test configurations!")
+
+	def teardown(self):
+		print "End of unit test for function writeMetadata() in diskUtil.py\n"
+		cmd1 = "losetup -d %s" % self.__loop_device
+                po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to detach the loop device!")
+
+		cmd2 = "rm -rf /etc/swift/*; cp -r %s/* /etc/swift" % self.__backup_dir
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+
+		nose.tools.ok_(po.returncode == 0, "Failed to recover original Swift configurations!")
+
+                cmd3 = "rm %s; rm -rf %s; rm -rf %s" % (self.__disk, self.__backup_dir, self.__mount_dir)
+                po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                output = po.stdout.readlines()
+                po.wait()
+
+                nose.tools.ok_(po.returncode == 0, "Failed to remove the disk image and Swift folders!")
+
+	def test_WriteOperation(self):
+		'''
+		Check whether the writing operation is successfully done by writeMetadata().
+		'''
+		test_vers = "100"
+		test_deviceCnt = "10"
+		test_devicePrx = "CTBU"
+		test_deviceNum = "7"
+
+		result = diskUtil.writeMetadata(self.__loop_device, test_vers, test_deviceCnt, test_devicePrx, test_deviceNum)
+		nose.tools.ok_(result == 0, "The execution of writeMetadata() failed!")
+
+		fingerprint_path = self.__mount_dir + "/fingerprint"
+		src_path = self.__mount_dir + "/DCloudSwift"
+		swift_path = self.__mount_dir + "/swift"
+
+		try:
+			cmd1 = "mount %s %s" % (self.__loop_device, self.__mount_dir)
+			po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to mount the loop device!")
+
+			nose.tools.ok_(os.path.exists(fingerprint_path), "Function writeMetadata() failed! File %s does not exist!" % fingerprint_path)
+			# TODO: compare the fingerprint
+			nose.tools.ok_(os.path.exists(src_path), "Function writeMetadata() failed! Directory %s does not exist!" % src_path)
+			nose.tools.ok_(os.path.exists(swift_path), "Function writeMetadata() failed! Directory %s does not exist!" % swift_path)
+		finally:
+			cmd2 = "umount %s" % self.__mount_dir
+			po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			output = po.stdout.readlines()
+			po.wait()
+
+			nose.tools.ok_(po.returncode == 0, "Failed to unmount the loop device!")
 
 
 if __name__ == "__main__":
