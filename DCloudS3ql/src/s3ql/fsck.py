@@ -1155,10 +1155,19 @@ def main(args=None):
             if line.startswith(match):
                 raise QuietError('Can not check mounted file system.')
 
+# Jiahong: Adding extra exception handling during fsck start
     try:
         bucket = get_bucket(options)
     except NoSuchBucket as exc:
         raise QuietError(str(exc))
+    except:
+        log.info('[During Startup] Connection failed. Retrying after 10 seconds...')
+        time.sleep(10)
+        try:
+            bucket = get_bucket(options)
+        except NoSuchBucket as exc:
+            raise QuietError(str(exc))
+
 
     cachepath = get_bucket_cachedir(options.storage_url, options.cachedir)
     seq_no = get_seq_no(bucket)

@@ -22,6 +22,9 @@ import tempfile
 import time
 import urllib
 from s3ql.backends.common import NoSuchBucket
+import socket
+socket_timeout = 300
+socket.setdefaulttimeout(socket_timeout) 
 
 log = logging.getLogger("backend.swift")
 
