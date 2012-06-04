@@ -75,17 +75,7 @@ class DatabaseBroker(object):
 
         conn.row_factory = sqlite3.Row
         conn.text_factory = str
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS user_info (
-                account TEXT NOT NULL,
-                name TEXT NOT NULL,
-		password TEXT NOT NULL, 
-		admin BOOLEAN DEFAULT FALSE,
-		reseller BOOLEAN DEFAULT FALSE,
-		PRIMARY KEY (account, name)
-            );
-        """)
-
+	self._initialize(conn)
         conn.commit()
         self.conn = conn
 
@@ -113,17 +103,60 @@ class DatabaseBroker(object):
             conn.close()
             raise
 
+class AccountDatabaseBroker(DatabaseBroker):
+    """Encapsulates working with a Account database."""
+
+    def _initialize(self, conn):
+        self.create_user_info_table(conn)
+
+    def create_user_info_table(self, conn):
+        """
+        Create user_info table which is specific to the account DB.
+
+        :param conn: DB connection object
+        """
+	
+        conn.executescript("""
+            CREATE TABLE user_info (
+                account TEXT NOT NULL,
+                name TEXT NOT NULL,
+		password TEXT NOT NULL, 
+		admin BOOLEAN NOT NULL,
+		reseller BOOLEAN NOT NULL,
+		PRIMARY KEY (account, name)
+            );
+        """)
+
+    def get_password(self, account, name):
+	"""
+        Return password of user account:name
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: the password or None if the user doesn't exist
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			return row["password"]
+		else:
+			return None
+
 if __name__ == '__main__':
 
-	db = DatabaseBroker("/etc/test/test.db")
+	os.system("rm /etc/test/test.db")
+	db = AccountDatabaseBroker("/etc/test/test.db")
 	db.initialize()
 
 	with db.get() as conn:
-		conn.execute("insert into user_info values (?, ?, ?)", ("system", "root", "testpass"))
-		conn.close()
+		try:
+			conn.execute("insert into user_info values ('system', 'root', 'testpass', 'True', 'False')")
+			conn.commit()
+		except Exception as e:
+			print e
 
-	with db.get() as conn:
-		conn.execute("insert into user_info values (?, ?, ?)", ("system", "root", "testpass"))
-		conn.close()
+	print db.get_password("system", "root")
+	print db.get_password("system1", "root")
 
 	pass	
