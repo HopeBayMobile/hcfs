@@ -1,0 +1,129 @@
+import os
+import sqlite3
+import util
+import time
+from contextlib import contextmanager
+
+BROKER_TIMEOUT = 25
+
+class DatabaseConnectionError(sqlite3.DatabaseError):
+    """More friendly error messages for DB Errors."""
+
+    def __init__(self, path, msg, timeout=0):
+        self.path = path
+        self.timeout = timeout
+        self.msg = msg
+
+    def __str__(self):
+        return 'DB connection error (%s, %s):\n%s' % (
+                self.path, self.timeout, self.msg)
+
+def get_db_connection(path, timeout=30, okay_to_create=False):
+    """
+    Returns a properly configured SQLite database connection.
+
+    :param path: path to DB
+    :param timeout: timeout for connection
+    :param okay_to_create: if True, create the DB if it doesn't exist
+    :returns: DB connection object
+    """
+    try:
+        connect_time = time.time()
+        conn = sqlite3.connect(path, check_same_thread=False, timeout=timeout)
+
+        if path != ':memory:' and not okay_to_create:
+            # attempt to detect and fail when connect creates the db file
+            stat = os.stat(path)
+            if stat.st_size == 0 and stat.st_ctime >= connect_time:
+                os.unlink(path)
+                raise DatabaseConnectionError(path,
+                    'DB file created by connect?')
+        conn.row_factory = sqlite3.Row
+        conn.text_factory = str
+        conn.execute('PRAGMA synchronous = NORMAL')
+        conn.execute('PRAGMA count_changes = OFF')
+        conn.execute('PRAGMA temp_store = MEMORY')
+        conn.execute('PRAGMA journal_mode = DELETE')
+    except sqlite3.DatabaseError:
+        import traceback
+        raise DatabaseConnectionError(path, traceback.format_exc(),
+                timeout=timeout)
+    return conn
+
+
+class DatabaseBroker(object):
+    """Encapsulates working with a database."""
+
+    def __init__(self, db_file, timeout=BROKER_TIMEOUT):
+        """ Encapsulates working with a database. """
+        self.conn = None
+        self.db_file = db_file
+        self.db_dir = os.path.dirname(db_file)
+        self.timeout = timeout
+
+    def initialize(self):
+        """
+        Create the DB
+
+        """
+	conn = None
+        if self.db_file == ':memory:':
+            conn = get_db_connection(self.db_file, self.timeout)
+        else:
+            util.mkdirs(self.db_dir)
+            conn = sqlite3.connect(self.db_file, check_same_thread=False, timeout=0)
+
+        conn.row_factory = sqlite3.Row
+        conn.text_factory = str
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS user_info (
+                account TEXT NOT NULL,
+                name TEXT NOT NULL,
+		password TEXT NOT NULL, 
+		admin BOOLEAN DEFAULT FALSE,
+		reseller BOOLEAN DEFAULT FALSE,
+		PRIMARY KEY (account, name)
+            );
+        """)
+
+        conn.commit()
+        self.conn = conn
+
+    @contextmanager
+    def get(self):
+        """Use with the "with" statement; returns a database connection."""
+        if not self.conn:
+            if self.db_file != ':memory:' and os.path.exists(self.db_file):
+                    self.conn = get_db_connection(self.db_file, self.timeout)
+            else:
+                raise DatabaseConnectionError(self.db_file, "DB doesn't exist")
+
+        conn = self.conn
+        self.conn = None
+        try:
+            yield conn
+            conn.rollback()
+            self.conn = conn
+        except sqlite3.DatabaseError:
+            try:
+                conn.close()
+            except:
+                pass
+        except Exception:
+            conn.close()
+            raise
+
+if __name__ == '__main__':
+
+	db = DatabaseBroker("/etc/test/test.db")
+	db.initialize()
+
+	with db.get() as conn:
+		conn.execute("insert into user_info values (?, ?, ?)", ("system", "root", "testpass"))
+		conn.close()
+
+	with db.get() as conn:
+		conn.execute("insert into user_info values (?, ?, ?)", ("system", "root", "testpass"))
+		conn.close()
+
+	pass	
