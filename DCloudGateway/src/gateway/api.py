@@ -221,7 +221,7 @@ def _check_network():
                 	if output.find("cmp_req" and "ttl" and "time") !=-1:
 				op_network_ok = True
 		else:
-			op_msg = output
+			log.info(output)
 
         except IOError as e:
                 op_msg = 'Unable to access /root/.s3ql/authinfo2.'
@@ -248,7 +248,7 @@ def _check_system():
                 if len(lines) > 2:
                         op_system_check = True
         else:
-                op_msg = output
+                log.info(output)
 
 	log.info("_check_system end")
 	return op_system_check
@@ -268,7 +268,7 @@ def _check_flush():
                         op_flush_inprogress = True
 
         else:
-                op_msg = output
+                log.info(output)
 
 	log.info("_check_flush end")
 	return op_flush_inprogress
@@ -287,7 +287,7 @@ def _check_dirtycache():
                 if output.find("Dirty cache near full: True") !=-1:
                         op_dirtycache_nearfull = True
         else:
-                op_msg = output
+                log.info(output)
 
         log.info("_check_dirtycache end")
         return op_dirtycache_nearfull
@@ -312,7 +312,7 @@ def _check_HDD():
 		if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
 			op_all_disk += 1 
 		else:
-			op_msg = "%s test result: NOT PASSED"%i
+			log.info("%s test result: NOT PASSED"%i)
 	
 	if op_all_disk == len(all_disk):
 		op_HDD_ok = True
@@ -334,7 +334,8 @@ def _check_nfs_service():
                 if output.find("running") !=-1:
                         op_NFS_srv = True
         else:
-                op_msg = output
+                log.info(output)
+		restart_nfs_service()
 
 	log.info("_check_nfs_service end")
 	return op_NFS_srv
@@ -353,7 +354,8 @@ def _check_smb_service():
                 if output.find("running") !=-1:
                         op_SMB_srv = True
         else:
-                op_msg = output
+                log.info(output)
+		restart_smb_service():
 
 	log.info("_check_smb_service end")
 	return op_SMB_srv
