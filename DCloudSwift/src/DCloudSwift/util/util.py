@@ -25,6 +25,7 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 	         DELTADIR='/etc/delta',
                  ORI_SWIFTCONF='/etc/delta/Swift.ini',
 		 SWIFTINFO='/etc/delta/Swift.info',
+		 ACCOUNT_DB_NAME='swift_account.db',
 		 OBJBUILDER='object.builder')
 
 

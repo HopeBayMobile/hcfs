@@ -4,7 +4,7 @@ import util
 import time
 from contextlib import contextmanager
 
-BROKER_TIMEOUT = 25
+BROKER_TIMEOUT = 60
 
 class DatabaseConnectionError(sqlite3.DatabaseError):
     """More friendly error messages for DB Errors."""
@@ -94,11 +94,6 @@ class DatabaseBroker(object):
             yield conn
             conn.rollback()
             self.conn = conn
-        except sqlite3.DatabaseError:
-            try:
-                conn.close()
-            except:
-                pass
         except Exception:
             conn.close()
             raise
@@ -123,9 +118,78 @@ class AccountDatabaseBroker(DatabaseBroker):
 		password TEXT NOT NULL, 
 		admin BOOLEAN NOT NULL,
 		reseller BOOLEAN NOT NULL,
+		enabled BOOLEAN NOT NULL,
 		PRIMARY KEY (account, name)
             );
         """)
+
+ 
+    def add_user(self, account, name, password, admin, reseller):
+	"""
+         add user into the db
+
+        :param account: account of the user
+	:param name: name of the user
+        :param password: password of the user
+        :param admin: boolean variable indicates if the user is an admin
+        :param reseller: boolean variable indicates if the user is an reseller-admin
+        
+	:returns: return None if the user already exists. Otherwise return the newly added row
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			return None
+		else:
+			conn.execute("INSERT INTO user_info VALUES (?,?,?,?,?,?)", (account, name, password, admin, reseller, 1))
+			conn.commit()
+			row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+			return row
+
+    def delete_user(self, account, name):
+	"""
+         delete user from the db
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: return None if the user does not exist; otherwise return the deleted row
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			conn.execute("DELETE FROM user_info WHERE account=? AND name=?", (account, name))
+			conn.commit()
+			return row
+		else:
+			return None
+
+    def disable_user(self, account, name):
+	"""
+         set enabled of user to False if the user exists
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: no return
+	"""
+	with self.get() as conn:
+		conn.execute("UPDATE user_info SET enabled = ? where account=? AND name=?", (0, account, name))
+		conn.commit()
+
+    def enable_user(self, account, name):
+	"""
+         set enabled of user to True if the user exists
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: no return
+	"""
+	with self.get() as conn:
+		conn.execute("UPDATE user_info SET enabled = ? where account=? AND name=?", (1, account, name))
+		conn.commit()
+
 
     def get_password(self, account, name):
 	"""
@@ -143,20 +207,96 @@ class AccountDatabaseBroker(DatabaseBroker):
 		else:
 			return None
 
+    def is_admin(self, account, name):
+	"""
+        check if user account:name is an admin
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: if account:name exists and is an admin then return true. Otherwise return false.
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			if row["admin"] == 1:
+				return True
+			else:
+				return False
+		else:
+			return False
+
+    def is_reseller(self, account, name):
+	"""
+        check if user account:name is a reseller
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: if account:name exists and is a reseller then return true. Otherwise return false.
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			if row["reseller"] == 1:
+				return True
+			else:
+				return False
+		else:
+			return False
+
+    def is_enabled(self, account, name):
+	"""
+        check if user account:name is enabled
+
+        :param account: account of the user
+	:param name: name of the user
+        
+	:returns: if account:name exists and is enabled then return true. Otherwise return false.
+	"""
+	with self.get() as conn:
+		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+		if row:
+			if row["enabled"] == 1:
+				return True
+			else:
+				return False
+		else:
+			return False
+
+    def change_password(self, account, name, newPassword):
+	"""
+        Change password of user account:name
+
+        :param account: account of the user
+	:param name: name of the user
+	:param newPassword: new password which cannot be None
+        
+	:returns: no return
+	"""
+	with self.get() as conn:
+		conn.execute("UPDATE user_info SET password = ? where account=? AND name=?", (newPassword, account, name))
+		conn.commit()
+			
+
 if __name__ == '__main__':
 
 	os.system("rm /etc/test/test.db")
 	db = AccountDatabaseBroker("/etc/test/test.db")
 	db.initialize()
 
-	with db.get() as conn:
-		try:
-			conn.execute("insert into user_info values ('system', 'root', 'testpass', 'True', 'False')")
-			conn.commit()
-		except Exception as e:
-			print e
+	print db.add_user(account="system", name="root", password="testpass", admin=True, reseller=False)
+	print db.add_user(account="system", name="root", password="pass", admin=False, reseller=True)
+	print db.delete_user(account="system", name="root")
+	print db.add_user(account="system", name="root", password="pass", admin=False, reseller=True)
 
 	print db.get_password("system", "root")
 	print db.get_password("system1", "root")
-
+	print db.is_enabled("system", "root")
+	print db.is_admin("system","root")
+	print db.is_reseller("system","root")
+	#db.change_password("system", "root",None)
+	print db.get_password("system", "root")
+	db.disable_user("system", "root")
+	print db.is_enabled("system", "root")
 	pass	
