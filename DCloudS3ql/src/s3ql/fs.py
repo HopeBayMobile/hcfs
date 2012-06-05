@@ -146,8 +146,9 @@ class Operations(llfuse.Operations):
     def check_args(self, args):
         '''Check and/or supplement fuse mount options'''
 
+        #Jiahong: Commented out max_write config here as new config is added to mount.py
         args.append(b'big_writes')
-        args.append('max_write=131072')
+        #args.append('max_write=131072')
         args.append('no_remote_lock')
 
     def readdir(self, id_, off):
@@ -956,6 +957,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('read(%d, %d, %d): start', fh, offset, length)
+        log.info('read(%d, %d, %d): start', fh, offset, length)
         buf = StringIO()
         inode = self.inodes[fh]
 
@@ -1025,6 +1027,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
+        log.info('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
