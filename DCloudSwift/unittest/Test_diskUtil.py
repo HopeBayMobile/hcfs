@@ -409,6 +409,91 @@ class Test_formatDisks:
 			nose.tools.ok_(ext4_flag == 1, "There does not exist ext4 file system in the disk image %s!" % diskImage)
 
 
+class Test_formatNonRootDisks:
+	'''
+	Test the function formatNonRootDisks() in diskUtil.py
+	'''
+	def setup(self):
+		print "Start of unit test for function formatNonRootDisks() in diskUtil.py\n"
+		self.__testable = True
+		self.__mark = "ForUnitTest"
+		self.__disk = []
+		self.__root_disk = ""
+		self.__mount_dir = "./mount_dir"
+
+		cmd1 = "ls /dev/sd?"
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+		nose.tools.ok_(po.returncode == 0, "Failed to get HDD list!")
+
+		for line in output:
+			for item in line.split():
+				self.__disk.append(item)
+
+		cmd2 = "df -P / | grep /"
+		po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+		nose.tools.ok_(po.returncode == 0, "Failed to get the root disk!")
+
+		self.__root_disk = output[0].split()[0][0:8]
+
+		cmd3 = "mkdir -p %s" % self.__mount_dir
+		po = subprocess.Popen(cmd3, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+		nose.tools.ok_(po.returncode == 0, "Failed to create the temp folder!")
+
+		for item in self.__disk:
+			if item != self.__root_disk:
+				cmd4 = "mount %s %s" % (item, self.__mount_dir)
+				po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				output = po.stdout.readlines()
+				po.wait()
+
+				if po.returncode != 0 or not os.path.exists("%s/%s" % (self.__mount_dir, self.__mark)) :
+					self.__testable = False
+				if po.returncode == 0:
+					os.system("umount %s" % self.__mount_dir)
+			else:
+				if len(self.__disk) == 1:
+					self.__testable = False
+					break
+
+	def teardown(self):
+		print "End of unit test for function formatNonRootDisks() in diskUtil.py\n"
+		cmd1 = "rm -rf %s" % self.__mount_dir
+		po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		output = po.stdout.readlines()
+		po.wait()
+		nose.tools.ok_(po.returncode == 0, "Failed to remove the temp folder!")
+		
+	def test_FormatOperation(self):
+		'''
+		Check whether the format operation is successfully done by formatNonRootDisks().
+		'''
+		device_cnt = len(self.__disk) - 1
+		if self.__testable == False:
+			nose.tools.ok_(False, "Some disks have not been prepared yet!!")
+		else:
+			result = diskUtil.formatNonRootDisks(device_cnt)
+			nose.tools.ok_(result[0] == 0, "Some disks are not been formatted by formatNonRootDisks()!")
+			nose.tools.ok_(len(result[1]) == len(self.__disk) - 1, "The number of formatted disks returned by formatNonRootDisks() is not correct!")
+
+			for item in self.__disk:
+				cmd1 = "mount %s %s" % (item, self.__mount_dir)
+				po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				output = po.stdout.readlines()
+				po.wait()
+
+				nose.tools.ok_(not os.path.exists("%s/%s" % (self.__mount_dir, self.__mark)), "The format operation performed by formatNonRootDisks() failed!")
+
+				cmd2 = "umount %s" % self.__mount_dir
+				po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				output = po.stdout.readlines()
+				po.wait()
+
 class Test_mountDisk:
 	'''
 	Test the function mountDisk() in diskUtil.py
@@ -764,6 +849,42 @@ class Test_readFingerprint:
 		result = diskUtil.readFingerprint(self.__loop_device)
 		nose.tools.ok_(result[0] == 0, "The read operation performed by readFingerprint() failed!")
 		nose.tools.ok_(result[1] != None, "The content returned by readFingerprint() is not correct!")
+
+
+class Test_getLatestFingerprint:
+	'''
+	Test the function getLatestFingerprint() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getLatestFingerprint() in diskUtil.py\n"
+
+	def teardown(self):
+		print "End of unit test for function getLatestFingerprint() in diskUtil.py\n"
+
+	def test_NoFingerprint(self):
+		'''
+		Check whether the output of getLatestFingerprint() is empty when fingerprint does not exist.
+		'''
+		result = diskUtil.getLatestFingerprint()
+		nose.tools.ok_(result == None or result == [] or result == "" or result == {}, "The fingerprint returned by getLatestFingerprint() does not exist!")
+
+
+class Test_getLatestVers:
+	'''
+	Test the function getLatestVers() in diskUtil.py.
+	'''
+	def setup(self):
+		print "Start of unit test for function getLatestVers() in diskUtil.py\n"
+
+	def teardown(self):
+		print "End of unit test for function getLatestVers() in diskUtil.py\n"
+
+	def test_(self):
+		'''
+		Check whether the output of getLatestVers() is empty when fingerprint does not exist.
+		'''
+		result = diskUtil.getLatestVers()
+		nose.tools.ok_(result == None or result == [] or result == "" or result == {}, "The version returned by getLatestVers() does not exist!")
 
 
 class Test_lazyUmount:

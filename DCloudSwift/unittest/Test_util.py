@@ -225,10 +225,13 @@ class Test_restartRsync:
 	def teardown(self):
 		print "End of unit test for function restartRsync() in util.py\n"
 		if self.__installed == True:
+			'''
 			if self.__started == False:
 				cmd = "/etc/init.d/rsync stop"
 			else:
 				cmd = "/etc/init.d/rsync start"
+			'''
+			cmd = "/etc/init.d/rsync stop"
 
 			po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
@@ -286,10 +289,13 @@ class Test_startRsync:
 	def teardown(self):
 		print "End of unit test for function startRsync() in util.py\n"
 		if self.__installed == True:
+			'''
                         if self.__started == False:
                                 cmd = "/etc/init.d/rsync stop"
                         else:
                                 cmd = "/etc/init.d/rsync start"
+			'''
+			cmd = "/etc/init.d/rsync stop"
 
                         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                         output = po.stdout.readlines()
@@ -346,10 +352,13 @@ class Test_restartMemcached:
 	def teardown(self):
 		print "End of unit test for function restartMemcached() in util.py\n"
 		if self.__installed == True:
+			'''
 			if self.__started == False:
 				cmd = "/etc/init.d/memcached stop"
 			else:
 				cmd = "/etc/init.d/memcached start"
+			'''
+			cmd = "/etc/init.d/memcached stop"
 
 			po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
@@ -407,10 +416,13 @@ class Test_startMemcached:
 	def teardown(self):
                 print "End of unit test for function startMemcached() in util.py\n"
 		if self.__installed == True:
+			'''
 			if self.__started == False:
 				cmd = "/etc/init.d/memcached stop"
 			else:
 				cmd = "/etc/init.d/memcached start"
+			'''
+			cmd = "/etc/init.d/memcached stop"
 
 			po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
@@ -729,11 +741,14 @@ class Test_restartAllServices:
 			po.wait()
 			nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
 
-			cmd4 = item['path'] + " restart"
+			cmd4 = item['path'] + " stop"
 			po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			output = po.stdout.readlines()
 			po.wait()
-			nose.tools.ok_(po.returncode == 0, "Failed to restart %s daemon!" % item['name'])
+			nose.tools.ok_(po.returncode == 0, "Failed to stop %s daemon!" % item['name'])
+
+		cmd5 = "killall -r swift"
+		os.system(cmd5)
 
 	def test_RestartOperation(self):
 		'''
@@ -860,11 +875,14 @@ class Test_startAllServices:
                         po.wait()
                         nose.tools.ok_(po.returncode == 0, "Failed to recover the configuration files of %s!" % item['name'])
 
-                        cmd4 = item['path'] + " restart"
+                        cmd4 = item['path'] + " stop"
                         po = subprocess.Popen(cmd4, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                         output = po.stdout.readlines()
                         po.wait()
-                        nose.tools.ok_(po.returncode == 0, "Failed to restart %s daemon!" % item['name'])
+                        nose.tools.ok_(po.returncode == 0, "Failed to stop %s daemon!" % item['name'])
+
+		cmd5 = "killall -r swift"
+		os.system(cmd5)
 
 	def test_StartOperation(self):
 		'''
@@ -886,7 +904,7 @@ class Test_startAllServices:
                 test_swift_pid = test_swift_status.getDaemonStatus()
                 test_swift_started = test_swift_status.getSwiftHealth()
 
-                nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by restartAllServices()!")
+                nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by startAllServices()!")
 
 
 class Test_findLine:
