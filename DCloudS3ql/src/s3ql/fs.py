@@ -957,7 +957,6 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('read(%d, %d, %d): start', fh, offset, length)
-        log.info('read(%d, %d, %d): start', fh, offset, length)
         buf = StringIO()
         inode = self.inodes[fh]
 
@@ -1027,7 +1026,6 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
-        log.info('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
