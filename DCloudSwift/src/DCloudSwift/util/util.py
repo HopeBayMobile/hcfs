@@ -10,22 +10,24 @@ import struct
 import math
 import pickle
 import time
+import functools
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+DELTADIR='/etc/delta'
 
 def enum(**enums):
 	return type('Enum', (), enums)
 
 GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
-	         DELTADIR='/etc/delta',
-                 ORI_SWIFTCONF='/etc/delta/Swift.ini',
-		 SWIFTINFO='/etc/delta/Swift.info',
-		 ACCOUNT_DB_NAME='swift_account.db',
+	         DELTADIR=DELTADIR,
+                 ORI_SWIFTCONF='%s/Swift.ini'%DELTADIR,
+		 SWIFTINFO='%s/Swift.info'%DELTADIR,
+		 ACCOUNT_DB='%s/swift_account.db'%DELTADIR,
 		 OBJBUILDER='object.builder')
 
 
@@ -88,6 +90,7 @@ def retry(tries, delay=3):
 #timeout decorator
 def timeout(timeout_time):
 	def timeoutDeco(f):
+		@functools.wraps(f)
 		def wrapper(*args,**kwargs):
 			class InterruptableThread(threading.Thread):
 				def __init__(self,f, *args, **kwargs):

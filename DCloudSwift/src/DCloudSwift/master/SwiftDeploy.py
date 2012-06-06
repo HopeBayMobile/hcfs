@@ -24,7 +24,6 @@ from util.SwiftCfg import SwiftCfg
 from util.util import GlobalVar
 
 UNNECESSARYFILES="cert* *.conf backups"
-ACCOUNT_DATABASE_PATH = GlobalVar.DELTADIR+'/'+GlobalVar.ACCOUNT_DB_NAME
 lock = threading.Lock()
 
 class CleanNodeError(Exception):
@@ -505,7 +504,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 
 		try:
-			os.system("rm %s"%ACCOUNT_DATABASE_PATH)
+			os.system("rm %s"%GlobalVar.ACCOUNT_DB)
 			self.__createMetadata(proxyList, storageList, numOfReplica)
 			self.__deploySwift(proxyList, storageList)
 		except UpdateMetadataError, DeploySwiftError: 
