@@ -355,7 +355,7 @@ def _check_smb_service():
                         op_SMB_srv = True
         else:
                 log.info(output)
-		restart_smb_service():
+		restart_smb_service()
 
 	log.info("_check_smb_service end")
 	return op_SMB_srv
@@ -532,6 +532,19 @@ def _createS3qlConf( storage_url):
 		ret = po.returncode
 		if ret !=0:
 			log.error("Failed to create s3ql config for %s"%output)
+                
+                storage_component=storage_url.split(":")
+                storage_addr=storage_component[0]
+
+                cmd ='sudo sh %s/createpregwconf.sh %s'%(DIR, storage_addr)
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+
+                ret = po.returncode
+                if ret !=0:
+                        log.error("Failed to create s3ql config for %s"%output)
+
 
 	except Exception as e:
 		log.error("Failed to create s3ql config for %s"%str(e))
@@ -2124,4 +2137,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
 	#print build_gateway("1234567")
 	#print apply_user_enc_key("123456", "1234567")
+    _createS3qlConf("172.16.228.53:8080")
     pass
