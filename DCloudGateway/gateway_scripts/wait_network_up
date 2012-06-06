@@ -1,0 +1,9 @@
+#!/bin/bash
+
+val=1
+while [[ "$val" -ne "0" ]]
+do
+  ping -c 5 $1 > /var/log/gwboot_ping.log
+  val=$?
+done
+

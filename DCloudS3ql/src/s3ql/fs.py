@@ -421,6 +421,8 @@ class Operations(llfuse.Operations):
                                'id IN (SELECT name_id FROM ext_attributes WHERE inode=?)',
                                (id_,))
 
+#TODO: Jiahong: Verify that cache.upload process update what db entries, and additionally handle those
+#updates for dirty cache blocks
                     processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
