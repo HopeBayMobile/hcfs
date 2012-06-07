@@ -358,9 +358,14 @@ class Operations(llfuse.Operations):
         db = self.db
 
         # First we make sure that all blocks are in the database
-#TODO: it may not be necessary for the cache to be uploaded first for snapshotting,
+#Jiahong: TODO: it may not be necessary for the cache to be uploaded first for snapshotting,
 #but gateway users should be warned about failed snapshots if blocks in any snapshot are corrupted
-        self.cache.commit()
+        #Jiahong: don't flush cache at fast dir copy, but instead duplicate cache blocks
+        #self.cache.commit()
+
+
+#Jiahong: TODO: will need to expire cache blocks if cache size is full after duplication
+#Jiahong: TODO: verify that we don't need to duplicate clean cache block
         log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
         # Copy target attributes
@@ -1021,7 +1026,7 @@ class Operations(llfuse.Operations):
             # If we can't read enough, add null bytes
             return buf + b"\0" * (length - len(buf))
 
-# TODO: Block write to FUSE when network connection to backend is down and dirty cache occupied all cache  
+# Jiahong: TODO: Block write to FUSE when network connection to backend is down and dirty cache occupied all cache  
     def write(self, fh, offset, buf):
         '''Handle FUSE write requests.
         

@@ -464,7 +464,7 @@ class Fsck(object):
         self.conn.execute('CREATE TEMPORARY TABLE min_sizes '
                           '(id INTEGER PRIMARY KEY, min_size INTEGER NOT NULL)')
         try:
-#TODO: Think about what to do about the checked size is less than what inode said. S3QL seems to ignore this.
+#Jiahong: TODO: Think about what to do about the checked size is less than what inode said. S3QL seems to ignore this.
             self.conn.execute('''
             INSERT INTO min_sizes (id, min_size) 
             SELECT inode, MAX(blockno * ? + size) 
