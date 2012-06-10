@@ -26,7 +26,7 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
 	         DELTADIR=DELTADIR,
                  ORI_SWIFTCONF='%s/Swift.ini'%DELTADIR,
-		 SWIFTINFO='%s/Swift.info'%DELTADIR,
+		 MASTERCONF='%s/swift_master.ini'%DELTADIR,
 		 ACCOUNT_DB='%s/swift_account.db'%DELTADIR,
 		 OBJBUILDER='object.builder')
 
