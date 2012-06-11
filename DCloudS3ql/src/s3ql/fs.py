@@ -436,7 +436,6 @@ class Operations(llfuse.Operations):
                     processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
-#Jiahong: TODO: check the meaning of COUNT(id) in the following command to make sure we are adding the correct amount to refcount
                     db.execute('REPLACE INTO blocks (id, hash, refcount, size, obj_id) '
                                'SELECT id, hash, refcount+COUNT(id), size, obj_id '
                                'FROM inode_blocks JOIN blocks ON block_id = id '
@@ -479,6 +478,8 @@ class Operations(llfuse.Operations):
                         (target_inode.id, tmp.id))
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
+
+#Jiahong: TODO: upload the metadata to cloud after snapshotting is finished
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
