@@ -20,7 +20,8 @@ from util import util
 
 
 TIMEOUT = 180
-EVENTS_FIELD= 'events'
+EVENTS_FIELD = 'events'
+MAX_DELAYED_CALLS = 500
 
 
 class SwiftEventMgr(Daemon):
@@ -49,11 +50,23 @@ class SwiftEventMgr(Daemon):
 		logger.info("%s"%jsonStr4Events)
 		#Add your code here
 		
+	#TODO:What will happen if the reading of HTTP request failed
+	#TODO:What will happen if the sending of HTTP response failed
 	class EventsPage(Resource):
     		def render_GET(self, request):
         		return '<html><body><form method="POST"><input name="%s" type="text" /></form></body></html>'%EVENTS_FIELD
 
     		def render_POST(self, request):
+			delayedCalls = reactor.getDelayedCalls()
+			elapsed = 0
+			while len(delayedCalls)> MAX_DELAYED_CALLS and elapsed <= TIMEOUT:
+				time.sleep(5)
+				elapsed +=5
+				delayedCalls = reactor.getDelayedCalls()
+			if elapsed > TIMEOUT:
+				#TODO: return error
+				return'<html><body>Try again!</body></html>'
+
 			reactor.callLater(1, SwiftEventMgr.handleEvents, request.args[EVENTS_FIELD][0])
         		return '<html><body>Thank you!</body></html>'
 
@@ -64,8 +77,12 @@ class SwiftEventMgr(Daemon):
 		root = Resource()
 		root.putChild("events", SwiftEventMgr.EventsPage())
 		factory = Site(root)
-		reactor.listenTCP(int(self.port), factory)
-		reactor.run()
+
+		try:
+			reactor.listenTCP(int(self.port), factory)
+			reactor.run()
+		except twisted.internet.error.CannotListenError as e:
+			logger(str(e))
 
 
 if __name__ == "__main__":
