@@ -38,8 +38,8 @@ def read(fname):
 def main():
 	os.system("mkdir -p %s"%DELTADIR)
 
-	if not isAllDebInstalled("misc/deb_src"):
-		os.system("cd misc/deb_src; dpkg -i *.deb")
+	#if not isAllDebInstalled("misc/deb_src"):
+	#	os.system("cd misc/deb_src; dpkg -i *.deb")
 
 	setup(
 		name = "DCloudSwift",
