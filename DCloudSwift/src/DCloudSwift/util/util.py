@@ -10,21 +10,24 @@ import struct
 import math
 import pickle
 import time
+import functools
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+DELTADIR='/etc/delta'
 
 def enum(**enums):
 	return type('Enum', (), enums)
 
 GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 		 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
-	         DELTADIR='/etc/delta',
-                 ORI_SWIFTCONF='/etc/delta/Swift.ini',
-		 SWIFTINFO='/etc/delta/Swift.info',
+	         DELTADIR=DELTADIR,
+                 ORI_SWIFTCONF='%s/Swift.ini'%DELTADIR,
+		 MASTERCONF='%s/swift_master.ini'%DELTADIR,
+		 ACCOUNT_DB='%s/swift_account.db'%DELTADIR,
 		 OBJBUILDER='object.builder')
 
 
@@ -87,6 +90,7 @@ def retry(tries, delay=3):
 #timeout decorator
 def timeout(timeout_time):
 	def timeoutDeco(f):
+		@functools.wraps(f)
 		def wrapper(*args,**kwargs):
 			class InterruptableThread(threading.Thread):
 				def __init__(self,f, *args, **kwargs):
@@ -400,6 +404,26 @@ def getNumOfZones(swiftDir="/etc/swift"):
 
 	return	numOfZones
 
+def getProxyNodeIpList(swiftDir="/etc/swift"):
+	logger = getLogger(name="getProxyNodeIpList")
+
+	proxyList =[]
+	ipSet = set()
+	
+	try:
+		with open("%s/proxyList"%swiftDir,"rb") as fh:
+			proxyList = pickle.load(fh)
+	except IOError:
+		logger.warn("Failed to load proxyList from %s/proxyList"%swiftDir)
+		return None
+
+	for node in proxyList:
+		ipSet.add(node["ip"])
+
+	ipList = [ip for ip in ipSet]
+	
+	return ipList
+
 def getSwiftNodeIpList(swiftDir="/etc/swift"):
 	logger = getLogger(name="getSwiftNodeIpList")
 
@@ -518,6 +542,20 @@ def getStorageNodeIpList(swiftDir="/etc/swift"):
 		i+=1
 
 	return ipList
+
+def mkdirs(path):
+    """
+    Ensures the path is a directory or makes it if not. Errors if the path
+    exists but is a file or on permissions failure.
+
+    :param path: path to create
+    """
+    if not os.path.isdir(path):
+        try:
+            os.makedirs(path)
+        except OSError, err:
+            if err.errno != errno.EEXIST or not os.path.isdir(path):
+                raise
 
 def sshpass(passwd, cmd, timeout=0):
 	logger = getLogger(name="sshpass")
@@ -720,8 +758,7 @@ class TryLockError(Exception):
 		return "Failed to tryLock lockFile"
 
 if __name__ == '__main__':
-	startAllServices()
-#	print getSwiftConfVers()
+	print getProxyNodeIpList('/etc/delta/swift')
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")

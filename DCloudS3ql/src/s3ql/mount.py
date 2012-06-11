@@ -377,7 +377,8 @@ def get_metadata(bucket, cachepath):
 def get_fuse_opts(options):
     '''Return fuse options for given command line options'''
 
-    fuse_opts = [ b"nonempty", b'fsname=%s' % options.storage_url,
+    #Jiahong: New config added to fuse mount to allow bigger block r/w
+    fuse_opts = [ b"nonempty", b'fsname=%s' % options.storage_url, b'big_writes', 'max_read=2100000', 'max_write=2100000',
                   'subtype=s3ql' ]
 
     if options.allow_other:

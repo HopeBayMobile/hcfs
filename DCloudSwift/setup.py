@@ -43,7 +43,7 @@ def main():
 
 	setup(
 		name = "DCloudSwift",
-    		version = "0.1",
+    		version = "0.2",
     		author = "Cloud Data Team, CTBU, Delta Electronic Inc.",
     		description = ("Delta Inc. CTBU Storage Gateway"),
     		license = "Delta Inc.",
@@ -55,6 +55,10 @@ def main():
         	# If any package contains *.txt or *.rst files, include them:
         	'': ['*.txt', '*.rst', '*.sh', "*.ini"],
     		},
+		
+		scripts=[
+		'bin/swift-event-manager'
+    		],
 
 		entry_points = {
        			 'console_scripts': [
@@ -64,7 +68,7 @@ def main():
         		 ]
     		},		
 
-		data_files=[ (DELTADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini']),  
+		data_files=[ (DELTADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini', 'swift_master.ini']),  
                            ], 
 		
 		test_suite='unittest',
@@ -74,6 +78,14 @@ def main():
         		"Topic :: FILESYSTEM",
 		],
 	)
+
+	#Post-scripts
+	
+	os.system("chmod 755 misc/ServiceScripts/*")
+	os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
+
+	os.system("update-rc.d -f swift-event-manager remove")
+	os.system("update-rc.d -n swift-event-manager defaults")
 
 if __name__ == '__main__':
     main()

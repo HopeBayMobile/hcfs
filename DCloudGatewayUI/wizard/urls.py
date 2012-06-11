@@ -12,8 +12,8 @@ class InstallWizard(DeltaWizard):
     finish_template = 'wizard/finish.html'
 
     wizard_step = [
-#        (Form_All, install_task)
-        (Test_Form_All, install_task)
+        (Form_All, install_task)
+#        (Test_Form_All, install_task)
     ]
 #    wizard_initial = {
 #        'Form_All': {

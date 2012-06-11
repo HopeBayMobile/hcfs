@@ -53,6 +53,22 @@ class SwiftCfg:
 		return self.__kwparams
 	
 
+class SwiftMasterCfg:
+	def __init__(self, configFile):
+		self.__kwparams = {}
+		self.__configFile = configFile
+
+		config = ConfigParser()
+		config.readfp(open(self.__configFile))
+
+		self.__eventMgrPort = config.get('eventMgr', 'port')
+
+		self.__kwparams = {
+			'eventMgrPort': self.__eventMgrPort
+		}
+
+	def getKwparams(self):
+		return self.__kwparams
 if __name__ == '__main__':
 	SC = SwiftCfg("%s/DCloudSwift/Swift.ini"%BASEDIR)
 	kwparams = SC.getKwparams()

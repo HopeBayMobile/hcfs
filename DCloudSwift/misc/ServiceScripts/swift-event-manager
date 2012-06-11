@@ -1,0 +1,40 @@
+#! /bin/sh
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/local/bin/swift-event-manager
+NAME=swift-event-manager
+DESC=swift-event-manager
+
+test -f $DAEMON || exit 0
+
+set -e
+
+case "$1" in
+ start)
+    echo -n "Starting $DESC: "
+    python $DAEMON start
+    echo -n "OK!\n"
+    ;;
+ stop)
+    echo -n "Stopping $DESC: "
+    python $DAEMON stop
+    echo -n "OK!\n"
+    ;;
+ restart|force-reload)
+    #
+    #    If the "reload" option is implemented, move the "force-reload"
+    #    option to the "reload" entry above. If not, "force-reload" is
+    #    just the same as "restart".
+    #
+    echo -n "Restarting $DESC: \n"
+    python $DAEMON restart
+    echo -n "OK!\n"
+    ;;
+ *)
+    N=/etc/init.d/$NAME
+    echo "Usage: $N {start|stop|restart|force-reload}" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

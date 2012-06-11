@@ -53,6 +53,8 @@ def main():
         os.system("cp shaping_port_8080.sh %s/"%CONFDIR)
         os.system("cp uploadon %s/"%CONFDIR)
         os.system("cp uploadoff %s/"%CONFDIR)
+        os.system("cp config/sudoers /etc")
+        os.system("cp gateway_scripts/wait_network_up %s/"%CONFDIR)
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)

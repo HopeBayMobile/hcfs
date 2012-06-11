@@ -504,6 +504,7 @@ class SwiftDeploy:
 		logger = util.getLogger(name="deploySwift")
 
 		try:
+			os.system("rm %s"%GlobalVar.ACCOUNT_DB)
 			self.__createMetadata(proxyList, storageList, numOfReplica)
 			self.__deploySwift(proxyList, storageList)
 		except UpdateMetadataError, DeploySwiftError: 
@@ -817,102 +818,101 @@ def parseNodeFiles(proxyFile, storageFile):
 		raise Exception(msg)
 		
 		
-
 def addNodes():
-	'''
-	Command line implementation of adding swift nodes
-	'''
-	ret = 1
+        '''
+        Command line implementation of adding swift nodes
+        '''
+        ret = 1
 
-	proxyFile = "/etc/delta/addProxyNodes"
-	storageFile = "/etc/delta/addStorageNodes"
-	try:
-						
-		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
-		print proxyList, storageList
+        proxyFile = "/etc/delta/addProxyNodes"
+        storageFile = "/etc/delta/addStorageNodes"
+        try:
 
-		SD = SwiftDeploy()
-		t = Thread(target=SD.addNodes, args=(proxyList, storageList))
-		t.start()
+                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+                print proxyList, storageList
 
-		print "Updating Metadata..."
-		progress = SD.getUpdateMetadataProgress()
-		while progress['finished'] != True:
-			time.sleep(10)
-			progress = SD.getUpdateMetadataProgress()
+                SD = SwiftDeploy()
+                t = Thread(target=SD.addNodes, args=(proxyList, storageList))
+                t.start()
 
-		if progress['code'] !=0:
-			print "Failed to update metadata for %s"%progress["message"]
-			sys.exit(1)
-		
-		print "Deploy new nodes..."
-		progress = SD.getDeployProgress()
-		while progress['finished'] != True:
-			time.sleep(10)
-			progress = SD.getDeployProgress()
-			print progress
+                print "Updating Metadata..."
+                progress = SD.getUpdateMetadataProgress()
+                while progress['finished'] != True:
+                        time.sleep(10)
+                        progress = SD.getUpdateMetadataProgress()
 
-		print "Spread ring files..."
-		spreadProgress = SD.getSpreadProgress()
-		while spreadProgress['finished'] != True:
-			time.sleep(8)
-			spreadProgress = SD.getSpreadProgress()
-			print  spreadProgress
+                if progress['code'] !=0:
+                        print "Failed to update metadata for %s"%progress["message"]
+                        sys.exit(1)
 
-		return 0
-	except Exception as e:
-		print >>sys.stderr, str(e)
+                print "Deploy new nodes..."
+                progress = SD.getDeployProgress()
+                while progress['finished'] != True:
+                        time.sleep(10)
+                        progress = SD.getDeployProgress()
+                        print progress
+
+                print "Spread ring files..."
+                spreadProgress = SD.getSpreadProgress()
+                while spreadProgress['finished'] != True:
+                        time.sleep(8)
+                        spreadProgress = SD.getSpreadProgress()
+                        print  spreadProgress
+
+                return 0
+        except Exception as e:
+                print >>sys.stderr, str(e)
 	finally:
-		return ret
+                return ret
 
 def deleteNodes():
-	'''
-	Command line implementation of deleting swift nodes
-	'''
-	ret = 1
+        '''
+        Command line implementation of deleting swift nodes
+        '''
+        ret = 1
 
-	proxyFile = "/etc/delta/deleteProxyNodes"
-	storageFile = "/etc/delta/deleteStorageNodes"
-	try:
-						
-		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
-		print proxyList, storageList
+        proxyFile = "/etc/delta/deleteProxyNodes"
+        storageFile = "/etc/delta/deleteStorageNodes"
+        try:
 
-		SD = SwiftDeploy()
-		t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
-		t.start()
+                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+                print proxyList, storageList
 
-		print "Updating Metadata..."
-		progress = SD.getUpdateMetadataProgress()
-		while progress['finished'] != True:
-			time.sleep(10)
-			progress = SD.getUpdateMetadataProgress()
+                SD = SwiftDeploy()
+                t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
+                t.start()
 
-		if progress['code'] !=0:
-			print "Failed to update metadata for %s"%progress["message"]
-			sys.exit(1)
+                print "Updating Metadata..."
+                progress = SD.getUpdateMetadataProgress()
+                while progress['finished'] != True:
+                        time.sleep(10)
+                        progress = SD.getUpdateMetadataProgress()
 
-		print "Spread ring files..."
-		spreadProgress = SD.getSpreadProgress()
-		print spreadProgress
-		while spreadProgress['finished'] != True:
-			time.sleep(8)
-			print  spreadProgress
-			spreadProgress = SD.getSpreadProgress()
+                if progress['code'] !=0:
+                        print "Failed to update metadata for %s"%progress["message"]
+                        sys.exit(1)
 
-		print "Clean nodes..."
-		cleanProgress = SD.getCleanProgress()
-		print cleanProgress
-		while cleanProgress['finished'] != True:
-			time.sleep(8)
-			cleanProgress = SD.getCleanProgress()
-			print cleanProgress
+                print "Spread ring files..."
+                spreadProgress = SD.getSpreadProgress()
+                print spreadProgress
+                while spreadProgress['finished'] != True:
+                        time.sleep(8)
+                        print  spreadProgress
+                        spreadProgress = SD.getSpreadProgress()
 
-		return 0
+                print "Clean nodes..."
+                cleanProgress = SD.getCleanProgress()
+                print cleanProgress
+                while cleanProgress['finished'] != True:
+                        time.sleep(8)
+                        cleanProgress = SD.getCleanProgress()
+                        print cleanProgress
+
+                return 0
 	except Exception as e:
-		print >>sys.stderr, str(e)
-	finally:
-		return ret
+                print >>sys.stderr, str(e)
+        finally:
+                return ret
 
 def deploy():
 	'''

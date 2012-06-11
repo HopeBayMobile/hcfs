@@ -17,7 +17,7 @@ description	"S3QL Backup File System"
 author		"Nikolaus Rath <Nikolaus@rath.org>"
 
 # This assumes that eth0 provides your internet connection
-start on (filesystem and net-device-up IFACE=$IFACE)
+start on (filesystem and net-device-up IFACE=$IFACE and stopped pre-gwstart)
 
 # We can't use "stop on runlevel [016]" because from that point on we
 # have only 10 seconds until the system shuts down completely.
