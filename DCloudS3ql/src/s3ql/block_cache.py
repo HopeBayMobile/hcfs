@@ -396,6 +396,7 @@ class BlockCache(object):
                 fh.write(buf)
             return fh
 
+#Jiahong: TODO: delay (sleep) upload if snapshotting is underway
         try:
             if log.isEnabledFor(logging.DEBUG):
                 time_ = time.time()
