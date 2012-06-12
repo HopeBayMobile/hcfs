@@ -9,11 +9,11 @@
 2. How to use the scripts:
 	(1) Copy the folder 'DCloudSwift' to the master node.
 	(2) Change your privilege to root.
-	(3) Execute 'python setup.py install'
-	(4) Modify the [storage] section in Swift.ini:
+	(3) Modify the [storage] section in Swift.ini:
             password = password of root in swift nodes
             deviceCnt = how many disks to use in each swift node
 `
+	(4) Execute 'python setup.py install'
 	(5) Edit /etc/delta/proxyNodes in the following format:
               ip1
               ip2
