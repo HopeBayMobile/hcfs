@@ -20,8 +20,8 @@ from util import util
 
 
 TIMEOUT = 180
-EVENTS_FIELD = 'events'
-MAX_DELAYED_CALLS = 500
+EVENTS_FIELD = 'notification'
+MAX_DELAYED_CALLS = 1000
 
 
 class SwiftEventMgr(Daemon):
@@ -50,24 +50,22 @@ class SwiftEventMgr(Daemon):
 		logger.info("%s"%jsonStr4Events)
 		#Add your code here
 		
-	#TODO:What will happen if the reading of HTTP request failed
-	#TODO:What will happen if the sending of HTTP response failed
 	class EventsPage(Resource):
     		def render_GET(self, request):
         		return '<html><body><form method="POST"><input name="%s" type="text" /></form></body></html>'%EVENTS_FIELD
 
     		def render_POST(self, request):
 			delayedCalls = reactor.getDelayedCalls()
-			elapsed = 0
-			while len(delayedCalls)> MAX_DELAYED_CALLS and elapsed <= TIMEOUT:
+			timeElapsed = -1
+			while len(delayedCalls)> MAX_DELAYED_CALLS and timeElapsed <= TIMEOUT:
 				time.sleep(5)
-				elapsed +=5
+				timeElapsed +=5
 				delayedCalls = reactor.getDelayedCalls()
-			if elapsed > TIMEOUT:
-				#TODO: return error
-				return'<html><body>Try again!</body></html>'
+			if timeElapsed > TIMEOUT:
+				request.setResponseCode(500, "Server Busy!")
+				return'<html><body>Server busy!</body></html>'
 
-			reactor.callLater(1, SwiftEventMgr.handleEvents, request.args[EVENTS_FIELD][0])
+			reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[EVENTS_FIELD][0])
         		return '<html><body>Thank you!</body></html>'
 
 	def run(self):
