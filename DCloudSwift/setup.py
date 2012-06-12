@@ -80,7 +80,7 @@ def main():
 	)
 
 	#Post-scripts
-	
+	os.system("cp ./Swift.ini  ./src/DCloudSwift/")
 	os.system("chmod 755 misc/ServiceScripts/*")
 	os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
 
