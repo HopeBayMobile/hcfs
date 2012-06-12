@@ -33,6 +33,7 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini'%BASEDIR,
 
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
+
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
@@ -253,21 +254,6 @@ def findLine(filename, line):
 
 	return False
 	
-def getListenPid(address):
-	cmd = "netstat -ntpl | grep %s"%address
-	po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-	lines = po.stdout.readlines()
-	pid = None
-	for line in lines:
-		laddress = line.split()[3]
-		lstate = line.split()[5]
-
-		if lstate == "LISTEN" and laddress == address:
-			pid = int(line.split()[6].split('/')[0])
-	po.wait()
-	
-
-	return pid
 def getLogger(name=None, conf=SWIFTCONF):
 	"""
 	Get a file logger using config settings.
@@ -308,12 +294,46 @@ def getLogger(name=None, conf=SWIFTCONF):
 	finally:
 		pass
 
+def getPortalUrl():
+	'''
+	get protalUrl from Swift.ini
+	'''
+	logger = getLogger(name="getPortalUrl")
+	portalUrl = None
+	try:
+		SC = SwiftCfg(SWIFTCONF)
+		kwparams = SC.getKwparams()
+		portalUrl = kwparams["portalUrl"]
+	except Exception as e:
+		logger.error(str(e))
+
+	return portalUrl
+
+def getProxyPort():
+	'''
+	get proxyPort from Swift.ini
+	'''
+	logger = getLogger(name="getProxyPort")
+	proxyPort = None
+	try:
+		SC = SwiftCfg(SWIFTCONF)
+		kwparams = SC.getKwparams()
+		proxyPort = kwparams["proxyPort"]
+	except Exception as e:
+		logger.error(str(e))
+
+	return proxyPort
+
 def generateSwiftConfig():
 	ip = socket.gethostbyname(socket.gethostname())
 	if ip.startswith("127"):
 		ip =getIpAddress()
 
-	os.system("sh %s/DCloudSwift/proxy/CreateProxyConfig.sh %s"%(BASEDIR,ip))
+	proxyPort = getProxyPort()
+	portalUrl = getPortalUrl()
+
+	if proxyPort and ip and portalUrl:
+		os.system("sh %s/DCloudSwift/proxy/CreateProxyConfig.sh %d %s %s"%(BASEDIR, proxyPort, ip, portalUrl))
 	os.system("sh %s/DCloudSwift/storage/rsync.sh %s"%(BASEDIR,ip))
 	os.system("sh %s/DCloudSwift/storage/accountserver.sh %s"%(BASEDIR,ip))
 	os.system("sh %s/DCloudSwift/storage/containerserver.sh %s"%(BASEDIR,ip))
@@ -758,7 +778,9 @@ class TryLockError(Exception):
 		return "Failed to tryLock lockFile"
 
 if __name__ == '__main__':
-	print getProxyNodeIpList('/etc/delta/swift')
+	print getPortalUrl()
+	print getProxyPort()
+	generateSwiftConfig()
 #	print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #	spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #	print installAllDeb("/DCloudSwift/storage/deb_source")

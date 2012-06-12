@@ -30,6 +30,9 @@ class SwiftCfg:
 		self.__password = config.get('storage', 'password')
 		self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
 		self.__devicePrx = "sdb"
+		self.__proxyPort = int(config.get('storage', 'proxyPort'))
+		
+		self.__portalUrl = config.get('portal', 'url')
 
 		self.__kwparams = {
 			'logDir': self.__logDir,
@@ -39,6 +42,8 @@ class SwiftCfg:
 			'password': self.__password,
 			'devicePrx': self.__devicePrx,
 			'deviceCnt': self.__deviceCnt,
+			'proxyPort': self.__proxyPort,
+			'portalUrl': self.__portalUrl
 		}
 
 		os.system("mkdir -p " + self.__kwparams['logDir'])

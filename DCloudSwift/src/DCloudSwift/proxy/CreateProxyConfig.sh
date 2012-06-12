@@ -1,13 +1,15 @@
-if [ $# != 1 ]; then
+if [ $# != 3 ]; then
         echo "Please enter the correct parameters!"
         echo "For example:"
-        echo "./CreateProxyConfig ProxyIP"
+        echo "./CreateProxyConfig BindPort ProxyIP PortalUrl"
         exit 1
 fi
 
 
-IP=$1
-export PROXY_LOCAL_NET_IP=$IP
+
+export BIND_PORT=$1
+export PROXY_LOCAL_NET_IP=$2
+export PORTAL_URL=$3
 
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
@@ -39,7 +41,7 @@ cat >/etc/swift/proxy-server.conf <<EOF
 [DEFAULT]
 cert_file = /etc/swift/cert.crt
 key_file = /etc/swift/cert.key
-bind_port = 8080
+bind_port = $BIND_PORT
 workers = 8
 user = swift
 
@@ -53,7 +55,7 @@ allow_account_management = true
 [filter:swauth]
 use = egg:swauth#swauth
 set log_name = root
-default_swift_cluster = local#https://$PROXY_LOCAL_NET_IP:8080/v1#https://127.0.0.1:8080/v1
+default_swift_cluster = local#$PORTAL_URL/v1#https://127.0.0.1:$BIND_PORT/v1
 super_admin_key = deltacloud
 
 [filter:healthcheck]

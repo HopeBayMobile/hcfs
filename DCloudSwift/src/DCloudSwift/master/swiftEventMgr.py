@@ -37,17 +37,17 @@ class SwiftEventMgr(Daemon):
 	def unSubscribe(self):
 		pass
 		
-	def isValidEventStr(self, eventStr):
+	def isValidNotification(self, notification):
 		'''
-		Check if eventStr is a valid json str representing an event
+		Check if notification is a valid json str representing an event list
 		'''	
 		#Add your code here
 		return True
 
 	@staticmethod
-	def handleEvents(jsonStr4Events):
+	def handleEvents(notification):
 		logger = util.getLogger(name="swifteventmgr.handleEvents")
-		logger.info("%s"%jsonStr4Events)
+		logger.info("%s"%notification)
 		#Add your code here
 		
 	class EventsPage(Resource):
