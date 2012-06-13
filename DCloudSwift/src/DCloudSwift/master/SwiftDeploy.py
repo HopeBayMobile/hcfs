@@ -817,19 +817,140 @@ def parseNodeFiles(proxyFile, storageFile):
 		msg = "Failed to access input files for %s"%str(e)
 		raise Exception(msg)
 		
+
+def getSection(inputFile, section):
+	ret = []
+	with open(inputFile) as fh:
+		lines = fh.readlines()
+		start = 0
+		for i in range(len(lines)):
+			line = lines[i].strip()
+			if line.startswith('[') and section in line:
+				start = i+1
+				break
+		end = len(lines)
+		for i in range(start, len(lines)):
+			line = lines[i].strip()
+			if line.startswith('['):
+				end = i
+				break
+
+
+		for line in lines[start:end]:
+			line = line.strip()
+			if len(line) > 0:
+				ret.append(line)
+
+		return ret
 		
+def parseAddNodesSection(inputFile):
+	lines = getSection(inputFile,"addNodes")
+	try:
+		proxyList = []
+		storageList = []
+		ipSet = set()
+		for line in lines:
+			line = line.strip()
+			if len(line) > 0:
+				tokens = line.split()
+				if len(tokens) != 2:
+					raise Exception("[addNodes] contains an invalid line %s"%line)
+				try:
+					ip=tokens[0]
+					zid = int(tokens[1])
+					socket.inet_aton(ip)
+
+					if zid < 1 or zid > 9:
+						raise Exception("zid has to be a positive integer < 10")
+
+					if ip in ipSet:
+						raise Exception("[addNodes] contains duplicate ip")
+
+					proxyList.append({"ip":ip})
+					storageList.append({"ip": ip, "zid": zid})
+					ipSet.add(ip)
+				except socket.error:
+					raise Exception("[addNodes] contains an invalid ip %s"%ip)
+				except ValueError:
+					raise Exception("[addNodes] contains an invalid zid %s"%tokens[1])
+		return (proxyList, storageList)
+	except IOError as e:
+		msg = "Failed to access input files for %s"%str(e)
+		raise Exception(msg)
+
+def parseDeleteNodesSection(inputFile):
+	lines = getSection(inputFile,"deleteNodes")
+	try:
+		proxyList = []
+		storageList = []
+		ipSet = set()
+		for line in lines:
+			line = line.strip()
+			if len(line) > 0:
+				tokens = line.split()
+				try:
+					ip=tokens[0]
+					socket.inet_aton(ip)
+
+					if ip in ipSet:
+						raise Exception("[deleteNodes] contains duplicate ip")
+
+					proxyList.append({"ip":ip})
+					storageList.append({"ip": ip})
+					ipSet.add(ip)
+				except socket.error:
+					raise Exception("[deleteNodes] contains an invalid ip %s"%ip)
+
+		return (proxyList, storageList)
+	except IOError as e:
+		msg = "Failed to access input files for %s"%str(e)
+		raise Exception(msg)
+
+def parseDeploySection(inputFile):
+	lines = getSection(inputFile,"deploy")
+	try:
+		proxyList = []
+		storageList = []
+		ipSet = set()
+		for line in lines:
+			line = line.strip()
+			if len(line) > 0:
+				tokens = line.split()
+				if len(tokens) != 2:
+					raise Exception("[deploy] contains an invalid line %s"%line)
+				try:
+					ip=tokens[0]
+					zid = int(tokens[1])
+					socket.inet_aton(ip)
+
+					if zid < 1 or zid > 9:
+						raise Exception("zid has to be a positive integer < 10")
+
+					if ip in ipSet:
+						raise Exception("[deploy] contains duplicate ip")
+
+					proxyList.append({"ip":ip})
+					storageList.append({"ip": ip, "zid": zid})
+					ipSet.add(ip)
+				except socket.error:
+					raise Exception("[deploy] contains an invalid ip %s"%ip)
+				except ValueError:
+					raise Exception("[deploy] contains an invalid zid %s"%tokens[1])
+		return (proxyList, storageList)
+	except IOError as e:
+		msg = "Failed to access input files for %s"%str(e)
+		raise Exception(msg)
+
 def addNodes():
         '''
         Command line implementation of adding swift nodes
         '''
         ret = 1
 
-        proxyFile = "/etc/delta/addProxyNodes"
-        storageFile = "/etc/delta/addStorageNodes"
+        inputFile = "/etc/delta/inputFile"
         try:
 
-                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
-                print proxyList, storageList
+                (proxyList, storageList) = parseAddNodesSection(inputFile=inputFile)
 
                 SD = SwiftDeploy()
                 t = Thread(target=SD.addNodes, args=(proxyList, storageList))
@@ -871,11 +992,10 @@ def deleteNodes():
         '''
         ret = 1
 
-        proxyFile = "/etc/delta/deleteProxyNodes"
-        storageFile = "/etc/delta/deleteStorageNodes"
+        inputFile = "/etc/delta/inputFile"
         try:
 
-                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+                (proxyList, storageList) = parseDeleteNodesSection(inputFile=inputFile)
                 print proxyList, storageList
 
                 SD = SwiftDeploy()
@@ -939,11 +1059,10 @@ def deploy():
 		print >>sys.stderr, Usage
                 sys.exit(1)
 
-	proxyFile = "/etc/delta/proxyNodes"
-	storageFile = "/etc/delta/storageNodes"
+	inputFile = "/etc/delta/inputFile"
 	try:
 						
-		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+		(proxyList, storageList) = parseDeploySection(inputFile)
 
 		SC = SwiftCfg(GlobalVar.SWIFTCONF)
 		password = SC.getKwparams()['password']
@@ -985,7 +1104,6 @@ def deploy():
 		return ret
 
 if __name__ == '__main__':
-	SD = SwiftDeploy()
 	print util.getNumOfReplica("/etc/delta/swift")
 	#t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
 	#t = Thread(target=SD.spreadRingFiles, args=())
