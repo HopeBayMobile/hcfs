@@ -68,7 +68,7 @@ def main():
         		 ]
     		},		
 
-		data_files=[ (DELTADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini', 'swift_master.ini']),  
+		data_files=[ (DELTADIR, ['inputFile.sample', 'Swift.ini', 'swift_master.ini']),  
                            ], 
 		
 		test_suite='unittest',

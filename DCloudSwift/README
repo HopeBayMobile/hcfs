@@ -9,23 +9,24 @@
 2. How to use the scripts:
 	(1) Copy the folder 'DCloudSwift' to the master node.
 	(2) Change your privilege to root.
-	(3) Modify the [storage] section in Swift.ini:
+	(3) Edit ./Swift.ini:
+	    [storage]
             password = password of root in swift nodes
             deviceCnt = how many disks to use in each swift node
+	    proxyPort = the port on which the swift-proxy should listen
+	   
+            [portal]
+            url = url of the public access portal for users
 `
 	(4) Execute 'python setup.py install'
-	(5) Edit /etc/delta/proxyNodes in the following format:
-              ip1
-              ip2
-              ... 
-        (6) Edit /etc/delta/storageNodes in the following format:
+        (5) Add [deploy] section to /etc/delta/inputFile in the following format:
               ip1 zid1
               ip2 zid2
               ...
             
               where zid has to be a positive integer less than 10.
               
-	(7) execute "dcloud_swift_deploy numOfReplcia"
+	(6) execute "dcloud_swift_deploy numOfReplcia"
 
               where numOfReplica has to be a positive integer less than 10 
 

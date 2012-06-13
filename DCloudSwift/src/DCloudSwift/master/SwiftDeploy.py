@@ -947,12 +947,10 @@ def addNodes():
         '''
         ret = 1
 
-        proxyFile = "/etc/delta/addProxyNodes"
-        storageFile = "/etc/delta/addStorageNodes"
+        inputFile = "/etc/delta/inputFile"
         try:
 
-                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
-                print proxyList, storageList
+                (proxyList, storageList) = parseAddNodesSection(inputFile=inputFile)
 
                 SD = SwiftDeploy()
                 t = Thread(target=SD.addNodes, args=(proxyList, storageList))
@@ -994,11 +992,10 @@ def deleteNodes():
         '''
         ret = 1
 
-        proxyFile = "/etc/delta/deleteProxyNodes"
-        storageFile = "/etc/delta/deleteStorageNodes"
+        inputFile = "/etc/delta/inputFile"
         try:
 
-                (proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+                (proxyList, storageList) = parseDeleteNodesSection(inputFile=inputFile)
                 print proxyList, storageList
 
                 SD = SwiftDeploy()
@@ -1062,11 +1059,10 @@ def deploy():
 		print >>sys.stderr, Usage
                 sys.exit(1)
 
-	proxyFile = "/etc/delta/proxyNodes"
-	storageFile = "/etc/delta/storageNodes"
+	inputFile = "/etc/delta/inputFile"
 	try:
 						
-		(proxyList, storageList) = parseNodeFiles(proxyFile=proxyFile, storageFile=storageFile)
+		(proxyList, storageList) = parseDeploySection(inputFile)
 
 		SC = SwiftCfg(GlobalVar.SWIFTCONF)
 		password = SC.getKwparams()['password']
@@ -1108,8 +1104,7 @@ def deploy():
 		return ret
 
 if __name__ == '__main__':
-	#print parseDeleteNodesSection("./inputFile.sample")
-	#print util.getNumOfReplica("/etc/delta/swift")
+	print util.getNumOfReplica("/etc/delta/swift")
 	#t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
 	#t = Thread(target=SD.spreadRingFiles, args=())
 	#t.start()
