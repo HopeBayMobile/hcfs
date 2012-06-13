@@ -348,7 +348,7 @@ class Operations(llfuse.Operations):
         log.debug('remove_tree(%d, %s): end', id_p0, name0)
 
 
-#Jiahong: Snapshots only include files that are completely uploaded to the backend (i.e., no data in dirty cache blocks)
+#Jiahong: Snapshotting begins with dirty cache flush, and only after complete flush will metadata replication starts 
     def copy_tree(self, src_id, target_id):
         '''Efficiently copy directory tree'''
 
@@ -359,10 +359,12 @@ class Operations(llfuse.Operations):
         db = self.db
 
         # First we make sure that all blocks are in the database
-        #Jiahong: don't flush cache at fast dir copy, but instead skip files with data in dirty cache blocks
+        #Jiahong: commenting out the following. We do not need to use this function
         #self.cache.commit()
         #log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
+#Jiahong: TODO: Put a monitoring code here to probe for
+#all clean cache and yield lock in between monitoring.
 
 
         # Copy target attributes
@@ -376,12 +378,10 @@ class Operations(llfuse.Operations):
         for attr in ('atime', 'ctime', 'mtime', 'mode', 'uid', 'gid'):
             setattr(target_inode, attr, getattr(src_inode, attr))
 
-#Jiahong: TODO: Suspend cache upload to cloud (to avoid changing dirty attribute to clean) and yielding lock during snapshotting
-#Jiahong: TODO: open a snapshot log file for recording the files that are included or skipped in the snapshot
-#Jiahong: TODO: maintain another dict() 'id_passed' to record the inodes skipped due to dirty cache blocks
+#Jiahong: TODO: Suspend yielding lock during snapshotting
+#Jiahong: TODO: open a snapshot log file for recording the files that are included in the snapshot
 
 #Jiahong: TODO: make sure the lock is aquired during the snapshot process (for example, check if writing a file will be slow...
-#Jiahong: TODO: build a set that contains all inodes with dirty cache
 
         # We first replicate into a dummy inode, so that we
         # need to invalidate only once.
@@ -401,12 +401,8 @@ class Operations(llfuse.Operations):
             for (name_id, id_) in db.query('SELECT name_id, inode FROM contents '
                                            'WHERE parent_inode=? AND name_id > ? '
                                            'ORDER BY name_id', (src_id, off)):
-
-#Jiahong: TODO: If the inode is already in 'id_passed', then record a log entry that the name_id is passed to the snapshot log file 
                 if id_ not in id_cache:
                     inode = self.inodes[id_]
-
-#Jiahong: TODO: check if there is a dirty cache block associated with the inode. If so, skip the inode and record this in the log file and 'id_passed'
 
                     try:
                         inode_new = make_inode(refcount=1, mode=inode.mode, size=inode.size,
