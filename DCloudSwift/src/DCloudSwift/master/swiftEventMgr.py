@@ -19,7 +19,9 @@ from util.util import GlobalVar
 from util import util
 
 
-EVENTS_FIELD = 'notification'
+FROM_MONITOR = 'output'
+TO_MONITOR = 'input'
+
 MAX_DELAYED_CALLS = 5000
 
 
@@ -51,7 +53,7 @@ class SwiftEventMgr(Daemon):
 		
 	class EventsPage(Resource):
     		def render_GET(self, request):
-        		return '<html><body><form method="POST"><input name="%s" type="text" /></form></body></html>'%EVENTS_FIELD
+        		return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>'%FROM_MONITOR
 
     		def render_POST(self, request):
 			delayedCalls = reactor.getDelayedCalls()
@@ -60,7 +62,7 @@ class SwiftEventMgr(Daemon):
 				request.setResponseCode(500, "Server Busy!")
 				return'<html><body>Server busy!</body></html>'
 
-			reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[EVENTS_FIELD][0])
+			reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
         		return '<html><body>Thank you!</body></html>'
 
 	def run(self):
