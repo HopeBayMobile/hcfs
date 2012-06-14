@@ -19,7 +19,7 @@ from util.util import GlobalVar
 from util import util
 
 
-EVENTS_FIELD = 'notification'
+EVENTS_FIELD = 'output'
 MAX_DELAYED_CALLS = 5000
 
 
@@ -51,7 +51,7 @@ class SwiftEventMgr(Daemon):
 		
 	class EventsPage(Resource):
     		def render_GET(self, request):
-        		return '<html><body><form method="POST"><input name="%s" type="text" /></form></body></html>'%EVENTS_FIELD
+        		return '<html><body><form method="POST"><input="%s" type="text" /></form></body></html>'%EVENTS_FIELD
 
     		def render_POST(self, request):
 			delayedCalls = reactor.getDelayedCalls()

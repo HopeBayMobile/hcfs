@@ -115,36 +115,33 @@ class AccountDatabaseBroker(DatabaseBroker):
             CREATE TABLE user_info (
                 account TEXT NOT NULL,
                 name TEXT NOT NULL,
-		password TEXT NOT NULL, 
-		admin BOOLEAN NOT NULL,
-		reseller BOOLEAN NOT NULL,
-		enabled BOOLEAN NOT NULL,
-		PRIMARY KEY (account, name)
+                enabled BOOLEAN NOT NULL,
+                PRIMARY KEY (account, name)
             );
         """)
-
+    def show_user_info_table(self):
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM user_info").fetchall()
+            return row
  
-    def add_user(self, account, name, password, admin, reseller):
-	"""
-         add user into the db
+    def add_user(self, account, name):
+        """
+        add user into the db
 
         :param account: account of the user
-	:param name: name of the user
-        :param password: password of the user
-        :param admin: boolean variable indicates if the user is an admin
-        :param reseller: boolean variable indicates if the user is an reseller-admin
+        :param name: name of the user
         
-	:returns: return None if the user already exists. Otherwise return the newly added row
-	"""
-	with self.get() as conn:
-		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-		if row:
-			return None
-		else:
-			conn.execute("INSERT INTO user_info VALUES (?,?,?,?,?,?)", (account, name, password, admin, reseller, 1))
-			conn.commit()
-			row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-			return row
+        :returns: return None if the user already exists. Otherwise return the newly added row
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+            if row:
+                return None
+            else:
+                conn.execute("INSERT INTO user_info VALUES (?,?,?)", (account, name, 1))
+                conn.commit()
+                row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+                return row
 
     def delete_user(self, account, name):
 	"""
@@ -190,61 +187,6 @@ class AccountDatabaseBroker(DatabaseBroker):
 		conn.execute("UPDATE user_info SET enabled = ? where account=? AND name=?", (1, account, name))
 		conn.commit()
 
-
-    def get_password(self, account, name):
-	"""
-        Return password of user account:name
-
-        :param account: account of the user
-	:param name: name of the user
-        
-	:returns: the password or None if the user doesn't exist
-	"""
-	with self.get() as conn:
-		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-		if row:
-			return row["password"]
-		else:
-			return None
-
-    def is_admin(self, account, name):
-	"""
-        check if user account:name is an admin
-
-        :param account: account of the user
-	:param name: name of the user
-        
-	:returns: if account:name exists and is an admin then return true. Otherwise return false.
-	"""
-	with self.get() as conn:
-		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-		if row:
-			if row["admin"] == 1:
-				return True
-			else:
-				return False
-		else:
-			return False
-
-    def is_reseller(self, account, name):
-	"""
-        check if user account:name is a reseller
-
-        :param account: account of the user
-	:param name: name of the user
-        
-	:returns: if account:name exists and is a reseller then return true. Otherwise return false.
-	"""
-	with self.get() as conn:
-		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-		if row:
-			if row["reseller"] == 1:
-				return True
-			else:
-				return False
-		else:
-			return False
-
     def is_enabled(self, account, name):
 	"""
         check if user account:name is enabled
@@ -263,20 +205,6 @@ class AccountDatabaseBroker(DatabaseBroker):
 				return False
 		else:
 			return False
-
-    def change_password(self, account, name, newPassword):
-	"""
-        Change password of user account:name
-
-        :param account: account of the user
-	:param name: name of the user
-	:param newPassword: new password which cannot be None
-        
-	:returns: no return
-	"""
-	with self.get() as conn:
-		conn.execute("UPDATE user_info SET password = ? where account=? AND name=?", (newPassword, account, name))
-		conn.commit()
 			
 
 if __name__ == '__main__':
