@@ -11,14 +11,22 @@ set -e
 
 case "$1" in
  start)
-    echo -n "Starting $DESC: "
+    echo -n "Starting $DESC...\n"
     python $DAEMON start
-    echo -n "OK!\n"
+    if [ $? = 0 ]; then
+        echo -n "OK!\n"
+    else
+        echo -n "Failed to start daemon!\n"
+    fi
     ;;
  stop)
-    echo -n "Stopping $DESC: "
+    echo -n "Stopping $DESC...\n"
     python $DAEMON stop
-    echo -n "OK!\n"
+    if [ $? = 0 ]; then
+        echo -n "Daemon seems to have stopped.\n"
+    else
+        echo -n "Failed to stop daemon!\n"
+    fi
     ;;
  restart|force-reload)
     #
@@ -26,9 +34,13 @@ case "$1" in
     #    option to the "reload" entry above. If not, "force-reload" is
     #    just the same as "restart".
     #
-    echo -n "Restarting $DESC: \n"
+    echo -n "Restarting $DESC...\n"
     python $DAEMON restart
-    echo -n "OK!\n"
+    if [ $? = 0 ]; then
+        echo -n "OK.\n"
+    else
+        echo -n "Failed to restart daemon!\n"
+    fi
     ;;
  *)
     N=/etc/init.d/$NAME
