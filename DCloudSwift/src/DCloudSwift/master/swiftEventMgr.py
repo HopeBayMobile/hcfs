@@ -19,9 +19,8 @@ from util.util import GlobalVar
 from util import util
 
 
-TIMEOUT = 180
 EVENTS_FIELD = 'notification'
-MAX_DELAYED_CALLS = 1000
+MAX_DELAYED_CALLS = 5000
 
 
 class SwiftEventMgr(Daemon):
@@ -56,12 +55,8 @@ class SwiftEventMgr(Daemon):
 
     		def render_POST(self, request):
 			delayedCalls = reactor.getDelayedCalls()
-			timeElapsed = -1
-			while len(delayedCalls)> MAX_DELAYED_CALLS and timeElapsed <= TIMEOUT:
-				time.sleep(5)
-				timeElapsed +=5
+			if len(delayedCalls)> MAX_DELAYED_CALLS:
 				delayedCalls = reactor.getDelayedCalls()
-			if timeElapsed > TIMEOUT:
 				request.setResponseCode(500, "Server Busy!")
 				return'<html><body>Server busy!</body></html>'
 
