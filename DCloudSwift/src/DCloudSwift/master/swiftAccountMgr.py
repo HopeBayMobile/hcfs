@@ -83,7 +83,7 @@ class SwiftAccountMgr:
 					msg = output.msg
 					break
 				else:
-					errMsg = "Failed to run %s on %s thru %s for %s"%(fn.__name__, ip, output.msg)
+					errMsg = "Failed to run %s thru %s for %s"%(fn.__name__, ip, output.msg)
 					msg = msg + '\n' + errMsg
 					
 			except util.TimeoutError:
@@ -510,7 +510,7 @@ class SwiftAccountMgr:
 
 	@util.timeout(300)
 	def __get_account_info(self, proxyIp, account):
-		logger = util.getLogger(name="__account_existence")
+		logger = util.getLogger(name="__get_account_info")
 
 		url = "https://%s:8080/auth/" % proxyIp
 		msg = ""
@@ -522,8 +522,8 @@ class SwiftAccountMgr:
 		(stdoutData, stderrData) = po.communicate()
 
 		if po.returncode != 0:
-			logger.error(stderrData)
-			msg = stderrData
+			msg = "Failed to get account information: %s" % stderrData
+			logger.error(msg)
 			val = False
 			return Bool(val, msg)
 		else:
@@ -548,20 +548,20 @@ class SwiftAccountMgr:
 		'''
 		logger = util.getLogger(name="account_existence")
 
-                proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		account_info = {}
 		result = False
 		val = False
 		msg = ""
-                Bool = collections.namedtuple("Bool", "result val msg")
+		Bool = collections.namedtuple("Bool", "result val msg")
 
-                if proxy_ip_list is None or len(proxy_ip_list) ==0:
-                        msg = "No proxy node is found"
-                        return Bool(result, val, msg)
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
 
-                if retry < 1:
-                        msg = "Argument retry has to >= 1"
-                        return Bool(result, val, msg)
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
 		fn=self.__get_account_info, account=account)
@@ -588,6 +588,29 @@ class SwiftAccountMgr:
 
 		return Bool(result, val, msg)
 
+	@util.timeout(300)
+	def __get_user_info(self, proxyIp, account, user):
+		logger = util.getLogger(name="__get_user_info")
+
+		url = "https://%s:8080/auth/" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swauth-list -K %s -A %s %s" % (self.__password, url, account)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = "Failed to get the user information of account %s: %s" % (account, stderrData)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			val = True
+			return Bool(val, msg)
+
 	def user_existence(self, account, user, retry=3):
 		'''
 		Check whether the given user exists.
@@ -605,7 +628,47 @@ class SwiftAccountMgr:
 			== False, Bool.val == False, and Bool.msg records the error
 			message.
 		'''
-		pass
+		logger = util.getLogger(name="user_existence")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_info = {}
+		result = False
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "result val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_info, account=account, user=user)
+
+		if val == False:
+			result = False
+			return Bool(result, val, msg)
+
+		try:
+			user_info = json.loads(msg)
+			val = True
+			msg = ""
+
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			result = False
+			val = False
+			return Bool(result, val, msg)
+
+		for item in user_info["users"]:
+                        if item["name"] == user:
+                                result = True
+
+		return Bool(result, val, msg)
 
 
 if __name__ == '__main__':
