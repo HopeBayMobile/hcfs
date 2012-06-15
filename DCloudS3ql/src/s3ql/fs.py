@@ -348,6 +348,7 @@ class Operations(llfuse.Operations):
         log.debug('remove_tree(%d, %s): end', id_p0, name0)
 
 
+#Jiahong: Snapshotting begins with dirty cache flush, and only after complete flush will metadata replication starts 
     def copy_tree(self, src_id, target_id):
         '''Efficiently copy directory tree'''
 
@@ -358,15 +359,13 @@ class Operations(llfuse.Operations):
         db = self.db
 
         # First we make sure that all blocks are in the database
-#Jiahong: TODO: it may not be necessary for the cache to be uploaded first for snapshotting,
-#but gateway users should be warned about failed snapshots if blocks in any snapshot are corrupted
-        #Jiahong: don't flush cache at fast dir copy, but instead duplicate cache blocks
+        #Jiahong: commenting out the following. We do not need to use this function
         #self.cache.commit()
+        #log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
+#Jiahong: TODO: Put a monitoring code here to probe for
+#all clean cache and yield lock in between monitoring.
 
-#Jiahong: TODO: will need to expire cache blocks if cache size is full after duplication
-#Jiahong: TODO: verify that we don't need to duplicate clean cache block
-        log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
         # Copy target attributes
         # These come from setxattr, so they may have been deleted
@@ -378,6 +377,11 @@ class Operations(llfuse.Operations):
             raise FUSEError(errno.ENOENT)
         for attr in ('atime', 'ctime', 'mtime', 'mode', 'uid', 'gid'):
             setattr(target_inode, attr, getattr(src_inode, attr))
+
+#Jiahong: TODO: Suspend yielding lock during snapshotting
+#Jiahong: TODO: open a snapshot log file for recording the files that are included in the snapshot
+
+#Jiahong: TODO: make sure the lock is aquired during the snapshot process (for example, check if writing a file will be slow...
 
         # We first replicate into a dummy inode, so that we
         # need to invalidate only once.
@@ -397,7 +401,6 @@ class Operations(llfuse.Operations):
             for (name_id, id_) in db.query('SELECT name_id, inode FROM contents '
                                            'WHERE parent_inode=? AND name_id > ? '
                                            'ORDER BY name_id', (src_id, off)):
-
                 if id_ not in id_cache:
                     inode = self.inodes[id_]
 
@@ -426,8 +429,6 @@ class Operations(llfuse.Operations):
                                'id IN (SELECT name_id FROM ext_attributes WHERE inode=?)',
                                (id_,))
 
-#TODO: Jiahong: Verify that cache.upload process update what db entries, and additionally handle those
-#updates for dirty cache blocks
                     processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
@@ -448,12 +449,15 @@ class Operations(llfuse.Operations):
 
                 processed += 1
 
+#Jiahong: TODO: Record in the log the name of the file entered into the snapshot
+#Jiahong: TODO: comment out the yielding process for now
                 if processed > gil_step:
                     log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
                               src_inode.id, target_inode.id, src_id, target_id, name_id)
                     queue.append((src_id, target_id, name_id))
                     break
 
+#Jiahong: TODO: comment out the yielding process for now
             if processed > gil_step:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
@@ -470,6 +474,8 @@ class Operations(llfuse.Operations):
                         (target_inode.id, tmp.id))
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
+
+#Jiahong: TODO: upload the metadata to cloud after snapshotting is finished
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 

@@ -102,14 +102,13 @@ class SwiftAccountMgr:
 		msg = ""
 		val = False
 
-		admin_opt = "-a " if self.__accountDb.is_admin(account, name) else ""
-		reseller_opt = "-r " if self.__accountDb.is_reseller(account, name)  else ""
+		admin_opt = "-a " if admin else ""
+		reseller_opt = "-r " if reseller  else ""
 		optStr = admin_opt+reseller_opt
 
 		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
-				
 
 		if po.returncode !=0:
 			logger.error(stderrData)
@@ -151,9 +150,7 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		try:
-			row = self.__accountDb.add_user(account=account, name=name,
-						  password=password, admin=admin,
-                                                  reseller=reseller)
+			row = self.__accountDb.add_user(account=account, name=name)
 
 			if row is None:
 				msg = "User %s:%s alread exists"%(account, name)
@@ -441,6 +438,6 @@ if __name__ == '__main__':
 	SA = SwiftAccountMgr()
 	#print SA.add_user("test", "tester28", "testpass", True, True).msg
 	#print SA.delete_user("test", "tester28").msg
-	print SA.disable_user("test", "tester28").msg
-	print SA.enable_user("test", "tester28").msg
+	#print SA.disable_user("test", "tester28").msg
+	#print SA.enable_user("test", "tester28").msg
 	
