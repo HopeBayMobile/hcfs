@@ -363,9 +363,9 @@ class Operations(llfuse.Operations):
         #self.cache.commit()
         #log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
-#Jiahong: TODO: Put a monitoring code here to probe for
-#all clean cache and notify API immediately if cache dirty > 0 (perhaps via FUSEError).
-
+        #Jiahong: A monitoring code here to probe for clean cache and raise EAGAIN error if contain dirty cache
+        if self.cache.dirty_entries > 0:
+            raise FUSEError(errno.EAGAIN)
 
         # Copy target attributes
         # These come from setxattr, so they may have been deleted
