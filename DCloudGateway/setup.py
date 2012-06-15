@@ -27,7 +27,6 @@ def main():
     		},
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
-			     (SMBDIR, ['config/smb.conf']),
                              (ETCDIR, ['config/hosts.deny']),
                              (ETCDIR, ['config/exports']),
                              (ETCDIR, ['config/rc.local']),
@@ -53,8 +52,11 @@ def main():
         os.system("cp shaping_port_8080.sh %s/"%CONFDIR)
         os.system("cp uploadon %s/"%CONFDIR)
         os.system("cp uploadoff %s/"%CONFDIR)
+        os.system("cp gateway_scripts/post-gwstart.conf /etc/init/")
+        os.system("cp config/smb.conf %s/"%SMBDIR)
         os.system("cp config/sudoers /etc")
         os.system("cp gateway_scripts/wait_network_up %s/"%CONFDIR)
+        os.system("cp gateway_scripts/service_restart %s/"%CONFDIR)
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)
