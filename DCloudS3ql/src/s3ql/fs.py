@@ -364,7 +364,7 @@ class Operations(llfuse.Operations):
         #log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
 
 #Jiahong: TODO: Put a monitoring code here to probe for
-#all clean cache and yield lock in between monitoring.
+#all clean cache and notify API immediately if cache dirty > 0 (perhaps via FUSEError).
 
 
         # Copy target attributes
