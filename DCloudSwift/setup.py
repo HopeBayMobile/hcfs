@@ -38,8 +38,8 @@ def read(fname):
 def main():
 	os.system("mkdir -p %s"%DELTADIR)
 
-	if not isAllDebInstalled("misc/deb_src"):
-		os.system("cd misc/deb_src; dpkg -i *.deb")
+	#if not isAllDebInstalled("misc/deb_src"):
+	#	os.system("cd misc/deb_src; dpkg -i *.deb")
 
 	setup(
 		name = "DCloudSwift",
@@ -68,7 +68,7 @@ def main():
         		 ]
     		},		
 
-		data_files=[ (DELTADIR, ['proxyNodes.sample', 'storageNodes.sample', 'Swift.ini', 'swift_master.ini']),  
+		data_files=[ (DELTADIR, ['inputFile.sample', 'Swift.ini', 'swift_master.ini']),  
                            ], 
 		
 		test_suite='unittest',
@@ -80,7 +80,7 @@ def main():
 	)
 
 	#Post-scripts
-	
+	os.system("cp ./Swift.ini  ./src/DCloudSwift/")
 	os.system("chmod 755 misc/ServiceScripts/*")
 	os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
 

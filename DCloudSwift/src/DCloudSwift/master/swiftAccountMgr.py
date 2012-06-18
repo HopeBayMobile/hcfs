@@ -83,7 +83,7 @@ class SwiftAccountMgr:
 					msg = output.msg
 					break
 				else:
-					errMsg = "Failed to run %s on %s thru %s for %s"%(fn.__name__, ip, output.msg)
+					errMsg = "Failed to run %s thru %s for %s"%(fn.__name__, ip, output.msg)
 					msg = msg + '\n' + errMsg
 					
 			except util.TimeoutError:
@@ -102,14 +102,13 @@ class SwiftAccountMgr:
 		msg = ""
 		val = False
 
-		admin_opt = "-a " if self.__accountDb.is_admin(account, name) else ""
-		reseller_opt = "-r " if self.__accountDb.is_reseller(account, name)  else ""
+		admin_opt = "-a " if admin else ""
+		reseller_opt = "-r " if reseller  else ""
 		optStr = admin_opt+reseller_opt
 
 		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
-				
 
 		if po.returncode !=0:
 			logger.error(stderrData)
@@ -151,9 +150,7 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		try:
-			row = self.__accountDb.add_user(account=account, name=name,
-						  password=password, admin=admin,
-                                                  reseller=reseller)
+			row = self.__accountDb.add_user(account=account, name=name)
 
 			if row is None:
 				msg = "User %s:%s alread exists"%(account, name)
@@ -177,13 +174,6 @@ class SwiftAccountMgr:
 			raise InconsistentDatabaseError(errMsg)
 
                 return Bool(val, msg)
-
-	def change_password(self, account, user, oldPassword, newPassword):
-		logger = util.getLogger(name="change_password")
-		try:
-			pass
-		except:
-			raise
 
 	@util.timeout(300)
 	def __delete_user(self, proxyIp, account, name):
@@ -393,11 +383,94 @@ class SwiftAccountMgr:
 
                 return Bool(val, msg)
 
-	def change_password(self, account, user, oldPassword, newPassword):
+	@util.timeout(300)
+	def __change_password(self, proxyIp, account, user, newPassword, admin=True, reseller=False):
+		logger = util.getLogger(name="__change_password")
+		#self.__class__.__add_user.__name__
+
+                url = "https://%s:8080/auth/"%proxyIp
+                msg = ""
+                val = False
+
+                admin_opt = "-a " if admin else ""
+                reseller_opt = "-r " if reseller  else ""
+                optStr = admin_opt+reseller_opt
+
+                cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode !=0:
+                        logger.error(stderrData)
+                        msg = stderrData
+                        val =False
+                else:
+                        logger.info(stdoutData)
+                        msg = stdoutData
+                        val =True
+
+                Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
+	def change_password(self, account, user, oldPassword, newPassword, retry=3):
 		'''
-		Must
+		Change the password of a Swift user in a given account.
+		The original password of the user must be provided for identification.
+
+		@type  account: string
+		@param account: the name of the account
+		@type  user: string
+		@param user: the user of the given account
+		@type  oldPassword: string
+		@param oldPassword: the original password of the user
+		@type  newPassword: string
+		@param newPassword: the new password of the user
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the password is changed successfully,
+			then Bool.val == True and msg == "". Otherwise, Bool.val == False and
+			Bool.msg records the error message.
 		'''
-		pass
+		logger = util.getLogger(name="change_password")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		'''
+		try:
+                        if row is None:
+                                msg = "User %s:%s alread exists"%(account, name)
+                                return Bool(val, msg)
+
+                except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+                        msg = str(e)
+                        return Bool(val, msg)
+		'''
+
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
+                                                   account=account, name=name, password=password,
+                                                   admin=admin, reseller=reseller)
+
+                try:
+                        if val == False:
+                                self.__accountDb.delete_user(account=account, name=name)
+
+                except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+                        errMsg = "Failed to clean user %s:%s from database for %s"%(account, name, str(e))
+                        logger.error(errMsg)
+                        raise InconsistentDatabaseError(errMsg)
+
+		return Bool(val, msg)
 
 	def add_account(self, account):
 		pass
@@ -410,18 +483,218 @@ class SwiftAccountMgr:
 
 	def list_user(self, account):
 		pass
+	
+	def __get_account_usage(self, proxyIp, account, name):
+		logger = util.getLogger(name="__get_account_user")
 
-	def get_account_usage(self, account):
+		url = "https://%s:8080/auth/v1.0"%proxyIp
+		#how to get password
+		cmd = "swift -A %s -U %s:%s -K %s stat"%(url, account, name, password)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+				
+		msg = ""
+		val = False
+
+		if po.returncode !=0:
+			logger.error(stderrData)
+			msg = stderrData
+			val =False
+		else:
+			logger.info(stdoutData)
+			msg = stdoutData
+			val =True
+
+		Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
+	def get_account_usage(self, account, name, retry=3):
 		'''
-		must
+		get account usage from the backend swift
+    		:param account: account of the user
+    		:param name: name of the user
+    		:param password: password of the user
+		:param retry: retry how many times when the operation failed
+		:returns: return a Bool object. If the user get account usage successfully from backend swift
+                          then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+
 		'''
-		pass
+		logger = util.getLogger(name="get_account_usage")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
 
-	def is_admin(self, account, name):
-		pass
+		if proxy_ip_list is None or len(proxy_ip_list)==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
 
-	def is_reseller(self, account, name):
-		pass
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_account_usage,
+                                                   account=account, name=name)
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_user_detail(self, proxyIp, account, user):
+		logger = util.getLogger(name="__get_user_detail")
+
+		url = "https://%s:8080/auth/" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swauth-list -K %s -A %s %s %s" % (self.__password, url, account, user)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = "Failed to get the details for user %s of account %s: %s" % (user, account, stderrData)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			val = True
+			return Bool(val, msg)
+
+		'''
+		cmd = "swauth-list -K %s -A %s %s %s" % (self.__password, url, account, user)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = "Failed to get the details of user %s: %s" % (user, stderrData)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			val = True
+			return Bool(val, msg)
+		'''
+
+	def is_admin(self, account, user, retry=3):
+		'''
+		Return whether the given user is admin.
+
+		@type  account: string
+		@param account: the account name of the given user
+		@type  user: string
+		@param user: the user to be checked
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(result, val, msg). If the user
+			is admin, then Bool.result == True, Bool.val == True,
+			and Bool.msg == "". If the user is not admin, then
+			Bool.result == False, Bool.val == True, and Bool.msg == "".
+			Otherwise, Bool.result == False, Bool.val == False, and
+			Bool.msg records the error message.
+		'''
+		logger = util.getLogger(name="is_admin")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_detail = {}
+		result = False
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "result val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_detail, account=account, user=user)
+
+		if val == False:
+			result = False
+			return Bool(result, val, msg)
+
+		try:
+			user_detail = json.loads(msg)
+			val = True
+			msg = ""
+
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			result = False
+			val = False
+			return Bool(result, val, msg)
+
+		for item in user_detail["groups"]:
+                        if item["name"] == ".admin":
+                                result = True
+
+		return Bool(result, val, msg)
+
+	def is_reseller(self, account, user, retry=3):
+		'''
+		Return whether the given user is reseller admin.
+
+		@type  account: string
+		@param account: the account name of the given user
+		@type  user: string
+		@param user: the user to be checked
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(result, val, msg). If the user
+			is reseller admin, then Bool.result == True, Bool.val == True,
+			and Bool.msg == "". If the user is not reseller admin, then
+			Bool.result == False, Bool.val == True, and Bool.msg == "".
+			Otherwise, Bool.result == False, Bool.val == False, and
+			Bool.msg records the error message.
+		'''
+		logger = util.getLogger(name="is_reseller")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_detail = {}
+		result = False
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "result val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_detail, account=account, user=user)
+
+		if val == False:
+			result = False
+			return Bool(result, val, msg)
+
+		try:
+			user_detail = json.loads(msg)
+			val = True
+			msg = ""
+
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			result = False
+			val = False
+			return Bool(result, val, msg)
+
+		for item in user_detail["groups"]:
+                        if item["name"] == ".reseller_admin":
+                                result = True
+
+		return Bool(result, val, msg)
 
 	def set_account_quota(self, account, quota):
 		pass
@@ -435,12 +708,173 @@ class SwiftAccountMgr:
 	def enable_account(self, account):
 		pass
 
+	@util.timeout(300)
+	def __get_account_info(self, proxyIp, account):
+		logger = util.getLogger(name="__get_account_info")
+
+		url = "https://%s:8080/auth/" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swauth-list -K %s -A %s" % (self.__password, url)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = "Failed to get account information: %s" % stderrData
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			val = True
+			return Bool(val, msg)
+
+	def account_existence(self, account, retry=3):
+		'''
+		Check whether the given account exists.
+
+		@type  account: string
+		@param account: an account name to be queried
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(result, val, msg). If the account
+			exists, then Bool.result == True, Bool.val == True,
+			and Bool.msg == "". If the account does not exist, then
+			Bool.result == False, Bool.val == True, and Bool.msg == "".
+			Otherwise, Bool.result == False, Bool.val == False, and
+			Bool.msg records the error message.
+		'''
+		logger = util.getLogger(name="account_existence")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		account_info = {}
+		result = False
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "result val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_account_info, account=account)
+
+		if val == False:
+			result = False
+			return Bool(result, val, msg)
+
+		try:
+			account_info = json.loads(msg)
+			val = True
+			msg = ""
+			
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			result = False
+			val = False
+			return Bool(result, val, msg)
+
+		for item in account_info["accounts"]:
+			if item["name"] == account:
+				result = True
+
+		return Bool(result, val, msg)
+
+	@util.timeout(300)
+	def __get_user_info(self, proxyIp, account, user):
+		logger = util.getLogger(name="__get_user_info")
+
+		url = "https://%s:8080/auth/" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swauth-list -K %s -A %s %s" % (self.__password, url, account)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = "Failed to get the user information of account %s: %s" % (account, stderrData)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			val = True
+			return Bool(val, msg)
+
+	def user_existence(self, account, user, retry=3):
+		'''
+		Check whether the given user exists.
+
+		@type  account: string
+		@param account: the account name of the given user
+		@type  user: string
+		@param user: the user to be checked
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(result, val, msg). If the user exists,
+			then Bool.result == True, Bool.val == True, and Bool.msg == "".
+			If the user does not exist, then Bool.result == False,
+			Bool.val == True, and Bool.msg == "". Otherwise, Bool.result
+			== False, Bool.val == False, and Bool.msg records the error
+			message.
+		'''
+		logger = util.getLogger(name="user_existence")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_info = {}
+		result = False
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "result val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(result, val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(result, val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_info, account=account, user=user)
+
+		if val == False:
+			result = False
+			return Bool(result, val, msg)
+
+		try:
+			user_info = json.loads(msg)
+			val = True
+			msg = ""
+
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			result = False
+			val = False
+			return Bool(result, val, msg)
+
+		for item in user_info["users"]:
+                        if item["name"] == user:
+                                result = True
+
+		return Bool(result, val, msg)
 
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
 	#print SA.add_user("test", "tester28", "testpass", True, True).msg
 	#print SA.delete_user("test", "tester28").msg
-	print SA.disable_user("test", "tester28").msg
-	print SA.enable_user("test", "tester28").msg
+	#print SA.disable_user("test", "tester28").msg
+	#print SA.enable_user("test", "tester28").msg
 	
