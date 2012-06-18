@@ -247,10 +247,10 @@ def _check_network():
         else:
             log.info(output)
 
-        except IOError as e:
+    except IOError as e:
             op_msg = 'Unable to access /root/.s3ql/authinfo2.'
             log.error(str(e))
-        except Exception as e:
+    except Exception as e:
             op_msg = 'Unable to obtain storage url or login info.'
             log.error(str(e))
 
@@ -756,7 +756,7 @@ def _restartServices():
         config = getGatewayConfig()
     
         cmd = "sudo /etc/init.d/smbd restart"
-                    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
@@ -1127,7 +1127,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
             op_config.set('network', 'dns1', dns1)
     
             if dns2 != None:
-            op_config.set('network', 'dns2', dns2)
+                op_config.set('network', 'dns2', dns2)
     
         with open(info_path, "wb") as f:
             op_config.write(f)
@@ -1614,11 +1614,11 @@ def apply_scheduling_rules(schedule):        # by Yen
     fname = "gw_schedule.conf"
     try:
         with open(fpath+fname, "w") as fh:
-        fptr = csv.writer(fh)
-        header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
-        fptr.writerow(header)
-        for row in schedule:
-            fptr.writerow(row)
+            fptr = csv.writer(fh)
+            header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+            fptr.writerow(header)
+            for row in schedule:
+                fptr.writerow(row)
     except:
         return_val = {
             'result': False,
@@ -1666,10 +1666,10 @@ def stop_upload_sync():        # by Yen
 
 def force_upload_sync(bw):        # by Yen
     if (bw<256):
-    return_val = {
-        'result': False,
-        'msg': "Uploading bandwidth has to be larger than 256KB/s.",
-        'data': {}
+        return_val = {
+            'result': False,
+            'msg': "Uploading bandwidth has to be larger than 256KB/s.",
+            'data': {}
     }
     return json.dumps(return_val)
 
