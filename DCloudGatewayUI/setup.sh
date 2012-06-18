@@ -73,11 +73,13 @@ python /var/www/$BASENAME/manage.py syncdb --noinput
 cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
 
-/etc/init.d/celeryd start
+chmod 755  /etc/init.d/celeryd
+/etc/init.d/celeryd restart
 
 sleep 5
 
 chmod 777 -R /var/www/$BASENAME/GatewayUI/
+mkdir -p /var/log/delta
 chmod 777 -R /var/log/delta/
 
 echo "DCloudGatewayUI setup completed..."

@@ -13,7 +13,8 @@ import re
 
 from ConfigParser import ConfigParser
 
-FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+#FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+FORMATTER = '[%(asctime)s] %(message)s'
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 # Retry decorator
