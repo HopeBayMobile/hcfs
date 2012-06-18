@@ -179,6 +179,7 @@ def get_gateway_indicators():
     op_HDD_ok= _check_HDD()
     op_NFS_srv = _check_nfs_service()
     op_SMB_srv = _check_smb_service()
+    op_Proxy_srv = _check_http_proxy_service()
 
     op_ok = True
     op_msg = "Gateway indocators read successfully."
@@ -191,11 +192,34 @@ def get_gateway_indicators():
           'dirtycache_nearfull' : op_dirtycache_nearfull,
           'HDD_ok' : op_HDD_ok,
           'NFS_srv' : op_NFS_srv,
-          'SMB_srv' : op_SMB_srv}}
+          'SMB_srv' : op_SMB_srv,
+          'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("get_gateway_indicators end")
     return json.dumps(return_val)
 
+def _check_http_proxy_service():
+    """
+    Check whether Squid3 is running.
+    """
+    op_proxy_check = False
+    log.info("_check_http_proxy start")
+
+    cmd ="sudo ps aux | grep squid3"
+    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    lines = po.stdout.readlines()
+    po.wait()
+
+    if po.returncode == 0:
+        if len(lines) > 2:
+            op_proxy_check = True
+    else:
+        log.info(output)
+
+    log.info("_check_http_proxy end")
+    return op_proxy_check
+    
+    
 # check network connecttion from gateway to storage by Rice
 def _check_network():
     op_network_ok = False
@@ -223,10 +247,10 @@ def _check_network():
         else:
             log.info(output)
 
-        except IOError as e:
+    except IOError as e:
             op_msg = 'Unable to access /root/.s3ql/authinfo2.'
             log.error(str(e))
-        except Exception as e:
+    except Exception as e:
             op_msg = 'Unable to obtain storage url or login info.'
             log.error(str(e))
 
@@ -732,7 +756,7 @@ def _restartServices():
         config = getGatewayConfig()
     
         cmd = "sudo /etc/init.d/smbd restart"
-                    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
@@ -1103,7 +1127,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
             op_config.set('network', 'dns1', dns1)
     
             if dns2 != None:
-            op_config.set('network', 'dns2', dns2)
+                op_config.set('network', 'dns2', dns2)
     
         with open(info_path, "wb") as f:
             op_config.write(f)
@@ -1590,11 +1614,11 @@ def apply_scheduling_rules(schedule):        # by Yen
     fname = "gw_schedule.conf"
     try:
         with open(fpath+fname, "w") as fh:
-        fptr = csv.writer(fh)
-        header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
-        fptr.writerow(header)
-        for row in schedule:
-            fptr.writerow(row)
+            fptr = csv.writer(fh)
+            header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+            fptr.writerow(header)
+            for row in schedule:
+                fptr.writerow(row)
     except:
         return_val = {
             'result': False,
@@ -1642,10 +1666,10 @@ def stop_upload_sync():        # by Yen
 
 def force_upload_sync(bw):        # by Yen
     if (bw<256):
-    return_val = {
-        'result': False,
-        'msg': "Uploading bandwidth has to be larger than 256KB/s.",
-        'data': {}
+        return_val = {
+            'result': False,
+            'msg': "Uploading bandwidth has to be larger than 256KB/s.",
+            'data': {}
     }
     return json.dumps(return_val)
 
