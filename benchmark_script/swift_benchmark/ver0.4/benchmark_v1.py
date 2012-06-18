@@ -17,7 +17,7 @@ fnc_write_a_file(tmp_dir)
 
 #------------------
 #~ while True:
-for i in range(100):
+for i in range(10):
 	action = random.choice('WWWWWWWWWWWWWWWWWWRRRD')
 	if action=="W":
 		fnc_write_a_file(tmp_dir)

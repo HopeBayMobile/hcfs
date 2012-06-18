@@ -17,6 +17,10 @@ SWIFT_IP = '172.16.228.53'
 SWIFT_USER = 'storage:yen'
 SWIFT_PW = 'abcd'
 
+file_size = (4, 32, 256, 1024, 4096, 16384, 131072, 1048576, 8388608)  # unit = KB
+weight =    (4, 8,  16,  32,    16,    8,    1,       0,       0)
+
+
 def read_command_log(tmp_dir, log_file_name):
 	fname = tmp_dir + log_file_name
 	try:
@@ -36,9 +40,6 @@ def get_random_word(wordLen):
     return word	
 
 def fnc_pick_a_file_size():
-	file_size = (4, 32, 256, 1024, 4096, 16384, 131072, 1048576, 8388608)  # unit = KB
-	#weight = (4,8,16,32,64,32,8,4,1)
-	weight =    (4, 8,  16,  32,    16,    8,    1,       0,       0)
 	total = sum(weight);	idx=0
 	r = random.randint(0,total)  # pick a file size where weight is used for likelihood
 	for x in weight:
@@ -53,7 +54,10 @@ def fnc_create_a_file(fileSize, tmp_dir):
 	# randomlly generate a file name
 	r = random.randint(1,9999999)  # pick a random number as file name
 	fname = 'f' + str(r)
-	cmd = 'dd if=/dev/urandom of=' + tmp_dir + fname + ' bs=1K count=' + str(fileSize)
+	if fileSize<=16:
+		cmd = 'dd if=/dev/urandom of=' + tmp_dir + fname + ' bs=1K count=' + str(fileSize)
+	else:
+		cmd = 'dd if=/dev/urandom of=' + tmp_dir + fname + ' bs=1K count=16  seek=' + str(fileSize-16)
 	print(cmd)
 	os.system(cmd)
 	return(fname)
