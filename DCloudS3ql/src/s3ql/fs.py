@@ -471,8 +471,6 @@ class Operations(llfuse.Operations):
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
 
-#Jiahong: TODO: In API, upload the metadata to cloud after snapshotting is finished
-
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
     def unlink(self, id_p, name):
