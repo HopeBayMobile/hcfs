@@ -179,6 +179,7 @@ def get_gateway_indicators():
     op_HDD_ok= _check_HDD()
     op_NFS_srv = _check_nfs_service()
     op_SMB_srv = _check_smb_service()
+    op_Proxy_srv = _check_http_proxy_service()
 
     op_ok = True
     op_msg = "Gateway indocators read successfully."
@@ -191,11 +192,34 @@ def get_gateway_indicators():
           'dirtycache_nearfull' : op_dirtycache_nearfull,
           'HDD_ok' : op_HDD_ok,
           'NFS_srv' : op_NFS_srv,
-          'SMB_srv' : op_SMB_srv}}
+          'SMB_srv' : op_SMB_srv,
+          'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("get_gateway_indicators end")
     return json.dumps(return_val)
 
+def _check_http_proxy_service():
+    """
+    Check whether Squid3 is running.
+    """
+    op_proxy_check = False
+    log.info("_check_http_proxy start")
+
+    cmd ="sudo ps aux | grep squid3"
+    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    lines = po.stdout.readlines()
+    po.wait()
+
+    if po.returncode == 0:
+        if len(lines) > 2:
+            op_proxy_check = True
+    else:
+        log.info(output)
+
+    log.info("_check_http_proxy end")
+    return op_proxy_check
+    
+    
 # check network connecttion from gateway to storage by Rice
 def _check_network():
     op_network_ok = False
