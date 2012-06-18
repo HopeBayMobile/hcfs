@@ -407,12 +407,61 @@ class SwiftAccountMgr:
 
 	def list_user(self, account):
 		pass
+	
+	def __get_account_usage(self, proxyIp, account, name):
+		logger = util.getLogger(name="__get_account_user")
 
-	def get_account_usage(self, account):
+		url = "https://%s:8080/auth/v1.0"%proxyIp
+		#how to get password
+		cmd = "swift -A %s -U %s:%s -K %s stat"%(url, account, name, password)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+				
+		msg = ""
+		val = False
+
+		if po.returncode !=0:
+			logger.error(stderrData)
+			msg = stderrData
+			val =False
+		else:
+			logger.info(stdoutData)
+			msg = stdoutData
+			val =True
+
+		Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
+	def get_account_usage(self, account, name, retry=3):
 		'''
-		must
+		get account usage from the backend swift
+    		:param account: account of the user
+    		:param name: name of the user
+    		:param password: password of the user
+		:param retry: retry how many times when the operation failed
+		:returns: return a Bool object. If the user get account usage successfully from backend swift
+                          then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+
 		'''
-		pass
+		logger = util.getLogger(name="get_account_usage")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list)==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_account_usage,
+                                                   account=account, name=name)
+
+                return Bool(val, msg)
 
 	def is_admin(self, account, name):
 		pass
