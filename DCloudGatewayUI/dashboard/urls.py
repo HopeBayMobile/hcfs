@@ -11,4 +11,5 @@ urlpatterns = patterns("dashboard.views",
     url(r'^indicator/$', "indicator", name="indicator"),
     url(r'^status/$', "status", name="status"),
     url(r'^cache_usage/$', "cache_usage", name="cache_usage"),
+    url(r'^config/$', "config", name="config"),
 )

@@ -385,31 +385,49 @@ class SwiftAccountMgr:
 
 	@util.timeout(300)
 	def __change_password(self, proxyIp, account, user, newPassword, admin=True, reseller=False):
-		logger = util.getLogger(name="__change_password")
-		#self.__class__.__add_user.__name__
+		'''
+		Change the password of the given user in Swift.
 
-                url = "https://%s:8080/auth/"%proxyIp
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@type  newPassword: string
+		@param newPassword: the new password to be set
+		@type  admin: boolean
+		@param admin: admin or not
+		@type  reseller: boolean
+		@param reseller: reseller or not
+		@return: a tuple (val, msg). If the operation is successfully done,
+		then val == True and msg records the standard output. Otherwise,
+		val == False and msg records the error message. 
+		'''
+		logger = util.getLogger(name="__change_password")
+
+                url = "https://%s:8080/auth/" % proxyIp
                 msg = ""
                 val = False
+		Bool = collections.namedtuple("Bool", "val msg")
 
                 admin_opt = "-a " if admin else ""
                 reseller_opt = "-r " if reseller  else ""
-                optStr = admin_opt+reseller_opt
+                optStr = admin_opt + reseller_opt
 
-                cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
+                cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, newPassword)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 (stdoutData, stderrData) = po.communicate()
 
                 if po.returncode !=0:
-                        logger.error(stderrData)
-                        msg = stderrData
+			msg = "Failed to change the password of %s: %s" % (user, stderrData)
+                        logger.error(msg)
                         val =False
                 else:
-                        logger.info(stdoutData)
                         msg = stdoutData
+			logger.info(msg)
                         val =True
 
-                Bool = collections.namedtuple("Bool", "val msg")
                 return Bool(val, msg)
 
 	def change_password(self, account, user, oldPassword, newPassword, retry=3):
@@ -432,7 +450,12 @@ class SwiftAccountMgr:
 			Bool.msg records the error message.
 		'''
 		logger = util.getLogger(name="change_password")
+
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_detail = {}
+		admin = False
+		reseller = False
+		ori_password = ""
 
 		msg = ""
 		val = False
@@ -446,29 +469,47 @@ class SwiftAccountMgr:
 			msg = "Argument retry has to >= 1"
 			return Bool(val, msg)
 
-		'''
+		user_existence_output = self.user_existence(account, user)
+		if user_existence_output.val == True:
+			if user_existence_output.result == False:
+				val = False
+				msg = "User %s does not exist!" % user
+				return Bool(val, msg)
+		else:
+			val = False
+			msg = user_existence_output.msg
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_detail, account=account, user=user)
+
+		if val == False:
+			return Bool(val, msg)
+
 		try:
-                        if row is None:
-                                msg = "User %s:%s alread exists"%(account, name)
-                                return Bool(val, msg)
+			user_detail = json.loads(msg)
+			msg = ""
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
 
-                except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-                        msg = str(e)
-                        return Bool(val, msg)
-		'''
+		for item in user_detail["groups"]:
+                        if item["name"] == ".admin":
+                                admin = True
+			if item["name"] == ".reseller_admin":
+				reseller = True
 
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
-                                                   account=account, name=name, password=password,
-                                                   admin=admin, reseller=reseller)
+		ori_password = user_detail["auth"].split(":")[1]
 
-                try:
-                        if val == False:
-                                self.__accountDb.delete_user(account=account, name=name)
+		if oldPassword != ori_password:
+			val = False
+			msg = "Authentication failed! The old password is not correct!"
+			return Bool(val, msg)
 
-                except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-                        errMsg = "Failed to clean user %s:%s from database for %s"%(account, name, str(e))
-                        logger.error(errMsg)
-                        raise InconsistentDatabaseError(errMsg)
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__change_password,\
+		account=account, user=user, newPassword=newPassword, admin=admin, reseller=reseller)
 
 		return Bool(val, msg)
 
@@ -543,6 +584,20 @@ class SwiftAccountMgr:
 
 	@util.timeout(300)
 	def __get_user_detail(self, proxyIp, account, user):
+		'''
+		Return the information of the given user in the give account.
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@return: a tuple (val, msg). If the operatoin is successfully
+			done, then val == True and msg records the information
+			of the given user. Otherwise, val == False and msg
+			records the error message.
+		'''
 		logger = util.getLogger(name="__get_user_detail")
 
 		url = "https://%s:8080/auth/" % proxyIp
@@ -555,30 +610,15 @@ class SwiftAccountMgr:
 		(stdoutData, stderrData) = po.communicate()
 
 		if po.returncode != 0:
-			msg = "Failed to get the details for user %s of account %s: %s" % (user, account, stderrData)
+			msg = stderrData
 			logger.error(msg)
 			val = False
-			return Bool(val, msg)
 		else:
 			msg = stdoutData
+			logger.info(msg)
 			val = True
-			return Bool(val, msg)
 
-		'''
-		cmd = "swauth-list -K %s -A %s %s %s" % (self.__password, url, account, user)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-
-		if po.returncode != 0:
-			msg = "Failed to get the details of user %s: %s" % (user, stderrData)
-			logger.error(msg)
-			val = False
-			return Bool(val, msg)
-		else:
-			msg = stdoutData
-			val = True
-			return Bool(val, msg)
-		'''
+		return Bool(val, msg)
 
 	def get_user_password(self, account, user, retry=3):
 		'''
@@ -775,7 +815,17 @@ class SwiftAccountMgr:
 		pass
 
 	@util.timeout(300)
-	def __get_account_info(self, proxyIp, account):
+	def __get_account_info(self, proxyIp):
+		'''
+		Get the account information of Swift.
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@return: a tuple (val, msg). If the operation is successfully
+			done, then val == True and msg will record the 
+			information. Otherwise, val == False, and msg will 
+			record the error message.
+		'''
 		logger = util.getLogger(name="__get_account_info")
 
 		url = "https://%s:8080/auth/" % proxyIp
@@ -788,14 +838,14 @@ class SwiftAccountMgr:
 		(stdoutData, stderrData) = po.communicate()
 
 		if po.returncode != 0:
-			msg = "Failed to get account information: %s" % stderrData
+			msg = stderrData
 			logger.error(msg)
 			val = False
-			return Bool(val, msg)
 		else:
 			msg = stdoutData
 			val = True
-			return Bool(val, msg)
+
+		return Bool(val, msg)
 
 	def account_existence(self, account, retry=3):
 		'''
@@ -830,7 +880,7 @@ class SwiftAccountMgr:
 			return Bool(result, val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-		fn=self.__get_account_info, account=account)
+		fn=self.__get_account_info)
 
 		if val == False:
 			result = False
@@ -855,7 +905,19 @@ class SwiftAccountMgr:
 		return Bool(result, val, msg)
 
 	@util.timeout(300)
-	def __get_user_info(self, proxyIp, account, user):
+	def __get_user_info(self, proxyIp, account):
+		'''
+		Return the user information of a given account.
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account to be queried
+		@return: a tuple (val, msg). If the operation is successfully
+			done, then val == True and msg records the user
+			information. Otherwise, val == False and msg records
+			the error message.
+		'''
 		logger = util.getLogger(name="__get_user_info")
 
 		url = "https://%s:8080/auth/" % proxyIp
@@ -868,14 +930,14 @@ class SwiftAccountMgr:
 		(stdoutData, stderrData) = po.communicate()
 
 		if po.returncode != 0:
-			msg = "Failed to get the user information of account %s: %s" % (account, stderrData)
+			msg = stderrData
 			logger.error(msg)
 			val = False
-			return Bool(val, msg)
 		else:
 			msg = stdoutData
 			val = True
-			return Bool(val, msg)
+
+		return Bool(val, msg)
 
 	def user_existence(self, account, user, retry=3):
 		'''
@@ -912,7 +974,7 @@ class SwiftAccountMgr:
 			return Bool(result, val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-		fn=self.__get_user_info, account=account, user=user)
+		fn=self.__get_user_info, account=account)
 
 		if val == False:
 			result = False
