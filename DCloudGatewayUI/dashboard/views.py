@@ -1,6 +1,7 @@
 from django.shortcuts import render, HttpResponse, redirect
 from django.contrib.auth.decorators import login_required
 from django import forms
+from django.views.decorators.http import require_POST
 from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
@@ -283,6 +284,14 @@ def syslog(request):
     return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
                                                      'log_data': log_data
                                                      })
+
+
+@login_required
+@require_POST
+def http_proxy(request, action=None):
+    if request.method == 'POST':
+        result = json.loads(api.set_http_proxy(action))
+        return HttpResponse(result)
 
 
 @login_required

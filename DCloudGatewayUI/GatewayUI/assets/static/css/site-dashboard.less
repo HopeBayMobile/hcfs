@@ -165,50 +165,20 @@ tr{
    	float: right;
     margin-top: (@site-top-height - @notify-group-height)/2;
     margin-right: (@site-top-height - @notify-group-height)/2;
-    width: 448px;
+    width: 350px;
     height: @notify-group-height;
-    background-image: url("/@{dashboard-image-path}/indicator_bg.png");
     display: inline-block;
 
     .notify-box-row-NW{
 		float: left;
-		margin-top: 10px;
+		margin-top: (@notify-group-height - 80px) / 2;
 		margin-left: 5px;
 	}
-	.notify-box-row-SW{
-		float: left;
-		clear: both;
-		margin-top: 5px;
-		margin-left: 5px;
-		.notify-box{
-			width: 72px;
-		    height: 32px;
-		    text-align: center;
-		    vertical-align: middle;
-		    line-height: 32px;
-		}
-	}
-	.notify-box-row-NE{
-		float: right;
-		width: 140px;
-		margin-top: 10px;
-		margin-right: 10px;
-		line-height: 32px;
-		vertical-align: middle;
-		font-weight: bold;
-		.logout{
-			float: right;
-		}
-	}
+
 	.notify-box-row-SE{
-		float: right;
-		width: 140px;
-		margin-right: 10px;
-		margin-top: -5px;
-		p{
-			margin: 0;
-		}
+		margin-left: 10px;
 	}
+
 	.notify-box{
 		float: left;
 	    margin-left: 10px;
@@ -474,61 +444,106 @@ tr{
 
 /*The following are styles for usage and status page*/
 
-.storage-usage-info{
+.storage-indicator-and-switch{
 	position: relative;
 	top: 10px;
 	max-width: @site-main-width - 100px;
 	background-color: #EBEDED;
-	padding: 5px 20px 20px 20px;
+	padding: 20px;
 	.corner-radius (20px);
-	.css3-shadow (2px 2px 5px gray)
-}
+	.css3-shadow (2px 2px 5px gray);
 
-.storage-usage-info h2{
-	margin: 10px 10px;
-	padding: 0;
-}
+	.notify-box{
+		width: 72px;
+	    height: 32px;
+	    text-align: center;
+	    vertical-align: middle;
+	    line-height: 32px;
+	}
 
-.storage-usage-info hr{
-	margin: 0;
-	margin-bottom: 10px;
-}
+	& > div{
+		h1{
+			margin-bottom: 10px;
+		}
+		float: left;
+		width: 49.5%;
+	}
 
-.storage-usage-info section p{
-	font-size: 16px;
-	line-height: 16px;
-	color: gray;
-	margin: 15px 0 5px 0;
-}
+	.switches{
+		position: relative;
+		.checkbox {
+			display: -webkit-box;
+			-webkit-box-orient: horizontal;
+			-webkit-box-pack:justify;
+			-webkit-box-sizing: border-box;
+			-webkit-tap-highlight-color: transparent;
+			width: 141px;
+			overflow: hidden;
+			border-radius: 8px;
+			-moz-border-radius: 8px;
+			-webkit-border-radius: 8px;
+			text-align: center;
+			line-height: 28px;
+			cursor: pointer;
+			-webkit-user-select: none;
+		}
 
-.storage-usage-info .percentage-bar{
-	position: relative;
-	height: @cache-usage-bar-height;
-}
+		.checkbox > input[type="checkbox"] {
+			display: none;
+		}
+		.checkbox .thumb {
+			-webkit-border-radius: 7px;
+			position: relative;
+			z-index: 3;
+			border: solid 1px #919191;
+			-webkit-transition: all 0.125s  ease-in-out;
+			-webkit-transform: translate3d(0px,0%,0%);
+		}
+		.checkbox .thumb span {
+			display: block;
+			-webkit-box-sizing: border-box;
+			height: 25px;
+			width: 38px;
+			border-top: solid 1px #efefef;
+			-webkit-border-radius: 6px;
+			background-image: -webkit-gradient(linear, left top, left bottom, from(#cecece), to(#fbfbfb));
+			border-top: solid 1px #efefef;
+			position:relative;
+		}
+		.checkbox .on {
+			color: #fff;
+			background-image:
+			-webkit-gradient(linear, left top, left bottom, from(#295ab2), to(#76adfc));
+			background-repeat: no-repeat;
+			width: 54px;
+			padding-right: 4px;
+			border: solid 1px #093889;
+			-webkit-border-top-left-radius: 6px;
+			-webkit-border-bottom-left-radius: 6px;
+			margin-right: -6px;
+			height: 25px;
+			-webkit-transition: all 0.125s  ease-in-out;
+			position: relative;
+			-webkit-transform: translate3d(0px,0%,0%);
+		}
+		.checkbox .off {
+			color: #666;
+			background-image: -webkit-gradient(linear, left top, left bottom, from(#b5b5b5), color-stop(0.50, #fff));
+			background-repeat: no-repeat;
+			width: 20px;
+			padding-left: 4px;
+			border: solid 1px #a1a1a1;
+			-webkit-border-top-right-radius: 6px;
+			-webkit-border-bottom-right-radius: 6px;
+			margin-left: -6px;
+			height: 25px;
+			-webkit-transition: all 0.125s  ease-in-out;
+			position: relative;
+			-webkit-transform: translate3d(-54px,0%,0%);
+		}
 
-.storage-usage-info .percentage-bar div{
-	position: absolute;
-	top: 0px;
-	left: 0px;
-	right: 0px;
-	height: @cache-usage-bar-height;
-	.corner-radius (20px);
+	}
 }
-
-.storage-usage-info .percentage-bar .total-usage{
-	.css3-progress-bar-gray;
-	background-size: 100% 100%;
-	background-repeat: no-repeat;
-	.css3-shadow (1px 1px 5px gray)
-}
-
-.storage-usage-info .percentage-bar .current-usage{
-	max-width: @site-main-content-width;
-	.css3-progress-bar-skyblue;
-	background-size: 50% 100%;
-	background-repeat: no-repeat;
-}
-
 
 .cache-usage-bar{
 	position: relative;
@@ -542,7 +557,7 @@ tr{
 	div{
 		float: left;
 		margin: 0 25px;
-		width: @site-main-content-width / 4;
+		width: @site-main-content-width / 4.5;
 	}
 	img{
 		float: left;
@@ -550,6 +565,12 @@ tr{
 	}
 	p{
 		margin: 0;
+	}
+	.upgrade {
+		background-color: red;
+		width: 40px;
+		height: 40px;
+		word-wrap: break-word;
 	}
 }
 
