@@ -483,12 +483,13 @@ class SwiftAccountMgr:
 
 	def list_user(self, account):
 		pass
-	
+
+	@util.timeout(300)	
 	def __get_account_usage(self, proxyIp, account, name):
 		logger = util.getLogger(name="__get_account_user")
 
 		url = "https://%s:8080/auth/v1.0"%proxyIp
-		#how to get password
+		password = self.get_user_password(account, name).msg
 		cmd = "swift -A %s -U %s:%s -K %s stat"%(url, account, name, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
@@ -511,6 +512,7 @@ class SwiftAccountMgr:
 	def get_account_usage(self, account, name, retry=3):
 		'''
 		get account usage from the backend swift
+		
     		:param account: account of the user
     		:param name: name of the user
     		:param password: password of the user
@@ -578,6 +580,70 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		'''
 
+	def get_user_password(self, account, user, retry=3):
+		'''
+		Return password of user.
+
+		@type  account: string
+		@param account: the account name of the given user
+		@type  user: string
+		@param user: the user to be checked
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(result, val, msg). If the user
+			is admin, then Bool.result == True, Bool.val == True,
+			and Bool.msg == "". If the user is not admin, then
+			Bool.result == False, Bool.val == True, and Bool.msg == "".
+			Otherwise, Bool.result == False, Bool.val == False, and
+			Bool.msg records the error message.
+			
+		'''
+		logger = util.getLogger(name="get_user_password")
+
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_detail = {}
+		user_password = ""
+		password = ""
+		val = False
+		msg = ""
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_user_detail, account=account, user=user)
+
+		if val == False:
+			return Bool(val, msg)
+
+		try:
+			user_detail = json.loads(msg)
+			val = True
+			msg = ""
+
+		except Exception as e:
+			msg = "Failed to load the json string: %s" % str(e)
+			logger.error(msg)
+			val = False
+			return Bool(val, msg)
+		
+		user_password = user_detail["auth"]
+		
+		if user_password is None:
+			msg = "Failed to get password of user %s:%s"%(account, user)
+		else:
+			password = user_password.split(":")
+			if password != -1:
+				msg = password[-1]
+				
+		return Bool(val, msg)
+		
 	def is_admin(self, account, user, retry=3):
 		'''
 		Return whether the given user is admin.
@@ -877,4 +943,4 @@ if __name__ == '__main__':
 	#print SA.delete_user("test", "tester28").msg
 	#print SA.disable_user("test", "tester28").msg
 	#print SA.enable_user("test", "tester28").msg
-	
+	print SA.get_account_usage("system", "root").msg
