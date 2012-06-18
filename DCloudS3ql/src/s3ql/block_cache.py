@@ -263,6 +263,7 @@ class BlockCache(object):
         self.preload_cache = False
         self.do_upload = False
         self.forced_upload = False
+        self.snapshot_upload = False #New upload switch for snapshotting (need to flush first before snapshotting)
         #Jiahong: Adding a mechanism to monitor alive upload threads
         self.last_checked = time.time()
         self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed

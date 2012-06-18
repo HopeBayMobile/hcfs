@@ -648,10 +648,10 @@ class CommitThread(Thread):
         while not self.stop_event.is_set():
             did_sth = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
-            if self.block_cache.do_upload or self.block_cache.forced_upload:
+            if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
                 for el in self.block_cache.entries.values_rev():
-                    if not (self.block_cache.do_upload or self.block_cache.forced_upload):
+                    if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
                         break;
                     if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
                         continue

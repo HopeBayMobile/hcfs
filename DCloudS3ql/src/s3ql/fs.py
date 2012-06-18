@@ -365,6 +365,7 @@ class Operations(llfuse.Operations):
 
         #Jiahong: A monitoring code here to probe for clean cache and raise EAGAIN error if contain dirty cache
         if self.cache.dirty_entries > 0:
+            self.cache.snapshot_upload = True #Start flushing to cloud
             raise FUSEError(errno.EAGAIN)
 
         # Copy target attributes
@@ -484,6 +485,8 @@ class Operations(llfuse.Operations):
                 fh.write('total size: %d\n' % snapshot_total_size)
         except:
             log.warning('Unable to write snapshot statistics to log. Skipping logging')
+
+        self.cache.snapshot_upload = False
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
@@ -855,7 +858,7 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = max(self.cache.dirty_entries,0)
         cache_maxsize = max(self.cache.max_size,0)
         cache_maxentries = max(self.cache.max_entries,0)
-        if (self.cache.do_upload or self.cache.forced_upload) and self.cache.dirty_size>0:
+        if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
             cache_uploading = 0
