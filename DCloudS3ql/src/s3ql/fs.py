@@ -378,7 +378,9 @@ class Operations(llfuse.Operations):
         for attr in ('atime', 'ctime', 'mtime', 'mode', 'uid', 'gid'):
             setattr(target_inode, attr, getattr(src_inode, attr))
 
-#Jiahong: TODO: record statistics of this snapshotting (number of files, size)
+        #Jiahong: record statistics of this snapshotting (number of files, size)
+        snapshot_total_files = 0
+        snapshot_total_size = 0
 
         # We first replicate into a dummy inode, so that we
         # need to invalidate only once.
@@ -409,6 +411,10 @@ class Operations(llfuse.Operations):
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
+
+                    #Jiahong: updating statistics
+                    snapshot_total_files = snapshot_total_files + 1
+                    snapshot_total_size = snapshot_total_size + inode.size
 
                     id_new = inode_new.id
 
@@ -470,6 +476,14 @@ class Operations(llfuse.Operations):
                         (target_inode.id, tmp.id))
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
+
+        #write statistics to /root/.s3ql
+        try:
+            with open('/root/.s3ql/snapshot.log','w') as fh:
+                fh.write('total files: %d\n' % snapshot_total_files)
+                fh.write('total size: %d\n' % snapshot_total_size)
+        except:
+            log.warning('Unable to write snapshot statistics to log. Skipping logging')
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
