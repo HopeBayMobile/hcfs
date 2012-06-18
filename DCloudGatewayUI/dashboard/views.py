@@ -36,7 +36,7 @@ def gateway_status():
 def index(request):
     data = gateway_status()
     cache_usage = data['gateway_cache_usage']
-    maxcache = cache_usage["max_cache_size"]
+    maxcache = cache_usage["max_cache_size"] or 1
     context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
     context.update(data)
@@ -315,3 +315,7 @@ def status(request):
 def cache_usage(request):
     data = gateway_status()
     return HttpResponse(json.dumps(data['gateway_cache_usage']))
+
+@login_required
+def config(request):
+    return render(request, 'dashboard/config.html')
