@@ -5,6 +5,7 @@ from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 from gateway import api
+from gateway import api_restore_conf
 import json
 
 
@@ -317,5 +318,18 @@ def cache_usage(request):
     return HttpResponse(json.dumps(data['gateway_cache_usage']))
 
 @login_required
-def config(request):
-    return render(request, 'dashboard/config.html')
+def config(request, action=None):
+    if request.method == 'POST':
+        info = '{"result":false}'
+        if action == 'restore':
+            info = api_restore_conf.restore_gateway_configuration()
+        elif action == 'save':
+            info = api_restore_conf.save_gateway_configuration()
+        result = json.loads(info)
+        return HttpResponse(result)
+    
+    info = api_restore_conf.get_configuration_backup_info()
+    backup_info = json.loads(info)
+    backup_time = backup_info['backup_time']
+    
+    return render(request, 'dashboard/config.html', {'backup_time': backup_time})
