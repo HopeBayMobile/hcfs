@@ -422,11 +422,11 @@ class SwiftAccountMgr:
                 if po.returncode !=0:
 			msg = "Failed to change the password of %s: %s" % (user, stderrData)
                         logger.error(msg)
-                        val =False
+                        val = False
                 else:
                         msg = stdoutData
 			logger.info(msg)
-                        val =True
+                        val = True
 
                 return Bool(val, msg)
 
@@ -997,6 +997,193 @@ class SwiftAccountMgr:
                                 result = True
 
 		return Bool(result, val, msg)
+
+	@util.timeout(300)
+	def __get_read_acl(self, proxyIp, account, container, admin_user, admin_password):
+		logger = util.getLogger(name="__get_read_acl")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to get the read acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s stat %s"%(url, account, admin_user, admin_password, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0:
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+
+		lines = stdoutData.split("\n")
+
+		for line in lines:
+			if "Read" in line:
+				msg = line.split("ACL: ")[1]
+				logger.info(msg)
+				val = True
+
+		if val == False:
+			msg = msg + " " + stderrData
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_write_acl(self, proxyIp, account, container, admin_user, admin_password):
+		logger = util.getLogger(name="__get_write_acl")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to get the write acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s stat %s"%(url, account, admin_user, admin_password, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0:
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+
+		lines = stdoutData.split("\n")
+
+		for line in lines:
+			if "Write" in line:
+				msg = line.split("ACL: ")[1]
+				logger.info(msg)
+				val = True
+
+		if val == False:
+			msg = msg + " " + stderrData
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __set_read_acl(self, proxyIp, account, container, user, admin_user, admin_password, read_acl):
+		logger = util.getLogger(name="__set_read_acl")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to set the read acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s post -r \'%s\' %s"%(url, account, admin_user,\
+		admin_password, read_acl, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0 or stderrData != "":
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			logger.info(msg)
+			val = True
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __set_write_acl(self, proxyIp, account, container, user, admin_user, admin_password, write_acl):
+		logger = util.getLogger(name="__set_write_acl")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to set the write acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s post -w \'%s\' %s" % (url, account, admin_user,\
+		admin_password, write_acl, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0 or stderrData != "":
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			logger.info(msg)
+			val = True
+
+                return Bool(val, msg)
+
+	def assign_read_acl(self, account, container, user, admin_user, retry=3):
+		'''
+		Assign the user to the read acl of the container.
+
+		@type  account: string
+		@param account: the account of the user and admin_user
+		@type  container: string
+		@param container: the container to assign the read acl
+		@type  user: string
+		@param user: the user to add into the read acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the read acl is successfully
+			assigned, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="assign_read_acl")
+
+		#TODO: Check the existence of container
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		ori_read_acl = ""
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_read_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		else:
+			ori_read_acl = msg
+			ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_read_acl, account=account, container=container, user=user,\
+		admin_user=admin_user, admin_password=admin_password, read_acl=ori_read_acl)
+
+		return Bool(val, msg)
+
+	def assign_write_acl(self, account, container, user, admin_user, retry=3):
+		pass
+
+	def remove_read_acl(self, account, container, user, admin_user, retry=3):
+		pass
+
+	def remove_write_acl(self, account, container, user, admin_user, retry=3):
+		pass
 
 
 if __name__ == '__main__':
