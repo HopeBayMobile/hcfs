@@ -39,18 +39,19 @@ LOG_PARSER = {
              #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
              #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
              #[INFO from GatewayAPI on 2012-05-07 18:37:52,604] get_smb_user_list
-             "gateway" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\s+(?P<message>.+)$"),
+             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
              }
 
 # if a keywork match a msg, the msg is belong to the class
 # key = level, val = keyword array
 KEYWORD_FILTER = {
-                  "error_log" : ["error", "exception"], # 0
-                  "warning_log" : ["warning"], # 1
-                  "info_log" : ["nfs", "cifs" , "."], #2
+                  "error_log" : ["[0]"], #["error", "exception"], # 0
+                  "warning_log" : ["[1]"], #["warning"], # 1
+                  "info_log" : ["[2]"], #["nfs", "cifs" , "."], #2
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
+LOG_LEVEL_PREFIX_LEN = 4 # len("[0] ") 
 
 LOG_LEVEL = {
             0 : ["error_log", "warning_log", "info_log"],
@@ -1838,7 +1839,7 @@ def parse_log (type, log_cnt):
     #print msg
     log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
     log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
-    log_entry["msg"] = msg
+    log_entry["msg"] = msg[LOG_LEVEL_PREFIX_LEN:]
     return log_entry
 
 ##########################
@@ -1879,6 +1880,7 @@ def read_logs(logfiles_dict, offset, num_lines):
                 nums = num_lines
 
             for log in log_buf[ offset : offset + nums]:
+                print log
                 log_entry = parse_log(type, log)
                 if not log_entry == None: #ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
@@ -2190,5 +2192,8 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
     #print build_gateway("1234567")
     #print apply_user_enc_key("123456", "1234567")
-    _createS3qlConf("172.16.228.53:8080")
+    
+    #_createS3qlConf("172.16.228.53:8080")
+    data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    print data
     pass

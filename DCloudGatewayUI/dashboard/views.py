@@ -7,6 +7,7 @@ from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 from gateway import api
 from gateway import api_restore_conf
+from gateway import api_remote_upgrade
 import json
 
 
@@ -42,6 +43,13 @@ def index(request):
     context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
     context.update(data)
+    try:
+        version = {"current_version": json.loads(api_remote_upgrade.get_gateway_version()).get("version"),
+                   "available_version": json.loads(api_remote_upgrade.get_available_upgrade()).get("version")}
+    except:
+        version = {"current_version": "1.0",
+                   "available_version": "1.1"}
+    context.update(version)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -292,6 +300,16 @@ def http_proxy(request, action=None):
     if request.method == 'POST':
         result = json.loads(api.set_http_proxy(action))
         return HttpResponse(result)
+
+
+@login_required
+@require_POST
+def system_upgrade(request):
+    try:
+        api_remote_upgrade.upgrade_gateway()
+        return HttpResponse("Upgrade Success.")
+    except:
+        return HttpResponse("Upgrade Failed.")
 
 
 @login_required
