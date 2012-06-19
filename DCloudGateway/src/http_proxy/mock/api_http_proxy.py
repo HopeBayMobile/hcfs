@@ -5,6 +5,7 @@
 # Function: API function for controlling HTTP proxy 
 
 
+import json
 import os
 
 def set_http_proxy( setting ):
