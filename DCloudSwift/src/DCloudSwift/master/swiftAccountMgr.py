@@ -207,8 +207,8 @@ class SwiftAccountMgr:
 		'''
 		delte user from the database and backend swift
     	
-    	:param account: account of the user
-    	:param name: name of the user
+    		:param account: account of the user
+    		:param name: name of the user
 		:param retry: retry how many times when the operation failed
 		:returns: return a Bool object. If the user is successfully deleted from  both the database and backend swift
                           then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
@@ -576,9 +576,9 @@ class SwiftAccountMgr:
 		@param account: the account name of the given user
 		@type user: string
 		@param user: the user to be checked
-    	@type  retry: integer
+    		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
-    	@return: a named tuple Bool(val, msg). If get the account usage
+	    	@return: a named tuple Bool(val, msg). If get the account usage
 			successfully, then Bool.val == True, and Bool.msg == "". 
 			Otherwise, Bool.val == False, and Bool.msg records the error message. 
 
@@ -991,15 +991,15 @@ class SwiftAccountMgr:
                 user_info = {}
                 val = False
                 msg = ""
-		Bool = collections.namedtuple("Bool", "result val msg")
+		Bool = collections.namedtuple("Bool", "val msg")
 
                 if proxy_ip_list is None or len(proxy_ip_list) ==0:
                         msg = "No proxy node is found"
-                        return Bool(result, val, msg)
+                        return Bool(val, msg)
 
                 if retry < 1:
                         msg = "Argument retry has to >= 1"
-                        return Bool(result, val, msg)
+                        return Bool(val, msg)
 
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
