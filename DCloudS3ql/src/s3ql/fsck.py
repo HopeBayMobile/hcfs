@@ -1275,6 +1275,13 @@ def main(args=None):
 
     fsck = Fsck(cachepath + '-cache', bucket, param, db)
     fsck.check()
+    #Jiahong: If still have errors, run additional fsck.check (up to four times)
+    additional_checks = 0
+    while fsck.found_errors and (additional_checks < 4):
+        additional_checks = additional_checks + 1
+        fsck = Fsck(cachepath + '-cache', bucket, param, db)
+        fsck.check()
+
     param['max_inode'] = db.get_val('SELECT MAX(id) FROM inodes')
 
     if fsck.uncorrectable_errors:

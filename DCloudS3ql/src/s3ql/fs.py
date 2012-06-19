@@ -365,6 +365,7 @@ class Operations(llfuse.Operations):
 
         #Jiahong: A monitoring code here to probe for clean cache and raise EAGAIN error if contain dirty cache
         if self.cache.dirty_entries > 0:
+            self.cache.snapshot_upload = True #Start flushing to cloud
             raise FUSEError(errno.EAGAIN)
 
         # Copy target attributes
@@ -378,7 +379,9 @@ class Operations(llfuse.Operations):
         for attr in ('atime', 'ctime', 'mtime', 'mode', 'uid', 'gid'):
             setattr(target_inode, attr, getattr(src_inode, attr))
 
-#Jiahong: TODO: record statistics of this snapshotting (number of files, size)
+        #Jiahong: record statistics of this snapshotting (number of files, size)
+        snapshot_total_files = 0
+        snapshot_total_size = 0
 
         # We first replicate into a dummy inode, so that we
         # need to invalidate only once.
@@ -409,6 +412,10 @@ class Operations(llfuse.Operations):
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
+
+                    #Jiahong: updating statistics
+                    snapshot_total_files = snapshot_total_files + 1
+                    snapshot_total_size = snapshot_total_size + inode.size
 
                     id_new = inode_new.id
 
@@ -471,7 +478,15 @@ class Operations(llfuse.Operations):
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
 
-#Jiahong: TODO: In API, upload the metadata to cloud after snapshotting is finished
+        #write statistics to /root/.s3ql
+        try:
+            with open('/root/.s3ql/snapshot.log','w') as fh:
+                fh.write('total files: %d\n' % snapshot_total_files)
+                fh.write('total size: %d\n' % snapshot_total_size)
+        except:
+            log.warning('Unable to write snapshot statistics to log. Skipping logging')
+
+        self.cache.snapshot_upload = False
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
@@ -843,7 +858,7 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = max(self.cache.dirty_entries,0)
         cache_maxsize = max(self.cache.max_size,0)
         cache_maxentries = max(self.cache.max_entries,0)
-        if (self.cache.do_upload or self.cache.forced_upload) and self.cache.dirty_size>0:
+        if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
             cache_uploading = 0

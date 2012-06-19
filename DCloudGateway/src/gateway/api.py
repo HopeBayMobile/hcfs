@@ -28,15 +28,18 @@ RUN_CMD_TIMEOUT = 15
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
 
 LOGFILES = {
-            "syslog" : "/var/log/syslog",
-            "mount" : "/root/.s3ql/mount.log",
-            "fsck" : "/root/.s3ql/fsck.log"
+            #"syslog" : "/var/log/syslog",
+            #"mount" : "/root/.s3ql/mount.log",
+            #"fsck" : "/root/.s3ql/fsck.log",
+            "gateway" : "/var/log/delta/Gateway.log"
             }
 
 LOG_PARSER = {
-             "syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
-             "mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             "fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
+             #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             #[INFO from GatewayAPI on 2012-05-07 18:37:52,604] get_smb_user_list
+             "gateway" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\s+(?P<message>.+)$"),
              }
 
 # if a keywork match a msg, the msg is belong to the class
@@ -69,21 +72,27 @@ MONITOR_IFACE = "eth1"
 ################################################################################
 
 class BuildGWError(Exception):
+    log.info("[0] Gateway building error")
     pass
 
 class EncKeyError(Exception):
+    log.info("[0] Setting Gateway Encryption Key error")
     pass
 
 class MountError(Exception):
+    log.info("[0] Gateway mount error")
     pass
 
 class TestStorageError(Exception):
+    log.info("[0] Gateway testing error")
     pass
 
 class GatewayConfError(Exception):
+    log.info("[0] Gateway configurate error")
     pass
 
 class UmountError(Exception):
+    log.info("[0] Gateway unmount error")
     pass
 
 def getGatewayConfig():
@@ -184,8 +193,9 @@ def get_gateway_indicators():
     op_ok = True
     op_msg = "Gateway indocators read successfully."
 
-    return_val = {'result' : op_ok,
-                  'msg'    : op_msg,
+    return_val = {
+          'result' : op_ok,
+          'msg'    : op_msg,
           'data'   : {'network_ok' : op_network_ok,
           'system_check' : op_system_check,
           'flush_inprogress' : op_flush_inprogress,
@@ -247,10 +257,10 @@ def _check_network():
         else:
             log.info(output)
 
-        except IOError as e:
+    except IOError as e:
             op_msg = 'Unable to access /root/.s3ql/authinfo2.'
             log.error(str(e))
-        except Exception as e:
+    except Exception as e:
             op_msg = 'Unable to obtain storage url or login info.'
             log.error(str(e))
 
@@ -632,8 +642,7 @@ def _mkfs(storage_url, key):
 
 @common.timeout(600)
 def _umount():
-    log.info("_umount start")
-
+    log.info("[2] Gateway umounting")
     try:
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
@@ -644,7 +653,9 @@ def _umount():
             output = po.stdout.read()
             po.wait()
             if po.returncode !=0:
+                #log.info("[2] Fail to stop Samba")
                 raise UmountError(output)
+            #log.info("[2] Samba stopped")
 
             cmd = "sudo /etc/init.d/nmbd stop"
             po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -670,11 +681,12 @@ def _umount():
         raise UmountError(str(e))
     
     finally:
-        log.info("_umount end")
+        log.info("[2] Gateway umounted")
 
 @common.timeout(360)
 def _mount(storage_url):
-    log.info("_mount start")
+    #log.info("_mount start")
+    log.info("[2] Gateway mounting")
 
     try:
         config = getGatewayConfig()
@@ -747,16 +759,20 @@ def _mount(storage_url):
         op_msg = "Failed to mount filesystem for %s"%str(e)
         log.error(str(e))
         raise BuildGWError(op_msg)
+
+    log.info("[2] Gateway mounted")
     
 
 @common.timeout(360)
 def _restartServices():
-    log.info("_restartServices start")
+    log.info("[2] Gateway restarting")
+ 
+    #log.info("_restartServices start")
     try:
         config = getGatewayConfig()
     
         cmd = "sudo /etc/init.d/smbd restart"
-                    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
@@ -789,9 +805,11 @@ def _restartServices():
     finally:
         log.info("_restartServices start")
 
+    log.info("[2] Gateway restarted")
 
 def build_gateway(user_key):
-    log.info("build_gateway start")
+    log.info("[2] Gateway building")
+    #log.info("build_gateway start")
 
     op_ok = False
     op_msg = 'Failed to apply storage accounts for unexpetced errors.'
@@ -845,9 +863,11 @@ def build_gateway(user_key):
                       'data'   : {}}
 
         log.info("build_gateway end")
+        log.info("[2] Gateway builded")
         return json.dumps(return_val)
 
 def restart_nfs_service():
+    log.info("[2] NFS service restarting")
     log.info("restart_nfs_service start")
 
     return_val = {}
@@ -876,10 +896,12 @@ def restart_nfs_service():
         }
     
         log.info("restart_nfs_service end")
+        log.info("[2] NFS service restarted")
         return json.dumps(return_val)
 
 def restart_smb_service():
     log.info("restart_smb_service start")
+    log.info("[2] Samba service restarting")
 
     return_val = {}
     op_ok = False
@@ -911,11 +933,13 @@ def restart_smb_service():
             'data': {}
         }
     
+        log.info("[2] Samba service restarted")
         log.info("restart_smb_service end")
     return json.dumps(return_val)
 
 def reset_gateway():
     log.info("reset_gateway start")
+    log.info("[2] Gateway restarting")
 
     return_val = {}
     op_ok = True
@@ -927,11 +951,13 @@ def reset_gateway():
         time.sleep(10)
         os.system("sudo reboot")
     else:
+        log.info("[2] Gateway will restart after ten seconds")
         log.info("The gateway will restart after ten seconds.")
     return json.dumps(return_val)
 
 def shutdown_gateway():
     log.info("shutdown_gateway start")
+    log.info("[2] Gateway shutdowning")
     
     return_val = {}
     op_ok = True
@@ -943,6 +969,7 @@ def shutdown_gateway():
         time.sleep(10)
         os.system("sudo poweroff")
     else:
+        log.info("[2] Gateway will shutdown after ten seconds")
         log.info("The gateway will shutdown after ten seconds.")
     return json.dumps(return_val)
 
@@ -990,6 +1017,7 @@ def test_storage_account(storage_url, account, password):
 
 def get_network():
     log.info("get_network start")
+    log.info("[2] Gateway networking starting")
 
     info_path = "/etc/delta/network.info"
     return_val = {}
@@ -1035,6 +1063,7 @@ def get_network():
         }
     
         log.info("get_network end")
+        log.info("[2] Gateway networking started")
         return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -1127,7 +1156,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
             op_config.set('network', 'dns1', dns1)
     
             if dns2 != None:
-            op_config.set('network', 'dns2', dns2)
+                op_config.set('network', 'dns2', dns2)
     
         with open(info_path, "wb") as f:
             op_config.write(f)
@@ -1614,11 +1643,11 @@ def apply_scheduling_rules(schedule):        # by Yen
     fname = "gw_schedule.conf"
     try:
         with open(fpath+fname, "w") as fh:
-        fptr = csv.writer(fh)
-        header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
-        fptr.writerow(header)
-        for row in schedule:
-            fptr.writerow(row)
+            fptr = csv.writer(fh)
+            header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
+            fptr.writerow(header)
+            for row in schedule:
+                fptr.writerow(row)
     except:
         return_val = {
             'result': False,
@@ -1666,10 +1695,10 @@ def stop_upload_sync():        # by Yen
 
 def force_upload_sync(bw):        # by Yen
     if (bw<256):
-    return_val = {
-        'result': False,
-        'msg': "Uploading bandwidth has to be larger than 256KB/s.",
-        'data': {}
+        return_val = {
+            'result': False,
+            'msg': "Uploading bandwidth has to be larger than 256KB/s.",
+            'data': {}
     }
     return json.dumps(return_val)
 
