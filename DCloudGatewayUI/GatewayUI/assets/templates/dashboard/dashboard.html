@@ -1,20 +1,37 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
-<div class="storage-usage-info">
-	<h2>Storage space usage</h2>
-	<hr />
-	<section>
-		<h3>Cloud Data</h3>
-		<p>{{ cloud_storage_usage.cloud_data }} GB</p>
-	</section>
-	<section>
-		<h3>Cloud Data Dedup</h3>
-		<p>{{ cloud_storage_usage.cloud_data_dedup }} GB</p>
-	</section>
-	<section>
-		<h3>Cloud Data Dedup Compress</h3>
-		<p>{{ cloud_storage_usage.cloud_data_dedup_compress }} GB</p>
-	</section>
+
+
+<div class="notify-box-row-SW">
+</div>
+<div class="storage-indicator-and-switch">
+	<div class="indicators">
+	    <div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">HDD
+	    </div>
+	    <div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">NFS
+	    </div>
+	    <div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">SMB
+	    </div>
+	    <div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">Http Proxy
+	    </div>
+	</div>
+	<div class="switches">
+		<div class="iphone-toggle-buttons">
+            <ul>
+                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label>Http Proxy</li>
+            </ul>
+        </div>
+	</div>
+	<script type="text/javascript">
+		$("#checkbox-0").on("click", function(){
+			if($(this).is(":checked")){
+				$.post('/dashboard/http_proxy/on', function(a,b,c){
+					console.log(b)
+				})
+			}
+		})
+	</script>
+	<p style="clear:both;"></p>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
@@ -32,6 +49,9 @@
 			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
 			<p id="max_cache_size">Max cache: <span>{{gateway_cache_usage.max_cache_size}}</span>GB</p>
 			<p id="max_cache_entries">Max entries: <span>{{gateway_cache_usage.max_cache_entries}}</span></p>
+		</div>
+		<div class="upgrade">
+			Upgrade!
 		</div>
 	</div>
 	<div class="usage">
