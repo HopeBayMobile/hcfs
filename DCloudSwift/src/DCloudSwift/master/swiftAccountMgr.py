@@ -476,6 +476,9 @@ class SwiftAccountMgr:
 		pass
 
 	def delete_account(self, account):
+		'''
+		check user
+		'''
 		pass
 	
 	def list_account(self, account):
@@ -485,12 +488,12 @@ class SwiftAccountMgr:
 		pass
 
 	@util.timeout(300)	
-	def __get_account_usage(self, proxyIp, account, name):
+	def __get_account_usage(self, proxyIp, account, user):
 		logger = util.getLogger(name="__get_account_user")
 
 		url = "https://%s:8080/auth/v1.0"%proxyIp
-		password = self.get_user_password(account, name).msg
-		cmd = "swift -A %s -U %s:%s -K %s stat"%(url, account, name, password)
+		password = self.get_user_password(account, user).msg
+		cmd = "swift -A %s -U %s:%s -K %s stat"%(url, account, user, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
 				
@@ -509,16 +512,18 @@ class SwiftAccountMgr:
 		Bool = collections.namedtuple("Bool", "val msg")
                 return Bool(val, msg)
 
-	def get_account_usage(self, account, name, retry=3):
+	def get_account_usage(self, account, user, retry=3):
 		'''
 		get account usage from the backend swift
 		
-    		:param account: account of the user
-    		:param name: name of the user
-    		:param password: password of the user
-		:param retry: retry how many times when the operation failed
-		:returns: return a Bool object. If the user get account usage successfully from backend swift
-                          then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+		@type account: string 
+		@param account: the account name of the given user
+		@type user: string
+		@param user: the user to be checked
+    	@type return: integer 
+    	@param return: a named tuple Bool(val, msg). If get the account usage
+			successfully, then Bool.val == True, and Bool.msg == "". 
+			Otherwise, Bool.val == False, and Bool.msg records the error message. 
 
 		'''
 		logger = util.getLogger(name="get_account_usage")
@@ -526,6 +531,7 @@ class SwiftAccountMgr:
 		
 		msg = ""
 		val = False
+		user_detail = {}
 		Bool = collections.namedtuple("Bool", "val msg")
 
 		if proxy_ip_list is None or len(proxy_ip_list)==0:
@@ -537,9 +543,9 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_account_usage,
-                                                   account=account, name=name)
-
-                return Bool(val, msg)
+                                                   account=account, user=user)
+		
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __get_user_detail(self, proxyIp, account, user):
@@ -582,7 +588,7 @@ class SwiftAccountMgr:
 
 	def get_user_password(self, account, user, retry=3):
 		'''
-		Return password of user.
+		Return user password
 
 		@type  account: string
 		@param account: the account name of the given user
@@ -590,12 +596,9 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
-		@return: a named tuple Bool(result, val, msg). If the user
-			is admin, then Bool.result == True, Bool.val == True,
-			and Bool.msg == "". If the user is not admin, then
-			Bool.result == False, Bool.val == True, and Bool.msg == "".
-			Otherwise, Bool.result == False, Bool.val == False, and
-			Bool.msg records the error message.
+		@return: a named tuple Bool(val, msg). If get the user
+			successfully, then Bool.val == True, and Bool.msg == "". 
+			Otherwise, Bool.val == False, and Bool.msg records the error message.
 			
 		'''
 		logger = util.getLogger(name="get_user_password")
