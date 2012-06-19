@@ -65,12 +65,16 @@ class SwiftAccountMgr:
 	def __functionBroker(self, proxy_ip_list, retry, fn, **kwargs):
 		'''
 		Repeat at most retry times:
-		   1. Execute the private function fn with a randomly chosen proxy node and kwargs as input.
-		   2. Break if fn retrun True
-    		:param proxy_ip_list: ip list of proxy nodes
-    		:param retry: retry how many times when fn return False
-    		:param fn: private function to call
-    		:param kwargs: keyword arguments to fn
+		1. Execute the private function fn with a randomly chosen proxy node and kwargs as input.
+		2. Break if fn retrun True
+		 
+		@type  proxy_ip_list: string  
+    	@param proxy_ip_list: ip list of proxy nodes
+    	@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+    	@type  fn: string
+    	@param fn: private function to call
+    	@param kwargs: keyword arguments to fn
 		'''
 		val = False
 		msg =""
@@ -94,7 +98,7 @@ class SwiftAccountMgr:
 		return (val, msg)
 
 	@util.timeout(300)
-	def __add_user(self, proxyIp, account, name, password, admin=True, reseller=False):
+	def __add_user(self, proxyIp, account, user, password, admin=True, reseller=False):
 		logger = util.getLogger(name="__add_user")
 		self.__class__.__add_user.__name__
 		
@@ -106,7 +110,7 @@ class SwiftAccountMgr:
 		reseller_opt = "-r " if reseller  else ""
 		optStr = admin_opt+reseller_opt
 
-		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
+		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
 
@@ -122,18 +126,27 @@ class SwiftAccountMgr:
 		Bool = collections.namedtuple("Bool", "val msg")
                 return Bool(val, msg)
 
-	def add_user(self, account, name, password, admin=True, reseller=False, retry=3):
+	def add_user(self, account, user, password, admin=True, reseller=False, retry=3):
 		'''
 		add user to the database and backend swift
-    		:param account: account of the user
-    		:param name: name of the user
-    		:param admin: a boolean variable indicates if the user is a admin
-    		:param reseller: a boolean variable indicates if the user is reseller
-		:param retry: retry how many times when failures
-		:returns: return a Bool object. If the user is successfully added to both the database and backend swift
-                          then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
 
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@type  password: string
+		@param password: the password to be set
+		@type  admin: boolean
+		@param admin: admin or not
+		@type  reseller: boolean
+		@param reseller: reseller or not
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). If the user is successfully added to both the database and backend swift
+			then Bool.val == True and msg records the standard output. Otherwise, val == False and msg records the error message.
+		
 		'''
+		
 		logger = util.getLogger(name="add_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -150,10 +163,10 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		try:
-			row = self.__accountDb.add_user(account=account, name=name)
+			row = self.__accountDb.add_user(account=account, name=user)
 
 			if row is None:
-				msg = "User %s:%s alread exists"%(account, name)
+				msg = "User %s:%s alread exists"%(account, user)
 				return Bool(val, msg)
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
@@ -161,26 +174,26 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
-                                                   account=account, name=name, password=password,
+                                                   account=account, user=user, password=password,
 						   admin=admin, reseller=reseller)
 
 		try:
 			if val == False:
-				self.__accountDb.delete_user(account=account, name=name)
+				self.__accountDb.delete_user(account=account, name=user)
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to clean user %s:%s from database for %s"%(account, name, str(e))
+			errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
 			logger.error(errMsg)
 			raise InconsistentDatabaseError(errMsg)
 
                 return Bool(val, msg)
 
 	@util.timeout(300)
-	def __delete_user(self, proxyIp, account, name):
+	def __delete_user(self, proxyIp, account, user):
 		logger = util.getLogger(name="__delete_user")
 
 		url = "https://%s:8080/auth/"%proxyIp
-		cmd = "swauth-delete-user -K %s -A %s %s %s"%(self.__password, url, account, name)
+		cmd = "swauth-delete-user -K %s -A %s %s %s"%(self.__password, url, account, user)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
 				
@@ -192,7 +205,7 @@ class SwiftAccountMgr:
 			msg = stderrData
 			val =False
 		elif '404' in stderrData:
-			msg = "user %s:%s does not exists"%(account, name)
+			msg = "user %s:%s does not exists"%(account, user)
 			logger.warn(msg)
 			val =True
 		else:
@@ -203,17 +216,21 @@ class SwiftAccountMgr:
 		Bool = collections.namedtuple("Bool", "val msg")
                 return Bool(val, msg)
 
-	def delete_user(self, account, name, retry=3):
+	def delete_user(self, account, user, retry=3):
 		'''
 		delte user from the database and backend swift
-    	
-    	:param account: account of the user
-    	:param name: name of the user
-		:param retry: retry how many times when the operation failed
-		:returns: return a Bool object. If the user is successfully deleted from  both the database and backend swift
-                          then Bool.val == True. Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
 
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). If the user is successfully deleted to both the database and backend swift
+			then Bool.val == True and msg records the standard output. Otherwise, val == False and msg records the error message.
+		
 		'''
+		
 		logger = util.getLogger(name="delete_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -230,104 +247,98 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_user,
-                                                   account=account, name=name)
+                                                   account=account, user=user)
 
 		try:
 			if val == True:
-				self.__accountDb.delete_user(account=account, name=name)
+				self.__accountDb.delete_user(account=account, name=user)
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to clean user %s:%s from database for %s"%(account, name, str(e))
+			errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
 			logger.error(errMsg)
 			raise InconsistentDatabaseError(errMsg)
 
                 return Bool(val, msg)
 
-	@util.timeout(300)
-	def __disable_user(self, proxyIp, account, name):
-		logger = util.getLogger(name="__disable_user")
-
-		url = "https://%s:8080/auth/"%proxyIp
-		randomPassword = str(uuid.uuid4())
-		cmd = "swauth-add-user -K %s -A %s %s %s %s"%(self.__password, url, account, name, randomPassword)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-				
-		msg = ""
-		val = False
-
-		if po.returncode !=0:
-			logger.error(stderrData)
-			msg = stderrData
-			val =False
-		else:
-			logger.info(stdoutData)
-			msg = stdoutData
-			val =True
-
-		Bool = collections.namedtuple("Bool", "val msg")
-                return Bool(val, msg)
-
-	def disable_user(self, account, name, retry=3):
+	def add_account(self, account, retry=3):
 		'''
-		Disabe the user from accessing the backend swift by changing
-                the user's password in the backend.
+		add account and create an default admin to the database and backend swift
 
-    		:param account: account of the user
-    		:param name: name of the user
-		:param retry: retry how many times when the operation failed
-		:returns: return a Bool object. If the user's backend password is successfully changed
-                          and the enabled field in the database is set to false then Bool.val == True. 
-			  Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
-
-		'''
-		logger = util.getLogger(name="disable_user")
-		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		@type  account: string
+		@param account: the name of the given account
+		@type  password: string
+		@param password: the password to be set
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). 
 		
-		Bool = collections.namedtuple("Bool", "val msg")
-		msg = ""
-		val = False
+		'''
+		
+#		logger = util.getLogger(name="add_account")
+#		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+#		
+#		msg = ""
+#		val = False
+#		Bool = collections.namedtuple("Bool", "val msg")
+#
+#		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+#			msg = "No proxy node is found"
+#			return Bool(val, msg)
+#
+#		if retry < 1:
+#			msg = "Argument retry has to >= 1"
+#			return Bool(val, msg)
+#
+#		try:
+#			row = self.__accountDb.add_user(account=account, name=user)
+#
+#			if row is None:
+#				msg = "User %s:%s alread exists"%(account, user)
+#				return Bool(val, msg)
+#
+#		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+#			msg = str(e)
+#			return Bool(val, msg)
+#		
+#		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
+#                                                   account=account, user=user, password=password,
+#						   admin=admin, reseller=reseller)
+#
+#		try:
+#			if val == False:
+#				self.__accountDb.delete_user(account=account, name=user)
+#
+#		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+#			errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
+#			logger.error(errMsg)
+#			raise InconsistentDatabaseError(errMsg)
+#
+#                return Bool(val, msg)
 
-		if proxy_ip_list is None or len(proxy_ip_list)==0:
-			msg = "No proxy node is found"
-			return Bool(val, msg)
-
-		if retry < 1:
-			msg = "Argument retry has to >= 1"
-			return Bool(val, msg)
-
-		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__disable_user,
-                                                   account=account, name=name)
-
-		try:
-			if val == True:
-				self.__accountDb.disable_user(account=account, name=name)
-
-		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=False for user %s:%s in database for %s"%(account, name, str(e))
-			logger.error(errMsg)
-			raise InconsistentDatabaseError(errMsg)
-
-                return Bool(val, msg)
+	def delete_account(self, account):
+		'''
+		check user
+		'''
+		pass
 
 	@util.timeout(300)
-	def __enable_user(self, proxyIp, account, name):
+	def __enable_user(self, proxyIp, account, user):
 		logger = util.getLogger(name="__enable_user")
 
 		url = "https://%s:8080/auth/"%proxyIp
 		msg = ""
 		val = False
 
-		password = self.__accountDb.get_password(account, name)
+		password = self.__accountDb.get_password(account, user)
 		if password is None:
-			msg = "user %s:%s does not exists"%(account,name)
+			msg = "user %s:%s does not exists"%(account,user)
 			return Bool(val, msg)
 		
-		admin_opt = "-a " if self.__accountDb.is_admin(account, name) else ""
-		reseller_opt = "-r " if self.__accountDb.is_reseller(account, name)  else ""
+		admin_opt = "-a " if self.__accountDb.is_admin(account, user) else ""
+		reseller_opt = "-r " if self.__accountDb.is_reseller(account, user)  else ""
 		optStr = admin_opt + reseller_opt
 
-		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, name, password)
+		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, password)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
 				
@@ -343,19 +354,21 @@ class SwiftAccountMgr:
 		Bool = collections.namedtuple("Bool", "val msg")
                 return Bool(val, msg)
 
-	def enable_user(self, account, name, retry=3):
+	def enable_user(self, account, user, retry=3):
 		'''
-		Enable the user to access the backend swift by re-adding it to the backend 
-                using original setting stored in database.
+		Enable the user to access the backend swift by re-adding it to the backend using original setting stored in database.
 
-    		:param account: account of the user
-    		:param name: name of the user
-		:param retry: retry how many times when the operation failed
-		:returns: return a Bool object. If the user is re-added to the backend using the original
-                          setting stored in the backend.
-			  Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
-
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). If the user is re-added to the backend using the original setting stored in the backend.
+			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+		
 		'''
+
 		logger = util.getLogger(name="enable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -372,17 +385,93 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__enable_user,
-                                                   account=account, name=name)
+                                                   account=account, user=user)
 		try:
 			if val == True:
-				self.__accountDb.enable_user(account=account, name=name)
+				self.__accountDb.enable_user(account=account, name=user)
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=True for user %s:%s in database for %s"%(account, name, str(e))
+			errMsg = "Failed to set enabled=True for user %s:%s in database for %s"%(account, user, str(e))
 			logger.error(errMsg)
 			raise InconsistentDatabaseError(errMsg)
 
                 return Bool(val, msg)
+
+	@util.timeout(300)
+	def __disable_user(self, proxyIp, account, user):
+		logger = util.getLogger(name="__disable_user")
+
+		url = "https://%s:8080/auth/"%proxyIp
+		randomPassword = str(uuid.uuid4())
+		cmd = "swauth-add-user -K %s -A %s %s %s %s"%(self.__password, url, account, user, randomPassword)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+				
+		msg = ""
+		val = False
+
+		if po.returncode !=0:
+			logger.error(stderrData)
+			msg = stderrData
+			val =False
+		else:
+			logger.info(stdoutData)
+			msg = stdoutData
+			val =True
+
+		Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
+	def disable_user(self, account, user, retry=3):
+		'''
+		Disabe the user from accessing the backend swift by changing the user's password in the backend.
+
+		@type  account: string
+		@param account: the name of the given account
+		@type  user: string
+		@param user: the name of the given user
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). If the user's backend password is successfully changed
+			and the enabled field in the database is set to false then Bool.val == True. 
+			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+		
+		'''
+
+		logger = util.getLogger(name="disable_user")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		
+		Bool = collections.namedtuple("Bool", "val msg")
+		msg = ""
+		val = False
+
+		if proxy_ip_list is None or len(proxy_ip_list)==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__disable_user,
+                                                   account=account, user=user)
+
+		try:
+			if val == True:
+				self.__accountDb.disable_user(account=account, name=user)
+
+		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+			errMsg = "Failed to set enabled=False for user %s:%s in database for %s"%(account, user, str(e))
+			logger.error(errMsg)
+			raise InconsistentDatabaseError(errMsg)
+
+                return Bool(val, msg)
+
+	def enable_account(self, account):
+		pass
+	
+	def disable_account(self, account):
+		pass
 
 	@util.timeout(300)
 	def __change_password(self, proxyIp, account, user, newPassword, admin=True, reseller=False):
@@ -514,20 +603,6 @@ class SwiftAccountMgr:
 
 		return Bool(val, msg)
 
-	def add_account(self, account):
-		'''
-		need to creat a default admin user
-		'''
-
-		pass
-
-	def delete_account(self, account):
-		'''
-		check user
-		'''
-		pass
-
-
 	@util.timeout(300)	
 	def __get_account_usage(self, proxyIp, account, user):
 		'''
@@ -572,9 +647,9 @@ class SwiftAccountMgr:
 		'''
 		get account usage from the backend swift
 		
-		@type account: string 
+		@type  account: string 
 		@param account: the account name of the given user
-		@type user: string
+		@type  user: string
 		@param user: the user to be checked
     	@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
@@ -825,12 +900,6 @@ class SwiftAccountMgr:
 		pass
 
 	def get_account_quota(self, account):
-		pass
-
-	def disable_account(self, account):
-		pass
-
-	def enable_account(self, account):
 		pass
 
 	@util.timeout(300)
@@ -1119,10 +1188,12 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
-	#print SA.add_user("test", "tester28", "testpass", True, True).msg
+	#print SA.add_user("rice", "rice01", "rice01", True, False).msg
+	print SA.add_user("rice", "rice01", "rice02", True, False).msg
+	print SA.add_user("rice", "rice01", "rice02", True, False).msg
 	#print SA.delete_user("test", "tester28").msg
 	#print SA.disable_user("test", "tester28").msg
 	#print SA.enable_user("test", "tester28").msg
 	#print SA.get_account_usage("system", "root").msg
 	print SA.list_account().msg
-	print SA.list_user("system").msg
+	print SA.list_user("rice").msg
