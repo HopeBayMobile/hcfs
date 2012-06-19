@@ -1,10 +1,13 @@
 from django.shortcuts import render, HttpResponse, redirect
 from django.contrib.auth.decorators import login_required
 from django import forms
+from django.views.decorators.http import require_POST
 from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 from gateway import api
+from gateway import api_restore_conf
+from gateway import api_remote_upgrade
 import json
 
 
@@ -40,6 +43,13 @@ def index(request):
     context = {"dirty_cache_percentage": cache_usage['dirty_cache_size'] * 100 / maxcache,
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
     context.update(data)
+    try:
+        version = {"current_version": json.loads(api_remote_upgrade.get_gateway_version()).get("version"),
+                   "available_version": json.loads(api_remote_upgrade.get_available_upgrade()).get("version")}
+    except:
+        version = {"current_version": "1.0",
+                   "available_version": "1.1"}
+    context.update(version)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -285,6 +295,24 @@ def syslog(request):
 
 
 @login_required
+@require_POST
+def http_proxy(request, action=None):
+    if request.method == 'POST':
+        result = json.loads(api.set_http_proxy(action))
+        return HttpResponse(result)
+
+
+@login_required
+@require_POST
+def system_upgrade(request):
+    try:
+        api_remote_upgrade.upgrade_gateway()
+        return HttpResponse("Upgrade Success.")
+    except:
+        return HttpResponse("Upgrade Failed.")
+
+
+@login_required
 def power(request, action=None):
     if request.method == 'POST':
         if action == 'poweroff':
@@ -317,5 +345,18 @@ def cache_usage(request):
     return HttpResponse(json.dumps(data['gateway_cache_usage']))
 
 @login_required
-def config(request):
-    return render(request, 'dashboard/config.html')
+def config(request, action=None):
+    if request.method == 'POST':
+        info = '{"result":false}'
+        if action == 'restore':
+            info = api_restore_conf.restore_gateway_configuration()
+        elif action == 'save':
+            info = api_restore_conf.save_gateway_configuration()
+        result = json.loads(info)
+        return HttpResponse(result)
+    
+    info = api_restore_conf.get_configuration_backup_info()
+    backup_info = json.loads(info)
+    backup_time = backup_info['backup_time']
+    
+    return render(request, 'dashboard/config.html', {'backup_time': backup_time})
