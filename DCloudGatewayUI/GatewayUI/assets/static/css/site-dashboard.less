@@ -231,13 +231,6 @@ tr{
     border-right: solid #ccc @site-left-main-seperator;
 }
 
-.left-bg-tail{
-	height: 80px;
-	width: @site-left-width;
-	background-repeat: repeat-x;
-	background-image: url("/@{dashboard-image-path}/tab_bg.png");
-}
-
 .main-row{
     float: right;
     height: 100%;
@@ -248,7 +241,7 @@ tr{
 	float:left;
     width: @site-left-width;
     height: 100%;
-    overflow-y: hidden;
+    overflow-y: auto;
 }
 
 .tab-content{
@@ -281,6 +274,11 @@ tr{
 		}
 		img{
 			width: 30px;
+		}
+		&:last-child{
+			-webkit-box-shadow: 0px 10px 10px 0px #787878;
+			-moz-box-shadow: 0px 10px 10px 0px #787878;
+			box-shadow: 0px 10px 10px 0px #787878;
 		}
 	}
 	a{
