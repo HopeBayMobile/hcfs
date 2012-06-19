@@ -18,15 +18,15 @@
 	<div class="switches">
 		<div class="iphone-toggle-buttons">
             <ul>
-                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label>Http Proxy</li>
+                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label><span style="font-size: 18px; font-style: bold;">Http Proxy</span></li>
             </ul>
         </div>
 	</div>
 	<script type="text/javascript">
 		$("#checkbox-0").on("click", function(){
 			if($(this).is(":checked")){
-				$.post('/dashboard/http_proxy/on', function(a,b,c){
-					console.log(b)
+				$.post('/dashboard/http_proxy/on', function(ctnt, status, opts){
+					console.log(ctnt)
 				})
 			}
 		})
@@ -50,8 +50,18 @@
 			<p id="max_cache_size">Max cache: <span>{{gateway_cache_usage.max_cache_size}}</span>GB</p>
 			<p id="max_cache_entries">Max entries: <span>{{gateway_cache_usage.max_cache_entries}}</span></p>
 		</div>
-		<div class="upgrade">
-			Upgrade!
+		<div class="version">
+			{{ current_version }}
+			{% if available_version %}
+			<div class="upgrade">{{ available_version }}</div>
+			{% endif %}
+			<script type="text/javascript">
+				$(".version .upgrade").on("click", function(){
+					$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
+						console.log(ctnt)
+					})
+				});
+			</script>
 		</div>
 	</div>
 	<div class="usage">
