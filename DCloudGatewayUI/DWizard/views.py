@@ -76,11 +76,11 @@ class DeltaWizard(SessionWizardView):
             for step in steps:
                 step.task_id = ''
                 step.save()
-            
+
             work.current_form = ''
             work.save()
             return redirect('.')
-        
+
         is_ajax = request.is_ajax()
         #first init
         if work.current_form == '':
@@ -92,7 +92,7 @@ class DeltaWizard(SessionWizardView):
         #check if current step have task
         step_index = self.get_step_index()
         task = self.wizard_step[step_index][1]
-        
+
         if task:
             try:
                 step = Step.objects.get(form=self.steps.current)
@@ -104,7 +104,7 @@ class DeltaWizard(SessionWizardView):
             if result.state == states.SUCCESS:
                 if self.steps.next:
                     if 'next' in request.GET:
-                        return render_to_response(self.done_template, {'params':{'is_ajax':is_ajax}})
+                        return render_to_response(self.done_template, {'params': {'is_ajax': is_ajax}})
                     else:
                         self.storage.current_step = self.steps.next
                         return self.render(self.get_form(), is_ajax=is_ajax)
@@ -112,7 +112,7 @@ class DeltaWizard(SessionWizardView):
                     meta = result.info
                     return render_to_response(self.finish_template, {'meta': meta,
                                                                      'exit': self.exit_url,
-                                                                     'params':{'is_ajax':is_ajax}
+                                                                     'params': {'is_ajax': is_ajax}
                                                                      })
             elif result.state == states.FAILURE:
                 meta = result.info.args[0]
@@ -186,7 +186,7 @@ class DeltaWizard(SessionWizardView):
             form.initial = initial_data
         except ObjectDoesNotExist:
             pass
-        
+
         return form
 
     def process_step(self, form):
@@ -211,7 +211,7 @@ class DeltaWizard(SessionWizardView):
             step.data = json.dumps(cleaned_data)
             step.task_id = result.task_id
             step.save()
-            
+
         data = self.get_form_step_data(form)
         return data
 
