@@ -1,8 +1,19 @@
 {% extends "dashboard/base.html" %}
 {% block tab_content %}
+	<div style="font-size:20px; text-align:center; padding-top:100px;">
+	{% if backup_time%}
+	Last backup time: {{backup_time}}
+	{% else %}
+	You haven't save any configuration.
+	{% endif %}
+	</div>
     <div class="action-btn">
-		<div class="btn btn-danger restore" action="restore">Restore</div>
-		<div class="btn btn-warning save" action="save">Save</div>
+		<button class="btn btn-danger restore" action="restore"
+		{% if not backup_time%}
+		disabled="disabled"
+		{% endif %}
+		>Restore</button>
+		<button class="btn btn-warning save" action="save">Save</button>
 	</div>
 	<script>
 		$('.action-btn .btn').on('click', function(){
