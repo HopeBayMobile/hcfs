@@ -23,6 +23,8 @@ nfs_hosts_allow_file = "/etc/hosts.allow"
 default_user_id = "superuser"
 default_user_pwd = "superuser"
 
+snapshot_tag = "/root/.s3ql/.snapshotting"
+
 RUN_CMD_TIMEOUT = 15
 
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
@@ -94,6 +96,21 @@ class GatewayConfError(Exception):
 class UmountError(Exception):
     log.info("[0] Gateway unmount error")
     pass
+
+class SnapshotError(Exception):
+    log.info("[0] Error in taking snapshot")
+    pass
+
+def _check_snapshot_in_progress():
+    '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
+
+    try:
+        if os.path.exists(snapshot_tag):
+            return True
+        return False
+    except:
+        raise SnapshotError("Could not decide whether a snapshot is in progress.")
+
 
 def getGatewayConfig():
     try:
@@ -189,6 +206,7 @@ def get_gateway_indicators():
     op_NFS_srv = _check_nfs_service()
     op_SMB_srv = _check_smb_service()
     op_Proxy_srv = _check_http_proxy_service()
+    op_snapshot_in_progress = _check_snapshot_in_progress()
 
     op_ok = True
     op_msg = "Gateway indocators read successfully."
@@ -203,6 +221,7 @@ def get_gateway_indicators():
           'HDD_ok' : op_HDD_ok,
           'NFS_srv' : op_NFS_srv,
           'SMB_srv' : op_SMB_srv,
+          'snapshot_in_progress' : op_snapshot_in_progress,
           'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("get_gateway_indicators end")
@@ -2190,5 +2209,6 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 if __name__ == '__main__':
     #print build_gateway("1234567")
     #print apply_user_enc_key("123456", "1234567")
-    _createS3qlConf("172.16.228.53:8080")
+    #_createS3qlConf("172.16.228.53:8080")
+    print get_gateway_indicators()
     pass
