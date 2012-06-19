@@ -5,6 +5,7 @@
 # Function: API function for controlling HTTP proxy 
 
 import os
+import json
 
 def get_configuration_backup_info():
 	"""
@@ -13,7 +14,7 @@ def get_configuration_backup_info():
 	
 	# do something here ...
 	op_ok = True
-	op_data = "2012/06/31 15:31"
+	op_data = {'backup_time': "2012/06/31 15:31"}
 	op_code = "000"
 	op_msg = None
 

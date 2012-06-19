@@ -5,6 +5,7 @@
 # Function: API function for gateway remote upgrade
 
 import os
+import json
 
 def get_gateway_version():
 	"""
