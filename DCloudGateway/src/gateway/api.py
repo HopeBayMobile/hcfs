@@ -93,27 +93,21 @@ NUM_LOG_LINES = 20
 ################################################################################
 
 class BuildGWError(Exception):
-    #log.info("[0] Gateway building error")
     pass
 
 class EncKeyError(Exception):
-    #log.info("[0] Setting Gateway Encryption Key error")
     pass
 
 class MountError(Exception):
-    #log.info("[0] Gateway mount error")
     pass
 
 class TestStorageError(Exception):
-    #log.info("[0] Gateway testing error")
     pass
 
 class GatewayConfError(Exception):
-    #log.info("[0] Gateway configurate error")
     pass
 
 class UmountError(Exception):
-    #log.info("[0] Gateway unmount error")
     pass
 
 def getGatewayConfig():
@@ -664,6 +658,8 @@ def _mkfs(storage_url, key):
 @common.timeout(600)
 def _umount():
     log.info("[2] Gateway umounting")
+    op_ok = False
+
     try:
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
@@ -674,9 +670,7 @@ def _umount():
             output = po.stdout.read()
             po.wait()
             if po.returncode !=0:
-                #log.info("[2] Fail to stop Samba")
                 raise UmountError(output)
-            #log.info("[2] Samba stopped")
 
             cmd = "sudo /etc/init.d/nmbd stop"
             po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -698,17 +692,23 @@ def _umount():
             po.wait()
             if po.returncode !=0:
                 raise UmountError(output)
+            
+            op_ok = True
     except Exception as e:
         raise UmountError(str(e))
     
     finally:
-        log.info("[2] Gateway umounted")
+        if op_ok == False:
+            log.info("[0] Gateway umount error.")
+        else:
+            log.info("[2] Gateway umounted")
+
+
 
 @common.timeout(360)
 def _mount(storage_url):
-    #log.info("_mount start")
     log.info("[2] Gateway mounting")
-
+    op_ok = False
     try:
         config = getGatewayConfig()
     
@@ -771,7 +771,7 @@ def _mount(storage_url):
         if po.returncode != 0:
             raise BuildGWError(output)
 
-
+        op_ok = True
     except GatewayConfError:
         raise
     except EncKeyError:
@@ -781,7 +781,10 @@ def _mount(storage_url):
         log.error(str(e))
         raise BuildGWError(op_msg)
 
-    log.info("[2] Gateway mounted")
+        if op_ok == False:
+            log.info("[0] Gateway mount error.")
+        else:
+            log.info("[2] Gateway mounted")
     
 
 @common.timeout(360)
@@ -827,6 +830,7 @@ def _restartServices():
         log.info("_restartServices start")
 
     log.info("[2] Gateway restarted")
+
 
 def build_gateway(user_key):
     log.info("[2] Gateway building")
@@ -878,13 +882,15 @@ def build_gateway(user_key):
     finally:
         if op_ok == False:
             log.error(op_msg)
-
+            log.info("[0] Gateway building error. " + op_msg)
+        else:
+            log.info("[2] Gateway builded")
+            
         return_val = {'result' : op_ok,
                       'msg'    : op_msg,
                       'data'   : {}}
 
         log.info("build_gateway end")
-        log.info("[2] Gateway builded")
         return json.dumps(return_val)
 
 def restart_nfs_service():
@@ -908,6 +914,7 @@ def restart_nfs_service():
     except Exception as e:
         op_ok = False
         log.error(str(e))
+        log.info("[0] NFS service restarting error")
 
     finally:
         return_val = {
@@ -946,6 +953,7 @@ def restart_smb_service():
     except Exception as e:
         op_ok = False
         log.error(str(e))
+        log.info("[0] Samba service restarting error")
 
     finally:
         return_val = {
@@ -2213,7 +2221,7 @@ if __name__ == '__main__':
     #print build_gateway("1234567")
     #print apply_user_enc_key("123456", "1234567")
     
-    _createS3qlConf("172.16.228.53:8080")
+    #_createS3qlConf("172.16.228.53:8080")
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
     pass
