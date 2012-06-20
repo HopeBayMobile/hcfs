@@ -230,16 +230,19 @@ def _check_http_proxy_service():
     op_proxy_check = False
     log.info("_check_http_proxy start")
 
-    cmd ="sudo ps aux | grep squid3"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    lines = po.stdout.readlines()
-    po.wait()
+    try:
+        cmd ="sudo ps aux | grep squid3"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
 
-    if po.returncode == 0:
-        if len(lines) > 2:
-            op_proxy_check = True
-    else:
-        log.info(output)
+        if po.returncode == 0:
+            if len(lines) > 2:
+                op_proxy_check = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_http_proxy end")
     return op_proxy_check
