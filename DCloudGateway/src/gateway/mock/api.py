@@ -125,13 +125,11 @@ def shutdown_gateway():
 	return json.dumps(return_val)
 
 def get_scheduling_rules():
-	
+
 	return_val = {
 		'result': True,
 		'msg': "This is a mock value for testing purpose.",
-		'data': {'policies' : [{'day' : 2, 'start' : -1, 'stop' : -1, 'uplink_bw_limit' : 100},
-                                       {'day' : 3, 'start' : 2, 'stop' : 5, 'uplink_bw_limit': 200}]}
-	}
+		'data': [[2, -1, -1, 100], [3, 2, 5, 200]]}
 	return json.dumps(return_val)
 
 def apply_scheduling_rules( policies ):
@@ -213,16 +211,16 @@ def set_compression(switch):
 
 def get_gateway_system_log(log_level, number_of_messages, category_mask):
 
-    print('Input parameters: log_level %d, number of messages %d, category_mask %d' % (log_level, number_of_messages, category_mask))
+    print('Input parameters: log_level %d, number of messages %d, category_mask %s' % (log_level, number_of_messages, category_mask))
 
     return_val = {
             'result': True,
             'msg': "This is a mock value for testing purpose.",
             'data': {'error_log' : [{ 'category' : 'Samba',
-                                                    'timestamp' : '2012-04-24 14:26:25.749',
+                                                    'timestamp' : '2012-04-24 14:26:25',
                                                     'msg' : 'smb service start error'}],
                      'warning_log' : [{ 'category' : 'gateway',
-                                                    'timestamp' : '2012-04-24 14:26:25.749',
+                                                    'timestamp' : '2012-04-24 14:26:25',
                                                     'msg' : 'Delaying upload due to the weather'}],
                      'info_log' : []
                     }

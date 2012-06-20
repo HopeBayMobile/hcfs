@@ -1,14 +1,24 @@
 from django.shortcuts import render, HttpResponse, redirect
 from django.contrib.auth.decorators import login_required
 from django import forms
+from django.conf import settings
 from django.views.decorators.http import require_POST
 from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
-from gateway import api
-from gateway import api_restore_conf
-from gateway import api_remote_upgrade
 import json
+
+
+if not getattr(settings, "DEBUG", False):
+    from gateway import api
+    from gateway import api_restore_conf
+    from gateway import api_remote_upgrade
+    from http_proxy import api_http_proxy
+else:
+    from gateway.mock import api
+    from gateway.mock import api_restore_conf
+    from gateway.mock import api_remote_upgrade
+    from http_proxy.mock import api_http_proxy
 
 
 def gateway_status():
@@ -21,17 +31,6 @@ def gateway_status():
     except Exception as inst:
         print inst
         data = {}
-        data['gateway_cache_usage'] = {"max_cache_size": 1000,
-                               "max_cache_entries": 100,
-                               "used_cache_size": 500,
-                               "used_cache_entries": 50,
-                               "dirty_cache_size": 100,
-                               "dirty_cache_entries": 10}
-        data['cloud_storage_usage'] = {"cloud_data": "1024",
-                                 "cloud_data_dedup": "1024",
-                                 "cloud_data_dedup_compress": "1024"}
-        data["uplink_usage"] = 100
-        data["downlink_usage"] = 1000
     return data
 
 
@@ -46,9 +45,8 @@ def index(request):
     try:
         version = {"current_version": json.loads(api_remote_upgrade.get_gateway_version()).get("version"),
                    "available_version": json.loads(api_remote_upgrade.get_available_upgrade()).get("version")}
-    except:
-        version = {"current_version": "1.0",
-                   "available_version": "1.1"}
+    except Exception as inst:
+        print inst
     context.update(version)
     return render(request, 'dashboard/dashboard.html', context)
 
@@ -174,10 +172,8 @@ def account(request, action=None):
 def sharefolder(request, action):
 
     forms_group = {}
-    smb_data = json.loads(api.get_smb_user_list()).get('data')
     action_error = {}
-    smb_data['username'] = smb_data['accounts'][0]
-    print smb_data
+    smb_data = {"username": json.loads(api.get_smb_user_list()).get('data').get('username')}
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
         nfs_data = nfs_ip_query['data']
@@ -298,7 +294,7 @@ def syslog(request):
 @require_POST
 def http_proxy(request, action=None):
     if request.method == 'POST':
-        result = json.loads(api.set_http_proxy(action))
+        result = json.loads(api_http_proxy.set_http_proxy(action))
         return HttpResponse(result)
 
 
@@ -344,6 +340,7 @@ def cache_usage(request):
     data = gateway_status()
     return HttpResponse(json.dumps(data['gateway_cache_usage']))
 
+
 @login_required
 def config(request, action=None):
     if request.method == 'POST':
@@ -352,11 +349,18 @@ def config(request, action=None):
             info = api_restore_conf.restore_gateway_configuration()
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
+        print info
         result = json.loads(info)
-        return HttpResponse(result)
-    
+        if result['result']:
+            info = api_restore_conf.get_configuration_backup_info()
+            backup_info = json.loads(info)
+            backup_time = backup_info['data']['backup_time']
+            return HttpResponse(backup_time)
+        else:
+            return HttpResponse(result)
+
     info = api_restore_conf.get_configuration_backup_info()
     backup_info = json.loads(info)
-    backup_time = backup_info['backup_time']
-    
+    backup_time = backup_info['data']['backup_time']
+
     return render(request, 'dashboard/config.html', {'backup_time': backup_time})
