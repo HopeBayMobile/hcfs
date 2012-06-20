@@ -93,27 +93,27 @@ NUM_LOG_LINES = 20
 ################################################################################
 
 class BuildGWError(Exception):
-    log.info("[0] Gateway building error")
+    #log.info("[0] Gateway building error")
     pass
 
 class EncKeyError(Exception):
-    log.info("[0] Setting Gateway Encryption Key error")
+    #log.info("[0] Setting Gateway Encryption Key error")
     pass
 
 class MountError(Exception):
-    log.info("[0] Gateway mount error")
+    #log.info("[0] Gateway mount error")
     pass
 
 class TestStorageError(Exception):
-    log.info("[0] Gateway testing error")
+    #log.info("[0] Gateway testing error")
     pass
 
 class GatewayConfError(Exception):
-    log.info("[0] Gateway configurate error")
+    #log.info("[0] Gateway configurate error")
     pass
 
 class UmountError(Exception):
-    log.info("[0] Gateway unmount error")
+    #log.info("[0] Gateway unmount error")
     pass
 
 def getGatewayConfig():
