@@ -17,16 +17,39 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 ################################################################################
 # Configuration
 
-smb_conf_file = "/etc/samba/smb.conf"
-nfs_hosts_allow_file = "/etc/hosts.allow"
+# Global section 
+# Timeout for running system commands
+RUN_CMD_TIMEOUT = 15
 
+# Switch of enabling showing some debug log 
+enable_log = False
+
+# script of s3qlstat  
+CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+
+# Which NIC to monitoring
+MONITOR_IFACE = "eth1"
+
+# Samba section
+# Samba's conf file
+smb_conf_file = "/etc/samba/smb.conf"
+
+#Samba's defualt user and passwd
 default_user_id = "superuser"
 default_user_pwd = "superuser"
 
-RUN_CMD_TIMEOUT = 15
-
+# script of setting smb user's passwd
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
 
+# NFS section
+# NFS's ACL conf file
+nfs_hosts_allow_file = "/etc/hosts.allow"
+
+# Log section
+
+# source of log files. There are too much info from the syslog,mount,fsck logs.
+# We don't use them. Instead, we use gateway log, where records the results of 
+# invoking gateway's API. 
 LOGFILES = {
             #"syslog" : "/var/log/syslog",
             #"mount" : "/root/.s3ql/mount.log",
@@ -34,16 +57,9 @@ LOGFILES = {
             "gateway" : "/var/log/delta/Gateway.log"
             }
 
-LOG_PARSER = {
-             #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
-             #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             #[INFO from GatewayAPI on 2012-05-07 18:37:52,604] get_smb_user_list
-             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
-             }
-
-# if a keywork match a msg, the msg is belong to the class
-# key = level, val = keyword array
+# ****Note that not all logs will be displayed.****  
+# Only those with certain KEYWORDs that is defined by KEYWORD_FILTER, in log  
+# content will be shown and classified into three categories error,warning,info
 KEYWORD_FILTER = {
                   "error_log" : ["[0]"], #["error", "exception"], # 0
                   "warning_log" : ["[1]"], #["warning"], # 1
@@ -51,24 +67,28 @@ KEYWORD_FILTER = {
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
+
+# This is used to eliminate the prefix of a log msg.
 LOG_LEVEL_PREFIX_LEN = 4 # len("[0] ") 
 
-LOG_LEVEL = {
+# Log files use different timestamp format. To unify the format, the LOG_PARSER defines
+# regexp string for a log format. Log msg that mismatch the format will be ignored.     
+LOG_PARSER = {
+             #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
+             #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
+             }
+# define how many categories of log are shown.
+# 0 => show all logs, 2 => show only error log 
+SHOW_LOG_LEVEL = {
             0 : ["error_log", "warning_log", "info_log"],
             1 : ["error_log", "warning_log"],
             2 : ["error_log"],
             }
 
-DEFAULT_SHOW_LOG_LEVEL = 2
-
-enable_log = False
-
-CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-
+# How many log records to show
 NUM_LOG_LINES = 20
-
-MONITOR_IFACE = "eth1"
-
 
 ################################################################################
 
@@ -357,7 +377,7 @@ def _check_HDD():
 
 # check nfs daemon by Rice
 def _check_nfs_service():
-    op_NFS_srv = False
+    op_NFS_srv = True
     log.info("_check_nfs_service start")
 
     cmd ="sudo service nfs-kernel-server status"
@@ -366,11 +386,11 @@ def _check_nfs_service():
     po.wait()
 
     if po.returncode == 0:
-        if output.find("running") !=-1:
-            op_NFS_srv = True
+        if output.find("not running") >= 0:
+            op_NFS_srv = False
+            restart_nfs_service()
     else:
         log.info(output)
-        restart_nfs_service()
 
     log.info("_check_nfs_service end")
     return op_NFS_srv
@@ -2168,7 +2188,7 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
     logs = read_logs(LOGFILES, 0 , None) #query all logs
 
-    for level in LOG_LEVEL[log_level]:
+    for level in SHOW_LOG_LEVEL[log_level]:
         for logfile in logs: # mount, syslog, ...
             counter = 0  # for each info src, it has number_of_msg returned
 
