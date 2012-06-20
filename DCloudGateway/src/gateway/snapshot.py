@@ -234,4 +234,5 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
+    print take_snapshot()
     pass
