@@ -21,7 +21,6 @@ snapshot_bot = "/etc/delta/snapshot_bot"
 
 
 class SnapshotError(Exception):
-    log.info("[0] Error in taking snapshot")
     pass
 
 def _check_snapshot_in_progress():
@@ -45,7 +44,7 @@ def take_snapshot():
 
     log.info('Started take_snapshot')
     return_result = False
-    return_msg = 'Unexpected error in take_snapshot'
+    return_msg = '[2] Unexpected error in take_snapshot'
 
     try:
         if _check_snapshot_in_progress():
@@ -109,7 +108,7 @@ def get_snapshot_in_progress():
 
     log.info('Started get_snapshot_in_progress')
     return_result = False
-    return_msg = 'Unexpected error in get_snapshot_in_progress'
+    return_msg = '[2] Unexpected error in get_snapshot_in_progress'
     in_progress_name = ""
 
     try:
@@ -173,7 +172,7 @@ def set_snapshot_lifespan(months_to_live):
     print('Lifespan of a snapshot is set to %d months' % months_to_live)
 
     return_result = False
-    return_msg = 'Unexpected error in get_snapshot_lifespan'
+    return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
     if months_to_live > 0:
         try:
@@ -197,7 +196,7 @@ def get_snapshot_lifespan():
     log.info('Started get_snapshot_lifespan')
     months_to_live = 12
     return_result = False
-    return_msg = 'Unexpected error in get_snapshot_lifespan'
+    return_msg = '[2] Unexpected error in get_snapshot_lifespan'
     reset_config = False
 
     try:
