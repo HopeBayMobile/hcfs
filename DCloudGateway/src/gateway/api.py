@@ -288,16 +288,19 @@ def _check_system():
     op_system_check = False
     log.info("_check_system start")
 
-    cmd ="sudo ps aux | grep fsck.s3ql"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    lines = po.stdout.readlines()
-    po.wait()
-
-    if po.returncode == 0:
-        if len(lines) > 2:
-            op_system_check = True
-    else:
-        log.info(output)
+    try:
+        cmd ="sudo ps aux | grep fsck.s3ql"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
+    
+        if po.returncode == 0:
+            if len(lines) > 2:
+                op_system_check = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_system end")
     return op_system_check
@@ -307,18 +310,21 @@ def _check_flush():
     op_flush_inprogress = False
     log.info("_check_flush start")
     
-    cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
-
-    if po.returncode == 0:
-        if output.find("Cache uploading: On") !=-1:
-            op_flush_inprogress = True
-
-    else:
-        log.info(output)
-
+    try:
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("Cache uploading: On") !=-1:
+                op_flush_inprogress = True
+    
+        else:
+            log.info(output)
+    except:
+        pass
+    
     log.info("_check_flush end")
     return op_flush_inprogress
 
@@ -327,16 +333,19 @@ def _check_dirtycache():
     op_dirtycache_nearfull = False
     log.info("_check_dirtycache start")
 
-    cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
-
-    if po.returncode == 0:
-        if output.find("Dirty cache near full: True") !=-1:
-                        op_dirtycache_nearfull = True
-    else:
-        log.info(output)
+    try:
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("Dirty cache near full: True") !=-1:
+                            op_dirtycache_nearfull = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_dirtycache end")
     return op_dirtycache_nearfull
@@ -346,25 +355,29 @@ def _check_HDD():
     op_HDD_ok = False
     log.info("_check_HDD start")
 
-    all_disk = common.getAllDisks()
-    nu_all_disk = len(all_disk)
-    op_all_disk = 0
-
-    for i in all_disk:
-        cmd ="sudo smartctl -a %s"%i
+    try:
+        all_disk = common.getAllDisks()
+        nu_all_disk = len(all_disk)
+        op_all_disk = 0
     
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-
-#          if po.returncode == 0:
-        if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-            op_all_disk += 1 
-        else:
-            log.info("%s test result: NOT PASSED"%i)
+        for i in all_disk:
+            cmd ="sudo smartctl -a %s"%i
+        
+            po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            po.wait()
     
-    if op_all_disk == len(all_disk):
-        op_HDD_ok = True
+    #          if po.returncode == 0:
+            if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+                op_all_disk += 1 
+            else:
+                log.info("%s test result: NOT PASSED"%i)
+        
+        if op_all_disk == len(all_disk):
+            op_HDD_ok = True
+
+    except:
+        pass
 
     log.info("_check_HDD end")
     return op_HDD_ok
@@ -374,17 +387,21 @@ def _check_nfs_service():
     op_NFS_srv = True
     log.info("_check_nfs_service start")
 
-    cmd ="sudo service nfs-kernel-server status"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
+    try:
+        cmd ="sudo service nfs-kernel-server status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("not running") >= 0:
+                op_NFS_srv = False
+                restart_nfs_service()
+        else:
+            log.info(output)
 
-    if po.returncode == 0:
-        if output.find("not running") >= 0:
-            op_NFS_srv = False
-            restart_nfs_service()
-    else:
-        log.info(output)
+    except:
+        pass
 
     log.info("_check_nfs_service end")
     return op_NFS_srv
@@ -394,18 +411,21 @@ def _check_smb_service():
     op_SMB_srv = False
     log.info("_check_smb_service start")    
 
-    cmd ="sudo service smbd status"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
+    try:
+        cmd ="sudo service smbd status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("running") !=-1:
+                op_SMB_srv = True
+        else:
+            log.info(output)
+            restart_smb_service()
 
-    if po.returncode == 0:
-        if output.find("running") !=-1:
-            op_SMB_srv = True
-    else:
-        log.info(output)
-        restart_smb_service()
-
+    except:
+        pass
     log.info("_check_smb_service end")
     return op_SMB_srv
 
