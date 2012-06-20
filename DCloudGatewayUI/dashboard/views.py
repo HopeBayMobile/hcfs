@@ -349,11 +349,18 @@ def config(request, action=None):
             info = api_restore_conf.restore_gateway_configuration()
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
+        print info
         result = json.loads(info)
-        return HttpResponse(result)
+        if result['result']:
+            info = api_restore_conf.get_configuration_backup_info()
+            backup_info = json.loads(info)
+            backup_time = backup_info['data']['backup_time']
+            return HttpResponse(backup_time)
+        else:
+            return HttpResponse(result)
 
     info = api_restore_conf.get_configuration_backup_info()
     backup_info = json.loads(info)
-    backup_time = backup_info['backup_time']
+    backup_time = backup_info['data']['backup_time']
 
     return render(request, 'dashboard/config.html', {'backup_time': backup_time})
