@@ -2213,7 +2213,7 @@ if __name__ == '__main__':
     #print build_gateway("1234567")
     #print apply_user_enc_key("123456", "1234567")
     
-    #_createS3qlConf("172.16.228.53:8080")
-    data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    print data
+    _createS3qlConf("172.16.228.53:8080")
+    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    #print data
     pass
