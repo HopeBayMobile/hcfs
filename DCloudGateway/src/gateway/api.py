@@ -110,6 +110,9 @@ class GatewayConfError(Exception):
 class UmountError(Exception):
     pass
 
+class SnapshotError(Exception):
+    pass
+
 def getGatewayConfig():
     try:
         config = ConfigParser.ConfigParser()
@@ -189,21 +192,50 @@ def get_compression():
         log.info("get_compression end")
     return json.dumps(return_val)
 
+def _check_snapshot_in_progress():
+    '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
+
+    try:
+        if os.path.exists(snapshot_tag):
+            return True
+        return False
+    except:
+        raise SnapshotError("Could not decide whether a snapshot is in progress.")
+
 # by Rice
 def get_gateway_indicators():
 
     log.info("get_gateway_indicators start")
     op_ok = False
     op_msg = 'Gateway indocators read failed unexpetcedly.'
+    return_val = {
+          'result' : op_ok,
+          'msg'    : op_msg,
+          'data'   : {'network_ok' : False,
+          'system_check' : False,
+          'flush_inprogress' : False,
+          'dirtycache_nearfull' : False,
+          'HDD_ok' : False,
+          'NFS_srv' : False,
+          'SMB_srv' : False,
+          'snapshot_in_progress' : False,
+          'HTTP_proxy_srv' : False }}
 
-    op_network_ok = _check_network()
-    op_system_check = _check_system()
-    op_flush_inprogress = _check_flush()
-    op_dirtycache_nearfull = _check_dirtycache()
-    op_HDD_ok= _check_HDD()
-    op_NFS_srv = _check_nfs_service()
-    op_SMB_srv = _check_smb_service()
-    op_Proxy_srv = _check_http_proxy_service()
+
+    try:
+        op_network_ok = _check_network()
+        op_system_check = _check_system()
+        op_flush_inprogress = _check_flush()
+        op_dirtycache_nearfull = _check_dirtycache()
+        op_HDD_ok= _check_HDD()
+        op_NFS_srv = _check_nfs_service()
+        op_SMB_srv = _check_smb_service()
+        op_snapshot_in_progress = _check_snapshot_in_progress()
+        op_Proxy_srv = _check_http_proxy_service()
+    except Exception as Err:
+        log.info("Unable to get indicators")
+        log.info("msg: %s" % str(Err))
+        return json.dumps(return_val)
 
     op_ok = True
     op_msg = "Gateway indocators read successfully."
@@ -218,6 +250,7 @@ def get_gateway_indicators():
           'HDD_ok' : op_HDD_ok,
           'NFS_srv' : op_NFS_srv,
           'SMB_srv' : op_SMB_srv,
+          'snapshot_in_progress' : op_snapshot_in_progress,
           'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("get_gateway_indicators end")
@@ -2185,19 +2218,22 @@ def get_gateway_status():
     if enable_log:
         log.info("get_gateway_status")
 
-    # get logs           
-    #ret_log_dict = read_logs(NUM_LOG_LINES)
-    ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    try:
+        # get logs           
+        #ret_log_dict = read_logs(NUM_LOG_LINES)
+        ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
-    # get usage
-    usage = storage_cache_usage()
-    ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
-    ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
+        # get usage
+        usage = storage_cache_usage()
+        ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
+        ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
-    # get network statistics
-    network = get_network_speed(MONITOR_IFACE)
-    ret_val["data"]["uplink_usage"] = network["uplink_usage"]
-    ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+        # get network statistics
+        network = get_network_speed(MONITOR_IFACE)
+        ret_val["data"]["uplink_usage"] = network["uplink_usage"]
+        ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+    except:
+        log.info("Unable to get gateway status")
 
     return json.dumps(ret_val)
 
@@ -2247,4 +2283,5 @@ if __name__ == '__main__':
     #_createS3qlConf("172.16.228.53:8080")
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
+    print get_gateway_indicators()
     pass
