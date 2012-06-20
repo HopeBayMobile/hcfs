@@ -125,13 +125,11 @@ def shutdown_gateway():
 	return json.dumps(return_val)
 
 def get_scheduling_rules():
-	
+
 	return_val = {
 		'result': True,
 		'msg': "This is a mock value for testing purpose.",
-		'data': {'policies' : [{'day' : 2, 'start' : -1, 'stop' : -1, 'uplink_bw_limit' : 100},
-                                       {'day' : 3, 'start' : 2, 'stop' : 5, 'uplink_bw_limit': 200}]}
-	}
+		'data': [[2, -1, -1, 100], [3, 2, 5, 200]]}
 	return json.dumps(return_val)
 
 def apply_scheduling_rules( policies ):
