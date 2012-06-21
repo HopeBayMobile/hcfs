@@ -166,7 +166,10 @@ class SwiftAccountMgr:
 			row = self.__accountDb.add_user(account=account, name=user)
 
 			if row is None:
-				msg = "User %s:%s alread exists"%(account, user)
+				msg = "User %s:%s alreay exists"%(account, user)
+				return Bool(val, msg)
+			elif row is False:
+				msg = "Account %s does not exist"%account
 				return Bool(val, msg)
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
@@ -205,7 +208,7 @@ class SwiftAccountMgr:
 			msg = stderrData
 			val =False
 		elif '404' in stderrData:
-			msg = "user %s:%s does not exists"%(account, user)
+			msg = "user %s:%s does not exist"%(account, user)
 			logger.warn(msg)
 			val =True
 		else:
@@ -260,9 +263,34 @@ class SwiftAccountMgr:
 
                 return Bool(val, msg)
 
+	@util.timeout(300)
+	def __add_account(self, proxyIp, account):
+		logger = util.getLogger(name="__add_account")
+#		self.__class__.__add_account.__account__
+		
+		url = "https://%s:8080/auth/"%proxyIp
+		msg = ""
+		val = False
+
+		cmd = "swauth-add-account -K %s -A %s %s"%(self.__password, url, account)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode !=0:
+			logger.error(stderrData)
+			msg = stderrData
+			val =False
+		else:
+			logger.info(stdoutData)
+			msg = stdoutData
+			val =True
+
+		Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
 	def add_account(self, account, retry=3):
 		'''
-		add account and create an default admin to the database and backend swift
+		add account and create an default admin user to the database and backend swift
 
 		@type  account: string
 		@param account: the name of the given account
@@ -274,52 +302,121 @@ class SwiftAccountMgr:
 		
 		'''
 		
-#		logger = util.getLogger(name="add_account")
-#		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-#		
-#		msg = ""
-#		val = False
-#		Bool = collections.namedtuple("Bool", "val msg")
-#
-#		if proxy_ip_list is None or len(proxy_ip_list) ==0:
-#			msg = "No proxy node is found"
-#			return Bool(val, msg)
-#
-#		if retry < 1:
-#			msg = "Argument retry has to >= 1"
-#			return Bool(val, msg)
-#
-#		try:
-#			row = self.__accountDb.add_user(account=account, name=user)
-#
-#			if row is None:
-#				msg = "User %s:%s alread exists"%(account, user)
-#				return Bool(val, msg)
-#
-#		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-#			msg = str(e)
-#			return Bool(val, msg)
-#		
-#		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
-#                                                   account=account, user=user, password=password,
-#						   admin=admin, reseller=reseller)
-#
-#		try:
-#			if val == False:
-#				self.__accountDb.delete_user(account=account, name=user)
-#
-#		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-#			errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
-#			logger.error(errMsg)
-#			raise InconsistentDatabaseError(errMsg)
-#
-#                return Bool(val, msg)
+		logger = util.getLogger(name="add_account")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
 
-	def delete_account(self, account):
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		try:
+			row = self.__accountDb.add_account(account=account)
+
+			if row is None:
+				msg = "Account %s already exists"%account
+				return Bool(val, msg)
+
+		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+			msg = str(e)
+			return Bool(val, msg)
+		
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_account,
+                                                   account=account)
+
+		try:
+			if val == False:
+				self.__accountDb.delete_account(account=account)
+			else:
+				self.add_user(account=account, user="admin", password="admin", admin=True, reseller=False)
+				
+			
+		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+			errMsg = "Failed to clean account %s from database for %s"%(account, str(e))
+			logger.error(errMsg)
+			raise InconsistentDatabaseError(errMsg)
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __delete_account(self, proxyIp, account):
+		logger = util.getLogger(name="__delete_account")
+
+		url = "https://%s:8080/auth/"%proxyIp
+		cmd = "swauth-delete-account -K %s -A %s %s"%(self.__password, url, account)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+				
+		msg = ""
+		val = False
+
+		if po.returncode !=0 and '409' not in stderrData and '404' not in stderrData:
+			logger.error(stderrData)
+			msg = stderrData
+			val =False
+		elif '404' in stderrData:
+			msg = "Account %s does not exist"%account
+			logger.warn(msg)
+			val = False
+		elif '409' in stderrData:
+			msg = "Still have user(s) in account %s."%(account)
+			logger.warn(msg)
+			val = False
+		else:
+			logger.info(stdoutData)
+			msg = stdoutData
+			val =True
+
+		Bool = collections.namedtuple("Bool", "val msg")
+                return Bool(val, msg)
+
+	def delete_account(self, account, retry=3):
 		'''
-		check user
+		Delete account from database and backend swift after checking that there's no users in the account
+
+		@type  account: string
+		@param account: the name of the given account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@return: a tuple (val, msg). 
+		
 		'''
-		pass
+		
+		logger = util.getLogger(name="delete_account")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list)==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_account,
+                                                   account=account)
+
+		try:
+			if val == True:
+				self.__accountDb.delete_account(account=account)
+
+		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
+			errMsg = "Failed to clean account %s from database for %s"%(account, str(e))
+			logger.error(errMsg)
+			raise InconsistentDatabaseError(errMsg)
+		
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __enable_user(self, proxyIp, account, user):
@@ -1008,6 +1105,7 @@ class SwiftAccountMgr:
 
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		account_info = {}
+		account_list = ""
 		val = False
 		msg = ""
 		Bool = collections.namedtuple("Bool", "val msg")
@@ -1037,61 +1135,72 @@ class SwiftAccountMgr:
 			result = False
 			val = False
 			return Bool(val, msg)
-
-		msg = account_info["accounts"]
-
+		
+		for item in account_info["accounts"]:
+			account_list += item["name"] + ", "
+			msg = account_list
+			
 		return Bool(val, msg)
 
 	def list_user(self, account, retry=3):
-                '''             
-                List all the existed accounts.
-                
-                @type  account: string
-                @param account: the account name of the given user
-                @type  retry: integer
-                @param retry: the maximum number of times to retry after the failure
-                @return: a named tuple Bool(val, msg). If the get the user
-                        list successfully, then Bool.val == True, and Bool.msg == user list. 
-                        If the user list does not exist, then Bool.val == True, and Bool.msg == "".
-                        Otherwise, Bool.val == False, and Bool.msg records the error message.
-                '''
-                logger = util.getLogger(name="list_user")
-
-                proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-                user_info = {}
-                val = False
-                msg = ""
+		'''
+		List all the existed accounts.
+		
+		@type  account: string
+		@param account: the account name of the given user
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the get the user
+			list successfully, then Bool.val == True, and Bool.msg == user list.
+			If the user list does not exist, then Bool.val == True, and Bool.msg == "".
+			Otherwise, Bool.val == False, and Bool.msg records the error message.
+		'''
+		
+		logger = util.getLogger(name="list_user")
+		
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		user_info = {}
+		user_list = ""
+		val = False
+		msg = ""
+		
 		Bool = collections.namedtuple("Bool", "val msg")
-
-                if proxy_ip_list is None or len(proxy_ip_list) ==0:
-                        msg = "No proxy node is found"
-                        return Bool(val, msg)
-
-                if retry < 1:
-                        msg = "Argument retry has to >= 1"
-                        return Bool(val, msg)
-
-
+		
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+		
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+		
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
                 fn=self.__get_user_info, account=account)
+		
+		if val == False:
+			return Bool(val, msg)
 
-                if val == False:
-                        return Bool(val, msg)
-
-                try:
-                        user_info = json.loads(msg)
-                        val = True
-                        msg = ""
-
-                except Exception as e:
-                        msg = "Failed to load the json string: %s" % str(e)
-                        logger.error(msg)
-                        val = False
-                        return Bool(val, msg)
-
-                msg = user_info["users"]
-
-                return Bool(val, msg)
+		if not msg:
+			msg = "account %s does not exist"%account
+			return Bool(val, msg)
+		
+		else:
+			try:
+				user_info = json.loads(msg)
+				val = True
+				msg = ""
+			
+			except Exception as e:
+				msg = "Failed to load the json string: %s" % str(e)
+				logger.error(msg)
+				val = False
+				return Bool(val, msg)
+			
+			for item in user_info["users"]:
+				user_list += item["name"] + ", "
+				msg = user_list
+				
+				return Bool(val, msg)
 
 	def list_container(self, account, admin_user, retry=3):
                 '''             
@@ -1207,14 +1316,19 @@ class SwiftAccountMgr:
 		cmd = "swauth-list -K %s -A %s %s" % (self.__password, url, account)
 		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		(stdoutData, stderrData) = po.communicate()
-
-		if po.returncode != 0:
+		
+		if po.returncode !=0 and '404' not in stderrData:
+			logger.error(stderrData)
 			msg = stderrData
-			logger.error(msg)
-			val = False
+			val =False
+		elif '404' in stderrData:
+			msg = ""
+			logger.warn(msg)
+			val =True
 		else:
+			logger.info(stdoutData)
 			msg = stdoutData
-			val = True
+			val =True
 
 		return Bool(val, msg)
 
@@ -1870,12 +1984,6 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
-	#print SA.add_user("rice", "rice01", "rice01", True, False).msg
-	print SA.add_user("rice", "rice01", "rice02", True, False).msg
-	print SA.add_user("rice", "rice01", "rice02", True, False).msg
-	#print SA.delete_user("test", "tester28").msg
-	#print SA.disable_user("test", "tester28").msg
-	#print SA.enable_user("test", "tester28").msg
-	#print SA.get_account_usage("system", "root").msg
 	print SA.list_account().msg
-	print SA.list_user("rice").msg
+	print SA.delete_account("rice88").msg
+	print SA.list_account().msg
