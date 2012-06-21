@@ -1,5 +1,12 @@
-from gateway import api
 import json
+
+from django.conf import settings
+
+
+if not getattr(settings, "DEBUG", False):
+    from gateway import api
+else:
+    from gateway.mock import api
 
 
 def indicator(request):

@@ -2,9 +2,10 @@
 
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
 
-# Function: API function for controlling HTTP proxy 
+# Function: API function for gateway remote upgrade
 
 import os
+import json
 
 def get_gateway_version():
 	"""
