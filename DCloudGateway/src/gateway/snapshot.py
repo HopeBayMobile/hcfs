@@ -19,10 +19,41 @@ lifespan_conf = "/etc/delta/snapshot_lifespan"
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
 snapshot_schedule = "/etc/delta/snapshot_schedule"
+snapshot_db = "/root/.s3ql/snapshot_db.txt"
+snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
 
 
 class SnapshotError(Exception):
     pass
+
+class Snapshot_Db_Lock():
+
+    def __init__(self):
+
+        self.locked = False
+        try:
+            finish = False
+            while not finish:
+                if os.path.exists(snapshot_db_lock):
+                    time.sleep(10)
+                else:
+                   os.system('sudo touch %s' % snapshot_db_lock)
+                   finish = True
+        except:
+            raise SnapshotError('Unable to acquire snapshot db lock')
+        self.locked = True
+
+
+    def __del__(self):
+
+        try:
+            if self.locked:
+                self.locked = False
+                if os.path.exists(snapshot_db_lock):
+                    os.system('sudo rm -rf %s' % snapshot_db_lock)
+        except:
+            raise SnapshotError('Unable to release snapshot sb lock')
+
 
 def _check_snapshot_in_progress():
     '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
@@ -117,23 +148,56 @@ def get_snapshot_schedule():
                   'data': {'snapshot_time': snapshot_time}}
     return json.dumps(return_val)
 
+def _acquire_db_list():
+
+    db_lock = Snapshot_Db_Lock()
+    db_entries = []
+
+    try:
+        if os.path.exists(snapshot_db):
+            with open(snapshot_db,'r') as fh:
+                db_entries = fh.readlines()
+    except:
+        raise SnapshotError('Unable to access snapshot database')
+    finally:
+        del db_lock
+
+    return db_entries
 
 def get_snapshot_list():
 
-    time1 = time.time()
-    time2 = time1 + 20
-    time3 = time2 + 100
+    log.info('Started get_snapshot_list')
+    return_result = False
+    return_msg = '[2] Unexpected error in get_snapshot_list'
+    snapshots = []
 
-    #Two sample snapshot entries, one finished and one in progress
-    snapshots = [{'name': 'demosnapshot', 'start_time': time1, \
-                  'finish_time': time2, 'num_files': 100, \
-                  'total_size': 100000, 'exposed': True},
-                 {'name': 'new_snapshot', 'start_time': time3, \
-                  'finish_time': -1, 'num_files': 0, \
-                  'total_size': 0, 'exposed': False}]
+    try:
+        db_list = _acquire_db_list()
 
-    return_val = {'result': True,
-                  'msg': 'Done getting snapshot list.',
+        for entry in db_list:
+            tmp_items = entry.split(',')
+
+            if tmp_items[5] == 'true':
+                tmp_exposed = True
+            else:
+                tmp_exposed = False
+
+            temp_obj = {'name': tmp_items[0], \
+                        'start_time': float(tmp_items[1]), \
+                        'finish_time': float(tmp_items[2]),\
+                        'num_files': int(tmp_items[3]), \
+                        'total_size': int(tmp_items[4]), \
+                        'exposed': tmp_exposed}       
+            snapshots = snapshots + [temp_obj]
+
+        return_result = True
+        return_msg = 'Finished reading snapshot list'
+    except:
+        return_msg = '[2] Unable to read snapshot list'
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
                   'data': {'snapshots': snapshots}}
     return json.dumps(return_val)
 
@@ -270,4 +334,5 @@ def get_snapshot_lifespan():
 if __name__ == '__main__':
     print set_snapshot_schedule(10)
     print get_snapshot_schedule()
+    print get_snapshot_list()
     pass
