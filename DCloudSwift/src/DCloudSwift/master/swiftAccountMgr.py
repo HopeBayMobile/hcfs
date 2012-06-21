@@ -1741,6 +1741,128 @@ class SwiftAccountMgr:
 
 		return Bool(val, msg)
 
+	@util.timeout(300)
+	def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
+		'''
+		Set self-defined metadata of the given container.
+		The self-defined metadata are associatied with a user and include:
+			(1) Account_Enable: True/False
+			(2) User_Enable: True/False
+			(3) Password: the original password for the user
+			(4) Quota: quota of the user (Number of bytes, int)
+
+		The following is the details of metadata_content:
+		metadata_content = {
+			"Account_Enable": True/False,
+			"User_Enable": True/False,
+			"Password": user password,
+			"Quota": number of bytes
+		}
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set metadata
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@type  metadata_content: dictionary
+		@param metadata_content: the content to be set to metadata of the container
+		@return: a named tuple Bool(val, msg). If the metadata are successfully
+			set, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="__set_container_metadata")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to set the read acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s post -r \'%s\' %s"%(url, account, admin_user,\
+		admin_password, read_acl, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0 or stderrData != "":
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			logger.info(msg)
+			val = True
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
+		'''
+		Get self-defined metadata of the given container as a dictionary.
+		The self-defined metadata are associatied with a user and include:
+			(1) Account_Enable: True/False
+			(2) User_Enable: True/False
+			(3) Password: the original password for the user
+			(4) Quota: quota of the user (Number of bytes, int)
+
+		The following is the details of metadata:
+		{
+			"Account_Enable": True/False,
+			"User_Enable": True/False,
+			"Password": user password,
+			"Quota": number of bytes
+		}
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set metadata
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@type  metadata_content: dictionary
+		@param metadata_content: the content to be set to metadata of the container
+		@return: a named tuple Bool(val, msg). If the metadata are successfully
+			got, then val == True and msg records the metadata. Otherwise,
+			val == False and msg records the error message.
+		'''
+		logger = util.getLogger(name="__get_container_metadata")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to get the read acl of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s stat %s"%(url, account, admin_user, admin_password, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0:
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+
+		lines = stdoutData.split("\n")
+
+		for line in lines:
+			if "Read" in line:
+				msg = line.split("ACL: ")[1]
+				logger.info(msg)
+				val = True
+
+		if val == False:
+			msg = msg + " " + stderrData
+
+                return Bool(val, msg)
+
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
