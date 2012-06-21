@@ -1778,12 +1778,16 @@ class SwiftAccountMgr:
 		logger = util.getLogger(name="__set_container_metadata")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
-                msg = "Failed to set the read acl of container %s:" % container
+                msg = "Failed to set the metadata of container %s:" % container
                 val = False
 		Bool = collections.namedtuple("Bool", "val msg")
 
-                cmd = "swift -A %s -U %s:%s -K %s post -r \'%s\' %s"%(url, account, admin_user,\
-		admin_password, read_acl, container)
+                cmd = "swift -A %s -U %s:%s -K %s post %s" % (url, account, admin_user, admin_password, container)
+
+		#TODO: check whether the format of metadata_content is correct
+		for field, value in metadata_content.items():
+			cmd = cmd + " -m \'%s:%s\'" % (field, value)
+
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 (stdoutData, stderrData) = po.communicate()
 
@@ -1827,8 +1831,6 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  admin_password: string
 		@param admin_password: the password of admin_user
-		@type  metadata_content: dictionary
-		@param metadata_content: the content to be set to metadata of the container
 		@return: a named tuple Bool(val, msg). If the metadata are successfully
 			got, then val == True and msg records the metadata. Otherwise,
 			val == False and msg records the error message.
@@ -1836,11 +1838,12 @@ class SwiftAccountMgr:
 		logger = util.getLogger(name="__get_container_metadata")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
-                msg = "Failed to get the read acl of container %s:" % container
+                msg = "Failed to get the metadata of container %s:" % container
                 val = False
+		metadata_content = {}
 		Bool = collections.namedtuple("Bool", "val msg")
 
-                cmd = "swift -A %s -U %s:%s -K %s stat %s"%(url, account, admin_user, admin_password, container)
+                cmd = "swift -A %s -U %s:%s -K %s stat %s" % (url, account, admin_user, admin_password, container)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 (stdoutData, stderrData) = po.communicate()
 
@@ -1853,13 +1856,14 @@ class SwiftAccountMgr:
 		lines = stdoutData.split("\n")
 
 		for line in lines:
-			if "Read" in line:
-				msg = line.split("ACL: ")[1]
-				logger.info(msg)
+			if "Meta" in line:
+				metadata_content[line.split()[1][:-1]] = line.split()[2]
 				val = True
+		msg = metadata_content
+		logger.info(msg)
 
 		if val == False:
-			msg = msg + " " + stderrData
+			msg = stderrData
 
                 return Bool(val, msg)
 
