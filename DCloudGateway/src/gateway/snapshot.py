@@ -18,6 +18,7 @@ smb_conf_file = "/etc/samba/smb.conf"
 lifespan_conf = "/etc/delta/snapshot_lifespan"
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
+snapshot_schedule = "/etc/delta/snapshot_schedule"
 
 
 class SnapshotError(Exception):
@@ -65,22 +66,55 @@ def take_snapshot():
 
 def set_snapshot_schedule(snapshot_time):
 
-    if snapshot_time >= 0:
-        print('Snapshot time is set to %d:00' % snapshot_time)
-    else:
-        print('Snapshot schedule is disabled')
+    log.info('Started set_snapshot_schedule')
+    return_result = False
+    return_msg = '[2] Unexpected error in set_snapshot_schedule'
 
-    return_val = {'result': True,
-                  'msg': 'Done setting snapshot schedule.',
+    try:
+        if os.path.exists(snapshot_schedule):
+            os.system('sudo rm -rf %s' % snapshot_schedule)
+
+        with open(snapshot_schedule,'w') as fh:
+            fh.write('%d' % snapshot_time)
+
+        return_result = True
+        return_msg = 'Completed set_snapshot_schedule'
+    except:
+        return_msg = '[2] Unable to write snapshot schedule'
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
                   'data': {}}
     return json.dumps(return_val)
 
 
 def get_snapshot_schedule():
 
-    return_val = {'result': True,
-                  'msg': 'Done setting snapshot schedule.',
-                  'data': {'snapshot_time': 1}}
+    log.info('Started get_snapshot_schedule')
+    return_result = False
+    return_msg = '[2] Unexpected error in get_snapshot_schedule'
+    snapshot_time = -1
+
+    try:
+        if not os.path.exists(snapshot_schedule):
+            with open(snapshot_schedule, 'w') as fh:
+                fh.write('%d' % snapshot_time)
+        else:
+            with open(snapshot_schedule, 'r') as fh:
+                tmp_line = fh.readline()
+                snapshot_time = int(tmp_line)
+
+        return_result = True
+        return_msg = 'Completed get_snapshot_schedule'
+
+    except:
+        return_msg = '[2] Unable to read snapshot schedule'
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
+                  'data': {'snapshot_time': snapshot_time}}
     return json.dumps(return_val)
 
 
@@ -234,5 +268,6 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
-    print take_snapshot()
+    print set_snapshot_schedule(10)
+    print get_snapshot_schedule()
     pass
