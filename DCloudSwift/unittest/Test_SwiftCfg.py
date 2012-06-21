@@ -19,7 +19,8 @@ class CreateCfg:
 	'''
 	def __init__(self):
 		self.cfgContent = {
-			"[storage]": {"password": "", "deviceCnt": 6},
+			"[storage]": {"password": "", "deviceCnt": 6, "proxyPort": 8080},
+			"[portal]": {"url": "https://172.16.229.79:8080"},
 			"[log]": {"level": "", "dir": "", "name": ""},
 		}
 		self.cfgKwparams = {}
@@ -51,7 +52,9 @@ class CreateCfg:
 			"logLevel": self.cfgContent['[log]']['level'],
 			"logName": self.cfgContent['[log]']['name'],
 			"password": self.cfgContent['[storage]']['password'],
-			"deviceCnt": self.cfgContent['[storage]']['deviceCnt']
+			"deviceCnt": self.cfgContent['[storage]']['deviceCnt'],
+			"proxyPort": self.cfgContent['[storage]']['proxyPort'],
+			"portalUrl": self.cfgContent["[portal]"]["url"]
 		}
 
 	def __randStrGenerator(self, size=8, chars=string.letters + string.digits):
@@ -94,8 +97,7 @@ class Test_getKwparams:
 		nose.tools.ok_(result['logDir'] != None, "Field \'dir\' does not exist in section [log]!")
 		nose.tools.ok_(result['logLevel'] != None, "Field \'level\' does not exist in section [log]!")
 		nose.tools.ok_(result['logName'] != None, "Field \'name\' does not exist in section [log]!")
-		#os.system("rm %s/%s" % (result['logDir'], result['logName']))
-
+		nose.tools.ok_(result['proxyPort'] != None, "Field \'proxyPort\' does not exist in section [storage]!")
 
 
 if __name__ == "__main__":
