@@ -505,6 +505,7 @@ class SwiftAccountMgr:
                 reseller_opt = "-r " if reseller  else ""
                 optStr = admin_opt + reseller_opt
 
+		#TODO: Must fix the format of password to use special character
                 cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, newPassword)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 (stdoutData, stderrData) = po.communicate()
@@ -1092,6 +1093,95 @@ class SwiftAccountMgr:
 
                 return Bool(val, msg)
 
+	def list_container(self, account, admin_user, retry=3):
+                '''             
+                List all containers of a given account.
+                
+                @type  account: string
+                @param account: the account name of the given user
+		@type  admin_user: string
+		@param admin_user: the admin user of the given account
+                @type  retry: integer
+                @param retry: the maximum number of times to retry after the failure
+                @return: a named tuple Bool(val, msg). If the container list is got
+                        successfully, then Bool.val == True and Bool.msg == user list. 
+                        If the container list does not exist, then Bool.val == True and Bool.msg == "".
+                        Otherwise, Bool.val == False, and Bool.msg records the error message.
+                '''
+                logger = util.getLogger(name="list_container")
+
+                proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+                val = False
+                msg = ""
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                if proxy_ip_list is None or len(proxy_ip_list) ==0:
+                        msg = "No proxy node is found"
+                        return Bool(val, msg)
+
+                if retry < 1:
+                        msg = "Argument retry has to >= 1"
+                        return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+                fn=self.__get_container_info, account=account, admin_user=admin_user,\
+		admin_password=admin_password)
+
+                if val == False or msg == "":
+                        return Bool(val, msg)
+
+		msg = msg.split("\n")
+		msg.remove("")
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_container_info(self, proxyIp, account, admin_user, admin_password):
+		'''
+		Return the container information of a given account.
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account to be queried
+		@type  admin_user: string
+		@param admin_user: the admin user of the given account
+		@type  admin_password: string
+		@param admin_password: the password of the admin user
+		@return: a tuple (val, msg). If the operation is successfully
+			done, then val == True and msg records the container
+			information. Otherwise, val == False and msg records
+			the error message.
+		'''
+		logger = util.getLogger(name="__get_container_info")
+
+		url = "https://%s:8080/auth/v1.0" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swift -A %s -U %s:%s -K %s list" % (url, account, admin_user, admin_password)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = stderrData
+			logger.error(msg)
+			val = False
+		else:
+			msg = stdoutData
+			val = True
+
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __get_user_info(self, proxyIp, account):
