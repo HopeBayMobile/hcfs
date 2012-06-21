@@ -1,0 +1,21 @@
+{% extends "dashboard/base.html" %}
+{% block tab_content %}
+    <ul class="nav nav-tabs">
+        <li class="active"><a href="#A" data-toggle="tab">A</a></li>
+        <li class=""><a href="#B" data-toggle="tab">B</a></li>
+    </ul>
+    <div class="tab-content">
+        <div class="tab-pane active" id="A" style="">
+            <div style="">
+                A
+            </div>
+            <div style="border: solid 2px; height: 50px; background-color: green;">
+            C
+            </div>
+        </div>
+        <div class="tab-pane" id="B">
+            B
+        </div>
+    </div>
+
+{% endblock tab_content %}
