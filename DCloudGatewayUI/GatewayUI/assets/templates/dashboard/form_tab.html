@@ -10,7 +10,7 @@
 	<div class="tab-content">
 	{% for name, form in forms_group.iteritems %}
 		<div class="tab-pane" id="{{form.name}}">
-		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{name}}">
+		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{form.name}}">
 			{% csrf_token %} {{ form.render }}
 			<div class="controls">
 				<p class="help-block" style="color: red;">
