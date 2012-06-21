@@ -15,19 +15,27 @@ log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
 
 smb_conf_file = "/etc/samba/smb.conf"
+org_smb_conf = "/etc/delta/smb.orig"
+tmp_smb_conf = "/root/.s3ql/.smb.conf.tmp"
+tmp_smb_conf1 = "/root/.s3ql/.smb.conf.tmp1"
+tmp_smb_conf2 = "/root/.s3ql/.smb.conf.tmp2"
 lifespan_conf = "/etc/delta/snapshot_lifespan"
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
 snapshot_schedule = "/etc/delta/snapshot_schedule"
 snapshot_db = "/root/.s3ql/snapshot_db.txt"
 snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
+snapshot_dir = "/mnt/cloudgwfiles/snapshots"
+temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
+temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
 
 
 class SnapshotError(Exception):
     pass
 
-class Snapshot_Db_Lock():
 
+class Snapshot_Db_Lock():
+    '''Class for handling acquiring/releasing lock for snapshotting database'''
     def __init__(self):
 
         self.locked = False
@@ -37,12 +45,11 @@ class Snapshot_Db_Lock():
                 if os.path.exists(snapshot_db_lock):
                     time.sleep(10)
                 else:
-                   os.system('sudo touch %s' % snapshot_db_lock)
-                   finish = True
+                    os.system('sudo touch %s' % snapshot_db_lock)
+                    finish = True
         except:
             raise SnapshotError('Unable to acquire snapshot db lock')
         self.locked = True
-
 
     def __del__(self):
 
@@ -56,7 +63,7 @@ class Snapshot_Db_Lock():
 
 
 def _check_snapshot_in_progress():
-    '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
+    '''Check if the tag /root/.s3ql/.snapshotting exists.'''
 
     try:
         if os.path.exists(snapshot_tag):
@@ -65,15 +72,17 @@ def _check_snapshot_in_progress():
     except:
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
 
-def _initialize_snapshot():
 
+def _initialize_snapshot():
+    '''Starts snapshotting bot (which actually handles the snapshotting)'''
     try:
-        subprocess.Popen('sudo %s' % snapshot_bot, shell = True)
+        subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
     except:
         raise SnapshotError("Could not initialize the snapshot bot.")
 
-def take_snapshot():
 
+def take_snapshot():
+    '''API function for taking snapshots manually'''
     log.info('Started take_snapshot')
     return_result = False
     return_msg = '[2] Unexpected error in take_snapshot'
@@ -105,7 +114,7 @@ def set_snapshot_schedule(snapshot_time):
         if os.path.exists(snapshot_schedule):
             os.system('sudo rm -rf %s' % snapshot_schedule)
 
-        with open(snapshot_schedule,'w') as fh:
+        with open(snapshot_schedule, 'w') as fh:
             fh.write('%d' % snapshot_time)
 
         return_result = True
@@ -148,6 +157,7 @@ def get_snapshot_schedule():
                   'data': {'snapshot_time': snapshot_time}}
     return json.dumps(return_val)
 
+
 def _acquire_db_list():
 
     db_lock = Snapshot_Db_Lock()
@@ -155,7 +165,7 @@ def _acquire_db_list():
 
     try:
         if os.path.exists(snapshot_db):
-            with open(snapshot_db,'r') as fh:
+            with open(snapshot_db, 'r') as fh:
                 db_entries = fh.readlines()
     except:
         raise SnapshotError('Unable to access snapshot database')
@@ -163,6 +173,31 @@ def _acquire_db_list():
         del db_lock
 
     return db_entries
+
+
+def _translate_db(db_list):
+
+    snapshots = []
+    try:
+        for entry in db_list:
+            tmp_items = entry.split(',')
+
+            if tmp_items[5] == 'true\n':
+                tmp_exposed = True
+            else:
+                tmp_exposed = False
+
+            temp_obj = {'name': tmp_items[0], \
+                        'start_time': float(tmp_items[1]), \
+                        'finish_time': float(tmp_items[2]),\
+                        'num_files': int(tmp_items[3]), \
+                        'total_size': int(tmp_items[4]), \
+                        'exposed': tmp_exposed}
+            snapshots = snapshots + [temp_obj]
+    except:
+        raise SnapshotError('Unable to convert snapshot db')
+    return snapshots
+
 
 def get_snapshot_list():
 
@@ -173,22 +208,7 @@ def get_snapshot_list():
 
     try:
         db_list = _acquire_db_list()
-
-        for entry in db_list:
-            tmp_items = entry.split(',')
-
-            if tmp_items[5] == 'true':
-                tmp_exposed = True
-            else:
-                tmp_exposed = False
-
-            temp_obj = {'name': tmp_items[0], \
-                        'start_time': float(tmp_items[1]), \
-                        'finish_time': float(tmp_items[2]),\
-                        'num_files': int(tmp_items[3]), \
-                        'total_size': int(tmp_items[4]), \
-                        'exposed': tmp_exposed}       
-            snapshots = snapshots + [temp_obj]
+        snapshots = _translate_db(db_list)
 
         return_result = True
         return_msg = 'Finished reading snapshot list'
@@ -226,13 +246,100 @@ def get_snapshot_in_progress():
     return json.dumps(return_val)
 
 
+def _append_samba_entry(entry):
+
+    try:
+        if os.path.exists(tmp_smb_conf1):
+            os.system('sudo rm -rf %s' % tmp_smb_conf1)
+        snapshot_share_path = os.path.join(snapshot_dir, entry['name'])
+        with open(tmp_smb_conf1, 'w') as fh:
+            fh.write('[%s]\n' % entry['name'])
+            fh.write('comment = Samba Share for snapshot %s\n' % entry['name'])
+            fh.write('path = %s\n' % snapshot_share_path)
+            fh.write('browsable = yes\n')
+            fh.write('guest ok = no\n')
+            fh.write('read only = no\n')
+            fh.write('create mask = 0755\n')
+            fh.write('valid users = superuser\n\n')
+
+        os.system('sudo cat %s %s > %s' % (tmp_smb_conf, tmp_smb_conf1, tmp_smb_conf2))
+        os.system('sudo cp %s %s' % (tmp_smb_conf2, tmp_smb_conf))
+    except:
+        raise SnapshotError('Unable to append entry to smb.conf')
+
+
+def _write_snapshot_db(snapshot_list):
+
+    db_lock = Snapshot_Db_Lock()
+
+    try:
+        if os.path.exists(temp_snapshot_db):
+            os.system('sudo rm -rf %s' % temp_snapshot_db)
+
+        with open(temp_snapshot_db, 'w') as fh:
+            for entry in snapshot_list:
+                if entry['exposed']:
+                    is_exposed = 'true'
+                else:
+                    is_exposed = 'false'
+
+                fh.write('%s,%f,%f,%d,%d,%s\n' % (entry['name'],\
+                       entry['start_time'], entry['finish_time'],\
+                       entry['num_files'], entry['total_size'],\
+                       is_exposed))
+
+        os.system('sudo cp %s %s' % (temp_snapshot_db, snapshot_db))
+
+    except:
+        raise SnapshotError('Unable to update snapshot database')
+    finally:
+        del db_lock
+
+
 def expose_snapshot(to_expose):
 
-    for snapshot in to_expose:
-        print('Exposing snapshot (name: %s) as samba share' % snapshot)
+    log.info('Started get_snapshot_in_progress')
+    return_result = False
+    return_msg = '[2] Unexpected error in get_snapshot_in_progress'
 
-    return_val = {'result': True,
-                  'msg': 'Finished exposing snapshot.',
+    try:
+        if not os.path.exists(org_smb_conf):
+            os.system('sudo cp %s %s' % (smb_conf_file, org_smb_conf))
+
+        db_list = _acquire_db_list()
+        snapshot_list = _translate_db(db_list)
+
+        # Initial tmp samba config
+        os.system('sudo cp %s %s' % (org_smb_conf, tmp_smb_conf))
+
+        for entry in snapshot_list:
+            if entry['name'] in to_expose:
+                entry['exposed'] = True
+                _append_samba_entry(entry)
+            else:
+                entry['exposed'] = False
+
+        # Restart samba service
+        os.system('sudo /etc/init.d/smbd stop')
+        os.system('sudo /etc/init.d/nmbd stop')
+        os.system('sudo cp %s %s' % (tmp_smb_conf, smb_conf_file))
+        os.system('sudo /etc/init.d/smbd start')
+        os.system('sudo /etc/init.d/nmbd start')
+
+        log.info('Restarted samba service after snapshot exposing')
+
+        # Write back snapshot database
+        _write_snapshot_db(snapshot_list)
+
+        return_result = True
+        return_msg = 'Finished exposing snapshots as samba shares'
+
+    except:
+        return_msg = '[2] Unable to expose snapshot'
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
                   'data': {}}
     return json.dumps(return_val)
 
@@ -332,7 +439,6 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
-    print set_snapshot_schedule(10)
-    print get_snapshot_schedule()
     print get_snapshot_list()
+    print expose_snapshot([])
     pass

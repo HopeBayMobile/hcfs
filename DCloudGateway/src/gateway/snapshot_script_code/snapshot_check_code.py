@@ -31,7 +31,7 @@ def continue_snapshot_in_progress():
     try:
         if os.path.exists(snapshot_tag):
             try:
-                subprocess.Popen('sudo %s' % snapshot_bot, shell = True)
+                subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
                 log.info('Continue snapshotting process.')
             except:
                 raise SnapshotError("Could not initialize the snapshot bot.")

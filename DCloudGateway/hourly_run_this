@@ -1,4 +1,5 @@
 #!/bin/sh -e
 
 /etc/delta/update_bandwidth
+/etc/delta/hourly_snapshotting
 
