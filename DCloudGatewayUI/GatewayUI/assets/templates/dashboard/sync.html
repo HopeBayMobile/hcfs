@@ -230,7 +230,7 @@
         <form class="well form-horizontal" action="/dashboard/sync/" method="POST" id="modal-for-{{ key }}">
             <div class="modal-header">
                 <button class="close" data-dismiss="modal">×</button>
-                <h3>Setting {{ value.name }}</h3>
+                <h3>{{ value.name }} Setting</h3>
             </div>
             <div class="modal-body">
                 {% csrf_token %}
@@ -249,7 +249,7 @@
                     {% if value.option == 2 %}
                         checked=checked
                     {% endif %} >
-                    All Day
+                    All day
                     </p>
                     <hr/>
                     <p class="sync_font_size">
@@ -267,7 +267,8 @@
                             {% endif %}
                         {% endfor %}
                     </select>
-                    <i class="icon-play interval-select-{{ key }}"></i>
+                    <!--<i class="icon-play interval-select-{{ key }}"></i>-->
+                    to
                     <select id="select02-{{ key }}" name="interval_to" class="span1 interval-select-{{ key }}">
                         {% for i in hours %}
                             {% if i == value.interval_to %}
@@ -281,15 +282,15 @@
                     <hr/>
                     <div id="bandwidth-{{ key }}">
                     <p class="sync_font_size">
-                    Bandwidth <input type="text" class="span1 digits" id="bandwidth_input{{ key }}"
+                    Limit bandwidth to<input type="text" class="span1 digits" id="bandwidth_input{{ key }}"
                     name="bandwidth" value="{{ value.bandwidth }}"
-                    min="64" max="1024" > KB
+                    min="64" max="1024" > KB/s
                     </div>
                     </p>
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="#" class="btn" data-dismiss="modal">Close</a>
+                <!--<a href="#" class="btn" data-dismiss="modal">Close</a>-->
                 <button type="submit" class="btn btn-primary">Save changes</button>
             </div>
         </form>
