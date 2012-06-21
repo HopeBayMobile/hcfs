@@ -1519,7 +1519,12 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		else:
 			ori_read_acl = msg
-			#TODO: Check the repeat of account:user
+
+			if "%s:%s" % (account, user) in ori_read_acl:
+				val = True
+				msg = ""
+				return Bool(val, msg)
+
 			ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
@@ -1582,7 +1587,12 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		else:
 			ori_write_acl = msg
-			#TODO: Check the repeat of account:user
+
+			if "%s:%s" % (account, user) in ori_write_acl:
+				val = True
+				msg = ""
+				return Bool(val, msg)
+
 			ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
