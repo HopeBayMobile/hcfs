@@ -35,7 +35,7 @@
 	{
 		if(!slided)
 		{
-			$('.tab-content').hide();
+			$('.main-content').hide();
 			var slide_height = $(".main-row").height() - 110 -$('.statusbar-header').outerHeight()-($('.statusbar-content').outerHeight()-$('.statusbar-content').height());
 			if (navigator.appName == 'Microsoft Internet Explorer'){
 				slide_height -= 132;
@@ -48,7 +48,7 @@
 		{
 			$('.statusbar-content').slideUp(function(){
 				$(".toggle-btn").toggleClass("active");
-				$('.tab-content').show(1);
+				$('.main-content').show(1);
 			});
 		}
 		slided = !slided;

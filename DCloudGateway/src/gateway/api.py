@@ -17,16 +17,39 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 ################################################################################
 # Configuration
 
-smb_conf_file = "/etc/samba/smb.conf"
-nfs_hosts_allow_file = "/etc/hosts.allow"
+# Global section 
+# Timeout for running system commands
+RUN_CMD_TIMEOUT = 15
 
+# Switch of enabling showing some debug log 
+enable_log = False
+
+# script of s3qlstat  
+CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+
+# Which NIC to monitoring
+MONITOR_IFACE = "eth1"
+
+# Samba section
+# Samba's conf file
+smb_conf_file = "/etc/samba/smb.conf"
+
+#Samba's defualt user and passwd
 default_user_id = "superuser"
 default_user_pwd = "superuser"
 
-RUN_CMD_TIMEOUT = 15
-
+# script of setting smb user's passwd
 CMD_CH_SMB_PWD = "%s/change_smb_pwd.sh"%DIR
 
+# NFS section
+# NFS's ACL conf file
+nfs_hosts_allow_file = "/etc/hosts.allow"
+
+# Log section
+
+# source of log files. There are too much info from the syslog,mount,fsck logs.
+# We don't use them. Instead, we use gateway log, where records the results of 
+# invoking gateway's API. 
 LOGFILES = {
             #"syslog" : "/var/log/syslog",
             #"mount" : "/root/.s3ql/mount.log",
@@ -34,16 +57,9 @@ LOGFILES = {
             "gateway" : "/var/log/delta/Gateway.log"
             }
 
-LOG_PARSER = {
-             #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
-             #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             #[INFO from GatewayAPI on 2012-05-07 18:37:52,604] get_smb_user_list
-             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
-             }
-
-# if a keywork match a msg, the msg is belong to the class
-# key = level, val = keyword array
+# ****Note that not all logs will be displayed.****  
+# Only those with certain KEYWORDs that is defined by KEYWORD_FILTER, in log  
+# content will be shown and classified into three categories error,warning,info
 KEYWORD_FILTER = {
                   "error_log" : ["[0]"], #["error", "exception"], # 0
                   "warning_log" : ["[1]"], #["warning"], # 1
@@ -51,49 +67,53 @@ KEYWORD_FILTER = {
                   # the pattern . matches any log, 
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
+
+# This is used to eliminate the prefix of a log msg.
 LOG_LEVEL_PREFIX_LEN = 4 # len("[0] ") 
 
-LOG_LEVEL = {
+# Log files use different timestamp format. To unify the format, the LOG_PARSER defines
+# regexp string for a log format. Log msg that mismatch the format will be ignored.     
+LOG_PARSER = {
+             #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
+             #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
+             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
+             }
+# define how many categories of log are shown.
+# 0 => show all logs, 2 => show only error log 
+SHOW_LOG_LEVEL = {
             0 : ["error_log", "warning_log", "info_log"],
             1 : ["error_log", "warning_log"],
             2 : ["error_log"],
             }
 
-DEFAULT_SHOW_LOG_LEVEL = 2
-
-enable_log = False
-
-CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-
+# How many log records to show
 NUM_LOG_LINES = 20
 
-MONITOR_IFACE = "eth1"
-
+#Snapshot tag
+snapshot_tag = "/root/.s3ql/.snapshotting"
 
 ################################################################################
 
 class BuildGWError(Exception):
-    log.info("[0] Gateway building error")
     pass
 
 class EncKeyError(Exception):
-    log.info("[0] Setting Gateway Encryption Key error")
     pass
 
 class MountError(Exception):
-    log.info("[0] Gateway mount error")
     pass
 
 class TestStorageError(Exception):
-    log.info("[0] Gateway testing error")
     pass
 
 class GatewayConfError(Exception):
-    log.info("[0] Gateway configurate error")
     pass
 
 class UmountError(Exception):
-    log.info("[0] Gateway unmount error")
+    pass
+
+class SnapshotError(Exception):
     pass
 
 def getGatewayConfig():
@@ -175,21 +195,50 @@ def get_compression():
         log.info("get_compression end")
     return json.dumps(return_val)
 
+def _check_snapshot_in_progress():
+    '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
+
+    try:
+        if os.path.exists(snapshot_tag):
+            return True
+        return False
+    except:
+        raise SnapshotError("Could not decide whether a snapshot is in progress.")
+
 # by Rice
 def get_gateway_indicators():
 
     log.info("get_gateway_indicators start")
     op_ok = False
     op_msg = 'Gateway indocators read failed unexpetcedly.'
+    return_val = {
+          'result' : op_ok,
+          'msg'    : op_msg,
+          'data'   : {'network_ok' : False,
+          'system_check' : False,
+          'flush_inprogress' : False,
+          'dirtycache_nearfull' : False,
+          'HDD_ok' : False,
+          'NFS_srv' : False,
+          'SMB_srv' : False,
+          'snapshot_in_progress' : False,
+          'HTTP_proxy_srv' : False }}
 
-    op_network_ok = _check_network()
-    op_system_check = _check_system()
-    op_flush_inprogress = _check_flush()
-    op_dirtycache_nearfull = _check_dirtycache()
-    op_HDD_ok= _check_HDD()
-    op_NFS_srv = _check_nfs_service()
-    op_SMB_srv = _check_smb_service()
-    op_Proxy_srv = _check_http_proxy_service()
+
+    try:
+        op_network_ok = _check_network()
+        op_system_check = _check_system()
+        op_flush_inprogress = _check_flush()
+        op_dirtycache_nearfull = _check_dirtycache()
+        op_HDD_ok= _check_HDD()
+        op_NFS_srv = _check_nfs_service()
+        op_SMB_srv = _check_smb_service()
+        op_snapshot_in_progress = _check_snapshot_in_progress()
+        op_Proxy_srv = _check_http_proxy_service()
+    except Exception as Err:
+        log.info("Unable to get indicators")
+        log.info("msg: %s" % str(Err))
+        return json.dumps(return_val)
 
     op_ok = True
     op_msg = "Gateway indocators read successfully."
@@ -204,6 +253,7 @@ def get_gateway_indicators():
           'HDD_ok' : op_HDD_ok,
           'NFS_srv' : op_NFS_srv,
           'SMB_srv' : op_SMB_srv,
+          'snapshot_in_progress' : op_snapshot_in_progress,
           'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("get_gateway_indicators end")
@@ -216,16 +266,19 @@ def _check_http_proxy_service():
     op_proxy_check = False
     log.info("_check_http_proxy start")
 
-    cmd ="sudo ps aux | grep squid3"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    lines = po.stdout.readlines()
-    po.wait()
+    try:
+        cmd ="sudo ps aux | grep squid3"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
 
-    if po.returncode == 0:
-        if len(lines) > 2:
-            op_proxy_check = True
-    else:
-        log.info(output)
+        if po.returncode == 0:
+            if len(lines) > 2:
+                op_proxy_check = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_http_proxy end")
     return op_proxy_check
@@ -274,16 +327,19 @@ def _check_system():
     op_system_check = False
     log.info("_check_system start")
 
-    cmd ="sudo ps aux | grep fsck.s3ql"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    lines = po.stdout.readlines()
-    po.wait()
-
-    if po.returncode == 0:
-        if len(lines) > 2:
-            op_system_check = True
-    else:
-        log.info(output)
+    try:
+        cmd ="sudo ps aux | grep fsck.s3ql"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
+    
+        if po.returncode == 0:
+            if len(lines) > 2:
+                op_system_check = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_system end")
     return op_system_check
@@ -293,18 +349,21 @@ def _check_flush():
     op_flush_inprogress = False
     log.info("_check_flush start")
     
-    cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
-
-    if po.returncode == 0:
-        if output.find("Cache uploading: On") !=-1:
-            op_flush_inprogress = True
-
-    else:
-        log.info(output)
-
+    try:
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("Cache uploading: On") !=-1:
+                op_flush_inprogress = True
+    
+        else:
+            log.info(output)
+    except:
+        pass
+    
     log.info("_check_flush end")
     return op_flush_inprogress
 
@@ -313,16 +372,19 @@ def _check_dirtycache():
     op_dirtycache_nearfull = False
     log.info("_check_dirtycache start")
 
-    cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
-
-    if po.returncode == 0:
-        if output.find("Dirty cache near full: True") !=-1:
-                        op_dirtycache_nearfull = True
-    else:
-        log.info(output)
+    try:
+        cmd ="sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("Dirty cache near full: True") !=-1:
+                            op_dirtycache_nearfull = True
+        else:
+            log.info(output)
+    except:
+        pass
 
     log.info("_check_dirtycache end")
     return op_dirtycache_nearfull
@@ -332,45 +394,53 @@ def _check_HDD():
     op_HDD_ok = False
     log.info("_check_HDD start")
 
-    all_disk = common.getAllDisks()
-    nu_all_disk = len(all_disk)
-    op_all_disk = 0
-
-    for i in all_disk:
-        cmd ="sudo smartctl -a %s"%i
+    try:
+        all_disk = common.getAllDisks()
+        nu_all_disk = len(all_disk)
+        op_all_disk = 0
     
-        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-
-#          if po.returncode == 0:
-        if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
-            op_all_disk += 1 
-        else:
-            log.info("%s test result: NOT PASSED"%i)
+        for i in all_disk:
+            cmd ="sudo smartctl -a %s"%i
+        
+            po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            po.wait()
     
-    if op_all_disk == len(all_disk):
-        op_HDD_ok = True
+    #          if po.returncode == 0:
+            if output.find("SMART overall-health self-assessment test result: PASSED") !=-1:
+                op_all_disk += 1 
+            else:
+                log.info("%s test result: NOT PASSED"%i)
+        
+        if op_all_disk == len(all_disk):
+            op_HDD_ok = True
+
+    except:
+        pass
 
     log.info("_check_HDD end")
     return op_HDD_ok
 
 # check nfs daemon by Rice
 def _check_nfs_service():
-    op_NFS_srv = False
+    op_NFS_srv = True
     log.info("_check_nfs_service start")
 
-    cmd ="sudo service nfs-kernel-server status"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
+    try:
+        cmd ="sudo service nfs-kernel-server status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("not running") >= 0:
+                op_NFS_srv = False
+                restart_nfs_service()
+        else:
+            log.info(output)
 
-    if po.returncode == 0:
-        if output.find("running") !=-1:
-            op_NFS_srv = True
-    else:
-        log.info(output)
-        restart_nfs_service()
+    except:
+        pass
 
     log.info("_check_nfs_service end")
     return op_NFS_srv
@@ -380,18 +450,21 @@ def _check_smb_service():
     op_SMB_srv = False
     log.info("_check_smb_service start")    
 
-    cmd ="sudo service smbd status"
-    po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
+    try:
+        cmd ="sudo service smbd status"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode == 0:
+            if output.find("running") !=-1:
+                op_SMB_srv = True
+        else:
+            log.info(output)
+            restart_smb_service()
 
-    if po.returncode == 0:
-        if output.find("running") !=-1:
-            op_SMB_srv = True
-    else:
-        log.info(output)
-        restart_smb_service()
-
+    except:
+        pass
     log.info("_check_smb_service end")
     return op_SMB_srv
 
@@ -644,6 +717,8 @@ def _mkfs(storage_url, key):
 @common.timeout(600)
 def _umount():
     log.info("[2] Gateway umounting")
+    op_ok = False
+
     try:
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
@@ -654,9 +729,7 @@ def _umount():
             output = po.stdout.read()
             po.wait()
             if po.returncode !=0:
-                #log.info("[2] Fail to stop Samba")
                 raise UmountError(output)
-            #log.info("[2] Samba stopped")
 
             cmd = "sudo /etc/init.d/nmbd stop"
             po  = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -678,17 +751,23 @@ def _umount():
             po.wait()
             if po.returncode !=0:
                 raise UmountError(output)
+            
+            op_ok = True
     except Exception as e:
         raise UmountError(str(e))
     
     finally:
-        log.info("[2] Gateway umounted")
+        if op_ok == False:
+            log.info("[0] Gateway umount error.")
+        else:
+            log.info("[2] Gateway umounted")
+
+
 
 @common.timeout(360)
 def _mount(storage_url):
-    #log.info("_mount start")
     log.info("[2] Gateway mounting")
-
+    op_ok = False
     try:
         config = getGatewayConfig()
     
@@ -751,7 +830,7 @@ def _mount(storage_url):
         if po.returncode != 0:
             raise BuildGWError(output)
 
-
+        op_ok = True
     except GatewayConfError:
         raise
     except EncKeyError:
@@ -761,7 +840,10 @@ def _mount(storage_url):
         log.error(str(e))
         raise BuildGWError(op_msg)
 
-    log.info("[2] Gateway mounted")
+        if op_ok == False:
+            log.info("[0] Gateway mount error.")
+        else:
+            log.info("[2] Gateway mounted")
     
 
 @common.timeout(360)
@@ -807,6 +889,7 @@ def _restartServices():
         log.info("_restartServices start")
 
     log.info("[2] Gateway restarted")
+
 
 def build_gateway(user_key):
     log.info("[2] Gateway building")
@@ -858,13 +941,15 @@ def build_gateway(user_key):
     finally:
         if op_ok == False:
             log.error(op_msg)
-
+            log.info("[0] Gateway building error. " + op_msg)
+        else:
+            log.info("[2] Gateway builded")
+            
         return_val = {'result' : op_ok,
                       'msg'    : op_msg,
                       'data'   : {}}
 
         log.info("build_gateway end")
-        log.info("[2] Gateway builded")
         return json.dumps(return_val)
 
 def restart_nfs_service():
@@ -888,6 +973,7 @@ def restart_nfs_service():
     except Exception as e:
         op_ok = False
         log.error(str(e))
+        log.info("[0] NFS service restarting error")
 
     finally:
         return_val = {
@@ -926,6 +1012,7 @@ def restart_smb_service():
     except Exception as e:
         op_ok = False
         log.error(str(e))
+        log.info("[0] Samba service restarting error")
 
     finally:
         return_val = {
@@ -2134,19 +2221,22 @@ def get_gateway_status():
     if enable_log:
         log.info("get_gateway_status")
 
-    # get logs           
-    #ret_log_dict = read_logs(NUM_LOG_LINES)
-    ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    try:
+        # get logs           
+        #ret_log_dict = read_logs(NUM_LOG_LINES)
+        ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
-    # get usage
-    usage = storage_cache_usage()
-    ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
-    ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
+        # get usage
+        usage = storage_cache_usage()
+        ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
+        ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
-    # get network statistics
-    network = get_network_speed(MONITOR_IFACE)
-    ret_val["data"]["uplink_usage"] = network["uplink_usage"]
-    ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+        # get network statistics
+        network = get_network_speed(MONITOR_IFACE)
+        ret_val["data"]["uplink_usage"] = network["uplink_usage"]
+        ret_val["data"]["downlink_usage"] = network["downlink_usage"]
+    except:
+        log.info("Unable to get gateway status")
 
     return json.dumps(ret_val)
 
@@ -2168,7 +2258,7 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
     logs = read_logs(LOGFILES, 0 , None) #query all logs
 
-    for level in LOG_LEVEL[log_level]:
+    for level in SHOW_LOG_LEVEL[log_level]:
         for logfile in logs: # mount, syslog, ...
             counter = 0  # for each info src, it has number_of_msg returned
 
@@ -2194,6 +2284,7 @@ if __name__ == '__main__':
     #print apply_user_enc_key("123456", "1234567")
     
     #_createS3qlConf("172.16.228.53:8080")
-    data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    print data
+    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    #print data
+    print get_gateway_indicators()
     pass

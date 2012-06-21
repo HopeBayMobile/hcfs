@@ -602,6 +602,7 @@ class SwiftAccountMgr:
                 reseller_opt = "-r " if reseller  else ""
                 optStr = admin_opt + reseller_opt
 
+		#TODO: Must fix the format of password to use special character
                 cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, newPassword)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 (stdoutData, stderrData) = po.communicate()
@@ -1201,6 +1202,95 @@ class SwiftAccountMgr:
 				
 				return Bool(val, msg)
 
+	def list_container(self, account, admin_user, retry=3):
+                '''             
+                List all containers of a given account.
+                
+                @type  account: string
+                @param account: the account name of the given user
+		@type  admin_user: string
+		@param admin_user: the admin user of the given account
+                @type  retry: integer
+                @param retry: the maximum number of times to retry after the failure
+                @return: a named tuple Bool(val, msg). If the container list is got
+                        successfully, then Bool.val == True and Bool.msg == user list. 
+                        If the container list does not exist, then Bool.val == True and Bool.msg == "".
+                        Otherwise, Bool.val == False, and Bool.msg records the error message.
+                '''
+                logger = util.getLogger(name="list_container")
+
+                proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+                val = False
+                msg = ""
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                if proxy_ip_list is None or len(proxy_ip_list) ==0:
+                        msg = "No proxy node is found"
+                        return Bool(val, msg)
+
+                if retry < 1:
+                        msg = "Argument retry has to >= 1"
+                        return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+                fn=self.__get_container_info, account=account, admin_user=admin_user,\
+		admin_password=admin_password)
+
+                if val == False or msg == "":
+                        return Bool(val, msg)
+
+		msg = msg.split("\n")
+		msg.remove("")
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_container_info(self, proxyIp, account, admin_user, admin_password):
+		'''
+		Return the container information of a given account.
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account to be queried
+		@type  admin_user: string
+		@param admin_user: the admin user of the given account
+		@type  admin_password: string
+		@param admin_password: the password of the admin user
+		@return: a tuple (val, msg). If the operation is successfully
+			done, then val == True and msg records the container
+			information. Otherwise, val == False and msg records
+			the error message.
+		'''
+		logger = util.getLogger(name="__get_container_info")
+
+		url = "https://%s:8080/auth/v1.0" % proxyIp
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		cmd = "swift -A %s -U %s:%s -K %s list" % (url, account, admin_user, admin_password)
+		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		(stdoutData, stderrData) = po.communicate()
+
+		if po.returncode != 0:
+			msg = stderrData
+			logger.error(msg)
+			val = False
+		else:
+			msg = stdoutData
+			val = True
+
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __get_user_info(self, proxyIp, account):
@@ -1303,6 +1393,23 @@ class SwiftAccountMgr:
 
 	@util.timeout(300)
 	def __get_read_acl(self, proxyIp, account, container, admin_user, admin_password):
+		'''
+		Get the read acl of the container
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to get the read acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@return: a named tuple Bool(val, msg). If the read acl is successfully
+			gotten, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
 		logger = util.getLogger(name="__get_read_acl")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -1335,6 +1442,23 @@ class SwiftAccountMgr:
 
 	@util.timeout(300)
 	def __get_write_acl(self, proxyIp, account, container, admin_user, admin_password):
+		'''
+		Get the write acl of the container
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to get the write acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@return: a named tuple Bool(val, msg). If the write acl is successfully
+			gotten, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
 		logger = util.getLogger(name="__get_write_acl")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -1366,7 +1490,26 @@ class SwiftAccountMgr:
                 return Bool(val, msg)
 
 	@util.timeout(300)
-	def __set_read_acl(self, proxyIp, account, container, user, admin_user, admin_password, read_acl):
+	def __set_read_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl):
+		'''
+		Set the read acl of the container
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set the read acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@type  read_acl: string
+		@param read_acl: the read acl to be set to that of the container
+		@return: a named tuple Bool(val, msg). If the read acl is successfully
+			set, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
 		logger = util.getLogger(name="__set_read_acl")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -1392,7 +1535,26 @@ class SwiftAccountMgr:
                 return Bool(val, msg)
 
 	@util.timeout(300)
-	def __set_write_acl(self, proxyIp, account, container, user, admin_user, admin_password, write_acl):
+	def __set_write_acl(self, proxyIp, account, container, admin_user, admin_password, write_acl):
+		'''
+		Set the write acl of the container
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set the write acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@type  read_acl: string
+		@param read_acl: the write acl to be set to that of the container
+		@return: a named tuple Bool(val, msg). If the write acl is successfully
+			set, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
 		logger = util.getLogger(name="__set_write_acl")
 
                 url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -1471,22 +1633,353 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		else:
 			ori_read_acl = msg
+
+			if "%s:%s" % (account, user) in ori_read_acl:
+				val = True
+				msg = ""
+				return Bool(val, msg)
+
 			ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
 
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-		fn=self.__set_read_acl, account=account, container=container, user=user,\
-		admin_user=admin_user, admin_password=admin_password, read_acl=ori_read_acl)
+		fn=self.__set_read_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password, read_acl=ori_read_acl)
 
 		return Bool(val, msg)
 
 	def assign_write_acl(self, account, container, user, admin_user, retry=3):
-		pass
+		'''
+		Assign the user to the write acl of the container.
+
+		@type  account: string
+		@param account: the account of the user and admin_user
+		@type  container: string
+		@param container: the container to assign the write acl
+		@type  user: string
+		@param user: the user to add into the write acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the write acl is successfully
+			assigned, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="assign_write_acl")
+
+		#TODO: Check the existence of container
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		ori_write_acl = ""
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_write_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		else:
+			ori_write_acl = msg
+
+			if "%s:%s" % (account, user) in ori_write_acl:
+				val = True
+				msg = ""
+				return Bool(val, msg)
+
+			ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_write_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password, write_acl=ori_write_acl)
+
+		return Bool(val, msg)
 
 	def remove_read_acl(self, account, container, user, admin_user, retry=3):
-		pass
+		'''
+		Remove the user from the read acl of the container.
+
+		@type  account: string
+		@param account: the account of the user and admin_user
+		@type  container: string
+		@param container: the container to remove the read acl
+		@type  user: string
+		@param user: the user to remove from the read acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the read acl is successfully
+			removed, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="remove_read_acl")
+
+		#TODO: Check the existence of container
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		ori_read_acl = ""
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_read_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+
+		ori_read_acl = msg
+		new_read_acl = ""
+		ori_read_acl = ori_read_acl.split(",")
+		account_user_pattern = account + ":" + user
+
+		while account_user_pattern in ori_read_acl:
+			ori_read_acl.remove(account_user_pattern)
+
+		for item in ori_read_acl:
+			new_read_acl = new_read_acl + item + ","
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_read_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password, read_acl=new_read_acl)
+
+		return Bool(val, msg)
 
 	def remove_write_acl(self, account, container, user, admin_user, retry=3):
-		pass
+		'''
+		Remove the user from the write acl of the container.
+
+		@type  account: string
+		@param account: the account of the user and admin_user
+		@type  container: string
+		@param container: the container to remove the write acl
+		@type  user: string
+		@param user: the user to remove from the write acl
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry after the failure
+		@return: a named tuple Bool(val, msg). If the write acl is successfully
+			removed, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="remove_write_acl")
+
+		#TODO: Check the existence of container
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		ori_write_acl = ""
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		if proxy_ip_list is None or len(proxy_ip_list) ==0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_user_password_output = self.get_user_password(account, admin_user)
+		if get_user_password_output.val == True:
+			admin_password = get_user_password_output.msg
+		else:
+			val = False
+			msg = "Failed to get the password of the admin user %s: %s"\
+			% (admin_user, get_user_password_output.msg)
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_write_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+
+		ori_write_acl = msg
+		new_write_acl = ""
+		ori_write_acl = ori_write_acl.split(",")
+		account_user_pattern = account + ":" + user
+
+		while account_user_pattern in ori_write_acl:
+			ori_write_acl.remove(account_user_pattern)
+
+		for item in ori_write_acl:
+			new_write_acl = new_write_acl + item + ","
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_write_acl, account=account, container=container, admin_user=admin_user,\
+		admin_password=admin_password, write_acl=new_write_acl)
+
+		return Bool(val, msg)
+
+	@util.timeout(300)
+	def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
+		'''
+		Set self-defined metadata of the given container.
+		The self-defined metadata are associatied with a user and include:
+			(1) Account_Enable: True/False
+			(2) User_Enable: True/False
+			(3) Password: the original password for the user
+			(4) Quota: quota of the user (Number of bytes, int)
+
+		The following is the details of metadata_content:
+		metadata_content = {
+			"Account_Enable": True/False,
+			"User_Enable": True/False,
+			"Password": user password,
+			"Quota": number of bytes
+		}
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set metadata
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@type  metadata_content: dictionary
+		@param metadata_content: the content to be set to metadata of the container
+		@return: a named tuple Bool(val, msg). If the metadata are successfully
+			set, then val == True and msg == "". Otherwise, val ==
+			False and msg records the error message.
+		'''
+		logger = util.getLogger(name="__set_container_metadata")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to set the metadata of container %s:" % container
+                val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s post %s" % (url, account, admin_user, admin_password, container)
+
+		#TODO: check whether the format of metadata_content is correct
+		for field, value in metadata_content.items():
+			cmd = cmd + " -m \'%s:%s\'" % (field, value)
+
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0 or stderrData != "":
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+		else:
+			msg = stdoutData
+			logger.info(msg)
+			val = True
+
+                return Bool(val, msg)
+
+	@util.timeout(300)
+	def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
+		'''
+		Get self-defined metadata of the given container as a dictionary.
+		The self-defined metadata are associatied with a user and include:
+			(1) Account_Enable: True/False
+			(2) User_Enable: True/False
+			(3) Password: the original password for the user
+			(4) Quota: quota of the user (Number of bytes, int)
+
+		The following is the details of metadata:
+		{
+			"Account_Enable": True/False,
+			"User_Enable": True/False,
+			"Password": user password,
+			"Quota": number of bytes
+		}
+
+		@type  proxyIp: string
+		@param proxyIp: IP of the proxy node
+		@type  account: string
+		@param account: the account of the container
+		@type  container: string
+		@param container: the container to set metadata
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  admin_password: string
+		@param admin_password: the password of admin_user
+		@return: a named tuple Bool(val, msg). If the metadata are successfully
+			got, then val == True and msg records the metadata. Otherwise,
+			val == False and msg records the error message.
+		'''
+		logger = util.getLogger(name="__get_container_metadata")
+
+                url = "https://%s:8080/auth/v1.0" % proxyIp
+                msg = "Failed to get the metadata of container %s:" % container
+                val = False
+		metadata_content = {}
+		Bool = collections.namedtuple("Bool", "val msg")
+
+                cmd = "swift -A %s -U %s:%s -K %s stat %s" % (url, account, admin_user, admin_password, container)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                (stdoutData, stderrData) = po.communicate()
+
+                if po.returncode != 0:
+			msg = msg + " " + stderrData
+                        logger.error(msg)
+                        val = False
+			return Bool(val, msg)
+
+		lines = stdoutData.split("\n")
+
+		for line in lines:
+			if "Meta" in line:
+				metadata_content[line.split()[1][:-1]] = line.split()[2]
+				val = True
+		msg = metadata_content
+		logger.info(msg)
+
+		if val == False:
+			msg = stderrData
+
+                return Bool(val, msg)
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 {% block tab_content %}
 	<div style="font-size:20px; text-align:center; padding-top:100px;">
 	{% if backup_time%}
-	Last backup time: {{backup_time}}
+	Last backup time:<div id="backup_time" style="display:inline;">{{backup_time}}</div>
 	{% else %}
 	You haven't save any configuration.
 	{% endif %}
@@ -20,7 +20,9 @@
 			action = $(this).attr('action');
 			sure = confirm("Confirm: The configuration will be "+ action + ".");
 			if (sure){
-				$.post(action);
+				$.post(action,function(data){
+					$('#backup_time').html(data);
+				});
 			}
 		});
 	</script>

@@ -59,15 +59,15 @@ def system(request, action=None):
     print network_data
 
     class Network(RenderFormMixinClass, forms.Form):
-        ip = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
-        gateway = forms.IPAddressField(label='Gateway Address', widget=IPAddressInput)
+        ip = forms.IPAddressField(label='IP address', widget=IPAddressInput)
         mask = forms.IPAddressField(label='Submask', widget=IPAddressInput)
+        gateway = forms.IPAddressField(label='Default gateway', widget=IPAddressInput)
         dns1 = forms.IPAddressField(label='Primary DNS server', widget=IPAddressInput)
         dns2 = forms.IPAddressField(label='Secondary DNS server', widget=IPAddressInput)
 
     class AdminPassword(RenderFormMixinClass, forms.Form):
-        password = forms.CharField(widget=forms.PasswordInput)
-        retype_password = forms.CharField(widget=forms.PasswordInput)
+        password = forms.CharField(label='New password', widget=forms.PasswordInput)
+        retype_password = forms.CharField('Retype new password', widget=forms.PasswordInput)
 
         def clean(self):
             cleaned_data = super(AdminPassword, self).clean()
@@ -98,8 +98,8 @@ def system(request, action=None):
             else:
                 forms_group[action] = form
 
-    forms_group['network'] = forms_group.get('network', Network(initial=network_data))
-    forms_group['admin_pass'] = forms_group.get('admin_pass', AdminPassword())
+    forms_group['Network'] = forms_group.get('network', Network(initial=network_data))
+    forms_group['Password'] = forms_group.get('admin_pass', AdminPassword())
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 
 
@@ -112,7 +112,7 @@ def account(request, action=None):
     print gateway_data
 
     class Gateway(RenderFormMixinClass, forms.Form):
-        storage_url = forms.CharField()
+        storage_url = forms.CharField(label='Cloud storage url')
         account = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
         retype_password = forms.CharField(widget=forms.PasswordInput)
@@ -162,8 +162,8 @@ def account(request, action=None):
             else:
                 forms_group[action] = form
 
-    forms_group['gateway'] = forms_group.get('gateway', Gateway(initial=gateway_data))
-    forms_group['encrypt'] = forms_group.get('encrypt', EncryptionKey())
+    forms_group['Cloud Storage Access'] = forms_group.get('gateway', Gateway(initial=gateway_data))
+    forms_group['EncryptionKey'] = forms_group.get('encrypt', EncryptionKey())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group, 'action_error': action_error})
 
@@ -200,7 +200,7 @@ def sharefolder(request, action):
                 action_error[action] = update_return['msg']
             nfs_data['array_of_ip'] = ip_list
 
-    forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
+    forms_group['SMB Setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
 
     return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
                                                           'action_error': action_error, "nfs_data": nfs_data})
@@ -291,6 +291,12 @@ def syslog(request):
 
 
 @login_required
+def snapshot(request, action=None):
+    return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot'})
+
+
+
+@login_required
 @require_POST
 def http_proxy(request, action=None):
     if request.method == 'POST':
@@ -349,11 +355,18 @@ def config(request, action=None):
             info = api_restore_conf.restore_gateway_configuration()
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
+        print info
         result = json.loads(info)
-        return HttpResponse(result)
+        if result['result']:
+            info = api_restore_conf.get_configuration_backup_info()
+            backup_info = json.loads(info)
+            backup_time = backup_info['data']['backup_time']
+            return HttpResponse(backup_time)
+        else:
+            return HttpResponse(result)
 
     info = api_restore_conf.get_configuration_backup_info()
     backup_info = json.loads(info)
-    backup_time = backup_info['backup_time']
+    backup_time = backup_info['data']['backup_time']
 
     return render(request, 'dashboard/config.html', {'backup_time': backup_time})
