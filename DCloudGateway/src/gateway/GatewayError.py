@@ -25,7 +25,7 @@ class BackupError(GatewayError):
     def __str__(self):
         return "Backup config error(%s): %s" % (self._code, self._msg)        
     
-class FileNotFoundError(BackupError):
+class MetaDataError(BackupError):
     """
     """
     def __init__(self, msg = None):
@@ -37,7 +37,7 @@ class FileNotFoundError(BackupError):
 class ErrorCode():
     errorCodes = {
                   '001' : 'config backup is fail!',
-                  '002' : 'config file is not found',
+                  '002' : 'create metadata file is fail!',
                  }
     
 def main(argv = None):

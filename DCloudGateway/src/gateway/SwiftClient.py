@@ -25,24 +25,27 @@ class SwiftClient():
     def executeCommand(self, command = None):
     	if command is None:
             command = 'stat'
-            try:
-                cmd = ''.join(['swift -A https://', self._url, '/auth/v1.0 -U ',
-                              self._login, ' -K ', self._password, ' ', command])
-                print "swift command is \n" 
-                print cmd
-                po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-                (stdout, stderr) = po.communicate()
-                po.wait()
-                if po.returncode == 0:
-                    print stdout
-                else:
-                    print stderr
-            except Exception as e:
-                print e.args
+        try:
+            cmd = ''.join(['swift -A https://', self._url, '/auth/v1.0 -U ',
+                self._login, ' -K ', self._password, ' ', command])
+            print "swift command is \n" 
+            print cmd
+            po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            (stdout, stderr) = po.communicate()
+            po.wait()
+            if po.returncode == 0:
+                print stdout
+            else:
+                print stderr
+        except Exception as e:
+            print e
+    
+    def upload(self, container, file):
+        self.executeCommand('upload %s %s' %(container, file))
 
 def main(argv = None):
 	swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
 	swift.executeCommand()
-	
+        
 if __name__ == '__main__':
 	main()
