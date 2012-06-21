@@ -25,10 +25,39 @@ nfs_folder = "/mnt/cloudgwfiles/nfsshare"
 mount_point = "/mnt/cloudgwfiles"
 snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 samba_user = "superuser:superuser"
+snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
 
 
 class SnapshotError(Exception):
     pass
+
+class Snapshot_Db_Lock():
+    
+    def __init__(self):
+        
+        self.locked = False
+        try:
+            finish = False
+            while not finish:
+                if os.path.exists(snapshot_db_lock):
+                    time.sleep(10)
+                else:
+                   os.system('sudo touch %s' % snapshot_db_lock)
+                   finish = True
+        except:
+            raise SnapshotError('Unable to acquire snapshot db lock')
+        self.locked = True
+
+
+    def __del__(self):
+
+        try:
+            if self.locked:
+                self.locked = False
+                if os.path.exists(snapshot_db_lock):
+                    os.system('sudo rm -rf %s' % snapshot_db_lock)
+        except:
+            raise SnapshotError('Unable to release snapshot sb lock')
 
 
 def _check_snapshot_in_progress():
@@ -49,6 +78,7 @@ def new_database_entry():
     finished = False
 
     while not finished:
+        db_lock = Snapshot_Db_Lock()
         try:
             if os.path.exists(temp_snapshot_db):
                 os.system('rm -rf %s' % temp_snapshot_db)
@@ -62,6 +92,7 @@ def new_database_entry():
                 os.system('sudo cat %s %s > %s' % (temp_snapshot_db,\
                                snapshot_db, temp_snapshot_db1))
                 os.system('sudo cp %s %s' % (temp_snapshot_db1, snapshot_db))
+
             finished = True
 
         except:
@@ -69,7 +100,8 @@ def new_database_entry():
             if retries <= 0:
                 error_msg = "Could not write new entry to snapshot database"
                 raise SnapshotError(error_msg)
-
+        finally:
+            del db_lock
 
 def invalidate_entry():
 
@@ -82,6 +114,7 @@ def invalidate_entry():
 def actually_not_in_progress():
     ''' Check if there is actually a "new_snapshot" entry in database. '''
 
+    db_lock = Snapshot_Db_Lock()
     try:
         with open(snapshot_db, 'r') as fh:
             db_lines = fh.readlines()
@@ -95,6 +128,8 @@ def actually_not_in_progress():
                     no_new_entry = False
     except:
         raise SnapshotError('Unable to determine if snapshot is in progress')
+    finally:
+        del db_lock
 
     return no_new_entry
 
@@ -110,6 +145,7 @@ def recover_database():
 
     while not finished:
 
+        db_lock = Snapshot_Db_Lock()
         try:
             #First check if the temp snapshot folder still exists
             if os.path.exists(temp_folder):
@@ -165,6 +201,8 @@ def recover_database():
             if retries <= 0:
                 error_msg = "Could not recover snapshot database"
                 raise SnapshotError(error_msg)
+        finally:
+            del db_lock
 
 
 def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
@@ -174,6 +212,7 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
 
     while not finished:
 
+        db_lock = Snapshot_Db_Lock()
         try:
             with open(snapshot_db, 'r') as fh:
                 db_lines = fh.readlines()
@@ -212,6 +251,8 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
             if retries <= 0:
                 error_msg = "Could not update new entry in snapshot database"
                 raise SnapshotError(error_msg)
+        finally:
+            del db_lock
 
 
 def execute_take_snapshot():
