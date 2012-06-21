@@ -244,14 +244,29 @@ tr{
     overflow-y: auto;
 }
 
-.tab-content{
+.main-content{
 	position: relative;
 	width: @site-main-width - 40px;
-	margin: 68px 20px 20px 0;
-	&:first-child{
-		position: relative;
+	margin: 0;
+	.main-content-spacer{
+		height: 70px;
+	}
+	& > * {
 		left: 30px;
 	}
+}
+.bottom-popup-spacer{
+	height: 50px;
+	display: none;
+}
+#bottom-popup{
+		position: fixed;
+		bottom: 0px;
+		top: auto;
+		left: auto;
+		height: 0px;
+		background-color: blue;
+		width: 803px;
 }
 
 .tab-btn{
@@ -418,6 +433,24 @@ tr{
 
 }
 
+#snapshot{
+	.menu-button{
+		margin-left: 20px;
+		border: none;
+		width: 161px;
+		height: 69px;
+		font-size: 18px;
+		color: #434343;
+		vertical-align: middle;
+		background-color: transparent;
+		background-image: url("/@{dashboard-image-path}/snapshot_control.png");
+		&:hover{
+			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
+		}
+	}
+}
+
+
 /*The following are styles for power page.*/
 
 .poweroff,.restore{
@@ -470,7 +503,7 @@ tr{
 
 .cache-usage-bar{
 	position: relative;
-	top: 35px;
+	margin: 20px 0 0 0 ;
 	width: @site-main-content-width;
 	height: @cache-usage-bar-height + 75px;
 }

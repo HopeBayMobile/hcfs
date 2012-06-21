@@ -3,8 +3,8 @@
 
 <div class="formset">
 	<ul class="nav nav-tabs">
-	{% for form in forms_group.values %}
-          <li class=""><a href="#{{form.name}}" data-toggle="tab">{{form.name}}</a></li>
+	{% for key, form in forms_group.iteritems %}
+          <li class=""><a href="#{{form.name}}" data-toggle="tab">{{key}}</a></li>
 	{% endfor %}
 	</ul>
 	<div class="tab-content">

@@ -1,9 +1,39 @@
 {% extends "dashboard/base.html" %}
+{% block javascript %}
+<script type="text/javascript">
+	$(function(){
+		$("#checkbox-0").on("click", function(){
+			if($(this).is(":checked")){
+				$.post('/dashboard/http_proxy/on', function(ctnt, status, opts){
+					console.log(ctnt);
+				});
+			}
+		});
+
+		$(".version .upgrade").on("click", function(){
+			$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
+				console.log(ctnt);
+			})
+		});
+
+		function update_cache(){
+	        $.get('/dashboard/cache_usage/', function(ctnt, stat, opts){
+	            var data = JSON.parse(ctnt);
+	            for (key in data){
+	            	$('#'+key).find('span').text(data[key])
+	            }
+	            used_cache_percentage = Math.round(data['used_cache_size'] * 100 / data['max_cache_size']);
+	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%");
+				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size']);
+				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%");
+	        });
+	    }
+	    setInterval(update_cache, 10000);
+	});
+</script>
+{% endblock javascript %}
 {% block tab_content %}
 
-
-<div class="notify-box-row-SW">
-</div>
 <div class="storage-indicator-and-switch">
 	<div class="indicators">
 	    <div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">HDD
@@ -22,15 +52,6 @@
             </ul>
         </div>
 	</div>
-	<script type="text/javascript">
-		$("#checkbox-0").on("click", function(){
-			if($(this).is(":checked")){
-				$.post('/dashboard/http_proxy/on', function(ctnt, status, opts){
-					console.log(ctnt)
-				})
-			}
-		})
-	</script>
 	<p style="clear:both;"></p>
 </div>
 <div class="cache-usage-bar">
@@ -40,6 +61,7 @@
 			<p id="dirty_cache_size">Dirty cache: <span>{{gateway_cache_usage.dirty_cache_size}}</span>GB</p>
 			<p id="dirty_cache_entries">Dirty entries: <span>{{gateway_cache_usage.dirty_cache_entries}}</span></p>
 		</div>
+
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_2.png" alt="">
 			<p id="used_cache_size">Used cache: <span>{{gateway_cache_usage.used_cache_size}}</span>GB</p>
@@ -55,13 +77,6 @@
 			{% if available_version %}
 			<div class="upgrade">{{ available_version }}</div>
 			{% endif %}
-			<script type="text/javascript">
-				$(".version .upgrade").on("click", function(){
-					$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-						console.log(ctnt)
-					})
-				});
-			</script>
 		</div>
 	</div>
 	<div class="usage">
@@ -70,22 +85,4 @@
 		<div class="dirty" style="background-size: {{dirty_cache_percentage}}% 100%"></div>
 	</div>
 </div>
-
-<script type="text/javascript">
-	$(function(){
-		function update_cache(){
-	        $.get('/dashboard/cache_usage/', function(ctnt, stat, opts){
-	            var data = JSON.parse(ctnt);
-	            for (key in data){
-	            	$('#'+key).find('span').text(data[key])
-	            }
-	            used_cache_percentage = Math.round(data['used_cache_size'] * 100 / data['max_cache_size'])
-	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%")
-				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size'])
-				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%")
-	        });
-	    }
-	    setInterval(update_cache, 10000)
-	})
-</script>
 {% endblock tab_content %}
