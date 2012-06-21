@@ -344,18 +344,54 @@ def expose_snapshot(to_expose):
     return json.dumps(return_val)
 
 
+def _search_index(snapshot_name, snapshot_list):
+
+    try:
+        for index in range(len(snapshot_list)):
+            if snapshot_list[index]['name'] == snapshot_name:
+                return index
+    except:
+        raise SnapshotError('Unable to determine if the snapshot is exposed')
+    
+    return -1
+
+
 def delete_snapshot(to_delete):
 
-    if type(to_delete) is not str:
-        return_val = {'result': False,
-                      'msg': 'Invalid name for snapshot to delete.',
-                      'data': {}}
-        return json.dumps(return_val)
+    log.info('Started delete_snapshot')
+    return_result = False
+    return_msg = '[2] Unexpected error in delete_snapshot'
 
-    print('Deleting snapshot (name: %s)' % to_delete)
 
-    return_val = {'result': True,
-                  'msg': 'Finished deleting snapshot.',
+    try:
+        if type(to_delete) is not str:
+            raise SnapshotError('Name is not a string')
+
+        db_list = _acquire_db_list()
+        snapshot_list = _translate_db(db_list)
+
+        snapshot_index = _search_index(to_delete, snapshot_list)
+
+        if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
+            snapshot_path = os.path.join(snapshot_dir, to_delete)
+            if os.path.exists(snapshot_path):  #Invoke s3qlrm
+                os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
+
+            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index+1:]
+            _write_snapshot_db(updated_snapshot_list)
+
+            return_result = True
+            return_msg = 'Finished deleting snapshot'
+
+        else:
+            return_msg = 'Snapshot is currently being exposed. Skipping.'
+
+    except:
+        pass
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
                   'data': {}}
     return json.dumps(return_val)
 
@@ -374,20 +410,18 @@ def _write_snapshot_lifespan(months_to_live):
 def set_snapshot_lifespan(months_to_live):
 
     log.info('Started set_snapshot_lifespan')
-    print('Lifespan of a snapshot is set to %d months' % months_to_live)
-
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
-    if months_to_live > 0:
-        try:
+    try:
+        if months_to_live > 0:
             _write_snapshot_lifespan(months_to_live)
             return_result = True
             return_msg = 'Completed set_snapshot_lifespan'
-        except SnapshotError as Err:
-            return_msg = str(Err)
-    else:
-        return_msg = 'Error in set_snapshot_lifespan: months_to_live must be a positive integer.'
+        else:
+            return_msg = 'Error in set_snapshot_lifespan: months_to_live must be a positive integer.'
+    except Exception as Err:
+        return_msg = str(Err)
 
     log.info(return_msg)
     return_val = {'result': return_result,
@@ -439,6 +473,4 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
-    print get_snapshot_list()
-    print expose_snapshot([])
     pass
