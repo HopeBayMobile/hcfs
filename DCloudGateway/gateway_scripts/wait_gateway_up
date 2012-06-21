@@ -1,0 +1,9 @@
+#!/bin/bash
+
+val=1
+while [[ "$val" -ne "0" ]]
+do
+  ls /mnt/cloudgwfiles/lost+found > /var/log/gateway_lost_found
+  val=$?
+done
+
