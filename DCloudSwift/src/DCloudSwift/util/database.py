@@ -134,9 +134,13 @@ class AccountDatabaseBroker(DatabaseBroker):
         :returns: return None if the user already exists. Otherwise return the newly added row
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-            if row:
-                return None
+            row_account = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
+            row_name = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()        
+            
+            if row_name:
+                return None          
+            if not row_account:
+                return False
             else:
                 conn.execute("INSERT INTO user_info VALUES (?,?,?)", (account, name, 1))
                 conn.commit()
@@ -144,22 +148,60 @@ class AccountDatabaseBroker(DatabaseBroker):
                 return row
 
     def delete_user(self, account, name):
-	"""
+        '''
          delete user from the db
 
-        :param account: account of the user
-	:param name: name of the user
+        :param account: account of the user    
+        :param name: name of the user     
+        :returns: return None if the user does not exist; otherwise return the deleted row
+        '''
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
+            if row:
+                conn.execute("DELETE FROM user_info WHERE account=? AND name=?", (account, name))
+                conn.commit()
+                return row
+            else:
+                return None
+
+    def add_account(self, account):
+        """
+        add account into the db
+        @author: Rice
         
-	:returns: return None if the user does not exist; otherwise return the deleted row
-	"""
-	with self.get() as conn:
-		row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-		if row:
-			conn.execute("DELETE FROM user_info WHERE account=? AND name=?", (account, name))
-			conn.commit()
-			return row
-		else:
-			return None
+        @type  account: string
+        @param account: the name of account
+        @return: return None if the account already exists. Otherwise return the newly added row.
+        """      
+
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
+            if row:
+                return None
+            else:
+                conn.execute("INSERT INTO user_info VALUES (?,0,?)", (account, 1))
+                conn.commit()
+                row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
+                return row
+
+    def delete_account(self, account):
+        '''
+         delete user from the db
+         @author: Rice
+         
+         @type  account: string
+         @param account: the name of account
+         @return: return None if the account does not exists. Otherwise, return the deleted row.
+        '''
+        
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
+            if row:
+                conn.execute("DELETE FROM user_info WHERE account=?", (account,))
+                conn.commit()
+                return row
+            else:
+                return None
 
     def disable_user(self, account, name):
 	"""
