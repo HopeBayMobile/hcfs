@@ -90,6 +90,9 @@ SHOW_LOG_LEVEL = {
 # How many log records to show
 NUM_LOG_LINES = 20
 
+#Snapshot tag
+snapshot_tag = "/root/.s3ql/.snapshotting"
+
 ################################################################################
 
 class BuildGWError(Exception):
