@@ -95,10 +95,9 @@
                     $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content')
                 });
             });
-
-            {% block javascript %}
-            {% endblock javascript %}
         </script>
+        {% block javascript %}
+        {% endblock javascript %}
     </head>
 
     <body>
@@ -141,7 +140,7 @@
                   <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
                   <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
                   <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
-                  <li class=""><a href="#">Snapshot</a></li>
+                  <li class=""><a href="{% url dashboard:snapshot %}">Snapshot</a></li>
                   <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
                   <li class=""><a href="{% url dashboard:config action=None %}">Configuration</a></li>
                   <li class=""><a href="{% url dashboard:power action=None %}"><img src="/static/img/dashboard/power_icon.png"></a></li>
@@ -150,10 +149,13 @@
         </div>
         <div id="errormsgbox"></div>
         <div class="main-row main-bg">
-            <div class="tab-content">
+            <div class="main-content">
+                <div class="main-content-spacer"></div>
                 {% block tab_content %}
                 {% endblock tab_content %}
+                <div id="bottom-popup">1</div>
             </div>
+
         </div>
         </td>
         </tr>

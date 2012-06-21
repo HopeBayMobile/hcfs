@@ -1,0 +1,126 @@
+{% extends "dashboard/base.html" %}
+{% block javascript %}
+    <script type="text/javascript">
+        $(function(){
+            var sign = 1;
+            $("body").on("click", ".menu-button.delete", function(){
+                console.log(sign)
+                if (sign > 0){
+                    $("#bottom-popup").css({"height": "50px"})
+                    $(".bottom-popup-spacer").show();
+                } else {
+                    $("#bottom-popup").css({"height": "0px"})
+                    $(".bottom-popup-spacer").hide();
+                }
+                sign = sign * (-1)
+            })
+        })
+    </script>
+{% endblock javascript %}
+{% block tab_content %}
+    <ul class="nav nav-tabs">
+        <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
+        <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
+    </ul>
+    <div class="tab-content">
+        <div class="tab-pane active" id="snapshot" style="">
+            <button class="menu-button">Create</button>
+            <button class="menu-button delete">Delete</button>
+            <button class="menu-button">Export</button>
+            <div id="test" style="">
+                <table class="table table-striped table-bordered table-condensed">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Snapshot ID</th>
+                        <th>Usage</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Export</th>
+                        <th>Path</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    <tr>
+                        <td><input type="checkbox" name="" value=""></td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                        <td>1bc</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="bottom-popup-spacer"></div>
+        </div>
+        <div class="tab-pane" id="schedule">
+            This is the schedule view.
+        </div>
+    </div>
+
+{% endblock tab_content %}

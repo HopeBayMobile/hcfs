@@ -291,6 +291,12 @@ def syslog(request):
 
 
 @login_required
+def snapshot(request, action=None):
+    return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot'})
+
+
+
+@login_required
 @require_POST
 def http_proxy(request, action=None):
     if request.method == 'POST':
