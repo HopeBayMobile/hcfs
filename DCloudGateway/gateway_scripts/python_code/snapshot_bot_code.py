@@ -31,10 +31,11 @@ snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
 class SnapshotError(Exception):
     pass
 
+
 class Snapshot_Db_Lock():
-    
+
     def __init__(self):
-        
+
         self.locked = False
         try:
             finish = False
@@ -42,12 +43,11 @@ class Snapshot_Db_Lock():
                 if os.path.exists(snapshot_db_lock):
                     time.sleep(10)
                 else:
-                   os.system('sudo touch %s' % snapshot_db_lock)
-                   finish = True
+                    os.system('sudo touch %s' % snapshot_db_lock)
+                    finish = True
         except:
             raise SnapshotError('Unable to acquire snapshot db lock')
         self.locked = True
-
 
     def __del__(self):
 
@@ -102,6 +102,7 @@ def new_database_entry():
                 raise SnapshotError(error_msg)
         finally:
             del db_lock
+
 
 def invalidate_entry():
 
