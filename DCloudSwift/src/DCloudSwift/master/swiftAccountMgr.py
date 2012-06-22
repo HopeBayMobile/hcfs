@@ -68,13 +68,13 @@ class SwiftAccountMgr:
 		1. Execute the private function fn with a randomly chosen proxy node and kwargs as input.
 		2. Break if fn retrun True
 		 
-		@type  proxy_ip_list: string  
-    	@param proxy_ip_list: ip list of proxy nodes
-    	@type  retry: integer
+		@type  proxy_ip_list: string
+		@param proxy_ip_list: ip list of proxy nodes
+		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-    	@type  fn: string
-    	@param fn: private function to call
-    	@param kwargs: keyword arguments to fn
+		@type  fn: string
+		@param fn: private function to call
+		@param kwargs: keyword arguments to fn
 		'''
 		val = False
 		msg =""
@@ -1860,15 +1860,15 @@ class SwiftAccountMgr:
 		'''
 		Set self-defined metadata of the given container.
 		The self-defined metadata are associatied with a user and include:
-			(1) Account_Enable: True/False
-			(2) User_Enable: True/False
+			(1) Account-Enable: True/False
+			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
 		The following is the details of metadata_content:
 		metadata_content = {
-			"Account_Enable": True/False,
-			"User_Enable": True/False,
+			"Account-Enable": True/False,
+			"User-Enable": True/False,
 			"Password": user password,
 			"Quota": number of bytes
 		}
@@ -1922,15 +1922,15 @@ class SwiftAccountMgr:
 		'''
 		Get self-defined metadata of the given container as a dictionary.
 		The self-defined metadata are associatied with a user and include:
-			(1) Account_Enable: True/False
-			(2) User_Enable: True/False
+			(1) Account-Enable: True/False
+			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
 		The following is the details of metadata:
 		{
-			"Account_Enable": True/False,
-			"User_Enable": True/False,
+			"Account-Enable": True/False,
+			"User-Enable": True/False,
 			"Password": user password,
 			"Quota": number of bytes
 		}
