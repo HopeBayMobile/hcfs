@@ -4,9 +4,11 @@
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
 # Swift client class can connect to swift and do swift operation
 
-import os
+import common
 import subprocess
 from GatewayError import *
+
+log = common.getLogger(name="class name: SwiftClient", conf="/etc/delta/Gateway.ini")
 
 class SwiftClient():
     """
@@ -48,7 +50,7 @@ class SwiftClient():
         except Exception:
             raise SwiftCommandError()
 
-def main(argv = None):
+def main():
     swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
     swift.executeCommand()
         

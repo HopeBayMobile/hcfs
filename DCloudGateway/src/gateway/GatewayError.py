@@ -57,7 +57,7 @@ class ErrorCode():
                   '004' : 'swift upload container is fail!',
                  }
     
-def main(argv = None):
+def main():
     try:
         raise CreateMetaDataError()
     except CreateMetaDataError as e:

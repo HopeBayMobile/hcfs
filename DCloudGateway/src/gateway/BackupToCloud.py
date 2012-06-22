@@ -16,7 +16,7 @@ from time import gmtime, strftime
 from SwiftClient import *
 
 TEMP_PATH = '/tmp/backuptocloud'
-log = common.getLogger(name="Backup To Cloud", conf="/etc/delta/Gateway.ini")
+log = common.getLogger(name="class name: BackupToCloud", conf="/etc/delta/Gateway.ini")
 
 class BackupToCloud():
     """
@@ -26,7 +26,8 @@ class BackupToCloud():
         self._cloudObject = cloudObject
         if self._fileList is None:
             self._fileList = ['/etc/network/interfaces', '/home/hungic/.bashrc', '/tmp/aaa']
-            print self._fileList
+            log.info('input file list: %s' % self._fileList)
+            #print self._fileList
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
         self._metaData = {}
@@ -56,7 +57,8 @@ class BackupToCloud():
                 statInfo = os.stat(filename)
                 user = pwd.getpwuid(statInfo.st_uid)[0]
                 group = grp.getgrgid(statInfo.st_gid)[0]
-                fileMode = stat.S_IMODE(statInfo.st_mode)
+                fileMode = oct(stat.S_IMODE(statInfo.st_mode))
+                #print user, group, fileMode
                 key = ''.join(['file', str(i)])
                 self._metaData[key] = {'fname': os.path.basename(filename), 
                                        'fpath': os.path.dirname(filename), 
@@ -84,7 +86,7 @@ class BackupToCloud():
         """
         """
         os.chdir(TEMP_PATH)
-        returnData = self._cloudObject.upload('config', self._tarFileName)
+        self._cloudObject.upload('config', self._tarFileName)
 
 
 def main():
