@@ -257,27 +257,7 @@ def get_gateway_indicators():
         log.info("msg: %s" % str(Err))
         return json.dumps(return_val)
 
-<<<<<<< HEAD
-    op_ok = True
-    op_msg = "Gateway indocators read successfully."
-
-    return_val = {
-          'result' : op_ok,
-          'msg'    : op_msg,
-          'data'   : {'network_ok' : op_network_ok,
-          'system_check' : op_system_check,
-          'flush_inprogress' : op_flush_inprogress,
-          'dirtycache_nearfull' : op_dirtycache_nearfull,
-          'HDD_ok' : op_HDD_ok,
-          'NFS_srv' : op_NFS_srv,
-          'SMB_srv' : op_SMB_srv,
-          'snapshot_in_progress' : op_snapshot_in_progress,
-          'HTTP_proxy_srv' : op_Proxy_srv }}
-
-    log.info("[2] get_gateway_indicators end")
-=======
     log.info("get_gateway_indicators end")
->>>>>>> 3aa7cef248409465f11569870ae62b047ea4883e
     return json.dumps(return_val)
 
 def _check_http_proxy_service():
