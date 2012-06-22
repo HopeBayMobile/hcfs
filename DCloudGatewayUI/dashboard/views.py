@@ -53,21 +53,53 @@ def index(request):
 
 def system(request, action=None):
 
-    forms_group = {}
+    forms_group = SortedDict()
     network_data = json.loads(api.get_network()).get('data')
+    gateway_data = json.loads(api.get_storage_account()).get('data')
     action_error = {}
     print network_data
 
+    class Gateway(RenderFormMixinClass, forms.Form):
+        storage_url = forms.CharField(label='Cloud storage url')
+        account = forms.CharField()
+        password = forms.CharField(widget=forms.PasswordInput)
+        retype_password = forms.CharField(widget=forms.PasswordInput)
+
+        def clean(self):
+            cleaned_data = super(Gateway, self).clean()
+            new_passord = cleaned_data.get('password')
+            if new_passord:
+                if new_passord == cleaned_data['retype_password']:
+                    del cleaned_data['retype_password']
+                else:
+                    raise forms.ValidationError("The password does not match the retype password!")
+            return cleaned_data
+
+    class EncryptionKey(RenderFormMixinClass, forms.Form):
+        old_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+        retype_new_key = forms.CharField(widget=forms.PasswordInput, min_length=6, max_length=20)
+
+        def clean(self):
+            cleaned_data = super(EncryptionKey, self).clean()
+            new_key = cleaned_data.get('new_key')
+            if new_key:
+                if new_key == cleaned_data['retype_new_key']:
+                    del cleaned_data['retype_new_key']
+                else:
+                    raise forms.ValidationError("The newkey does not match the retype key!")
+            return cleaned_data
+
     class Network(RenderFormMixinClass, forms.Form):
-        ip = forms.IPAddressField(label='IP Address', widget=IPAddressInput)
-        gateway = forms.IPAddressField(label='Gateway Address', widget=IPAddressInput)
+        ip = forms.IPAddressField(label='IP address', widget=IPAddressInput)
         mask = forms.IPAddressField(label='Submask', widget=IPAddressInput)
+        gateway = forms.IPAddressField(label='Default gateway', widget=IPAddressInput)
         dns1 = forms.IPAddressField(label='Primary DNS server', widget=IPAddressInput)
         dns2 = forms.IPAddressField(label='Secondary DNS server', widget=IPAddressInput)
 
     class AdminPassword(RenderFormMixinClass, forms.Form):
-        password = forms.CharField(widget=forms.PasswordInput)
-        retype_password = forms.CharField(widget=forms.PasswordInput)
+        password = forms.CharField(label='New password', widget=forms.PasswordInput)
+        retype_password = forms.CharField('Retype new password', widget=forms.PasswordInput)
 
         def clean(self):
             cleaned_data = super(AdminPassword, self).clean()
@@ -97,9 +129,30 @@ def system(request, action=None):
                 return redirect('/logout')
             else:
                 forms_group[action] = form
+        elif action == "gateway":
+            form = Gateway(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
+                print update_return
+                if not update_return['result']:
+                    action_error[action] = update_return['msg']
+            else:
+                forms_group[action] = form
+        elif action == "encrypt":
+            form = EncryptionKey(request.POST)
+            if form.is_valid():
+                update_return = json.loads(api.apply_user_enc_key(form['old_key'].data, form['new_key'].data))
+                print update_return
+                if not update_return['result']:
+                    action_error[action] = update_return['msg']
+            else:
+                forms_group[action] = form
 
-    forms_group['network'] = forms_group.get('network', Network(initial=network_data))
-    forms_group['admin_pass'] = forms_group.get('admin_pass', AdminPassword())
+    forms_group['Network'] = forms_group.get('network', Network(initial=network_data))
+    forms_group['Cloud Storage Access'] = forms_group.get('gateway', Gateway(initial=gateway_data))
+    forms_group['Admin Password'] = forms_group.get('admin_pass', AdminPassword())
+    forms_group['Encryption Key'] = forms_group.get('encrypt', EncryptionKey())
+
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 
 
@@ -112,7 +165,7 @@ def account(request, action=None):
     print gateway_data
 
     class Gateway(RenderFormMixinClass, forms.Form):
-        storage_url = forms.CharField()
+        storage_url = forms.CharField(label='Cloud storage url')
         account = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
         retype_password = forms.CharField(widget=forms.PasswordInput)
@@ -162,8 +215,8 @@ def account(request, action=None):
             else:
                 forms_group[action] = form
 
-    forms_group['gateway'] = forms_group.get('gateway', Gateway(initial=gateway_data))
-    forms_group['encrypt'] = forms_group.get('encrypt', EncryptionKey())
+    forms_group['Cloud Storage Access'] = forms_group.get('gateway', Gateway(initial=gateway_data))
+    forms_group['EncryptionKey'] = forms_group.get('encrypt', EncryptionKey())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'account', 'forms_group': forms_group, 'action_error': action_error})
 
@@ -200,7 +253,7 @@ def sharefolder(request, action):
                 action_error[action] = update_return['msg']
             nfs_data['array_of_ip'] = ip_list
 
-    forms_group['smb_setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
+    forms_group['SMB Setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
 
     return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
                                                           'action_error': action_error, "nfs_data": nfs_data})
@@ -288,6 +341,11 @@ def syslog(request):
     return render(request, 'dashboard/syslog.html', {'tab': 'syslog',
                                                      'log_data': log_data
                                                      })
+
+
+@login_required
+def snapshot(request, action=None):
+    return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot'})
 
 
 @login_required

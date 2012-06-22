@@ -3,14 +3,14 @@
 
 <div class="formset">
 	<ul class="nav nav-tabs">
-	{% for form in forms_group.values %}
-          <li class=""><a href="#{{form.name}}" data-toggle="tab">{{form.name}}</a></li>
+	{% for key, form in forms_group.iteritems %}
+          <li class=""><a href="#{{form.name}}" data-toggle="tab">{{key}}</a></li>
 	{% endfor %}
 	</ul>
 	<div class="tab-content">
 	{% for name, form in forms_group.iteritems %}
 		<div class="tab-pane" id="{{form.name}}">
-		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{name}}">
+		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{form.name}}">
 			{% csrf_token %} {{ form.render }}
 			<div class="controls">
 				<p class="help-block" style="color: red;">

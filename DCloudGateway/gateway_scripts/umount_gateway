@@ -1,7 +1,0 @@
-sudo /etc/init.d/portmap stop
-sudo /etc/init.d/nfs-kernel-server stop
-sudo /etc/init.d/smbd stop
-sudo /etc/init.d/nmbd stop
-sudo /etc/init.d/iscsitarget stop
-sudo umount.s3ql /mnt/cloudgwfiles
-

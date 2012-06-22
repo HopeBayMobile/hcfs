@@ -235,11 +235,29 @@ def get_gateway_indicators():
         op_SMB_srv = _check_smb_service()
         op_snapshot_in_progress = _check_snapshot_in_progress()
         op_Proxy_srv = _check_http_proxy_service()
+
+        op_ok = True
+        op_msg = "Gateway indocators read successfully."
+    
+        return_val = {
+              'result' : op_ok,
+              'msg'    : op_msg,
+              'data'   : {'network_ok' : op_network_ok,
+              'system_check' : op_system_check,
+              'flush_inprogress' : op_flush_inprogress,
+              'dirtycache_nearfull' : op_dirtycache_nearfull,
+              'HDD_ok' : op_HDD_ok,
+              'NFS_srv' : op_NFS_srv,
+              'SMB_srv' : op_SMB_srv,
+              'snapshot_in_progress' : op_snapshot_in_progress,
+              'HTTP_proxy_srv' : op_Proxy_srv }}
+    
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
         return json.dumps(return_val)
 
+<<<<<<< HEAD
     op_ok = True
     op_msg = "Gateway indocators read successfully."
 
@@ -257,6 +275,9 @@ def get_gateway_indicators():
           'HTTP_proxy_srv' : op_Proxy_srv }}
 
     log.info("[2] get_gateway_indicators end")
+=======
+    log.info("get_gateway_indicators end")
+>>>>>>> 3aa7cef248409465f11569870ae62b047ea4883e
     return json.dumps(return_val)
 
 def _check_http_proxy_service():
@@ -1034,15 +1055,20 @@ def reset_gateway():
     op_ok = True
     op_msg = "Succeeded to reset the gateway."
     
-    pid = os.fork()
-
-    if pid == 0:
-        time.sleep(10)
-        os.system("sudo reboot")
-    else:
-        log.info("[2] Gateway will restart after ten seconds")
-        log.info("The gateway will restart after ten seconds.")
+    try:
+        pid = os.fork()
+    
+        if pid == 0:
+            time.sleep(10)
+            os.system("sudo reboot")
+        else:
+            log.info("[2] Gateway will restart after ten seconds")
+            log.info("The gateway will restart after ten seconds.")
+    except:
+        pass
+    
     return json.dumps(return_val)
+
 
 def shutdown_gateway():
     log.info("shutdown_gateway start")
@@ -1052,15 +1078,20 @@ def shutdown_gateway():
     op_ok = True
     op_msg = "Succeeded to shutdown the gateway."
 
-    pid = os.fork()
-
-    if pid == 0:
-        time.sleep(10)
-        os.system("sudo poweroff")
-    else:
-        log.info("[2] Gateway will shutdown after ten seconds")
-        log.info("The gateway will shutdown after ten seconds.")
+    try:
+        pid = os.fork()
+    
+        if pid == 0:
+            time.sleep(10)
+            os.system("sudo poweroff")
+        else:
+            log.info("[2] Gateway will shutdown after ten seconds")
+            log.info("The gateway will shutdown after ten seconds.")
+    except:
+        pass
+    
     return json.dumps(return_val)
+
 
 @common.timeout(180)
 def _test_storage_account(storage_url, account, password):
@@ -1199,29 +1230,32 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
             return json.dumps(return_val)
     
-
-    if not _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2):
-
-        return_val = {
-            'result': False,
-            'msg': "Failed to store the network information",
-            'data': {}
-        }
+    try:
+        if not _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2):
     
-        return json.dumps(return_val)
+            return_val = {
+                'result': False,
+                'msg': "Failed to store the network information",
+                'data': {}
+            }
+        
+            return json.dumps(return_val)
+        
     
-
-    if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
-        if os.system("sudo /etc/init.d/networking restart") == 0:
-            op_ok = True
-            op_msg = "Succeeded to apply the network configuration."
+        if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
+            if os.system("sudo /etc/init.d/networking restart") == 0:
+                op_ok = True
+                op_msg = "Succeeded to apply the network configuration."
+            else:
+                op_ok = False
+                log.error("Failed to restart the network.")
         else:
             op_ok = False
-            log.error("Failed to restart the network.")
-    else:
-        op_ok = False
-        log.error(op_msg)
+            log.error(op_msg)
 
+    except:
+        pass
+    
     return_val = {
     'result': op_ok,
     'msg': op_msg,
@@ -1410,27 +1444,7 @@ def get_smb_user_list ():
     try:
         parser = ConfigParser.SafeConfigParser() 
         parser.read(smb_conf_file)
-    except ConfigParser.ParsingError, err:
-        #print err
-        op_msg = smb_conf_file + ' is not readable.'
-        
-        log.error(op_msg)
-            
-        username.append(default_user_id) # default
-        
-        #print "file is not readable"
-    else:
 
-        '''
-        #read all info
-        for section_name in parser.sections():
-            print 'Section:', section_name
-            print '  Options:', parser.options(section_name)
-            #for name, value in parser.items(section_name):
-            #    print '  %s = %s' % (name, value)
-            #print
-        '''
-        
         if parser.has_option("cloudgwshare", "valid users"):
             user = parser.get("cloudgwshare", "valid users")
             username = str(user).split(" ") 
@@ -1440,12 +1454,22 @@ def get_smb_user_list ():
 
         op_ok = True
         op_msg = 'Obtained smb account information'
-
+        
+    except ConfigParser.ParsingError, err:
+        #print err
+        op_msg = smb_conf_file + ' is not readable.'
+        
+        log.error(op_msg)
+            
+        username.append(default_user_id) # default
+        
+        #print "file is not readable"
     
     return_val = {
                   'result' : op_ok,
                   'msg' : op_msg,
                   'data' : {'accounts' : username}}
+
     log.info("get_storage_account end")
         
     return json.dumps(return_val)
@@ -1707,19 +1731,18 @@ def set_nfs_access_ip_list (array_of_ip):
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
 
-    #Resetting nfs service
-    nfs_return_val = json.loads(restart_nfs_service())
-
-    if nfs_return_val['result'] == False:
-        return_val['result'] = False
-        return_val['msg'] = 'Error in restarting NFS service.'
-        return json.dumps(return_val)
-
+    try:
+        #Resetting nfs service
+        nfs_return_val = json.loads(restart_nfs_service())
+    
+        if nfs_return_val['result'] == False:
+            return_val['result'] = False
+            return_val['msg'] = 'Error in restarting NFS service.'
+            return json.dumps(return_val)
+    except:
+        pass
         
     log.info("get_nfs_access_ip_list end")
-
-
-
     
     return json.dumps(return_val)
     
@@ -1737,6 +1760,14 @@ def apply_scheduling_rules(schedule):        # by Yen
             fptr.writerow(header)
             for row in schedule:
                 fptr.writerow(row)
+        # apply settings
+        os.system("sudo /etc/cron.hourly/hourly_run_this")
+        return_val = {
+            'result': True,
+            'msg': "Rules of bandwidth schedule are saved.",
+            'data': {}
+        }
+
     except:
         return_val = {
             'result': False,
@@ -1745,16 +1776,6 @@ def apply_scheduling_rules(schedule):        # by Yen
         }
         return json.dumps(return_val)
     
-    # apply settings
-
-    os.system("sudo /etc/cron.hourly/hourly_run_this")
-
-    
-    return_val = {
-    'result': True,
-    'msg': "Rules of bandwidth schedule are saved.",
-    'data': {}
-    }
     return json.dumps(return_val)
     
 
@@ -2256,25 +2277,28 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
                            "info_log" : []
                          }
                }
-
-    logs = read_logs(LOGFILES, 0 , None) #query all logs
-
-    for level in SHOW_LOG_LEVEL[log_level]:
-        for logfile in logs: # mount, syslog, ...
-            counter = 0  # for each info src, it has number_of_msg returned
-
-            for log in logs[logfile]: # log entries
-                if counter >= number_of_msg:
-                    break # full, finish this src
-                try:
-                    if log["category"] == level:
-                        ret_val["data"][level].append(log)
-                        counter = counter + 1
-                    else:
-                        pass
-                except:
-                    pass # any except, skip this line
-
+    
+    try:
+        logs = read_logs(LOGFILES, 0 , None) #query all logs
+    
+        for level in SHOW_LOG_LEVEL[log_level]:
+            for logfile in logs: # mount, syslog, ...
+                counter = 0  # for each info src, it has number_of_msg returned
+    
+                for log in logs[logfile]: # log entries
+                    if counter >= number_of_msg:
+                        break # full, finish this src
+                    try:
+                        if log["category"] == level:
+                            ret_val["data"][level].append(log)
+                            counter = counter + 1
+                        else:
+                            pass
+                    except:
+                        pass # any except, skip this line
+    except:
+        pass
+    
     return json.dumps(ret_val)
 
 #######################################################
