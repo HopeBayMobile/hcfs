@@ -21,7 +21,7 @@ class BackupError(GatewayError):
         if self.code is None:
             self.code = '001'
         if self.msg is None:
-            self.msg = ReturnCode.backupReturnCodes[self.code]
+            self.msg = ErrorCode.BackupErrorCodes[self.code]
     def __str__(self):
         return "Backup config error(%s): %s" % (self.code, self.msg)        
     
@@ -31,7 +31,7 @@ class CreateMetaDataError(BackupError):
     def __init__(self, msg = None):
         self.code = '002'
         self.msg = msg
-        super(FileNotFoundError, self).__init__(self.code, self.msg)
+        super(CreateMetaDataError, self).__init__(self.code, self.msg)
         
 class SwiftCommandError(BackupError):
     """
@@ -39,7 +39,7 @@ class SwiftCommandError(BackupError):
     def __init__(self, msg = None):
         self.code = '003'
         self.msg = msg
-        super(FileNotFoundError, self).__init__(self.code, self.msg)
+        super(SwiftCommandError, self).__init__(self.code, self.msg)
         
 class SwiftUploadError(BackupError):
     """
@@ -47,12 +47,10 @@ class SwiftUploadError(BackupError):
     def __init__(self, msg = None):
         self.code = '004'
         self.msg = msg
-        super(FileNotFoundError, self).__init__(self._code, self.msg) 
+        super(SwiftUploadError, self).__init__(self.code, self.msg) 
 
-class ReturnCode():
-    backupReturnCodes = {
-                  '100' : "success",
-                  '101' : "success but not update",
+class ErrorCode():
+    BackupErrorCodes = {
                   '001' : 'config backup is fail!',
                   '002' : 'create metadata file is fail!',
                   '003' : 'swift command is fail!',
