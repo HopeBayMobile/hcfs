@@ -1,8 +1,0 @@
-sudo /etc/init.d/portmap stop
-sudo /etc/init.d/nfs-kernel-server stop
-sudo /etc/init.d/smbd stop
-sudo /etc/init.d/nmbd stop
-sudo /etc/init.d/iscsitarget stop
-sudo fusermount -u -z /mnt/cloudgwfiles
-sudo fsck.s3ql --debug all swift://$1:8080/$2
-
