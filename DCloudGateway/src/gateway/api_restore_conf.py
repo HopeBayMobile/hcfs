@@ -123,6 +123,8 @@ def save_gateway_configuration():
                       'code'    : e.code,
                       'msg'     : e.msg}
         return json.dumps(return_val)
+    except Exception as e:
+        log.error('unexception error: %s' % e)
 
 #----------------------------------------------------------------------
 def restore_gateway_configuration():
