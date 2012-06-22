@@ -6,6 +6,7 @@
 
 import os
 import subprocess
+import GatewayError
 
 class SwiftClient():
     """
@@ -23,29 +24,33 @@ class SwiftClient():
             self._password = 'testpass'
             
     def executeCommand(self, command = None):
-    	if command is None:
+        if command is None:
             command = 'stat'
-        try:
-            cmd = ''.join(['swift -A https://', self._url, '/auth/v1.0 -U ',
-                self._login, ' -K ', self._password, ' ', command])
-            print "swift command is \n" 
-            print cmd
-            po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            (stdout, stderr) = po.communicate()
-            po.wait()
-            if po.returncode == 0:
-                print stdout
-            else:
-                print stderr
-        except Exception as e:
-            print e
-    
+        cmd = ''.join(['sudo swift -A https://', self._url, '/auth/v1.0 -U ',
+            self._login, ' -K ', self._password, ' ', command])
+        print "swift command is"
+        print cmd
+        po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        (stdout, stderr) = po.communicate()
+        po.wait()
+        if po.returncode == 0:
+            return True
+        else:
+            return False
+
     def upload(self, container, file):
-        self.executeCommand('upload %s %s' %(container, file))
+        try:
+            returnData = self.executeCommand('upload %s %s' %(container, file))
+            if returnData is False:
+                raise SwiftUploadError()
+        except SwiftUploadError as e:
+            raise SwiftUploadError()
+        except Exception as e:
+            raise SwiftCommandError()
 
 def main(argv = None):
-	swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
-	swift.executeCommand()
+    swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
+    swift.executeCommand()
         
 if __name__ == '__main__':
-	main()
+    main()
