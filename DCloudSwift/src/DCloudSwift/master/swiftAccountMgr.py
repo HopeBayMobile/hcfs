@@ -420,63 +420,39 @@ class SwiftAccountMgr:
 		
 		return Bool(val, msg)
 
-	@util.timeout(300)
-	def __enable_user(self, proxyIp, account, user):
-		logger = util.getLogger(name="__enable_user")
-
-		url = "https://%s:8080/auth/"%proxyIp
-		msg = ""
-		val = False
-
-		password = self.__accountDb.get_password(account, user)
-		if password is None:
-			msg = "user %s:%s does not exists"%(account,user)
-			return Bool(val, msg)
-		
-		admin_opt = "-a " if self.__accountDb.is_admin(account, user) else ""
-		reseller_opt = "-r " if self.__accountDb.is_reseller(account, user)  else ""
-		optStr = admin_opt + reseller_opt
-
-		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, password)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-				
-		if po.returncode !=0:
-			logger.error(stderrData)
-			msg = stderrData
-			val =False
-		else:
-			logger.info(stdoutData)
-			msg = stdoutData
-			val =True
-
-		Bool = collections.namedtuple("Bool", "val msg")
-                return Bool(val, msg)
-
-	def enable_user(self, account, user, retry=3):
+	def enable_user(self, account, container, user, admin_user, retry=3):
 		'''
-		Enable the user to access the backend swift by re-adding it to the backend
-		using original setting stored in database.
+		Enable the user to access the backend Swift by restoring the original
+		password kept in the metadata of the user's container.
 
 		@type  account: string
-		@param account: the name of the given account
+		@param account: the account of the user
+		@type  container: string
+		@param container: the container for the user
 		@type  user: string
-		@param user: the name of the given user
+		@param user: the user to be enabled
+		@type  admin_user: string
+		@param admin_user: the admin user of the container
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
 		@rtype:  named tuple
-		@return: a tuple Bool(val, msg). If the user is re-added to the backend using
-			the original setting stored in the backend. Otherwise, Bool.val == False
-			and Bool.msg indicates the reason of failure.
+		@return: a tuple Bool(val, msg). If the user's password is successfully
+			restored to the original password kept in the metadata of the user's 
+			container, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
 		'''
 		logger = util.getLogger(name="enable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-		
+		ori_user_password = ""
+		actual_user_password = ""
+		admin_password = ""
+		container_metadata = {}
+
 		msg = ""
 		val = False
 		Bool = collections.namedtuple("Bool", "val msg")
 
-		if proxy_ip_list is None or len(proxy_ip_list)==0:
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
 			msg = "No proxy node is found"
 			return Bool(val, msg)
 
@@ -484,18 +460,63 @@ class SwiftAccountMgr:
 			msg = "Argument retry has to >= 1"
 			return Bool(val, msg)
 
-		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__enable_user,
-                                                   account=account, user=user)
-		try:
-			if val == True:
-				self.__accountDb.enable_user(account=account, name=user)
+		get_user_password_output = self.get_user_password(account, user)
+		if get_user_password_output.val == False:
+			val = False
+			msg = get_user_password_output.msg
+			return Bool(val, msg)
+		else:
+			actual_user_password = get_user_password_output.msg
 
-		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=True for user %s:%s in database for %s"%(account, user, str(e))
-			logger.error(errMsg)
-			raise InconsistentDatabaseError(errMsg)
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
 
-                return Bool(val, msg)
+		#TODO: check whehter the container is associated with the user
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=container,\
+		admin_user=admin_user, admin_password=admin_password)
+
+		if val == False:
+			msg = "Failed to get the metadata of the container %s" % container + msg
+			return Bool(val, msg)
+		else:
+			container_metadata = msg
+
+		if container_metadata["Account-Enable"] == False:
+			val = False
+			msg = "Failed to enable the user %s: the account %s does not enable"\
+			% (user, account)
+			return Bool(val, msg)
+		elif container_metadata["User-Enable"] == True:
+			val = True
+			msg = "The user %s has enabled" % user
+			return Bool(val, msg)
+		elif container_metadata["Password"] == actual_user_password:
+			val = True
+			msg = "The user %s has enabled" % user
+			return Bool(val, msg)
+		else:
+			ori_user_password = container_metadata["Password"]
+			container_metadata["User-Enable"] = True
+
+		change_password_output = self.change_password(account, user, actual_user_password,\
+		ori_user_password)
+
+		if change_password_output.val == False:
+			val = False
+			msg = change_password_output.msg
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __disable_user(self, proxyIp, account, user):
@@ -536,7 +557,6 @@ class SwiftAccountMgr:
 		@return: a tuple Bool(val, msg). If the user's backend password is successfully changed
 			and the enabled field in the database is set to false then Bool.val == True. 
 			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
-		
 		'''
 		logger = util.getLogger(name="disable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
@@ -1886,19 +1906,19 @@ class SwiftAccountMgr:
 	def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
 		'''
 		Set self-defined metadata of the given container.
-		The self-defined metadata are associatied with a user and include:
+		The self-defined metadata are associatied with a user and include::
 			(1) Account-Enable: True/False
 			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
-		The following is the details of metadata_content:
-		metadata_content = {
-			"Account-Enable": True/False,
-			"User-Enable": True/False,
-			"Password": user password,
-			"Quota": number of bytes
-		}
+		The following is the details of metadata_content::
+			metadata_content = {
+				"Account-Enable": True/False,
+				"User-Enable": True/False,
+				"Password": user password,
+				"Quota": number of bytes
+			}
 
 		@type  proxyIp: string
 		@param proxyIp: IP of the proxy node
@@ -1949,19 +1969,19 @@ class SwiftAccountMgr:
 	def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
 		'''
 		Get self-defined metadata of the given container as a dictionary.
-		The self-defined metadata are associatied with a user and include:
+		The self-defined metadata are associatied with a user and include::
 			(1) Account-Enable: True/False
 			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
-		The following is the details of metadata:
-		{
-			"Account-Enable": True/False,
-			"User-Enable": True/False,
-			"Password": user password,
-			"Quota": number of bytes
-		}
+		The following is the details of metadata::
+			{
+				"Account-Enable": True/False,
+				"User-Enable": True/False,
+				"Password": user password,
+				"Quota": number of bytes
+			}
 
 		@type  proxyIp: string
 		@param proxyIp: IP of the proxy node
