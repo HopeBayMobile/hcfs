@@ -6,7 +6,7 @@
 
 import os
 import subprocess
-import GatewayError
+from GatewayError import *
 
 class SwiftClient():
     """
@@ -33,19 +33,19 @@ class SwiftClient():
         po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
         (stdout, stderr) = po.communicate()
         po.wait()
-        if po.returncode == 0:
-            return True
-        else:
-            return False
+        return [po.returncode, stdout, stderr]
 
     def upload(self, container, file):
         try:
             returnData = self.executeCommand('upload %s %s' %(container, file))
-            if returnData is False:
-                raise SwiftUploadError()
-        except SwiftUploadError as e:
-            raise SwiftUploadError()
-        except Exception as e:
+            if returnData[0] == 0:
+                return True
+            else:
+                log.error('swift upload fail: %s' %returnData[2])
+                raise SwiftUploadError('swift upload fail error message: %s' %returnData[2])
+        except SwiftUploadError:
+            raise
+        except Exception:
             raise SwiftCommandError()
 
 def main(argv = None):
