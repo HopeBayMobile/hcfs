@@ -352,7 +352,7 @@ def _search_index(snapshot_name, snapshot_list):
                 return index
     except:
         raise SnapshotError('Unable to determine if the snapshot is exposed')
-    
+
     return -1
 
 
@@ -362,11 +362,7 @@ def delete_snapshot(to_delete):
     return_result = False
     return_msg = '[2] Unexpected error in delete_snapshot'
 
-
     try:
-        if type(to_delete) is not str:
-            raise SnapshotError('Name is not a string')
-
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
 
@@ -374,10 +370,10 @@ def delete_snapshot(to_delete):
 
         if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
             snapshot_path = os.path.join(snapshot_dir, to_delete)
-            if os.path.exists(snapshot_path):  #Invoke s3qlrm
+            if os.path.exists(snapshot_path):  # Invoke s3qlrm
                 os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
 
-            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index+1:]
+            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
             _write_snapshot_db(updated_snapshot_list)
 
             return_result = True
