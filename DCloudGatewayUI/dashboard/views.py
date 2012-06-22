@@ -7,17 +7,20 @@ from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 import json
+import datetime, time
 
 
 if not getattr(settings, "DEBUG", False):
     from gateway import api
     from gateway import api_restore_conf
     from gateway import api_remote_upgrade
+    from gateway.mock import snapshot as api_snapshot
     from http_proxy import api_http_proxy
 else:
     from gateway.mock import api
     from gateway.mock import api_restore_conf
     from gateway.mock import api_remote_upgrade
+    from gateway.mock import snapshot as api_snapshot
     from http_proxy.mock import api_http_proxy
 
 
@@ -345,8 +348,45 @@ def syslog(request):
 
 @login_required
 def snapshot(request, action=None):
-    return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot'})
 
+    if request.method == "POST":
+        if action == "create":
+            return_val = json.loads(api_snapshot.take_snapshot())
+            if return_val['result']:
+                return HttpResponse("Success")
+            else:
+                return HttpResponse("Failure")
+
+        if action == "delete":
+            snapshot_list = request.POST.getlist("snapshots[]")
+            for snap in snapshot_list:
+                del_result = json.loads(api_snapshot.delete_snapshot(snap))
+                if not del_result['result']:
+                    return_val = {'result': False, 'msg': 'An error occurred when deleting %s' % snap}
+                    break
+
+        if action == "export":
+            snapshot_list = request.POST.getlist("snapshots[]")
+            return_val = json.loads(api_snapshot.expose_snapshot(snapshot_list))
+
+        if return_val['result']:
+            return HttpResponse("Success")
+        else:
+            return HttpResponse("Failure")
+
+    else:
+        return_val = json.loads(api_snapshot.get_snapshot_list())
+        if return_val['result']:
+            snapshots = return_val.get('data').get('snapshots')
+            snapshots = sorted(snapshots, key=lambda x: x["start_time"], reverse=True)
+        for snapshot in snapshots:
+            snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
+            snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
+            snapshot['total_size'] /= 1000
+            snapshot['status'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
+
+        return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
 
 @login_required
 @require_POST

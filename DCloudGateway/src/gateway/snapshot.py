@@ -352,7 +352,7 @@ def _search_index(snapshot_name, snapshot_list):
                 return index
     except:
         raise SnapshotError('Unable to determine if the snapshot is exposed')
-    
+
     return -1
 
 
@@ -362,11 +362,7 @@ def delete_snapshot(to_delete):
     return_result = False
     return_msg = '[2] Unexpected error in delete_snapshot'
 
-
     try:
-        if type(to_delete) is not str:
-            raise SnapshotError('Name is not a string')
-
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
 
@@ -374,10 +370,10 @@ def delete_snapshot(to_delete):
 
         if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
             snapshot_path = os.path.join(snapshot_dir, to_delete)
-            if os.path.exists(snapshot_path):  #Invoke s3qlrm
+            if os.path.exists(snapshot_path):  # Invoke s3qlrm
                 os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
 
-            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index+1:]
+            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
             _write_snapshot_db(updated_snapshot_list)
 
             return_result = True
@@ -396,30 +392,30 @@ def delete_snapshot(to_delete):
     return json.dumps(return_val)
 
 
-def _write_snapshot_lifespan(months_to_live):
+def _write_snapshot_lifespan(days_to_live):
     '''Function for actually writing lifespan config to file'''
 
     try:
         with open(lifespan_conf, 'w') as fh:
-            fh.write('%d' % months_to_live)
+            fh.write('%d' % days_to_live)
         os.system('sudo chown www-data:www-data %s' % lifespan_conf)
     except:
         raise SnapshotError('Unable to write snapshot lifespan config to file')
 
 
-def set_snapshot_lifespan(months_to_live):
+def set_snapshot_lifespan(days_to_live):
 
     log.info('Started set_snapshot_lifespan')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
     try:
-        if months_to_live > 0:
-            _write_snapshot_lifespan(months_to_live)
+        if days_to_live > 0:
+            _write_snapshot_lifespan(days_to_live)
             return_result = True
             return_msg = 'Completed set_snapshot_lifespan'
         else:
-            return_msg = 'Error in set_snapshot_lifespan: months_to_live must be a positive integer.'
+            return_msg = 'Error in set_snapshot_lifespan: days_to_live must be a positive integer.'
     except Exception as Err:
         return_msg = str(Err)
 
@@ -433,7 +429,7 @@ def set_snapshot_lifespan(months_to_live):
 def get_snapshot_lifespan():
 
     log.info('Started get_snapshot_lifespan')
-    months_to_live = 12
+    days_to_live = 365
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
     reset_config = False
@@ -442,22 +438,22 @@ def get_snapshot_lifespan():
         with open(lifespan_conf, 'r') as fh:
             data_in = fh.readline()
             try:
-                months_to_live = int(data_in)
+                days_to_live = int(data_in)
                 return_result = True
                 return_msg = 'Completed get_snapshot_lifespan'
             except:
-                log.info('Stored lifespan is not an integer. Resetting to default (12 months).')
+                log.info('Stored lifespan is not an integer. Resetting to default (365 days).')
                 reset_config = True
     except IOError:
-        log.info('Unable to open config for snapshot lifespan. Resetting to default (12 months).')
+        log.info('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
         reset_config = True
     except:
         pass
 
     if reset_config:
         try:
-            _write_snapshot_lifespan(12)
-            months_to_live = 12
+            _write_snapshot_lifespan(365)
+            days_to_live = 365
             return_result = True
             return_msg = 'Completed get_snapshot_lifespan'
         except SnapshotError as Err:
@@ -466,11 +462,13 @@ def get_snapshot_lifespan():
     log.info(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
-                  'data': {'months_to_live': months_to_live}}
+                  'data': {'days_to_live': days_to_live}}
     return json.dumps(return_val)
 
 
 ################################################################
 
 if __name__ == '__main__':
+    expose_snapshot([])
+    take_snapshot()
     pass
