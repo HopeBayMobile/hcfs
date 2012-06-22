@@ -1,0 +1,4 @@
+#!/bin/sh -e
+
+/etc/delta/check_expired
+
