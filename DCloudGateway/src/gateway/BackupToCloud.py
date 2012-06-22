@@ -20,7 +20,6 @@ log = common.getLogger(name="Backup To Cloud", conf="/etc/delta/Gateway.ini")
 
 class BackupToCloud():
     """
-	
     """
     def __init__(self, fileList = None, cloudObject = None):
         self._fileList = fileList
@@ -32,7 +31,7 @@ class BackupToCloud():
             self._cloudObject = SwiftClient()
         self._metaData = {}
     
-    def backupToCloud(self):
+    def backup(self):
         """
         """
         self._datetime = strftime("%Y%m%d%H%M", gmtime())
@@ -63,11 +62,10 @@ class BackupToCloud():
                 log.warning('File(%s) is not exist' % file)
         print self._metaData
         try:
-            fd = open(''.join([TEMP_PATH, '/metadata.txt']), 'w+')
-            fd.write(json.dumps(self._metaData))
-            fd.close()
+            with open(''.join([TEMP_PATH, '/metadata.txt']), 'w+') as fd:
+                fd.write(json.dumps(self._metaData))
         except IOError as e:
-            raise MetaDataError()
+            raise CreateMetaDataError()
 
     def tarFile(self):
         os.system('tar -zcvf %s %s' % (self._tarFileName, TEMP_PATH))
@@ -77,7 +75,7 @@ class BackupToCloud():
 
 def main(argv = None):
     test = BackupToCloud()
-    test.backupToCloud()
+    test.backup()
 if __name__ == '__main__':
     main()
-		
+
