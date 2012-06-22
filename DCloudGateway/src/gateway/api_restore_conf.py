@@ -6,13 +6,14 @@
 
 import os
 import json
-#import api
+import api
 import common
 import ConfigParser
 import subprocess
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
+#----------------------------------------------------------------------
 def _get_Swift_credential():
 	log.info("_get_Swift_credential start")
 	url = None
@@ -45,13 +46,14 @@ def get_configuration_backup_info():
 	2. Probe whether there is a config file in Swift.
 	3. If yes, download it and get the last backup date and time
 	"""
+	#~ log.info("[2] get_configuration_backup_info start")
 	backup_info = _get_latest_backup()
 	
 	#~ Case 1. There is no container "config" 
 	if backup_info is None:
 		op_ok = False
 		op_data = {'backup_time': None}
-		op_code = "100"
+		op_code = "000"
 		op_msg = "There is no [config] container at Swift."
 	else:
 		dt = backup_info['datetime']
@@ -59,14 +61,15 @@ def get_configuration_backup_info():
 		#~ print backup_time
 		op_ok = True
 		op_data = {'backup_time': backup_time}
-		op_code = "000"
+		op_code = "100"
 		op_msg = None
 
 	return_val = {'result'  : op_ok,
 				  'data'	: op_data,
 				  'code'	: op_code,
 				  'msg'	 : op_msg	}
-			  
+	
+	#~ log.info("[2] get_configuration_backup_info end")		  
 	return json.dumps(return_val)
 
 #----------------------------------------------------------------------
@@ -116,34 +119,65 @@ def restore_gateway_configuration():
 	"""
 	Restore latest configuration from Cloud.
 	"""
-	tmp_dir = "/tmp/"
-	backup_info = _get_latest_backup()
+	log.info("[2] restore_gateway_configuration start")
+	
+	tmp_dir = "/tmp/restore_config/"
+	os.system("rm -r "+tmp_dir)			#~ clean old temp. data
+	os.system("mkdir -p "+tmp_dir)		#~ prepare tmp working directory.
+	backup_info = _get_latest_backup()	#~ read backup file info from cloud.
 
 	if backup_info is None:
 		op_ok = False
-		op_code = "100"
+		op_code = "000"
 		op_msg = "There is no [config] container at Swift."
 	else:
 		fname = backup_info['fname']
 		[url, login, password] = _get_Swift_credential()
 		cmd = "cd %s; " % (tmp_dir)
 		cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download config %s"%(url, login, password, fname)
-		print cmd
 		os.system(cmd)
-		# ^^^ download last backup file.
-		cmd = "cd %s; tar zxvf " % (tmp_dir, fname)
+		# ^^^ 1. download last backup file.
+		cmd = "cd %s; tar zxvf %s " % (tmp_dir, fname)
+		os.system(cmd)
+		# ^^^ 2. untar the backup file.
+		print
+		try:
+			fp = open(tmp_dir+'metadata.txt')
+			JsonData = fp.read();
+			bak = json.loads(JsonData)
+			for b in bak.items():
+				v = b[1]	# get a dict of 'file'				
+				# ToDo...
+				# ^^^ 3.1. upgrade config files if necessary.
+				cmd = "chown %s:%s %s%s" % (v['user'], v['group'], tmp_dir, v['fname'])				
+				os.system(cmd)		# chage file owner
+				cmd = "chmod %s %s%s" % (v['chmod'], tmp_dir, v['fname'])				
+				os.system(cmd)		# chage file access
+				cmd = "cd %s; mv %s %s" % (tmp_dir, v['fname'], v['fpath'])
+				os.system(cmd)
+				# ^^^ 3.2. put config files back to their destination folder.
+
+			# ^^^ 3.3. restart gateway services
+			api.restart_nfs_service()
+
+			op_ok = True
+			op_code = "100"
+			op_msg = None
+		# ^^^ 3. parse metadata. (where should config files be put to)
+		except IOError as e:
+			op_ok = False
+			op_code = "001"
+			op_msg = "Errors occurred when restoring configuration files."
 		
-		
-	# do something here ...
-	op_ok = True
-	op_code = "000"
-	op_msg = None
+	#~ end of if-else
 	
 	return_val = {'result'  : op_ok,
 				  'code'	: op_code,
 				  'msg'	 : op_msg	}
 			  
+	log.info("[2] restore_gateway_configuration stop")
 	return json.dumps(return_val)
+
 
 #----------------------------------------------------------------------
 	
