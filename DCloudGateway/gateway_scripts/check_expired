@@ -1,0 +1,3 @@
+#!/bin/sh -e
+
+/usr/bin/python /etc/delta/check_expired_code.py

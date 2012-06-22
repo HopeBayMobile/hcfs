@@ -4,9 +4,11 @@
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
 # Swift client class can connect to swift and do swift operation
 
-import os
+import common
 import subprocess
-import GatewayError
+from GatewayError import *
+
+log = common.getLogger(name="class name: SwiftClient", conf="/etc/delta/Gateway.ini")
 
 class SwiftClient():
     """
@@ -33,22 +35,22 @@ class SwiftClient():
         po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
         (stdout, stderr) = po.communicate()
         po.wait()
-        if po.returncode == 0:
-            return True
-        else:
-            return False
+        return [po.returncode, stdout, stderr]
 
     def upload(self, container, file):
         try:
             returnData = self.executeCommand('upload %s %s' %(container, file))
-            if returnData is False:
-                raise SwiftUploadError()
-        except SwiftUploadError as e:
-            raise SwiftUploadError()
-        except Exception as e:
+            if returnData[0] == 0:
+                return True
+            else:
+                log.error('swift upload fail: %s' %returnData[2])
+                raise SwiftUploadError('swift upload fail error message: %s' %returnData[2])
+        except SwiftUploadError:
+            raise
+        except Exception:
             raise SwiftCommandError()
 
-def main(argv = None):
+def main():
     swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
     swift.executeCommand()
         
