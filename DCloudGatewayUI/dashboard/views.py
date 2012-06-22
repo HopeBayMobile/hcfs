@@ -352,18 +352,27 @@ def snapshot(request, action=None):
     if request.method == "POST":
         if action == "create":
             return_val = json.loads(api_snapshot.take_snapshot())
-            print return_val
             if return_val['result']:
                 return HttpResponse("Success")
             else:
                 return HttpResponse("Failure")
 
         if action == "delete":
-            return HttpResponse("Success")
+            snapshot_list = request.POST.getlist("snapshots[]")
+            for snap in snapshot_list:
+                del_result = json.loads(api_snapshot.delete_snapshot(snap))
+                if not del_result['result']:
+                    return_val = {'result': False, 'msg': 'An error occurred when deleting %s' % snap}
+                    break
 
-        if action == "expose":
-            print request.POST.get('snapshots')
+        if action == "export":
+            snapshot_list = request.POST.getlist("snapshots[]")
+            return_val = json.loads(api_snapshot.expose_snapshot(snapshot_list))
+
+        if return_val['result']:
             return HttpResponse("Success")
+        else:
+            return HttpResponse("Failure")
 
     else:
         return_val = json.loads(api_snapshot.get_snapshot_list())

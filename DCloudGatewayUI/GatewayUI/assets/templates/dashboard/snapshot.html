@@ -13,7 +13,13 @@
         })("#progress-light");
 
         $(function(){
+
+            function toggle_checkbox(){
+                $("#snapshot-list tr > :nth-child(1)").toggleClass("hide");
+            }
+
             $("body").on("click", ".menu-button.select", function(){
+                $("#bottom-popup #do-action").text($(this).text());
                 actived = $(".menu-button.select.active")
                 if (actived.length){
                     if (!actived.filter(this).length){
@@ -40,11 +46,24 @@
                     console.log(ctnt);
                 });
             });
-        });
 
-        function toggle_checkbox(){
-            $("#snapshot-list tr > :nth-child(1)").toggleClass("hide");
-        }
+            function get_snapshots(){
+                var snapshots = [];
+                $.each($(":checked"), function(idx, item){
+                    snapshots.push(this.value)
+                });
+                return snapshots;
+            }
+
+            $("#bottom-popup #do-action").on("click", function(){
+                $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
+                       {"snapshots": get_snapshots()},
+                       function(ctnt, success, opts){
+                           console.log(ctnt);
+                       });
+            });
+
+        });
     </script>
 {% endblock javascript %}
 {% block tab_content %}
@@ -73,7 +92,7 @@
                     <tbody>
                     {% for snapshot in snapshots %}
                     <tr>
-                        <td class="hide"><input type="checkbox" name="" value=""></td>
+                        <td class="hide"><input type="checkbox" value="{{ snapshot.name }}"></td>
                         <td>{{ snapshot.name }}</td>
                         <td>{{ snapshot.total_size}}GB({{snapshot.num_files}})</td>
                         <td>{{ snapshot.start_time|date:"Y-m-d h:i"}}<br>|<br>{{ snapshot.finish_time|date:"Y-m-d h:i"}}</td>
@@ -98,5 +117,8 @@
             This is the schedule view.
         </div>
     </div>
-
+    <div id="bottom-popup">
+        <button id="do-action" class="btn btn-danger"></button>
+        <button class="btn">Cancel</button>
+    </div>
 {% endblock tab_content %}
