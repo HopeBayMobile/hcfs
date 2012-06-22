@@ -36,19 +36,25 @@
 
 <div class="storage-indicator-and-switch">
 	<div class="indicators">
-	    <div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">HDD
-	    </div>
-	    <div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">NFS
-	    </div>
-	    <div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">SMB
-	    </div>
-	    <div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">Http Proxy
-	    </div>
+		<div class="header">System Status</div>
+		<ul>
+			<li><div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
+	    		</div><span>HDD</span></li>
+			<li><div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">
+			    </div><span>NFS</span></li>
+			<li><div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">
+			    </div><span>SMB</span></li>
+			<li><div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">
+			    </div><span>HTTP Proxy</span></li>
+		</ul>
 	</div>
 	<div class="switches">
+		<div class="header">System Control
+			<div class="upgrade">Ver1.0</div>
+		</div>
 		<div class="iphone-toggle-buttons">
             <ul>
-                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label><span style="font-size: 18px;">Http Proxy</span></li>
+                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label><span>Http Proxy</span></li>
             </ul>
         </div>
 	</div>
@@ -71,12 +77,6 @@
 			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
 			<p id="max_cache_size">Max cache: <span>{{gateway_cache_usage.max_cache_size}}</span>GB</p>
 			<p id="max_cache_entries">Max entries: <span>{{gateway_cache_usage.max_cache_entries}}</span></p>
-		</div>
-		<div class="version">
-			{{ current_version }}
-			{% if available_version %}
-			<div class="upgrade">{{ available_version }}</div>
-			{% endif %}
 		</div>
 	</div>
 	<div class="usage">
