@@ -15,7 +15,7 @@ import simplejson as json
 from time import gmtime, strftime
 from SwiftClient import *
 
-TEMP_PATH = './temp'
+TEMP_PATH = '/tmp/backuptocloud'
 log = common.getLogger(name="Backup To Cloud", conf="/etc/delta/Gateway.ini")
 
 class BackupToCloud():
@@ -30,6 +30,7 @@ class BackupToCloud():
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
         self._metaData = {}
+        self.currentPath = os.getcwd()
     
     def backup(self):
         """
@@ -75,12 +76,14 @@ class BackupToCloud():
     def tarFile(self):
         """
         """
-        os.system('cd %s;tar -zcvf %s ./ --exclude *.tar.gz; mv %s ../' 
-                  % (TEMP_PATH, self._tarFileName, self._tarFileName))
+        
+        os.system('cd %s;tar -zcvf %s ./ --exclude *.tar.gz' 
+                  % (TEMP_PATH, self._tarFileName))
         
     def sendToCloud(self):
         """
         """
+        os.chdir(TEMP_PATH)
         returnData = self._cloudObject.upload('config', self._tarFileName)
 
 
