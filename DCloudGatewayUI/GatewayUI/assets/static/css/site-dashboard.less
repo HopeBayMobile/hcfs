@@ -265,8 +265,19 @@ tr{
 		top: auto;
 		left: auto;
 		height: 0px;
-		background-color: blue;
+		background-image: url("/@{dashboard-image-path}/check_bg03.png");
 		width: 803px;
+
+		button{
+			width: 87px;
+			height: 40px;
+			border: none;
+			background-color: transparent;
+			margin-top: 12px;
+			margin-right: 10px;
+			float: right;
+			background-image: url("/@{dashboard-image-path}/snapshot_control.png");
+		}
 }
 
 .tab-btn{
@@ -436,15 +447,16 @@ tr{
 #snapshot{
 	.menu-button{
 		margin-left: 20px;
+		margin-bottom: 10px;
 		border: none;
-		width: 161px;
-		height: 69px;
+		width: 87px;
+		height: 40px;
 		font-size: 18px;
 		color: #434343;
 		vertical-align: middle;
 		background-color: transparent;
 		background-image: url("/@{dashboard-image-path}/snapshot_control.png");
-		&:hover{
+		&.active{
 			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
 		}
 	}

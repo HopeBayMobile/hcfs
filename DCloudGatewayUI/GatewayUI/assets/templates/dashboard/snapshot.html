@@ -33,7 +33,7 @@
                         toggle_checkbox();
                     }
                 } else {
-                    $("#bottom-popup").animate({"height": "50px"}, 1000);
+                    $("#bottom-popup").animate({"height": "63px"}, 1000);
                     $(".bottom-popup-spacer").show(1000);
                     $(this).addClass("active");
                     toggle_checkbox();
@@ -118,7 +118,7 @@
         </div>
     </div>
     <div id="bottom-popup">
-        <button id="do-action" class="btn btn-danger"></button>
-        <button class="btn">Cancel</button>
+        <button>Cancel</button>
+        <button id="do-action">Done</button>
     </div>
 {% endblock tab_content %}
