@@ -17,6 +17,9 @@ log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
 #----------------------------------------------------------------------
 def _get_Swift_credential():
+    """
+    """
+    
     log.info("_get_Swift_credential start")
     url = None
     login = None
@@ -42,37 +45,37 @@ def _get_Swift_credential():
 
 #----------------------------------------------------------------------
 def get_configuration_backup_info():
-	"""
-	Get the information of latest backup configuration.
-	1. Get connection info for Swift.
-	2. Probe whether there is a config file in Swift.
-	3. If yes, download it and get the last backup date and time
-	"""
-	#~ log.info("[2] get_configuration_backup_info start")
-	backup_info = _get_latest_backup()
-	
-	#~ Case 1. There is no container "config" 
-	if backup_info is None:
-		op_ok = False
-		op_data = {'backup_time': None}
-		op_code = "000"
-		op_msg = "There is no [config] container at Swift."
-	else:
-		dt = backup_info['datetime']
-		backup_time = "%s/%s/%s %s:%s"%(dt[0:4], dt[4:6], dt[6:8], dt[8:10], dt[10:12])
-		#~ print backup_time
-		op_ok = True
-		op_data = {'backup_time': backup_time}
-		op_code = "100"
-		op_msg = None
+    """
+    Get the information of latest backup configuration.
+    1. Get connection info for Swift.
+    2. Probe whether there is a config file in Swift.
+    3. If yes, download it and get the last backup date and time
+    """
+    #~ log.info("[2] get_configuration_backup_info start")
+    backup_info = _get_latest_backup()
+    
+    #~ Case 1. There is no container "config" 
+    if backup_info is None:
+        op_ok = False
+        op_data = {'backup_time': None}
+        op_code = "000"
+        op_msg = "There is no [config] container at Swift."
+    else:
+        dt = backup_info['datetime']
+        backup_time = "%s/%s/%s %s:%s"%(dt[0:4], dt[4:6], dt[6:8], dt[8:10], dt[10:12])
+        #~ print backup_time
+        op_ok = True
+        op_data = {'backup_time': backup_time}
+        op_code = "100"
+        op_msg = None
 
-	return_val = {'result'  : op_ok,
-				  'data'	: op_data,
-				  'code'	: op_code,
-				  'msg'	 : op_msg	}
-	
-	#~ log.info("[2] get_configuration_backup_info end")		  
-	return json.dumps(return_val)
+    return_val = {'result'  : op_ok,
+                  'data'    : op_data,
+                  'code'    : op_code,
+                  'msg'     : op_msg    }
+    
+    #~ log.info("[2] get_configuration_backup_info end")          
+    return json.dumps(return_val)
 
 #----------------------------------------------------------------------
 def _get_latest_backup():
@@ -131,67 +134,67 @@ def save_gateway_configuration():
 
 #----------------------------------------------------------------------
 def restore_gateway_configuration():
-	"""
-	Restore latest configuration from Cloud.
-	"""
-	log.info("[2] restore_gateway_configuration start")
-	
-	tmp_dir = "/tmp/restore_config/"
-	os.system("rm -r "+tmp_dir)			#~ clean old temp. data
-	os.system("mkdir -p "+tmp_dir)		#~ prepare tmp working directory.
-	backup_info = _get_latest_backup()	#~ read backup file info from cloud.
+    """
+    Restore latest configuration from Cloud.
+    """
+    log.info("[2] restore_gateway_configuration start")
+    
+    tmp_dir = "/tmp/restore_config/"
+    os.system("rm -r "+tmp_dir)            #~ clean old temp. data
+    os.system("mkdir -p "+tmp_dir)        #~ prepare tmp working directory.
+    backup_info = _get_latest_backup()    #~ read backup file info from cloud.
 
-	if backup_info is None:
-		op_ok = False
-		op_code = "000"
-		op_msg = "There is no [config] container at Swift."
-	else:
-		fname = backup_info['fname']
-		[url, login, password] = _get_Swift_credential()
-		cmd = "cd %s; " % (tmp_dir)
-		cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download config %s"%(url, login, password, fname)
-		os.system(cmd)
-		# ^^^ 1. download last backup file.
-		cmd = "cd %s; tar zxvf %s " % (tmp_dir, fname)
-		os.system(cmd)
-		# ^^^ 2. untar the backup file.
-		print
-		try:
-			fp = open(tmp_dir+'metadata.txt')
-			JsonData = fp.read();
-			bak = json.loads(JsonData)
-			for b in bak.items():
-				v = b[1]	# get a dict of 'file'				
-				# ToDo...
-				# ^^^ 3.1. upgrade config files if necessary.
-				cmd = "chown %s:%s %s%s" % (v['user'], v['group'], tmp_dir, v['fname'])				
-				os.system(cmd)		# chage file owner
-				cmd = "chmod %s %s%s" % (v['chmod'], tmp_dir, v['fname'])				
-				os.system(cmd)		# chage file access
-				cmd = "cd %s; mv %s %s" % (tmp_dir, v['fname'], v['fpath'])
-				os.system(cmd)
-				# ^^^ 3.2. put config files back to their destination folder.
+    if backup_info is None:
+        op_ok = False
+        op_code = "000"
+        op_msg = "There is no [config] container at Swift."
+    else:
+        fname = backup_info['fname']
+        [url, login, password] = _get_Swift_credential()
+        cmd = "cd %s; " % (tmp_dir)
+        cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download config %s"%(url, login, password, fname)
+        os.system(cmd)
+        # ^^^ 1. download last backup file.
+        cmd = "cd %s; tar zxvf %s " % (tmp_dir, fname)
+        os.system(cmd)
+        # ^^^ 2. untar the backup file.
+        print
+        try:
+            fp = open(tmp_dir+'metadata.txt')
+            JsonData = fp.read();
+            bak = json.loads(JsonData)
+            for b in bak.items():
+                v = b[1]    # get a dict of 'file'                
+                # ToDo...
+                # ^^^ 3.1. upgrade config files if necessary.
+                cmd = "chown %s:%s %s%s" % (v['user'], v['group'], tmp_dir, v['fname'])                
+                os.system(cmd)        # chage file owner
+                cmd = "chmod %s %s%s" % (v['chmod'], tmp_dir, v['fname'])                
+                os.system(cmd)        # chage file access
+                cmd = "cd %s; mv %s %s" % (tmp_dir, v['fname'], v['fpath'])
+                os.system(cmd)
+                # ^^^ 3.2. put config files back to their destination folder.
 
-			# ^^^ 3.3. restart gateway services
-			api.restart_nfs_service()
+            # ^^^ 3.3. restart gateway services
+            api.restart_nfs_service()
 
-			op_ok = True
-			op_code = "100"
-			op_msg = None
-		# ^^^ 3. parse metadata. (where should config files be put to)
-		except IOError as e:
-			op_ok = False
-			op_code = "001"
-			op_msg = "Errors occurred when restoring configuration files."
-		
-	#~ end of if-else
-	
-	return_val = {'result'  : op_ok,
-				  'code'	: op_code,
-				  'msg'	 : op_msg	}
-			  
-	log.info("[2] restore_gateway_configuration stop")
-	return json.dumps(return_val)
+            op_ok = True
+            op_code = "100"
+            op_msg = None
+        # ^^^ 3. parse metadata. (where should config files be put to)
+        except IOError as e:
+            op_ok = False
+            op_code = "001"
+            op_msg = "Errors occurred when restoring configuration files."
+        
+    #~ end of if-else
+    
+    return_val = {'result'  : op_ok,
+                  'code'    : op_code,
+                  'msg'     : op_msg    }
+              
+    log.info("[2] restore_gateway_configuration stop")
+    return json.dumps(return_val)
 
 
 
