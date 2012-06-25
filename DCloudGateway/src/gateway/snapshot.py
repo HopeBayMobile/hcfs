@@ -640,4 +640,5 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
+    print delete_snapshot('snapshot_2012_6_25_17_46_24')
     pass
