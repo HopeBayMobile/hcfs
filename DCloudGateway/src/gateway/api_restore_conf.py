@@ -1,8 +1,7 @@
 #!/usr/bin/python
 
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
-
-# Function: API function for controlling HTTP proxy 
+# Function: API function for controlling HTTP proxy
 
 import os
 import json
@@ -10,51 +9,46 @@ import api
 import common
 import ConfigParser
 import subprocess
-import BackupToCloud
 from BackupToCloud import *
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
-#----------------------------------------------------------------------
+
 def _get_Swift_credential():
     """
+    get swift credential setting
     """
-    
     log.info("_get_Swift_credential start")
     url = None
     login = None
     password = None
-    
     try:
         config = ConfigParser.ConfigParser()
         with open('/root/.s3ql/authinfo2') as op_fh:
             config.readfp(op_fh)
 
         section = "CloudStorageGateway"
-        url = config.get(section, 'storage-url').replace("swift://","")
+        url = config.get(section, 'storage-url').replace("swift://", "")
         login = config.get(section, 'backend-login')
         password = config.get(section, 'backend-password')
 
     except Exception as e:
-        log.error("Failed to _get_Swift_credential for %s"%str(e))
+        log.error("Failed to _get_Swift_credential for %s" % str(e))
     finally:
         log.info("_get_Swift_credential end")
-    
     return [url, login, password]
 
 
-#----------------------------------------------------------------------
 def get_configuration_backup_info():
     """
     Get the information of latest backup configuration.
-    1. Get connection info for Swift.
-    2. Probe whether there is a config file in Swift.
-    3. If yes, download it and get the last backup date and time
+        1. Get connection info for Swift.
+        2. Probe whether there is a config file in Swift.
+        3. If yes, download it and get the last backup date and time
     """
     #~ log.info("[2] get_configuration_backup_info start")
     backup_info = _get_latest_backup()
-    
-    #~ Case 1. There is no container "config" 
+    #~ Case 1. There is no container "config"
     if backup_info is None:
         op_ok = False
         op_data = {'backup_time': None}
@@ -62,7 +56,7 @@ def get_configuration_backup_info():
         op_msg = "There is no [config] container at Swift."
     else:
         dt = backup_info['datetime']
-        backup_time = "%s/%s/%s %s:%s"%(dt[0:4], dt[4:6], dt[6:8], dt[8:10], dt[10:12])
+        backup_time = "%s/%s/%s %s:%s" % (dt[0:4], dt[4:6], dt[6:8], dt[8:10], dt[10:12])
         #~ print backup_time
         op_ok = True
         op_data = {'backup_time': backup_time}
@@ -79,14 +73,17 @@ def get_configuration_backup_info():
 
 #----------------------------------------------------------------------
 def _get_latest_backup():
+    """
+    get the latest backup config from swift
+    """
     [url, login, password] = _get_Swift_credential()
     cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list config"%(url, login, password)
     po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     res = po.stdout.readlines()
     po.wait()    
-        
+    
     #~ Case 1. There is no container "config" 
-    if "not found" in res:
+    if "not found" in res[0]:
         return None
     else:
         #~ Case 2. Get a list of files
@@ -158,7 +155,6 @@ def restore_gateway_configuration():
         cmd = "cd %s; tar zxvf %s " % (tmp_dir, fname)
         os.system(cmd)
         # ^^^ 2. untar the backup file.
-        print
         try:
             fp = open(tmp_dir+'metadata.txt')
             JsonData = fp.read();
@@ -169,7 +165,7 @@ def restore_gateway_configuration():
                 # ^^^ 3.1. upgrade config files if necessary.
                 cmd = "chown %s:%s %s%s" % (v['user'], v['group'], tmp_dir, v['fname'])                
                 os.system(cmd)        # chage file owner
-                cmd = "chmod %s %s%s" % (v['chmod'], tmp_dir, v['fname'])                
+                cmd = "chmod %s %s%s" % (v['chmod'], tmp_dir, v['fname'])
                 os.system(cmd)        # chage file access
                 cmd = "cd %s; mv %s %s" % (tmp_dir, v['fname'], v['fpath'])
                 os.system(cmd)
@@ -182,7 +178,7 @@ def restore_gateway_configuration():
             op_code = "100"
             op_msg = None
         # ^^^ 3. parse metadata. (where should config files be put to)
-        except IOError as e:
+        except:
             op_ok = False
             op_code = "001"
             op_msg = "Errors occurred when restoring configuration files."
@@ -201,9 +197,12 @@ def restore_gateway_configuration():
 #----------------------------------------------------------------------
     
 if __name__ == '__main__':
-    #~ info = get_configuration_backup_info()
-    #~ print info
+    #~ res = save_gateway_configuration()
+    #~ print res
+    info = get_configuration_backup_info()
+    print info
     #~ res = restore_gateway_configuration()
-    res = save_gateway_configuration()
-    print res
+    #~ #res = save_gateway_configuration()
+
+    #~ print res
     pass

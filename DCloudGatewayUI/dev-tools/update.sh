@@ -13,7 +13,7 @@ cd /var/www/
 tar czvf "$(date +'%Y%m%d-%H%M%S')-backup.tar.gz" DCloudGatewayUI/
 
 #Update the latest files
-cp -r ${BASEPATH}/DCloudGatewayUI/ /var/www/DCloudGatewayUI
+cp -r ${BASEPATH}/DCloudGatewayUI/ /var/www/
 
 #Start services
 service apache2 start

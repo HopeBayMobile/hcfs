@@ -243,6 +243,7 @@ def _check_snapshot_in_progress():
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
 
 # by Rice
+# modified by wthung, 2012/6/25
 def get_gateway_indicators():
     """
     Get gateway services' indicators.
@@ -281,33 +282,46 @@ def get_gateway_indicators():
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False }}
 
-
-    try:
-        op_network_ok = _check_network()
-        op_system_check = _check_system()
-        op_flush_inprogress = _check_flush()
-        op_dirtycache_nearfull = _check_dirtycache()
-        op_HDD_ok= _check_HDD()
-        op_NFS_srv = _check_nfs_service()
-        op_SMB_srv = _check_smb_service()
-        op_snapshot_in_progress = _check_snapshot_in_progress()
-        op_Proxy_srv = _check_http_proxy_service()
-
-        op_ok = True
-        op_msg = "Gateway indocators read successfully."
+    # test, for fast UI integration
+    return json.dumps(return_val)
     
-        return_val = {
-              'result' : op_ok,
-              'msg'    : op_msg,
-              'data'   : {'network_ok' : op_network_ok,
-              'system_check' : op_system_check,
-              'flush_inprogress' : op_flush_inprogress,
-              'dirtycache_nearfull' : op_dirtycache_nearfull,
-              'HDD_ok' : op_HDD_ok,
-              'NFS_srv' : op_NFS_srv,
-              'SMB_srv' : op_SMB_srv,
-              'snapshot_in_progress' : op_snapshot_in_progress,
-              'HTTP_proxy_srv' : op_Proxy_srv }}
+    # indicator file
+    indic_file = '/dev/shm/gw_indicator'
+            
+    try:
+        # check if indicator file is exist
+        if os.path.exists(indic_file):
+            # read indicator file as result
+            # deserialize json object from file
+            with os.open(indic_file, 'r') as fh:
+                return json.load(fh)
+        else:
+            # invoke regular function calls
+            op_network_ok = _check_network()
+            op_system_check = _check_system()
+            op_flush_inprogress = _check_flush()
+            op_dirtycache_nearfull = _check_dirtycache()
+            op_HDD_ok= _check_HDD()
+            op_NFS_srv = _check_nfs_service()
+            op_SMB_srv = _check_smb_service()
+            op_snapshot_in_progress = _check_snapshot_in_progress()
+            op_Proxy_srv = _check_http_proxy_service()
+    
+            op_ok = True
+            op_msg = "Gateway indocators read successfully."
+        
+            return_val = {
+                  'result' : op_ok,
+                  'msg'    : op_msg,
+                  'data'   : {'network_ok' : op_network_ok,
+                  'system_check' : op_system_check,
+                  'flush_inprogress' : op_flush_inprogress,
+                  'dirtycache_nearfull' : op_dirtycache_nearfull,
+                  'HDD_ok' : op_HDD_ok,
+                  'NFS_srv' : op_NFS_srv,
+                  'SMB_srv' : op_SMB_srv,
+                  'snapshot_in_progress' : op_snapshot_in_progress,
+                  'HTTP_proxy_srv' : op_Proxy_srv }}
     
     except Exception as Err:
         log.info("Unable to get indicators")
@@ -2749,7 +2763,7 @@ def storage_cache_usage():
 def get_network_speed(iface_name): # iface_name = eth1
     """
     Call get_network_status to get current NIC status.
-    Wait for 1 second, and all again. 
+    Wait for 0.1 second, and call again. 
     Then calculate difference, i.e., up/down link.
     
     @type iface_name: string
@@ -2772,12 +2786,12 @@ def get_network_speed(iface_name): # iface_name = eth1
                }
 
     pre_status = get_network_status(iface_name)
-    time.sleep(1)
+    time.sleep(0.1)
     next_status = get_network_status(iface_name)
 
     try:
-        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
-        ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
+        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 * 10 # KB 
+        ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024 * 10
     except:
         ret_val["downlink_usage"] = 0 
         ret_val["uplink_usage"] = 0

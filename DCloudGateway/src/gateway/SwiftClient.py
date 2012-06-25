@@ -50,8 +50,8 @@ class SwiftClient():
             command = 'stat'
         cmd = ''.join(['sudo swift -A https://', self._url, '/auth/v1.0 -U ',
                        self._login, ' -K ', self._password, ' ', command])
-        print "swift command is"
-        print cmd
+        #print "swift command is"
+        #print cmd
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT)
         (stdout, stderr) = po.communicate()
