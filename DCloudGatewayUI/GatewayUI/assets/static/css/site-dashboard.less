@@ -489,48 +489,36 @@ tr{
 
 /*The following are styles for usage and status page*/
 
-.storage-indicator-and-switch{
+.system-pane{
 	position: relative;
-	top: 10px;
-	max-width: @site-main-width - 100px;
+	// max-width: @site-main-width - 100px;
 	padding: 20px;
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	user-select: none;
 
 	.notify-box{
 		width: 53px;
-	    height: 53px;
-	    margin: 5px 10px;
-	    display: inline-block;
-	    text-align: center;
-	    vertical-align: middle;
-	    line-height: 32px;
+		height: 53px;
+		margin: 0 10px;
+		display: inline-block;
+		vertical-align: middle;
 	}
 
+	.control-box{
+		margin: 0 10px;
+		display: inline-block;
+		text-align: center;
+		vertical-align: middle;
+	}
 
 	& > div{
-		h1{
-			margin-bottom: 10px;
-		}
-		.header{
-			.corner-radius (10px 10px 0 0);
-			.css3-shadow (0px 2px 5px black);
-			position: relative;
-			background-color: #585858;
+		height: 280px;
+		li{
+			list-style: none;
+			margin: 5px 0;
 			font-size: 20px;
-			line-height: 40px;
-			text-indent: 25px;
-			vertical-align: middle;
-			height: 40px;
-			color: white;
-		}
-
-		ul{
-			li{
-				list-style: none;
-				margin: 0;
-			}
-			span{
-				font-size: 20px;
-			}
 		}
 
 		float: left;
@@ -539,6 +527,39 @@ tr{
 		.css3-shadow (0px 2px 5px black);
 		width: 48%;
 		margin-right: 10px;
+	}
+
+	.header{
+		.corner-radius (10px 10px 0 0);
+		.css3-shadow (0px 2px 5px black);
+		position: relative;
+		background-color: #585858;
+		font-size: 20px;
+		line-height: 40px;
+		text-indent: 25px;
+		vertical-align: middle;
+		height: 40px;
+		color: white;
+	}
+
+	label{
+		margin: 0;
+		padding: 6px 0 0 0;
+	}
+
+	input[type="checkbox"]{
+		display: none;
+	}
+
+	input[type="checkbox"] + .toggle-btn{
+		display: inline-block;
+		width: 71px;
+		height: 40px;
+		background: transparent url('/@{dashboard-image-path}/on_off_switch01.png') no-repeat;
+	}
+
+	input[type="checkbox"]:checked + .toggle-btn{
+		background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
 	}
 }
 
