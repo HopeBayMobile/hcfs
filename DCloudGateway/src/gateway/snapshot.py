@@ -1,18 +1,21 @@
+'''
+This function is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This source code implements the API functions for the snapshotting
+features of Delta Cloud Storage Gateway.
+'''
 import os.path
-import sys
-import csv
 import json
-import os
-import ConfigParser
 import common
 import subprocess
 import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
+
+####### Global variable definition ###############
 
 smb_conf_file = "/etc/samba/smb.conf"
 org_smb_conf = "/etc/delta/smb.orig"
@@ -29,15 +32,31 @@ snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
 temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
 
+####### Exception class definition ###############
+
 
 class SnapshotError(Exception):
     pass
 
 
-class Snapshot_Db_Lock():
-    '''Class for handling acquiring/releasing lock for snapshotting database'''
-    def __init__(self):
+####### Start of API function ####################
 
+
+class Snapshot_Db_Lock():
+    '''
+    Class for handling acquiring/releasing lock for snapshotting database.
+
+    Usage:
+      1. Acquiring database lock: I{lock = Snapshot_Db_Lock()}.
+      2. Releasing database lock: I{del lock}.
+    '''
+    def __init__(self):
+        '''
+        Constructor for Snapshot_Db_Lock.
+
+        The file defined by I{snapshot_db_lock} variable is used as the
+        lock. Existance of the file infers that the database is locked.
+        '''
         self.locked = False
         try:
             finish = False
@@ -52,7 +71,12 @@ class Snapshot_Db_Lock():
         self.locked = True
 
     def __del__(self):
+        '''
+        Destructor for Snapshot_Db_Lock.
 
+        Deletes the lock file if it is created by this instance of
+        Snapshot_Db_Lock.
+        '''
         try:
             if self.locked:
                 self.locked = False
@@ -63,8 +87,14 @@ class Snapshot_Db_Lock():
 
 
 def _check_snapshot_in_progress():
-    '''Check if the tag /root/.s3ql/.snapshotting exists.'''
+    '''
+    Checks if there is a snapshotting process in progress.
+    A tag file (defined by I{snapshot_tag}) indicates the existance
+    of such a process.
 
+    @rtype:    Boolean value
+    @return:   Whether the tag for snapshotting process exists
+    '''
     try:
         if os.path.exists(snapshot_tag):
             return True
@@ -74,7 +104,9 @@ def _check_snapshot_in_progress():
 
 
 def _initialize_snapshot():
-    '''Starts snapshotting bot (which actually handles the snapshotting)'''
+    '''
+    Starts snapshotting bot (which actually handles the snapshotting)
+    '''
     try:
         subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
     except:

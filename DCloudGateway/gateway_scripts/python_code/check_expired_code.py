@@ -1,14 +1,6 @@
 import os.path
-import sys
-import csv
-import json
-import os
-import ConfigParser
 import common
-import subprocess
 import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -165,7 +157,7 @@ def check_expired_snapshots():
     ''' Check snapshot database for expired snapshots '''
 
     log.info('Start checking expired snapshots')
-    
+
     try:
         finished = False
         snapshot_lifetime = _get_snapshot_lifespan()
@@ -195,13 +187,13 @@ def check_expired_snapshots():
             # Delete expired snapshots
             log.info('Deleting snapshot %s' % to_delete)
             snapshot_path = os.path.join(snapshot_dir, to_delete)
-            if os.path.exists(snapshot_path):  #Invoke s3qlrm
+            if os.path.exists(snapshot_path):  # Invoke s3qlrm
                 os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
 
-            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index+1:]
+            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
             _write_snapshot_db(updated_snapshot_list)
 
-        log.info('Finished checking expired snapshots') 
+        log.info('Finished checking expired snapshots')
 
     except Exception as Err:
         raise SnapshotError(str(Err))
