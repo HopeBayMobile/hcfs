@@ -162,21 +162,47 @@ tr{
 }
 
 .notify-box-group{
-   	float: right;
-    margin-top: (@site-top-height - @notify-group-height)/2;
-    margin-right: (@site-top-height - @notify-group-height)/2;
-    width: 350px;
-    height: @notify-group-height;
-    display: inline-block;
+	float: right;
+	display: inline-block;
+	margin-top: (@site-top-height - @notify-group-height)/2;
+	margin-right: (@site-top-height - @notify-group-height)/2;
+	width: 508px;
+	height: @notify-group-height;
+	background-image: url("/@{dashboard-image-path}/indicator_bg.png");
+	background-repeat: no-repeat;
 
-    .notify-box-row-NW{
+	.notify-box-row-NW{
 		float: left;
-		margin-top: (@notify-group-height - 80px) / 2;
-		margin-left: 5px;
+		height: 53px;
+		vertical-align: middle;
+		margin: 10px 0;
+		padding: 20px 0;
+		padding-right: 5px;
+		border-right: solid 1px gray;
+	}
+
+	.notify-box-row-NE{
+		float: right;
+		margin-top: 10px;
+		width: 180px;
+		height: 30px;
+		margin: 10px 10px 5px 0;
+		padding-bottom: 5px;
+		vertical-align: middle;
+		line-height: 32px;
+		font-size: 16px;
+		border-bottom: 1px solid gray;
+		position: relative;
+		img{
+			position: absolute;
+			right: 0px;
+		}
 	}
 
 	.notify-box-row-SE{
-		margin-left: 10px;
+		float: right;
+		width: 180px;
+		margin: 5px 10px 0 0;
 	}
 
 	.notify-box{

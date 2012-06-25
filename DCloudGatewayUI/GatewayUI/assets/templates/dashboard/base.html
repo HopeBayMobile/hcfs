@@ -61,8 +61,8 @@
                     $.get('/dashboard/status/', function(ctnt, stat, opts){
                         if (stat == 'success'){
                             var data = JSON.parse(ctnt);
-                            $("#basic_bandwidth .down").text(data.downlink_usage);
-                            $("#basic_bandwidth .up").text(data.uplink_usage);
+                            $("#basic-bandwidth .down").text(data.downlink_usage);
+                            $("#basic-bandwidth .up").text(data.uplink_usage);
                         }
                     });
                 }
@@ -120,9 +120,12 @@
                         <div id="dirtycache_nearfull" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
                         </div>
                     </div>
+                    <div class="notify-box-row-NE">
+                        {{ user.username }}<img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></p>
+                    </div>
                     <div class="notify-box-row-SE">
-                        <p id="basic_bandwidth">
-                            Download / Upload:
+                        <p id="basic-bandwidth">
+                            Download / Upload:<br>
                             <span class="down">{{ result_data.downlink_usage }}</span> / <span class="up">{{ result_data.uplink_usage }}</span>
                             (KB/Sec)
                         </p>
