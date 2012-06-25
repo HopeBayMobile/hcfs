@@ -364,6 +364,10 @@ def _append_samba_entry(entry):
         if os.path.exists(tmp_smb_conf1):
             os.system('sudo rm -rf %s' % tmp_smb_conf1)
         snapshot_share_path = os.path.join(snapshot_dir, entry['name'])
+
+        os.system('sudo touch %s' % tmp_smb_conf1)
+        os.system('sudo chown www-data:www-data %s' % tmp_smb_conf1)
+
         with open(tmp_smb_conf1, 'w') as fh:
             fh.write('[%s]\n' % entry['name'])
             fh.write('comment = Samba Share for snapshot %s\n' % entry['name'])
@@ -394,6 +398,9 @@ def _write_snapshot_db(snapshot_list):
     try:
         if os.path.exists(temp_snapshot_db):
             os.system('sudo rm -rf %s' % temp_snapshot_db)
+
+        os.system('sudo touch %s' % temp_snapshot_db)
+        os.system('sudo chown www-data:www-data %s' % temp_snapshot_db)
 
         with open(temp_snapshot_db, 'w') as fh:
             for entry in snapshot_list:
