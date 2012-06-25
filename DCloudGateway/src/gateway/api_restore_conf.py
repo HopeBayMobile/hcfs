@@ -147,8 +147,6 @@ def restore_gateway_configuration():
         op_msg = "There is no [config] container at Swift."
     else:
         fname = backup_info['fname']
-        print "aaaaaa"
-        print fname
         [url, login, password] = _get_Swift_credential()
         cmd = "cd %s; " % (tmp_dir)
         cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download config %s"%(url, login, password, fname)
