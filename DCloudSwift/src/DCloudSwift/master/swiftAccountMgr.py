@@ -166,7 +166,7 @@ class SwiftAccountMgr:
 			row = self.__accountDb.add_user(account=account, name=user)
 
 			if row is None:
-				msg = "User %s:%s alreay exists"%(account, user)
+				msg = "User %s:%s already exists"%(account, user)
 				return Bool(val, msg)
 			elif row is False:
 				msg = "Account %s does not exist"%account
@@ -342,7 +342,7 @@ class SwiftAccountMgr:
 			errMsg = "Failed to clean account %s from database for %s"%(account, str(e))
 			logger.error(errMsg)
 			raise InconsistentDatabaseError(errMsg)
-
+			
                 return Bool(val, msg)
 
 	@util.timeout(300)
@@ -1139,6 +1139,8 @@ class SwiftAccountMgr:
 		for item in account_info["accounts"]:
 			account_list += item["name"] + ", "
 			msg = account_list
+		
+		print self.__accountDb.show_user_info_table()
 			
 		return Bool(val, msg)
 
@@ -1175,8 +1177,8 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-                fn=self.__get_user_info, account=account)
-		
+                fn=self.__get_user_info, account=account)	
+	
 		if val == False:
 			return Bool(val, msg)
 
@@ -1196,9 +1198,14 @@ class SwiftAccountMgr:
 				val = False
 				return Bool(val, msg)
 			
-			for item in user_info["users"]:
-				user_list += item["name"] + ", "
-				msg = user_list
+			if not user_info["users"]:
+				msg = "No user exists in account %s"%account
+				val = False
+				return Bool(val, msg)
+			else:
+				for item in user_info["users"]:
+					user_list += item["name"] + ", "
+					msg = user_list
 				
 				return Bool(val, msg)
 
@@ -1984,6 +1991,9 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
+#	print SA.add_account("rice01").msg
 	print SA.list_account().msg
-	print SA.delete_account("rice88").msg
+	print SA.list_user("rice01").msg
+	print SA.delete_account("rice01").msg
 	print SA.list_account().msg
+	print SA.list_user("rice01").msg
