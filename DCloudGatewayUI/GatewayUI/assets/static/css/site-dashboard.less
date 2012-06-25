@@ -1,7 +1,7 @@
 // The following are predefined variables and functions for less
 @site-width: 1024px;
 @site-top-height: 132px;
-@notify-group-height: 115px;
+@notify-group-height: 113px;
 @site-left-width: 220px;
 @site-left-main-seperator: 1px;
 @site-main-width: @site-width - @site-left-width;
@@ -19,7 +19,7 @@
 @cache-usage-bar-height: 25px;
 @dashboard-image-path: "static/img/dashboard";
 .css3-transform (@times){
-    -moz-transition: all @times ease-in-out;
+	-moz-transition: all @times ease-in-out;
 	-webkit-transition: all @times ease-in-out;
 	-o-transition: all @times ease-in-out;
 	transition: all @times ease-in-out;
@@ -33,9 +33,9 @@
 
 .corner-radius (@size){
 	-moz-border-radius: @size;
-    -webkit-border-radius: @size;
-    -khtml-border-radius: @size;
-    border-radius: @size;
+	-webkit-border-radius: @size;
+	-khtml-border-radius: @size;
+	border-radius: @size;
 }
 
 .css3-progress-bar-skyblue{
@@ -141,11 +141,11 @@ tr{
 }
 
 .site-header{
-    position: relative;
-    top: 0;
-    margin: 0; padding:0;
-    width:  @site-width;
-    height: @site-top-height;
+	position: relative;
+	top: 0;
+	margin: 0; padding:0;
+	width:  @site-width;
+	height: @site-top-height;
 	background-image: url("/@{dashboard-image-path}/banner.png");
 }
 
@@ -207,12 +207,12 @@ tr{
 
 	.notify-box{
 		float: left;
-	    margin-left: 10px;
-	    margin-bottom: 10px;
-	    color: white;
-	    width: 50px;
-	    height: 50px;
-	    background-position: 0;
+		margin-left: 10px;
+		margin-bottom: 10px;
+		color: white;
+		width: 50px;
+		height: 50px;
+		background-position: 0;
 		background-repeat: no-repeat;
 	}
 }
@@ -221,18 +221,18 @@ tr{
 	float: left;
 	margin-top: 33px;
 	margin-left: 23px;
-    background-image: url("/@{dashboard-image-path}/delta_logo.png");
-    background-repeat: no-repeat;
-    width: 198px;
-    height: 64px;
+	background-image: url("/@{dashboard-image-path}/delta_logo.png");
+	background-repeat: no-repeat;
+	width: 198px;
+	height: 64px;
 }
 
 .refresh-box{
-    position: absolute;
-    bottom:20px; left:20px;
-    height: 30px;
-    background-color: gray;
-    width: 480px;
+	position: absolute;
+	bottom:20px; left:20px;
+	height: 30px;
+	background-color: gray;
+	width: 480px;
 }
 
 .bg-fixed{
@@ -253,21 +253,21 @@ tr{
 .left-bg{
 	background-color: #E5E5E5;
 	background-repeat: repeat-x;
-    width:@site-left-width;
-    border-right: solid #ccc @site-left-main-seperator;
+	width:@site-left-width;
+	border-right: solid #ccc @site-left-main-seperator;
 }
 
 .main-row{
-    float: right;
-    height: 100%;
-    overflow: auto;
+	float: right;
+	height: 100%;
+	overflow: auto;
 }
 
 .left-row{
 	float:left;
-    width: @site-left-width;
-    height: 100%;
-    overflow-y: auto;
+	width: @site-left-width;
+	height: 100%;
+	overflow-y: auto;
 }
 
 .main-content{
@@ -355,14 +355,14 @@ tr{
 }
 
 .statusbar-header{
-    height: @slide-box-footer-bar-height;
-    line-height: @slide-box-footer-bar-height;
-    text-align: center;
-    vertical-align: middle;
-    color: white;
-    font-weight: bold;
-    cursor:pointer;
-    background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
+	height: @slide-box-footer-bar-height;
+	line-height: @slide-box-footer-bar-height;
+	text-align: center;
+	vertical-align: middle;
+	color: white;
+	font-weight: bold;
+	cursor:pointer;
+	background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
 }
 
 .statusbar-content{
@@ -454,9 +454,9 @@ tr{
 	vertical-align: middle;
 	// Fake list-style
 	list-style:none;
-    padding-left: 30px;
-    background-position: left 3px;
-    background-repeat: no-repeat;
+	padding-left: 30px;
+	background-position: left 3px;
+	background-repeat: no-repeat;
 	// Text truncation
 	overflow: hidden;
 	text-overflow: ellipsis;
