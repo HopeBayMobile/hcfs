@@ -3,7 +3,7 @@
           "DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 <head>
-  <title>gateway.BackupToCloud.BackupToCloud</title>
+  <title>gateway.mock.snapshot</title>
   <link rel="stylesheet" href="epydoc.css" type="text/css" />
   <script type="text/javascript" src="epydoc.js"></script>
 </head>
@@ -38,8 +38,8 @@
     <td width="100%">
       <span class="breadcrumbs">
         <a href="gateway-module.html">Package&nbsp;gateway</a> ::
-        <a href="gateway.BackupToCloud-module.html">Module&nbsp;BackupToCloud</a> ::
-        Class&nbsp;BackupToCloud
+        <a href="gateway.mock-module.html">Package&nbsp;mock</a> ::
+        Module&nbsp;snapshot
       </span>
     </td>
     <td>
@@ -49,33 +49,25 @@
     onclick="toggle_private();">hide&nbsp;private</a>]</span></td></tr>
         <tr><td align="right"><span class="options"
             >[<a href="frames.html" target="_top">frames</a
-            >]&nbsp;|&nbsp;<a href="gateway.BackupToCloud.BackupToCloud-class.html"
+            >]&nbsp;|&nbsp;<a href="gateway.mock.snapshot-module.html"
             target="_top">no&nbsp;frames</a>]</span></td></tr>
       </table>
     </td>
   </tr>
 </table>
-<!-- ==================== CLASS DESCRIPTION ==================== -->
-<h1 class="epydoc">Class BackupToCloud</h1><p class="nomargin-top"><span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud">source&nbsp;code</a></span></p>
-<pre class="literalblock">
-
-This class implemenet backup process from local disk to cloud.
-Usage: backupObj = BackupToCloud(fileList, cloudObject)
-       backupObj.backup()
-
-</pre>
-
-<!-- ==================== INSTANCE METHODS ==================== -->
-<a name="section-InstanceMethods"></a>
+<!-- ==================== MODULE DESCRIPTION ==================== -->
+<h1 class="epydoc">Module snapshot</h1><p class="nomargin-top"><span class="codelink"><a href="gateway.mock.snapshot-pysrc.html">source&nbsp;code</a></span></p>
+<!-- ==================== FUNCTIONS ==================== -->
+<a name="section-Functions"></a>
 <table class="summary" border="1" cellpadding="3"
        cellspacing="0" width="100%" bgcolor="white">
 <tr bgcolor="#70b0f0" class="table-header">
   <td colspan="2" class="table-header">
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
       <tr valign="top">
-        <td align="left"><span class="table-header">Instance Methods</span></td>
+        <td align="left"><span class="table-header">Functions</span></td>
         <td align="right" valign="top"
-         ><span class="options">[<a href="#section-InstanceMethods"
+         ><span class="options">[<a href="#section-Functions"
          class="privatelink" onclick="toggle_private();"
          >hide private</a>]</span></td>
       </tr>
@@ -88,11 +80,9 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a href="gateway.BackupToCloud.BackupToCloud-class.html#__init__" class="summary-sig-name">__init__</a>(<span class="summary-sig-arg">self</span>,
-        <span class="summary-sig-arg">fileList</span>=<span class="summary-sig-default">None</span>,
-        <span class="summary-sig-arg">cloudObject</span>=<span class="summary-sig-default">None</span>)</span></td>
+          <td><span class="summary-sig"><a name="take_snapshot"></a><span class="summary-sig-name">take_snapshot</span>()</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.__init__">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#take_snapshot">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -106,10 +96,9 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a name="backup"></a><span class="summary-sig-name">backup</span>(<span class="summary-sig-arg">self</span>)</span><br />
-      start backup file list to cloud</td>
+          <td><span class="summary-sig"><a name="set_snapshot_schedule"></a><span class="summary-sig-name">set_snapshot_schedule</span>(<span class="summary-sig-arg">snapshot_time</span>)</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.backup">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#set_snapshot_schedule">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -123,11 +112,9 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a name="copyFile"></a><span class="summary-sig-name">copyFile</span>(<span class="summary-sig-arg">self</span>)</span><br />
-      copy file from original folder to temp folder and also save the user,
-      group, permission information in metdata.txt</td>
+          <td><span class="summary-sig"><a name="get_snapshot_schedule"></a><span class="summary-sig-name">get_snapshot_schedule</span>()</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.copyFile">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#get_snapshot_schedule">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -141,10 +128,9 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a name="tarFile"></a><span class="summary-sig-name">tarFile</span>(<span class="summary-sig-arg">self</span>)</span><br />
-      tar files and metadata.txt</td>
+          <td><span class="summary-sig"><a name="get_snapshot_list"></a><span class="summary-sig-name">get_snapshot_list</span>()</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.tarFile">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#get_snapshot_list">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -158,10 +144,73 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a name="sendToCloud"></a><span class="summary-sig-name">sendToCloud</span>(<span class="summary-sig-arg">self</span>)</span><br />
-      send tar.gz file to cloud storage</td>
+          <td><span class="summary-sig"><a name="get_snapshot_in_progress"></a><span class="summary-sig-name">get_snapshot_in_progress</span>()</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.sendToCloud">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#get_snapshot_in_progress">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="expose_snapshot"></a><span class="summary-sig-name">expose_snapshot</span>(<span class="summary-sig-arg">to_expose</span>)</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#expose_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="delete_snapshot"></a><span class="summary-sig-name">delete_snapshot</span>(<span class="summary-sig-arg">to_delete</span>)</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#delete_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="set_snapshot_lifespan"></a><span class="summary-sig-name">set_snapshot_lifespan</span>(<span class="summary-sig-arg">months_to_live</span>)</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#set_snapshot_lifespan">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="get_snapshot_lifespan"></a><span class="summary-sig-name">get_snapshot_lifespan</span>()</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.mock.snapshot-pysrc.html#get_snapshot_lifespan">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -170,52 +219,31 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
     </td>
   </tr>
 </table>
-<!-- ==================== METHOD DETAILS ==================== -->
-<a name="section-MethodDetails"></a>
-<table class="details" border="1" cellpadding="3"
+<!-- ==================== VARIABLES ==================== -->
+<a name="section-Variables"></a>
+<table class="summary" border="1" cellpadding="3"
        cellspacing="0" width="100%" bgcolor="white">
 <tr bgcolor="#70b0f0" class="table-header">
   <td colspan="2" class="table-header">
     <table border="0" cellpadding="0" cellspacing="0" width="100%">
       <tr valign="top">
-        <td align="left"><span class="table-header">Method Details</span></td>
+        <td align="left"><span class="table-header">Variables</span></td>
         <td align="right" valign="top"
-         ><span class="options">[<a href="#section-MethodDetails"
+         ><span class="options">[<a href="#section-Variables"
          class="privatelink" onclick="toggle_private();"
          >hide private</a>]</span></td>
       </tr>
     </table>
   </td>
 </tr>
-</table>
-<a name="__init__"></a>
-<div>
-<table class="details" border="1" cellpadding="3"
-       cellspacing="0" width="100%" bgcolor="white">
-<tr><td>
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr valign="top"><td>
-  <h3 class="epydoc"><span class="sig"><span class="sig-name">__init__</span>(<span class="sig-arg">self</span>,
-        <span class="sig-arg">fileList</span>=<span class="sig-default">None</span>,
-        <span class="sig-arg">cloudObject</span>=<span class="sig-default">None</span>)</span>
-    <br /><em class="fname">(Constructor)</em>
-  </h3>
-  </td><td align="right" valign="top"
-    ><span class="codelink"><a href="gateway.BackupToCloud-pysrc.html#BackupToCloud.__init__">source&nbsp;code</a></span>&nbsp;
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="'gateway.mock'"><code class="variable-quote">'</code><code class="variable-string">gateway.mock</code><code class="variable-quote">'</code></code>
     </td>
-  </tr></table>
-  
-  
-  <dl class="fields">
-    <dt>Parameters:</dt>
-    <dd><ul class="nomargin-top">
-        <li><strong class="pname"><code>fileList</code></strong> (list type) - file list which want to be sent to cloud</li>
-        <li><strong class="pname"><code>cloudObject</code></strong> (string) - cloud object which can access cloud storage</li>
-    </ul></dd>
-  </dl>
-</td></tr></table>
-</div>
-<br />
+  </tr>
+</table>
 <!-- ==================== NAVIGATION BAR ==================== -->
 <table class="navbar" border="0" width="100%" cellpadding="0"
        bgcolor="#a0c0ff" cellspacing="0">
@@ -242,7 +270,7 @@ Usage: backupObj = BackupToCloud(fileList, cloudObject)
 <table border="0" cellpadding="0" cellspacing="0" width="100%%">
   <tr>
     <td align="left" class="footer">
-    Generated by Epydoc 3.0.1 on Mon Jun 25 15:22:22 2012
+    Generated by Epydoc 3.0.1 on Mon Jun 25 15:22:05 2012
     </td>
     <td align="right" class="footer">
       <a target="mainFrame" href="http://epydoc.sourceforge.net"
