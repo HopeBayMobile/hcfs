@@ -1,14 +1,7 @@
 import os.path
-import sys
-import csv
-import json
-import os
-import ConfigParser
 import common
 import subprocess
 import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -107,7 +100,6 @@ def new_database_entry():
 def invalidate_entry():
 
     finish_time = time.time()
-    ftime_format = time.localtime(finish_time)
     new_snapshot_name = "Failed_snapshot"
     update_new_entry(new_snapshot_name, finish_time, 0, 0)
 
@@ -353,7 +345,7 @@ def execute_take_snapshot():
                     os.system('sudo rm -rf %s' % snapshot_statistics)
 
                     finish = True
-        except Exception as err:
+        except Exception:
             #Check if file system is still up
             if not os.path.exists(samba_folder):
                 return
