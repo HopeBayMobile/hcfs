@@ -1,20 +1,69 @@
 {% extends "dashboard/base.html" %}
 {% block javascript %}
     <script type="text/javascript">
+
+        toogle_progress = (function(target){
+            var toogle_indicator = 1;
+            function return_func(){
+                var num = toogle_indicator % 2 + 1;
+                $(target).attr("src", "/static/img/dashboard/in_progress_0" + num + ".png");
+                toogle_indicator += 1;
+            }
+            return return_func
+        })("#progress-light");
+
         $(function(){
-            var sign = 1;
-            $("body").on("click", ".menu-button.delete", function(){
-                console.log(sign)
-                if (sign > 0){
-                    $("#bottom-popup").css({"height": "50px"})
-                    $(".bottom-popup-spacer").show();
+
+            function toggle_checkbox(){
+                $("#snapshot-list tr > :nth-child(1)").toggleClass("hide");
+            }
+
+            $("body").on("click", ".menu-button.select", function(){
+                $("#bottom-popup #do-action").text($(this).text());
+                actived = $(".menu-button.select.active")
+                if (actived.length){
+                    if (!actived.filter(this).length){
+                        actived.removeClass("active");
+                        $(this).addClass("active");
+                    } else {
+                        $(this).addClass("active");
+                        $("#bottom-popup").animate({"height": "0px"}, 1000);
+                        $(".bottom-popup-spacer").hide(1000);
+                        $(this).removeClass("active");
+                        toggle_checkbox();
+                    }
                 } else {
-                    $("#bottom-popup").css({"height": "0px"})
-                    $(".bottom-popup-spacer").hide();
+                    $("#bottom-popup").animate({"height": "50px"}, 1000);
+                    $(".bottom-popup-spacer").show(1000);
+                    $(this).addClass("active");
+                    toggle_checkbox();
                 }
-                sign = sign * (-1)
-            })
-        })
+            });
+            setInterval(toogle_progress, 500);
+
+            $(".menu-button.create").on("click", function(){
+                $.post('/dashboard/snapshot/create', function(ctnt, success, opts){
+                    console.log(ctnt);
+                });
+            });
+
+            function get_snapshots(){
+                var snapshots = [];
+                $.each($(":checked"), function(idx, item){
+                    snapshots.push(this.value)
+                });
+                return snapshots;
+            }
+
+            $("#bottom-popup #do-action").on("click", function(){
+                $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
+                       {"snapshots": get_snapshots()},
+                       function(ctnt, success, opts){
+                           console.log(ctnt);
+                       });
+            });
+
+        });
     </script>
 {% endblock javascript %}
 {% block tab_content %}
@@ -24,95 +73,41 @@
     </ul>
     <div class="tab-content">
         <div class="tab-pane active" id="snapshot" style="">
-            <button class="menu-button">Create</button>
-            <button class="menu-button delete">Delete</button>
-            <button class="menu-button">Export</button>
-            <div id="test" style="">
-                <table class="table table-striped table-bordered table-condensed">
+            <button class="menu-button create">Create</button>
+            <button class="menu-button select">Delete</button>
+            <button class="menu-button select">Export</button>
+            <div id="" style="">
+                <table id="snapshot-list" class="table table-striped table-bordered table-condensed">
                     <thead>
                       <tr>
-                        <th>#</th>
-                        <th>Snapshot ID</th>
-                        <th>Usage</th>
-                        <th>Time</th>
-                        <th>Status</th>
-                        <th>Export</th>
-                        <th>Path</th>
+                        <th class="span1 hide">#</th>
+                        <th class="span2">Snapshot ID</th>
+                        <th class="span1">Usage</th>
+                        <th class="span2">Time</th>
+                        <th style="width: 75px;">Status</th>
+                        <th class="span1">Export</th>
+                        <th class="span2">Path</th>
                       </tr>
                     </thead>
                     <tbody>
+                    {% for snapshot in snapshots %}
                     <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
+                        <td class="hide"><input type="checkbox" value="{{ snapshot.name }}"></td>
+                        <td>{{ snapshot.name }}</td>
+                        <td>{{ snapshot.total_size}}GB({{snapshot.num_files}})</td>
+                        <td>{{ snapshot.start_time|date:"Y-m-d h:i"}}<br>|<br>{{ snapshot.finish_time|date:"Y-m-d h:i"}}</td>
+                        <td>{% if snapshot.status %}
+                            <img id="progress-light" src="/static/img/dashboard/in_progress_01.png" alt=""><br>
+                            <!--div class="ani-inprogress"></div-->
+                            In Progress{% else %}Complete{% endif %}</td>
+                        <td>{% if snapshot.exposed %}<img src="/static/img/dashboard/export.png" alt="">{% endif %}</td>
+                        <td>{{ snapshot.path}}</td>
                     </tr>
+                    {% empty %}
                     <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
+                        <td colspan="7">You don't have any snapshots.</td>
                     </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
-                    <tr>
-                        <td><input type="checkbox" name="" value=""></td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                        <td>1bc</td>
-                    </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -122,5 +117,8 @@
             This is the schedule view.
         </div>
     </div>
-
+    <div id="bottom-popup">
+        <button id="do-action" class="btn btn-danger"></button>
+        <button class="btn">Cancel</button>
+    </div>
 {% endblock tab_content %}

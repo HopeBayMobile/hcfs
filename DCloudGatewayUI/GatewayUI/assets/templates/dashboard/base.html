@@ -109,7 +109,7 @@
                 </div>
                 <div class="notify-box-group">
                     <div class="notify-box-row-NW">
-                        <div id="snapshot_in_progress" class="notify-box {% if result_data.snapshot_in_progress %}work{% endif %}" style="background-color: red;">
+                        <div id="snapshot_in_progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
                         </div>
                         <div id="system_check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                         </div>
@@ -140,7 +140,7 @@
                   <li class=""><a href="{% url dashboard:system action=None %}">System Configurations</a></li>
                   <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
                   <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
-                  <li class=""><a href="{% url dashboard:snapshot %}">Snapshot</a></li>
+                  <li class=""><a href="{% url dashboard:snapshot action=None %}">Snapshot</a></li>
                   <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
                   <li class=""><a href="{% url dashboard:config action=None %}">Configuration</a></li>
                   <li class=""><a href="{% url dashboard:power action=None %}"><img src="/static/img/dashboard/power_icon.png"></a></li>
@@ -153,7 +153,6 @@
                 <div class="main-content-spacer"></div>
                 {% block tab_content %}
                 {% endblock tab_content %}
-                <div id="bottom-popup">1</div>
             </div>
 
         </div>

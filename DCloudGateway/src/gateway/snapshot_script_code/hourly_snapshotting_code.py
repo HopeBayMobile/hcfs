@@ -1,14 +1,7 @@
 import os.path
-import sys
-import csv
-import json
-import os
-import ConfigParser
 import common
 import subprocess
 import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -22,6 +15,7 @@ snapshot_schedule = "/etc/delta/snapshot_schedule"
 
 class SnapshotError(Exception):
     pass
+
 
 def check_snapshot_schedule():
 

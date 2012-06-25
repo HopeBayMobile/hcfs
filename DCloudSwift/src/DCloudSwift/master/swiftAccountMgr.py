@@ -75,6 +75,10 @@ class SwiftAccountMgr:
 		@type  fn: string
 		@param fn: private function to call
 		@param kwargs: keyword arguments to fn
+		@rtype:  tuple
+		@return: a tuple (val, msg). If fn is executed successfully, then val == True and
+			msg records the standard output. Otherwise, val == False and msg records
+			the error message.
 		'''
 		val = False
 		msg =""
@@ -128,7 +132,7 @@ class SwiftAccountMgr:
 
 	def add_user(self, account, user, password, admin=True, reseller=False, retry=3):
 		'''
-		add user to the database and backend swift
+		Add user to the database and backend swift
 
 		@type  account: string
 		@param account: the name of the given account
@@ -142,11 +146,11 @@ class SwiftAccountMgr:
 		@param reseller: reseller or not
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). If the user is successfully added to both the database and backend swift
-			then Bool.val == True and msg records the standard output. Otherwise, val == False and msg records the error message.
-		
-		'''
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user is successfully added to both the database
+			and backend swift then Bool.val == True and msg records the standard output.
+			Otherwise, val == False and msg records the error message.
+		'''		
 		logger = util.getLogger(name="add_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -166,7 +170,7 @@ class SwiftAccountMgr:
 			row = self.__accountDb.add_user(account=account, name=user)
 
 			if row is None:
-				msg = "User %s:%s alreay exists"%(account, user)
+				msg = "User %s:%s already exists"%(account, user)
 				return Bool(val, msg)
 			elif row is False:
 				msg = "Account %s does not exist"%account
@@ -221,7 +225,7 @@ class SwiftAccountMgr:
 
 	def delete_user(self, account, user, retry=3):
 		'''
-		delte user from the database and backend swift
+		Delete user from the database and backend swift
 
 		@type  account: string
 		@param account: the name of the given account
@@ -229,11 +233,11 @@ class SwiftAccountMgr:
 		@param user: the name of the given user
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). If the user is successfully deleted to both the database and backend swift
-			then Bool.val == True and msg records the standard output. Otherwise, val == False and msg records the error message.
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user is successfully deleted to both the
+			database and backend swift then Bool.val == True and msg records the
+			standard output. Otherwise, val == False and msg records the error message.
 		'''
-		
 		logger = util.getLogger(name="delete_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -290,7 +294,7 @@ class SwiftAccountMgr:
 
 	def add_account(self, account, retry=3):
 		'''
-		add account and create an default admin user to the database and backend swift
+		Add account and create an default admin user to the database and backend swift.
 
 		@type  account: string
 		@param account: the name of the given account
@@ -298,10 +302,9 @@ class SwiftAccountMgr:
 		@param password: the password to be set
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). 
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). 
 		'''
-		
 		logger = util.getLogger(name="add_account")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -342,7 +345,7 @@ class SwiftAccountMgr:
 			errMsg = "Failed to clean account %s from database for %s"%(account, str(e))
 			logger.error(errMsg)
 			raise InconsistentDatabaseError(errMsg)
-
+			
                 return Bool(val, msg)
 
 	@util.timeout(300)
@@ -385,10 +388,9 @@ class SwiftAccountMgr:
 		@param account: the name of the given account
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). 
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). 
 		'''
-		
 		logger = util.getLogger(name="delete_account")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		
@@ -418,62 +420,39 @@ class SwiftAccountMgr:
 		
 		return Bool(val, msg)
 
-	@util.timeout(300)
-	def __enable_user(self, proxyIp, account, user):
-		logger = util.getLogger(name="__enable_user")
-
-		url = "https://%s:8080/auth/"%proxyIp
-		msg = ""
-		val = False
-
-		password = self.__accountDb.get_password(account, user)
-		if password is None:
-			msg = "user %s:%s does not exists"%(account,user)
-			return Bool(val, msg)
-		
-		admin_opt = "-a " if self.__accountDb.is_admin(account, user) else ""
-		reseller_opt = "-r " if self.__accountDb.is_reseller(account, user)  else ""
-		optStr = admin_opt + reseller_opt
-
-		cmd = "swauth-add-user -K %s -A %s %s %s %s %s"%(self.__password, url, optStr, account, user, password)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-				
-		if po.returncode !=0:
-			logger.error(stderrData)
-			msg = stderrData
-			val =False
-		else:
-			logger.info(stdoutData)
-			msg = stdoutData
-			val =True
-
-		Bool = collections.namedtuple("Bool", "val msg")
-                return Bool(val, msg)
-
-	def enable_user(self, account, user, retry=3):
+	def enable_user(self, account, container, user, admin_user, retry=3):
 		'''
-		Enable the user to access the backend swift by re-adding it to the backend using original setting stored in database.
+		Enable the user to access the backend Swift by restoring the original
+		password kept in the metadata of the user's container.
 
 		@type  account: string
-		@param account: the name of the given account
+		@param account: the account of the user
+		@type  container: string
+		@param container: the container for the user
 		@type  user: string
-		@param user: the name of the given user
+		@param user: the user to be enabled
+		@type  admin_user: string
+		@param admin_user: the admin user of the container
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). If the user is re-added to the backend using the original setting stored in the backend.
-			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's password is successfully
+			restored to the original password kept in the metadata of the user's 
+			container, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
 		'''
-
 		logger = util.getLogger(name="enable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-		
+		ori_user_password = ""
+		actual_user_password = ""
+		admin_password = ""
+		container_metadata = {}
+
 		msg = ""
 		val = False
 		Bool = collections.namedtuple("Bool", "val msg")
 
-		if proxy_ip_list is None or len(proxy_ip_list)==0:
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
 			msg = "No proxy node is found"
 			return Bool(val, msg)
 
@@ -481,68 +460,97 @@ class SwiftAccountMgr:
 			msg = "Argument retry has to >= 1"
 			return Bool(val, msg)
 
-		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__enable_user,
-                                                   account=account, user=user)
-		try:
-			if val == True:
-				self.__accountDb.enable_user(account=account, name=user)
-
-		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=True for user %s:%s in database for %s"%(account, user, str(e))
-			logger.error(errMsg)
-			raise InconsistentDatabaseError(errMsg)
-
-                return Bool(val, msg)
-
-	@util.timeout(300)
-	def __disable_user(self, proxyIp, account, user):
-		logger = util.getLogger(name="__disable_user")
-
-		url = "https://%s:8080/auth/"%proxyIp
-		randomPassword = str(uuid.uuid4())
-		cmd = "swauth-add-user -K %s -A %s %s %s %s"%(self.__password, url, account, user, randomPassword)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-				
-		msg = ""
-		val = False
-
-		if po.returncode !=0:
-			logger.error(stderrData)
-			msg = stderrData
-			val =False
+		get_user_password_output = self.get_user_password(account, user)
+		if get_user_password_output.val == False:
+			val = False
+			msg = get_user_password_output.msg
+			return Bool(val, msg)
 		else:
-			logger.info(stdoutData)
-			msg = stdoutData
-			val =True
+			actual_user_password = get_user_password_output.msg
 
-		Bool = collections.namedtuple("Bool", "val msg")
-                return Bool(val, msg)
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
 
-	def disable_user(self, account, user, retry=3):
+		#TODO: check whehter the container is associated with the user
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=container,\
+		admin_user=admin_user, admin_password=admin_password)
+
+		if val == False:
+			msg = "Failed to get the metadata of the container %s" % container + msg
+			return Bool(val, msg)
+		else:
+			container_metadata = msg
+
+		if container_metadata["Account-Enable"] == False:
+			val = False
+			msg = "Failed to enable the user %s: the account %s does not enable"\
+			% (user, account)
+			return Bool(val, msg)
+		elif container_metadata["User-Enable"] == True:
+			val = True
+			msg = "The user %s has enabled" % user
+			return Bool(val, msg)
+		elif container_metadata["Password"] == actual_user_password:
+			val = True
+			msg = "The user %s has enabled" % user
+			return Bool(val, msg)
+		else:
+			ori_user_password = container_metadata["Password"]
+			container_metadata["User-Enable"] = True
+
+		change_password_output = self.change_password(account, user, actual_user_password,\
+		ori_user_password)
+
+		if change_password_output.val == False:
+			val = False
+			msg = change_password_output.msg
+			return Bool(val, msg)
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
+
+	def disable_user(self, account, container, user, admin_user, retry=3):
 		'''
-		Disabe the user from accessing the backend swift by changing the user's password in the backend.
+		Disable the user to access the backend Swift by changing the password
+		to a random string. The original password will be stored in the
+		metadata of the user's container.
 
 		@type  account: string
-		@param account: the name of the given account
+		@param account: the account of the user
+		@type  container: string
+		@param container: the container for the user
 		@type  user: string
-		@param user: the name of the given user
+		@param user: the user to be disabled
+		@type  admin_user: string
+		@param admin_user: the admin user of the container
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
-		@return: a tuple (val, msg). If the user's backend password is successfully changed
-			and the enabled field in the database is set to false then Bool.val == True. 
-			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
-		
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's password is successfully
+			changed and the original password is stored in the metadata of the user's 
+			container, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
 		'''
-
 		logger = util.getLogger(name="disable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-		
-		Bool = collections.namedtuple("Bool", "val msg")
+		new_user_password = str(uuid.uuid4())
+		actual_user_password = ""
+		admin_password = ""
+
 		msg = ""
 		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
 
-		if proxy_ip_list is None or len(proxy_ip_list)==0:
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
 			msg = "No proxy node is found"
 			return Bool(val, msg)
 
@@ -550,19 +558,42 @@ class SwiftAccountMgr:
 			msg = "Argument retry has to >= 1"
 			return Bool(val, msg)
 
-		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__disable_user,
-                                                   account=account, user=user)
+		get_user_password_output = self.get_user_password(account, user)
+		if get_user_password_output.val == False:
+			val = False
+			msg = get_user_password_output.msg
+			return Bool(val, msg)
+		else:
+			actual_user_password = get_user_password_output.msg
 
-		try:
-			if val == True:
-				self.__accountDb.disable_user(account=account, name=user)
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
 
-		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=False for user %s:%s in database for %s"%(account, user, str(e))
-			logger.error(errMsg)
-			raise InconsistentDatabaseError(errMsg)
+		#TODO: check whehter the container is associated with the user
 
-                return Bool(val, msg)
+		change_password_output = self.change_password(account, user, actual_user_password,\
+		new_user_password)
+
+		if change_password_output.val == False:
+			val = False
+			msg = change_password_output.msg
+			return Bool(val, msg)
+
+		container_metadata = {
+			"User-Enable": False,
+			"Password": actual_user_password
+		}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
 
 	def enable_account(self, account):
 		pass
@@ -587,7 +618,8 @@ class SwiftAccountMgr:
 		@param admin: admin or not
 		@type  reseller: boolean
 		@param reseller: reseller or not
-		@return: a tuple (val, msg). If the operation is successfully done,
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operation is successfully done,
 		then val == True and msg records the standard output. Otherwise,
 		val == False and msg records the error message. 
 		'''
@@ -633,6 +665,7 @@ class SwiftAccountMgr:
 		@param newPassword: the new password of the user
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the password is changed successfully,
 			then Bool.val == True and msg == "". Otherwise, Bool.val == False and
 			Bool.msg records the error message.
@@ -712,7 +745,8 @@ class SwiftAccountMgr:
 		@param account: the name of the given account
 		@type  user: string
 		@param user: the name of the given user
-		@return: a tuple (val, msg). If the operatoin is successfully
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operatoin is successfully
 			done, then val == True and msg records the information
 			of the given user. Otherwise, val == False and msg
 			records the error message.
@@ -751,6 +785,7 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
     		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 	    	@return: a named tuple Bool(val, msg). If get the account usage
 			successfully, then Bool.val == True, and Bool.msg == "". 
 			Otherwise, Bool.val == False, and Bool.msg records the error message. 
@@ -788,7 +823,8 @@ class SwiftAccountMgr:
 		@param account: the name of the given account
 		@type  user: string
 		@param user: the name of the given user
-		@return: a tuple (val, msg). If the operatoin is successfully
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operatoin is successfully
 			done, then val == True and msg records the information
 			of the given user. Otherwise, val == False and msg
 			records the error message.
@@ -825,6 +861,7 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype: named tuple
 		@return: a named tuple Bool(val, msg). If get the user's password
 			successfully, then Bool.val == True, and Bool.msg == password. 
 			Otherwise, Bool.val == False, and Bool.msg records the error message.
@@ -886,6 +923,7 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(result, val, msg). If the user
 			is admin, then Bool.result == True, Bool.val == True,
 			and Bool.msg == "". If the user is not admin, then
@@ -945,6 +983,7 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(result, val, msg). If the user
 			is reseller admin, then Bool.result == True, Bool.val == True,
 			and Bool.msg == "". If the user is not reseller admin, then
@@ -994,11 +1033,233 @@ class SwiftAccountMgr:
 
 		return Bool(result, val, msg)
 
-	def set_account_quota(self, account, quota):
-		pass
+	def set_account_quota(self, account, admin_container, admin_user, quota, retry=3):
+		'''
+		Set the quota of the given account by updating the metadata in the container
+		for the admin user of the given account.
 
-	def get_account_quota(self, account):
-		pass
+		@type  account: string
+		@param account: the account to be set quota
+		@type  admin_container: string
+		@param admin_container: the container for the admin user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  quota: integer
+		@param quota: quota of the account (bytes)
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the account's quota is successfully
+			set, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="set_account_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container admin_container is associated with admin_user
+		#TODO: check whether the quota is a valid number
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		container_metadata = {"Quota": quota}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=admin_container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
+
+	def get_account_quota(self, account, admin_container, admin_user, retry=3):
+		'''
+		Get the quota of the given account by reading the metadata in the container
+		for the admin user of the given account.
+
+		@type  account: string
+		@param account: the account to be set quota
+		@type  admin_container: string
+		@param admin_container: the container for the admin user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the account's quota is successfully
+			got, then Bool.val = True and Bool.msg = the quota of the given account.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="get_account_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container admin_container is associated with admin_user
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=admin_container,\
+		admin_user=admin_user,admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		elif msg["Quota"].isdigit():
+			msg = int(msg["Quota"])
+		else:
+			val = False
+			msg = "The value of the quota in the metadata is not a number."
+
+		return Bool(val, msg)
+
+	def set_user_quota(self, account, container, user, admin_user, quota, retry=3):
+		'''
+		Set the quota of the given user by updating the metadata in the container
+		for the user.
+
+		@type  account: string
+		@param account: the account of the given user
+		@type  container: string
+		@param container: the container for the given user
+		@type  user: string
+		@param user: the user to be set quota
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  quota: integer
+		@param quota: quota of the account (bytes)
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's quota is successfully
+			set, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="set_user_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container is associated with the given user
+		#TODO: check whether the quota is a valid number
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		container_metadata = {"Quota": quota}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
+
+	def get_user_quota(self, account, container, user, admin_user, retry=3):
+		'''
+		Get the quota of the given user by reading the metadata in the container
+		for the user.
+
+		@type  account: string
+		@param account: the account to be set quota
+		@type  container: string
+		@param container: the container for the given user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's quota is successfully
+			got, then Bool.val = True and Bool.msg = the quota of the given user.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="get_user_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container is associated with the given user
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		elif msg["Quota"].isdigit():
+			msg = int(msg["Quota"])
+		else:
+			val = False
+			msg = "The value of the quota in the metadata is not a number."
+
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __get_account_info(self, proxyIp):
@@ -1007,7 +1268,8 @@ class SwiftAccountMgr:
 
 		@type  proxyIp: string
 		@param proxyIp: IP of the proxy node
-		@return: a tuple (val, msg). If the operation is successfully
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operation is successfully
 			done, then val == True and msg will record the 
 			information. Otherwise, val == False, and msg will 
 			record the error message.
@@ -1041,6 +1303,7 @@ class SwiftAccountMgr:
 		@param account: an account name to be queried
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(result, val, msg). If the account
 			exists, then Bool.result == True, Bool.val == True,
 			and Bool.msg == "". If the account does not exist, then
@@ -1096,6 +1359,7 @@ class SwiftAccountMgr:
 
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(result, val, msg). If the get the account
 			list successfully, then Bool.val == True, and Bool.msg == account list. 
 			If the account list does not exist, then Bool.val == True, and Bool.msg == "".
@@ -1139,6 +1403,8 @@ class SwiftAccountMgr:
 		for item in account_info["accounts"]:
 			account_list += item["name"] + ", "
 			msg = account_list
+		
+		print self.__accountDb.show_user_info_table()
 			
 		return Bool(val, msg)
 
@@ -1150,6 +1416,7 @@ class SwiftAccountMgr:
 		@param account: the account name of the given user
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the get the user
 			list successfully, then Bool.val == True, and Bool.msg == user list.
 			If the user list does not exist, then Bool.val == True, and Bool.msg == "".
@@ -1175,8 +1442,8 @@ class SwiftAccountMgr:
 			return Bool(val, msg)
 		
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-                fn=self.__get_user_info, account=account)
-		
+                fn=self.__get_user_info, account=account)	
+	
 		if val == False:
 			return Bool(val, msg)
 
@@ -1196,9 +1463,14 @@ class SwiftAccountMgr:
 				val = False
 				return Bool(val, msg)
 			
-			for item in user_info["users"]:
-				user_list += item["name"] + ", "
-				msg = user_list
+			if not user_info["users"]:
+				msg = "No user exists in account %s"%account
+				val = False
+				return Bool(val, msg)
+			else:
+				for item in user_info["users"]:
+					user_list += item["name"] + ", "
+					msg = user_list
 				
 				return Bool(val, msg)
 
@@ -1212,6 +1484,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the given account
                 @type  retry: integer
                 @param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
                 @return: a named tuple Bool(val, msg). If the container list is got
                         successfully, then Bool.val == True and Bool.msg == user list. 
                         If the container list does not exist, then Bool.val == True and Bool.msg == "".
@@ -1266,7 +1539,8 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the given account
 		@type  admin_password: string
 		@param admin_password: the password of the admin user
-		@return: a tuple (val, msg). If the operation is successfully
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operation is successfully
 			done, then val == True and msg records the container
 			information. Otherwise, val == False and msg records
 			the error message.
@@ -1301,7 +1575,8 @@ class SwiftAccountMgr:
 		@param proxyIp: IP of the proxy node
 		@type  account: string
 		@param account: the account to be queried
-		@return: a tuple (val, msg). If the operation is successfully
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the operation is successfully
 			done, then val == True and msg records the user
 			information. Otherwise, val == False and msg records
 			the error message.
@@ -1342,6 +1617,7 @@ class SwiftAccountMgr:
 		@param user: the user to be checked
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(result, val, msg). If the user exists,
 			then Bool.result == True, Bool.val == True, and Bool.msg == "".
 			If the user does not exist, then Bool.result == False,
@@ -1406,6 +1682,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  admin_password: string
 		@param admin_password: the password of admin_user
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the read acl is successfully
 			gotten, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1455,6 +1732,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  admin_password: string
 		@param admin_password: the password of admin_user
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the write acl is successfully
 			gotten, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1506,6 +1784,7 @@ class SwiftAccountMgr:
 		@param admin_password: the password of admin_user
 		@type  read_acl: string
 		@param read_acl: the read acl to be set to that of the container
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the read acl is successfully
 			set, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1551,6 +1830,7 @@ class SwiftAccountMgr:
 		@param admin_password: the password of admin_user
 		@type  read_acl: string
 		@param read_acl: the write acl to be set to that of the container
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the write acl is successfully
 			set, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1593,6 +1873,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the read acl is successfully
 			assigned, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1661,6 +1942,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the write acl is successfully
 			assigned, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1729,6 +2011,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the read acl is successfully
 			removed, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1799,6 +2082,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  retry: integer
 		@param retry: the maximum number of times to retry after the failure
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the write acl is successfully
 			removed, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1859,19 +2143,19 @@ class SwiftAccountMgr:
 	def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
 		'''
 		Set self-defined metadata of the given container.
-		The self-defined metadata are associatied with a user and include:
+		The self-defined metadata are associatied with a user and include::
 			(1) Account-Enable: True/False
 			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
-		The following is the details of metadata_content:
-		metadata_content = {
-			"Account-Enable": True/False,
-			"User-Enable": True/False,
-			"Password": user password,
-			"Quota": number of bytes
-		}
+		The following is the details of metadata_content::
+			metadata_content = {
+				"Account-Enable": True/False,
+				"User-Enable": True/False,
+				"Password": user password,
+				"Quota": number of bytes
+			}
 
 		@type  proxyIp: string
 		@param proxyIp: IP of the proxy node
@@ -1885,6 +2169,7 @@ class SwiftAccountMgr:
 		@param admin_password: the password of admin_user
 		@type  metadata_content: dictionary
 		@param metadata_content: the content to be set to metadata of the container
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the metadata are successfully
 			set, then val == True and msg == "". Otherwise, val ==
 			False and msg records the error message.
@@ -1921,19 +2206,19 @@ class SwiftAccountMgr:
 	def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
 		'''
 		Get self-defined metadata of the given container as a dictionary.
-		The self-defined metadata are associatied with a user and include:
+		The self-defined metadata are associatied with a user and include::
 			(1) Account-Enable: True/False
 			(2) User-Enable: True/False
 			(3) Password: the original password for the user
 			(4) Quota: quota of the user (Number of bytes, int)
 
-		The following is the details of metadata:
-		{
-			"Account-Enable": True/False,
-			"User-Enable": True/False,
-			"Password": user password,
-			"Quota": number of bytes
-		}
+		The following is the details of metadata::
+			{
+				"Account-Enable": True/False,
+				"User-Enable": True/False,
+				"Password": user password,
+				"Quota": number of bytes
+			}
 
 		@type  proxyIp: string
 		@param proxyIp: IP of the proxy node
@@ -1945,6 +2230,7 @@ class SwiftAccountMgr:
 		@param admin_user: the admin user of the account
 		@type  admin_password: string
 		@param admin_password: the password of admin_user
+		@rtype:  named tuple
 		@return: a named tuple Bool(val, msg). If the metadata are successfully
 			got, then val == True and msg records the metadata. Otherwise,
 			val == False and msg records the error message.
@@ -1984,6 +2270,9 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
 	SA = SwiftAccountMgr()
+#	print SA.add_account("rice01").msg
 	print SA.list_account().msg
-	print SA.delete_account("rice88").msg
+	print SA.list_user("rice01").msg
+	print SA.delete_account("rice01").msg
 	print SA.list_account().msg
+	print SA.list_user("rice01").msg

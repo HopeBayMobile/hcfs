@@ -37,11 +37,11 @@ def set_http_proxy( setting ):
 		# set result values
 		if a==0 and 'fail' not in op_log:
 			op_ok = True
-			op_code = "000"
+			op_code = "100"
 			op_msg = None
 		else:
 			op_ok = False
-			op_code = "100"
+			op_code = "000"
 			op_msg = "failed to turn on http proxy."
 			
 	if setting=="off":
@@ -51,11 +51,11 @@ def set_http_proxy( setting ):
 		# set result values
 		if a==0 and 'fail' not in op_log:
 			op_ok = True
-			op_code = "000"
+			op_code = "100"
 			op_msg = None
 		else:
 			op_ok = False
-			op_code = "100"
+			op_code = "000"
 			op_msg = "failed to turn off http proxy."
 	
 	return_val = {'result'	: op_ok,

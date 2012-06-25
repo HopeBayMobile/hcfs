@@ -1,18 +1,21 @@
+'''
+This function is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This source code implements the API functions for the snapshotting
+features of Delta Cloud Storage Gateway.
+'''
 import os.path
-import sys
-import csv
 import json
-import os
-import ConfigParser
 import common
 import subprocess
 import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
+
+####### Global variable definition ###############
 
 smb_conf_file = "/etc/samba/smb.conf"
 org_smb_conf = "/etc/delta/smb.orig"
@@ -29,15 +32,31 @@ snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
 temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
 
+####### Exception class definition ###############
+
 
 class SnapshotError(Exception):
     pass
 
 
-class Snapshot_Db_Lock():
-    '''Class for handling acquiring/releasing lock for snapshotting database'''
-    def __init__(self):
+####### Start of API function ####################
 
+
+class Snapshot_Db_Lock():
+    '''
+    Class for handling acquiring/releasing lock for snapshotting database.
+
+    Usage:
+      1. Acquiring database lock: I{lock = Snapshot_Db_Lock()}.
+      2. Releasing database lock: I{del lock}.
+    '''
+    def __init__(self):
+        '''
+        Constructor for Snapshot_Db_Lock.
+
+        The file defined by I{snapshot_db_lock} variable is used as the
+        lock. Existance of the file infers that the database is locked.
+        '''
         self.locked = False
         try:
             finish = False
@@ -52,7 +71,12 @@ class Snapshot_Db_Lock():
         self.locked = True
 
     def __del__(self):
+        '''
+        Destructor for Snapshot_Db_Lock.
 
+        Deletes the lock file if it is created by this instance of
+        Snapshot_Db_Lock.
+        '''
         try:
             if self.locked:
                 self.locked = False
@@ -63,8 +87,14 @@ class Snapshot_Db_Lock():
 
 
 def _check_snapshot_in_progress():
-    '''Check if the tag /root/.s3ql/.snapshotting exists.'''
+    '''
+    Checks if there is a snapshotting process in progress.
+    A tag file (defined by I{snapshot_tag}) indicates the existance
+    of such a process.
 
+    @rtype:    Boolean value
+    @return:   Whether the tag for snapshotting process exists
+    '''
     try:
         if os.path.exists(snapshot_tag):
             return True
@@ -74,7 +104,9 @@ def _check_snapshot_in_progress():
 
 
 def _initialize_snapshot():
-    '''Starts snapshotting bot (which actually handles the snapshotting)'''
+    '''
+    Starts snapshotting bot (which actually handles the snapshotting)
+    '''
     try:
         subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
     except:
@@ -352,7 +384,7 @@ def _search_index(snapshot_name, snapshot_list):
                 return index
     except:
         raise SnapshotError('Unable to determine if the snapshot is exposed')
-    
+
     return -1
 
 
@@ -362,11 +394,7 @@ def delete_snapshot(to_delete):
     return_result = False
     return_msg = '[2] Unexpected error in delete_snapshot'
 
-
     try:
-        if type(to_delete) is not str:
-            raise SnapshotError('Name is not a string')
-
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
 
@@ -374,10 +402,10 @@ def delete_snapshot(to_delete):
 
         if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
             snapshot_path = os.path.join(snapshot_dir, to_delete)
-            if os.path.exists(snapshot_path):  #Invoke s3qlrm
+            if os.path.exists(snapshot_path):  # Invoke s3qlrm
                 os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
 
-            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index+1:]
+            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
             _write_snapshot_db(updated_snapshot_list)
 
             return_result = True
@@ -396,30 +424,30 @@ def delete_snapshot(to_delete):
     return json.dumps(return_val)
 
 
-def _write_snapshot_lifespan(months_to_live):
+def _write_snapshot_lifespan(days_to_live):
     '''Function for actually writing lifespan config to file'''
 
     try:
         with open(lifespan_conf, 'w') as fh:
-            fh.write('%d' % months_to_live)
+            fh.write('%d' % days_to_live)
         os.system('sudo chown www-data:www-data %s' % lifespan_conf)
     except:
         raise SnapshotError('Unable to write snapshot lifespan config to file')
 
 
-def set_snapshot_lifespan(months_to_live):
+def set_snapshot_lifespan(days_to_live):
 
     log.info('Started set_snapshot_lifespan')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
     try:
-        if months_to_live > 0:
-            _write_snapshot_lifespan(months_to_live)
+        if days_to_live > 0:
+            _write_snapshot_lifespan(days_to_live)
             return_result = True
             return_msg = 'Completed set_snapshot_lifespan'
         else:
-            return_msg = 'Error in set_snapshot_lifespan: months_to_live must be a positive integer.'
+            return_msg = 'Error in set_snapshot_lifespan: days_to_live must be a positive integer.'
     except Exception as Err:
         return_msg = str(Err)
 
@@ -433,7 +461,7 @@ def set_snapshot_lifespan(months_to_live):
 def get_snapshot_lifespan():
 
     log.info('Started get_snapshot_lifespan')
-    months_to_live = 12
+    days_to_live = 365
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
     reset_config = False
@@ -442,22 +470,22 @@ def get_snapshot_lifespan():
         with open(lifespan_conf, 'r') as fh:
             data_in = fh.readline()
             try:
-                months_to_live = int(data_in)
+                days_to_live = int(data_in)
                 return_result = True
                 return_msg = 'Completed get_snapshot_lifespan'
             except:
-                log.info('Stored lifespan is not an integer. Resetting to default (12 months).')
+                log.info('Stored lifespan is not an integer. Resetting to default (365 days).')
                 reset_config = True
     except IOError:
-        log.info('Unable to open config for snapshot lifespan. Resetting to default (12 months).')
+        log.info('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
         reset_config = True
     except:
         pass
 
     if reset_config:
         try:
-            _write_snapshot_lifespan(12)
-            months_to_live = 12
+            _write_snapshot_lifespan(365)
+            days_to_live = 365
             return_result = True
             return_msg = 'Completed get_snapshot_lifespan'
         except SnapshotError as Err:
@@ -466,7 +494,7 @@ def get_snapshot_lifespan():
     log.info(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
-                  'data': {'months_to_live': months_to_live}}
+                  'data': {'days_to_live': days_to_live}}
     return json.dumps(return_val)
 
 

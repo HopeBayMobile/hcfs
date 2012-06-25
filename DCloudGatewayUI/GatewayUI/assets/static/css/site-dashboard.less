@@ -448,6 +448,20 @@ tr{
 			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
 		}
 	}
+
+	td, th{
+		text-align: center;
+	}
+
+
+	.ani-inprogress{
+		width: 36px;
+		height: 36px;
+		background-image: url("/@{dashboard-image-path}/in_progress_01.png");
+		&.change{
+			background-image: url("/@{dashboard-image-path}/in_progress_02.png");
+		}
+	}
 }
 
 
@@ -475,29 +489,94 @@ tr{
 
 /*The following are styles for usage and status page*/
 
-.storage-indicator-and-switch{
+.system-pane{
 	position: relative;
-	top: 10px;
-	max-width: @site-main-width - 100px;
-	background-color: #EBEDED;
+	// max-width: @site-main-width - 100px;
 	padding: 20px;
-	.corner-radius (20px);
-	.css3-shadow (2px 2px 5px gray);
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	user-select: none;
 
 	.notify-box{
-		width: 72px;
-	    height: 32px;
-	    text-align: center;
-	    vertical-align: middle;
-	    line-height: 32px;
+		width: 53px;
+		height: 53px;
+		margin: 0 10px;
+		display: inline-block;
+		vertical-align: middle;
+	}
+
+	.control-box{
+		margin: 0 10px;
+		display: inline-block;
+		text-align: center;
+		vertical-align: middle;
 	}
 
 	& > div{
-		h1{
-			margin-bottom: 10px;
+		height: 280px;
+		li{
+			list-style: none;
+			margin: 5px 0;
+			font-size: 20px;
 		}
+
 		float: left;
-		width: 49.5%;
+		background-color: #EBEDED;
+		.corner-radius (10px);
+		.css3-shadow (0px 2px 5px black);
+		width: 48%;
+		margin-right: 10px;
+	}
+
+	.header{
+		.corner-radius (10px 10px 0 0);
+		.css3-shadow (0px 2px 5px black);
+		position: relative;
+		background-color: #585858;
+		font-size: 20px;
+		line-height: 40px;
+		text-indent: 25px;
+		vertical-align: middle;
+		height: 40px;
+		color: white;
+	}
+
+	label{
+		margin: 0;
+		padding: 6px 0 0 0;
+	}
+
+	input[type="checkbox"]{
+		display: none;
+	}
+
+	input[type="checkbox"] + .toggle-btn{
+		display: inline-block;
+		width: 71px;
+		height: 40px;
+		background: transparent url('/@{dashboard-image-path}/on_off_switch01.png') no-repeat;
+	}
+
+	input[type="checkbox"]:checked + .toggle-btn{
+		background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
+	}
+}
+
+.upgrade{
+	position: absolute;
+	background-image: url("/@{dashboard-image-path}/update_2.png");
+	width: 75px;
+	height: 77px;
+	right: -20px;
+	font-size: 12px;
+	color: black;
+	text-indent: 0;
+	text-align: center;
+	line-height: 77px;
+	top: -20px;
+	& .ing{
+		background-image: url("/@{dashboard-image-path}/update_1.png");
 	}
 }
 
@@ -513,7 +592,7 @@ tr{
 	& > div{
 		float: left;
 		margin: 0 25px;
-		width: @site-main-content-width / 4.5;
+		width: @site-main-content-width / 4;
 	}
 	img{
 		float: left;
@@ -521,21 +600,6 @@ tr{
 	}
 	p{
 		margin: 0;
-	}
-	.version {
-		background-color: red;
-		width: 40px;
-		height: 40px;
-		word-wrap: break-word;
-		position: relative;
-		.upgrade{
-			position: absolute;
-			bottom: 0px;
-			right: 0px;
-			background-color: green;
-			width: 20px;
-			height: 20px;
-		}
 	}
 }
 
@@ -612,6 +676,9 @@ tr{
 .img-dirtycache.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_full.png");
 }
+.img-snapshot{
+	background-image: url("/@{dashboard-image-path}/indicator_1_snapshot.png");
+}
 .img-system.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_system_work.png");
 }
@@ -625,10 +692,13 @@ tr{
 	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_safe.png");
 }
 .img-indicator.work{
-	background-image: url("/@{dashboard-image-path}/indicator_2_normal.png");
+	background-image: url("/@{dashboard-image-path}/Btn_status_2.png");
+}
+.img-snapshot.work{
+	background-image: url("/@{dashboard-image-path}/indicator_1_snapshot_work.png");
 }
 .img-indicator{
-	background-image: url("/@{dashboard-image-path}/indicator_2_abnormal.png");
+	background-image: url("/@{dashboard-image-path}/Btn_status_1.png");
 }
 
 // styles for 404 and 500 pages
