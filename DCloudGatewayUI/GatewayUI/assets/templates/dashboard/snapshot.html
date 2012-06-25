@@ -39,7 +39,7 @@
                     toggle_checkbox();
                 }
             });
-            // setInterval(toogle_progress, 500);
+            setInterval(toogle_progress, 500);
 
             $(".menu-button.create").on("click", function(){
                 $.post('/dashboard/snapshot/create', function(ctnt, success, opts){
