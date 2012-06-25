@@ -16,34 +16,51 @@ class BackupError(GatewayError):
     """
     """
     def __init__(self, code = None, msg = None):
-        self._code = code
-        self._msg =msg
-        if self._code is None:
-            code = '001'
-        if self._msg is None:
-            self._msg = ErrorCode.errorCodes[self._code]
+        self.code = code
+        self.msg =msg
+        if self.code is None:
+            self.code = '001'
+        if self.msg is None:
+            self.msg = ErrorCode.BackupErrorCodes[self.code]
     def __str__(self):
-        return "Backup config error(%s): %s" % (self._code, self._msg)        
+        return "Backup config error(%s): %s" % (self.code, self.msg)        
     
-class MetaDataError(BackupError):
+class CreateMetaDataError(BackupError):
     """
     """
     def __init__(self, msg = None):
-        self._code = '002'
-        self._msg = msg
-        super(FileNotFoundError, self).__init__('002', self._msg) 
+        self.code = '002'
+        self.msg = msg
+        super(CreateMetaDataError, self).__init__(self.code, self.msg)
         
+class SwiftCommandError(BackupError):
+    """
+    """
+    def __init__(self, msg = None):
+        self.code = '003'
+        self.msg = msg
+        super(SwiftCommandError, self).__init__(self.code, self.msg)
         
+class SwiftUploadError(BackupError):
+    """
+    """
+    def __init__(self, msg = None):
+        self.code = '004'
+        self.msg = msg
+        super(SwiftUploadError, self).__init__(self.code, self.msg) 
+
 class ErrorCode():
-    errorCodes = {
+    BackupErrorCodes = {
                   '001' : 'config backup is fail!',
                   '002' : 'create metadata file is fail!',
+                  '003' : 'swift command is fail!',
+                  '004' : 'swift upload container is fail!',
                  }
     
-def main(argv = None):
+def main():
     try:
-        raise FileNotFoundError()
-    except FileNotFoundError as e:
+        raise CreateMetaDataError()
+    except CreateMetaDataError as e:
         print e
     
 if __name__ == '__main__':

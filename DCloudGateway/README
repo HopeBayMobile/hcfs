@@ -66,4 +66,6 @@ www-data ALL=(ALL) NOPASSWD:ALL
 #includedir /etc/sudoers.d
 
 ===================================================================
-
+# Dependent packages:
+1) squid3 (use /home/yen/WorkFiles/StorageAppliance/DCloudGateway/src/http_proxy/install_proxy.py to install)
+2) apt-show-versions (sudo apt-get install apt-show-versions)

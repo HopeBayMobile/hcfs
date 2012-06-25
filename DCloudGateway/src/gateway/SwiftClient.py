@@ -4,8 +4,11 @@
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
 # Swift client class can connect to swift and do swift operation
 
-import os
+import common
 import subprocess
+from GatewayError import *
+
+log = common.getLogger(name="class name: SwiftClient", conf="/etc/delta/Gateway.ini")
 
 class SwiftClient():
     """
@@ -23,29 +26,33 @@ class SwiftClient():
             self._password = 'testpass'
             
     def executeCommand(self, command = None):
-    	if command is None:
+        if command is None:
             command = 'stat'
-        try:
-            cmd = ''.join(['swift -A https://', self._url, '/auth/v1.0 -U ',
-                self._login, ' -K ', self._password, ' ', command])
-            print "swift command is \n" 
-            print cmd
-            po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            (stdout, stderr) = po.communicate()
-            po.wait()
-            if po.returncode == 0:
-                print stdout
-            else:
-                print stderr
-        except Exception as e:
-            print e
-    
-    def upload(self, container, file):
-        self.executeCommand('upload %s %s' %(container, file))
+        cmd = ''.join(['sudo swift -A https://', self._url, '/auth/v1.0 -U ',
+            self._login, ' -K ', self._password, ' ', command])
+        print "swift command is"
+        print cmd
+        po  = subprocess.Popen(cmd, shell = True, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+        (stdout, stderr) = po.communicate()
+        po.wait()
+        return [po.returncode, stdout, stderr]
 
-def main(argv = None):
-	swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
-	swift.executeCommand()
+    def upload(self, container, file):
+        try:
+            returnData = self.executeCommand('upload %s %s' %(container, file))
+            if returnData[0] == 0:
+                return True
+            else:
+                log.error('swift upload fail: %s' %returnData[2])
+                raise SwiftUploadError('swift upload fail error message: %s' %returnData[2])
+        except SwiftUploadError:
+            raise
+        except Exception:
+            raise SwiftCommandError()
+
+def main():
+    swift = SwiftClient('172.16.228.53:8080', 'dcloud:dgateway', 'testpass')
+    swift.executeCommand()
         
 if __name__ == '__main__':
-	main()
+    main()

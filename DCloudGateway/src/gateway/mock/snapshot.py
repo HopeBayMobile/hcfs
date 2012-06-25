@@ -73,12 +73,6 @@ def expose_snapshot(to_expose):
 
 def delete_snapshot(to_delete):
 
-    if type(to_delete) is not str:
-        return_val = {'result': False,
-                      'msg': 'Invalid name for snapshot to delete.',
-                      'data': {}}
-        return json.dumps(return_val)
-
     print('Deleting snapshot (name: %s)' % to_delete)
 
     return_val = {'result': True,
