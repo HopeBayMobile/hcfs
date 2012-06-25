@@ -36,4 +36,5 @@ gateway.snapshot._translate_db	gateway.snapshot-module.html#_translate_db
 gateway.snapshot.SnapshotError	gateway.snapshot.SnapshotError-class.html
 gateway.snapshot.Snapshot_Db_Lock	gateway.snapshot.Snapshot_Db_Lock-class.html
 gateway.snapshot.Snapshot_Db_Lock.__del__	gateway.snapshot.Snapshot_Db_Lock-class.html#__del__
+gateway.snapshot.Snapshot_Db_Lock.locked	gateway.snapshot.Snapshot_Db_Lock-class.html#locked
 gateway.snapshot.Snapshot_Db_Lock.__init__	gateway.snapshot.Snapshot_Db_Lock-class.html#__init__
