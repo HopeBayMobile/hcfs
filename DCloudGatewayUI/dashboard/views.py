@@ -14,7 +14,7 @@ if not getattr(settings, "DEBUG", False):
     from gateway import api
     from gateway import api_restore_conf
     from gateway import api_remote_upgrade
-    from gateway.mock import snapshot as api_snapshot
+    from gateway import snapshot as api_snapshot
     from http_proxy import api_http_proxy
 else:
     from gateway.mock import api
@@ -362,15 +362,16 @@ def snapshot(request, action=None):
                 if not del_result['result']:
                     return_val = {'result': False, 'msg': 'An error occurred when deleting %s' % snap}
                     break
+            return_val = {'result': True, 'msg': 'All snapshots are deleted.'}
 
         if action == "export":
             snapshot_list = request.POST.getlist("snapshots[]")
             return_val = json.loads(api_snapshot.expose_snapshot(snapshot_list))
 
         if return_val['result']:
-            return HttpResponse("Success")
+            return HttpResponse("Success: %s" % return_val['msg'])
         else:
-            return HttpResponse("Failure")
+            return HttpResponse("Failure: %s" % return_val['msg'], status=500)
 
     else:
         return_val = json.loads(api_snapshot.get_snapshot_list())
@@ -389,10 +390,13 @@ def snapshot(request, action=None):
 
 @login_required
 @require_POST
-def http_proxy(request, action=None):
+def http_proxy_switch(request, action=None):
     if request.method == 'POST':
-        result = json.loads(api_http_proxy.set_http_proxy(action))
-        return HttpResponse(result)
+        return_val = json.loads(api_http_proxy.set_http_proxy(action))
+        if return_val['result']:
+            return HttpResponse(return_val['msg'])
+        else:
+            return HttpResponse(return_val['msg'], status=500)
 
 
 @login_required
