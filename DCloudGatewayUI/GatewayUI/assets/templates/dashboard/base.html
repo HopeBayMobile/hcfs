@@ -13,7 +13,6 @@
         <link rel="stylesheet" type="text/css" name="bootstrap" href="/static/css/bootstrap.css" />
         <link rel="stylesheet" type="text/css" name="bootstrap" href="
         /static/css/site.css" />
-        <link rel="stylesheet/less" type="text/css" href="/static/css/iphone-style.css">
         <link rel="stylesheet/less" type="text/css" href="/static/css/site-dashboard.less">
         {% block stylesheet %}
         {% endblock stylesheet %}
@@ -121,7 +120,7 @@
                         </div>
                     </div>
                     <div class="notify-box-row-NE">
-                        {{ user.username }}<img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></p>
+                        {{ user.username }}<a href="/logout"><img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a></p>
                     </div>
                     <div class="notify-box-row-SE">
                         <p id="basic-bandwidth">

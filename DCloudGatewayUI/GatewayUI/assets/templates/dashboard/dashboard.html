@@ -10,7 +10,7 @@
 			}
 		});
 
-		$(".version .upgrade").on("click", function(){
+		$(".control .upgrade").on("click", function(){
 			$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
 				console.log(ctnt);
 			})
@@ -28,6 +28,15 @@
 				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%");
 	        });
 	    }
+	    $("#http_proxy").on("click", function(e){
+	    	var action = "off";
+	    	if($(this).is(':checked')){
+	    		action = "on"
+	    	}
+	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
+	    		console.log(ctnt)
+    		});
+	    })
 	    setInterval(update_cache, 10000);
 	});
 </script>
@@ -50,7 +59,7 @@
 	</div>
 	<div class="control">
 		<div class="header">System Control
-			<div class="upgrade">Ver1.0</div>
+			<div class="upgrade {% if not available_version %}hide{% endif %}">New<br>Version</div>
 		</div>
         <ul>
             <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>

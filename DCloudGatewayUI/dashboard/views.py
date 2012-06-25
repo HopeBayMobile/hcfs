@@ -46,11 +46,9 @@ def index(request):
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
     context.update(data)
     try:
-        version = {"current_version": json.loads(api_remote_upgrade.get_gateway_version()).get("version"),
-                   "available_version": json.loads(api_remote_upgrade.get_available_upgrade()).get("version")}
+        context["available_version"] = json.loads(api_remote_upgrade.get_available_upgrade()).get("version")
     except Exception as inst:
         print inst
-    context.update(version)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -387,6 +385,7 @@ def snapshot(request, action=None):
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
 
         return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+
 
 @login_required
 @require_POST
