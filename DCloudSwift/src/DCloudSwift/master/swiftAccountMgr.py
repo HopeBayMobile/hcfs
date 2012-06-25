@@ -1033,11 +1033,227 @@ class SwiftAccountMgr:
 
 		return Bool(result, val, msg)
 
-	def set_account_quota(self, account, quota):
-		pass
+	def set_account_quota(self, account, admin_container, admin_user, quota, retry=3):
+		'''
+		Set the quota of the given account by updating the metadata in the container
+		for the admin user of the given account.
 
-	def get_account_quota(self, account):
-		pass
+		@type  account: string
+		@param account: the account to be set quota
+		@type  admin_container: string
+		@param admin_container: the container for the admin user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  quota: integer
+		@param quota: quota of the account (bytes)
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the account's quota is successfully
+			set, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="set_account_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container admin_container is associated with admin_user
+		#TODO: check whether the quota is a valid number
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		container_metadata = {"Quota": quota}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=admin_container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
+
+	def get_account_quota(self, account, admin_container, admin_user, retry=3):
+		'''
+		Get the quota of the given account by reading the metadata in the container
+		for the admin user of the given account.
+
+		@type  account: string
+		@param account: the account to be set quota
+		@type  admin_container: string
+		@param admin_container: the container for the admin user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the account's quota is successfully
+			got, then Bool.val = True and Bool.msg = the quota of the given account.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="get_account_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container admin_container is associated with admin_user
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=admin_container,\
+		admin_user=admin_user,admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		else:
+			msg = int(msg["Quota"])
+
+		return Bool(val, msg)
+
+	def set_user_quota(self, account, container, user, admin_user, quota, retry=3):
+		'''
+		Set the quota of the given user by updating the metadata in the container
+		for the user.
+
+		@type  account: string
+		@param account: the account of the given user
+		@type  container: string
+		@param container: the container for the given user
+		@type  user: string
+		@param user: the user to be set quota
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  quota: integer
+		@param quota: quota of the account (bytes)
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's quota is successfully
+			set, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="set_user_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container is associated with the given user
+		#TODO: check whether the quota is a valid number
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		container_metadata = {"Quota": quota}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
+
+	def get_user_quota(self, account, container, user, admin_user, retry=3):
+		'''
+		Get the quota of the given user by reading the metadata in the container
+		for the user.
+
+		@type  account: string
+		@param account: the account to be set quota
+		@type  container: string
+		@param container: the container for the given user
+		@type  admin_user: string
+		@param admin_user: the admin user of the account
+		@type  retry: integer
+		@param retry: the maximum number of times to retry when fn return the False
+		@rtype:  named tuple
+		@return: a tuple Bool(val, msg). If the user's quota is successfully
+			got, then Bool.val = True and Bool.msg = the quota of the given user.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
+		'''
+		logger = util.getLogger(name="get_user_quota")
+		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+		admin_password = ""
+
+		msg = ""
+		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
+
+		#TODO: check whehter the container is associated with the given user
+
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
+			msg = "No proxy node is found"
+			return Bool(val, msg)
+
+		if retry < 1:
+			msg = "Argument retry has to >= 1"
+			return Bool(val, msg)
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__get_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password)
+
+		if val == False:
+			return Bool(val, msg)
+		else:
+			msg = int(msg["Quota"])
+
+		return Bool(val, msg)
 
 	@util.timeout(300)
 	def __get_account_info(self, proxyIp):
