@@ -15,8 +15,8 @@ import simplejson as json
 from time import gmtime, strftime
 from SwiftClient import *
 
-TEMP_PATH = './temp'
-log = common.getLogger(name="Backup To Cloud", conf="/etc/delta/Gateway.ini")
+TEMP_PATH = '/tmp/backuptocloud'
+log = common.getLogger(name="class name: BackupToCloud", conf="/etc/delta/Gateway.ini")
 
 class BackupToCloud():
     """
@@ -26,10 +26,12 @@ class BackupToCloud():
         self._cloudObject = cloudObject
         if self._fileList is None:
             self._fileList = ['/etc/network/interfaces', '/home/hungic/.bashrc', '/tmp/aaa']
-            print self._fileList
+            log.info('input file list: %s' % self._fileList)
+            #print self._fileList
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
         self._metaData = {}
+        self.currentPath = os.getcwd()
     
     def backup(self):
         """
@@ -55,7 +57,8 @@ class BackupToCloud():
                 statInfo = os.stat(filename)
                 user = pwd.getpwuid(statInfo.st_uid)[0]
                 group = grp.getgrgid(statInfo.st_gid)[0]
-                fileMode = stat.S_IMODE(statInfo.st_mode)
+                fileMode = oct(stat.S_IMODE(statInfo.st_mode))
+                #print user, group, fileMode
                 key = ''.join(['file', str(i)])
                 self._metaData[key] = {'fname': os.path.basename(filename), 
                                        'fpath': os.path.dirname(filename), 
@@ -75,13 +78,15 @@ class BackupToCloud():
     def tarFile(self):
         """
         """
-        os.system('cd %s;tar -zcvf %s ./ --exclude *.tar.gz; mv %s ../' 
-                  % (TEMP_PATH, self._tarFileName, self._tarFileName))
+        
+        os.system('cd %s;tar -zcvf %s ./ --exclude *.tar.gz' 
+                  % (TEMP_PATH, self._tarFileName))
         
     def sendToCloud(self):
         """
         """
-        returnData = self._cloudObject.upload('config', self._tarFileName)
+        os.chdir(TEMP_PATH)
+        self._cloudObject.upload('config', self._tarFileName)
 
 
 def main():
