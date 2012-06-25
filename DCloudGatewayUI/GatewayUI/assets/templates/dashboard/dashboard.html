@@ -34,8 +34,8 @@
 {% endblock javascript %}
 {% block tab_content %}
 
-<div class="storage-indicator-and-switch">
-	<div class="indicators">
+<div class="system-pane">
+	<div class="status">
 		<div class="header">System Status</div>
 		<ul>
 			<li><div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
@@ -48,15 +48,13 @@
 			    </div><span>HTTP Proxy</span></li>
 		</ul>
 	</div>
-	<div class="switches">
+	<div class="control">
 		<div class="header">System Control
 			<div class="upgrade">Ver1.0</div>
 		</div>
-		<div class="iphone-toggle-buttons">
-            <ul>
-                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label><span>Http Proxy</span></li>
-            </ul>
-        </div>
+        <ul>
+            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>
+        </ul>
 	</div>
 	<p style="clear:both;"></p>
 </div>

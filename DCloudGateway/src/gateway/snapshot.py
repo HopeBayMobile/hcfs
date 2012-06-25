@@ -1,10 +1,10 @@
-'''
+"""
 This function is part of Delta Cloud Storage Gateway API functions
 Developed by CTBU, Delta Electronics Inc., 2012
 
 This source code implements the API functions for the snapshotting
 features of Delta Cloud Storage Gateway.
-'''
+"""
 import os.path
 import json
 import common
@@ -43,20 +43,23 @@ class SnapshotError(Exception):
 
 
 class Snapshot_Db_Lock():
-    '''
+    """
     Class for handling acquiring/releasing lock for snapshotting database.
+
+    @cvar locked: Whether this class instance acquired the database lock.
+    @type locked: Boolean value
 
     Usage:
       1. Acquiring database lock: I{lock = Snapshot_Db_Lock()}.
       2. Releasing database lock: I{del lock}.
-    '''
+    """
     def __init__(self):
-        '''
+        """
         Constructor for Snapshot_Db_Lock.
 
         The file defined by I{snapshot_db_lock} variable is used as the
         lock. Existance of the file infers that the database is locked.
-        '''
+        """
         self.locked = False
         try:
             finish = False
@@ -71,12 +74,12 @@ class Snapshot_Db_Lock():
         self.locked = True
 
     def __del__(self):
-        '''
+        """
         Destructor for Snapshot_Db_Lock.
 
         Deletes the lock file if it is created by this instance of
         Snapshot_Db_Lock.
-        '''
+        """
         try:
             if self.locked:
                 self.locked = False
@@ -87,14 +90,14 @@ class Snapshot_Db_Lock():
 
 
 def _check_snapshot_in_progress():
-    '''
+    """
     Checks if there is a snapshotting process in progress.
     A tag file (defined by I{snapshot_tag}) indicates the existance
     of such a process.
 
     @rtype:    Boolean value
     @return:   Whether the tag for snapshotting process exists
-    '''
+    """
     try:
         if os.path.exists(snapshot_tag):
             return True
@@ -104,9 +107,12 @@ def _check_snapshot_in_progress():
 
 
 def _initialize_snapshot():
-    '''
-    Starts snapshotting bot (which actually handles the snapshotting)
-    '''
+    """
+    Starts snapshotting bot (which actually handles the snapshotting).
+
+    @return:   None
+    @rtype:    N/A
+    """
     try:
         subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
     except:
@@ -114,7 +120,12 @@ def _initialize_snapshot():
 
 
 def take_snapshot():
-    '''API function for taking snapshots manually'''
+    """
+    API function for taking snapshots manually.
+
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     log.info('Started take_snapshot')
     return_result = False
     return_msg = '[2] Unexpected error in take_snapshot'
@@ -137,7 +148,17 @@ def take_snapshot():
 
 
 def set_snapshot_schedule(snapshot_time):
+    """
+    API function for setting the snapshot schedule.
 
+    If the input parameter is equal to -1, the snapshot scheduling
+    is disabled.
+
+    @param snapshot_time:  Time in a day for taking snapshots
+    @type snapshot_time:   Integer (from -1 to 23)
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     log.info('Started set_snapshot_schedule')
     return_result = False
     return_msg = '[2] Unexpected error in set_snapshot_schedule'
@@ -162,7 +183,20 @@ def set_snapshot_schedule(snapshot_time):
 
 
 def get_snapshot_schedule():
+    """
+    API function for getting the snapshot schedule.
 
+    If the value of the snapshot schedule is -1, the snapshot scheduling
+    is disabled.
+
+    If there is no I{snapshot_schedule} file, the value -1 is returned
+    as the snapshot schedule and this value is also written as the current
+    schedule.
+
+    @rtype:    Json object
+    @return:   A json object with function result, returned message,
+               and the current snapshot schedule.
+    """
     log.info('Started get_snapshot_schedule')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_schedule'
@@ -191,7 +225,13 @@ def get_snapshot_schedule():
 
 
 def _acquire_db_list():
+    """
+    Helper function for reading snapshot database without parsing
+    database entries.
 
+    @rtype:    Array of strings
+    @return:   Lines in the snapshot database (as array of strings).
+    """
     db_lock = Snapshot_Db_Lock()
     db_entries = []
 
@@ -208,7 +248,23 @@ def _acquire_db_list():
 
 
 def _translate_db(db_list):
+    """
+    Helper function for parsing database entries into array of
+    python dictionaries for snapshot entries.
 
+    Variables in each database entry:
+      1. "name": Name of the snapshot.
+      2. "start_time": When the snapshot request is started.
+      3. "finish_time": When the snapshot request is completed.
+      4. "num_files": Total number of files included in this snapshot.
+      5. "total_size": Total data size include in this snapshot.
+      6. "exposed": Whether this snapshot is exposed as a samba share.
+
+    @type db_list:  Array of strings
+    @param db_list: Lines in the snapshot database (as array of strings).
+    @rtype:         Array of python dictionaries
+    @return:        Entries in the snapshot database.
+    """
     snapshots = []
     try:
         for entry in db_list:
@@ -232,7 +288,13 @@ def _translate_db(db_list):
 
 
 def get_snapshot_list():
+    """
+    API function for reading the snapshot database.
 
+    @rtype:    Json object
+    @return:   A json object with function result, returned message,
+               and the current snapshot database entries.
+    """
     log.info('Started get_snapshot_list')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_list'
@@ -255,7 +317,18 @@ def get_snapshot_list():
 
 
 def get_snapshot_in_progress():
+    """
+    API function for probing if there is a snapshot in progress.
 
+    The function checks for the existance of the snapshot tag file.
+
+    Returned value I{in_progress} is the empty string "" if there
+    is no snapshot process in progress.
+
+    @rtype:    Json object
+    @return:   A json object with function result, returned message,
+               and the current snapshot in progress (if any).
+    """
     log.info('Started get_snapshot_in_progress')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_in_progress'
@@ -279,7 +352,14 @@ def get_snapshot_in_progress():
 
 
 def _append_samba_entry(entry):
+    """
+    Append new entry to a list of new exposed samba shared folders.
 
+    @type entry:  Snapshot database entry
+    @param entry: New snapshot database entry to be exposed.
+    @rtype: N/A
+    @return: None
+    """
     try:
         if os.path.exists(tmp_smb_conf1):
             os.system('sudo rm -rf %s' % tmp_smb_conf1)
@@ -301,7 +381,14 @@ def _append_samba_entry(entry):
 
 
 def _write_snapshot_db(snapshot_list):
+    """
+    Write updated snapshot database entries to the database file.
 
+    @type snapshot_list:  Array of snapshot database entries
+    @param snapshot_list: Array of updated snapshot database entries
+    @rtype:   N/A
+    @return:  None
+    """
     db_lock = Snapshot_Db_Lock()
 
     try:
@@ -329,7 +416,14 @@ def _write_snapshot_db(snapshot_list):
 
 
 def expose_snapshot(to_expose):
+    """
+    API function for exposing snapshot entries as samba shares.
 
+    @type to_expose: Array of strings
+    @param to_expose: List of snapshot names to be exposed as samba shares.
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     log.info('Started get_snapshot_in_progress')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_in_progress'
@@ -377,7 +471,17 @@ def expose_snapshot(to_expose):
 
 
 def _search_index(snapshot_name, snapshot_list):
+    """
+    Helper function for finding the index of a snapshot name in the database.
 
+    @type snapshot_name: String
+    @param snapshot_name: Name of the snapshot that is being queried.
+    @type snapshot_list: Array of snapshot database entries
+    @param snapshot_list: Array of the current snapshot database entries
+    @rtype:  Number
+    @return: The index of the queried snapshot in the database (-1 if
+             not found).
+    """
     try:
         for index in range(len(snapshot_list)):
             if snapshot_list[index]['name'] == snapshot_name:
@@ -389,7 +493,14 @@ def _search_index(snapshot_name, snapshot_list):
 
 
 def delete_snapshot(to_delete):
+    """
+    API function for deleting a snapshot entry.
 
+    @type to_delete: String
+    @param to_delete: Snapshot name to be deleted.
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     log.info('Started delete_snapshot')
     return_result = False
     return_msg = '[2] Unexpected error in delete_snapshot'
@@ -400,19 +511,22 @@ def delete_snapshot(to_delete):
 
         snapshot_index = _search_index(to_delete, snapshot_list)
 
-        if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
-            snapshot_path = os.path.join(snapshot_dir, to_delete)
-            if os.path.exists(snapshot_path):  # Invoke s3qlrm
-                os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
-
-            updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
-            _write_snapshot_db(updated_snapshot_list)
-
-            return_result = True
-            return_msg = 'Finished deleting snapshot'
-
+        if snapshot_index < 0:  # Cannot find the name of the snapshot
+            return_msg = 'Unable to find the snapshot in the database'
         else:
-            return_msg = 'Snapshot is currently being exposed. Skipping.'
+            if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
+                snapshot_path = os.path.join(snapshot_dir, to_delete)
+                if os.path.exists(snapshot_path):  # Invoke s3qlrm
+                    os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
+
+                updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
+                _write_snapshot_db(updated_snapshot_list)
+
+                return_result = True
+                return_msg = 'Finished deleting snapshot'
+
+            else:
+                return_msg = 'Snapshot is currently being exposed. Skipping.'
 
     except:
         pass
@@ -425,9 +539,18 @@ def delete_snapshot(to_delete):
 
 
 def _write_snapshot_lifespan(days_to_live):
-    '''Function for actually writing lifespan config to file'''
+    """
+    Helper function for actually writing lifespan config to file
 
+    @type days_to_live: Number
+    @param days_to_live: The lifespan of a snapshot, measured in days.
+    @rtype: N/A
+    @return: None
+    """
     try:
+        if os.path.exists(lifespan_conf):
+            os.system('rm -rf %s' % lifespan_conf)
+
         with open(lifespan_conf, 'w') as fh:
             fh.write('%d' % days_to_live)
         os.system('sudo chown www-data:www-data %s' % lifespan_conf)
@@ -436,18 +559,25 @@ def _write_snapshot_lifespan(days_to_live):
 
 
 def set_snapshot_lifespan(days_to_live):
+    """
+    API function for setting the lifespan of snapshots.
 
+    @type days_to_live: Number
+    @param days_to_live: The lifespan of a snapshot, measured in days.
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     log.info('Started set_snapshot_lifespan')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
     try:
-        if days_to_live > 0:
+        if days_to_live >= 0:
             _write_snapshot_lifespan(days_to_live)
             return_result = True
             return_msg = 'Completed set_snapshot_lifespan'
         else:
-            return_msg = 'Error in set_snapshot_lifespan: days_to_live must be a positive integer.'
+            return_msg = 'Error in set_snapshot_lifespan: days_to_live must be a positive integer or zero.'
     except Exception as Err:
         return_msg = str(Err)
 
@@ -459,7 +589,16 @@ def set_snapshot_lifespan(days_to_live):
 
 
 def get_snapshot_lifespan():
+    """
+    API function for getting the lifespan of snapshots.
 
+    If the lifespan config does not exists, the default value (365 days)
+    is returned and also written to the config file.
+
+    @rtype:    Json object
+    @return:   A json object with function result ,returned message, and
+               the current lifespan (in days) of the snapshots.
+    """
     log.info('Started get_snapshot_lifespan')
     days_to_live = 365
     return_result = False
@@ -482,7 +621,7 @@ def get_snapshot_lifespan():
     except:
         pass
 
-    if reset_config:
+    if reset_config:  # If we need to use the default value as returned value
         try:
             _write_snapshot_lifespan(365)
             days_to_live = 365

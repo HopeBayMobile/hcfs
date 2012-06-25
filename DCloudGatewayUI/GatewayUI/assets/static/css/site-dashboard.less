@@ -1,7 +1,7 @@
 // The following are predefined variables and functions for less
 @site-width: 1024px;
 @site-top-height: 132px;
-@notify-group-height: 115px;
+@notify-group-height: 113px;
 @site-left-width: 220px;
 @site-left-main-seperator: 1px;
 @site-main-width: @site-width - @site-left-width;
@@ -19,7 +19,7 @@
 @cache-usage-bar-height: 25px;
 @dashboard-image-path: "static/img/dashboard";
 .css3-transform (@times){
-    -moz-transition: all @times ease-in-out;
+	-moz-transition: all @times ease-in-out;
 	-webkit-transition: all @times ease-in-out;
 	-o-transition: all @times ease-in-out;
 	transition: all @times ease-in-out;
@@ -33,9 +33,9 @@
 
 .corner-radius (@size){
 	-moz-border-radius: @size;
-    -webkit-border-radius: @size;
-    -khtml-border-radius: @size;
-    border-radius: @size;
+	-webkit-border-radius: @size;
+	-khtml-border-radius: @size;
+	border-radius: @size;
 }
 
 .css3-progress-bar-skyblue{
@@ -141,11 +141,11 @@ tr{
 }
 
 .site-header{
-    position: relative;
-    top: 0;
-    margin: 0; padding:0;
-    width:  @site-width;
-    height: @site-top-height;
+	position: relative;
+	top: 0;
+	margin: 0; padding:0;
+	width:  @site-width;
+	height: @site-top-height;
 	background-image: url("/@{dashboard-image-path}/banner.png");
 }
 
@@ -162,31 +162,57 @@ tr{
 }
 
 .notify-box-group{
-   	float: right;
-    margin-top: (@site-top-height - @notify-group-height)/2;
-    margin-right: (@site-top-height - @notify-group-height)/2;
-    width: 350px;
-    height: @notify-group-height;
-    display: inline-block;
+	float: right;
+	display: inline-block;
+	margin-top: (@site-top-height - @notify-group-height)/2;
+	margin-right: (@site-top-height - @notify-group-height)/2;
+	width: 508px;
+	height: @notify-group-height;
+	background-image: url("/@{dashboard-image-path}/indicator_bg.png");
+	background-repeat: no-repeat;
 
-    .notify-box-row-NW{
+	.notify-box-row-NW{
 		float: left;
-		margin-top: (@notify-group-height - 80px) / 2;
-		margin-left: 5px;
+		height: 53px;
+		vertical-align: middle;
+		margin: 10px 0;
+		padding: 20px 0;
+		padding-right: 5px;
+		border-right: solid 1px gray;
+	}
+
+	.notify-box-row-NE{
+		float: right;
+		margin-top: 10px;
+		width: 180px;
+		height: 30px;
+		margin: 10px 10px 5px 0;
+		padding-bottom: 5px;
+		vertical-align: middle;
+		line-height: 32px;
+		font-size: 16px;
+		border-bottom: 1px solid gray;
+		position: relative;
+		img{
+			position: absolute;
+			right: 0px;
+		}
 	}
 
 	.notify-box-row-SE{
-		margin-left: 10px;
+		float: right;
+		width: 180px;
+		margin: 5px 10px 0 0;
 	}
 
 	.notify-box{
 		float: left;
-	    margin-left: 10px;
-	    margin-bottom: 10px;
-	    color: white;
-	    width: 50px;
-	    height: 50px;
-	    background-position: 0;
+		margin-left: 10px;
+		margin-bottom: 10px;
+		color: white;
+		width: 50px;
+		height: 50px;
+		background-position: 0;
 		background-repeat: no-repeat;
 	}
 }
@@ -195,18 +221,18 @@ tr{
 	float: left;
 	margin-top: 33px;
 	margin-left: 23px;
-    background-image: url("/@{dashboard-image-path}/delta_logo.png");
-    background-repeat: no-repeat;
-    width: 198px;
-    height: 64px;
+	background-image: url("/@{dashboard-image-path}/delta_logo.png");
+	background-repeat: no-repeat;
+	width: 198px;
+	height: 64px;
 }
 
 .refresh-box{
-    position: absolute;
-    bottom:20px; left:20px;
-    height: 30px;
-    background-color: gray;
-    width: 480px;
+	position: absolute;
+	bottom:20px; left:20px;
+	height: 30px;
+	background-color: gray;
+	width: 480px;
 }
 
 .bg-fixed{
@@ -227,21 +253,21 @@ tr{
 .left-bg{
 	background-color: #E5E5E5;
 	background-repeat: repeat-x;
-    width:@site-left-width;
-    border-right: solid #ccc @site-left-main-seperator;
+	width:@site-left-width;
+	border-right: solid #ccc @site-left-main-seperator;
 }
 
 .main-row{
-    float: right;
-    height: 100%;
-    overflow: auto;
+	float: right;
+	height: 100%;
+	overflow: auto;
 }
 
 .left-row{
 	float:left;
-    width: @site-left-width;
-    height: 100%;
-    overflow-y: auto;
+	width: @site-left-width;
+	height: 100%;
+	overflow-y: auto;
 }
 
 .main-content{
@@ -265,8 +291,19 @@ tr{
 		top: auto;
 		left: auto;
 		height: 0px;
-		background-color: blue;
+		background-image: url("/@{dashboard-image-path}/check_bg03.png");
 		width: 803px;
+
+		button{
+			width: 87px;
+			height: 40px;
+			border: none;
+			background-color: transparent;
+			margin-top: 12px;
+			margin-right: 10px;
+			float: right;
+			background-image: url("/@{dashboard-image-path}/snapshot_control.png");
+		}
 }
 
 .tab-btn{
@@ -318,14 +355,14 @@ tr{
 }
 
 .statusbar-header{
-    height: @slide-box-footer-bar-height;
-    line-height: @slide-box-footer-bar-height;
-    text-align: center;
-    vertical-align: middle;
-    color: white;
-    font-weight: bold;
-    cursor:pointer;
-    background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
+	height: @slide-box-footer-bar-height;
+	line-height: @slide-box-footer-bar-height;
+	text-align: center;
+	vertical-align: middle;
+	color: white;
+	font-weight: bold;
+	cursor:pointer;
+	background-image: url("/@{dashboard-image-path}/1_errormsg_bar.png");
 }
 
 .statusbar-content{
@@ -417,9 +454,9 @@ tr{
 	vertical-align: middle;
 	// Fake list-style
 	list-style:none;
-    padding-left: 30px;
-    background-position: left 3px;
-    background-repeat: no-repeat;
+	padding-left: 30px;
+	background-position: left 3px;
+	background-repeat: no-repeat;
 	// Text truncation
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -436,15 +473,16 @@ tr{
 #snapshot{
 	.menu-button{
 		margin-left: 20px;
+		margin-bottom: 10px;
 		border: none;
-		width: 161px;
-		height: 69px;
+		width: 87px;
+		height: 40px;
 		font-size: 18px;
 		color: #434343;
 		vertical-align: middle;
 		background-color: transparent;
 		background-image: url("/@{dashboard-image-path}/snapshot_control.png");
-		&:hover{
+		&.active{
 			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
 		}
 	}
@@ -489,48 +527,36 @@ tr{
 
 /*The following are styles for usage and status page*/
 
-.storage-indicator-and-switch{
+.system-pane{
 	position: relative;
-	top: 10px;
-	max-width: @site-main-width - 100px;
+	// max-width: @site-main-width - 100px;
 	padding: 20px;
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	user-select: none;
 
 	.notify-box{
 		width: 53px;
-	    height: 53px;
-	    margin: 5px 10px;
-	    display: inline-block;
-	    text-align: center;
-	    vertical-align: middle;
-	    line-height: 32px;
+		height: 53px;
+		margin: 0 10px;
+		display: inline-block;
+		vertical-align: middle;
 	}
 
+	.control-box{
+		margin: 0 10px;
+		display: inline-block;
+		text-align: center;
+		vertical-align: middle;
+	}
 
 	& > div{
-		h1{
-			margin-bottom: 10px;
-		}
-		.header{
-			.corner-radius (10px 10px 0 0);
-			.css3-shadow (0px 2px 5px black);
-			position: relative;
-			background-color: #585858;
+		height: 280px;
+		li{
+			list-style: none;
+			margin: 5px 0;
 			font-size: 20px;
-			line-height: 40px;
-			text-indent: 25px;
-			vertical-align: middle;
-			height: 40px;
-			color: white;
-		}
-
-		ul{
-			li{
-				list-style: none;
-				margin: 0;
-			}
-			span{
-				font-size: 20px;
-			}
 		}
 
 		float: left;
@@ -539,6 +565,39 @@ tr{
 		.css3-shadow (0px 2px 5px black);
 		width: 48%;
 		margin-right: 10px;
+	}
+
+	.header{
+		.corner-radius (10px 10px 0 0);
+		.css3-shadow (0px 2px 5px black);
+		position: relative;
+		background-color: #585858;
+		font-size: 20px;
+		line-height: 40px;
+		text-indent: 25px;
+		vertical-align: middle;
+		height: 40px;
+		color: white;
+	}
+
+	label{
+		margin: 0;
+		padding: 6px 0 0 0;
+	}
+
+	input[type="checkbox"]{
+		display: none;
+	}
+
+	input[type="checkbox"] + .toggle-btn{
+		display: inline-block;
+		width: 71px;
+		height: 40px;
+		background: transparent url('/@{dashboard-image-path}/on_off_switch01.png') no-repeat;
+	}
+
+	input[type="checkbox"]:checked + .toggle-btn{
+		background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
 	}
 }
 
@@ -655,6 +714,9 @@ tr{
 .img-dirtycache.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_full.png");
 }
+.img-snapshot{
+	background-image: url("/@{dashboard-image-path}/indicator_1_snapshot.png");
+}
 .img-system.work{
 	background-image: url("/@{dashboard-image-path}/indicator_1_system_work.png");
 }
@@ -668,10 +730,13 @@ tr{
 	background-image: url("/@{dashboard-image-path}/indicator_1_dirtycache_safe.png");
 }
 .img-indicator.work{
-	background-image: url("/@{dashboard-image-path}/Btn_status_1.png");
+	background-image: url("/@{dashboard-image-path}/Btn_status_2.png");
+}
+.img-snapshot.work{
+	background-image: url("/@{dashboard-image-path}/indicator_1_snapshot_work.png");
 }
 .img-indicator{
-	background-image: url("/@{dashboard-image-path}/Btn_status_2.png");
+	background-image: url("/@{dashboard-image-path}/Btn_status_1.png");
 }
 
 // styles for 404 and 500 pages
