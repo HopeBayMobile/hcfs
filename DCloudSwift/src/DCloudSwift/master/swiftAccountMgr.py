@@ -1138,8 +1138,11 @@ class SwiftAccountMgr:
 
 		if val == False:
 			return Bool(val, msg)
-		else:
+		elif msg["Quota"].isdigit():
 			msg = int(msg["Quota"])
+		else:
+			val = False
+			msg = "The value of the quota in the metadata is not a number."
 
 		return Bool(val, msg)
 
@@ -1250,8 +1253,11 @@ class SwiftAccountMgr:
 
 		if val == False:
 			return Bool(val, msg)
-		else:
+		elif msg["Quota"].isdigit():
 			msg = int(msg["Quota"])
+		else:
+			val = False
+			msg = "The value of the quota in the metadata is not a number."
 
 		return Bool(val, msg)
 
