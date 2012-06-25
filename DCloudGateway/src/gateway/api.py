@@ -117,6 +117,16 @@ class SnapshotError(Exception):
     pass
 
 def getGatewayConfig():
+    """
+    Get gateway configuration from /etc/delta/Gateway.ini.
+    
+    Will raise GatewayConfError if some error ocurred.
+    
+    @rtype: ConfigParser
+    @return: Instance of ConfigParser.
+    
+    """
+    
     try:
         config = ConfigParser.ConfigParser()
         with open('/etc/delta/Gateway.ini','rb') as fh:
@@ -149,6 +159,14 @@ def getGatewayConfig():
         raise GatewayConfError(op_msg)
     
 def getStorageUrl():
+    """
+    Get storage URL from /root/.s3ql/authinfo2.
+    
+    @rtype: string
+    @return: Storage URL or None if failed.
+    
+    """
+    
     log.info("getStorageUrl start")
     storage_url = None
 
@@ -166,6 +184,19 @@ def getStorageUrl():
     return storage_url
     
 def get_compression():
+    """
+    Get status of compression switch.
+    
+    @rtype: JSON object
+    @return: Compress switch.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - switch: True if compression is ON. Otherwise, false.
+    
+    """
+    
     log.info("get_compression start")
     op_ok = False
     op_msg = ''
@@ -196,7 +227,13 @@ def get_compression():
     return json.dumps(return_val)
 
 def _check_snapshot_in_progress():
-    '''Check if the tag /root/.s3ql/.snapshotting exists. If so, return true.'''
+    """
+    Check if the tag /root/.s3ql/.snapshotting exists.
+    
+    @rtype: boolean
+    @return: True if snapshotting is in progress. Otherwise false.
+    
+    """
 
     try:
         if os.path.exists(snapshot_tag):
@@ -207,6 +244,26 @@ def _check_snapshot_in_progress():
 
 # by Rice
 def get_gateway_indicators():
+    """
+    Get gateway services' indicators.
+    
+    @rtype: JSON object
+    @return: Gateway services' indicators.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - network_ok: If network from gateway to storage is up.
+            - system_check: If fsck.s3ql daemon is alive.
+            - flush_inprogress: If S3QL dirty cache flushing is in progress.
+            - dritycache_nearfull: If S3QL dirty cache is near full.
+            - HDD_ok: If all HDD are healthy.
+            - NFS_srv: If NFS is alive.
+            - SMB_srv: If Samba service is alive.
+            - snapshot_in_progress: If S3QL snapshotting is in progress.
+            - HTTP_proxy_srv: If HTTP proxy server is alive.
+    
+    """
 
     log.info("get_gateway_indicators start")
     op_ok = False
@@ -263,7 +320,12 @@ def get_gateway_indicators():
 def _check_http_proxy_service():
     """
     Check whether Squid3 is running.
+    
+    @rtype: boolean
+    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
+    
     """
+    
     op_proxy_check = False
     log.info("_check_http_proxy start")
 
@@ -285,8 +347,16 @@ def _check_http_proxy_service():
     return op_proxy_check
     
     
-# check network connecttion from gateway to storage by Rice
+# check network connection from gateway to storage by Rice
 def _check_network():
+    """
+    Check network connection from gateway to storage.
+    
+    @rtype: boolean
+    @return: True if network is alive. Otherwise false.
+    
+    """
+    
     op_network_ok = False
     log.info("_check_network start")
     try:
@@ -325,6 +395,14 @@ def _check_network():
 
 # check fsck.s3ql daemon by Rice
 def _check_system():
+    """
+    Check fsck.s3ql daemon.
+    
+    @rtype: boolean
+    @return: True if fsck.s3ql is alive. Otherwise false.
+    
+    """
+    
     op_system_check = False
     log.info("_check_system start")
 
@@ -347,6 +425,14 @@ def _check_system():
 
 # flush check by Rice
 def _check_flush():
+    """
+    Check if S3QL dirty cache flushing is in progress.
+    
+    @rtype: boolean
+    @return: True if dirty cache flushing is in progress. Otherwise false.
+    
+    """
+    
     op_flush_inprogress = False
     log.info("_check_flush start")
     
@@ -370,6 +456,14 @@ def _check_flush():
 
 # dirty cache check by Rice
 def _check_dirtycache():
+    """
+    Check if S3QL dirty cache is near full.
+    
+    @rtype: boolean
+    @return: True if dirty cache is near full. Otherwise false.
+    
+    """
+    
     op_dirtycache_nearfull = False
     log.info("_check_dirtycache start")
 
@@ -392,6 +486,14 @@ def _check_dirtycache():
 
 # check disks on gateway by Rice
 def _check_HDD():
+    """
+    Check HDD healthy status by S.M.A.R.T..
+    
+    @rtype: boolean
+    @return: True if all HDD are healthy. Otherwise false.
+    
+    """
+    
     op_HDD_ok = False
     log.info("_check_HDD start")
 
@@ -424,6 +526,14 @@ def _check_HDD():
 
 # check nfs daemon by Rice
 def _check_nfs_service():
+    """
+    Check NFS daemon.
+    
+    @rtype: boolean
+    @return: True if NFS is alive. Otherwise false.
+    
+    """
+    
     op_NFS_srv = True
     log.info("_check_nfs_service start")
 
@@ -448,6 +558,14 @@ def _check_nfs_service():
 
 # check samba daemon by Rice
 def _check_smb_service():
+    """
+    Check Samba daemon.
+    
+    @rtype: boolean
+    @return: True if Samba service is alive. Otherwise false.
+    
+    """
+
     op_SMB_srv = False
     log.info("_check_smb_service start")    
 
@@ -470,6 +588,20 @@ def _check_smb_service():
     return op_SMB_srv
 
 def get_storage_account():
+    """
+    Get storage account.
+    
+    @rtype: JSON object
+    @return: Result of getting storage account and storage URL with account name if success.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - storage_url: storage URL which can be specified in 
+              either domain name or IP, followed by port number.
+            - account: The storage account name.
+    """
+    
     log.info("get_storage_account start")
 
     op_ok = False
@@ -503,6 +635,28 @@ def get_storage_account():
     return json.dumps(return_val)
 
 def apply_storage_account(storage_url, account, password, test=True):
+    """
+    Apply for a storage account.
+    First call test_storage_account for storage credential, 
+    then write the info to the configuration file if credential is good.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type account: string
+    @param account: Account name.
+    @type password: string
+    @param password: Account password.
+    @type test: boolean
+    @param test: Test account prior to apply.
+    @rtype: JSON object
+    @return: Result of applying storage account.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("apply_storage_account start")
 
     op_ok = False
@@ -553,6 +707,22 @@ def apply_storage_account(storage_url, account, password, test=True):
     return json.dumps(return_val)
 
 def apply_user_enc_key(old_key=None, new_key=None):
+    """
+    Apply a new encryption passphrase.
+    
+    @type old_key: string
+    @param old_key: Old encryption passphrase.
+    @type new_key: string
+    @param new_key: New encryption passphrase.
+    @rtype: JSON object
+    @return: Result of applying new passphrase.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("apply_user_enc_key start")
 
     op_ok = False
@@ -623,6 +793,17 @@ def apply_user_enc_key(old_key=None, new_key=None):
     return json.dumps(return_val)
 
 def _createS3qlConf( storage_url):
+    """
+    Create S3QL configuration file and upstart script of gateway 
+    by calling createS3qlconf.sh and createpregwconf.sh
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @rtype: integer
+    @return: 0 for success. Otherwise, nonzero value.
+    
+    """
+    
     log.info("_createS3qlConf start")
     ret = 1
     try:
@@ -664,6 +845,20 @@ def _createS3qlConf( storage_url):
 
 @common.timeout(180)
 def _openContainter(storage_url, account, password):
+    """
+    Open container.
+    
+    Will raise BuildGWError if failed.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type account: string
+    @param account: Account name.
+    @type password: string
+    @param password: Account password.
+    
+    """
+    
     log.info("_openContainer start")
 
     try:
@@ -687,6 +882,19 @@ def _openContainter(storage_url, account, password):
 
 @common.timeout(180)
 def _mkfs(storage_url, key):
+    """
+    Create S3QL file system.
+    Do file system checking if an existing one was found.
+    
+    Will raise BuildGWError if failed.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type key: string
+    @param key: Encryption passphrase.
+    
+    """
+    
     log.info("_mkfs start")
 
     try:
@@ -717,6 +925,20 @@ def _mkfs(storage_url, key):
 
 @common.timeout(600)
 def _umount():
+    """
+    Umount S3QL file system.
+    
+    Note:
+        - Stop Samba.
+        - Stop NetBIOS.
+        - Stop NFS.
+        - Umount.
+    
+    @rtype: boolean
+    @return: True if succeed to umount file system. Otherwise, false.
+    
+    """
+    
     log.info("[2] Gateway umounting")
     op_ok = False
 
@@ -767,6 +989,17 @@ def _umount():
 
 @common.timeout(360)
 def _mount(storage_url):
+    """
+    Mount the S3QL file system.
+    Will create S3QL configuration file and gateway upstart script before mounting.
+        
+    Will raise BuildGWError if failed.
+    
+    @type storage_url: string
+    @param stroage_url: Storage URL.
+    
+    """
+    
     log.info("[2] Gateway mounting")
     op_ok = False
     try:
@@ -849,6 +1082,16 @@ def _mount(storage_url):
 
 @common.timeout(360)
 def _restartServices():
+    """
+    Restart all gateway services.
+        - Samba
+        - NetBIOS
+        - NFS
+    
+    Will raise BuildGWError if failed.
+    
+    """
+    
     log.info("[2] Gateway restarting")
  
     #log.info("_restartServices start")
@@ -893,6 +1136,30 @@ def _restartServices():
 
 
 def build_gateway(user_key):
+    """
+    Build gateway. GUI need to call this function for the gateway initiation to start.
+    
+    Note:
+        - Need to first test if there is an existing filesystem. If so, 
+          use the provided auth info to check if can access the filesystem.
+        - If no existing filesystem, need to call mkfs.s3ql to build S3QL filesystem, 
+          write necessary files (see previous installation guide for stage 1 gateway doc, 
+          minus the iSCSI part), and start/restart services.
+        - Potential obstacle: In S3ql, the user encryption key is entered via keyboard, 
+          and here we need to read it from a file.
+        - Required configuration files: /root/.s3ql/authinfo2 (see s3ql doc for format).
+    
+    @type user_key: string
+    @param user_key: Encryption passphrase for the file system.
+    @rtype: JSON object
+    @return: Result of building gateway.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("[2] Gateway building")
     #log.info("build_gateway start")
 
@@ -954,6 +1221,18 @@ def build_gateway(user_key):
         return json.dumps(return_val)
 
 def restart_nfs_service():
+    """
+    Restart NFS service.
+    
+    @rtype: JSON object
+    @return: Result after restarting NFS service.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("[2] NFS service restarting")
     log.info("restart_nfs_service start")
 
@@ -988,6 +1267,18 @@ def restart_nfs_service():
         return json.dumps(return_val)
 
 def restart_smb_service():
+    """
+    Restart Samba and NetBIOS services.
+    
+    @rtype: JSON object
+    @return: Result after restarting Samba and NetBIOS services.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("restart_smb_service start")
     log.info("[2] Samba service restarting")
 
@@ -1027,6 +1318,18 @@ def restart_smb_service():
     return json.dumps(return_val)
 
 def reset_gateway():
+    """
+    Reset gateway by calling 'reboot' command directly.
+    
+    @rtype: JSON object
+    @return: Result of resetting gateway.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+        
+    """
+    
     log.info("reset_gateway start")
     log.info("[2] Gateway restarting")
 
@@ -1050,6 +1353,18 @@ def reset_gateway():
 
 
 def shutdown_gateway():
+    """
+    Shutdown gateway by calling 'poweroff' command directly.
+    
+    @rtype: JSON object
+    @return: Result of shutting gateway down.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+        
+    """
+    
     log.info("shutdown_gateway start")
     log.info("[2] Gateway shutdowning")
     
@@ -1074,6 +1389,21 @@ def shutdown_gateway():
 
 @common.timeout(180)
 def _test_storage_account(storage_url, account, password):
+    """
+    Test the storage account to see if it works.
+    Use auth process of swift to check for the credential of the account info.
+    
+    Will raise TestStorageError if failed.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type account: string
+    @param account: Account name.
+    @type password: string
+    @param password: Account password.
+        
+    """
+    
     cmd ="sudo curl -k -v -H 'X-Storage-User: %s' -H 'X-Storage-Pass: %s' https://%s/auth/v1.0"%(account, password, storage_url)
     po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.stdout.read()
@@ -1088,6 +1418,25 @@ def _test_storage_account(storage_url, account, password):
         raise TestStorageError(op_msg)
 
 def test_storage_account(storage_url, account, password):
+    """
+    Test the storage account to see if it works.
+    Use auth process of swift to check for the credential of the account info.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type account: string
+    @param account: Account name.
+    @type password: string
+    @param password: Account password.
+    @rtype: JSON object
+    @return: Test result.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+        
+    """
+    
     log.info("test_storage_account start")
 
     op_ok = False
@@ -1115,6 +1464,23 @@ def test_storage_account(storage_url, account, password):
         return json.dumps(return_val)
 
 def get_network():
+    """
+    Get current storage gateway box network settings.
+    
+    @rtype: JSON object
+    @return: The network setting of storage gateway.
+        
+        - result: Function call result
+        - msg: Explanation of result
+        - data: JSON object
+            - ip: IP address
+            - gateway: Network gateway
+            - mask: Network mask
+            - dns1: Primary DNS
+            - dns2: Secondary DNS
+    
+    """
+    
     log.info("get_network start")
     log.info("[2] Gateway networking starting")
 
@@ -1166,6 +1532,29 @@ def get_network():
         return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
+    """
+    Set current storage gateway box network settings. 
+    Should also trigger restart network service action.
+    
+    @type ip: string
+    @param ip: IP address.
+    @type gateway: string
+    @param gateway: Network gateway.
+    @type mask: string
+    @param mask: Network mask.
+    @type dns1: string
+    @param dns1: Primary DNS.
+    @type dns2: string
+    @param dns2: Secondary DNS.
+    @rtype: JSON object
+    @return: Result of applying network.
+    
+        - result: Function call result
+        - msg: Explanation of result
+        - data: JSON object. Always return empty.
+        
+    """
+    
     log.info("apply_network start")
 
     ini_path = "/etc/delta/Gateway.ini"
@@ -1245,6 +1634,26 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     return json.dumps(return_val)
 
 def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
+    """
+    Store network info to /etc/delta/network.info.
+    
+    @type ini_path: string
+    @param ini_path: Path to ini file.
+    @type ip: string
+    @param ip: IP address.
+    @type gateway: string
+    @param gateway: Network gateway.
+    @type mask: string
+    @param mask: Network mask.
+    @type dns1: string
+    @param dns1: Primary DNS.
+    @type dns2: string
+    @param dns2: Secondary DNS.
+    @rtype: boolean
+    @return: Result of storing network info to ini file.
+        
+    """
+    
     op_ok = False
     op_config = ConfigParser.ConfigParser()
     info_path = "/etc/delta/network.info"
@@ -1280,6 +1689,21 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
         return op_ok
 
 def _setInterfaces(ip, gateway, mask, ini_path):
+    """
+    Change the setting of /etc/network/interfaces.
+    
+    @type ip: string
+    @param ip: IP address.
+    @type gateway: string
+    @param gateway: Network gateway.
+    @type mask: string
+    @param mask: Network mask.
+    @type ini_path: string
+    @param ini_path: Ini file to get fixed IP and network mask (used for eth0 currently).
+    @rtype: boolean
+    @return: True if successfully applied the net setting. Otherwise, false.
+    """
+    
     interface_path = "/etc/network/interfaces"
     interface_path_temp = "/etc/delta/network_interfaces"
     op_ok = False
@@ -1344,6 +1768,17 @@ def _setInterfaces(ip, gateway, mask, ini_path):
         return op_ok
 
 def _setNameserver(dns1, dns2=None):
+    """
+    Set the domain name server.
+    
+    @type dns1: string
+    @param dns1: Primiary DNS.
+    @type dns2: string
+    @param dns2: Secondary DNS.
+    @rtype: boolean
+    @return: True if successfully applied the DNS. Otherwise, false.
+    """
+    
     nameserver_path = "/etc/resolv.conf"
     nameserver_path_temp = "/etc/delta/temp_resolv.conf"
     op_ok = False
@@ -1382,6 +1817,18 @@ def _setNameserver(dns1, dns2=None):
         return op_ok
 
 def get_scheduling_rules():        # by Yen
+    """
+    Get gateway scheduling rules.
+    
+    @rtype: JSON object
+    @return: Gateway scheduling rules.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: A list to describe the scheduling rules.
+    
+    """
+    
     # load config file 
     fpath = "/etc/delta/"
     fname = "gw_schedule.conf"
@@ -1409,9 +1856,18 @@ def get_scheduling_rules():        # by Yen
     return json.dumps(return_val)
 
 def get_smb_user_list ():
-    '''
-    read from /etc/samba/smb.conf
-    '''
+    """
+    Get Samba user by reading /etc/samba/smb.conf.
+    
+    @rtype: JSON object
+    @return: Result of getting Samba user and user info if success.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - accounts: Samba user account.
+    
+    """
 
     username = []
 
@@ -1449,12 +1905,24 @@ def get_smb_user_list ():
                   'msg' : op_msg,
                   'data' : {'accounts' : username}}
 
-    log.info("get_storage_account end")
+    log.info("get_smb_user_list end")
         
     return json.dumps(return_val)
 
 @common.timeout(RUN_CMD_TIMEOUT)
 def _chSmbPasswd(username, password):
+    """
+    Change Samba password by calling change_smb_pwd.sh.
+    
+    @type username: string
+    @param username: Samba user name.
+    @type password: string
+    @param password: Samba user password.
+    @rtype: integer
+    @return: 0 for success. Otherwise, nonzero value.
+    
+    """
+    
     cmd = ["sudo", "sh", CMD_CH_SMB_PWD, username, password]
 
     proc = subprocess.Popen(cmd,
@@ -1471,9 +1939,22 @@ def _chSmbPasswd(username, password):
     return ret_val
 
 def set_smb_user_list(username, password):
-    '''
-    update username to /etc/samba/smb.conf and call smbpasswd to set password
-    '''
+    """
+    Update username to /etc/samba/smb.conf and call smbpasswd to set password
+    
+    @type username: string
+    @param username: Samba user name.
+    @type password: string
+    @param password: Samba user password.
+    @rtype: JSON object
+    @return: Result of setting Samba user.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     return_val = {
                   'result' : False,
                   'msg' : 'set Smb account failed unexpectedly.',
@@ -1543,9 +2024,20 @@ def set_smb_user_list(username, password):
     return json.dumps(return_val)
 
 def get_nfs_access_ip_list ():
-    '''
-    read from /etc/hosts.allow
-    '''
+    """
+    Get IP addresses allowed to access NFS.
+    
+    List was read from /etc/hosts.allow.
+    
+    @rtype: JSON object
+    @return: Result of allowed IP addresses.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - array_of_ip: Allowed IP addresses.
+    
+    """
 
     return_val = {
                   'result' : False,
@@ -1603,6 +2095,21 @@ def get_nfs_access_ip_list ():
     
 
 def set_compression(switch):
+    """
+    Set status of compression switch.
+    Will regenerate S3QL configuration file by calling _createS3qlConf().
+    
+    @type switch: boolean
+    @param switch: Compression status.
+    @rtype: JSON object
+    @return: Compress switch.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     log.info("set_compression start")
     op_ok = False
     op_msg = ''
@@ -1650,10 +2157,23 @@ def set_compression(switch):
         return json.dumps(return_val)
 
 def set_nfs_access_ip_list (array_of_ip):
-    '''
-    update to /etc/hosts.allow
-    the original ip list will be updated to the new ip list 
-    '''
+    """
+    Update new IP addresses allowed to access NFS.
+    
+    Update to /etc/hosts.allow.
+    The original IP list will be updated to the new IP list.
+    Will restart NFS after completion.
+    
+    @type array_of_ip: list
+    @param array_of_ip: New IP address allowed to access.
+    @rtype: JSON object
+    @return: Result of setting allowed IP addresses.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
 
     return_val = {
                   'result' : False,
@@ -1721,7 +2241,7 @@ def set_nfs_access_ip_list (array_of_ip):
     except:
         pass
         
-    log.info("get_nfs_access_ip_list end")
+    log.info("set_nfs_access_ip_list end")
     
     return json.dumps(return_val)
     
@@ -1729,6 +2249,21 @@ def set_nfs_access_ip_list (array_of_ip):
 
 # example schedule: [ [1,0,24,512],[2,0,24,1024], ... ]
 def apply_scheduling_rules(schedule):        # by Yen
+    """
+    Set gateway scheduling rules.
+    Will run /etc/cron.hourly/hourly_run_this after saving configuration file.
+    
+    @type schedule: list
+    @param schedule: Scheduling rules.
+    @rtype: JSON object
+    @return: Result of setting scheduling rules.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     # write settings to gateway_throttling.cfg
     fpath = "/etc/delta/"
     fname = "gw_schedule.conf"
@@ -1759,6 +2294,18 @@ def apply_scheduling_rules(schedule):        # by Yen
     
 
 def stop_upload_sync():        # by Yen
+    """
+    Turn off S3QL cache uploading.
+    
+    @rtype: JSON object
+    @return: Result of setting c.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     # generate a new rule set and apply it to the gateway
     schedule = []
     for ii in range(1,8):
@@ -1783,6 +2330,20 @@ def stop_upload_sync():        # by Yen
     return json.dumps(return_val)
 
 def force_upload_sync(bw):        # by Yen
+    """
+    Turn on S3QL cache uploading and set bandwidth for it.
+    
+    @type bw: integer
+    @param bw: Uploading bandwidth.
+    @rtype: JSON object
+    @return: Result of setting cache uploading on.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    
+    """
+    
     if (bw<256):
         return_val = {
             'result': False,
@@ -1816,7 +2377,17 @@ def force_upload_sync(bw):        # by Yen
 
 ################################################################################
 def month_number(monthabbr):
-    """Return the month number for monthabbr; e.g. "Jan" -> 1."""
+    """
+    Return the month number for monthabbr.
+    
+    e.g. "Jan" -> 1.
+    
+    @type monthabbr: string
+    @param monthabbr: Abbrevation of month.
+    @rtype: integer
+    @return: The numeric expression of the month.
+    
+    """
 
     MONTHS = ['',
               'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -1827,11 +2398,19 @@ def month_number(monthabbr):
     return index
 
 def classify_logs (log, keyword_filter=KEYWORD_FILTER):
-    '''
-    give a log msg and a keyword filter {key=category, val = [keyword]}
-    find out which category the log belongs to 
-    assume that keywords are not overlaped 
-    '''
+    """
+    Give a log message and a keyword filter {key=category, val = [keyword]}.
+    Find out which category the log belongs to. 
+    Assume that keywords are not overlaped.
+    
+    @type log: string
+    @param log: Input log message to be classified.
+    @type keyword_filter: dictionary
+    @param keyword_filter: Keyword filter.
+    @rtype: string
+    @return: The category name of input log message.
+    
+    """
 
     for category in sorted(keyword_filter.keys()):
 
@@ -1847,17 +2426,24 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     return None
 
 def parse_log (type, log_cnt):
-    '''
-    parse a log line to log_entry data structure 
-    different types require different parser
-    if a log line doesn't match the pattern, it return None
+    """
+    Parse a log line to log_entry data structure.
+    Different types require different parser.
+    If a log line doesn't match the pattern, it return None.
     
     #type = syslog
     #log_cnt = "May 10 13:43:46 ubuntu dhclient: bound to 172.16.229.78 -- renewal in 277 seconds."
 
     #type = mount | fsck # i.e.,g from s3ql
     #log_cnt = "2012-05-07 20:22:22.649 [1666] MainThread: [mount] FUSE main loop terminated."
-    '''
+    
+    @type type: string
+    @param type: Log type.
+    @type log_cnt: Log content.
+    @rtype: dictionary
+    @return: A log_entry structure if successfuly parsed. Otherwise, None will be returned.
+    
+    """
 
     #print "in parsing log"
     #print type
@@ -1932,16 +2518,25 @@ def parse_log (type, log_cnt):
 
 ##########################
 def read_logs(logfiles_dict, offset, num_lines):
-    '''
-    read all files in logfiles_dict, 
+    """
+    Read all files in logfiles_dict, 
     the log will be reversed since new log line is appended to the tail
-    
     and then, each log is parsed into log_entry dict.
     
-    the offset = 0 means that the latest log will be selected
+    The offset = 0 means that the latest log will be selected.
     num_lines means that how many lines of logs will be returned, 
-              set to "None" for selecting all logs 
-    '''
+    set to "None" for selecting all logs.
+    
+    @type logfiles_dict: dictionary
+    @param logfiles_dict: Logs to be read.
+    @type offset: integer
+    @param offset: File offset.
+    @type num_lines: integer
+    @param num_lines: Max number of lines to be read.
+    @rtype: integer
+    @return: Count of read log.
+    
+    """
 
     ret_log_cnt = {}
 
@@ -1986,26 +2581,40 @@ def read_logs(logfiles_dict, offset, num_lines):
 
 ##############################    
 def storage_cache_usage():
-    '''
-    read all files in logfiles array, return last n lines
-    format:
+    """
+    Read cloud storage and gateway usage.
     
-Directory entries:    601
-Inodes:               603
-Data blocks:          1012
-Total data size:      12349.54 MB
-After de-duplication: 7156.38 MB (57.95% of total)
-After compression:    7082.76 MB (57.35% of total, 98.97% of de-duplicated)
-Database size:        0.30 MB (uncompressed)
-(some values do not take into account not-yet-uploaded dirty blocks in cache)
-Cache size: current: 7146.38 MB, max: 20000.00 MB
-Cache entries: current: 1011, max: 250000
-Dirty cache status: size: 0.00 MB, entries: 0
-Cache uploading: Off
-
-Dirty cache near full: False
+    Format:
+        - Directory entries:    601
+        - Inodes:               603
+        - Data blocks:          1012
+        - Total data size:      12349.54 MB
+        - After de-duplication: 7156.38 MB (57.95% of total)
+        - After compression:    7082.76 MB (57.35% of total, 98.97% of de-duplicated)
+        - Database size:        0.30 MB (uncompressed)
+        (some values do not take into account not-yet-uploaded dirty blocks in cache)
+        - Cache size: current: 7146.38 MB, max: 20000.00 MB
+        - Cache entries: current: 1011, max: 250000
+        - Dirty cache status: size: 0.00 MB, entries: 0
+        - Cache uploading: Off
+        - Dirty cache near full: False
     
-    '''
+    @rtype: JSON object
+    @return: Cloud storage and gateway usage.
+    
+        - cloud_storage_usage: JSON object
+            - cloud_data: Cloud data usage.
+            - cloud_data_dedup: Cloud data usage after deduplication.
+            - cloud_data_dedup_compress: Cloud data usage after deduplication and compression.
+        - gateway_cache_usage: JSON object
+            - max_cache_size: Max cache size.
+            - max_cache_entries: Max cache entries.
+            - used_cache_size: Used cache size.
+            - used_cache_entries: Used cache entries.
+            - dirty_cache_size: Dirty cache size.
+            - dirty_cache_entries: Dirty cache entries.
+    
+    """
 
     ret_usage = {
               "cloud_storage_usage" :  {
@@ -2138,11 +2747,22 @@ Dirty cache near full: False
 
 ##############################
 def get_network_speed(iface_name): # iface_name = eth1
-    '''
-    call get_network_status to get current nic status
-    wait for 1 second, and all again. 
-    then calculate difference, i.e., up/down link 
-    '''
+    """
+    Call get_network_status to get current NIC status.
+    Wait for 1 second, and all again. 
+    Then calculate difference, i.e., up/down link.
+    
+    @type iface_name: string
+    @param iface_name: Interface name. Ex: eth1.
+    @rtype: JSON object
+    @return: NIC network usage
+    
+        - uplink_usage: Network traffic of outcoming packets.
+        - downlink_usage: Network traffic of incoming packets.
+        - uplink_backend_usage: TBD
+        - downlink_backend_usage: TBD
+    
+    """
 
     ret_val = {
                "uplink_usage" : 0 ,
@@ -2167,12 +2787,20 @@ def get_network_speed(iface_name): # iface_name = eth1
 
 ##############################
 def get_network_status(iface_name): # iface_name = eth1
-    '''
-    so far, cannot get current uplink, downlink numbers,
+    """
+    Get network usage.
+    So far, cannot get current uplink, downlink numbers,
     use file /proc/net/dev, i.e., current tx, rx instead of
 
-    if the target iface cannot find, all find ifaces will be returned
-    '''
+    If the target iface cannot find, all find ifaces will be returned.
+    
+    @type iface_name: string
+    @param iface_name: NIC interface name.
+    @rtype: dictionary
+    @return: Network usage.
+    
+    """
+    
     ret_network = {}
 
     lines = open("/proc/net/dev", "r").readlines()
@@ -2202,9 +2830,25 @@ def get_network_status(iface_name): # iface_name = eth1
 
 ################################################################################
 def get_gateway_status():
-    '''
-    report gateway status
-    '''
+    """
+    Report gateway status.
+    
+    @rtype: JSON object
+    @return: Gateway status.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - error_log: Error log entries.
+            - cloud_storage_usage: Cloud storage usage.
+            - gateway_cache_usage: Gateway cache usage.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
+            - uplink_backend_usage: Network traffic from gateway to backend.
+            - downlink_backend_usage: Network traffic from backend to gateway.
+            - network: TBD
+    
+    """
 
     ret_val = {"result" : True,
                "msg" : "Gateway log & status",
@@ -2243,11 +2887,32 @@ def get_gateway_status():
 
 ################################################################################
 def get_gateway_system_log (log_level, number_of_msg, category_mask):
-    '''
-    due to there are a few log src, e.g., mount, fsck, syslog, 
+    """
+    Get sytem logs in gateway.
+    
+    Due to there are a few log src, e.g., mount, fsck, syslog, 
     the number_of_msg will apply to each category.
-    so, 3 x number_of_msg of log may return for each type of log {info, err, war)
-    '''
+    So, 3 x number_of_msg of log may return for each type of log {info, err, war}.
+    
+    @type log_level: integer
+    @param log_level: 0 to return error/warning/info logs.
+        1 to return error/warning logs and 2 to return only error log.
+    @type number_of_msg: integer
+    @param number_of_msg: Max returned number of log entries.
+    @type category_mask: string
+    @param category_mask: 0 to hide logs from gateway/NFS/Samba category.
+        1 to show them.
+    @rtype: JSON object
+    @return: Gateway system log.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object
+            - error_log: Error logs.
+            - warning_log: Warning logs.
+            - info_log: Infomration logs.
+    
+    """
 
     ret_val = { "result" : True,
                 "msg" : "gateway system logs",
