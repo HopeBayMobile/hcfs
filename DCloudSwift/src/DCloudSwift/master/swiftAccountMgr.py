@@ -518,54 +518,39 @@ class SwiftAccountMgr:
 
 		return Bool(val, msg)
 
-	@util.timeout(300)
-	def __disable_user(self, proxyIp, account, user):
-		logger = util.getLogger(name="__disable_user")
-
-		url = "https://%s:8080/auth/"%proxyIp
-		randomPassword = str(uuid.uuid4())
-		cmd = "swauth-add-user -K %s -A %s %s %s %s"%(self.__password, url, account, user, randomPassword)
-		po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		(stdoutData, stderrData) = po.communicate()
-				
-		msg = ""
-		val = False
-
-		if po.returncode !=0:
-			logger.error(stderrData)
-			msg = stderrData
-			val =False
-		else:
-			logger.info(stdoutData)
-			msg = stdoutData
-			val =True
-
-		Bool = collections.namedtuple("Bool", "val msg")
-                return Bool(val, msg)
-
-	def disable_user(self, account, user, retry=3):
+	def disable_user(self, account, container, user, admin_user, retry=3):
 		'''
-		Disabe the user from accessing the backend swift by changing the user's password in the backend.
+		Disable the user to access the backend Swift by changing the password
+		to a random string. The original password will be stored in the
+		metadata of the user's container.
 
 		@type  account: string
-		@param account: the name of the given account
+		@param account: the account of the user
+		@type  container: string
+		@param container: the container for the user
 		@type  user: string
-		@param user: the name of the given user
+		@param user: the user to be disabled
+		@type  admin_user: string
+		@param admin_user: the admin user of the container
 		@type  retry: integer
 		@param retry: the maximum number of times to retry when fn return the False
 		@rtype:  named tuple
-		@return: a tuple Bool(val, msg). If the user's backend password is successfully changed
-			and the enabled field in the database is set to false then Bool.val == True. 
-			Otherwise, Bool.val == False and Bool.msg indicates the reason of failure.
+		@return: a tuple Bool(val, msg). If the user's password is successfully
+			changed and the original password is stored in the metadata of the user's 
+			container, then Bool.val = True and Bool.msg = the standard output.
+			Otherwise, Bool.val == False and Bool.msg indicates the error message.
 		'''
 		logger = util.getLogger(name="disable_user")
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-		
-		Bool = collections.namedtuple("Bool", "val msg")
+		new_user_password = str(uuid.uuid4())
+		actual_user_password = ""
+		admin_password = ""
+
 		msg = ""
 		val = False
+		Bool = collections.namedtuple("Bool", "val msg")
 
-		if proxy_ip_list is None or len(proxy_ip_list)==0:
+		if proxy_ip_list is None or len(proxy_ip_list) == 0:
 			msg = "No proxy node is found"
 			return Bool(val, msg)
 
@@ -573,19 +558,42 @@ class SwiftAccountMgr:
 			msg = "Argument retry has to >= 1"
 			return Bool(val, msg)
 
-		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__disable_user,
-                                                   account=account, user=user)
+		get_user_password_output = self.get_user_password(account, user)
+		if get_user_password_output.val == False:
+			val = False
+			msg = get_user_password_output.msg
+			return Bool(val, msg)
+		else:
+			actual_user_password = get_user_password_output.msg
 
-		try:
-			if val == True:
-				self.__accountDb.disable_user(account=account, name=user)
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False:
+			val = False
+			msg = get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
 
-		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-			errMsg = "Failed to set enabled=False for user %s:%s in database for %s"%(account, user, str(e))
-			logger.error(errMsg)
-			raise InconsistentDatabaseError(errMsg)
+		#TODO: check whehter the container is associated with the user
 
-                return Bool(val, msg)
+		change_password_output = self.change_password(account, user, actual_user_password,\
+		new_user_password)
+
+		if change_password_output.val == False:
+			val = False
+			msg = change_password_output.msg
+			return Bool(val, msg)
+
+		container_metadata = {
+			"User-Enable": False,
+			"Password": actual_user_password
+		}
+
+		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+		fn=self.__set_container_metadata, account=account, container=container,\
+		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
+
+		return Bool(val, msg)
 
 	def enable_account(self, account):
 		pass
