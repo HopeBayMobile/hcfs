@@ -19,9 +19,10 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 
 smb_conf_file = "/etc/samba/smb.conf"
 org_smb_conf = "/etc/delta/smb.orig"
-tmp_smb_conf = "/root/.s3ql/.smb.conf.tmp"
-tmp_smb_conf1 = "/root/.s3ql/.smb.conf.tmp1"
-tmp_smb_conf2 = "/root/.s3ql/.smb.conf.tmp2"
+tmp_smb_dir = "/root/.s3ql/.tmpsmb"
+tmp_smb_conf = "/root/.s3ql/.tmpsmb/.smb.conf.tmp"
+tmp_smb_conf1 = "/root/.s3ql/.tmpsmb/.smb.conf.tmp1"
+tmp_smb_conf2 = "/root/.s3ql/.tmpsmb/.smb.conf.tmp2"
 lifespan_conf = "/etc/delta/snapshot_lifespan"
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
@@ -438,6 +439,10 @@ def expose_snapshot(to_expose):
     try:
         if not os.path.exists(org_smb_conf):
             os.system('sudo cp %s %s' % (smb_conf_file, org_smb_conf))
+
+        if not os.path.exists(tmp_smb_dir):
+            os.system('sudo mkdir %s' % tmp_smb_dir)
+            os.system('sudo chown www-data:www-data %s' % tmp_smb_dir)
 
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
