@@ -10,7 +10,7 @@ import os
 cache_dir = "/storage/http_proxy_cache/"
 
 ### 1. install Squid3 package
-cmd = "apt-get install squid3"
+cmd = "apt-get install -y squid3"
 os.system(cmd)
 
 ### 2. setup config file
