@@ -13,6 +13,6 @@ urlpatterns = patterns("dashboard.views",
     url(r'^system_upgrade/$', "system_upgrade", name="system_upgrade"),
     url(r'^indicator/$', "indicator", name="indicator"),
     url(r'^status/$', "status", name="status"),
-    url(r'^cache_usage/$', "cache_usage", name="cache_usage"),
+    url(r'^data_update/$', "dashboard_update", name="data_update"),
     url(r'^config/(?P<action>(restore|save){0,1})$', "config", name="config"),
 )

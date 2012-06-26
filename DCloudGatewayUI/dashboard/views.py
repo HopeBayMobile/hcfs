@@ -353,7 +353,7 @@ def snapshot(request, action=None):
             if return_val['result']:
                 return HttpResponse("Success")
             else:
-                return HttpResponse("Failure")
+                return HttpResponse(return_val['msg'], status=500)
 
         if action == "delete":
             snapshot_list = request.POST.getlist("snapshots[]")
@@ -382,10 +382,13 @@ def snapshot(request, action=None):
             snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
             snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
-            snapshot['status'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
 
-        return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        if request.is_ajax():
+            return render(request, 'dashboard/snapshot_tbody.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        else:
+            return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
 
 
 @login_required
@@ -437,9 +440,10 @@ def status(request):
 
 
 @login_required
-def cache_usage(request):
+def dashboard_update(request):
     data = gateway_status()
-    return HttpResponse(json.dumps(data['gateway_cache_usage']))
+    data["version_upgrade"] = json.loads(api_remote_upgrade.get_available_upgrade())["version"]
+    return HttpResponse(json.dumps(data))
 
 
 @login_required

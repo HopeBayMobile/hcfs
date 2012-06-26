@@ -106,7 +106,7 @@ def thread_netspeed():
     Currently we always return network speed of eth1.
     """
     
-    log.info('Net speed thread start')
+    #log.info('Net speed thread start')
     
     # define net speed file
     netspeed_file = '/dev/shm/gw_netspeed'
@@ -205,10 +205,11 @@ def main():
     
     while not g_program_exit:
         # get gateway indicators
-        log.info('Start to get gateway indicator')
+        #log.info('Start to get gateway indicator')
         ret = get_gw_indicator()
         if ret:
-            log.info("Get indicator OK")
+            pass
+            #log.info("Get indicator OK")
         else:
             log.info("Failed to get indicator")
         
