@@ -23,6 +23,8 @@ snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 snapshot_db = "/root/.s3ql/snapshot_db.txt"
 temp_folder = "/mnt/cloudgwfiles/tempsnapshot"
+snapshot_schedule = "/etc/delta/snapshot_schedule"
+lifespan_conf = "/etc/delta/snapshot_lifespan"
 
 
 class SnapshotError(Exception):
@@ -43,6 +45,13 @@ class Test_takesnapshot:
         if os.path.exists(snapshot_tag):
             os.system('sudo rm -rf %s' % snapshot_tag)
 
+        if os.path.exists(snapshot_db):
+            os.system('sudo cp %s /root/.s3ql/.backup_snapshot_database' % snapshot_db)
+        if os.path.exists(snapshot_schedule):
+            os.system('sudo cp %s /etc/delta/.backup_snapshot_schedule' % snapshot_schedule)
+        if os.path.exists(lifespan_conf):
+            os.system('sudo cp %s /etc/delta/.backup_snapshot_lifespan' % lifespan_conf)
+
         os.system('sudo mkdir %s' % test_snapshot_path)
         self.newfile = os.path.join(test_snapshot_path, 'testfile')
 
@@ -56,9 +65,20 @@ class Test_takesnapshot:
         if not os.path.exists(self.newfile):  # Test file already deleted?
             raise SnapshotError
         os.system('sudo rm -rf %s' % test_snapshot_path)
-        # Delete the snapshot database
-        if os.path.exists(snapshot_db):
-            os.system('sudo rm -rf %s' % snapshot_db)
+
+        # Restore the snapshot database
+        if os.path.exists('/root/.s3ql/.backup_snapshot_database'):
+            os.system('sudo cp /root/.s3ql/.backup_snapshot_database %s' % snapshot_db)
+            os.system('sudo rm -rf /root/.s3ql/.backup_snapshot_database')
+
+        if os.path.exists('/etc/delta/.backup_snapshot_schedule'):
+            os.system('sudo cp /etc/delta/.backup_snapshot_schedule %s' % snapshot_schedule)
+            os.system('sudo rm -rf /etc/delta/.backup_snapshot_schedule')
+
+        if os.path.exists('/etc/delta/.backup_snapshot_lifespan'):
+            os.system('sudo cp /etc/delta/.backup_snapshot_lifespan %s' % lifespan_conf)
+            os.system('sudo rm -rf /etc/delta/.backup_snapshot_lifespan')
+
         if os.path.exists(temp_folder):
             os.system('sudo rm -rf %s' % temp_folder)
 
@@ -87,6 +107,7 @@ class Test_takesnapshot:
         result = snapshot.get_snapshot_list()
         result_val = json.loads(result)
         old_snapshot_list = result_val['data']['snapshots']
+        old_len = len(old_snapshot_list)
 
         result = snapshot.take_snapshot()
         result_val = json.loads(result)
@@ -102,8 +123,9 @@ class Test_takesnapshot:
             result = snapshot.get_snapshot_list()
             result_val = json.loads(result)
             new_snapshot_list = result_val['data']['snapshots']
+            new_len = len(new_snapshot_list)
 
-            if len(new_snapshot_list) > 0:
+            if new_len > 0 and new_len > old_len:
                 newest_snapshot = new_snapshot_list[0]['name']
 
                 if newest_snapshot != 'new_snapshot':
@@ -120,6 +142,16 @@ class Test_takesnapshot:
         test_file_name = os.path.join(test_file_path,\
                            'sambashare/testing_snapshot/testfile')
         nose.tools.ok_(os.path.exists(test_file_name))
+
+        # Let's now share this snapshot
+
+        result = snapshot.expose_snapshot([newest_snapshot])
+        # Attempt to delete this snapshot will fail
+        result = snapshot.delete_snapshot(newest_snapshot)
+        result_val = json.loads(result)
+        nose.tools.eq_(result_val['result'], False)
+        # Let's now not expose the snapshot
+        result = snapshot.expose_snapshot([])
 
         # Let's now delete the snapshot
 
@@ -138,3 +170,37 @@ class Test_takesnapshot:
             nose.tools.ok_(new_snapshot_list[0]['name'] != newest_snapshot)
 
         nose.tools.ok_(os.path.exists(snapshot_dir))
+
+
+    def test_snapshot_schedule_config(self):
+        '''
+        Test getting and setting snapshot schedule config file.
+        '''
+
+        os.system('sudo rm -rf %s' % snapshot_schedule)
+        result_tmp = snapshot.get_snapshot_schedule()
+        result = json.loads(result_tmp)
+        nose.tools.ok_(os.path.exists(snapshot_schedule))
+        nose.tools.eq_(result['data']['snapshot_time'], -1)
+
+        result = snapshot.set_snapshot_schedule(22)
+        result_tmp = snapshot.get_snapshot_schedule()
+        result = json.loads(result_tmp)
+        nose.tools.eq_(result['data']['snapshot_time'], 22)
+
+
+    def test_snapshot_lifespan_config(self):
+        '''
+        Test getting and setting snapshot lifespan config file.
+        '''
+
+        os.system('sudo rm -rf %s' % lifespan_conf)
+        result_tmp = snapshot.get_snapshot_lifespan()
+        result = json.loads(result_tmp)
+        nose.tools.ok_(os.path.exists(lifespan_conf))
+        nose.tools.eq_(result['data']['days_to_live'], 365)
+
+        result = snapshot.set_snapshot_lifespan(100)
+        result_tmp = snapshot.get_snapshot_lifespan()
+        result = json.loads(result_tmp)
+        nose.tools.eq_(result['data']['days_to_live'], 100)

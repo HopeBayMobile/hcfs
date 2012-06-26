@@ -1557,7 +1557,7 @@ def get_network():
     """
     
     log.info("get_network start")
-    log.info("[2] Gateway networking starting")
+    #log.info("[2] Gateway networking starting")
 
     info_path = "/etc/delta/network.info"
     return_val = {}
@@ -1603,7 +1603,7 @@ def get_network():
         }
     
         log.info("get_network end")
-        log.info("[2] Gateway networking started")
+        #log.info("[2] Gateway networking started")
         return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -1631,6 +1631,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     """
     
     log.info("apply_network start")
+    log.info("[2] Gateway networking starting")
 
     ini_path = "/etc/delta/Gateway.ini"
     op_ok = False
@@ -1689,9 +1690,10 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
             if os.system("sudo /etc/init.d/networking restart") == 0:
                 op_ok = True
                 op_msg = "Succeeded to apply the network configuration."
+                log.info("[2] Gateway networking started")
             else:
                 op_ok = False
-                log.error("Failed to restart the network.")
+                log.info("[0] Gateway networking starting error")
         else:
             op_ok = False
             log.error(op_msg)
