@@ -181,7 +181,7 @@ class Test_takesnapshot:
         result_tmp = snapshot.get_snapshot_schedule()
         result = json.loads(result_tmp)
         nose.tools.ok_(os.path.exists(snapshot_schedule))
-        nose.tools.eq_(result['data']['snapshot_time'], -1)
+        nose.tools.eq_(result['data']['snapshot_time'], 1)
 
         result = snapshot.set_snapshot_schedule(22)
         result_tmp = snapshot.get_snapshot_schedule()
