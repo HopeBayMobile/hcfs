@@ -329,18 +329,36 @@ def sync(request):
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
 
+
 @login_required
 def schedule(request):
+    load_data = json.loads(api_snapshot.get_snapshot_schedule())
+    data = load_data['data']
+    snapshot_time = data['snapshot_time']
+    print snapshot_time
+
     if request.method == "POST":
-        print "hi"
-    return render(request, 'dashboard/snapshot.html')
+        query = request.POST
+        day = query['select-day']
+        day = int(day)
+        return_value = json.loads(api_snapshot.set_snapshot_schedule(day))
+        return return_value
 
 
 @login_required
 def lifecycle(request):
+    load_data = json.loads(api_snapshot.get_snapshot_lifespan())
+    data = load_data['data']
+    default_day = data['months_to_live']
+    print default_day
+
     if request.method == "POST":
-        print "hi"
-    return render(request, 'dashboard/snapshot.html')
+        query = request.POST
+        day = query['days']
+        day = int(day)
+        return_value = json.loads(api_snapshot.set_snapshot_lifespan(day))
+        print return_value
+        return return_value
 
 
 @login_required
@@ -367,6 +385,12 @@ def snapshot(request, action=None):
                 return HttpResponse("Success")
             else:
                 return HttpResponse(return_val['msg'], status=500)
+
+        if action == "lifecycle":
+            return_val = lifecycle(request)
+
+        if action == "schedule":
+            return_val = schedule(request)
 
         if action == "delete":
             snapshot_list = request.POST.getlist("snapshots[]")
@@ -401,7 +425,22 @@ def snapshot(request, action=None):
         if request.is_ajax():
             return render(request, 'dashboard/snapshot_tbody.html', {'tab': 'snapshot', 'snapshots': snapshots})
         else:
-            return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+            the_day = {}
+            for i in range(0, 24):
+                the_day[i] = i
+            load_data = json.loads(api_snapshot.get_snapshot_lifespan())
+            data = load_data['data']
+            default_day = data['months_to_live']
+            load_data = json.loads(api_snapshot.get_snapshot_schedule())
+            data = load_data['data']
+            snapshot_time = data['snapshot_time']
+
+            return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot',
+                'snapshots': snapshots,
+                'the_day': the_day,
+                'default_day': default_day,
+                'snapshot_time': snapshot_time,
+                })
 
 
 @login_required
