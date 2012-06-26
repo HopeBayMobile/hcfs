@@ -437,9 +437,10 @@ def status(request):
 
 
 @login_required
-def cache_usage(request):
+def dashboard_update(request):
     data = gateway_status()
-    return HttpResponse(json.dumps(data['gateway_cache_usage']))
+    data["version_upgrade"] = json.loads(api_remote_upgrade.get_available_upgrade())["version"]
+    return HttpResponse(json.dumps(data))
 
 
 @login_required
