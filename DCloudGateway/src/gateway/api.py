@@ -2486,7 +2486,7 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-
+    #print log
     for category in sorted(keyword_filter.keys()):
 
         for keyword in keyword_filter[category]:
@@ -2572,6 +2572,8 @@ def parse_log (type, log_cnt):
     msg = m.group('message')
     #print msg
 
+    if msg == None: # skip empty log
+        return None
     #now = datetime.datetime.utcnow()
 
     try:
@@ -2586,7 +2588,12 @@ def parse_log (type, log_cnt):
     #print timestamp
     #print "msg = "
     #print msg
-    log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
+    
+    category = classify_logs(msg, KEYWORD_FILTER)
+    if category == None: # skip invalid log
+        return None
+    
+    log_entry["category"] = category
     log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
     log_entry["msg"] = msg[LOG_LEVEL_PREFIX_LEN:]
     return log_entry
@@ -2638,7 +2645,7 @@ def read_logs(logfiles_dict, offset, num_lines):
                 nums = num_lines
 
             for log in log_buf[ offset : offset + nums]:
-                print log
+                #print log
                 log_entry = parse_log(type, log)
                 if not log_entry == None: #ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
@@ -3079,5 +3086,5 @@ if __name__ == '__main__':
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
     #print get_gateway_indicators()
-    _check_nfs_service()
+    #_check_nfs_service()
     pass
