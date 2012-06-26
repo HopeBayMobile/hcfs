@@ -210,12 +210,30 @@
   </tr>
 <tr>
     <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">dictionary</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.api-module.html#get_indicators" class="summary-sig-name">get_indicators</a>()</span><br />
+      Get gateway services' indicators by calling internal functions.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.api-pysrc.html#get_indicators">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
       <span class="summary-type">JSON object</span>
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td><span class="summary-sig"><a href="gateway.api-module.html#get_gateway_indicators" class="summary-sig-name">get_gateway_indicators</a>()</span><br />
-      Get gateway services' indicators.</td>
+      Get gateway services' indicators by reading file or by the result of 
+      calling get_indicators().</td>
           <td align="right" valign="top">
             <span class="codelink"><a href="gateway.api-pysrc.html#get_gateway_indicators">source&nbsp;code</a></span>
             
@@ -885,12 +903,29 @@
   </tr>
 <tr>
     <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">JSON object</span>
+      <span class="summary-type">dictionary</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.api-module.html#calculate_net_speed" class="summary-sig-name">calculate_net_speed</a>(<span class="summary-sig-arg">iface_name</span>)</span><br />
+      Call get_network_status to get current NIC status.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.api-pysrc.html#calculate_net_speed">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">dictionary</span>
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
           <td><span class="summary-sig"><a href="gateway.api-module.html#get_network_speed" class="summary-sig-name">get_network_speed</a>(<span class="summary-sig-arg">iface_name</span>)</span><br />
-      Call get_network_status to get current NIC status.</td>
+      Get network speed by reading file or call functions.</td>
           <td align="right" valign="top">
             <span class="codelink"><a href="gateway.api-pysrc.html#get_network_speed">source&nbsp;code</a></span>
             
@@ -1229,6 +1264,72 @@ d{2})\s+(?P&lt;hour&gt;\d{2}):(?P&lt;minute&gt;\d{2}):(?P&lt;second&gt;\d{2}),(?
   </dl>
 </td></tr></table>
 </div>
+<a name="get_indicators"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">get_indicators</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.api-pysrc.html#get_indicators">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Get gateway services' indicators by calling internal functions. This 
+  function may return up to several seconds. Use it carefully in 
+  environment which needs fast response time.</p>
+  <p>This function may be called by gateway background task.</p>
+  <dl class="fields">
+    <dt>Returns: dictionary</dt>
+        <dd>Gateway services' indicators.
+          <ul>
+            <li>
+              result: Function call result.
+            </li>
+            <li>
+              msg: Explanation of result.
+            </li>
+            <li>
+              data: dictionary
+              <ul>
+                <li>
+                  network_ok: If network from gateway to storage is up.
+                </li>
+                <li>
+                  system_check: If fsck.s3ql daemon is alive.
+                </li>
+                <li>
+                  flush_inprogress: If S3QL dirty cache flushing is in 
+                  progress.
+                </li>
+                <li>
+                  dritycache_nearfull: If S3QL dirty cache is near full.
+                </li>
+                <li>
+                  HDD_ok: If all HDD are healthy.
+                </li>
+                <li>
+                  NFS_srv: If NFS is alive.
+                </li>
+                <li>
+                  SMB_srv: If Samba service is alive.
+                </li>
+                <li>
+                  snapshot_in_progress: If S3QL snapshotting is in 
+                  progress.
+                </li>
+                <li>
+                  HTTP_proxy_srv: If HTTP proxy server is alive.
+                </li>
+              </ul>
+            </li>
+          </ul></dd>
+  </dl>
+</td></tr></table>
+</div>
 <a name="get_gateway_indicators"></a>
 <div>
 <table class="details" border="1" cellpadding="3"
@@ -1243,7 +1344,8 @@ d{2})\s+(?P&lt;hour&gt;\d{2}):(?P&lt;minute&gt;\d{2}):(?P&lt;second&gt;\d{2}),(?
     </td>
   </tr></table>
   
-  <p>Get gateway services' indicators.</p>
+  <p>Get gateway services' indicators by reading file or by the result of 
+  calling get_indicators().</p>
   <dl class="fields">
     <dt>Returns: JSON object</dt>
         <dd>Gateway services' indicators.
@@ -2577,6 +2679,46 @@ d{2})\s+(?P&lt;hour&gt;\d{2}):(?P&lt;minute&gt;\d{2}):(?P&lt;second&gt;\d{2}),(?
   </dl>
 </td></tr></table>
 </div>
+<a name="calculate_net_speed"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">calculate_net_speed</span>(<span class="sig-arg">iface_name</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.api-pysrc.html#calculate_net_speed">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Call get_network_status to get current NIC status. Wait for 1 second, 
+  and call again. Then calculate difference, i.e., up/down link.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>iface_name</code></strong> (string) - Interface name. Ex: eth1.</li>
+    </ul></dd>
+    <dt>Returns: dictionary</dt>
+        <dd>NIC network usage
+          <ul>
+            <li>
+              uplink_usage: Network traffic of outcoming packets.
+            </li>
+            <li>
+              downlink_usage: Network traffic of incoming packets.
+            </li>
+            <li>
+              uplink_backend_usage: TBD
+            </li>
+            <li>
+              downlink_backend_usage: TBD
+            </li>
+          </ul></dd>
+  </dl>
+</td></tr></table>
+</div>
 <a name="get_network_speed"></a>
 <div>
 <table class="details" border="1" cellpadding="3"
@@ -2591,14 +2733,14 @@ d{2})\s+(?P&lt;hour&gt;\d{2}):(?P&lt;minute&gt;\d{2}):(?P&lt;second&gt;\d{2}),(?
     </td>
   </tr></table>
   
-  <p>Call get_network_status to get current NIC status. Wait for 1 second, 
-  and all again. Then calculate difference, i.e., up/down link.</p>
+  <p>Get network speed by reading file or call functions. The later case 
+  will consume at least one second to return.</p>
   <dl class="fields">
     <dt>Parameters:</dt>
     <dd><ul class="nomargin-top">
         <li><strong class="pname"><code>iface_name</code></strong> (string) - Interface name. Ex: eth1.</li>
     </ul></dd>
-    <dt>Returns: JSON object</dt>
+    <dt>Returns: dictionary</dt>
         <dd>NIC network usage
           <ul>
             <li>
@@ -2918,7 +3060,7 @@ d<code class="re-op">{2}</code><code class="re-group">)</code>\s<code class="re-
 <table border="0" cellpadding="0" cellspacing="0" width="100%%">
   <tr>
     <td align="left" class="footer">
-    Generated by Epydoc 3.0.1 on Mon Jun 25 14:38:48 2012
+    Generated by Epydoc 3.0.1 on Tue Jun 26 11:27:45 2012
     </td>
     <td align="right" class="footer">
       <a target="mainFrame" href="http://epydoc.sourceforge.net"
