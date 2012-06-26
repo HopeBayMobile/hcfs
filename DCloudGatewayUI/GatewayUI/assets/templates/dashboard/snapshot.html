@@ -51,6 +51,7 @@
     <ul class="nav nav-tabs">
         <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
         <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
+        <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
     </ul>
     <div class="tab-content">
         <div class="tab-pane active" id="snapshot" style="">
@@ -94,8 +95,109 @@
             </div>
             <div class="bottom-popup-spacer"></div>
         </div>
+<style type='text/css'>
+.schedule_button {
+    display: block;
+    height: 71px;
+    width: 66px;
+    float: left;
+    background: url('/static/img/dashboard/radio_btn_01.png') no-repeat;
+    background-position: left 0px;
+    text-indent: -99999px;
+}
+.schedule_button:hover {
+    background: url('/static/img/dashboard/radio_btn_02.png') no-repeat;
+    background-position: left 0px;
+}
+.schedule_sub_div {
+    height: 71px;
+    margin-left: 40px;
+    margin-top: 15px;
+    font-size: 23px;
+}
+.schedule_sub_font_div {
+    text-indent: 15px;
+    padding-top: 25px;
+}
+.radio_button_div {
+    margin-right: 20px;
+}
+.search_div {
+    margin-top: 10px;
+    text-indent: 120px;
+    font-size: 23px;
+}
+.search_option_div {
+    text-indent: 120px;
+    margin-top: 20px;
+    font-size: 23px;
+}
+.submit_button_div {
+    text-indent: 450px;
+    font-size: 23px;
+}
+.submit_button {
+    border: none;
+    width: 147px;
+    height: 47px;
+    background:url(/static/img/wizard/wizard_button.png) no-repeat;
+}
+.button_text {
+    font-size: 23px;
+    color: white;
+}
+.days_div {
+    margin-top: 50px;
+    font-size: 23px;
+}
+</style>
         <div class="tab-pane" id="schedule">
-            This is the schedule view.
+            <form action="/dashboard/schedule/" method="POST">
+            {% csrf_token %}
+            <div class="schedule_sub_div">
+                <div class="radio_button_div">
+                    <a href="#" class="schedule_button" >button</a>
+                </div>
+                <div style="width: 10px;"></div>
+                <div class="schedule_sub_font_div">
+                    None
+                </div>
+            </div>
+            <div class="schedule_sub_div">
+                <a href="#" class="schedule_button" >button</a>
+                <div class="schedule_sub_font_div">
+                    Snapshot by schedule
+                </div>
+            </div>
+            <div class="search_div">
+                Start from:
+            </div>
+            <div class="search_option_div">
+            <select id="select-day" name="select">
+                <option>1</option>
+            </select>
+            </div>
+            <div class="submit_button_div">
+                <button type="submit" value="Modify" class="submit_button" alt="Submit">
+                    <div class="button_text">Modify</div>
+                </button>
+            </div>
+            </form>
+        </div>
+        <div class="tab-pane" id="lifecycle">
+            <form action="/dashboard/lifecycle/" method="POST">
+            {% csrf_token %}
+            <div class="schedule_sub_div">
+            SnapShot Life Cycle:<br /><br />
+            Snapshots will be Delete after<br />
+            <div class="days_div">
+                <input type="number" min="1" max="365" value="1" /> days
+            <div class="submit_button_div">
+                <button type="submit" value="Modify" class="submit_button" alt="Submit">
+                    <div class="button_text">Modify</div>
+                </button>
+            </div>
+            </form>
         </div>
     </div>
 
