@@ -41,9 +41,9 @@ def main():
 		],
 	)
 
-	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
+	#os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 666 %s/Gateway.ini"%CONFDIR)
-        os.system("cp config/interfaces /etc/network/interfaces")
+        #os.system("cp config/interfaces /etc/network/interfaces")
         os.system("cp config/hosts.allow /etc")
         os.system("cp config/gw_schedule.conf %s/"%CONFDIR)
         os.system("cp gateway_scripts/hourly_run_this %s/"%CRONDIR) 
@@ -56,8 +56,8 @@ def main():
         os.system("cp gateway_scripts/check_expired %s/"%CONFDIR)
         os.system("cp gateway_scripts/post-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/check-gwstart.conf /etc/init/")
-        os.system("cp config/smb.conf %s/"%SMBDIR)
-        os.system("cp config/sudoers /etc")
+        #os.system("cp config/smb.conf %s/"%SMBDIR)
+        #os.system("cp config/sudoers /etc")
         os.system("cp gateway_scripts/snapshot_bot %s/"%CONFDIR)
         os.system("cp gateway_scripts/snapshot_check %s/"%CONFDIR)
         os.system("cp gateway_scripts/wait_network_up %s/"%CONFDIR)
@@ -65,9 +65,9 @@ def main():
         os.system("cp gateway_scripts/service_restart %s/"%CONFDIR)
         os.system("cp gateway_scripts/hourly_snapshotting %s/"%CONFDIR)
         os.system("cp gateway_scripts/run_background_tasks %s/"%CONFDIR)
-        os.system("rm -rf /root/.s3ql/*")
-        os.system("chmod -R 777 /root")
-        os.system("chown -R www-data:www-data %s"%CONFDIR)
+        #os.system("rm -rf /root/.s3ql/*")
+        #os.system("chmod -R 777 /root")
+        #os.system("chown -R www-data:www-data %s"%CONFDIR)
 
 if __name__ == '__main__':
     main()

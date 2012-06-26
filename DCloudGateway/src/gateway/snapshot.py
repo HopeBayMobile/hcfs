@@ -400,6 +400,7 @@ def _write_snapshot_db(snapshot_list):
         if os.path.exists(temp_snapshot_db):
             os.system('sudo rm -rf %s' % temp_snapshot_db)
 
+        # Since the API is run from www-data account, we need to chown
         os.system('sudo touch %s' % temp_snapshot_db)
         os.system('sudo chown www-data:www-data %s' % temp_snapshot_db)
 
