@@ -2,57 +2,71 @@
 {% block javascript %}
 <script type="text/javascript">
 	$(function(){
-		$("#checkbox-0").on("click", function(){
-			if($(this).is(":checked")){
-				$.post('/dashboard/http_proxy/on', function(ctnt, status, opts){
-					console.log(ctnt);
-				});
-			}
-		});
-
-		$(".version .upgrade").on("click", function(){
+		$(".control .upgrade").on("click", function(){
 			$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
 				console.log(ctnt);
 			})
 		});
 
-		function update_cache(){
-	        $.get('/dashboard/cache_usage/', function(ctnt, stat, opts){
+		function update_dashboard(){
+	        $.get('/dashboard/data_update/', function(ctnt, stat, opts){
 	            var data = JSON.parse(ctnt);
-	            for (key in data){
-	            	$('#'+key).find('span').text(data[key])
+
+	            if (data["version_upgrade"]){
+	            	$(".control .upgrade").show();
 	            }
-	            used_cache_percentage = Math.round(data['used_cache_size'] * 100 / data['max_cache_size']);
+	            var cache_data = data["gateway_cache_usage"]
+	            for (key in cache_data){
+	            	$('#'+key).find('span').text(cache_data[key])
+	            }
+	            used_cache_percentage = Math.round(cache_data['used_cache_size'] * 100 / cache_data['max_cache_size']);
 	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%");
-				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size']);
+				dirty_cache_percentage = Math.round(cache_data['dirty_cache_size'] * 100 / cache_data['max_cache_size']);
 				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%");
 	        });
 	    }
-	    setInterval(update_cache, 10000);
+	    $("#http_proxy").on("click", function(e){
+	    	var action = "off";
+	    	if($(this).is(':checked')){
+	    		action = "on"
+	    	}
+	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
+	    		console.log(ctnt);
+    		});
+	    })
+	    setInterval(update_dashboard, 10000);
 	});
 </script>
 {% endblock javascript %}
 {% block tab_content %}
 
-<div class="storage-indicator-and-switch">
-	<div class="indicators">
-	    <div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">HDD
-	    </div>
-	    <div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">NFS
-	    </div>
-	    <div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">SMB
-	    </div>
-	    <div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">Http Proxy
-	    </div>
+<div class="system-pane">
+	<div class="status">
+		<div class="header">System Status</div>
+		<ul>
+			<li><div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
+	    		</div><span>HDD</span></li>
+			<li><div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">
+			    </div><span>NFS</span></li>
+			<li><div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">
+			    </div><span>SMB</span></li>
+			<li><div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">
+			    </div><span>HTTP Proxy</span></li>
+		</ul>
 	</div>
-	<div class="switches">
-		<div class="iphone-toggle-buttons">
-            <ul>
-                <li><label for="checkbox-0"><input type="checkbox" name="checkbox-0" id="checkbox-0" /><span>checkbox 0</span></label><span style="font-size: 18px;">Http Proxy</span></li>
-            </ul>
-        </div>
+	<div class="control">
+		<div class="header">System Control
+			<div class="upgrade hide">New<br>Version</div>
+		</div>
+        <ul>
+            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>
+        </ul>
 	</div>
 	<p style="clear:both;"></p>
+</div>
+<div class="data-stored">
+	<p>Total amount of data stored:</p>
+	<p>Actual amount of data stored:</p>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
@@ -71,12 +85,6 @@
 			<img src="/static/img/dashboard/1_capacity_icon_3.png" alt="">
 			<p id="max_cache_size">Max cache: <span>{{gateway_cache_usage.max_cache_size}}</span>GB</p>
 			<p id="max_cache_entries">Max entries: <span>{{gateway_cache_usage.max_cache_entries}}</span></p>
-		</div>
-		<div class="version">
-			{{ current_version }}
-			{% if available_version %}
-			<div class="upgrade">{{ available_version }}</div>
-			{% endif %}
 		</div>
 	</div>
 	<div class="usage">

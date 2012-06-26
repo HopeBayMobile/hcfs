@@ -14,7 +14,7 @@ if not getattr(settings, "DEBUG", False):
     from gateway import api
     from gateway import api_restore_conf
     from gateway import api_remote_upgrade
-    from gateway.mock import snapshot as api_snapshot
+    from gateway import snapshot as api_snapshot
     from http_proxy import api_http_proxy
 else:
     from gateway.mock import api
@@ -46,11 +46,9 @@ def index(request):
                "used_cache_percentage": cache_usage['used_cache_size'] * 100 / maxcache}
     context.update(data)
     try:
-        version = {"current_version": json.loads(api_remote_upgrade.get_gateway_version()).get("version"),
-                   "available_version": json.loads(api_remote_upgrade.get_available_upgrade()).get("version")}
+        context["available_version"] = json.loads(api_remote_upgrade.get_available_upgrade()).get("version")
     except Exception as inst:
         print inst
-    context.update(version)
     return render(request, 'dashboard/dashboard.html', context)
 
 
@@ -115,7 +113,7 @@ def system(request, action=None):
             return cleaned_data
 
     if request.method == "POST":
-        if action == "network":
+        if action == "Network":
             form = Network(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
@@ -124,7 +122,7 @@ def system(request, action=None):
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
-        elif action == "admin_pass":
+        elif action == "AdminPassword":
             form = AdminPassword(request.POST)
             if form.is_valid():
                 request.user.set_password(form['password'].data)
@@ -132,7 +130,7 @@ def system(request, action=None):
                 return redirect('/logout')
             else:
                 forms_group[action] = form
-        elif action == "gateway":
+        elif action == "Gateway":
             form = Gateway(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
@@ -141,7 +139,7 @@ def system(request, action=None):
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
-        elif action == "encrypt":
+        elif action == "EncryptionKey":
             form = EncryptionKey(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['old_key'].data, form['new_key'].data))
@@ -365,18 +363,28 @@ def snapshot(request, action=None):
     if request.method == "POST":
         if action == "create":
             return_val = json.loads(api_snapshot.take_snapshot())
-            print return_val
             if return_val['result']:
                 return HttpResponse("Success")
             else:
-                return HttpResponse("Failure")
+                return HttpResponse(return_val['msg'], status=500)
 
         if action == "delete":
-            return HttpResponse("Success")
+            snapshot_list = request.POST.getlist("snapshots[]")
+            for snap in snapshot_list:
+                del_result = json.loads(api_snapshot.delete_snapshot(snap))
+                if not del_result['result']:
+                    return_val = {'result': False, 'msg': 'An error occurred when deleting %s' % snap}
+                    break
+            return_val = {'result': True, 'msg': 'All snapshots are deleted.'}
 
-        if action == "expose":
-            print request.POST.get('snapshots')
-            return HttpResponse("Success")
+        if action == "export":
+            snapshot_list = request.POST.getlist("snapshots[]")
+            return_val = json.loads(api_snapshot.expose_snapshot(snapshot_list))
+
+        if return_val['result']:
+            return HttpResponse("Success: %s" % return_val['msg'])
+        else:
+            return HttpResponse("Failure: %s" % return_val['msg'], status=500)
 
     else:
         return_val = json.loads(api_snapshot.get_snapshot_list())
@@ -387,17 +395,24 @@ def snapshot(request, action=None):
             snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
             snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
-            snapshot['status'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
 
-        return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        if request.is_ajax():
+            return render(request, 'dashboard/snapshot_tbody.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        else:
+            return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+
 
 @login_required
 @require_POST
-def http_proxy(request, action=None):
+def http_proxy_switch(request, action=None):
     if request.method == 'POST':
-        result = json.loads(api_http_proxy.set_http_proxy(action))
-        return HttpResponse(result)
+        return_val = json.loads(api_http_proxy.set_http_proxy(action))
+        if return_val['result']:
+            return HttpResponse(return_val['msg'])
+        else:
+            return HttpResponse(return_val['msg'], status=500)
 
 
 @login_required
@@ -438,9 +453,10 @@ def status(request):
 
 
 @login_required
-def cache_usage(request):
+def dashboard_update(request):
     data = gateway_status()
-    return HttpResponse(json.dumps(data['gateway_cache_usage']))
+    data["version_upgrade"] = json.loads(api_remote_upgrade.get_available_upgrade())["version"]
+    return HttpResponse(json.dumps(data))
 
 
 @login_required
