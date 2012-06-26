@@ -353,7 +353,7 @@ def snapshot(request, action=None):
             if return_val['result']:
                 return HttpResponse("Success")
             else:
-                return HttpResponse("Failure")
+                return HttpResponse(return_val['msg'], status=500)
 
         if action == "delete":
             snapshot_list = request.POST.getlist("snapshots[]")
@@ -385,7 +385,10 @@ def snapshot(request, action=None):
             snapshot['status'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
 
-        return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        if request.is_ajax():
+            return render(request, 'dashboard/_snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+        else:
+            return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
 
 
 @login_required

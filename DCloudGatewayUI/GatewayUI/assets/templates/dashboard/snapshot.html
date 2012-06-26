@@ -41,9 +41,15 @@
             });
             setInterval(toogle_progress, 500);
 
-            $(".menu-button.create").on("click", function(){
-                $.post('/dashboard/snapshot/create', function(ctnt, success, opts){
-                    console.log(ctnt);
+            $("#snapshot #create").on("click", function(){
+                $.post('/dashboard/snapshot/create', function(ctnt){
+                    // Show alert message if necessary
+                }).error(function(obj, stat, msg){
+                    $("#create-popup").text(obj.responseText).fadeIn(500).delay(2000).fadeOut(500);
+                }).complete(function(){
+                    $.get("/dashboard/snapshot", function(data){
+                        $("#snapshot-list tbody").html(data);
+                    });
                 });
             });
 
@@ -73,9 +79,10 @@
     </ul>
     <div class="tab-content">
         <div class="tab-pane active" id="snapshot" style="">
-            <button class="menu-button create">Create</button>
             <button class="menu-button select">Delete</button>
             <button class="menu-button select">Export</button>
+            <div id="create-popup" class="hide"></div>
+            <button id="create" class="menu-button ">Create</button>
             <div id="" style="">
                 <table id="snapshot-list" class="table table-striped table-bordered table-condensed">
                     <thead>
