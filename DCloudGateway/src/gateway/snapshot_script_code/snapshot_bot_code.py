@@ -1,3 +1,9 @@
+"""
+This script is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This is the main bot script for taking snapshots.
+"""
 import os.path
 import common
 import subprocess
@@ -26,7 +32,9 @@ class SnapshotError(Exception):
 
 
 class Snapshot_Db_Lock():
-
+    """
+    Same snapshot database lock class as in the API.
+    """
     def __init__(self):
 
         self.locked = False
@@ -54,8 +62,12 @@ class Snapshot_Db_Lock():
 
 
 def _check_snapshot_in_progress():
-    '''Check if the snapshot tag exists. If so, return true.'''
+    """
+    Helper function for checking if a snapshot process exists.
 
+    @rtype: Boolean value
+    @Return: Whether a snapshotting process is in progress.
+    """
     try:
         if os.path.exists(snapshot_tag):
             return True
@@ -66,6 +78,11 @@ def _check_snapshot_in_progress():
 
 
 def new_database_entry():
+    """
+    Create a new entry in the database open the start of the snapshotting.
+
+    Function will retry up to 10 times.
+    """
 
     retries = 10
     finished = False
@@ -90,6 +107,7 @@ def new_database_entry():
 
         except:
             retries = retries - 1
+            time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not write new entry to snapshot database"
                 raise SnapshotError(error_msg)
@@ -98,6 +116,9 @@ def new_database_entry():
 
 
 def invalidate_entry():
+    """
+    Invalidate snapshot database entry and label it as failed snapshot.
+    """
 
     finish_time = time.time()
     new_snapshot_name = "Failed_snapshot"
@@ -105,7 +126,14 @@ def invalidate_entry():
 
 
 def actually_not_in_progress():
-    ''' Check if there is actually a "new_snapshot" entry in database. '''
+    """
+    Check if there is no 'new_snapshot' entry in database.
+
+    Reasoning behind this function: Snapshotting might already completed,
+    but the post-processing is not and a system failure occurs. Hence it
+    is possible that the snapshot tag exists but the database is already
+    updated.
+    """
 
     db_lock = Snapshot_Db_Lock()
     try:
@@ -128,11 +156,13 @@ def actually_not_in_progress():
 
 
 def recover_database():
-    '''
-       Fix the snapshot entry and database.
-       Note: The database could be updated but the snapshot directory is not.
-       Tag is removed at the end of the function.
-    '''
+    """
+    Fix the snapshot entry and database.
+
+    Note: The database could be updated but the snapshot directory is not.
+
+    Tag is removed at the end of the function.
+    """
     retries = 10
     finished = False
 
@@ -150,7 +180,7 @@ def recover_database():
                     new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
 
                 if not os.path.exists(new_snapshot_path):
-                    #This should be the missing snapshot folder
+                    # This should be the missing snapshot folder. Rename the temp folder.
                     if not os.path.exists(snapshot_dir):
                         os.system('sudo mkdir %s' % snapshot_dir)
                     os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
@@ -158,7 +188,7 @@ def recover_database():
                     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
                     log.info('Recovered snapshot' % new_snapshot_name)
                 else:
-                    #Perhaps the first entry is missing
+                    # Perhaps the first entry is missing. Create another snapshot entry.
                     finish_time = time.time()
                     ftime_format = time.localtime(finish_time)
                     new_snapshot_name = "recovered_snapshot_%s_%s_%s_%s_%s_%s" % (ftime_format.tm_year,\
@@ -173,7 +203,7 @@ def recover_database():
                     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
                     log.info('Recovered snapshot' % new_snapshot_name)
             else:
-                try:
+                try:  # We just need to lock the snapshot dir and change the ownership
                     with open(snapshot_db, 'r') as fh:
                         first_line = fh.readline()
                         first_entries = first_line.split(',')
@@ -191,6 +221,7 @@ def recover_database():
 
         except:
             retries = retries - 1
+            time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not recover snapshot database"
                 raise SnapshotError(error_msg)
@@ -199,7 +230,18 @@ def recover_database():
 
 
 def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
+    """
+    Update the snapshot database entry upon the completion of the snapshot.
 
+    @type new_snapshot_name: String
+    @param new_snapshot_name: Name of the snapshot entry
+    @type finish_time: Number
+    @param finish_time: Finish time of the snapshot process (secs after epoch)
+    @type total_files: Integer
+    @param total_files: Total number of files in the snapshot
+    @type total_size: Number
+    @param total_size: Total amount of data in the snapshot
+    """
     retries = 10
     finished = False
 
@@ -241,6 +283,7 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
 
         except:
             retries = retries - 1
+            time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not update new entry in snapshot database"
                 raise SnapshotError(error_msg)
@@ -249,7 +292,9 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
 
 
 def execute_take_snapshot():
-
+    """
+    Main function for taking the snapshots.
+    """
     log.info('Begin snapshotting bot tasks')
 
     if not _check_snapshot_in_progress():
@@ -286,6 +331,8 @@ def execute_take_snapshot():
             if os.path.exists(snapshot_statistics):
                 os.system('sudo rm -rf %s' % snapshot_statistics)
 
+            # Attempt the actual snapshotting again
+
             os.system("sudo mkdir %s" % temp_folder)
             cmd = "sudo python /usr/local/bin/s3qlcp %s %s/sambashare"\
                                 % (samba_folder, temp_folder)
@@ -299,15 +346,24 @@ def execute_take_snapshot():
                               != -1:
                     time.sleep(60)  # Wait one minute before retrying
                 else:
-                    #Check if file system is still up
+                    # Check if file system is still up
                     if not os.path.exists(samba_folder):
                         return
 
-                    invalidate_entry()
+                    invalidate_entry()  # Cannot finish the snapshot for some reason
                     log.info('[2] Unable to finish the current snapshotting process. Aborting.')
                     os.system('sudo rm -rf %s' % snapshot_tag)
                     return
             else:
+                # Record statistics for samba share
+
+                if not os.path.exists(snapshot_statistics):
+                    # Statistics does not exists
+                    log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                    invalidate_entry()  # Cannot finish the snapshot for some reason
+                    os.system('sudo rm -rf %s' % snapshot_tag)
+                    return
+
                 with open(snapshot_statistics, 'r') as fh:
                     for lines in fh:
                         if lines.find("total files") != -1:
@@ -326,7 +382,7 @@ def execute_take_snapshot():
                     if output.find("Dirty cache has not been completely flushed") != -1:
                         time.sleep(60)  # Wait one minute before retrying
                     else:
-                        #Check if file system is still up
+                        # Check if file system is still up
                         if not os.path.exists(samba_folder):
                             return
 
@@ -335,6 +391,15 @@ def execute_take_snapshot():
                         os.system('sudo rm -rf %s' % snapshot_tag)
                         return
                 else:
+                    # Record statistics for NFS share
+
+                    if not os.path.exists(snapshot_statistics):
+                        # Statistics does not exists
+                        log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                        invalidate_entry()  # Cannot finish the snapshot for some reason
+                        os.system('sudo rm -rf %s' % snapshot_tag)
+                        return
+
                     with open(snapshot_statistics, 'r') as fh:
                         for lines in fh:
                             if lines.find("total files") != -1:
@@ -346,12 +411,13 @@ def execute_take_snapshot():
 
                     finish = True
         except Exception:
-            #Check if file system is still up
+            # Check if file system is still up
             if not os.path.exists(samba_folder):
                 return
             raise
 
-    #Begin post-processing snapshotting
+    # Begin post-processing snapshotting
+    # Update database
     finish_time = time.time()
     ftime_format = time.localtime(finish_time)
     new_snapshot_name = "snapshot_%s_%s_%s_%s_%s_%s" % (ftime_format.tm_year,\
@@ -359,15 +425,18 @@ def execute_take_snapshot():
               ftime_format.tm_min, ftime_format.tm_sec)
     update_new_entry(new_snapshot_name, finish_time, samba_files + nfs_files,\
               samba_size + nfs_size)
+
+
+    # Make necessary changes to the directory structure and lock the snapshot
     if not os.path.exists(snapshot_dir):
         os.system('sudo mkdir %s' % snapshot_dir)
-
     new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
     os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
     os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
     os.system('sudo python /usr/local/bin/s3qlctrl upload-meta %s' % mount_point)
     os.system('sudo rm -rf %s' % snapshot_tag)
+
     log.info('Snapshotting finished at %s' % str(ftime_format))
 
 ################################################################

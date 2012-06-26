@@ -81,9 +81,9 @@ def _get_latest_backup():
     po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     res = po.stdout.readlines()
     po.wait()    
-        
+    
     #~ Case 1. There is no container "config" 
-    if "not found" in res:
+    if "not found" in res[0]:
         return None
     else:
         #~ Case 2. Get a list of files
@@ -197,11 +197,12 @@ def restore_gateway_configuration():
 #----------------------------------------------------------------------
     
 if __name__ == '__main__':
-    res = save_gateway_configuration()
-    print res
+    #~ res = save_gateway_configuration()
+    #~ print res
     info = get_configuration_backup_info()
     print info
-    res = restore_gateway_configuration()
-    #res = save_gateway_configuration()
-    print res
+    #~ res = restore_gateway_configuration()
+    #~ #res = save_gateway_configuration()
+
+    #~ print res
     pass

@@ -134,6 +134,7 @@ tr{
 	width: 1024px;
 	margin: 0 auto;
 	height: 100%;
+	position: relative;
 	border-right: solid #ccc @site-left-main-seperator;
 	-webkit-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
 	-moz-box-shadow: -3px 0px 3px 0px #aaa, 3px 0px 3px 0px #aaa;
@@ -141,7 +142,7 @@ tr{
 }
 
 .site-header{
-	position: relative;
+	position: fixed;
 	top: 0;
 	margin: 0; padding:0;
 	width:  @site-width;
@@ -191,6 +192,7 @@ tr{
 		vertical-align: middle;
 		line-height: 32px;
 		font-size: 16px;
+		color: #4cade6;
 		border-bottom: 1px solid gray;
 		position: relative;
 		img{
@@ -258,15 +260,18 @@ tr{
 }
 
 .main-row{
-	float: right;
-	height: 100%;
 	overflow: auto;
+	position: absolute;
+	top: @site-top-height;
+	left: @site-left-width;
+	bottom: 0;
 }
 
 .left-row{
-	float:left;
+	position: fixed;
+	top: @site-top-height;
+	bottom: 0;
 	width: @site-left-width;
-	height: 100%;
 	overflow-y: auto;
 }
 
@@ -295,14 +300,18 @@ tr{
 		width: 803px;
 
 		button{
-			width: 87px;
-			height: 40px;
+			width: 100px;
+			height: 56px;
 			border: none;
 			background-color: transparent;
-			margin-top: 12px;
+			margin-top: 3px;
 			margin-right: 10px;
 			float: right;
-			background-image: url("/@{dashboard-image-path}/snapshot_control.png");
+			background-image: url("/@{dashboard-image-path}/snapshot_confirm_control.png");
+		}
+
+		#do-action{
+			background-image: url("/@{dashboard-image-path}/snapshot_confirm_control_light.png");
 		}
 }
 
@@ -384,9 +393,11 @@ tr{
 
 
 #errormsgbox{
-	float: right;
+	position: relative;
 	width: 803px;
 	height: 0;
+	top: @site-top-height;
+	left: @site-left-width;
 }
 
 .msg-block{
@@ -471,6 +482,23 @@ tr{
 }
 
 #snapshot{
+	position: relative;
+
+	#create-popup{
+		position: absolute;
+		width: 172px;
+		height: 75px;
+		left: 23px;
+		top: 37px;
+		padding-top: 20px;
+		padding-left: 10px;
+		padding-right: 10px;
+		color: white;
+		font-size: 16px;
+		word-wrap: break-word;
+		background-image: url("/@{dashboard-image-path}/create_disable_popup.png");
+	}
+
 	.menu-button{
 		margin-left: 20px;
 		margin-bottom: 10px;
@@ -485,20 +513,14 @@ tr{
 		&.active{
 			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
 		}
+		&.disabled{
+			cursor: not-allowed;
+			background-image: url("/@{dashboard-image-path}/snapshot_control_disable.png");
+		}
 	}
 
 	td, th{
 		text-align: center;
-	}
-
-
-	.ani-inprogress{
-		width: 36px;
-		height: 36px;
-		background-image: url("/@{dashboard-image-path}/in_progress_01.png");
-		&.change{
-			background-image: url("/@{dashboard-image-path}/in_progress_02.png");
-		}
 	}
 }
 
@@ -601,21 +623,28 @@ tr{
 	}
 }
 
+.data-stored{
+	position: relative;
+	p{
+		margin-left: 20px;
+		font-size: 16px;
+	}
+}
+
 .upgrade{
 	position: absolute;
-	background-image: url("/@{dashboard-image-path}/update_2.png");
+	background-image: url("/@{dashboard-image-path}/update_1.png");
 	width: 75px;
-	height: 77px;
+	height: 57px;
 	right: -20px;
 	font-size: 12px;
 	color: black;
 	text-indent: 0;
+	padding-top: 20px;
 	text-align: center;
-	line-height: 77px;
+	line-height: 16px;
 	top: -20px;
-	& .ing{
-		background-image: url("/@{dashboard-image-path}/update_1.png");
-	}
+	cursor: pointer;
 }
 
 .cache-usage-bar{

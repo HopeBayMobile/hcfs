@@ -19,6 +19,7 @@ gateway.api.get_nfs_access_ip_list	gateway.api-module.html#get_nfs_access_ip_lis
 gateway.api._check_network	gateway.api-module.html#_check_network
 gateway.api._storeNetworkInfo	gateway.api-module.html#_storeNetworkInfo
 gateway.api.month_number	gateway.api-module.html#month_number
+gateway.api.reset_gateway	gateway.api-module.html#reset_gateway
 gateway.api.set_compression	gateway.api-module.html#set_compression
 gateway.api.nfs_hosts_allow_file	gateway.api-module.html#nfs_hosts_allow_file
 gateway.api.get_gateway_status	gateway.api-module.html#get_gateway_status
@@ -48,7 +49,7 @@ gateway.api.RUN_CMD_TIMEOUT	gateway.api-module.html#RUN_CMD_TIMEOUT
 gateway.api.get_network	gateway.api-module.html#get_network
 gateway.api.storage_cache_usage	gateway.api-module.html#storage_cache_usage
 gateway.api._check_http_proxy_service	gateway.api-module.html#_check_http_proxy_service
-gateway.api.reset_gateway	gateway.api-module.html#reset_gateway
+gateway.api.get_indicators	gateway.api-module.html#get_indicators
 gateway.api._setNameserver	gateway.api-module.html#_setNameserver
 gateway.api.stop_upload_sync	gateway.api-module.html#stop_upload_sync
 gateway.api._check_smb_service	gateway.api-module.html#_check_smb_service
@@ -76,6 +77,7 @@ gateway.api.CMD_CH_SMB_PWD	gateway.api-module.html#CMD_CH_SMB_PWD
 gateway.api.apply_storage_account	gateway.api-module.html#apply_storage_account
 gateway.api.NUM_LOG_LINES	gateway.api-module.html#NUM_LOG_LINES
 gateway.api._check_system	gateway.api-module.html#_check_system
+gateway.api.calculate_net_speed	gateway.api-module.html#calculate_net_speed
 gateway.api._check_HDD	gateway.api-module.html#_check_HDD
 gateway.api.apply_scheduling_rules	gateway.api-module.html#apply_scheduling_rules
 gateway.api_remote_upgrade	gateway.api_remote_upgrade-module.html
@@ -121,6 +123,7 @@ gateway.snapshot.lifespan_conf	gateway.snapshot-module.html#lifespan_conf
 gateway.snapshot._append_samba_entry	gateway.snapshot-module.html#_append_samba_entry
 gateway.snapshot.log	gateway.snapshot-module.html#log
 gateway.snapshot.snapshot_bot	gateway.snapshot-module.html#snapshot_bot
+gateway.snapshot.tmp_smb_dir	gateway.snapshot-module.html#tmp_smb_dir
 gateway.snapshot.set_snapshot_schedule	gateway.snapshot-module.html#set_snapshot_schedule
 gateway.snapshot.__package__	gateway.snapshot-module.html#__package__
 gateway.snapshot.DIR	gateway.snapshot-module.html#DIR
@@ -185,4 +188,5 @@ gateway.common.TimeoutError.__init__	gateway.common.TimeoutError-class.html#__in
 gateway.snapshot.SnapshotError	gateway.snapshot.SnapshotError-class.html
 gateway.snapshot.Snapshot_Db_Lock	gateway.snapshot.Snapshot_Db_Lock-class.html
 gateway.snapshot.Snapshot_Db_Lock.__del__	gateway.snapshot.Snapshot_Db_Lock-class.html#__del__
+gateway.snapshot.Snapshot_Db_Lock.locked	gateway.snapshot.Snapshot_Db_Lock-class.html#locked
 gateway.snapshot.Snapshot_Db_Lock.__init__	gateway.snapshot.Snapshot_Db_Lock-class.html#__init__

@@ -241,18 +241,21 @@ def _check_snapshot_in_progress():
         return False
     except:
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
-
-# by Rice
-def get_gateway_indicators():
-    """
-    Get gateway services' indicators.
     
-    @rtype: JSON object
+def get_indicators():
+    """
+    Get gateway services' indicators by calling internal functions.
+    This function may return up to several seconds.
+    Use it carefully in environment which needs fast response time.
+    
+    This function may be called by gateway background task.
+    
+    @rtype: dictionary
     @return: Gateway services' indicators.
     
         - result: Function call result.
         - msg: Explanation of result.
-        - data: JSON object.
+        - data: dictionary
             - network_ok: If network from gateway to storage is up.
             - system_check: If fsck.s3ql daemon is alive.
             - flush_inprogress: If S3QL dirty cache flushing is in progress.
@@ -264,10 +267,10 @@ def get_gateway_indicators():
             - HTTP_proxy_srv: If HTTP proxy server is alive.
     
     """
-
-    log.info("get_gateway_indicators start")
+    
+    log.info("get_indicators start")
     op_ok = False
-    op_msg = 'Gateway indocators read failed unexpetcedly.'
+    op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
           'result' : op_ok,
           'msg'    : op_msg,
@@ -280,8 +283,7 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False }}
-
-
+    
     try:
         op_network_ok = _check_network()
         op_system_check = _check_system()
@@ -308,7 +310,73 @@ def get_gateway_indicators():
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
               'HTTP_proxy_srv' : op_Proxy_srv }}
+    except Exception as Err:
+        log.info("Unable to get indicators")
+        log.info("msg: %s" % str(Err))
+        return return_val
     
+    log.info("get_indicators end successfully")
+    return return_val
+
+# by Rice
+# modified by wthung, 2012/6/25
+def get_gateway_indicators():
+    """
+    Get gateway services' indicators by reading file or by the result of calling get_indicators().
+    
+    @rtype: JSON object
+    @return: Gateway services' indicators.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object.
+            - network_ok: If network from gateway to storage is up.
+            - system_check: If fsck.s3ql daemon is alive.
+            - flush_inprogress: If S3QL dirty cache flushing is in progress.
+            - dritycache_nearfull: If S3QL dirty cache is near full.
+            - HDD_ok: If all HDD are healthy.
+            - NFS_srv: If NFS is alive.
+            - SMB_srv: If Samba service is alive.
+            - snapshot_in_progress: If S3QL snapshotting is in progress.
+            - HTTP_proxy_srv: If HTTP proxy server is alive.
+    
+    """
+
+    log.info("get_gateway_indicators start")
+    op_ok = False
+    op_msg = 'Gateway indicators read failed unexpectedly.'
+    return_val = {
+          'result' : op_ok,
+          'msg'    : op_msg,
+          'data'   : {'network_ok' : False,
+          'system_check' : False,
+          'flush_inprogress' : False,
+          'dirtycache_nearfull' : False,
+          'HDD_ok' : False,
+          'NFS_srv' : False,
+          'SMB_srv' : False,
+          'snapshot_in_progress' : False,
+          'HTTP_proxy_srv' : False }}
+
+    # test, for fast UI integration
+    #return json.dumps(return_val)
+    
+    # indicator file
+    indic_file = '/dev/shm/gw_indicator'
+            
+    try:
+        # check if indicator file is exist
+        if os.path.exists(indic_file):
+            # read indicator file as result
+            # deserialize json object from file
+            log.info('%s is existed. Try to get indicator from it' % indic_file)
+            with open(indic_file) as fh:
+                return json.dumps(json.load(fh))
+        else:
+            # invoke regular function calls
+            log.info('No indicator file existed. Try to spend some time to get it')
+            return_val = get_indicators()
+            
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
@@ -543,12 +611,16 @@ def _check_nfs_service():
         output = po.stdout.read()
         po.wait()
     
-        if po.returncode == 0:
+        # if nfsd is running, command returns 0
+        # if nfsd is not running, command returns 3
+        if po.returncode == 3:
             if output.find("not running") >= 0:
                 op_NFS_srv = False
                 restart_nfs_service()
         else:
-            log.info(output)
+            #print 'Checking NFS server returns nonzero value!'
+            #log.info(output)
+            pass
 
     except:
         pass
@@ -575,9 +647,12 @@ def _check_smb_service():
         output = po.stdout.read()
         po.wait()
     
+        # no matter smbd is running or not, command always returns 0
         if po.returncode == 0:
-            if output.find("running") !=-1:
+            if output.find("running") != -1:
                 op_SMB_srv = True
+            else:
+                restart_smb_service()
         else:
             log.info(output)
             restart_smb_service()
@@ -1482,7 +1557,7 @@ def get_network():
     """
     
     log.info("get_network start")
-    log.info("[2] Gateway networking starting")
+    #log.info("[2] Gateway networking starting")
 
     info_path = "/etc/delta/network.info"
     return_val = {}
@@ -1528,7 +1603,7 @@ def get_network():
         }
     
         log.info("get_network end")
-        log.info("[2] Gateway networking started")
+        #log.info("[2] Gateway networking started")
         return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -1556,6 +1631,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     """
     
     log.info("apply_network start")
+    log.info("[2] Gateway networking starting")
 
     ini_path = "/etc/delta/Gateway.ini"
     op_ok = False
@@ -1614,9 +1690,10 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
             if os.system("sudo /etc/init.d/networking restart") == 0:
                 op_ok = True
                 op_msg = "Succeeded to apply the network configuration."
+                log.info("[2] Gateway networking started")
             else:
                 op_ok = False
-                log.error("Failed to restart the network.")
+                log.info("[0] Gateway networking starting error")
         else:
             op_ok = False
             log.error(op_msg)
@@ -2411,7 +2488,7 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-
+    #print log
     for category in sorted(keyword_filter.keys()):
 
         for keyword in keyword_filter[category]:
@@ -2497,6 +2574,8 @@ def parse_log (type, log_cnt):
     msg = m.group('message')
     #print msg
 
+    if msg == None: # skip empty log
+        return None
     #now = datetime.datetime.utcnow()
 
     try:
@@ -2511,7 +2590,12 @@ def parse_log (type, log_cnt):
     #print timestamp
     #print "msg = "
     #print msg
-    log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
+    
+    category = classify_logs(msg, KEYWORD_FILTER)
+    if category == None: # skip invalid log
+        return None
+    
+    log_entry["category"] = category
     log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
     log_entry["msg"] = msg[LOG_LEVEL_PREFIX_LEN:]
     return log_entry
@@ -2563,7 +2647,7 @@ def read_logs(logfiles_dict, offset, num_lines):
                 nums = num_lines
 
             for log in log_buf[ offset : offset + nums]:
-                print log
+                #print log
                 log_entry = parse_log(type, log)
                 if not log_entry == None: #ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
@@ -2746,15 +2830,15 @@ def storage_cache_usage():
     return ret_usage
 
 ##############################
-def get_network_speed(iface_name): # iface_name = eth1
+def calculate_net_speed(iface_name):
     """
     Call get_network_status to get current NIC status.
-    Wait for 1 second, and all again. 
+    Wait for 1 second, and call again. 
     Then calculate difference, i.e., up/down link.
     
     @type iface_name: string
     @param iface_name: Interface name. Ex: eth1.
-    @rtype: JSON object
+    @rtype: dictionary
     @return: NIC network usage
     
         - uplink_usage: Network traffic of outcoming packets.
@@ -2763,7 +2847,7 @@ def get_network_speed(iface_name): # iface_name = eth1
         - downlink_backend_usage: TBD
     
     """
-
+    
     ret_val = {
                "uplink_usage" : 0 ,
                "downlink_usage" : 0,
@@ -2781,7 +2865,55 @@ def get_network_speed(iface_name): # iface_name = eth1
     except:
         ret_val["downlink_usage"] = 0 
         ret_val["uplink_usage"] = 0
-        
+    
+    return ret_val
+
+def get_network_speed(iface_name): # iface_name = eth1
+    """
+    Get network speed by reading file or call functions.
+    The later case will consume at least one second to return.
+    
+    @type iface_name: string
+    @param iface_name: Interface name. Ex: eth1.
+    @rtype: dictionary
+    @return: NIC network usage
+    
+        - uplink_usage: Network traffic of outcoming packets.
+        - downlink_usage: Network traffic of incoming packets.
+        - uplink_backend_usage: TBD
+        - downlink_backend_usage: TBD
+    
+    """
+    
+    log.info('get_network_speed start')
+    
+    # define net speed file
+    netspeed_file = '/dev/shm/gw_netspeed'
+
+    ret_val = {
+               "uplink_usage" : 0 ,
+               "downlink_usage" : 0,
+               "uplink_backend_usage" : 0 ,
+               "downlink_backend_usage" : 0
+               }
+    
+    # test
+    #return ret_val
+    
+    try:
+        if os.path.exists(netspeed_file):
+            # read net speed from file
+            log.info('Read net speed from file')
+            with open(netspeed_file, 'r') as fh:
+                ret_val = json.load(fh)
+        else:
+            # call functions directly. will consume at least one second
+            log.info('No net speed file existed. Consume one second to calculate')
+            ret_val = calculate_net_speed(iface_name)
+
+    except:
+        ret_val["downlink_usage"] = 0 
+        ret_val["uplink_usage"] = 0
 
     return ret_val
 
@@ -2955,5 +3087,6 @@ if __name__ == '__main__':
     #_createS3qlConf("172.16.228.53:8080")
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
-    print get_gateway_indicators()
+    #print get_gateway_indicators()
+    #_check_nfs_service()
     pass
