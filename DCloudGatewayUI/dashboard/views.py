@@ -382,11 +382,11 @@ def snapshot(request, action=None):
             snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
             snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
-            snapshot['status'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
 
         if request.is_ajax():
-            return render(request, 'dashboard/_snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
+            return render(request, 'dashboard/snapshot_tbody.html', {'tab': 'snapshot', 'snapshots': snapshots})
         else:
             return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot', 'snapshots': snapshots})
 

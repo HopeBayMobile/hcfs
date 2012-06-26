@@ -503,20 +503,14 @@ tr{
 		&.active{
 			background-image: url("/@{dashboard-image-path}/snapshot_control2.png");
 		}
+		&.disabled{
+			cursor: not-allowed;
+			background-image: url("/@{dashboard-image-path}/snapshot_control_disable.png");
+		}
 	}
 
 	td, th{
 		text-align: center;
-	}
-
-
-	.ani-inprogress{
-		width: 36px;
-		height: 36px;
-		background-image: url("/@{dashboard-image-path}/in_progress_01.png");
-		&.change{
-			background-image: url("/@{dashboard-image-path}/in_progress_02.png");
-		}
 	}
 }
 
