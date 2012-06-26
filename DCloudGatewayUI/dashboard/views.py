@@ -113,7 +113,7 @@ def system(request, action=None):
             return cleaned_data
 
     if request.method == "POST":
-        if action == "network":
+        if action == "Network":
             form = Network(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
@@ -122,7 +122,7 @@ def system(request, action=None):
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
-        elif action == "admin_pass":
+        elif action == "AdminPassword":
             form = AdminPassword(request.POST)
             if form.is_valid():
                 request.user.set_password(form['password'].data)
@@ -130,7 +130,7 @@ def system(request, action=None):
                 return redirect('/logout')
             else:
                 forms_group[action] = form
-        elif action == "gateway":
+        elif action == "Gateway":
             form = Gateway(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
@@ -139,7 +139,7 @@ def system(request, action=None):
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
-        elif action == "encrypt":
+        elif action == "EncryptionKey":
             form = EncryptionKey(request.POST)
             if form.is_valid():
                 update_return = json.loads(api.apply_user_enc_key(form['old_key'].data, form['new_key'].data))
