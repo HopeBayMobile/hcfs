@@ -155,6 +155,37 @@
                 {% endblock tab_content %}
             </div>
         </div>
-
+        <div id="delta-popup">
+            <script type="text/javascript">
+                $(function(){
+                    $("#delta-popup").on("click", ".button.cancel", function(){
+                        $("#delta-popup").fadeOut(1000, function(){
+                            $("#errormsgbox").show();
+                        });
+                    });
+                    $("#delta-popup").on("click", ".button.ok", function(){
+                        $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
+                            console.log(ctnt);
+                        });
+                    });
+                });
+            </script>
+            <div class="popup-mask">
+            </div>
+            <div class="popup-box">
+                <p class="warning-h1">Notice</p>
+                <p class="warning-h2">The system upgrade will execute.</p>
+                <p class="warning-msg">The system will reboot when the update is complete. Please make sure that all your files are saved before the action execute.</p>
+                <div class="action-wrap">
+                    <div class="button cancel">
+                        Cancel
+                    </div>
+                    <div class="button ok">
+                        OK
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     </body>
 </html>

@@ -3,9 +3,8 @@
 <script type="text/javascript">
 	$(function(){
 		$(".control .upgrade").on("click", function(){
-			$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-				console.log(ctnt);
-			})
+			$("#errormsgbox").hide()
+			$("#delta-popup").fadeIn(1000)
 		});
 
 		function update_dashboard(){
