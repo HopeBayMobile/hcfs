@@ -1,3 +1,9 @@
+"""
+This script is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This script checks for and deletes expired snapshots.
+"""
 import os.path
 import common
 import time
@@ -15,14 +21,34 @@ lifespan_conf = "/etc/delta/snapshot_lifespan"
 temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
 
 
+####### Exception class definition ###############
+
+
 class SnapshotError(Exception):
     pass
 
 
-class Snapshot_Db_Lock():
-    '''Class for handling acquiring/releasing lock for snapshotting database'''
-    def __init__(self):
+####### Start of functions ####################
 
+
+class Snapshot_Db_Lock():
+    """
+    Class for handling acquiring/releasing lock for snapshotting database.
+
+    @cvar locked: Whether this class instance acquired the database lock.
+    @type locked: Boolean value
+
+    Usage:
+      1. Acquiring database lock: I{lock = Snapshot_Db_Lock()}.
+      2. Releasing database lock: I{del lock}.
+    """
+    def __init__(self):
+        """
+        Constructor for Snapshot_Db_Lock.
+
+        The file defined by I{snapshot_db_lock} variable is used as the
+        lock. Existance of the file infers that the database is locked.
+        """
         self.locked = False
         try:
             finish = False
@@ -37,7 +63,12 @@ class Snapshot_Db_Lock():
         self.locked = True
 
     def __del__(self):
+        """
+        Destructor for Snapshot_Db_Lock.
 
+        Deletes the lock file if it is created by this instance of
+        Snapshot_Db_Lock.
+        """
         try:
             if self.locked:
                 self.locked = False
@@ -48,7 +79,13 @@ class Snapshot_Db_Lock():
 
 
 def _acquire_db_list():
+    """
+    Helper function for reading snapshot database without parsing
+    database entries.
 
+    @rtype:    Array of strings
+    @return:   Lines in the snapshot database (as array of strings).
+    """
     db_lock = Snapshot_Db_Lock()
     db_entries = []
 
@@ -65,7 +102,23 @@ def _acquire_db_list():
 
 
 def _translate_db(db_list):
+    """
+    Helper function for parsing database entries into array of
+    python dictionaries for snapshot entries.
 
+    Variables in each database entry:
+      1. "name": Name of the snapshot.
+      2. "start_time": When the snapshot request is started.
+      3. "finish_time": When the snapshot request is completed.
+      4. "num_files": Total number of files included in this snapshot.
+      5. "total_size": Total data size include in this snapshot.
+      6. "exposed": Whether this snapshot is exposed as a samba share.
+
+    @type db_list:  Array of strings
+    @param db_list: Lines in the snapshot database (as array of strings).
+    @rtype:         Array of python dictionaries
+    @return:        Entries in the snapshot database.
+    """
     snapshots = []
     try:
         for entry in db_list:
@@ -89,12 +142,23 @@ def _translate_db(db_list):
 
 
 def _write_snapshot_db(snapshot_list):
+    """
+    Write updated snapshot database entries to the database file.
+    Note that this is not the same version as the one in the API.
 
+    @type snapshot_list:  Array of snapshot database entries
+    @param snapshot_list: Array of updated snapshot database entries
+    @rtype:   N/A
+    @return:  None
+    """
     db_lock = Snapshot_Db_Lock()
 
     try:
         if os.path.exists(temp_snapshot_db):
             os.system('sudo rm -rf %s' % temp_snapshot_db)
+
+        # We don't need to chown to www-data here as the script is
+        # run from a cron job
 
         with open(temp_snapshot_db, 'w') as fh:
             for entry in snapshot_list:
@@ -117,9 +181,18 @@ def _write_snapshot_db(snapshot_list):
 
 
 def _write_snapshot_lifespan(days_to_live):
-    '''Function for actually writing lifespan config to file'''
+    """
+    Helper function for actually writing lifespan config to file
 
+    @type days_to_live: Number
+    @param days_to_live: The lifespan of a snapshot, measured in days.
+    @rtype: N/A
+    @return: None
+    """
     try:
+        if os.path.exists(lifespan_conf):
+            os.system('rm -rf %s' % lifespan_conf)
+
         with open(lifespan_conf, 'w') as fh:
             fh.write('%d' % days_to_live)
         os.system('sudo chown www-data:www-data %s' % lifespan_conf)
@@ -128,7 +201,14 @@ def _write_snapshot_lifespan(days_to_live):
 
 
 def _get_snapshot_lifespan():
+    """
+    Helper function for setting the lifespan of snapshots.
 
+    @type days_to_live: Number
+    @param days_to_live: The lifespan of a snapshot, measured in days.
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
     days_to_live = 365
     reset_config = False
 
@@ -154,8 +234,13 @@ def _get_snapshot_lifespan():
 
 
 def check_expired_snapshots():
-    ''' Check snapshot database for expired snapshots '''
+    """
+    The main function for checking for and deleting expired
+    snapshots.
 
+    @rtype: N/A
+    @return: None
+    """
     log.info('Start checking expired snapshots')
 
     try:
