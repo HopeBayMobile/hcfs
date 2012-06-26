@@ -615,9 +615,11 @@ class SwiftAccountMgr:
 		proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 		user_info = {}
 		user_list = []
+		user_metadata = {}
 		black_list = []
-		admin_user_prefix = "" # to be defined
-		user_container_prefix = "" # to be defined
+		admin_user = "" # to be defined
+		admin_password = ""
+		user_container = ""
 
 		msg = ""
 		val = False
@@ -654,17 +656,72 @@ class SwiftAccountMgr:
 		for item in user_info["users"]:
                         user_list.append(item["name"])
 
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False or get_admin_password_output.msg == "":
+			val = False
+			msg = "Failed to get the password of the admin user: %s"\
+			% get_admin_password_output.msg
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
 		for user in user_list:
+			# TODO: use thread pool to speed up
+			user_container = "" # to be defined
+			user_metadata = {
+				"Account-Enable": True
+			}
+
 			get_user_password_output = self.get_user_password(account, user)
 			if get_user_password_output.val == False or get_user_password_output.msg == "":
-				black_list.append(user)
+				black_list.append("Failed to get the password of %s: %s"\
+				% (user, get_user_password_output.msg))
+				continue
 			else:
 				ori_password = get_user_password_output.msg
-				new_password = uuid.uuid4()
-				self.change_password(account, user, ori_password,)
+
+				(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+				fn=self.__get_container_metadata, account=account, container=user_container,\
+				admin_user=admin_user, admin_password=admin_password)
+
+				if val == False:
+					black_list.append("Failed to get the original password of %s: %s"\
+					% (user, msg))
+					continue
+				elif msg["User-Enable"] == False:
+					new_password = ori_password
+					user_metadata["Password"] = msg["Password"]
+				else:
+					new_password = msg["Password"]
+
+				change_password_output = self.change_password(account, user,\
+				ori_password, new_password)
+
+			if change_password_output.val == False:
+				black_list.append("Failed to change the password of %s: %s"\
+				% (user, change_password_output.msg))
+				continue
+
+			if user == admin_user:
+				admin_password = new_password
+
+			(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+			fn=self.__set_container_metadata, account=account, container=user_container,\
+			admin_user=admin_user, admin_password=admin_password,\
+			metadata_content=user_metadata)
+
+			if val == False:
+				black_list.append("Failed to update the metadta of %s: %s" % (user, msg))
+
+		if len(black_list) != 0:
+			val = False
+			msg = black_list
+		else:
+			val = True
+			msg = ""
 
 		return Bool(val, msg)
-	
+
 	def disable_account(self, account, retry=3):
 		'''
 		Disable the account by changing the passwords of all users from original
@@ -739,9 +796,6 @@ class SwiftAccountMgr:
 		for user in user_list:
 			# TODO: use thread pool to speed up
 			user_container = "" # to be defined
-			user_metadata = {
-				"Account-Enable": False
-			}
 
 			get_user_password_output = self.get_user_password(account, user)
 			if get_user_password_output.val == False or get_user_password_output.msg == "":
@@ -761,6 +815,12 @@ class SwiftAccountMgr:
 
 			if user == admin_user:
 				admin_password = new_password
+
+			# BUG: check whether User-Enable is False
+			user_metadata = {
+				"Account-Enable": False,
+				"Password": ori_password
+			}
 
 			(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
 			fn=self.__set_container_metadata, account=account, container=user_container,\
@@ -911,15 +971,27 @@ class SwiftAccountMgr:
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__change_password,\
 		account=account, user=user, newPassword=newPassword, admin=admin, reseller=reseller)
 
-		# TODO: update the metadata
-		'''
 		if val == False:
 			return Bool(val, msg)
 
+		admin_user = "" # to be defined
+		admin_password = ""
+		user_container = "" # to be defined
+		container_metadata = {
+			"Password": newPassword
+		}
+
+		get_admin_password_output = self.get_user_password(account, admin_user)
+		if get_admin_password_output.val == False or get_admin_password_output.msg == "":
+			val = False
+			msg = "Failed to get the password of the admin user: %s" % admin_user
+			return Bool(val, msg)
+		else:
+			admin_password = get_admin_password_output.msg
+
 		(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
-		fn=self.__set_container_metadata, account=account, container=container,\
-		admin_user=admin_user,admin_password=admin_password, metadata_content=container_metadata)
-		'''
+		fn=self.__set_container_metadata, account=account, container=user_container,\
+		admin_user=admin_user, admin_password=admin_password, metadata_content=container_metadata)
 
 		return Bool(val, msg)
 
@@ -2446,8 +2518,15 @@ class SwiftAccountMgr:
 
 		for line in lines:
 			if "Meta" in line:
-				metadata_content[line.split()[1][:-1]] = line.split()[2]
 				val = True
+				if line.split()[2] == "True":
+					metadata_content[line.split()[1][:-1]] = True
+
+				elif line.split()[2] == "False":
+					metadata_content[line.split()[1][:-1]] = False
+				else:
+					metadata_content[line.split()[1][:-1]] = line.split()[2]
+
 		msg = metadata_content
 		logger.info(msg)
 

@@ -300,14 +300,18 @@ tr{
 		width: 803px;
 
 		button{
-			width: 87px;
-			height: 40px;
+			width: 100px;
+			height: 56px;
 			border: none;
 			background-color: transparent;
-			margin-top: 12px;
+			margin-top: 3px;
 			margin-right: 10px;
 			float: right;
-			background-image: url("/@{dashboard-image-path}/snapshot_control.png");
+			background-image: url("/@{dashboard-image-path}/snapshot_confirm_control.png");
+		}
+
+		#do-action{
+			background-image: url("/@{dashboard-image-path}/snapshot_confirm_control_light.png");
 		}
 }
 
@@ -616,6 +620,14 @@ tr{
 
 	input[type="checkbox"]:checked + .toggle-btn{
 		background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
+	}
+}
+
+.data-stored{
+	position: relative;
+	p{
+		margin-left: 20px;
+		font-size: 16px;
 	}
 }
 

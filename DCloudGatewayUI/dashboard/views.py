@@ -329,6 +329,19 @@ def sync(request):
     return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
         hours, 'weeks_data': weeks_data})
 
+@login_required
+def schedule(request):
+    if request.method == "POST":
+        print "hi"
+    return render(request, 'dashboard/snapshot.html')
+
+
+@login_required
+def lifecycle(request):
+    if request.method == "POST":
+        print "hi"
+    return render(request, 'dashboard/snapshot.html')
+
 
 @login_required
 def syslog(request):
