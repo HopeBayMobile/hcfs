@@ -184,7 +184,7 @@ def get_gw_indicator():
 def main():
     """
     Main entry point.
-    It will be looped infinitely unless the global flag is set to false.
+    It will be looped infinitely unless the global flag is set to true.
     
     """
     
