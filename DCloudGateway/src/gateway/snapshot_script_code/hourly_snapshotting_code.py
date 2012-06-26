@@ -1,3 +1,9 @@
+"""
+This script is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This script initiates scheduled snapshotting.
+"""
 import os.path
 import common
 import subprocess
@@ -18,7 +24,9 @@ class SnapshotError(Exception):
 
 
 def check_snapshot_schedule():
-
+    """
+    Check the current snapshot schedule.
+    """
     log.info('Loading snapshot schedule')
 
     snapshot_time = -1
@@ -38,7 +46,9 @@ def check_snapshot_schedule():
 
 
 def take_scheduled_snapshot():
-
+    """
+    Call snapshotting bot to take scheduled snapshots.
+    """
     try:
         if not os.path.exists(snapshot_tag):
             try:

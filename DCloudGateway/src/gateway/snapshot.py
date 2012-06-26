@@ -19,9 +19,10 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 
 smb_conf_file = "/etc/samba/smb.conf"
 org_smb_conf = "/etc/delta/smb.orig"
-tmp_smb_conf = "/root/.s3ql/.smb.conf.tmp"
-tmp_smb_conf1 = "/root/.s3ql/.smb.conf.tmp1"
-tmp_smb_conf2 = "/root/.s3ql/.smb.conf.tmp2"
+tmp_smb_dir = "/root/.s3ql/.tmpsmb"
+tmp_smb_conf = "/root/.s3ql/.tmpsmb/.smb.conf.tmp"
+tmp_smb_conf1 = "/root/.s3ql/.tmpsmb/.smb.conf.tmp1"
+tmp_smb_conf2 = "/root/.s3ql/.tmpsmb/.smb.conf.tmp2"
 lifespan_conf = "/etc/delta/snapshot_lifespan"
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
@@ -364,6 +365,10 @@ def _append_samba_entry(entry):
         if os.path.exists(tmp_smb_conf1):
             os.system('sudo rm -rf %s' % tmp_smb_conf1)
         snapshot_share_path = os.path.join(snapshot_dir, entry['name'])
+
+        os.system('sudo touch %s' % tmp_smb_conf1)
+        os.system('sudo chown www-data:www-data %s' % tmp_smb_conf1)
+
         with open(tmp_smb_conf1, 'w') as fh:
             fh.write('[%s]\n' % entry['name'])
             fh.write('comment = Samba Share for snapshot %s\n' % entry['name'])
@@ -394,6 +399,10 @@ def _write_snapshot_db(snapshot_list):
     try:
         if os.path.exists(temp_snapshot_db):
             os.system('sudo rm -rf %s' % temp_snapshot_db)
+
+        # Since the API is run from www-data account, we need to chown
+        os.system('sudo touch %s' % temp_snapshot_db)
+        os.system('sudo chown www-data:www-data %s' % temp_snapshot_db)
 
         with open(temp_snapshot_db, 'w') as fh:
             for entry in snapshot_list:
@@ -431,6 +440,10 @@ def expose_snapshot(to_expose):
     try:
         if not os.path.exists(org_smb_conf):
             os.system('sudo cp %s %s' % (smb_conf_file, org_smb_conf))
+
+        if not os.path.exists(tmp_smb_dir):
+            os.system('sudo mkdir %s' % tmp_smb_dir)
+            os.system('sudo chown www-data:www-data %s' % tmp_smb_dir)
 
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
@@ -640,4 +653,5 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
+    print delete_snapshot('snapshot_2012_6_25_17_46_24')
     pass

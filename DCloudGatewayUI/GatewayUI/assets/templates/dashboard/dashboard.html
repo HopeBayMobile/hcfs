@@ -8,15 +8,20 @@
 			})
 		});
 
-		function update_cache(){
-	        $.get('/dashboard/cache_usage/', function(ctnt, stat, opts){
+		function update_dashboard(){
+	        $.get('/dashboard/data_update/', function(ctnt, stat, opts){
 	            var data = JSON.parse(ctnt);
-	            for (key in data){
-	            	$('#'+key).find('span').text(data[key])
+
+	            if (data["version_upgrade"]){
+	            	$(".control .upgrade").show();
 	            }
-	            used_cache_percentage = Math.round(data['used_cache_size'] * 100 / data['max_cache_size']);
+	            var cache_data = data["gateway_cache_usage"]
+	            for (key in cache_data){
+	            	$('#'+key).find('span').text(cache_data[key])
+	            }
+	            used_cache_percentage = Math.round(cache_data['used_cache_size'] * 100 / cache_data['max_cache_size']);
 	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%");
-				dirty_cache_percentage = Math.round(data['dirty_cache_size'] * 100 / data['max_cache_size']);
+				dirty_cache_percentage = Math.round(cache_data['dirty_cache_size'] * 100 / cache_data['max_cache_size']);
 				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%");
 	        });
 	    }
@@ -29,7 +34,7 @@
 	    		console.log(ctnt);
     		});
 	    })
-	    setInterval(update_cache, 10000);
+	    setInterval(update_dashboard, 10000);
 	});
 </script>
 {% endblock javascript %}
@@ -51,7 +56,7 @@
 	</div>
 	<div class="control">
 		<div class="header">System Control
-			<div class="upgrade {% if not available_version %}hide{% endif %}">New<br>Version</div>
+			<div class="upgrade hide">New<br>Version</div>
 		</div>
         <ul>
             <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>
