@@ -1,11 +1,12 @@
-apt-get install python-setuptools python-software-properties curl portmap nfs-kernel-server samba
-apt-get install python-profiler
+apt-get install -y python-setuptools python-software-properties curl portmap nfs-kernel-server samba
+apt-get install -y python-profiler
 add-apt-repository ppa:swift-core/release
 apt-get update
-apt-get install swift
-apt-get install apt-show-versions
+apt-get install -y swift
+apt-get install -y apt-show-versions
 
 python ./src/http_proxy/install_proxy.py
+
 sudo dpkg -i ./sudo_1.8.5-2_amd64.deb
 
 python setup.py install

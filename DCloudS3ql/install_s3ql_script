@@ -1,4 +1,9 @@
-python setup.py build_cython
-python setup.py build
-python setup.py install
+./install_dep_script
+
+# install s3ql package
+dpkg -i debsrc/s3ql_1.12.0~natty1_amd64.deb
+
+# python setup.py build_cython
+# python setup.py build
+# python setup.py install
 
