@@ -2,7 +2,7 @@
 {% block javascript %}
     <script type="text/javascript">
 
-        toogle_progress = (function(target){
+        var toggle_progress_light = (function(target){
             var toogle_indicator = 1;
             function return_func(){
                 var num = toogle_indicator % 2 + 1;
@@ -14,58 +14,79 @@
 
         $(function(){
 
+            var animate_time = 750;
 
-            function toggle_selector(){
-                var actived = $(".menu-button.select.active")
-                if (!actived.length){
-                    $("#bottom-popup").animate({"height": "0px"}, 1000);
-                    $(".bottom-popup-spacer").hide();
-                } else {
-                    $("#bottom-popup").animate({"height": "63px"}, 1000);
+            setInterval(toggle_progress_light, 500);
+
+            function update_list(){
+                $.get("/dashboard/snapshot", function(data){
+                    $("#snapshot-list tbody").html(data);
+                    if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
+                        $("#create").removeClass("disabled")
+                    }
+                });
+            }
+
+            var $toogle_target;
+            function toggle_selector(update_delay){
+                if ($toogle_target.hasClass("active")){
+                    $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
+                } else {
+                    $("#bottom-popup").animate({"height": "0px"}, animate_time);
+                    $(".bottom-popup-spacer").hide();
                 }
-                $("#snapshot-list tr > :nth-child(1)").fadeToggle(1000);
+                var target_col = $("#" + $toogle_target.text().toLowerCase() + "_chk");
+                var chk_box_index = $("th").index(target_col) + 1;
+                $("#snapshot-list tr > :nth-child(" + chk_box_index + ")").fadeToggle(animate_time);
+                if(update_delay){
+                    setTimeout(update_list, update_delay);
+                }
             }
 
             $("body").on("click", ".menu-button.select:not(.disabled)", function(){
-                $("#bottom-popup #do-action").text($(this).text());
-                $(this).toggleClass("active")
-                $(".menu-button").not($(this)).toggleClass("disabled")
+                var $me;
+                $me = $toogle_target = $(this)
+                $("#bottom-popup #do-action").text($me.text());
+                $me.toggleClass("active");
+                $(".menu-button").not($me).toggleClass("disabled");
                 toggle_selector();
             });
-            setInterval(toogle_progress, 500);
 
             $("body").on("click", "#create:not(.disabled)", function(){
+                $(this).addClass("disabled");
                 $.post('/dashboard/snapshot/create', function(ctnt){
                     // Show alert message if necessary
                 }).error(function(obj, stat, msg){
                     $("#create-popup").text(obj.responseText).fadeIn(500).delay(2000).fadeOut(500);
                 }).complete(function(){
-                    $.get("/dashboard/snapshot", function(data){
-                        $("#snapshot-list tbody").html(data);
-                    });
+                    update_list();
                 });
             });
 
-            $("body").on("click", "#select-cancel", function(){
+            $("#bottom-popup #select-cancel").on("click", function(){
                 $(".menu-button").removeClass("active disabled")
-                toggle_selector()
+                toggle_selector(animate_time);
             });
 
             function get_snapshots(){
                 var snapshots = [];
                 $.each($(":checked"), function(idx, item){
-                    snapshots.push(this.value)
+                    snapshots.push(this.value);
                 });
                 return snapshots;
             }
 
             $("#bottom-popup #do-action").on("click", function(){
+                $(".menu-button").removeClass("active disabled")
                 $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
                        {"snapshots": get_snapshots()},
                        function(ctnt, success, opts){
                            console.log(ctnt);
-                       });
+                       }
+                ).complete(function(){
+                    toggle_selector(animate_time);
+                });
             });
 
         });
@@ -86,7 +107,8 @@
                 <table id="snapshot-list" class="table table-striped table-bordered table-condensed">
                     <thead>
                       <tr>
-                        <th class="span1 hide">#</th>
+                        <th id="delete_chk" class="span1 hide">#</th>
+                        <th id="export_chk" class="span1 hide">#</th>
                         <th class="span2">Snapshot ID</th>
                         <th class="span1">Usage</th>
                         <th class="span2">Time</th>

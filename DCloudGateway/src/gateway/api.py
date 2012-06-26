@@ -1557,7 +1557,7 @@ def get_network():
     """
     
     log.info("get_network start")
-    log.info("[2] Gateway networking starting")
+    #log.info("[2] Gateway networking starting")
 
     info_path = "/etc/delta/network.info"
     return_val = {}
@@ -1603,7 +1603,7 @@ def get_network():
         }
     
         log.info("get_network end")
-        log.info("[2] Gateway networking started")
+        #log.info("[2] Gateway networking started")
         return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -1631,6 +1631,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     """
     
     log.info("apply_network start")
+    log.info("[2] Gateway networking starting")
 
     ini_path = "/etc/delta/Gateway.ini"
     op_ok = False
@@ -1689,9 +1690,10 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
             if os.system("sudo /etc/init.d/networking restart") == 0:
                 op_ok = True
                 op_msg = "Succeeded to apply the network configuration."
+                log.info("[2] Gateway networking started")
             else:
                 op_ok = False
-                log.error("Failed to restart the network.")
+                log.info("[0] Gateway networking starting error")
         else:
             op_ok = False
             log.error(op_msg)
@@ -2486,7 +2488,7 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-
+    #print log
     for category in sorted(keyword_filter.keys()):
 
         for keyword in keyword_filter[category]:
@@ -2572,6 +2574,8 @@ def parse_log (type, log_cnt):
     msg = m.group('message')
     #print msg
 
+    if msg == None: # skip empty log
+        return None
     #now = datetime.datetime.utcnow()
 
     try:
@@ -2586,7 +2590,12 @@ def parse_log (type, log_cnt):
     #print timestamp
     #print "msg = "
     #print msg
-    log_entry["category"] = classify_logs(msg, KEYWORD_FILTER)
+    
+    category = classify_logs(msg, KEYWORD_FILTER)
+    if category == None: # skip invalid log
+        return None
+    
+    log_entry["category"] = category
     log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
     log_entry["msg"] = msg[LOG_LEVEL_PREFIX_LEN:]
     return log_entry
@@ -2638,7 +2647,7 @@ def read_logs(logfiles_dict, offset, num_lines):
                 nums = num_lines
 
             for log in log_buf[ offset : offset + nums]:
-                print log
+                #print log
                 log_entry = parse_log(type, log)
                 if not log_entry == None: #ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
@@ -3079,5 +3088,5 @@ if __name__ == '__main__':
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
     #print get_gateway_indicators()
-    _check_nfs_service()
+    #_check_nfs_service()
     pass
