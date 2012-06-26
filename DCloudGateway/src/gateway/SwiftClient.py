@@ -50,12 +50,13 @@ class SwiftClient():
             command = 'stat'
         cmd = ''.join(['sudo swift -A https://', self._url, '/auth/v1.0 -U ',
                        self._login, ' -K ', self._password, ' ', command])
-        #print "swift command is"
-        #print cmd
+        print "swift command is"
+        print cmd
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT)
         (stdout, stderr) = po.communicate()
         po.wait()
+        print [po.returncode, stdout, stderr]
         return [po.returncode, stdout, stderr]
 
     def upload(self, container, file):
@@ -69,15 +70,41 @@ class SwiftClient():
         try:
             returnData = self.executeCommand('upload %s %s'
                                              % (container, file))
-            if returnData[0] == 0:
+            if returnData[1].strip() == file[1:]:
                 return True
             else:
-                log.error('swift upload fail: %s' % returnData[2])
-                raise SwiftUploadError('swift upload fail error message: %s'
-                                       % returnData[2])
+                log.error('[0] swift upload fail: %s' % returnData[1])
+                raise SwiftUploadError('swift upload fail - error message: %s'
+                                       % returnData[1])
         except SwiftUploadError:
             raise
-        except Exception:
+        except Exception as e:
+            print e
+            log.error('[0] exception message: %s' % str(e))
+            raise SwiftCommandError()
+
+    def delete(self, container, file):
+        """
+        swift delete function
+        @type container: string
+        @param container: you want to delete in which container
+        @type file: string
+        @param file: the file name in swift
+        """
+        try:
+            returnData = self.executeCommand('delete %s %s'
+                                             % (container, file))
+            if returnData[1].strip() == file:
+                return True
+            else:
+                log.error('[0] swift delete fail: %s' % returnData[1])
+                raise SwiftDeleteError('swift delete fail - error message: %s'
+                                       % returnData[1])
+        except SwiftDeleteError:
+            raise
+        except Exception as e:
+            print e
+            log.error('[0] exception message: %s' % str(e))
             raise SwiftCommandError()
 
 

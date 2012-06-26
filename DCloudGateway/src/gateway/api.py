@@ -395,7 +395,7 @@ def _check_http_proxy_service():
     """
     
     op_proxy_check = False
-    log.info("[2] _check_http_proxy start")
+    #log.info("[2] _check_http_proxy start")
 
     try:
         cmd ="sudo ps aux | grep squid3"
@@ -411,7 +411,7 @@ def _check_http_proxy_service():
     except:
         pass
 
-    log.info("[2] _check_http_proxy end")
+    #log.info("[2] _check_http_proxy end")
     return op_proxy_check
     
     

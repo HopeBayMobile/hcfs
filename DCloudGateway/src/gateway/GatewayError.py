@@ -71,7 +71,7 @@ class SwiftCommandError(BackupError):
 
 class SwiftUploadError(BackupError):
     """
-    This class raise swift upload config file fail
+    This class raise swift upload file fail
     """
     def __init__(self, msg=None):
         """
@@ -81,6 +81,17 @@ class SwiftUploadError(BackupError):
         self.msg = msg
         super(SwiftUploadError, self).__init__(self.code, self.msg)
 
+class SwiftDeleteError(BackupError):
+    """
+    This class raise swift delete file fail
+    """
+    def __init__(self, msg=None):
+        """
+        The error code of SwiftDeleteError is '005'
+        """
+        self.code = '005'
+        self.msg = msg
+        super(SwiftDeleteError, self).__init__(self.code, self.msg)
 
 class ErrorCode():
     """
@@ -91,6 +102,7 @@ class ErrorCode():
         '002': 'create metadata file is fail!',
         '003': 'swift command is fail!',
         '004': 'swift upload container is fail!',
+        '005': 'swift delete container is fail!',
     }
 
 
