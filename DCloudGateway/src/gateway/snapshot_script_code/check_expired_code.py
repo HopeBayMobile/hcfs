@@ -202,12 +202,10 @@ def _write_snapshot_lifespan(days_to_live):
 
 def _get_snapshot_lifespan():
     """
-    Helper function for setting the lifespan of snapshots.
+    Helper function for getting the lifespan of snapshots.
 
-    @type days_to_live: Number
-    @param days_to_live: The lifespan of a snapshot, measured in days.
-    @rtype:    Json object
-    @return:   A json object with function result and returned message.
+    @rtype:    Number
+    @return:   Lifespan of snapshots (in days).
     """
     days_to_live = 365
     reset_config = False
