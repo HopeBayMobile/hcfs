@@ -356,6 +356,14 @@ def execute_take_snapshot():
                     return
             else:
                 # Record statistics for samba share
+
+                if not os.path.exists(snapshot_statistics):
+                    # Statistics does not exists
+                    log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                    invalidate_entry()  # Cannot finish the snapshot for some reason
+                    os.system('sudo rm -rf %s' % snapshot_tag)
+                    return
+
                 with open(snapshot_statistics, 'r') as fh:
                     for lines in fh:
                         if lines.find("total files") != -1:
@@ -384,6 +392,14 @@ def execute_take_snapshot():
                         return
                 else:
                     # Record statistics for NFS share
+
+                    if not os.path.exists(snapshot_statistics):
+                        # Statistics does not exists
+                        log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                        invalidate_entry()  # Cannot finish the snapshot for some reason
+                        os.system('sudo rm -rf %s' % snapshot_tag)
+                        return
+
                     with open(snapshot_statistics, 'r') as fh:
                         for lines in fh:
                             if lines.find("total files") != -1:

@@ -100,40 +100,37 @@
     </head>
 
     <body>
-    <div  class="site-container">
-        <table>
-        <tr class="site-header">
-            <td>
-                <div class="logo-box">
+    <div class="site-container">
+
+        <div class="site-header">
+            <div class="logo-box">
+            </div>
+            <div class="notify-box-group">
+                <div class="notify-box-row-NW">
+                    <div id="snapshot_in_progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
+                    </div>
+                    <div id="system_check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
+                    </div>
+                    <div id="network_ok" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
+                    </div>
+                    <div id="flush_inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
+                    </div>
+                    <div id="dirtycache_nearfull" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    </div>
                 </div>
-                <div class="notify-box-group">
-                    <div class="notify-box-row-NW">
-                        <div id="snapshot_in_progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
-                        </div>
-                        <div id="system_check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
-                        </div>
-                        <div id="network_ok" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
-                        </div>
-                        <div id="flush_inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
-                        </div>
-                        <div id="dirtycache_nearfull" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
-                        </div>
-                    </div>
-                    <div class="notify-box-row-NE">
-                        {{ user.username }}<a href="/logout"><img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a></p>
-                    </div>
-                    <div class="notify-box-row-SE">
-                        <p id="basic-bandwidth">
-                            Download / Upload:<br>
-                            <span class="down">{{ result_data.downlink_usage }}</span> / <span class="up">{{ result_data.uplink_usage }}</span>
-                            (KB/Sec)
-                        </p>
-                    </div>
-                </div><!-- / -->
-            </td>
-        </tr>
-        <tr class="site-body">
-        <td>
+                <div class="notify-box-row-NE">
+                    {{ user.username }}<a href="/logout"><img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a></p>
+                </div>
+                <div class="notify-box-row-SE">
+                    <p id="basic-bandwidth">
+                        Download / Upload:<br>
+                        <span class="down">{{ result_data.downlink_usage }}</span> / <span class="up">{{ result_data.uplink_usage }}</span>
+                        (KB/Sec)
+                    </p>
+                </div>
+            </div><!-- / -->
+        </div>
+
         <div class="left-row left-bg">
             <div>
                 <ul class="tab-btn" id="site-tab">
@@ -149,6 +146,7 @@
                 </ul>
             </div>
         </div>
+
         <div id="errormsgbox"></div>
         <div class="main-row main-bg">
             <div class="main-content">
@@ -156,10 +154,7 @@
                 {% block tab_content %}
                 {% endblock tab_content %}
             </div>
-
         </div>
-        </td>
-        </tr>
-        </table> <!-- site-body --></div>
+
     </body>
 </html>
