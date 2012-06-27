@@ -36,7 +36,7 @@
 	    		action = "on"
 	    	}
 	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
-	    		console.log(ctnt);
+	    		console.log(action);
     		});
 	    })
 	    setInterval(update_dashboard, 10000);
@@ -63,7 +63,7 @@
 			<div class="upgrade hide">New<br>Version</div>
 		</div>
         <ul>
-            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>
+            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
         </ul>
 	</div>
 	<p style="clear:both;"></p>

@@ -495,10 +495,7 @@ def http_proxy_switch(request, action=None):
 def system_upgrade(request):
     if request.is_ajax():
         result = api_remote_upgrade.upgrade_gateway()
-        info = json.loads(result)
-        title = 'Upgrade error.'
-        message = 'Please check ' + str(info['msg']) + ' and try again.'
-        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
+        return HttpResponse(result)
     else:
         title = 'The system is being upgraded.'
         message = 'Please wait for a while...'

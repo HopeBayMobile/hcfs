@@ -2,6 +2,7 @@
 
 # install s3ql package
 dpkg -i debsrc/s3ql_1.12.0~natty1_amd64.deb
+cp -rs /usr/bin/*s3ql* /usr/local/bin/
 
 # python setup.py build_cython
 # python setup.py build
