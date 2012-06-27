@@ -22,10 +22,8 @@
             setInterval(toggle_progress_light, 500);
 
             function update_list(){
-                console.log(1)
                 if (can_update){
                     in_update = true
-                    console.log(in_update)
                     $.get("/dashboard/snapshot", function(data){
                         $("#snapshot-list tbody").html(data);
                         if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
@@ -35,7 +33,6 @@
                         }
                     }).complete(function(){
                         in_update = false;
-                        console.log(in_update)
                     });
                 }
             }
@@ -48,7 +45,6 @@
                 }
                 if ($toogle_target.hasClass("active")){
                     $("#create").addClass("disabled");
-                    $(".menu-button.select").not($me).toggleClass("disabled");
                     $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
                 } else {
@@ -71,6 +67,8 @@
                 var $me;
                 $me = $toogle_target = $(this)
                 $("#bottom-popup #do-action").text($me.text());
+                $(".menu-button.select").not($me).toggleClass("disabled");
+                $("#create").addClass("disabled");
                 $me.toggleClass("active");
                 toggle_selector();
             });
@@ -129,7 +127,7 @@
                 );
             });
 
-            setInterval(update_list, 600);
+            setInterval(update_list, 1000);
 
         });
     </script>
