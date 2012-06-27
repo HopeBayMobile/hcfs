@@ -53,6 +53,10 @@
                             var indic;
                             var data = JSON.parse(ctnt);
                             for (indic in data){
+                                if (indic == "HTTP_proxy_srv"){
+                                    $("#http_proxy").attr("checked", data[indic])
+                                    continue;
+                                }
                                 setIndicator(indic, data[indic]);
                             }
                         }
@@ -65,7 +69,7 @@
                         }
                     });
                 }
-                setInterval(update_indicator, 3000);
+                setInterval(update_indicator, 1000);
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active')
@@ -93,6 +97,8 @@
                     var msgs = JSON.parse(ctnt)
                     $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content')
                 });
+
+                $(".notify-box-row-NW > div").tooltip();
             });
         </script>
         {% block javascript %}
@@ -107,15 +113,15 @@
             </div>
             <div class="notify-box-group">
                 <div class="notify-box-row-NW">
-                    <div id="snapshot_in_progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
+                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot Inprogress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
                     </div>
-                    <div id="system_check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
+                    <div id="system_check" rel="tooltip" title="System Check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                     </div>
-                    <div id="network_ok" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
+                    <div id="network_ok" rel="tooltip" title="Network" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
                     </div>
-                    <div id="flush_inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
+                    <div id="flush_inprogress" rel="tooltip" title="Flush Inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
                     </div>
-                    <div id="dirtycache_nearfull" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    <div id="dirtycache_nearfull" rel="tooltip" title="Dirty Cache Near Full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
                     </div>
                 </div>
                 <div class="notify-box-row-NE">
@@ -158,21 +164,20 @@
         <div id="delta-popup">
             <script type="text/javascript">
                 $(function(){
-                    $("#delta-popup").on("click", ".button.cancel", function(){
+                    $("#delta-popup").on("click", ".confirm .button.cancel", function(){
                         $("#delta-popup").fadeOut(1000, function(){
+                            $("#delta-popup .popup-box").hide()
                             $("#errormsgbox").show();
                         });
                     });
-                    $("#delta-popup").on("click", ".button.ok", function(){
-                        $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-                            console.log(ctnt);
-                        });
+                    $("#delta-popup").on("click", ".confirm .button.ok", function(){
+                    	window.location.assign("{% url dashboard:system_upgrade %}");
                     });
                 });
             </script>
             <div class="popup-mask">
             </div>
-            <div class="popup-box">
+            <div class="popup-box confirm">
                 <p class="warning-h1">Notice</p>
                 <p class="warning-h2">The system upgrade will execute.</p>
                 <p class="warning-msg">The system will reboot when the update is complete. Please make sure that all your files are saved before the action execute.</p>
@@ -180,6 +185,33 @@
                     <div class="button cancel">
                         Cancel
                     </div>
+                    <div class="button ok">
+                        OK
+                    </div>
+                </div>
+            </div>
+
+            <div class="popup-box notify">
+                <script type="text/javascript">
+                    $(function(){
+                        $("#delta-popup").on("click", ".notify .button.ok", function(){
+                            if ($("#check-display input").is(":checked")){
+                                $.setCookie('snapshot_create_checkbox', "yes", 365)
+                            }
+                            $("#delta-popup").fadeOut(1000, function(){
+                                $("#delta-popup .popup-box").hide()
+                                $("#errormsgbox").show();
+                            });
+                        });
+                    });
+                </script>
+                <p class="warning-h1">Notice</p>
+                <p class="warning-h2">Snapshoting is starting...</p>
+                <p class="warning-msg">Snapshoting will complete after all files are stored to the cloud.</p>
+                <p id="check-display">
+                    <input type="checkbox" name="display" value=""> Don't show it again.
+                </p>
+                <div class="action-wrap">
                     <div class="button ok">
                         OK
                     </div>

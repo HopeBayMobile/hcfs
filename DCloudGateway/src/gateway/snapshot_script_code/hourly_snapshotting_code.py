@@ -15,7 +15,6 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 
 snapshot_tag = "/root/.s3ql/.snapshotting"
 snapshot_bot = "/etc/delta/snapshot_bot"
-snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
 snapshot_schedule = "/etc/delta/snapshot_schedule"
 
 

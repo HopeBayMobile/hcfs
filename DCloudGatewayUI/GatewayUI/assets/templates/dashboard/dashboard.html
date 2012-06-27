@@ -4,6 +4,7 @@
 	$(function(){
 		$(".control .upgrade").on("click", function(){
 			$("#errormsgbox").hide()
+			$("#delta-popup .popup-box.confirm").show()
 			$("#delta-popup").fadeIn(1000)
 		});
 
@@ -35,10 +36,11 @@
 	    		action = "on"
 	    	}
 	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
-	    		console.log(ctnt);
+	    		console.log(action);
     		});
 	    })
 	    setInterval(update_dashboard, 10000);
+	    $(".system-pane > .status div[rel=tooltip]").tooltip({"placement": "bottom"});
 	});
 </script>
 {% endblock javascript %}
@@ -48,14 +50,12 @@
 	<div class="status">
 		<div class="header">System Status</div>
 		<ul>
-			<li><div id="HDD_ok" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
+			<li><div id="HDD_ok" rel="tooltip" title="HDD" class="notify-box img-indicator {% if result_data.HDD_ok %}work{% endif %}">
 	    		</div><span>HDD</span></li>
-			<li><div id="NFS_srv" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">
+			<li><div id="NFS_srv" rel="tooltip" title="NFS Service" class="notify-box img-indicator {% if result_data.NFS_srv %}work{% endif %}">
 			    </div><span>NFS</span></li>
-			<li><div id="SMB_srv" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">
+			<li><div id="SMB_srv" rel="tooltip" title="SMB Service" class="notify-box img-indicator {% if result_data.SMB_srv %}work{% endif %}">
 			    </div><span>SMB</span></li>
-			<li><div id="HTTP_proxy_srv" class="notify-box img-indicator {% if result_data.HTTP_proxy_srv %}work{% endif %}">
-			    </div><span>HTTP Proxy</span></li>
 		</ul>
 	</div>
 	<div class="control">
@@ -63,14 +63,14 @@
 			<div class="upgrade hide">New<br>Version</div>
 		</div>
         <ul>
-            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>Http Proxy</span></li>
+            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
         </ul>
 	</div>
 	<p style="clear:both;"></p>
 </div>
 <div class="data-stored">
-	<p id="cloud_data">Total amount of data stored: <span>{{ cloud_storage_usage.cloud_data }}</span></p>
-	<p id="cloud_data_dedup_compress">Actual amount of data stored: <span>{{ cloud_storage_usage.cloud_data_dedup_compress }}</span></p>
+	<p id="cloud_data">Total amount of data stored: <span>{{ cloud_storage_usage.cloud_data }}</span> GB</p>
+	<p id="cloud_data_dedup_compress">Actual amount of data stored: <span>{{ cloud_storage_usage.cloud_data_dedup_compress }}</span> GB</p>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
