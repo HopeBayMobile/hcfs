@@ -70,7 +70,9 @@ class SwiftClient():
         try:
             returnData = self.executeCommand('upload %s %s'
                                              % (container, file))
-            if returnData[1].strip() == file[1:]:
+            if file[0] == '/':
+                file = file[1:]
+            if returnData[1].strip() == file:
                 return True
             else:
                 log.error('[0] swift upload fail: %s' % returnData[1])
@@ -92,6 +94,8 @@ class SwiftClient():
         @param file: the file name in swift
         """
         try:
+            if file[0] == '/':
+                file = file[1:]
             returnData = self.executeCommand('delete %s %s'
                                              % (container, file))
             if returnData[1].strip() == file:

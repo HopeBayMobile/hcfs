@@ -116,14 +116,19 @@ def save_gateway_configuration():
     try:
         swiftObj = SwiftClient(swiftData[0], swiftData[1], swiftData[2])
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
-        backupToCloudObj.backup()
+        backuptime = backupToCloudObj.backup()
+        backuptime = "%s/%s/%s %s:%s" % (backuptime[0:4], backuptime[4:6],
+                                          backuptime[6:8], backuptime[8:10],
+                                          backuptime[10:12])
         return_val = {'result'  : True,
                       'code'    : '100',
+                      'data'    : {'backup_time': backuptime},
                       'msg'     : 'config backup success'}
         return json.dumps(return_val)
     except BackupError as e:
         return_val = {'result'  : False,
                       'code'    : e.code,
+                      'data'    : None,
                       'msg'     : e.msg}
         return json.dumps(return_val)
     except Exception as e:
