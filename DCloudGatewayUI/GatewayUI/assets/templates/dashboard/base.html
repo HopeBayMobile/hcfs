@@ -164,13 +164,13 @@
         <div id="delta-popup">
             <script type="text/javascript">
                 $(function(){
-                    $("#delta-popup").on("click", ".button.cancel", function(){
+                    $("#delta-popup").on("click", ".confirm .button.cancel", function(){
                         $("#delta-popup").fadeOut(1000, function(){
-                            $("#delta-popup").hide()
+                            $("#delta-popup .popup-box").hide()
                             $("#errormsgbox").show();
                         });
                     });
-                    $("#delta-popup").on("click", ".button.ok", function(){
+                    $("#delta-popup").on("click", ".confirm .button.ok", function(){
                         $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
                             console.log(ctnt);
                         });
@@ -193,15 +193,26 @@
                 </div>
             </div>
 
-
             <div class="popup-box notify">
+                <script type="text/javascript">
+                    $(function(){
+                        $("#delta-popup").on("click", ".notify .button.ok", function(){
+                            if ($("#check-display input").is(":checked")){
+                                $.setCookie('snapshot_create_checkbox', "yes", 365)
+                            }
+                            $("#delta-popup").fadeOut(1000, function(){
+                                $("#delta-popup .popup-box").hide()
+                                $("#errormsgbox").show();
+                            });
+                        });
+                    });
+                </script>
                 <p class="warning-h1">Notice</p>
                 <p class="warning-h2">Snapshoting is starting...</p>
                 <p class="warning-msg">Snapshoting will complete after all files are stored to the cloud.</p>
                 <p id="check-display">
                     <input type="checkbox" name="display" value=""> Don't show it again.
                 </p>
-
                 <div class="action-wrap">
                     <div class="button ok">
                         OK

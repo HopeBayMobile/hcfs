@@ -12,6 +12,8 @@
             return return_func
         })("#progress-light");
 
+        var update_schedule;
+
         $(function(){
 
             var animate_time = 750;
@@ -23,6 +25,8 @@
                     $("#snapshot-list tbody").html(data);
                     if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
                         $("#create").removeClass("disabled")
+                    } else {
+                        $("#create").addClass("disabled")
                     }
                 });
             }
@@ -30,9 +34,11 @@
             var $toogle_target;
             function toggle_selector(update_delay){
                 if ($toogle_target.hasClass("active")){
+                    clearInterval(update_schedule);
                     $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
                 } else {
+                    update_schedule = setInterval(update_list, 1000);
                     $("#bottom-popup").animate({"height": "0px"}, animate_time);
                     $(".bottom-popup-spacer").hide();
                 }
@@ -56,11 +62,15 @@
             $("body").on("click", "#create:not(.disabled)", function(){
                 $(this).addClass("disabled");
                 $.post('/dashboard/snapshot/create', function(ctnt){
-                    // Show alert message if necessary
+                    if (!$.getCookie("snapshot_create_checkbox")){
+                        $("#errormsgbox").hide()
+                        $("#delta-popup .popup-box.notify").show()
+                        $("#delta-popup").fadeIn(1000)
+                    }
                 }).error(function(obj, stat, msg){
                     $("#create-popup").text(obj.responseText).fadeIn(500).delay(2000).fadeOut(500);
                 }).complete(function(){
-                    update_list();
+                    setTimeout(update_list, 500);
                 });
             });
 
@@ -88,6 +98,8 @@
                     toggle_selector(animate_time);
                 });
             });
+
+            update_schedule = setInterval(update_list, 1000);
 
         });
     </script>
