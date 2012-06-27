@@ -54,7 +54,7 @@ class Snapshot_Db_Lock():
             finish = False
             while not finish:
                 if os.path.exists(snapshot_db_lock):
-                    time.sleep(10)
+                    time.sleep(0.5)
                 else:
                     os.system('sudo touch %s' % snapshot_db_lock)
                     finish = True
