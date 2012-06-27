@@ -136,7 +136,7 @@ def apply_scheduling_rules( policies ):
 
         for entry in policies:
             print('received values: day %d, start %d, stop %d, bandwidth limit %d' %
-                  (entry['day'], entry['start'], entry['stop'], entry['uplink_bw_limit']))
+                  (entry[0], entry[1], entry[2], entry[3]))
 	
 	return_val = {
 		'result': True,

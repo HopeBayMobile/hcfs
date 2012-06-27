@@ -285,6 +285,7 @@ def sync(request):
                     array = [day, interval_from, interval_to, bandwidth]
                 data[now] = array
 
+
         api.apply_scheduling_rules(data)
 
     hours = range(0, 24)
@@ -421,8 +422,8 @@ def snapshot(request, action=None):
             snapshots = return_val.get('data').get('snapshots')
             snapshots = sorted(snapshots, key=lambda x: x["start_time"], reverse=True)
         for snapshot in snapshots:
-            snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
-            snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
+            snapshot['start_time'] = datetime.datetime(*time.localtime(snapshot['start_time'])[0:6])
+            snapshot['finish_time'] = datetime.datetime(*time.localtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
             snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name'] if snapshot['exposed'] else ""
@@ -460,14 +461,14 @@ def http_proxy_switch(request, action=None):
 
 
 @login_required
-@require_POST
 def system_upgrade(request):
-    try:
-        api_remote_upgrade.upgrade_gateway()
-        return HttpResponse("Upgrade Success.")
-    except:
-        return HttpResponse("Upgrade Failed.")
-
+    if request.is_ajax():
+        result = api_remote_upgrade.upgrade_gateway()
+        return HttpResponse(result)
+    else:
+        title = 'The system is being upgraded.'
+        message = 'Please wait for a while...'
+        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
 
 @login_required
 def power(request, action=None):

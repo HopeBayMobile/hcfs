@@ -54,7 +54,7 @@
                             var data = JSON.parse(ctnt);
                             for (indic in data){
                                 if (indic == "HTTP_proxy_srv"){
-                                    $("#http_proxy").attr("checked", data)
+                                    $("#http_proxy").attr("checked", data[indic])
                                     continue;
                                 }
                                 setIndicator(indic, data[indic]);
@@ -171,9 +171,7 @@
                         });
                     });
                     $("#delta-popup").on("click", ".confirm .button.ok", function(){
-                        $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-                            console.log(ctnt);
-                        });
+                    	window.location.assign("{% url dashboard:system_upgrade %}");
                     });
                 });
             </script>
