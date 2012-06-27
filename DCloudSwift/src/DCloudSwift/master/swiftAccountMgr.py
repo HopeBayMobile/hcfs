@@ -797,6 +797,17 @@ class SwiftAccountMgr:
 			# TODO: use thread pool to speed up
 			user_container = "" # to be defined
 
+			(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+			fn=self.__get_container_metadata, account=account, container=user_container,\
+			admin_user=admin_user, admin_password=admin_password)
+
+			if val == False:
+				black_list.append("Failed to get the metadata of %s: %s"\
+				% (user, msg))
+				continue
+			else:
+				ori_user_metadata = msg
+
 			get_user_password_output = self.get_user_password(account, user)
 			if get_user_password_output.val == False or get_user_password_output.msg == "":
 				black_list.append("Failed to get the password of %s: %s"\
@@ -817,10 +828,16 @@ class SwiftAccountMgr:
 				admin_password = new_password
 
 			# BUG: check whether User-Enable is False
-			user_metadata = {
-				"Account-Enable": False,
-				"Password": ori_password
-			}
+			if ori_user_metadata["User-Enable"] == False:
+				user_metadata = {
+					"Account-Enable": False,
+					"Password": ori_user_metadata["Password"]
+				}
+			else:
+				user_metadata = {
+					"Account-Enable": False,
+					"Password": ori_password
+				}
 
 			(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
 			fn=self.__set_container_metadata, account=account, container=user_container,\

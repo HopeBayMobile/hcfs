@@ -190,7 +190,7 @@ def get_snapshot_schedule():
     If the value of the snapshot schedule is -1, the snapshot scheduling
     is disabled.
 
-    If there is no I{snapshot_schedule} file, the value -1 is returned
+    If there is no I{snapshot_schedule} file, the value 1 is returned
     as the snapshot schedule and this value is also written as the current
     schedule.
 
@@ -201,7 +201,7 @@ def get_snapshot_schedule():
     log.info('Started get_snapshot_schedule')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_schedule'
-    snapshot_time = -1
+    snapshot_time = 1
 
     try:
         if not os.path.exists(snapshot_schedule):

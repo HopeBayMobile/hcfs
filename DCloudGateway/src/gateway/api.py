@@ -342,7 +342,7 @@ def get_gateway_indicators():
     
     """
 
-    log.info("get_gateway_indicators start")
+    #log.info("get_gateway_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
@@ -369,7 +369,7 @@ def get_gateway_indicators():
         if os.path.exists(indic_file):
             # read indicator file as result
             # deserialize json object from file
-            log.info('%s is existed. Try to get indicator from it' % indic_file)
+            #log.info('%s is existed. Try to get indicator from it' % indic_file)
             with open(indic_file) as fh:
                 return json.dumps(json.load(fh))
         else:
@@ -378,11 +378,10 @@ def get_gateway_indicators():
             return_val = get_indicators()
             
     except Exception as Err:
-        log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
         return json.dumps(return_val)
 
-    log.info("get_gateway_indicators end")
+    #log.info("get_gateway_indicators end")
     return json.dumps(return_val)
 
 def _check_http_proxy_service():
@@ -395,7 +394,7 @@ def _check_http_proxy_service():
     """
     
     op_proxy_check = False
-    log.info("[2] _check_http_proxy start")
+    #log.info("[2] _check_http_proxy start")
 
     try:
         cmd ="sudo ps aux | grep squid3"
@@ -411,7 +410,7 @@ def _check_http_proxy_service():
     except:
         pass
 
-    log.info("[2] _check_http_proxy end")
+    #log.info("[2] _check_http_proxy end")
     return op_proxy_check
     
     
@@ -603,7 +602,9 @@ def _check_nfs_service():
     """
     
     op_NFS_srv = True
-    log.info("_check_nfs_service start")
+    #log.error("error_check_nfs_service start")
+    #log.warning("warning_check_nfs_service start")
+    #log.info("info_check_nfs_service start")
 
     try:
         cmd ="sudo service nfs-kernel-server status"
@@ -2903,12 +2904,12 @@ def get_network_speed(iface_name): # iface_name = eth1
     try:
         if os.path.exists(netspeed_file):
             # read net speed from file
-            log.info('Read net speed from file')
+            #log.info('Read net speed from file')
             with open(netspeed_file, 'r') as fh:
                 ret_val = json.load(fh)
         else:
             # call functions directly. will consume at least one second
-            log.info('No net speed file existed. Consume one second to calculate')
+            #log.info('No net speed file existed. Consume one second to calculate')
             ret_val = calculate_net_speed(iface_name)
 
     except:
@@ -3088,5 +3089,5 @@ if __name__ == '__main__':
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
     #print get_gateway_indicators()
-    #_check_nfs_service()
+    _check_nfs_service()
     pass

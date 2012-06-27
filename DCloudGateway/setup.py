@@ -68,6 +68,7 @@ def main():
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)
+        os.system("cp -rs /usr/bin/*s3ql* /usr/local/bin")
 
 if __name__ == '__main__':
     main()

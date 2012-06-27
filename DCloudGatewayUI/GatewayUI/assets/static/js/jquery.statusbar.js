@@ -18,7 +18,7 @@
 	function createBar() //creates the html for the bar
 	{
 		//create the bar
-		var statusbar = $("<div style=\"z-index: 2;position:relative; width:100%\" class=\"ui-widget statusbar-wrapper\"><div style=\"overflow:auto;\" class=\"ui-widget-content statusbar-content\"></div><div class=\"ui-widget-header statusbar-header\">Error Message<div class=\"toggle-btn\"></div></div></div>");
+		var statusbar = $("<div style=\"z-index: 1; position: absolute; width: 100%; height: 0;\"><div style=\"overflow:auto;\" class=\"statusbar-content\"></div><div class=\"ui-widget-header statusbar-header\">Error Message<div class=\"toggle-btn\"></div></div></div>");
 		$('#errormsgbox').prepend(statusbar);
 		// $('html').css("margin-top","26px");
 		$('.statusbar-content').hide();
