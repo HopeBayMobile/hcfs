@@ -5,9 +5,12 @@ apt-get update
 apt-get install -y swift
 apt-get install -y apt-show-versions
 
-python ./src/http_proxy/install_proxy.py
-
 sudo dpkg -i ./sudo_1.8.5-2_amd64.deb
 
-python setup.py install
+# install squid3 proxy
+cd ./src/http_proxy/
+python install_proxy.py
+cd ..
+cd ..
 
+python setup.py install
