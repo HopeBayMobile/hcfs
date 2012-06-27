@@ -157,6 +157,15 @@ class SwiftAccountMgr:
 		msg = ""
 		val = False
 		Bool = collections.namedtuple("Bool", "val msg")
+		admin_user = "admin"
+		admin_password = self.get_user_password(account, admin_user).msg
+		container = "ctn_" + user
+		metadata_content = {
+				"Account-Enable": True,
+				"User-Enable": True,
+				"Password": password,
+				"Quota": 0
+			}
 		
 		if proxy_ip_list is None or len(proxy_ip_list) ==0:
 			msg = "No proxy node is found"
@@ -187,14 +196,24 @@ class SwiftAccountMgr:
 		try:
 			if val == False:
 				self.__accountDb.delete_user(account=account, name=user)
-#			else:
-#				#Todo: crate container
-#				admin_user = self.__add_account.admin_user
-#				admin_password = self.get_user_password(account, admin_user)
-#				container = "ctn_" + user
-#				
-#				(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container, 
-#												account=account, admin_user=admin_user, admin_password=admin_password, container=container)
+			else:
+				#Todo: crate container
+				(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container, 
+												account=account, admin_user=admin_user, admin_password=admin_password, container=container)
+				#Todo: set metadata of container
+				if val == False:
+					msg = "Failed to create container"
+					return Bool(val, msg)
+				else:
+					(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata, 
+												account=account, admin_user=admin_user, admin_password=admin_password, container=container, metadata_content=metadata_content)
+					if val == False:
+						msg = "Failed to set metadata of container %s" %container
+					else:
+						print self.assign_read_acl(account=account, container=container, user=user, admin_user=admin_user).msg
+						print self.assign_write_acl(account=account, container=container, user=user, admin_user=admin_user).msg
+
+
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
 			errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
@@ -298,7 +317,6 @@ class SwiftAccountMgr:
 				self.__accountDb.delete_user(account=account, name=admin_user)
 			else:
 				#Todo: crate container
-				print "creating container..."				
 				(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container, 
 												account=account, admin_user=admin_user, admin_password=admin_password, container=container)
 				#Todo: set metadata of container
@@ -306,11 +324,8 @@ class SwiftAccountMgr:
 					msg = "Failed to create container"
 					return Bool(val, msg)
 				else:
-					print "setting container metadata..."
 					(val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata, 
 												account=account, admin_user=admin_user, admin_password=admin_password, container=container, metadata_content=metadata_content)
-					print val
-					print msg
 
 		except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
 			errMsg = "Failed to clean user %s:%s from database for %s"%(account, admin_user, str(e))
@@ -2727,8 +2742,8 @@ if __name__ == '__main__':
 	SA = SwiftAccountMgr()
 
 	print SA.list_account().msg
-	print SA.add_account("ricetest08").msg
-	print SA.list_account().msg
+	print SA.list_user("ricetest08").msg
+	print SA.add_user("ricetest08", "test01", "test01").msg
 	print SA.list_user("ricetest08").msg
 
 #	print SA.__create_container("192.168.11.10", "account", admin_user, admin_password, container)
