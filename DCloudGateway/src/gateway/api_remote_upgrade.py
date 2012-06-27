@@ -71,7 +71,7 @@ def get_available_upgrade():
         000:    Fail.
     """
     try:
-        os.system("apt-get update")     # update package info.
+        os.system("sudo apt-get update")     # update package info.
         cmd = "apt-show-versions -u s3ql"
         # ToDo: change to "DeltaGateway" package.
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
@@ -125,7 +125,7 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
-            cmd = "apt-get install -y --force-yes s3ql 2> /tmp/log.txt"
+            cmd = "sudo apt-get install -y --force-yes s3ql 2> /tmp/log.txt"
             # ToDo: change to "DeltaGateway" package.
             a = os.system(cmd)
             # ^^^ upgrade gateway
