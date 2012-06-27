@@ -106,12 +106,28 @@
 {% endblock javascript %}
 {% block tab_content %}
     <ul class="nav nav-tabs">
-        <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
-        <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
-        <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% if tab == "snapshot" %}
+            <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
+        {% else %}
+            <li class=""><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
+        {% endif %}
+        {% if tab == "schedule" %}
+            <li class="active"><a href="#schedule" data-toggle="tab">Schedule</a></li>
+        {% else %}
+            <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
+        {% endif %}
+        {% if tab == "lifecycle" %}
+            <li class="active"><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% else %}
+            <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% endif %}
     </ul>
     <div class="tab-content">
-        <div class="tab-pane active" id="snapshot" style="">
+        {% if tab == "snapshot" %}
+            <div class="tab-pane active" id="snapshot" style="">
+        {% else %}
+            <div class="tab-pane" id="snapshot" style="">
+        {% endif %}
             <div id="create-popup" class="hide"></div>
             <button id="create" class="menu-button ">Create</button>
             <button class="menu-button select">Delete</button>
@@ -198,7 +214,11 @@
                 font-size: 23px;
             }
         </style>
-        <div class="tab-pane" id="schedule">
+        {% if tab == "schedule" %}
+            <div class="tab-pane active" id="schedule">
+        {% else %}
+            <div class="tab-pane" id="schedule">
+        {% endif %}
             <form action="/dashboard/snapshot/schedule" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
@@ -239,7 +259,11 @@
             </div>
             </form>
         </div>
-        <div class="tab-pane" id="lifecycle">
+        {% if tab == "lifecycle" %}
+            <div class="tab-pane active" id="lifecycle">
+        {% else %}
+            <div class="tab-pane" id="lifecycle">
+        {% endif %}
             <form action="/dashboard/snapshot/lifecycle" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
