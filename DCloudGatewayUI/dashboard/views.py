@@ -339,8 +339,13 @@ def schedule(request):
 
     if request.method == "POST":
         query = request.POST
-        day = query['select-day']
-        day = int(day)
+        schedule_radio = query['schedule_radio']
+        print schedule_radio
+        if schedule_radio == "1":
+            day = -1
+        else:
+            day = query['select-day']
+            day = int(day)
         return_value = json.loads(api_snapshot.set_snapshot_schedule(day))
         return return_value
 
