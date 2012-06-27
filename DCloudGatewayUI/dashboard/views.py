@@ -354,7 +354,7 @@ def schedule(request):
 def lifecycle(request):
     load_data = json.loads(api_snapshot.get_snapshot_lifespan())
     data = load_data['data']
-    default_day = data['months_to_live']
+    default_day = data['days_to_live']
     print default_day
 
     if request.method == "POST":
@@ -435,7 +435,7 @@ def snapshot(request, action=None):
                 the_day[i] = i
             load_data = json.loads(api_snapshot.get_snapshot_lifespan())
             data = load_data['data']
-            default_day = data['months_to_live']
+            default_day = data['days_to_live']
             load_data = json.loads(api_snapshot.get_snapshot_schedule())
             data = load_data['data']
             snapshot_time = data['snapshot_time']
