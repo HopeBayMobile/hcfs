@@ -1,6 +1,6 @@
 {% for snapshot in snapshots %}
 <tr>
-    <td class="hide">{% if snapshot.in_progress %}{% else %}<input type="checkbox" value="{{ snapshot.name }}">{% endif %}</td>
+    <td class="hide">{% if snapshot.in_progress or snapshot.exposed %}{% else %}<input type="checkbox" value="{{ snapshot.name }}">{% endif %}</td>
     <td class="hide">{% if snapshot.in_progress %}{% else %}<input type="checkbox" value="{{ snapshot.name }}" {% if snapshot.exposed %}checked{% endif %}>{% endif %}</td>
     <td>{{ snapshot.name }}</td>
     <td>{{ snapshot.total_size}}GB({{snapshot.num_files}})</td>
