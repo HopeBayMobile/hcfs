@@ -12,9 +12,6 @@
             return return_func
         })("#progress-light");
 
-        var update_schedule;
-        var update_interval = 600;
-
         $(function(){
 
             var animate_time = 750;
@@ -45,14 +42,21 @@
 
             var $toogle_target;
             function toggle_selector(update_delay){
+                if (in_update){
+                    setTimeout(function(){toggle_selector(update_delay)}, 100);
+                    return;
+                }
                 if ($toogle_target.hasClass("active")){
+                    $("#create").addClass("disabled");
+                    $(".menu-button.select").not($me).toggleClass("disabled");
                     $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
                 } else {
                     $("#bottom-popup").animate({"height": "0px"}, animate_time, function(){
-                        update_schedule = setInterval(update_list, update_interval);
                     });
                     $(".bottom-popup-spacer").hide();
+
+                can_update = true;
                 }
                 var target_col = $("#" + $toogle_target.text().toLowerCase() + "_chk");
                 var chk_box_index = $("th").index(target_col) + 1;
@@ -63,17 +67,12 @@
             }
 
             $("body").on("click", ".menu-button.select:not(.disabled):not(.active)", function(){
-                while(in_update){}
                 can_update = false
                 var $me;
                 $me = $toogle_target = $(this)
                 $("#bottom-popup #do-action").text($me.text());
-                clearInterval(update_schedule);
                 $me.toggleClass("active");
-                $("#create").addClass("disabled");
-                $(".menu-button.select").not($me).toggleClass("disabled");
                 toggle_selector();
-                can_update = true;
             });
 
             $("body").on("click", "#create:not(.disabled)", function(){
@@ -130,7 +129,7 @@
                 );
             });
 
-            update_schedule = setInterval(update_list, update_interval);
+            setInterval(update_list, 600);
 
         });
     </script>
