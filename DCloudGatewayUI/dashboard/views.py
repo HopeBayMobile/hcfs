@@ -285,6 +285,7 @@ def sync(request):
                     array = [day, interval_from, interval_to, bandwidth]
                 data[now] = array
 
+
         api.apply_scheduling_rules(data)
 
     hours = range(0, 24)

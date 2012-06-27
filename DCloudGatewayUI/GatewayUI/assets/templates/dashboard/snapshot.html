@@ -144,25 +144,26 @@
                 background-position: left 0px;
             }
             .schedule_sub_div {
-                height: 71px;
+                height: 50px;
                 margin-left: 40px;
                 margin-top: 15px;
                 font-size: 23px;
             }
             .schedule_sub_font_div {
-                text-indent: 15px;
-                padding-top: 25px;
+                padding-top: 3px;
+                text-indent: 10px;
             }
             .radio_button_div {
-                margin-right: 20px;
+                float: left;
+                margin-right: 5px;
             }
             .search_div {
-                margin-top: 10px;
-                text-indent: 120px;
+                margin-top: 5px;
+                text-indent: 68px;
                 font-size: 23px;
             }
             .search_option_div {
-                text-indent: 120px;
+                text-indent: 68px;
                 margin-top: 20px;
                 font-size: 23px;
             }
@@ -190,8 +191,7 @@
             {% csrf_token %}
             <div class="schedule_sub_div">
                 <div class="radio_button_div">
-                    <!--<a href="#" class="schedule_button">button</a>-->
-                    <input type="radio" name="schedule_radio" value="1" class="schedule_button">
+                    <input type="radio" name="schedule_radio" value="1">
                 </div>
                 <div style="width: 10px;"></div>
                 <div class="schedule_sub_font_div">
@@ -199,8 +199,9 @@
                 </div>
             </div>
             <div class="schedule_sub_div">
-                <!--<a href="#" class="schedule_button">button</a>-->
-                <input type="radio" name="schedule_radio" value="2" class="schedule_button">
+                <div class="radio_button_div">
+                    <input type="radio" name="schedule_radio" value="2">
+                </div>
                 <div class="schedule_sub_font_div">
                     Snapshot by schedule
                 </div>
