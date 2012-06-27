@@ -81,9 +81,9 @@ def delete_snapshot(to_delete):
     return json.dumps(return_val)
 
 
-def set_snapshot_lifespan(months_to_live):
+def set_snapshot_lifespan(days_to_live):
 
-    print('Lifespan of a snapshot is set to %d months' % months_to_live)
+    print('Lifespan of a snapshot is set to %d days' % days_to_live)
 
     return_val = {'result': True,
                   'msg': 'Finished setting lifespan of snapshots.',
@@ -95,5 +95,5 @@ def get_snapshot_lifespan():
 
     return_val = {'result': True,
                   'msg': 'Finished setting lifespan of snapshots.',
-                  'data': {'months_to_live': 12}}
+                  'data': {'days_to_live': 365}}
     return json.dumps(return_val)

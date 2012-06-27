@@ -1,14 +1,13 @@
+"""
+This script is part of Delta Cloud Storage Gateway API functions
+Developed by CTBU, Delta Electronics Inc., 2012
+
+This script checks for unfinished snapshotting at system start
+and initiate continuation of the process if one exits.
+"""
 import os.path
-import sys
-import csv
-import json
-import os
-import ConfigParser
 import common
 import subprocess
-import time
-import errno
-import re
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
@@ -24,7 +23,11 @@ class SnapshotError(Exception):
 
 
 def continue_snapshot_in_progress():
+    """
+    Continue a in-progress snapshotting at system startup.
 
+    Function also cleans-up database lock file.
+    """
     if os.path.exists(snapshot_db_lock):
         os.system('sudo rm -rf %s' % snapshot_db_lock)
 

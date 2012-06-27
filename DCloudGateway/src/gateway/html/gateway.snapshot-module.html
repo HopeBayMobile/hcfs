@@ -1,0 +1,1107 @@
+<?xml version="1.0" encoding="ascii"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>gateway.snapshot</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+  <script type="text/javascript" src="epydoc.js"></script>
+</head>
+
+<body bgcolor="white" text="black" link="blue" vlink="#204080"
+      alink="#204080">
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="gateway-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+      <th class="navbar" width="100%"></th>
+  </tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr valign="top">
+    <td width="100%">
+      <span class="breadcrumbs">
+        <a href="gateway-module.html">Package&nbsp;gateway</a> ::
+        Module&nbsp;snapshot
+      </span>
+    </td>
+    <td>
+      <table cellpadding="0" cellspacing="0">
+        <!-- hide/show private -->
+        <tr><td align="right"><span class="options">[<a href="javascript:void(0);" class="privatelink"
+    onclick="toggle_private();">hide&nbsp;private</a>]</span></td></tr>
+        <tr><td align="right"><span class="options"
+            >[<a href="frames.html" target="_top">frames</a
+            >]&nbsp;|&nbsp;<a href="gateway.snapshot-module.html"
+            target="_top">no&nbsp;frames</a>]</span></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ==================== MODULE DESCRIPTION ==================== -->
+<h1 class="epydoc">Module snapshot</h1><p class="nomargin-top"><span class="codelink"><a href="gateway.snapshot-pysrc.html">source&nbsp;code</a></span></p>
+<p>This function is part of Delta Cloud Storage Gateway API functions 
+  Developed by CTBU, Delta Electronics Inc., 2012</p>
+  <p>This source code implements the API functions for the snapshotting 
+  features of Delta Cloud Storage Gateway.</p>
+
+<!-- ==================== CLASSES ==================== -->
+<a name="section-Classes"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Classes</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Classes"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="gateway.snapshot.SnapshotError-class.html" class="summary-name">SnapshotError</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="gateway.snapshot.Snapshot_Db_Lock-class.html" class="summary-name">Snapshot_Db_Lock</a><br />
+      Class for handling acquiring/releasing lock for snapshotting 
+        database.
+    </td>
+  </tr>
+</table>
+<!-- ==================== FUNCTIONS ==================== -->
+<a name="section-Functions"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Functions</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Functions"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Boolean value</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_check_snapshot_in_progress" class="summary-sig-name" onclick="show_private();">_check_snapshot_in_progress</a>()</span><br />
+      Checks if there is a snapshotting process in progress.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_check_snapshot_in_progress">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">N/A</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_initialize_snapshot" class="summary-sig-name" onclick="show_private();">_initialize_snapshot</a>()</span><br />
+      Starts snapshotting bot (which actually handles the snapshotting).</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_initialize_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#take_snapshot" class="summary-sig-name">take_snapshot</a>()</span><br />
+      API function for taking snapshots manually.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#take_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#set_snapshot_schedule" class="summary-sig-name">set_snapshot_schedule</a>(<span class="summary-sig-arg">snapshot_time</span>)</span><br />
+      API function for setting the snapshot schedule.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#set_snapshot_schedule">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#get_snapshot_schedule" class="summary-sig-name">get_snapshot_schedule</a>()</span><br />
+      API function for getting the snapshot schedule.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_schedule">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Array of strings</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_acquire_db_list" class="summary-sig-name" onclick="show_private();">_acquire_db_list</a>()</span><br />
+      Helper function for reading snapshot database without parsing 
+      database entries.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_acquire_db_list">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Array of python dictionaries</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_translate_db" class="summary-sig-name" onclick="show_private();">_translate_db</a>(<span class="summary-sig-arg">db_list</span>)</span><br />
+      Helper function for parsing database entries into array of python 
+      dictionaries for snapshot entries.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_translate_db">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#get_snapshot_list" class="summary-sig-name">get_snapshot_list</a>()</span><br />
+      API function for reading the snapshot database.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_list">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#get_snapshot_in_progress" class="summary-sig-name">get_snapshot_in_progress</a>()</span><br />
+      API function for probing if there is a snapshot in progress.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_in_progress">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">N/A</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_append_samba_entry" class="summary-sig-name" onclick="show_private();">_append_samba_entry</a>(<span class="summary-sig-arg">entry</span>)</span><br />
+      Append new entry to a list of new exposed samba shared folders.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_append_samba_entry">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">N/A</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_write_snapshot_db" class="summary-sig-name" onclick="show_private();">_write_snapshot_db</a>(<span class="summary-sig-arg">snapshot_list</span>)</span><br />
+      Write updated snapshot database entries to the database file.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_write_snapshot_db">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#expose_snapshot" class="summary-sig-name">expose_snapshot</a>(<span class="summary-sig-arg">to_expose</span>)</span><br />
+      API function for exposing snapshot entries as samba shares.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#expose_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Number</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_search_index" class="summary-sig-name" onclick="show_private();">_search_index</a>(<span class="summary-sig-arg">snapshot_name</span>,
+        <span class="summary-sig-arg">snapshot_list</span>)</span><br />
+      Helper function for finding the index of a snapshot name in the 
+      database.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_search_index">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#delete_snapshot" class="summary-sig-name">delete_snapshot</a>(<span class="summary-sig-arg">to_delete</span>)</span><br />
+      API function for deleting a snapshot entry.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#delete_snapshot">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr class="private">
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">N/A</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#_write_snapshot_lifespan" class="summary-sig-name" onclick="show_private();">_write_snapshot_lifespan</a>(<span class="summary-sig-arg">days_to_live</span>)</span><br />
+      Helper function for actually writing lifespan config to file</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#_write_snapshot_lifespan">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#set_snapshot_lifespan" class="summary-sig-name">set_snapshot_lifespan</a>(<span class="summary-sig-arg">days_to_live</span>)</span><br />
+      API function for setting the lifespan of snapshots.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#set_snapshot_lifespan">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">Json object</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gateway.snapshot-module.html#get_snapshot_lifespan" class="summary-sig-name">get_snapshot_lifespan</a>()</span><br />
+      API function for getting the lifespan of snapshots.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_lifespan">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
+<!-- ==================== VARIABLES ==================== -->
+<a name="section-Variables"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Variables</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Variables"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="gateway.snapshot-module.html#log" class="summary-name">log</a> = <code title="common.getLogger(name= &quot;API&quot;, conf= &quot;/etc/delta/Gateway.ini&quot;)">common.getLogger(name= &quot;API&quot;, conf= &quot;/etc/delta/Gateway.<code class="variable-ellipsis">...</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="gateway.snapshot-module.html#DIR" class="summary-name">DIR</a> = <code title="'/home/nii/DCloudGateway-git/StorageAppliance/DCloudGateway/src/gatewa\
+y'"><code class="variable-quote">'</code><code class="variable-string">/home/nii/DCloudGateway-git/StorageAppliance/DCloudGate</code><code class="variable-ellipsis">...</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="smb_conf_file"></a><span class="summary-name">smb_conf_file</span> = <code title="'/etc/samba/smb.conf'"><code class="variable-quote">'</code><code class="variable-string">/etc/samba/smb.conf</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="org_smb_conf"></a><span class="summary-name">org_smb_conf</span> = <code title="'/etc/delta/smb.orig'"><code class="variable-quote">'</code><code class="variable-string">/etc/delta/smb.orig</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="tmp_smb_conf"></a><span class="summary-name">tmp_smb_conf</span> = <code title="'/root/.s3ql/.smb.conf.tmp'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.smb.conf.tmp</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="tmp_smb_conf1"></a><span class="summary-name">tmp_smb_conf1</span> = <code title="'/root/.s3ql/.smb.conf.tmp1'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.smb.conf.tmp1</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="tmp_smb_conf2"></a><span class="summary-name">tmp_smb_conf2</span> = <code title="'/root/.s3ql/.smb.conf.tmp2'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.smb.conf.tmp2</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="lifespan_conf"></a><span class="summary-name">lifespan_conf</span> = <code title="'/etc/delta/snapshot_lifespan'"><code class="variable-quote">'</code><code class="variable-string">/etc/delta/snapshot_lifespan</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_tag"></a><span class="summary-name">snapshot_tag</span> = <code title="'/root/.s3ql/.snapshotting'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.snapshotting</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_bot"></a><span class="summary-name">snapshot_bot</span> = <code title="'/etc/delta/snapshot_bot'"><code class="variable-quote">'</code><code class="variable-string">/etc/delta/snapshot_bot</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_schedule"></a><span class="summary-name">snapshot_schedule</span> = <code title="'/etc/delta/snapshot_schedule'"><code class="variable-quote">'</code><code class="variable-string">/etc/delta/snapshot_schedule</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_db"></a><span class="summary-name">snapshot_db</span> = <code title="'/root/.s3ql/snapshot_db.txt'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/snapshot_db.txt</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_db_lock"></a><span class="summary-name">snapshot_db_lock</span> = <code title="'/root/.s3ql/.snapshot_db_lock'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.snapshot_db_lock</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="snapshot_dir"></a><span class="summary-name">snapshot_dir</span> = <code title="'/mnt/cloudgwfiles/snapshots'"><code class="variable-quote">'</code><code class="variable-string">/mnt/cloudgwfiles/snapshots</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="temp_snapshot_db"></a><span class="summary-name">temp_snapshot_db</span> = <code title="'/root/.s3ql/.tempsnapshotdb'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.tempsnapshotdb</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="temp_snapshot_db1"></a><span class="summary-name">temp_snapshot_db1</span> = <code title="'/root/.s3ql/.tempsnapshotdb1'"><code class="variable-quote">'</code><code class="variable-string">/root/.s3ql/.tempsnapshotdb1</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="'gateway'"><code class="variable-quote">'</code><code class="variable-string">gateway</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+</table>
+<!-- ==================== FUNCTION DETAILS ==================== -->
+<a name="section-FunctionDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Function Details</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-FunctionDetails"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+</table>
+<a name="_check_snapshot_in_progress"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_check_snapshot_in_progress</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_check_snapshot_in_progress">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Checks if there is a snapshotting process in progress. A tag file 
+  (defined by <i>snapshot_tag</i>) indicates the existance of such a 
+  process.</p>
+  <dl class="fields">
+    <dt>Returns: Boolean value</dt>
+        <dd>Whether the tag for snapshotting process exists</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_initialize_snapshot"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_initialize_snapshot</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_initialize_snapshot">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Starts snapshotting bot (which actually handles the snapshotting).</p>
+  <dl class="fields">
+    <dt>Returns: N/A</dt>
+        <dd>None</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="take_snapshot"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">take_snapshot</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#take_snapshot">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for taking snapshots manually.</p>
+  <dl class="fields">
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result and returned message.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="set_snapshot_schedule"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">set_snapshot_schedule</span>(<span class="sig-arg">snapshot_time</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#set_snapshot_schedule">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for setting the snapshot schedule.</p>
+  <p>If the input parameter is equal to -1, the snapshot scheduling is 
+  disabled.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>snapshot_time</code></strong> (Integer (from -1 to 23)) - Time in a day for taking snapshots</li>
+    </ul></dd>
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result and returned message.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="get_snapshot_schedule"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">get_snapshot_schedule</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_schedule">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for getting the snapshot schedule.</p>
+  <p>If the value of the snapshot schedule is -1, the snapshot scheduling 
+  is disabled.</p>
+  <p>If there is no <i>snapshot_schedule</i> file, the value -1 is returned
+  as the snapshot schedule and this value is also written as the current 
+  schedule.</p>
+  <dl class="fields">
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result, returned message, and the 
+          current snapshot schedule.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_acquire_db_list"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_acquire_db_list</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_acquire_db_list">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Helper function for reading snapshot database without parsing database
+  entries.</p>
+  <dl class="fields">
+    <dt>Returns: Array of strings</dt>
+        <dd>Lines in the snapshot database (as array of strings).</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_translate_db"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_translate_db</span>(<span class="sig-arg">db_list</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_translate_db">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Helper function for parsing database entries into array of python 
+  dictionaries for snapshot entries.</p>
+  <p>Variables in each database entry:</p>
+  <ol start="1">
+    <li>
+      &quot;name&quot;: Name of the snapshot.
+    </li>
+    <li>
+      &quot;start_time&quot;: When the snapshot request is started.
+    </li>
+    <li>
+      &quot;finish_time&quot;: When the snapshot request is completed.
+    </li>
+    <li>
+      &quot;num_files&quot;: Total number of files included in this 
+      snapshot.
+    </li>
+    <li>
+      &quot;total_size&quot;: Total data size include in this snapshot.
+    </li>
+    <li>
+      &quot;exposed&quot;: Whether this snapshot is exposed as a samba 
+      share.
+    </li>
+  </ol>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>db_list</code></strong> (Array of strings) - Lines in the snapshot database (as array of strings).</li>
+    </ul></dd>
+    <dt>Returns: Array of python dictionaries</dt>
+        <dd>Entries in the snapshot database.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="get_snapshot_list"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">get_snapshot_list</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_list">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for reading the snapshot database.</p>
+  <dl class="fields">
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result, returned message, and the 
+          current snapshot database entries.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="get_snapshot_in_progress"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">get_snapshot_in_progress</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_in_progress">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for probing if there is a snapshot in progress.</p>
+  <p>The function checks for the existance of the snapshot tag file.</p>
+  <p>Returned value <i>in_progress</i> is the empty string &quot;&quot; if 
+  there is no snapshot process in progress.</p>
+  <dl class="fields">
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result, returned message, and the 
+          current snapshot in progress (if any).</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_append_samba_entry"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_append_samba_entry</span>(<span class="sig-arg">entry</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_append_samba_entry">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Append new entry to a list of new exposed samba shared folders.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>entry</code></strong> (Snapshot database entry) - New snapshot database entry to be exposed.</li>
+    </ul></dd>
+    <dt>Returns: N/A</dt>
+        <dd>None</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_write_snapshot_db"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_write_snapshot_db</span>(<span class="sig-arg">snapshot_list</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_write_snapshot_db">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Write updated snapshot database entries to the database file.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>snapshot_list</code></strong> (Array of snapshot database entries) - Array of updated snapshot database entries</li>
+    </ul></dd>
+    <dt>Returns: N/A</dt>
+        <dd>None</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="expose_snapshot"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">expose_snapshot</span>(<span class="sig-arg">to_expose</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#expose_snapshot">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for exposing snapshot entries as samba shares.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>to_expose</code></strong> (Array of strings) - List of snapshot names to be exposed as samba shares.</li>
+    </ul></dd>
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result and returned message.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_search_index"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_search_index</span>(<span class="sig-arg">snapshot_name</span>,
+        <span class="sig-arg">snapshot_list</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_search_index">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Helper function for finding the index of a snapshot name in the 
+  database.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>snapshot_name</code></strong> (String) - Name of the snapshot that is being queried.</li>
+        <li><strong class="pname"><code>snapshot_list</code></strong> (Array of snapshot database entries) - Array of the current snapshot database entries</li>
+    </ul></dd>
+    <dt>Returns: Number</dt>
+        <dd>The index of the queried snapshot in the database (-1 if not 
+          found).</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="delete_snapshot"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">delete_snapshot</span>(<span class="sig-arg">to_delete</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#delete_snapshot">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for deleting a snapshot entry.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>to_delete</code></strong> (String) - Snapshot name to be deleted.</li>
+    </ul></dd>
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result and returned message.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="_write_snapshot_lifespan"></a>
+<div class="private">
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">_write_snapshot_lifespan</span>(<span class="sig-arg">days_to_live</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#_write_snapshot_lifespan">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Helper function for actually writing lifespan config to file</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>days_to_live</code></strong> (Number) - The lifespan of a snapshot, measured in days.</li>
+    </ul></dd>
+    <dt>Returns: N/A</dt>
+        <dd>None</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="set_snapshot_lifespan"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">set_snapshot_lifespan</span>(<span class="sig-arg">days_to_live</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#set_snapshot_lifespan">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for setting the lifespan of snapshots.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>days_to_live</code></strong> (Number) - The lifespan of a snapshot, measured in days.</li>
+    </ul></dd>
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result and returned message.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="get_snapshot_lifespan"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">get_snapshot_lifespan</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gateway.snapshot-pysrc.html#get_snapshot_lifespan">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>API function for getting the lifespan of snapshots.</p>
+  <p>If the lifespan config does not exists, the default value (365 days) 
+  is returned and also written to the config file.</p>
+  <dl class="fields">
+    <dt>Returns: Json object</dt>
+        <dd>A json object with function result ,returned message, and the 
+          current lifespan (in days) of the snapshots.</dd>
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== VARIABLES DETAILS ==================== -->
+<a name="section-VariablesDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Variables Details</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-VariablesDetails"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+</table>
+<a name="log"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">log</h3>
+  
+  <dl class="fields">
+  </dl>
+  <dl class="fields">
+    <dt>Value:</dt>
+      <dd><table><tr><td><pre class="variable">
+common.getLogger(name= &quot;API&quot;, conf= &quot;/etc/delta/Gateway.ini&quot;)
+</pre></td></tr></table>
+</dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="DIR"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">DIR</h3>
+  
+  <dl class="fields">
+  </dl>
+  <dl class="fields">
+    <dt>Value:</dt>
+      <dd><table><tr><td><pre class="variable">
+<code class="variable-quote">'</code><code class="variable-string">/home/nii/DCloudGateway-git/StorageAppliance/DCloudGateway/src/gatewa</code><span class="variable-linewrap"><img src="crarr.png" alt="\" /></span>
+<code class="variable-string">y</code><code class="variable-quote">'</code>
+</pre></td></tr></table>
+</dd>
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="gateway-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+      <th class="navbar" width="100%"></th>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%%">
+  <tr>
+    <td align="left" class="footer">
+    Generated by Epydoc 3.0.1 on Mon Jun 25 15:22:22 2012
+    </td>
+    <td align="right" class="footer">
+      <a target="mainFrame" href="http://epydoc.sourceforge.net"
+        >http://epydoc.sourceforge.net</a>
+    </td>
+  </tr>
+</table>
+
+<script type="text/javascript">
+  <!--
+  // Private objects are initially displayed (because if
+  // javascript is turned off then we want them to be
+  // visible); but by default, we want to hide them.  So hide
+  // them unless we have a cookie that says to show them.
+  checkCookie();
+  // -->
+</script>
+</body>
+</html>

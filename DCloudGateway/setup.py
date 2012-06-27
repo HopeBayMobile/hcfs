@@ -64,9 +64,11 @@ def main():
         os.system("cp gateway_scripts/wait_gateway_up %s/"%CONFDIR)
         os.system("cp gateway_scripts/service_restart %s/"%CONFDIR)
         os.system("cp gateway_scripts/hourly_snapshotting %s/"%CONFDIR)
+        os.system("cp gateway_scripts/run_background_tasks %s/"%CONFDIR)
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)
+        os.system("cp -rs /usr/bin/*s3ql* /usr/local/bin")
 
 if __name__ == '__main__':
     main()
