@@ -164,13 +164,13 @@
         <div id="delta-popup">
             <script type="text/javascript">
                 $(function(){
-                    $("#delta-popup").on("click", ".button.cancel", function(){
+                    $("#delta-popup").on("click", ".confirm .button.cancel", function(){
                         $("#delta-popup").fadeOut(1000, function(){
                             $("#delta-popup .popup-box").hide()
                             $("#errormsgbox").show();
                         });
                     });
-                    $("#delta-popup").on("click", ".button.ok", function(){
+                    $("#delta-popup").on("click", ".confirm .button.ok", function(){
                         $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
                             console.log(ctnt);
                         });

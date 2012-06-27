@@ -5,7 +5,7 @@
 # Function: API function for gateway remote upgrade
 
 import os
-import json
+import simplejson as json
 import common
 import subprocess
 
@@ -41,7 +41,7 @@ def get_gateway_version():
         res = po.stdout.readline()
         po.wait()
         t = res.split(' ')
-        ver = t[-1].replace('\n', '')
+        ver = t[-3].replace('\n', '')
         # read current version of gateway
         op_ok = True
         op_code = "100"
@@ -109,7 +109,7 @@ def get_available_upgrade():
 
 
 #----------------------------------------------------------------------
-def upgrade_gateway():
+def upgrade_gateway(enableReboot = True):
     """
     Upgrade gateway to the latest software version.
     op_code defintion:
@@ -139,8 +139,9 @@ def upgrade_gateway():
                 log.info("[2] Gateway is updated to %s (from %s)" \
                             % (new_ver, curr_ver))
                 # ^^^ write log info
-                os.system("reboot")
-                # ^^^ send a reboot command to os.
+                if enableReboot == True:
+                    os.system("reboot")
+                    # ^^^ send a reboot command to os.
 
             else:
                 op_ok = False
@@ -169,8 +170,8 @@ def upgrade_gateway():
 
 if __name__ == '__main__':
     #~ res = upgrade_gateway()
-    res = get_available_upgrade()
-    print res
-    res = upgrade_gateway()
-    print res
+    #res = get_available_upgrade()
+    #print res
+    #res = upgrade_gateway()
+    #print res
     pass

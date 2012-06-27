@@ -7,3 +7,10 @@ dpkg -i debsrc/s3ql_1.12.0~natty1_amd64.deb
 # python setup.py build
 # python setup.py install
 
+# change location of DEB server
+cp /etc/apt/sources.list /etc/apt/sources.list.bak
+
+cat >/etc/apt/sources.list <<EOF
+deb http://172.16.229.87/packages/ubuntu/ natty main
+deb-src http://172.16.229.87/packages/ubuntu natty main
+EOF
