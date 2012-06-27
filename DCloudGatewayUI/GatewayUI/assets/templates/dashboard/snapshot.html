@@ -12,6 +12,8 @@
             return return_func
         })("#progress-light");
 
+        var update_schedule;
+
         $(function(){
 
             var animate_time = 750;
@@ -32,9 +34,11 @@
             var $toogle_target;
             function toggle_selector(update_delay){
                 if ($toogle_target.hasClass("active")){
+                    clearInterval(update_schedule);
                     $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
                 } else {
+                    update_schedule = setInterval(update_list, 1000);
                     $("#bottom-popup").animate({"height": "0px"}, animate_time);
                     $(".bottom-popup-spacer").hide();
                 }
@@ -95,7 +99,7 @@
                 });
             });
 
-            setInterval(update_list, 1000);
+            update_schedule = setInterval(update_list, 1000);
 
         });
     </script>

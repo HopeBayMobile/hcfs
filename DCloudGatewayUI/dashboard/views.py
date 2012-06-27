@@ -421,8 +421,8 @@ def snapshot(request, action=None):
             snapshots = return_val.get('data').get('snapshots')
             snapshots = sorted(snapshots, key=lambda x: x["start_time"], reverse=True)
         for snapshot in snapshots:
-            snapshot['start_time'] = datetime.datetime(*time.gmtime(snapshot['start_time'])[0:6])
-            snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
+            snapshot['start_time'] = datetime.datetime(*time.localtime(snapshot['start_time'])[0:6])
+            snapshot['finish_time'] = datetime.datetime(*time.localtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
             snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name'] if snapshot['exposed'] else ""
