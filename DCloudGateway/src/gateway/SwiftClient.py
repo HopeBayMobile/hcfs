@@ -59,20 +59,20 @@ class SwiftClient():
         print [po.returncode, stdout, stderr]
         return [po.returncode, stdout, stderr]
 
-    def upload(self, container, file):
+    def upload(self, container, filename):
         """
         swift upload function
         @type container: string
         @param container: you want to save in which container
-        @type file: string
-        @param file: the local file which want to send to swift
+        @type filename: string
+        @param filename: the local file which want to send to swift
         """
         try:
             returnData = self.executeCommand('upload %s %s'
-                                             % (container, file))
-            if file[0] == '/':
-                file = file[1:]
-            if returnData[1].strip() == file:
+                                             % (container, filename))
+            if filename[0] == '/':
+                filename = filename[1:]
+            if returnData[1].strip() == filename:
                 return True
             else:
                 log.error('[0] swift upload fail: %s' % returnData[1])
@@ -85,20 +85,20 @@ class SwiftClient():
             log.error('[0] exception message: %s' % str(e))
             raise SwiftCommandError()
 
-    def delete(self, container, file):
+    def delete(self, container, filename):
         """
         swift delete function
         @type container: string
         @param container: you want to delete in which container
-        @type file: string
-        @param file: the file name in swift
+        @type filename: string
+        @param filename: the file name in swift
         """
         try:
-            if file[0] == '/':
-                file = file[1:]
+            if filename[0] == '/':
+                filename = filename[1:]
             returnData = self.executeCommand('delete %s %s'
-                                             % (container, file))
-            if returnData[1].strip() == file:
+                                             % (container, filename))
+            if returnData[1].strip() == filename:
                 return True
             else:
                 log.error('[0] swift delete fail: %s' % returnData[1])
