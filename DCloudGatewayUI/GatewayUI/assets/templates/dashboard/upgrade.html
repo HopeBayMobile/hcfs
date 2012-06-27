@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+	<div id="http-error" class="error-500"></div>
+	<div id="error-bubble">
+		<h1>{{title}}</h1>
+		<p>{{message}}</p>
+	</div>
+	<script type="text/javascript">
+	$(document).ready(function() {
+		function upgrade_reload(){
+			$.get('{% url dashboard:system_upgrade %}', function(data) {
+				
+			});
+		}		
+		setInterval(upgrade_reload, 2000);
+	});
+	</script>
+{% endblock content %}

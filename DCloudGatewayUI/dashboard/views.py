@@ -460,14 +460,17 @@ def http_proxy_switch(request, action=None):
 
 
 @login_required
-@require_POST
 def system_upgrade(request):
-    try:
-        api_remote_upgrade.upgrade_gateway()
-        return HttpResponse("Upgrade Success.")
-    except:
-        return HttpResponse("Upgrade Failed.")
-
+    if request.is_ajax():
+        result = api_remote_upgrade.upgrade_gateway()
+        info = json.loads(result)
+        title = 'Upgrade error.'
+        message = 'Please check ' + str(info['msg']) + ' and try again.'
+        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
+    else:
+        title = 'The system is being upgraded.'
+        message = 'Please wait for a while...'
+        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
 
 @login_required
 def power(request, action=None):
