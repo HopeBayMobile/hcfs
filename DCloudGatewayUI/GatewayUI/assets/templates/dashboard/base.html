@@ -166,6 +166,7 @@
                 $(function(){
                     $("#delta-popup").on("click", ".button.cancel", function(){
                         $("#delta-popup").fadeOut(1000, function(){
+                            $("#delta-popup").hide()
                             $("#errormsgbox").show();
                         });
                     });
@@ -178,7 +179,7 @@
             </script>
             <div class="popup-mask">
             </div>
-            <div class="popup-box">
+            <div class="popup-box confirm">
                 <p class="warning-h1">Notice</p>
                 <p class="warning-h2">The system upgrade will execute.</p>
                 <p class="warning-msg">The system will reboot when the update is complete. Please make sure that all your files are saved before the action execute.</p>
@@ -186,6 +187,22 @@
                     <div class="button cancel">
                         Cancel
                     </div>
+                    <div class="button ok">
+                        OK
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="popup-box notify">
+                <p class="warning-h1">Notice</p>
+                <p class="warning-h2">Snapshoting is starting...</p>
+                <p class="warning-msg">Snapshoting will complete after all files are stored to the cloud.</p>
+                <p id="check-display">
+                    <input type="checkbox" name="display" value=""> Don't show it again.
+                </p>
+
+                <div class="action-wrap">
                     <div class="button ok">
                         OK
                     </div>
