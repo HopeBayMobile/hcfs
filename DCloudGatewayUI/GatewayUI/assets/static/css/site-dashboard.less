@@ -391,6 +391,60 @@ tr{
 	background-image: url("/@{dashboard-image-path}/1_errormsg_arrow_up.png");
 }
 
+#delta-popup{
+	display: none;
+	.popup-mask{
+		position: absolute;
+		top:0; bottom:0;
+		width:1024px;
+		opacity:0.4;
+		background-color:black;
+		z-index: 5;
+	}
+
+	.popup-box{
+		background-image: url("/@{dashboard-image-path}/popup.png");
+		padding: 40px 40px 20px 60px;
+		width: 378px;
+		height: 251px;
+		position: relative;
+		top: 100px;
+		z-index: 6;
+		margin: auto;
+
+		.warning-h1{
+			color: #4AA6DF;
+			font-size: 40px;
+			line-height: 48px;
+		}
+		.warning-h2{
+			font-size: 16px;
+			font-weight: 500;
+			line-height: 16px;
+		}
+		.warning-msg{
+			font-size: 16px;
+			line-height: 24px;
+		}
+		.action-wrap{
+			position: absolute;
+			right: 20px;
+			bottom: 30px;
+		}
+		.button{
+			float: left;
+			width: 138px;
+			height: 47px;
+			margin-right: 20px;
+			text-align: center;
+			vertical-align: middle;
+			color: white;
+			font-size: 16px;
+			line-height: 47px;
+			background-image: url("/@{dashboard-image-path}/setting_button_normal.png");
+		}
+	}
+}
 
 #errormsgbox{
 	position: relative;

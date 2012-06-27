@@ -3,9 +3,8 @@
 <script type="text/javascript">
 	$(function(){
 		$(".control .upgrade").on("click", function(){
-			$.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-				console.log(ctnt);
-			})
+			$("#errormsgbox").hide()
+			$("#delta-popup").fadeIn(1000)
 		});
 
 		function update_dashboard(){
@@ -23,6 +22,11 @@
 	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%");
 				dirty_cache_percentage = Math.round(cache_data['dirty_cache_size'] * 100 / cache_data['max_cache_size']);
 				$(".cache-usage-bar .usage .dirty").css('background-size', dirty_cache_percentage + "% 100%");
+
+				var cloud_data = data["cloud_storage_usage"]
+				for (key in cloud_data){
+					$('#'+key).find('span').text(cloud_data[key])
+				}
 	        });
 	    }
 	    $("#http_proxy").on("click", function(e){
@@ -65,8 +69,8 @@
 	<p style="clear:both;"></p>
 </div>
 <div class="data-stored">
-	<p>Total amount of data stored:</p>
-	<p>Actual amount of data stored:</p>
+	<p id="cloud_data">Total amount of data stored: <span>{{ cloud_storage_usage.cloud_data }}</span></p>
+	<p id="cloud_data_dedup_compress">Actual amount of data stored: <span>{{ cloud_storage_usage.cloud_data_dedup_compress }}</span></p>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
