@@ -57,6 +57,7 @@ class BackupToCloud():
         self.tarFile()
         log.info('[3] start send to cloud')
         self.sendToCloud()
+        return self._datetime
 
     def copyFile(self):
         """
@@ -103,6 +104,7 @@ class BackupToCloud():
         """
         os.chdir(TEMP_PATH)
         self._cloudObject.upload('config', self._tarFileName)
+        os.chdir(self.currentPath)
 
 
 def main():
