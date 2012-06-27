@@ -134,13 +134,13 @@ def upgrade_gateway(enableReboot = True):
                 op_code = "100"
                 op_msg = None
                 # ^^^ assign return value
-                os.system("service apache2 stop")
+                os.system("sudo service apache2 stop")
                 # ^^^ stop apaache2 service
                 log.info("[2] Gateway is updated to %s (from %s)" \
                             % (new_ver, curr_ver))
                 # ^^^ write log info
                 if enableReboot == True:
-                    os.system("reboot")
+                    os.system("sudo reboot")
                     # ^^^ send a reboot command to os.
 
             else:
