@@ -425,7 +425,7 @@ def snapshot(request, action=None):
             snapshot['finish_time'] = datetime.datetime(*time.gmtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
             snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
-            snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name']
+            snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name'] if snapshot['exposed'] else ""
 
         if request.is_ajax():
             return render(request, 'dashboard/snapshot_tbody.html', {'tab': 'snapshot', 'snapshots': snapshots})

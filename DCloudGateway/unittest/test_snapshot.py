@@ -112,6 +112,11 @@ class Test_takesnapshot:
         result = snapshot.take_snapshot()
         result_val = json.loads(result)
         nose.tools.eq_(result_val['result'], True)
+        result = snapshot.get_snapshot_list()
+        result_val = json.loads(result)
+        new_snapshot_list = result_val['data']['snapshots']
+        new_len = len(new_snapshot_list)
+        nose.tools.ok_(new_len > old_len)
 
         finished = False
 

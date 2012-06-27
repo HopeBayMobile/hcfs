@@ -66,7 +66,7 @@ class Snapshot_Db_Lock():
             finish = False
             while not finish:
                 if os.path.exists(snapshot_db_lock):
-                    time.sleep(10)
+                    time.sleep(0.5)
                 else:
                     os.system('sudo touch %s' % snapshot_db_lock)
                     finish = True
@@ -120,6 +120,32 @@ def _initialize_snapshot():
         raise SnapshotError("Could not initialize the snapshot bot.")
 
 
+def _wait_snapshot(old_len):
+    """
+    Wait for the new entry to appear in the database.
+
+    @type old_len: integer
+    @param old_len: Number of entries in database before taking snapshot
+    """
+
+    finished = False
+
+    retries = 20
+
+    # Wait for the snapshotting process to finish
+    while not finished:
+        retries = retries - 1
+        db_list = _acquire_db_list()
+        snapshots = _translate_db(db_list)
+
+        new_len = len(snapshots)
+
+        if new_len > old_len:
+            finished = True
+        else:
+            time.sleep(0.5)
+
+
 def take_snapshot():
     """
     API function for taking snapshots manually.
@@ -135,7 +161,12 @@ def take_snapshot():
         if _check_snapshot_in_progress():
             return_msg = 'Another snapshotting process is already in progress. Aborting.'
         else:
+            db_list = _acquire_db_list()
+            snapshots = _translate_db(db_list)
+            old_len = len(snapshots)
+
             _initialize_snapshot()
+            _wait_snapshot(old_len)
             return_result = True
             return_msg = 'Completed take_snapshot'
     except SnapshotError as Err:
