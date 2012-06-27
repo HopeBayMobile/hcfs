@@ -13,33 +13,45 @@
         })("#progress-light");
 
         var update_schedule;
+        var update_interval = 600;
 
         $(function(){
 
             var animate_time = 750;
 
+            var in_update = false;
+            var can_update = true;
+
             setInterval(toggle_progress_light, 500);
 
             function update_list(){
-                $.get("/dashboard/snapshot", function(data){
-                    $("#snapshot-list tbody").html(data);
-                    if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
-                        $("#create").removeClass("disabled")
-                    } else {
-                        $("#create").addClass("disabled")
-                    }
-                });
+                console.log(1)
+                if (can_update){
+                    in_update = true
+                    console.log(in_update)
+                    $.get("/dashboard/snapshot", function(data){
+                        $("#snapshot-list tbody").html(data);
+                        if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
+                            $("#create").removeClass("disabled")
+                        } else {
+                            $("#create").addClass("disabled")
+                        }
+                    }).complete(function(){
+                        in_update = false;
+                        console.log(in_update)
+                    });
+                }
             }
 
             var $toogle_target;
             function toggle_selector(update_delay){
                 if ($toogle_target.hasClass("active")){
-                    clearInterval(update_schedule);
                     $("#bottom-popup").animate({"height": "63px"}, animate_time);
                     $(".bottom-popup-spacer").show();
                 } else {
-                    update_schedule = setInterval(update_list, 1000);
-                    $("#bottom-popup").animate({"height": "0px"}, animate_time);
+                    $("#bottom-popup").animate({"height": "0px"}, animate_time, function(){
+                        update_schedule = setInterval(update_list, update_interval);
+                    });
                     $(".bottom-popup-spacer").hide();
                 }
                 var target_col = $("#" + $toogle_target.text().toLowerCase() + "_chk");
@@ -50,13 +62,18 @@
                 }
             }
 
-            $("body").on("click", ".menu-button.select:not(.disabled)", function(){
+            $("body").on("click", ".menu-button.select:not(.disabled):not(.active)", function(){
+                while(in_update){}
+                can_update = false
                 var $me;
                 $me = $toogle_target = $(this)
                 $("#bottom-popup #do-action").text($me.text());
+                clearInterval(update_schedule);
                 $me.toggleClass("active");
-                $(".menu-button").not($me).toggleClass("disabled");
+                $("#create").addClass("disabled");
+                $(".menu-button.select").not($me).toggleClass("disabled");
                 toggle_selector();
+                can_update = true;
             });
 
             $("body").on("click", "#create:not(.disabled)", function(){
@@ -88,30 +105,60 @@
             }
 
             $("#bottom-popup #do-action").on("click", function(){
+
+                var mask = $("<div>").css({
+                    "position": "fixed",
+                    "width": "803px",
+                    "top": "156px",
+                    "bottom": 0,
+                    "background-color": "black",
+                    "opacity": 0.4,
+                    "z-index": 10,
+                    "color": "white",
+                    "font-size": "40px",
+                    "text-align": "center",
+                    "padding-top": "130px",
+                    "vertical-align": "middle"
+                }).text("Processing...").appendTo(".tab-content")
                 $(".menu-button").removeClass("active disabled")
                 $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
                        {"snapshots": get_snapshots()},
                        function(ctnt, success, opts){
-                           console.log(ctnt);
+                        toggle_selector(animate_time);
+                        mask.remove();
                        }
-                ).complete(function(){
-                    toggle_selector(animate_time);
-                });
+                );
             });
 
-            update_schedule = setInterval(update_list, 1000);
+            update_schedule = setInterval(update_list, update_interval);
 
         });
     </script>
 {% endblock javascript %}
 {% block tab_content %}
     <ul class="nav nav-tabs">
-        <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
-        <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
-        <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% if tab == "snapshot" %}
+            <li class="active"><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
+        {% else %}
+            <li class=""><a href="#snapshot" data-toggle="tab">Snapshot</a></li>
+        {% endif %}
+        {% if tab == "schedule" %}
+            <li class="active"><a href="#schedule" data-toggle="tab">Schedule</a></li>
+        {% else %}
+            <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
+        {% endif %}
+        {% if tab == "lifecycle" %}
+            <li class="active"><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% else %}
+            <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+        {% endif %}
     </ul>
     <div class="tab-content">
-        <div class="tab-pane active" id="snapshot" style="">
+        {% if tab == "snapshot" %}
+            <div class="tab-pane active" id="snapshot" style="">
+        {% else %}
+            <div class="tab-pane" id="snapshot" style="">
+        {% endif %}
             <div id="create-popup" class="hide"></div>
             <button id="create" class="menu-button ">Create</button>
             <button class="menu-button select">Delete</button>
@@ -198,7 +245,11 @@
                 font-size: 23px;
             }
         </style>
-        <div class="tab-pane" id="schedule">
+        {% if tab == "schedule" %}
+            <div class="tab-pane active" id="schedule">
+        {% else %}
+            <div class="tab-pane" id="schedule">
+        {% endif %}
             <form action="/dashboard/snapshot/schedule" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
@@ -239,7 +290,11 @@
             </div>
             </form>
         </div>
-        <div class="tab-pane" id="lifecycle">
+        {% if tab == "lifecycle" %}
+            <div class="tab-pane active" id="lifecycle">
+        {% else %}
+            <div class="tab-pane" id="lifecycle">
+        {% endif %}
             <form action="/dashboard/snapshot/lifecycle" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
