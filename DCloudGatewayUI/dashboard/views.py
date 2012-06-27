@@ -477,6 +477,7 @@ def get_snapshot_default_value():
     load_data = json.loads(api_snapshot.get_snapshot_schedule())
     data = load_data.get('data')
     return_hash['snapshot_time'] = data.get('snapshot_time')
+
     return return_hash
 
 

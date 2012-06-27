@@ -223,7 +223,11 @@
             {% csrf_token %}
             <div class="schedule_sub_div">
                 <div class="radio_button_div">
+                    {% if snapshot_time < 0 %}
+                    <input type="radio" name="schedule_radio" value="1" checked>
+                    {% else %}
                     <input type="radio" name="schedule_radio" value="1">
+                    {% endif %}
                 </div>
                 <div style="width: 10px;"></div>
                 <div class="schedule_sub_font_div">
@@ -232,7 +236,11 @@
             </div>
             <div class="schedule_sub_div">
                 <div class="radio_button_div">
+                    {% if snapshot_time > 0 %}
+                    <input type="radio" name="schedule_radio" value="2" checked>
+                    {% else %}
                     <input type="radio" name="schedule_radio" value="2">
+                    {% endif %}
                 </div>
                 <div class="schedule_sub_font_div">
                     Snapshot by schedule
