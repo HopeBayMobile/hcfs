@@ -333,18 +333,18 @@ def sync(request):
 @login_required
 def schedule(request):
     load_data = json.loads(api_snapshot.get_snapshot_schedule())
-    data = load_data['data']
-    snapshot_time = data['snapshot_time']
+    data = load_data.get('data')
+    snapshot_time = data.get('snapshot_time')
     print snapshot_time
 
     if request.method == "POST":
         query = request.POST
-        schedule_radio = query['schedule_radio']
+        schedule_radio = query.get('schedule_radio')
         print schedule_radio
         if schedule_radio == "1":
             day = -1
         else:
-            day = query['select-day']
+            day = query.get('select-day')
             day = int(day)
         return_value = json.loads(api_snapshot.set_snapshot_schedule(day))
         return return_value
@@ -353,13 +353,13 @@ def schedule(request):
 @login_required
 def lifecycle(request):
     load_data = json.loads(api_snapshot.get_snapshot_lifespan())
-    data = load_data['data']
-    default_day = data['days_to_live']
+    data = load_data.get('data')
+    default_day = data.get('days_to_live')
     print default_day
 
     if request.method == "POST":
         query = request.POST
-        day = query['days']
+        day = query.get('days')
         day = int(day)
         return_value = json.loads(api_snapshot.set_snapshot_lifespan(day))
         print return_value
@@ -434,11 +434,11 @@ def snapshot(request, action=None):
             for i in range(0, 24):
                 the_day[i] = i
             load_data = json.loads(api_snapshot.get_snapshot_lifespan())
-            data = load_data['data']
-            default_day = data['days_to_live']
+            data = load_data.get('data')
+            default_day = data.get('days_to_live')
             load_data = json.loads(api_snapshot.get_snapshot_schedule())
-            data = load_data['data']
-            snapshot_time = data['snapshot_time']
+            data = load_data.get('data')
+            snapshot_time = data.get('snapshot_time')
 
             return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot',
                 'snapshots': snapshots,
