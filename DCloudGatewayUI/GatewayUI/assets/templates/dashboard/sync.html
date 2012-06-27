@@ -179,6 +179,7 @@
         $(document).ready(function() {
                 $(".button_onclick-{{ key }}").click(function() {
                     var radio_val = $("input[name=bandwidth_option]:checked").val();
+                    /*
                     if (radio_val == 1) {
                             $("#bandwidth-{{ key }}").hide();
                             $(".interval-select-{{ key }}").hide();
@@ -192,6 +193,7 @@
                             $(".interval-select-{{ key }}").show();
                             }
                     });
+                    */
                 $("#optionsRadios1-{{ key }}").click(function() {
                     $("#bandwidth-{{ key }}").hide();
                     $(".interval-select-{{ key }}").hide();
