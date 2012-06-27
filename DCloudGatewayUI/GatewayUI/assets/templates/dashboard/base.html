@@ -54,7 +54,7 @@
                             var data = JSON.parse(ctnt);
                             for (indic in data){
                                 if (indic == "HTTP_proxy_srv"){
-                                    $("#http_proxy").attr("checked", data)
+                                    $("#http_proxy").attr("checked", data[indic])
                                     continue;
                                 }
                                 setIndicator(indic, data[indic]);
