@@ -171,9 +171,7 @@
                         });
                     });
                     $("#delta-popup").on("click", ".confirm .button.ok", function(){
-                        $.post("/dashboard/system_upgrade/", function(ctnt, status, opts){
-                            console.log(ctnt);
-                        });
+                    	window.location.assign("{% url dashboard:system_upgrade %}");
                     });
                 });
             </script>
