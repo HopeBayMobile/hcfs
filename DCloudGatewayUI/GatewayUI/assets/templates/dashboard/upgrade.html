@@ -20,7 +20,7 @@ background-image:url('/static/img/dashboard/setting_button_hover.png');
 	<div id="error-bubble">
 		<h1 id="b-title">{{title}}</h1>
 		<p id="b-msg">{{message}}</p>
-		<button id="b-ok">OK</button>
+		<button id="b-ok" style="display: none;">OK</button>
 	</div>
 	<script type="text/javascript">
 	$(document).ready(function() {
@@ -29,6 +29,7 @@ background-image:url('/static/img/dashboard/setting_button_hover.png');
 				var result=jQuery.parseJSON(data);
 				$("#b-title").text('System upgrade error.');
 				$("#b-msg").text(result.msg + " (code=" + result.code + ")");
+				$("#b-ok").css("display","block");
 			});
 		}		
 		setInterval(upgrade_reload, 1000);
