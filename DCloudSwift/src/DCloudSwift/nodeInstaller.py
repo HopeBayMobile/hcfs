@@ -16,42 +16,41 @@ from util import util
 from util import diskUtil
 import maintenance
 
+
 class NodeInstaller:
-	def __init__(self, devicePrx="sdb", deviceCnt=1):
-		self.__devicePrx = devicePrx
-		self.__deviceCnt = deviceCnt
-		self.__privateIP = socket.gethostbyname(socket.gethostname())
-		
-		if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
-			os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+    def __init__(self, devicePrx="sdb", deviceCnt=1):
+        self.__devicePrx = devicePrx
+        self.__deviceCnt = deviceCnt
+        self.__privateIP = socket.gethostbyname(socket.gethostname())
 
-		if util.isDaemonAlive("swiftMonitor"):
-			os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
+        if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+            os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
-		util.stopAllServices()
+        if util.isDaemonAlive("swiftMonitor"):
+            os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
 
-		os.system("rm -rf /etc/swift")
-		os.system("cp -r %s/swift /etc/"%BASEDIR)
-		os.system("chown -R swift:swift /etc/swift")
+        util.stopAllServices()
 
-		self.__logger = util.getLogger(name = "nodeInstaller")
+        os.system("rm -rf /etc/swift")
+        os.system("cp -r %s/swift /etc/" % BASEDIR)
+        os.system("chown -R swift:swift /etc/swift")
 
+        self.__logger = util.getLogger(name="nodeInstaller")
 
-	def install(self):
-		self.__logger.info("start install")
+    def install(self):
+        self.__logger.info("start install")
 
-		fingerprint = diskUtil.getLatestFingerprint()
-		if fingerprint is None or fingerprint["vers"] < util.getSwiftConfVers():
-			diskUtil.createSwiftDevices(deviceCnt=self.__deviceCnt,devicePrx=self.__devicePrx)
-			if BASEDIR != "/":
-				os.system("rm -rf /DCloudSwift")
-				os.system("cp -r %s/DCloudSwift /"%BASEDIR)
-		else:
-			diskUtil.remountDisks()
+        fingerprint = diskUtil.getLatestFingerprint()
+        if fingerprint is None or fingerprint["vers"] < util.getSwiftConfVers():
+            diskUtil.createSwiftDevices(deviceCnt=self.__deviceCnt, devicePrx=self.__devicePrx)
+            if BASEDIR != "/":
+                os.system("rm -rf /DCloudSwift")
+                os.system("cp -r %s/DCloudSwift /" % BASEDIR)
+        else:
+            diskUtil.remountDisks()
 
-		os.system("chown -R swift:swift /srv/node/ ")
-		util.generateSwiftConfig()
+        os.system("chown -R swift:swift /srv/node/ ")
+        util.generateSwiftConfig()
 
-		util.restartAllServices()
-		os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
-
+        util.restartAllServices()
+        os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
