@@ -5,6 +5,7 @@
 # Function: API function for gateway remote upgrade
 
 import os
+import time
 import simplejson as json
 import common
 import subprocess
@@ -140,7 +141,8 @@ def upgrade_gateway(enableReboot = True):
                             % (new_ver, curr_ver))
                 # ^^^ write log info
                 if enableReboot == True:
-                    os.system("sudo reboot")
+                    time.sleep(5)
+                    os.system("sudo sync;  sudo shutdown -r now")
                     # ^^^ send a reboot command to os.
 
             else:
