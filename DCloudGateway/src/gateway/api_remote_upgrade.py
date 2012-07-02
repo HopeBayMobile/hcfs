@@ -137,13 +137,14 @@ def upgrade_gateway(enableReboot = True):
                 op_code = "100"
                 op_msg = None
                 # ^^^ assign return value
-                #~ os.system("sudo service apache2 stop")
-                # ^^^ we cannot stop apaache2 service because reboot will not be run
                 log.info("[2] Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
                 if enableReboot == True:
-                    api.reset_gateway()
+                    #~ api.reset_gateway()
+                    os.system("sudo sync;  sudo shutdown -r now")
                     # ^^^ send a reboot command to os.
+                    os.system("sudo service apache2 stop")
+                    # ^^^ stop apache2 service 
 
             else:
                 op_ok = False
