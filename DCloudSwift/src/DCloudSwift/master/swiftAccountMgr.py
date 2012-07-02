@@ -143,10 +143,11 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password, admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password,\
+                 admin=False, reseller=False, retry=3):
         '''
         Add user to the database and backend swift
-        
+
         @type  account: string
         @param account: the name of the given account
         @type  user: string
@@ -158,15 +159,16 @@ class SwiftAccountMgr:
         @type  reseller: boolean
         @param reseller: reseller or not
         @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return the False
+        @param retry: the maximum number of times to retry when fn return False
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user is successfully added to both the database
-            and backend swift then Bool.val == True and msg records the standard output.
-            Otherwise, val == False and msg records the error message.
+        @return: a tuple Bool(val, msg). If the user is successfully added to
+            both the database and backend swift then Bool.val == True and msg
+            records the standard output. Otherwise, val == False and msg
+            records the error message.
         '''
         logger = util.getLogger(name="add_user")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-        
+
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -174,61 +176,86 @@ class SwiftAccountMgr:
         admin_password = self.get_user_password(account, admin_user).msg
         container = "ctn_" + user
         metadata_content = {
-				"Account-Enable": True,
-				"User-Enable": True,
-				"Password": password,
-				"Quota": 0
-			}
-		
-        if proxy_ip_list is None or len(proxy_ip_list) ==0:
-        	msg = "No proxy node is found"
-        	return Bool(val, msg)
-        
+                "Account-Enable": True,
+                "User-Enable": True,
+                "Password": password,
+                "Quota": 0}
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found"
+            return Bool(val, msg)
+
         if retry < 1:
-        	msg = "Argument retry has to >= 1"
-        	return Bool(val, msg)
-        
+            msg = "Argument retry has to >= 1"
+            return Bool(val, msg)
+
         try:
-        	row = self.__accountDb.add_user(account=account, name=user)
-        	
-        	if row is None:
-        		msg = "User %s:%s already exists"%(account, user)
-        		return Bool(val, msg)
-        	elif row is False:
-        		msg = "Account %s does not exist"%account
-        		return Bool(val, msg)
-        
+            row = self.__accountDb.add_user(account=account, name=user)
+
+            if row is None:
+                msg = "User %s:%s already exists" % (account, user)
+                return Bool(val, msg)
+            elif row is False:
+                msg = "Account %s does not exist" % account
+                return Bool(val, msg)
+
         except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-        	msg = str(e)
-        	return Bool(val, msg)
-        
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user,
-                                                   account=account, user=user, password=password,
-						   admin=admin, reseller=reseller)
+            msg = str(e)
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
+                                           retry=retry,\
+                                           fn=self.__add_user,\
+                                           account=account,\
+                                           user=user,\
+                                           password=password,\
+                                           admin=admin,\
+                                           reseller=reseller)
         try:
             if val == False:
                 self.__accountDb.delete_user(account=account, name=user)
             else:
                 #Todo: crate container
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container, 
-												account=account, admin_user=admin_user, admin_password=admin_password, container=container)
+                (val, msg) = self.__functionBroker(\
+                                proxy_ip_list=proxy_ip_list,\
+                                retry=retry,\
+                                fn=self.__create_container,\
+                                account=account,\
+                                admin_user=admin_user,\
+                                admin_password=admin_password,\
+                                container=container)
                 #Todo: set metadata of container
                 if val == False:
-                	msg = "Failed to create container"
-                	return Bool(val, msg)
+                    msg = "Failed to create container"
+                    return Bool(val, msg)
                 else:
-                    (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata, 
-												account=account, admin_user=admin_user, admin_password=admin_password, container=container, metadata_content=metadata_content)
+                    (val, msg) = self.__functionBroker(\
+                                    proxy_ip_list=proxy_ip_list,\
+                                    retry=retry,\
+                                    fn=self.__set_container_metadata,\
+                                    account=account,\
+                                    admin_user=admin_user,\
+                                    admin_password=admin_password,\
+                                    container=container,\
+                                    metadata_content=metadata_content)
                     if val == False:
-                        msg = "Failed to set metadata of container %s" %container
+                        msg = "Failed to set metadata of container %s"\
+                              % container
                     else:
-                        self.assign_read_acl(account=account, container=container, user=user, admin_user=admin_user)
-                        self.assign_write_acl(account=account, container=container, user=user, admin_user=admin_user)
+                        self.assign_read_acl(account=account,\
+                                             container=container,\
+                                             user=user,\
+                                             admin_user=admin_user)
+                        self.assign_write_acl(account=account,\
+                                              container=container,\
+                                              user=user,\
+                                              admin_user=admin_user)
         except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            errMsg = "Failed to clean user %s:%s from database for %s"%(account, user, str(e))
+            errMsg = "Failed to clean user %s:%s from database for %s"\
+                     % (account, user, str(e))
             logger.error(errMsg)
             raise InconsistentDatabaseError(errMsg)
-        
+
             return Bool(val, msg)
 
     @util.timeout(300)
@@ -318,7 +345,7 @@ class SwiftAccountMgr:
                 msg = "User %s:%s already exists" % (account, admin_user)
                 return Bool(val, msg)
             elif row is False:
-                msg = "Account %s does not exist"%account
+                msg = "Account %s does not exist" % account
                 return Bool(val, msg)
 
         except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
