@@ -166,8 +166,9 @@ def getLogger(name=None, conf=None):
 			logName = 'Gateway.log'
 			logLevel = 'DEBUG'
 
-		os.system("mkdir -p "+logDir)
-		os.system("touch "+logDir+'/'+logName)
+		os.system("sudo mkdir -p "+logDir)
+		os.system("sudo touch "+logDir+'/'+logName)
+                os.system("sudo chown www-data:www-data "+logDir+'/'+logName)
 
 		hdlr = logging.handlers.RotatingFileHandler(logDir+'/'+logName, maxBytes=1024*1024, backupCount=5)
 		hdlr.setFormatter(logging.Formatter(FORMATTER))
