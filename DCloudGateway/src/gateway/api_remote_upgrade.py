@@ -152,7 +152,7 @@ def upgrade_gateway(enableReboot = True):
         else:
             op_ok = False
             op_code = "003"
-            op_msg = "There is no new update."
+            op_msg = "Gateway is already up to date."
             log.info("[1] There is no new update detected when \
                         running upgrade_gateway()")
 
