@@ -61,6 +61,7 @@ class NoResultsPending(Exception):
     """All work requests have been processed."""
     pass
 
+
 class NoWorkersAvailable(Exception):
     """No worker threads available to process remaining requests."""
     pass
@@ -218,6 +219,7 @@ class WorkRequest:
         return "<WorkRequest id=%s args=%r kwargs=%r exception=%s>" % \
             (self.requestID, self.args, self.kwds, self.exception)
 
+
 class ThreadPool:
     """A thread pool, distributing work requests and collecting results.
 
@@ -337,7 +339,7 @@ if __name__ == '__main__':
 
     # the work the threads will have to do (rather trivial in our example)
     def do_something(data):
-        time.sleep(random.randint(1,5))
+        time.sleep(random.randint(1, 5))
         result = round(random.random() * data, 5)
         # just to show off, we throw an exception once in a while
         if result > 5:
@@ -360,7 +362,7 @@ if __name__ == '__main__':
           (request.requestID, exc_info)
 
     # assemble the arguments for each job to a list...
-    data = [random.randint(1,10) for i in range(20)]
+    data = [random.randint(1, 10) for i in range(20)]
     # ... and build a WorkRequest object for each item in data
     requests = makeRequests(do_something, data, print_result, handle_exception)
     # to use the default exception handler, uncomment next line and comment out
@@ -368,7 +370,7 @@ if __name__ == '__main__':
     #requests = makeRequests(do_something, data, print_result)
 
     # or the other form of args_lists accepted by makeRequests: ((,), {})
-    data = [((random.randint(1,10),), {}) for i in range(20)]
+    data = [((random.randint(1, 10),), {}) for i in range(20)]
     requests.extend(
         makeRequests(do_something, data, print_result, handle_exception)
         #makeRequests(do_something, data, print_result)
@@ -399,7 +401,7 @@ if __name__ == '__main__':
             time.sleep(0.5)
             main.poll()
             print "Main thread working...",
-            print "(active worker threads: %i)" % (threading.activeCount()-1, )
+            print "(active worker threads: %i)" % (threading.activeCount() - 1, )
             if i == 10:
                 print "**** Adding 3 more worker threads..."
                 main.createWorkers(3)
