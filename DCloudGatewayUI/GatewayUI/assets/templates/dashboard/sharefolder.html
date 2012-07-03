@@ -11,7 +11,7 @@
 	<div class="tab-content">
 	{% for name, form in forms_group.iteritems %}
 		<div class="tab-pane" id="{{form.name}}">
-		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="{{form.name}}">
+		<form id="{{form.name}}_form" class="form-horizontal" method="POST" action="/dashboard/sharefolder/smb_setting">
 			{% csrf_token %} {{ form.render }}
 			<div class="controls">
 				<p class="help-block" style="color: red;">
@@ -48,7 +48,7 @@
 					{% endfor %}
 				</div>
 			</div>
-			<form id="NFSSetting_form" class="form-horizontal" method="POST" action="nfs_setting">
+			<form id="NFSSetting_form" class="form-horizontal" method="POST" action="/dashboard/sharefolder/nfs_setting">
 				{% csrf_token %} {{ form.render }}
 				<div class="controls hide">
 					<input id="array_of_ip" name="array_of_ip" >
