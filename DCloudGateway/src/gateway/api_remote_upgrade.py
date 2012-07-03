@@ -120,6 +120,7 @@ def upgrade_gateway(enableReboot = True):
         002:    Fail, apt-get install occurs error.
         003:    Fail, there is no new update.
     """
+    log.info("[2] Try to upgrade gateway")
     try:
         t = get_gateway_version()
         curr_ver = json.loads(t)['version']
@@ -136,15 +137,14 @@ def upgrade_gateway(enableReboot = True):
                 op_code = "100"
                 op_msg = None
                 # ^^^ assign return value
-                os.system("sudo service apache2 stop")
-                # ^^^ stop apaache2 service
-                log.info("[2] Gateway is updated to %s (from %s)" \
-                            % (new_ver, curr_ver))
+                log.info("[2] Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
                 if enableReboot == True:
-                    api.reset_gateway()
-                    #~ os.system("sudo sync;  sudo shutdown -r now")
+                    #~ api.reset_gateway()
+                    os.system("sudo sync;  sudo shutdown -r now")
                     # ^^^ send a reboot command to os.
+                    os.system("sudo service apache2 stop")
+                    # ^^^ stop apache2 service 
 
             else:
                 op_ok = False
@@ -153,7 +153,7 @@ def upgrade_gateway(enableReboot = True):
         else:
             op_ok = False
             op_code = "003"
-            op_msg = "There is no new update."
+            op_msg = "Gateway is already up to date."
             log.info("[1] There is no new update detected when \
                         running upgrade_gateway()")
 
