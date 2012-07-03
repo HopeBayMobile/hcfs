@@ -45,6 +45,9 @@ class SwiftClient():
         @type command: string
         @param command: swift command. For example: stat, list,
                         upload, post download, delete
+        @rtype: list
+        @return: a list include return code, stand out, stand error
+                 For example: [0, '/etc/network/interfaces', None]
         """
         if command is None:
             command = 'stat'

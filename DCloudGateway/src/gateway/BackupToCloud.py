@@ -38,8 +38,8 @@ class BackupToCloud():
         if self._fileList is None:
             self._fileList = ['/etc/network/interfaces',
                               '/home/hungic/.bashrc', '/tmp/aaa']
-            log.info('[3] input file list: %s' % self._fileList)
-            #print self._fileList
+        log.info('[3] input file list: %s' % self._fileList)
+        #print self._fileList
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
         self._metaData = {}
@@ -48,6 +48,9 @@ class BackupToCloud():
     def backup(self):
         """
         start backup file list to cloud
+        @rtype: string
+        @return: a string is datetime which format is yyyyddmmHHMM
+                 For example: 201206301530
         """
         log.info('[3] start backup config')
         self._datetime = strftime("%Y%m%d%H%M", gmtime())
@@ -110,5 +113,6 @@ class BackupToCloud():
 def main():
     test = BackupToCloud()
     test.backup()
+
 if __name__ == '__main__':
     main()
