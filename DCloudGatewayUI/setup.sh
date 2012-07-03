@@ -67,19 +67,23 @@ fi
 
 /etc/init.d/apache2 restart
 
-# initialize django database stuff
-python /var/www/$BASENAME/manage.py syncdb --noinput
-
+#deploy Celery Task Queue
 cp -f $BASEPATH/deploy/celeryd/etc/init.d/celeryd /etc/init.d/celeryd
 cp -f $BASEPATH/deploy/celeryd/etc/default/celeryd /etc/default/celeryd
 
 chmod 755  /etc/init.d/celeryd
 /etc/init.d/celeryd restart
 
+# initialize django database stuff
+python /var/www/$BASENAME/manage.py syncdb --noinput
+
 sleep 5
 
-chmod 777 -R /var/www/$BASENAME/GatewayUI/
+#chmod 777 -R /var/www/$BASENAME/GatewayUI/
 mkdir -p /var/log/delta
-chmod 777 -R /var/log/delta/
+#chmod 777 -R /var/log/delta/
+
+chown www-data:www-data -R /var/www/$BASENAME/GatewayUI/
+chown www-data:www-data -R /var/log/delta
 
 echo "DCloudGatewayUI setup completed..."

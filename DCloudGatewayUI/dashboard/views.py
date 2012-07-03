@@ -468,7 +468,17 @@ def get_snapshot_default_value():
     return_hash = {'the_day': {}}
     the_day = {}
     for i in range(0, 24):
-        return_hash['the_day'][i] = i
+        if i < 12:
+            val = str(i) + " am"
+        else:
+            val = str(i - 12) + " pm"
+
+        if val == "0 am":
+            val = "12 Midnight"
+        elif val == "0 pm":
+            val = "12 Noon"
+
+        return_hash['the_day'][i] = val
 
     load_data = json.loads(api_snapshot.get_snapshot_lifespan())
     data = load_data.get('data')
