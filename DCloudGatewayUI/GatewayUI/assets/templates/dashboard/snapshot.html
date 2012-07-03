@@ -280,13 +280,13 @@
             <div class="search_option_div">
                 <select id="select-day" name="select-day">
                 {% for key, value in the_day.items %}
-                    {% if value == snapshot_time %}
-                        <option selected>{{ value }}</option>
+                    {% if key == snapshot_time %}
+                        <option value="{{ key }}" selected>{{ value }}</option>
                     {% else %}
-                        <option>{{ value }}</option>
+                        <option value="{{ key}}">{{ value }}</option>
                     {% endif %}
                 {% endfor %}
-            </select>
+            </select> each day
             </div>
             <div class="submit_button_div">
                 <button type="submit" value="Modify" class="submit_button" alt="Submit">
