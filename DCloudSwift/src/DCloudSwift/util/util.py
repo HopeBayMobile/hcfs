@@ -275,6 +275,15 @@ def getLogger(name=None, conf=SWIFTCONF):
     """
     Get a file logger using config settings.
 
+    @type name: string
+    @param name: logger name
+    @type  conf: string
+    @param conf: path to the swift cluster config
+    @rtype:  logging.Logger
+    @return: If conf is not specified or does not exist then 
+             return a logger which writes log to /var/log/deltaSwift with log-level=INFO.
+             Otherwise, return a logger with setting specified in conf.
+             The log rotates every 1MB and with 5 bacup. 
     """
 
     try:
