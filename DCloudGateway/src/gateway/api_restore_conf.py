@@ -190,6 +190,7 @@ def restore_gateway_configuration():
 
             # ^^^ 3.3. restart gateway services
             api.restart_nfs_service()
+            api.restart_smb_service()
 
             op_ok = True
             op_code = "100"
