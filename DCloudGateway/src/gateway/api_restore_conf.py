@@ -118,6 +118,10 @@ def save_gateway_configuration():
                 '/etc/samba/smb.conf',
                 ]
     swiftData = _get_Swift_credential()
+    if swiftData[0] is None:
+        return_val['code'] = '000'
+        return_val['msg'] = 'There is no [config] container at Swift.'
+        return json.dumps(return_val)
     try:
         swiftObj = SwiftClient(swiftData[0], swiftData[1], swiftData[2])
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
