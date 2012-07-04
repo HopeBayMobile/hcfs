@@ -67,10 +67,12 @@ def tryLock(tries=11, lockLife=900):
 
 # Retry decorator
 def retry(tries, delay=3):
-    '''Retries a function or method until it returns True.
+    '''
+    Retries a function or method until it returns True.
     delay sets the delay in seconds, and backoff sets the factor by which
     the delay should lengthen after each failure. tries must be at least 0, and delay
-    greater than 0.'''
+    greater than 0.
+    '''
 
     tries = math.floor(tries)
     if tries < 0:
@@ -273,7 +275,7 @@ def findLine(filename, line):
 
 def getLogger(name=None, conf=SWIFTCONF):
     """
-    Get a file logger using config settings.
+    Get a file logger.
 
     @type name: string
     @param name: logger name
@@ -339,7 +341,10 @@ def getPortalUrl():
 
 def getProxyPort():
     '''
-    get proxyPort from Swift.ini
+    get proxyPort by reading SWIFTCONF
+
+    @rtype: integer
+    @return: no return
     '''
     logger = getLogger(name="getProxyPort")
     proxyPort = None
@@ -354,6 +359,14 @@ def getProxyPort():
 
 
 def generateSwiftConfig():
+    """
+    Generate config files for proxy, rsyncd, accountserver, containcerserver 
+    and objectserver.
+
+    @rtype: None
+    @return: no return
+    """
+
     ip = socket.gethostbyname(socket.gethostname())
     if ip.startswith("127"):
         ip = getIpAddress()
@@ -460,6 +473,16 @@ def getNumOfZones(swiftDir="/etc/swift"):
 
 
 def getProxyNodeIpList(swiftDir="/etc/swift"):
+    """
+    get the ip list of proxy nodes by reading swiftDir/proxyList
+
+    @type swiftDir: string
+    @param swiftDir: path to the directory containing the file proxyList
+    @rtype: list
+    @return: If swiftDir/proxyList exists and contains legal contents
+             then return the ip list of proxy nodes. 
+             Otherwise, return none,
+    """
     logger = getLogger(name="getProxyNodeIpList")
 
     proxyList = []
@@ -787,6 +810,40 @@ def jsonStr2SshpassArg(jsonStr):
     arg = arg.replace("\"", '\\"')
     arg = "\'" + arg + "\'"
     return arg
+
+
+def hostname2Ip(hostname, nameserver="192.168.11.1"):
+    '''
+    Translate hostname into ip address according to nameserver.
+
+    @type  hostname: string
+    @param hostname: the hostname to be translated
+    @type  nameserver: string
+    @param nameserver: ip address of the nameserver, and the default
+        value is 192.168.11.1
+    @rtype: string
+    @return: If the translation is successfully done, then the ip
+        address will be returned. Otherwise, the returned value will
+        be none.
+    '''
+    logger = getLogger(name="hostname2Ip")
+
+    cmd = "host %s %s" % (hostname, nameserver)
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdoutData, stderrData) = po.communicate()
+
+    if po.returncode != 0:
+        logger.error(stderrData)
+        return None
+    else:
+        logger.info(stdoutData)
+        lines = stdoutData.split("\n")
+
+    for line in lines:
+        if hostname in line:
+            return line.split()[3]
+
+    return None
 
 
 class TimeoutError(Exception):
