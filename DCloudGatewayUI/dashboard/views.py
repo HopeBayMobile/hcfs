@@ -272,6 +272,7 @@ def sync(request):
         interval_to = query['interval_to']
         interval_from = query['interval_from']
         bandwidth = query['bandwidth']
+        no_upload = query['no_upload']
 
         for value in data:
             if value[0] == day:
@@ -282,7 +283,11 @@ def sync(request):
                 elif bandwidth_option == "2":
                     array = [day, 0, 24, bandwidth]
                 else:
-                    array = [day, interval_from, interval_to, bandwidth]
+                    if no_upload == "true":
+                        array = [day, interval_from, interval_to, 0]
+                    else:
+                        array = [day, interval_from, interval_to, bandwidth]
+
                 data[now] = array
 
         api.apply_scheduling_rules(data)
