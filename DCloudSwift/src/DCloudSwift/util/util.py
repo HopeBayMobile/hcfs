@@ -812,6 +812,38 @@ def jsonStr2SshpassArg(jsonStr):
     return arg
 
 
+def hostname2Ip(hostname, nameserver="192.168.11.1"):
+    '''
+    Translate hostname into ip address according to nameserver.
+
+    @type  hostname: string
+    @param hostname: the hostname to be translated
+    @type  nameserver: string
+    @param nameserver: ip address of the nameserver, and the default
+        value is 192.168.11.1
+    @rtype: string
+    @return: If the translation is successfully done, then the ip
+        address will be returned. Otherwise, the returned value will
+        be none.
+    '''
+    logger = getLogger(name="hostname2Ip")
+
+    cmd = "host %s %s" % (hostname, nameserver)
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    (stdoutData, stderrData) = po.communicate()
+
+    if po.returncode != 0:
+        logger.error(stderrData)
+        return None
+    else:
+        logger.info(stdoutData)
+        lines = stdoutData.split("\n")
+
+    for line in lines:
+        if hostname in line:
+            return line.split()[3]
+
+
 class TimeoutError(Exception):
     def __init__(self, cmd=None, timeout=None):
         self.cmd = cmd
