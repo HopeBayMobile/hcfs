@@ -843,6 +843,8 @@ def hostname2Ip(hostname, nameserver="192.168.11.1"):
         if hostname in line:
             return line.split()[3]
 
+    return None
+
 
 class TimeoutError(Exception):
     def __init__(self, cmd=None, timeout=None):
