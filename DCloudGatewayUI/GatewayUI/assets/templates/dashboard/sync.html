@@ -282,11 +282,14 @@
                     </select>
                     </p>
                     <hr/>
-                    <div id="bandwidth-{{ key }}">
+                    <div id="bandwidth-{{ key }}" style="text-indent:18px">
                     <p class="sync_font_size">
+                    <input type="radio" name="no_upload" value="true"> No upload </p>
+                    <p class="sync_font_size">
+                    <input type="radio" name="no_upload" value="false" checked>
                     Limit bandwidth to<input type="text" class="span1 digits" id="bandwidth_input{{ key }}"
                     name="bandwidth" value="{{ value.bandwidth }}"
-                    min="256" max="1024" > KB/s
+                    min="256" > KB/s (min: 256 KB/s)
                     </div>
                     </p>
                 </div>
