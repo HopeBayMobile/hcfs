@@ -9,11 +9,12 @@ ADMINS = (
 )
 
 MANAGERS = ADMINS
+DATABASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': os.path.dirname(os.path.abspath(__file__))+'/sqlite3.db',  # Or path to database file if using sqlite3.
+        'NAME': DATABASE_DIR+'/sqlite3.db',  # Or path to database file if using sqlite3.
         'USER': '',                      # Not used with sqlite3.
         'PASSWORD': '',                  # Not used with sqlite3.
         'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
@@ -120,9 +121,9 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'djcelery',
     'delta.wizard',
     'delta.forms',
-    'djcelery',
     # Uncomment the next line to enable the admin:
     # 'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
@@ -173,11 +174,11 @@ djcelery.setup_loader()
 # NOTE: The tasks should import after djcelery.setup_loader(),
 # otherwise, the tasks won't find celeryconfig.py
 # === Add wizard settings
-from wizard.forms import MetaForm, ManualForm
-from wizard.tasks import do_meta_form, do_manual_form
+from wizard.forms import MetaForm 
+from wizard.tasks import do_meta_form 
 
 WIZARD_TITLE = 'Swift ZCW Wizard'
 WIZARD_STEP = [
     (MetaForm, do_meta_form),
-    (ManualForm, do_manual_form),
+#    (ManualForm, do_manual_form),
 ]
