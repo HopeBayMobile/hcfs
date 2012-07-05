@@ -55,9 +55,7 @@ def get_configuration_backup_info():
         op_code = "000"
         op_msg = "There is no [config] container at Swift."
     else:
-        dt = backup_info['datetime']
-        backup_time = "%s/%s/%s %s:%s" % \
-                (dt[0:4], dt[4:6], dt[6:8], dt[8:10], dt[10:12])
+        backup_time = backup_info['datetime']
         #~ print backup_time
         op_ok = True
         op_data = {'backup_time': backup_time}
@@ -93,7 +91,7 @@ def _get_latest_backup():
         #~ Case 2. Get a list of files
         latest_dt = -999
         for fn in res:   # find latest backup
-            dt = fn[0:12]
+            dt = fn[0:10]
             if dt > latest_dt:
                 latest_dt = dt
                 fname = fn      # fname is the file name of latest backup
@@ -126,9 +124,6 @@ def save_gateway_configuration():
         swiftObj = SwiftClient(swiftData[0], swiftData[1], swiftData[2])
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
         backuptime = backupToCloudObj.backup()
-        backuptime = "%s/%s/%s %s:%s" % (backuptime[0:4], backuptime[4:6],
-                                          backuptime[6:8], backuptime[8:10],
-                                          backuptime[10:12])
         return_val = {'result'  : True,
                       'code'    : '100',
                       'data'    : {'backup_time': backuptime},

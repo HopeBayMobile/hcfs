@@ -78,7 +78,7 @@ class TestRestoreConf:
         mock.should_receive('upload').and_return(True)
         backupConf = BackupToCloud(None, mock)
         datetime = int(backupConf.backup())
-        now = int(strftime("%Y%m%d%H%M", gmtime()))
+        now = int(time.mktime(time.localtime()))
         if now > datetime:
             nose.tools.ok_((now == datetime + 1), "now(%d) > datetime(%d) + 1" % (now, datetime))
         else:
@@ -88,6 +88,9 @@ class TestRestoreConf:
         
         result = json.loads(save_gateway_configuration())
         info = json.loads(get_configuration_backup_info())
+        print "aaaa"
+        print result
+        print "bbbb"
         print info
         expectSaveReturnVal = {'result'  : True,
                                'code'    : '100',

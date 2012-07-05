@@ -1138,6 +1138,25 @@ class Test_getIp2Zid:
 			zid = ip2Zid[ip]
 			nose.tools.ok_(zid not in zidSet)
 			zidSet.add(zid)
+
+class Test_hostname2Ip:
+    '''
+    '''
+    def setup(self):
+        print "Start of unit test for function hostname2Ip() in util.py\n"
+        self.__google_nameserver = "8.8.8.8"
+
+    def teardown(self):
+        print "End of unit test for function hostname2Ip() in util.py\n"
+
+    def test_NTU2Ip(self):
+        '''
+        The ip adress returned should begin with 140.112
+        '''
+        ntu_url = "www.ntu.edu.tw"
+        ntu_ip = util.hostname2Ip(ntu_url, self.__google_nameserver)
+        nose.tools.ok_(ntu_ip.startswith("140.112"),\
+                       "The ip address returned by hostname2Ip() is wrong!")
 		
 
 if __name__ == "__main__":

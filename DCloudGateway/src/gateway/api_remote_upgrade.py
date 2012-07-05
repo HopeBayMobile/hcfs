@@ -73,7 +73,8 @@ def get_available_upgrade():
         000:    Fail.
     """
     try:
-        os.system("sudo apt-get update &")     # update package info.
+        #~ os.system("sudo apt-get update &")     # update package info.
+        #~ the apt-get update action will be ran at background process
         cmd = "apt-show-versions -u s3ql"
         # ToDo: change to "DeltaGateway" package.
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \

@@ -23,13 +23,13 @@
 
             function update_list(){
                 if (can_update){
-                    in_update = true
+                    in_update = true;
                     $.get("/dashboard/snapshot", function(data){
                         $("#snapshot-list tbody").html(data);
-                        if ($($(data)[0]).find('td:nth-child(6)').text() == "Complete"){
-                            $("#create").removeClass("disabled")
+                        if ($($(data)[0]).is(":has(.snapshoting)")){
+                            $("#create").addClass("disabled");
                         } else {
-                            $("#create").addClass("disabled")
+                            $("#create").removeClass("disabled");
                         }
                     }).complete(function(){
                         in_update = false;
@@ -93,9 +93,9 @@
                 toggle_selector(animate_time);
             });
 
-            function get_snapshots(){
+            function get_snapshots(action){
                 var snapshots = [];
-                $.each($(":checked"), function(idx, item){
+                $.each($("#snapshot-list ." + action + "_check :checked"), function(idx, item){
                     snapshots.push(this.value);
                 });
                 return snapshots;
@@ -116,10 +116,11 @@
                     "text-align": "center",
                     "padding-top": "130px",
                     "vertical-align": "middle"
-                }).text("Processing...").appendTo(".tab-content")
-                $(".menu-button").removeClass("active disabled")
-                $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
-                       {"snapshots": get_snapshots()},
+                }).text("Processing...").appendTo(".tab-content");
+                $(".menu-button").removeClass("active disabled");
+                var action = $(this).text().toLowerCase();
+                $.post('/dashboard/snapshot/'+ action,
+                       {"snapshots": get_snapshots(action)},
                        function(ctnt, success, opts){
                         toggle_selector(animate_time);
                         mask.remove();
@@ -157,7 +158,7 @@
             <div class="tab-pane" id="snapshot" style="">
         {% endif %}
             <div id="create-popup" class="hide"></div>
-            <button id="create" class="menu-button ">Create</button>
+            <button id="create" class="menu-button {% if snapshots_inprogress %}disabled{% endif %}">Create</button>
             <button class="menu-button select">Delete</button>
             <button class="menu-button select">Export</button>
             <div id="" style="">
