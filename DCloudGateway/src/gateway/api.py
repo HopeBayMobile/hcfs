@@ -659,13 +659,13 @@ def _check_smb_service():
 
         # if samba service is running, go check netbios
         if op_SMB_srv:
-            cmd = "sudo service nmbd status"
-            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
+            cmd2 = "sudo service nmbd status"
+            po2 = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output2 = po2.stdout.read()
+            po2.wait()
 
-            if po.returncode == 0:
-                if output.find("running") == -1:
+            if po2.returncode == 0:
+                if output2.find("running") == -1:
                     op_SMB_srv = False
                     restart_service("nmbd")
             else:
@@ -1421,7 +1421,6 @@ def restart_service(svc_name):
         - data: JSON object. Always return empty.
     """
     
-    #log.info("restart_smb_service start")
     log.info("[2] %s service restarting" % svc_name)
 
     return_val = {}
@@ -1429,12 +1428,16 @@ def restart_service(svc_name):
     op_msg = "Restarting %s service failed." % svc_name
 
     try:
-        cmd = "sudo service %s restart" % svc_name
+        # why we don't use 'service' utility?
+        # because 'service nmbd restart' is invalid command.
+        # thus, for simplicity, use /etc/init.d all the way
+        cmd = "sudo /etc/init.d/%s restart" % svc_name
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         po.wait()
 
         if po.returncode == 0:
             op_ok = True
+            log.info("[2] %s service restarted successfully." % svc_name)
             op_msg = "Restarting %s service succeeded." % svc_name
 
     except Exception as e:
@@ -1450,7 +1453,6 @@ def restart_service(svc_name):
         }
     
         log.info("[2] %s service restarted" % svc_name)
-        #log.info("restart_smb_service end")
     return json.dumps(return_val)
 
 def reset_gateway():
@@ -2955,7 +2957,7 @@ def get_network_speed(iface_name): # iface_name = eth1
     
     """
     
-    log.info('get_network_speed start')
+    #log.info('get_network_speed start')
     
     # define net speed file
     netspeed_file = '/dev/shm/gw_netspeed'

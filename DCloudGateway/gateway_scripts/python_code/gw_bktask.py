@@ -110,6 +110,22 @@ def redirect_stream(system_stream, target_stream):
 #   mq.unlink()
 #   print 'snapshot thread exited'
 
+def thread_aptget():
+    """
+    Worker thread to do 'apt-get update'
+    """
+
+    global g_program_exit
+    
+    while not g_program_exit:
+        os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
+        
+        # sleep for some time by a for loop in order to break at any time
+        for x in range(600):
+            time.sleep(1)
+            if g_program_exit:
+                break
+
 
 def thread_netspeed():
     """
@@ -223,6 +239,10 @@ def start_background_tasks(singleloop=False):
     # create a thread to calculate net speed
     t = Thread(target=thread_netspeed)
     t.start()
+    
+    # create a thread to do 'apt-get update'
+    t2 = Thread(target=thread_aptget)
+    t2.start()
 
 #    t2 = Thread(target=thread_get_snapshot_status)
 #    t2.start()
