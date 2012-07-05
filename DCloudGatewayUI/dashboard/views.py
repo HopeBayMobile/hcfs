@@ -7,7 +7,8 @@ from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 import json
-import datetime, time
+import datetime
+import time
 
 
 if not getattr(settings, "DEBUG", False):
@@ -331,8 +332,7 @@ def sync(request):
 
         weeks_data[day]['bandwidth'] = upload_limit
 
-    return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
-        hours, 'weeks_data': weeks_data})
+    return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours': hours, 'weeks_data': weeks_data})
 
 
 @login_required
@@ -374,7 +374,7 @@ def lifecycle(request):
 @login_required
 def syslog(request):
     return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
-    if return_val['result'] == True:
+    if return_val['result']:
         log_data = return_val['data']
 
     if request.is_ajax():
@@ -400,13 +400,14 @@ def snapshot(request, action=None):
             return_val = lifecycle(request)
             if return_val['result']:
                 return_hash = get_snapshot_default_value()
-                return render(request, 'dashboard/snapshot.html', {'tab':
-                    'lifecycle',
-                    #'snapshots': snapshots,
-                    'the_day': return_hash.get('the_day'),
-                    'default_day': return_hash.get('default_day'),
-                    'snapshot_time': return_hash.get('snapshot_time'),
-                    })
+                return render(request, 'dashboard/snapshot.html',
+                              {'tab': 'lifecycle',
+                               #'snapshots': snapshots,
+                               'the_day': return_hash.get('the_day'),
+                               'default_day': return_hash.get('default_day'),
+                               'snapshot_time': return_hash.get('snapshot_time'),
+                               }
+                              )
                 #return HttpResponse("Success: %s" % return_val['msg'])
             else:
                 return HttpResponse("Failure: %s" % return_val['msg'], status=500)
@@ -415,17 +416,16 @@ def snapshot(request, action=None):
             return_val = schedule(request)
             if return_val['result']:
                 return_hash = get_snapshot_default_value()
-                return render(request, 'dashboard/snapshot.html', {'tab':
-                    'schedule',
-                    #'snapshots': snapshots,
-                    'the_day': return_hash.get('the_day'),
-                    'default_day': return_hash.get('default_day'),
-                    'snapshot_time': return_hash.get('snapshot_time'),
-                    })
+                return render(request, 'dashboard/snapshot.html',
+                              {'tab': 'schedule',
+                               #'snapshots': snapshots,
+                               'the_day': return_hash.get('the_day'),
+                               'default_day': return_hash.get('default_day'),
+                               'snapshot_time': return_hash.get('snapshot_time'),
+                               })
                 #return HttpResponse("Success: %s" % return_val['msg'])
             else:
                 return HttpResponse("Failure: %s" % return_val['msg'], status=500)
-
 
         if action == "delete":
             snapshot_list = request.POST.getlist("snapshots[]")
@@ -462,11 +462,12 @@ def snapshot(request, action=None):
         else:
             return_hash = get_snapshot_default_value()
             return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot',
-                'snapshots': snapshots,
-                'the_day': return_hash.get('the_day'),
-                'default_day': return_hash.get('default_day'),
-                'snapshot_time': return_hash.get('snapshot_time'),
-                })
+                                                               'snapshots': snapshots,
+                                                               'the_day': return_hash.get('the_day'),
+                                                               'default_day': return_hash.get('default_day'),
+                                                               'snapshot_time': return_hash.get('snapshot_time'),
+                                                               }
+                          )
 
 
 def get_snapshot_default_value():
@@ -515,7 +516,8 @@ def system_upgrade(request):
     else:
         title = 'The system is being upgraded.'
         message = 'Please wait for a while...'
-        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
+        return render(request, 'dashboard/upgrade.html', {'title': title, 'message': message})
+
 
 @login_required
 def power(request, action=None):
@@ -554,12 +556,10 @@ def dashboard_update(request):
 @login_required
 def config(request, action=None):
     if request.method == 'POST':
-        info = '{"result":false}'
         if action == 'restore':
             info = api_restore_conf.restore_gateway_configuration()
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
-        print info
         result = json.loads(info)
         if result['result']:
             info = api_restore_conf.get_configuration_backup_info()
@@ -570,7 +570,10 @@ def config(request, action=None):
             return HttpResponse(result)
 
     info = api_restore_conf.get_configuration_backup_info()
-    backup_info = json.loads(info)
-    backup_time = backup_info['data']['backup_time']
+    result = json.loads(info)
+    if result['result']:
+        backup_time = backup_info['data']['backup_time']
+    else:
+        backup_time = None
 
     return render(request, 'dashboard/config.html', {'backup_time': backup_time})
