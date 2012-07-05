@@ -632,22 +632,21 @@ def _check_nfs_service():
 # check samba daemon by Rice
 def _check_smb_service():
     """
-    Check Samba daemon.
+    Check Samba and NetBIOS daemon.
     
     @rtype: boolean
-    @return: True if Samba service is alive. Otherwise false.
-    
+    @return: True if Samba and NetBIOS service are all alive. Otherwise false.
     """
 
     op_SMB_srv = False
-    log.info("_check_smb_service start")    
+    #log.info("_check_smb_service start")    
 
     try:
         cmd ="sudo service smbd status"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
-    
+
         # no matter smbd is running or not, command always returns 0
         if po.returncode == 0:
             if output.find("running") != -1:
@@ -658,9 +657,24 @@ def _check_smb_service():
             log.info(output)
             restart_smb_service()
 
+        # if samba service is running, go check netbios
+        if op_SMB_srv:
+            cmd = "sudo service nmbd status"
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            po.wait()
+
+            if po.returncode == 0:
+                if output.find("running") == -1:
+                    op_SMB_srv = False
+                    restart_service("nmbd")
+            else:
+                log.info(output)
+                restart_service("nmbd")
+
     except:
         pass
-    log.info("_check_smb_service end")
+    #log.info("_check_smb_service end")
     return op_SMB_srv
 
 def get_storage_account():
@@ -1372,7 +1386,6 @@ def restart_smb_service():
         po1 = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         po1.wait()
 
-
         if (po.returncode == 0) and (po1.returncode == 0):
             op_ok = True
             op_msg = "Restarting samba service succeeded."
@@ -1391,6 +1404,53 @@ def restart_smb_service():
     
         log.info("[2] Samba service restarted")
         log.info("restart_smb_service end")
+    return json.dumps(return_val)
+
+# wthung
+def restart_service(svc_name):
+    """
+    Restart input service.
+    
+    @type svc_name: string
+    @param svc_name: Service name to be restarted.
+    @rtype: JSON object
+    @return: Result after restarting the service.
+    
+        - result: Function call result.
+        - msg: Explanation of result.
+        - data: JSON object. Always return empty.
+    """
+    
+    #log.info("restart_smb_service start")
+    log.info("[2] %s service restarting" % svc_name)
+
+    return_val = {}
+    op_ok = False
+    op_msg = "Restarting %s service failed." % svc_name
+
+    try:
+        cmd = "sudo service %s restart" % svc_name
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        po.wait()
+
+        if po.returncode == 0:
+            op_ok = True
+            op_msg = "Restarting %s service succeeded." % svc_name
+
+    except Exception as e:
+        op_ok = False
+        log.error(str(e))
+        log.info("[0] %s service restarting error" % svc_name)
+
+    finally:
+        return_val = {
+            'result': op_ok,
+            'msg': op_msg,
+            'data': {}
+        }
+    
+        log.info("[2] %s service restarted" % svc_name)
+        #log.info("restart_smb_service end")
     return json.dumps(return_val)
 
 def reset_gateway():
@@ -1686,15 +1746,24 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         
             return json.dumps(return_val)
         
-    
         if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
-            if os.system("sudo /etc/init.d/networking restart") == 0:
-                op_ok = True
-                op_msg = "Succeeded to apply the network configuration."
-                log.info("[2] Gateway networking started")
-            else:
+            try:
+                cmd ="sudo /etc/init.d/networking restart"
+                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+
+            except:
                 op_ok = False
                 log.info("[0] Gateway networking starting error")
+            else:
+                if os.system("sudo /etc/init.d/networking restart") == 0:
+                    op_ok = True
+                    op_msg = "Succeeded to apply the network configuration."
+                    log.info("[2] Gateway networking started")
+                else:
+                    op_ok = False
+                    log.info("[0] Gateway networking starting error")
         else:
             op_ok = False
             log.error(op_msg)
