@@ -21,7 +21,7 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # install mdadm package
-apt-get install mdadm
+apt-get -y install mdadm
 
 # this token will be written if the raid is built successfuly
 SAFE_TOKEN="/storage/.init_raid_ok"
