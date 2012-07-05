@@ -119,7 +119,9 @@ def system(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
                 print update_return
-                if not update_return['result']:
+                if update_return['result']:
+                    network_data = json.loads(api.get_network()).get('data')
+                else:
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
@@ -136,7 +138,9 @@ def system(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
                 print update_return
-                if not update_return['result']:
+                if update_return['result']:
+                    gateway_data = json.loads(api.get_storage_account()).get('data')
+                else:
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
