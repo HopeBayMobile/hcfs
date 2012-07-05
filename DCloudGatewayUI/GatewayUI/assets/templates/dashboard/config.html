@@ -21,7 +21,14 @@
 			sure = confirm("Confirm: The configuration will be "+ action + ".");
 			if (sure){
 				$.post(action,function(data){
-					$('#backup_time').html(data);
+					var result=jQuery.parseJSON(data);
+					if(result.result){
+						$('#backup_time').html(result.backup_time);
+						alert(action.charAt(0).toUpperCase() + action.slice(1) + ' successfully.');
+					}
+					else{
+						alert(action.charAt(0).toUpperCase() + action.slice(1) + ' failed.');
+					}					
 				});
 			}
 		});

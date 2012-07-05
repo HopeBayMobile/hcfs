@@ -1452,8 +1452,7 @@ def restart_service(svc_name):
             'data': {}
         }
     
-        #log.info("[2] %s service restarted" % svc_name)
-        #log.info("restart_smb_service end")
+        log.info("[2] %s service restarted" % svc_name)
     return json.dumps(return_val)
 
 def reset_gateway():
@@ -1751,14 +1750,9 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         
         if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
             try:
-                cmd ="sudo rm -rf /proc/net/route"
+                cmd ="sudo /etc/init.d/networking restart"
                 po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                lines = po.stdout.read()
-                po.wait()
-
-                cmd ="sudo ip route flush table main"
-                po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                lines = po.stdout.read()
+                output = po.stdout.read()
                 po.wait()
 
             except:

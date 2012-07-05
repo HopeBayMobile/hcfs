@@ -7,7 +7,8 @@ from django.utils.datastructures import SortedDict
 from lib.forms import RenderFormMixinClass
 from lib.forms import IPAddressInput
 import json
-import datetime, time
+import datetime
+import time
 
 
 if not getattr(settings, "DEBUG", False):
@@ -118,7 +119,9 @@ def system(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_network(**form.cleaned_data))
                 print update_return
-                if not update_return['result']:
+                if update_return['result']:
+                    network_data = json.loads(api.get_network()).get('data')
+                else:
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
@@ -135,7 +138,9 @@ def system(request, action=None):
             if form.is_valid():
                 update_return = json.loads(api.apply_storage_account(**form.cleaned_data))
                 print update_return
-                if not update_return['result']:
+                if update_return['result']:
+                    gateway_data = json.loads(api.get_storage_account()).get('data')
+                else:
                     action_error[action] = update_return['msg']
             else:
                 forms_group[action] = form
@@ -149,10 +154,10 @@ def system(request, action=None):
             else:
                 forms_group[action] = form
 
-    forms_group['Network'] = forms_group.get('network', Network(initial=network_data))
-    forms_group['Cloud Storage Access'] = forms_group.get('gateway', Gateway(initial=gateway_data))
-    forms_group['Admin Password'] = forms_group.get('admin_pass', AdminPassword())
-    forms_group['Encryption Key'] = forms_group.get('encrypt', EncryptionKey())
+    forms_group['Network'] = forms_group.get('Network', Network(initial=network_data))
+    forms_group['Cloud Storage Access'] = forms_group.get('Gateway', Gateway(initial=gateway_data))
+    forms_group['Admin Password'] = forms_group.get('AdminPassword', AdminPassword())
+    forms_group['Encryption Key'] = forms_group.get('EncryptionKey', EncryptionKey())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 
@@ -331,8 +336,7 @@ def sync(request):
 
         weeks_data[day]['bandwidth'] = upload_limit
 
-    return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours':
-        hours, 'weeks_data': weeks_data})
+    return render(request, 'dashboard/sync.html', {'tab': 'sync', 'hours': hours, 'weeks_data': weeks_data})
 
 
 @login_required
@@ -374,7 +378,7 @@ def lifecycle(request):
 @login_required
 def syslog(request):
     return_val = json.loads(api.get_gateway_system_log(0, 100, 'gateway'))
-    if return_val['result'] == True:
+    if return_val['result']:
         log_data = return_val['data']
 
     if request.is_ajax():
@@ -400,13 +404,14 @@ def snapshot(request, action=None):
             return_val = lifecycle(request)
             if return_val['result']:
                 return_hash = get_snapshot_default_value()
-                return render(request, 'dashboard/snapshot.html', {'tab':
-                    'lifecycle',
-                    #'snapshots': snapshots,
-                    'the_day': return_hash.get('the_day'),
-                    'default_day': return_hash.get('default_day'),
-                    'snapshot_time': return_hash.get('snapshot_time'),
-                    })
+                return render(request, 'dashboard/snapshot.html',
+                              {'tab': 'lifecycle',
+                               #'snapshots': snapshots,
+                               'the_day': return_hash.get('the_day'),
+                               'default_day': return_hash.get('default_day'),
+                               'snapshot_time': return_hash.get('snapshot_time'),
+                               }
+                              )
                 #return HttpResponse("Success: %s" % return_val['msg'])
             else:
                 return HttpResponse("Failure: %s" % return_val['msg'], status=500)
@@ -415,17 +420,16 @@ def snapshot(request, action=None):
             return_val = schedule(request)
             if return_val['result']:
                 return_hash = get_snapshot_default_value()
-                return render(request, 'dashboard/snapshot.html', {'tab':
-                    'schedule',
-                    #'snapshots': snapshots,
-                    'the_day': return_hash.get('the_day'),
-                    'default_day': return_hash.get('default_day'),
-                    'snapshot_time': return_hash.get('snapshot_time'),
-                    })
+                return render(request, 'dashboard/snapshot.html',
+                              {'tab': 'schedule',
+                               #'snapshots': snapshots,
+                               'the_day': return_hash.get('the_day'),
+                               'default_day': return_hash.get('default_day'),
+                               'snapshot_time': return_hash.get('snapshot_time'),
+                               })
                 #return HttpResponse("Success: %s" % return_val['msg'])
             else:
                 return HttpResponse("Failure: %s" % return_val['msg'], status=500)
-
 
         if action == "delete":
             snapshot_list = request.POST.getlist("snapshots[]")
@@ -447,6 +451,7 @@ def snapshot(request, action=None):
 
     else:
         return_val = json.loads(api_snapshot.get_snapshot_list())
+        snapshots_inprogress = 0
         if return_val['result']:
             snapshots = return_val.get('data').get('snapshots')
             snapshots = sorted(snapshots, key=lambda x: x["start_time"], reverse=True)
@@ -454,7 +459,11 @@ def snapshot(request, action=None):
             snapshot['start_time'] = datetime.datetime(*time.localtime(snapshot['start_time'])[0:6])
             snapshot['finish_time'] = datetime.datetime(*time.localtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
-            snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            if snapshot['name'] == "new_snapshot":
+                snapshot['in_progress'] = 1
+                snapshots_inprogress += 1
+            else:
+                snapshot['in_progress'] = 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name'] if snapshot['exposed'] else ""
 
         if request.is_ajax():
@@ -463,6 +472,7 @@ def snapshot(request, action=None):
             return_hash = get_snapshot_default_value()
             return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot',
                 'snapshots': snapshots,
+                'snapshots_inprogress': snapshots_inprogress,
                 'the_day': return_hash.get('the_day'),
                 'default_day': return_hash.get('default_day'),
                 'snapshot_time': return_hash.get('snapshot_time'),
@@ -515,7 +525,8 @@ def system_upgrade(request):
     else:
         title = 'The system is being upgraded.'
         message = 'Please wait for a while...'
-        return render(request, 'dashboard/upgrade.html', {'title':title, 'message':message})
+        return render(request, 'dashboard/upgrade.html', {'title': title, 'message': message})
+
 
 @login_required
 def power(request, action=None):
@@ -554,23 +565,26 @@ def dashboard_update(request):
 @login_required
 def config(request, action=None):
     if request.method == 'POST':
-        info = '{"result":false}'
         if action == 'restore':
             info = api_restore_conf.restore_gateway_configuration()
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
-        print info
         result = json.loads(info)
+        
         if result['result']:
             info = api_restore_conf.get_configuration_backup_info()
             backup_info = json.loads(info)
             backup_time = backup_info['data']['backup_time']
-            return HttpResponse(backup_time)
-        else:
-            return HttpResponse(result)
+            result['backup_time']=backup_time
+        
+        response = json.dumps(result)
+        return HttpResponse(response)
 
     info = api_restore_conf.get_configuration_backup_info()
-    backup_info = json.loads(info)
-    backup_time = backup_info['data']['backup_time']
+    result = json.loads(info)
+    if result['result']:
+        backup_time = result['data']['backup_time']
+    else:
+        backup_time = None
 
     return render(request, 'dashboard/config.html', {'backup_time': backup_time})
