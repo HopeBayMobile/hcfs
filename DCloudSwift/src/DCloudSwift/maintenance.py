@@ -36,6 +36,8 @@ def isNewer(confDir):
 def updateMetadata(confDir):
     logger = util.getLogger(name="updateMetadata")
     logger.info("updateMetadata start")
+    util.createRamdiskDirs()
+
     try:
 
         os.system("mkdir -p /etc/swift")
@@ -70,6 +72,7 @@ def updateMetadata(confDir):
 def resume():
     logger = util.getLogger(name="resume")
     logger.info("start")
+    util.createRamdiskDirs()
 
     os.system("python /DCloudSwift/monitor/swiftMonitor.py stop")
     util.stopAllServices()

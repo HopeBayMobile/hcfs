@@ -134,6 +134,19 @@ def timeout(timeout_time):
         return wrapper
     return timeoutDeco
 
+#TODO: add error checking
+def createRamdiskDirs():
+    '''
+    Create some necessary directories using ramdisks
+    '''
+    if not os.path.exists("/dev/shm/srv"):
+        os.system("mkdir /dev/shm/srv")
+        os.system("mount --bind /dev/shm/srv /srv")
+
+    if not os.path.exists("/dev/shm/DCloudSwift"):
+        os.system("mkdir /dev/shm/DCloudSwift")
+        os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
+
 
 #TODO: findout a beter way to check if a daemon is alive
 def isDaemonAlive(daemonName):
@@ -878,9 +891,10 @@ class TryLockError(Exception):
 
 
 if __name__ == '__main__':
-    print getPortalUrl()
-    print getProxyPort()
-    generateSwiftConfig()
+    createRamdiskDirs()
+#    print getPortalUrl()
+#    print getProxyPort()
+#    generateSwiftConfig()
 #    print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
 #    spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
 #    print installAllDeb("/DCloudSwift/storage/deb_source")
