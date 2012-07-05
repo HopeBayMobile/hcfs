@@ -12,7 +12,7 @@ import pwd
 import stat
 import common
 import simplejson as json
-from time import gmtime, strftime
+import time
 from SwiftClient import *
 
 TEMP_PATH = '/tmp/backuptocloud'
@@ -43,7 +43,7 @@ class BackupToCloud():
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
         self._metaData = {}
-        self.currentPath = os.getcwd()
+        self.currentPath = os.path.dirname(os.path.abspath(__file__))
 
     def backup(self):
         """
@@ -53,7 +53,7 @@ class BackupToCloud():
                  For example: 201206301530
         """
         log.info('[3] start backup config')
-        self._datetime = strftime("%Y%m%d%H%M", gmtime())
+        self._datetime = str(int(time.mktime(time.localtime())))
         self._tarFileName = '%s_gw_conf_backup.tar.gz' % self._datetime
         self.copyFile()
         log.info('[3] prepare tar compression file')
@@ -108,6 +108,7 @@ class BackupToCloud():
         os.chdir(TEMP_PATH)
         self._cloudObject.upload('config', self._tarFileName)
         os.chdir(self.currentPath)
+
 
 
 def main():
