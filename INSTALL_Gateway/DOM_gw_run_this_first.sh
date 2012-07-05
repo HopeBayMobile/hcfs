@@ -165,9 +165,8 @@ cat >/root/build_raid1.sh <<EOF
 EOF
 
 ## append build_raid1.sh to /etc/rc.local
-INCLUDE_CONF="bash /root/build_raid1.sh"
-grep $INCLUDE_CONF /etc/rc.local > /dev/null
-if [ "$?" -ne "1" ]; then
-   echo $INCLUDE_CONF >> /etc/rc.local
-fi
-
+cat >/etc/init.d/check_raid1 <<EOF
+/root/build_raid1.sh
+EOF
+chmod 777 /etc/init.d/check_raid1
+cp -rs /etc/init.d/check_raid1 /etc/rc2.d/S10check_raid1

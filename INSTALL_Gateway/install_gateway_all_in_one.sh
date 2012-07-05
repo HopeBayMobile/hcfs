@@ -125,6 +125,15 @@ cache_dir ufs $CACHEDIR 51200 64 128
 EOF
 
 chmod 777 $CACHEDIR
+
+# add double check cache directory at each power on
+cat >/etc/init.d/make_http_proxy_cache_dir <<EOF
+mkdir $CACHEDIR
+chmod 777 $CACHEDIR
+EOF
+chmod 777 /etc/init.d/make_http_proxy_cache_dir
+cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
+
 echo "    Squid3 configuration has been written."
 # ^^^^^-- install GUI API -----------------------------------------------------------------------------
 
