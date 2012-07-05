@@ -118,7 +118,7 @@ def thread_aptget():
     global g_program_exit
     
     while not g_program_exit:
-        os.system("sudo apt-get update >/dev/null")
+        os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
         
         # sleep for some time by a for loop in order to break at any time
         for x in range(600):
