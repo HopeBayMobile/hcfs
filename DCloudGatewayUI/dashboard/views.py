@@ -149,10 +149,10 @@ def system(request, action=None):
             else:
                 forms_group[action] = form
 
-    forms_group['Network'] = forms_group.get('network', Network(initial=network_data))
-    forms_group['Cloud Storage Access'] = forms_group.get('gateway', Gateway(initial=gateway_data))
-    forms_group['Admin Password'] = forms_group.get('admin_pass', AdminPassword())
-    forms_group['Encryption Key'] = forms_group.get('encrypt', EncryptionKey())
+    forms_group['Network'] = forms_group.get('Network', Network(initial=network_data))
+    forms_group['Cloud Storage Access'] = forms_group.get('Gateway', Gateway(initial=gateway_data))
+    forms_group['Admin Password'] = forms_group.get('AdminPassword', AdminPassword())
+    forms_group['Encryption Key'] = forms_group.get('EncryptionKey', EncryptionKey())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 
@@ -447,6 +447,7 @@ def snapshot(request, action=None):
 
     else:
         return_val = json.loads(api_snapshot.get_snapshot_list())
+        snapshots_inprogress = 0
         if return_val['result']:
             snapshots = return_val.get('data').get('snapshots')
             snapshots = sorted(snapshots, key=lambda x: x["start_time"], reverse=True)
@@ -454,7 +455,11 @@ def snapshot(request, action=None):
             snapshot['start_time'] = datetime.datetime(*time.localtime(snapshot['start_time'])[0:6])
             snapshot['finish_time'] = datetime.datetime(*time.localtime(snapshot['finish_time'])[0:6]) if snapshot['finish_time'] > 0 else None
             snapshot['total_size'] /= 1000
-            snapshot['in_progress'] = 1 if snapshot['name'] == "new_snapshot" else 0
+            if snapshot['name'] == "new_snapshot":
+                snapshot['in_progress'] = 1
+                snapshots_inprogress += 1
+            else:
+                snapshot['in_progress'] = 0
             snapshot['path'] = "\\\\" + json.loads(api.get_network())['data']["ip"] + "\\" + snapshot['name'] if snapshot['exposed'] else ""
 
         if request.is_ajax():
@@ -463,6 +468,7 @@ def snapshot(request, action=None):
             return_hash = get_snapshot_default_value()
             return render(request, 'dashboard/snapshot.html', {'tab': 'snapshot',
                 'snapshots': snapshots,
+                'snapshots_inprogress': snapshots_inprogress,
                 'the_day': return_hash.get('the_day'),
                 'default_day': return_hash.get('default_day'),
                 'snapshot_time': return_hash.get('snapshot_time'),
