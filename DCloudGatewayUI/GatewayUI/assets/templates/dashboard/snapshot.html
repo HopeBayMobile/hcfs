@@ -95,7 +95,7 @@
 
             function get_snapshots(action){
                 var snapshots = [];
-                $.each($("#snapshot-list ." + action + "_check:checked"), function(idx, item){
+                $.each($("#snapshot-list ." + action + "_check :checked"), function(idx, item){
                     snapshots.push(this.value);
                 });
                 return snapshots;
