@@ -5,10 +5,12 @@
     <td>{{ snapshot.name }}</td>
     <td>{{ snapshot.total_size}}GB({{snapshot.num_files}})</td>
     <td>{{ snapshot.start_time|date:"Y-m-d h:i"}}<br>|<br>{{ snapshot.finish_time|date:"Y-m-d h:i"}}</td>
-    <td>{% if snapshot.in_progress %}
-        In Progress<br>
-        <img id="progress-light" src="/static/img/dashboard/in_progress_01.png" alt="">
-        {% else %}Complete{% endif %}</td>
+    {% if snapshot.in_progress %}
+    <td class="snapshoting">In Progress<br>
+    <img id="progress-light" src="/static/img/dashboard/in_progress_01.png" alt=""></td>
+    {% else %}
+    <td>Complete</td>
+    {% endif %}
     <td>{% if snapshot.exposed %}<img src="/static/img/dashboard/export.png" alt="">{% endif %}</td>
     <td>{{ snapshot.path}}</td>
 </tr>
