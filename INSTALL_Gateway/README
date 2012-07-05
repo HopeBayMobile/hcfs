@@ -1,0 +1,18 @@
+What are in this directory?
+    The files in this directory are for installing the software of a storage gateway from a clean OS.
+    
+
+Requirement:
+    1. Ubuntu 11.04 Server amd64
+    2. Two NICs, and internet is available.
+    3. A /storage/ folder (need to build it by hand on a VM)
+    4. Soruce code directory structure being the same as 5th July 2012 on GitHub.
+    
+
+Function of files:
+
+install_gateway_all_in_one.sh
+    This script install S3ql, GUI api and GUI codes into the system and configure necessary files/folder access permissions.
+    
+DOM_gw_run_this_first.sh
+    It will build a RAID1 on sdb and sdc on a TB1 machine with a DOM on sda.
