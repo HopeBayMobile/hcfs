@@ -93,9 +93,9 @@
                 toggle_selector(animate_time);
             });
 
-            function get_snapshots(){
+            function get_snapshots(action){
                 var snapshots = [];
-                $.each($(":checked"), function(idx, item){
+                $.each($("#snapshot-list ." + action + "_check:checked"), function(idx, item){
                     snapshots.push(this.value);
                 });
                 return snapshots;
@@ -116,10 +116,11 @@
                     "text-align": "center",
                     "padding-top": "130px",
                     "vertical-align": "middle"
-                }).text("Processing...").appendTo(".tab-content")
-                $(".menu-button").removeClass("active disabled")
-                $.post('/dashboard/snapshot/'+ $(this).text().toLowerCase(),
-                       {"snapshots": get_snapshots()},
+                }).text("Processing...").appendTo(".tab-content");
+                $(".menu-button").removeClass("active disabled");
+                var action = $(this).text().toLowerCase();
+                $.post('/dashboard/snapshot/'+ action,
+                       {"snapshots": get_snapshots(action)},
                        function(ctnt, success, opts){
                         toggle_selector(animate_time);
                         mask.remove();
