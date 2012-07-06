@@ -1,7 +1,12 @@
+import ConfigParser
+
 from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 from DCloudSwift.util import util
 import DCloudSwift
+
+
+SWIFTCONF = util.GlobalVar.ORI_SWIFTCONF
 
 def dns_lookup(hosts, nameserver="192.168.11.1"):
     '''
@@ -58,20 +63,55 @@ def assign_swift_zid(hosts, replica_number):
     return ret
 
 
+def set_portal_url(portal_url):
+    '''
+    @type  portal_url: string"
+    @param portal_url: url of portal
+    @rtype: None
+    @return: no return
+    '''
+    config = ConfigParser.ConfigParser()
+    section = "portal"
+
+    try:
+        with open(SWIFTCONF) as fh:
+            config.readfp(fh)
+    except IOError:
+        raise Exception("Failed to access %s" % SWIFTCONF)
+
+    if not config.has_section(section):
+        raise Exception("There is no [portal] section in the swift config")
+
+    config.set(section, 'url', portal_url)
+
+    try:
+        with open(SWIFTCONF, 'wb') as fh:
+            config.write(fh)
+    except IOError:
+        raise Exception("Failed to access %s" % SWIFTCONF)
+
+
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
     from time import sleep
     print data["cluster_name"]
-    print data["portal_domain"]
-    print data["portal_port"]
 
+    #  Contruct URL of portal and write it to SWIFTCONF
+    if data["portal_port"] < 1 or data["portal_port"] > 65536:
+        raise Exception("Portal port has to be an ingeger within the range [1, 65536]")
+    portal_url = "https://"+data["portal_domain"]+":"+str(data["portal_port"])
+    set_portal_url(portal_url=portal_url)
+
+    # Get list of hosts
     hosts = do_meta_form.get_zone_hosts()
 
+    # Assign swift zone id for each host
     hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
     do_meta_form.report_progress(10, True, 'Calculate swift zone id for each host', None)
     
+    # Lookup ip of each host
     hosts = dns_lookup(hosts=hosts)
     for host in hosts:
         if host["ip"] is None:
