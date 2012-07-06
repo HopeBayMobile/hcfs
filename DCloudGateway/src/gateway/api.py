@@ -2052,7 +2052,7 @@ def get_smb_user_list ():
     return_val = {
                   'result' : op_ok,
                   'msg' : op_msg,
-                  'data' : {'accounts' : username}}
+                  'data' : {'accounts' : username[0]}}
 
     log.info("get_smb_user_list end")
         
