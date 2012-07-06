@@ -2137,12 +2137,12 @@ def set_smb_user_list(username, password):
         #print u
         if u == default_user_id:
             flag = True
-            
+    '''
     if flag == False: # should not happen
         log.info("set_smb_user_list fails")
         return_val['msg'] = 'invalid user, and not in current user list.'
         return json.dumps(return_val)
-        
+    ''' 
     # ok, set the password
     # notice that only a " " is required btw tokens
      
@@ -3157,8 +3157,11 @@ if __name__ == '__main__':
     #print apply_user_enc_key("123456", "1234567")
     
     #_createS3qlConf("172.16.228.53:8080")
-    data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    print data
+    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    #print data
     #print get_gateway_indicators()
     #_check_nfs_service()
+    print get_smb_user_list()
+    print set_smb_user_list("superuser", "superuser")
+    print get_smb_user_list()
     pass
