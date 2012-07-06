@@ -589,6 +589,6 @@ def config(request, action=None):
         backup_time = datetime.datetime(*time.localtime(int(result['data']['backup_time']))[0:6])
         backup_time_str = datetime.datetime.strftime(backup_time, "%Y-%m-%d %H:%M:%S")
     else:
-        backup_time = None
+        backup_time_str = None
 
-    return render(request, 'dashboard/config.html', {'backup_time': backup_time_str})
+    return render(request, 'dashboard/config.html', {'tab': 'config', 'backup_time': backup_time_str})
