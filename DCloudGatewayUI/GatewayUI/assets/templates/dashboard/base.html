@@ -30,13 +30,14 @@
         <script src="/static/js/hogan.js"></script>
         <script src="/static/js/plugins.js"></script>
         <script type="text/javascript">
+            var http_proxy_updating = false;
             $(function(){
                 {% if tab %}
                 $("#site-tab li:has(a[href='\/dashboard\/{{tab}}\/'])").addClass('active');
                 {% else %}
                 $("#site-tab li:first").addClass('active');
                 {% endif %}
-                $('#site-tab li').append('<span></span>')
+                $('#site-tab li').append('<span></span>');
 
                 function setIndicator(name, status){
                     if (status){
@@ -54,8 +55,11 @@
                             var data = JSON.parse(ctnt);
                             for (indic in data){
                                 if (indic == "HTTP_proxy_srv"){
-                                    $("#http_proxy").attr("checked", data[indic])
-                                    continue;
+                                    if (!http_proxy_updating){
+                                        $("#http_proxy").attr("checked", data[indic]);
+                                    } else {
+                                        continue;
+                                    }
                                 }
                                 setIndicator(indic, data[indic]);
                             }
@@ -72,16 +76,16 @@
                 setInterval(update_indicator, 1000);
 
                 $("body").on('click', ".msg-detail", function(){
-                    $(this).toggleClass('active')
+                    $(this).toggleClass('active');
                     if ($(this).hasClass('active')){
-                        $(this).parent('.msg-content').css('white-space', 'normal')
+                        $(this).parent('.msg-content').css('white-space', 'normal');
                     } else {
                         $(this).parent('.msg-content').css('white-space', 'nowrap');
                     }
                 });
 
                 $(".tab-btn").on('click', 'li', function(){
-                    window.location = $(this).find('a').attr('href')
+                    window.location = $(this).find('a').attr('href');
                 })
 
                 var bar = $.statusbar({
@@ -94,8 +98,8 @@
                 var msg_template = Hogan.compile('{% templatetag openvariable %}#msgs{% templatetag closevariable %}<ul class="msg-block"><li class="msg-content error">{% templatetag openvariable %} msg {% templatetag closevariable %}<div class="msg-time">{% templatetag openvariable %} timestamp {% templatetag closevariable %}</div><div class="msg-detail"></div></li></ul>{% templatetag openvariable %}/msgs{% templatetag closevariable %}');
 
                 $.get('/dashboard/syslog/', function(ctnt, success, opt){
-                    var msgs = JSON.parse(ctnt)
-                    $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content')
+                    var msgs = JSON.parse(ctnt);
+                    $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
                 });
 
                 $(".notify-box-row-NW > div").tooltip();

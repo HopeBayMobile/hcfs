@@ -42,7 +42,7 @@ def tryLock(tries=1, lockTimeout=900):
 
 def __loadSwiftMetadata(disk):
         logger = getLogger(name="__loadSwiftMetadata")
-        mountpoint = "/temp/%s"%disk
+        mountpoint = "/tmp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
 
@@ -68,7 +68,7 @@ def __loadSwiftMetadata(disk):
 	return returncode
 def __loadScripts(disk):
         logger = getLogger(name="__loadSripts")
-        mountpoint =  "/temp/%s"%disk
+        mountpoint =  "/tmp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 
 
@@ -269,7 +269,7 @@ def mountDisk(disk, mountpoint):
 
 def readFingerprint(disk):
         logger = getLogger(name="readFingerprint")
-        mountpoint =  "/temp/%s"%disk
+        mountpoint =  "/tmp/%s"%disk
         os.system("mkdir -p %s"%mountpoint)
 	fingerprint = {}
 
@@ -292,8 +292,16 @@ def readFingerprint(disk):
 
 @tryLock(1)
 def main(argv):
-	if loadScripts() == 0:
-		os.system("python /DCloudSwift/maintenance.py -R")
+    if not os.path.exists("/dev/shm/srv"):
+        os.system("mkdir /dev/shm/srv")
+        os.system("mount --bind /dev/shm/srv /srv")
+
+    if not os.path.exists("/dev/shm/DCloudSwift"):
+        os.system("mkdir /dev/shm/DCloudSwift")
+        os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
+ 
+    if loadScripts() == 0:
+        os.system("python /DCloudSwift/maintenance.py -R")
 
 if __name__ == '__main__':
 	try:

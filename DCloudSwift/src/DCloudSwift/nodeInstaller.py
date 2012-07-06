@@ -22,6 +22,8 @@ class NodeInstaller:
         self.__devicePrx = devicePrx
         self.__deviceCnt = deviceCnt
         self.__privateIP = socket.gethostbyname(socket.gethostname())
+        
+        util.createRamdiskDirs()
 
         if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
             os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")

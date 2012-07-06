@@ -9,6 +9,8 @@ def do_meta_form(data):
     print data["portal_domain"]
     print data["portal_port"]
     print data["replica_number"]
+    hosts = do_meta_form.get_zone_hosts()
+    print hosts
 
     do_meta_form.report_progress(10, True, '3secs for 10% progress', None)
     sleep(5)
