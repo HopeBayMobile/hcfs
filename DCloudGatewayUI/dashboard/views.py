@@ -574,8 +574,9 @@ def config(request, action=None):
         if result['result']:
             info = api_restore_conf.get_configuration_backup_info()
             backup_info = json.loads(info)
-            backup_time = backup_info['data']['backup_time']
-            result['backup_time']=backup_time
+            backup_time = datetime.datetime(*time.localtime(int(backup_info['data']['backup_time']))[0:6])
+            backup_time_str = datetime.datetime.strftime(backup_time, "%Y-%m-%d %H:%M:%S")
+            result['backup_time'] = backup_time_str
         
         response = json.dumps(result)
         return HttpResponse(response)
@@ -583,8 +584,9 @@ def config(request, action=None):
     info = api_restore_conf.get_configuration_backup_info()
     result = json.loads(info)
     if result['result']:
-        backup_time = result['data']['backup_time']
+        backup_time = datetime.datetime(*time.localtime(int(result['data']['backup_time']))[0:6])
+        backup_time_str = datetime.datetime.strftime(backup_time, "%Y-%m-%d %H:%M:%S")
     else:
         backup_time = None
 
-    return render(request, 'dashboard/config.html', {'backup_time': backup_time})
+    return render(request, 'dashboard/config.html', {'backup_time': backup_time_str})
