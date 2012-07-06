@@ -591,4 +591,4 @@ def config(request, action=None):
     else:
         backup_time_str = None
 
-    return render(request, 'dashboard/config.html', {'backup_time': backup_time_str})
+    return render(request, 'dashboard/config.html', {'tab': 'config', 'backup_time': backup_time_str})
