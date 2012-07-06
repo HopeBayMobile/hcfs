@@ -281,7 +281,10 @@ def sync(request):
                 if bandwidth_option == "1":
                     array = [day, 0, 24, -1]
                 elif bandwidth_option == "2":
-                    array = [day, 0, 24, bandwidth]
+                    if no_upload == "true":
+                        array = [day, 0, 24, 0]
+                    else:
+                        array = [day, 0, 24, bandwidth]
                 else:
                     if no_upload == "true":
                         array = [day, interval_from, interval_to, 0]
