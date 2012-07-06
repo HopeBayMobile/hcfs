@@ -33,9 +33,9 @@
 	    $("body").on("click", "#http_proxy:not([disabled])", function(e){
 	    	var $me = $(this);
 	    	var action = $me.is(':checked') ? "on" : "off";
+	    	http_proxy_updating = true;
+    		$me.attr("disabled", true);
 	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
-	    		http_proxy_updating = true;
-	    		$me.attr("disabled", true);
 	    		setTimeout(function(){http_proxy_updating = false;
 	    			$me.attr("disabled", false);}, 15000);
     		});
