@@ -4,7 +4,7 @@
 #if ethtool eth0 | grep -q "Port: MII";
 # eth0 should have IRQ 16
 # eth1 should have IRQ 23
-if ifconfig eth0 | grep -q "Interrupt:23"
+if ifconfig -a eth0 | grep -q "Interrupt:23"
 then
    # Misdetected eth0 and eth1
    echo "Misordered NICs. Reordering them."
