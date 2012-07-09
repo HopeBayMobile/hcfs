@@ -1,12 +1,17 @@
 import ConfigParser
+import os
+import time
+from threading import Thread
 
 from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 from DCloudSwift.util import util
+from DCloudSwift.master import SwiftDeploy
 import DCloudSwift
 
 
 SWIFTCONF = util.GlobalVar.ORI_SWIFTCONF
+PASSWORD = 'deltacloud'
 
 def dns_lookup(hosts, nameserver="192.168.11.1"):
     '''
@@ -106,18 +111,50 @@ def do_meta_form(data):
     hosts = do_meta_form.get_zone_hosts()
 
     # Assign swift zone id for each host
+    do_meta_form.report_progress(0, True, 'Calculating swift zone id for each host...', None)
     hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
-    do_meta_form.report_progress(10, True, 'Calculate swift zone id for each host', None)
     
     # Lookup ip of each host
+    do_meta_form.report_progress(5, True, 'Looking up ip for each host...', None)
     hosts = dns_lookup(hosts=hosts)
     for host in hosts:
         if host["ip"] is None:
             raise Exception("Failed to lookup the ip of %s" % host["hostname"])
-    do_meta_form.report_progress(20, True, 'Lookup IPs of hosts', None)
 
-    #raise Exception('test task fail')
+    SD = SwiftDeploy.SwiftDeploy()
+    t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
+    t.start()
+    progress = SD.getUpdateMetadataProgress()
+    do_meta_form.report_progress(10, True, 'Creating swift cluster metadata...', None)
+    while progress['finished'] != True:
+        time.sleep(10)
+        progress = SD.getUpdateMetadataProgress()
+    if progress['code'] != 0:
+        raise Exception("Failed to create metadata for %s" % progress["message"])
+
+    do_meta_form.report_progress(40, True, 'Deploying swift nodes...', None)
+    progress = SD.getDeployProgress()
+    while progress['finished'] != True:
+        time.sleep(20)
+        progress = SD.getDeployProgress()
+        proxyProgress = int(progress["proxyProgress"]) / 4 #  scaling
+        storageProgress = int(progress["storageProgress"]) / 4  # scaling
+        total_progress = 40 + proxyProgress + storageProgress
+        do_meta_form.report_progress(total_progress,
+                                     True,
+                                     progress["message"],
+                                     None)
+
+    if progress['code'] == 0:
+        do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
+    else:
+        raise Exception('Swift deployment failed for %s' % progress['message'])
+
+    do_meta_form.report_progress(100, True, "Creating a default user...", None)
+    cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (PASSWORD, hosts[0]["ip"])
+    os.system(cmd)
+    os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (hosts[0]["ip"], PASSWORD))
 
 
