@@ -69,7 +69,7 @@ class SwiftMonitor(Daemon):
         returncode = 1
 
         try:
-            cmd = "ssh root@%s rm -rf /etc/delta/%s" % (peerIp, myIp)
+            cmd = "ssh root@%s rm -rf /tmp/delta/%s" % (peerIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:
@@ -114,25 +114,25 @@ class SwiftMonitor(Daemon):
         returncode = 1
 
         try:
-            cmd = "ssh root@%s mkdir -p /etc/delta/%s" % (peerIp, myIp)
+            cmd = "ssh root@%s mkdir -p /tmp/delta/%s" % (peerIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:
                 raise util.SshpassError(stderr)
 
-            cmd = "ssh root@%s rm -rf /etc/delta/%s/*" % (peerIp, myIp)
+            cmd = "ssh root@%s rm -rf /tmp/delta/%s/*" % (peerIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:
                 raise util.SshpassError(stderr)
 
-            cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/daemon/swift/ root@%s:/etc/delta/%s/" % (peerIp, myIp)
+            cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/daemon/swift/ root@%s:/tmp/delta/%s/" % (peerIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:
                 raise util.SshpassError(stderr)
 
-            cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/daemon/DCloudSwift/ root@%s:/etc/delta/%s/" % (peerIp, myIp)
+            cmd = "scp -r -o StrictHostKeyChecking=no --preserve /etc/delta/daemon/DCloudSwift/ root@%s:/tmp/delta/%s/" % (peerIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:
@@ -177,7 +177,7 @@ class SwiftMonitor(Daemon):
                 logger.error("Failed to send materials to %s" % peerIp)
                 return
 
-            cmd = "ssh root@%s python /etc/delta/%s/DCloudSwift/CmdReceiver.py -u /etc/delta/%s/swift" % (peerIp, myIp, myIp)
+            cmd = "ssh root@%s python /tmp/delta/%s/DCloudSwift/CmdReceiver.py -u /tmp/delta/%s/swift" % (peerIp, myIp, myIp)
             logger.info(cmd)
             (status, stdout, stderr) = util.sshpass(self.password, cmd)
             if status != 0:

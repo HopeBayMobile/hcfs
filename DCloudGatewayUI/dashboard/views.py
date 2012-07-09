@@ -232,7 +232,7 @@ def sharefolder(request, action):
 
     forms_group = {}
     action_error = {}
-    smb_data = {"username": json.loads(api.get_smb_user_list()).get('data').get('username')}
+    smb_data = {"username": json.loads(api.get_smb_user_list()).get('data').get('accounts')}
     nfs_ip_query = json.loads(api.get_nfs_access_ip_list())
     if nfs_ip_query['result']:
         nfs_data = nfs_ip_query['data']
@@ -286,7 +286,10 @@ def sync(request):
                 if bandwidth_option == "1":
                     array = [day, 0, 24, -1]
                 elif bandwidth_option == "2":
-                    array = [day, 0, 24, bandwidth]
+                    if no_upload == "true":
+                        array = [day, 0, 24, 0]
+                    else:
+                        array = [day, 0, 24, bandwidth]
                 else:
                     if no_upload == "true":
                         array = [day, interval_from, interval_to, 0]
@@ -570,21 +573,22 @@ def config(request, action=None):
         elif action == 'save':
             info = api_restore_conf.save_gateway_configuration()
         result = json.loads(info)
-        
+
         if result['result']:
             info = api_restore_conf.get_configuration_backup_info()
             backup_info = json.loads(info)
-            backup_time = backup_info['data']['backup_time']
-            result['backup_time']=backup_time
-        
+            backup_time = datetime.datetime(*time.localtime(int(backup_info['data']['backup_time']))[0:6])
+            backup_time_str = datetime.datetime.strftime(backup_time, "%Y-%m-%d %H:%M:%S")
+            result['backup_time'] = backup_time_str
         response = json.dumps(result)
         return HttpResponse(response)
 
     info = api_restore_conf.get_configuration_backup_info()
     result = json.loads(info)
     if result['result']:
-        backup_time = result['data']['backup_time']
+        backup_time = datetime.datetime(*time.localtime(int(result['data']['backup_time']))[0:6])
+        backup_time_str = datetime.datetime.strftime(backup_time, "%Y-%m-%d %H:%M:%S")
     else:
-        backup_time = None
+        backup_time_str = None
 
-    return render(request, 'dashboard/config.html', {'backup_time': backup_time})
+    return render(request, 'dashboard/config.html', {'tab': 'config', 'backup_time': backup_time_str})

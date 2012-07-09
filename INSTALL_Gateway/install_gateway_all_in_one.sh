@@ -6,6 +6,12 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
    exit 1
 fi
 
+# Yen: The following packages should be installed via "dpkg -i" if we are using customized version
+# For 11.04: libfuse-dev, fuse-utils, libfuse2
+# I found that in ubuntu 12.04, we might need to first purge the default libfuse2 (which will also
+# remove other packages including grub2) before installing the customized libfuse2, or otherwise
+# the changes may not take effect. We will have to somehow verify this at some point for 11.04 and 12.04.
+
 # install dependent packages via apt-get
 apt-get install -y --force-yes python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma 
 apt-get install -y --force-yes libfuse-dev libattr1-dev python-all-dev python-sphinx build-essential 
@@ -125,6 +131,15 @@ cache_dir ufs $CACHEDIR 51200 64 128
 EOF
 
 chmod 777 $CACHEDIR
+
+# add double check cache directory at each power on
+cat >/etc/init.d/make_http_proxy_cache_dir <<EOF
+mkdir $CACHEDIR
+chmod 777 $CACHEDIR
+EOF
+chmod 777 /etc/init.d/make_http_proxy_cache_dir
+cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
+
 echo "    Squid3 configuration has been written."
 # ^^^^^-- install GUI API -----------------------------------------------------------------------------
 

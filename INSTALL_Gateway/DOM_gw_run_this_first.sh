@@ -20,6 +20,9 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
    exit 1
 fi
 
+# install mdadm package
+apt-get -y install mdadm
+
 # this token will be written if the raid is built successfuly
 SAFE_TOKEN="/storage/.init_raid_ok"
 
@@ -165,9 +168,8 @@ cat >/root/build_raid1.sh <<EOF
 EOF
 
 ## append build_raid1.sh to /etc/rc.local
-INCLUDE_CONF="bash /root/build_raid1.sh"
-grep $INCLUDE_CONF /etc/rc.local > /dev/null
-if [ "$?" -ne "1" ]; then
-   echo $INCLUDE_CONF >> /etc/rc.local
-fi
-
+cat >/etc/init.d/check_raid1 <<EOF
+/root/build_raid1.sh
+EOF
+chmod 777 /etc/init.d/check_raid1
+cp -rs /etc/init.d/check_raid1 /etc/rc2.d/S10check_raid1

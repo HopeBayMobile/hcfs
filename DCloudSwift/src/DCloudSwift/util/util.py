@@ -135,6 +135,20 @@ def timeout(timeout_time):
     return timeoutDeco
 
 
+#TODO: add error checking
+def createRamdiskDirs():
+    '''
+    Create some necessary directories using ramdisks
+    '''
+    if not os.path.exists("/dev/shm/srv"):
+        os.system("mkdir /dev/shm/srv")
+        os.system("mount --bind /dev/shm/srv /srv")
+
+    if not os.path.exists("/dev/shm/DCloudSwift"):
+        os.system("mkdir /dev/shm/DCloudSwift")
+        os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
+
+
 #TODO: findout a beter way to check if a daemon is alive
 def isDaemonAlive(daemonName):
     logger = getLogger(name="isDaemonAlive")
@@ -282,10 +296,10 @@ def getLogger(name=None, conf=SWIFTCONF):
     @type  conf: string
     @param conf: path to the swift cluster config
     @rtype:  logging.Logger
-    @return: If conf is not specified or does not exist then 
+    @return: If conf is not specified or does not exist then
              return a logger which writes log to /var/log/deltaSwift with log-level=INFO.
              Otherwise, return a logger with setting specified in conf.
-             The log rotates every 1MB and with 5 bacup. 
+             The log rotates every 1MB and with 5 bacup.
     """
 
     try:
@@ -360,7 +374,7 @@ def getProxyPort():
 
 def generateSwiftConfig():
     """
-    Generate config files for proxy, rsyncd, accountserver, containcerserver 
+    Generate config files for proxy, rsyncd, accountserver, containcerserver
     and objectserver.
 
     @rtype: None
@@ -480,7 +494,7 @@ def getProxyNodeIpList(swiftDir="/etc/swift"):
     @param swiftDir: path to the directory containing the file proxyList
     @rtype: list
     @return: If swiftDir/proxyList exists and contains legal contents
-             then return the ip list of proxy nodes. 
+             then return the ip list of proxy nodes.
              Otherwise, return none,
     """
     logger = getLogger(name="getProxyNodeIpList")
@@ -841,7 +855,11 @@ def hostname2Ip(hostname, nameserver="192.168.11.1"):
 
     for line in lines:
         if hostname in line:
-            return line.split()[3]
+            ip = line.split()[3]
+            if ip.find("255.255.255.255") != -1:
+                return None
+            else:
+                return ip
 
     return None
 
@@ -878,45 +896,6 @@ class TryLockError(Exception):
 
 
 if __name__ == '__main__':
-    print getPortalUrl()
-    print getProxyPort()
-    generateSwiftConfig()
-#    print jsonStr2SshpassArg('{ "Hello" : 3, "list":["192.167.1.1", "178.16.3.1"]}')
-#    spreadPackages(password="deltacloud", nodeList = ["172.16.229.24"])
-#    print installAllDeb("/DCloudSwift/storage/deb_source")
-#    print isLineExistent("/etc/fstab","ddd")
-#    print getStorageNodeIpList()
-#    runPopenCommunicate("cd /etc/swift", inputString='y\n', logger=logger)
-#    runPopenCommunicate("mkfs -t ext4 /dev/sda", inputString='y\n', logger=logger)
-
-#    logger = getLogger(name="Hello")
-#    logger.info("Hello")
-
-#    spreadMetadata(password="deltacloud",nodeList=["172.16.229.132"])
-
-#    @timeout(5)
-#    def printstring():
-#        print "Start!!"
-#        time.sleep(10)
-#        print "This is not timeout!!!"
-#    printstring()
-#    @tryLock(1,1)
-#    def testTryLock():
-#        print "Hello"
-#    @tryLock(2,1)
-#    def testTryLock2():
-#        print "H"
-#        testTryLock()
-#    testTryLock2()
-    #print getListenPid("0.0.0.0:8080")
-
-    #sendMaterials("deltacloud", "172.16.229.146")
-    #cmd = "ssh root@172.16.229.146 sleep 5"
-    #print sshpass("deltacloud", cmd, timeout=1)
-    #print os.path.dirname(os.path.dirname(os.getcwd()))
-    #print isDaemonAlive("memcached")
-    #restartAllServices()
-    #print stopAllServices()
-    #generateSwiftConfig()
-    #print getSwiftNodeIpList()
+    #createRamdiskDirs()
+    print hostname2Ip("GDFGSDFSD")
     pass

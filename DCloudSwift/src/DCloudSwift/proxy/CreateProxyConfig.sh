@@ -13,6 +13,7 @@ export PORTAL_URL=$3
 
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
+cd /etc/swift
 
 
 cat >/etc/swift/swift.conf <<EOF
@@ -31,8 +32,6 @@ CTC
 CW
 cw.luo@delta.com.tw
 EOF
-mv cert.key /etc/swift
-mv cert.crt /etc/swift
 
 
 perl -pi -e "s/-l *.*.*.*/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
