@@ -65,6 +65,7 @@ def main():
         os.system("cp gateway_scripts/service_restart %s/"%CONFDIR)
         os.system("cp gateway_scripts/hourly_snapshotting %s/"%CONFDIR)
         os.system("cp gateway_scripts/run_background_tasks %s/"%CONFDIR)
+        os.system("cp gateway_scripts/reorder_eth.sh %s/"%CONFDIR)
         os.system("rm -rf /root/.s3ql/*")
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)

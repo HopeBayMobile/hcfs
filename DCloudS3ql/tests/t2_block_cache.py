@@ -114,7 +114,9 @@ class cache_tests(TestCase):
 
         # We want to expire 4 entries, 2 of which are already flushed
         self.cache.max_entries = 16
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
+        # wthung, to work around our modification
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=3)
+        #self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
         self.cache.expire()
         self.cache.bucket_pool.verify()
         self.assertEqual(len(self.cache.entries), 16)
@@ -188,7 +190,9 @@ class cache_tests(TestCase):
         self.cache.upload(el3)
         self.cache.bucket_pool.verify()
 
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool)
+        # wthung, to work around our modification
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
+        #self.cache.bucket_pool = TestBucketPool(self.bucket_pool)
         with self.cache.get(inode, blockno1) as fh:
             fh.seek(0)
             fh.write(data1)
@@ -203,7 +207,9 @@ class cache_tests(TestCase):
         blockno2 = 24
         data = self.random_data(datalen)
 
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
+        # wthung, to work around our modification
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
+        #self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
         with self.cache.get(inode, blockno1) as fh:
             fh.seek(0)
             fh.write(data)
@@ -258,7 +264,9 @@ class cache_tests(TestCase):
         with self.cache.get(inode, 1) as fh:
             fh.seek(0)
             fh.write(data1)
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
+        # wthung, to work around our modification
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
+        #self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
         self.cache.clear()
         self.cache.bucket_pool.verify()
         self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_del=1)
@@ -285,7 +293,7 @@ class TestBucketPool(AbstractBucket):
         if self.no_read != 0:
             raise RuntimeError('Got too few open_read calls')
         if self.no_write != 0:
-            raise RuntimeError('Got too few open_write calls')
+            raise RuntimeError('Got too few open_write calls, %d' % self.no_write)
         if self.no_del != 0:
             raise RuntimeError('Got too few delete calls')
 
@@ -309,7 +317,7 @@ class TestBucketPool(AbstractBucket):
     def open_write(self, key, metadata=None, is_compressed=False):
         self.no_write -= 1
         if self.no_write < 0:
-            raise RuntimeError('Got too many open_write calls')
+            raise RuntimeError('Got too many open_write calls, %d' % self.no_write)
 
         return self.bucket.open_write(key, metadata, is_compressed)
 

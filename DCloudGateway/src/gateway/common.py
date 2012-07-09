@@ -94,6 +94,32 @@ def getAllDisks():
 
         return disks
 
+# wthung, 2012/7/6
+def getDiskCapacity(dev_name):
+    """
+    Get devicne capacity.
+
+    @type dev_name: string
+    @param dev_name: Device name to be queried. For example: /dev/sda.
+    @rtype: Float
+    @return: Device capacity if any. Otherwise, None.
+    """
+
+    cmd = "sudo fdisk -l %s" % dev_name
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    lines = po.stdout.readlines()
+    
+    for line in lines:
+        re1='.*?'	# Non-greedy match on filler
+        re2='([+-]?\\d*\\.\\d+)(?![-+0-9\\.])'	# Float 1
+        rg = re.compile(re1+re2,re.IGNORECASE|re.DOTALL)
+        m = rg.search(line)
+        if m:
+            float1=m.group(1)
+            return float
+    
+    return None
+
 def getTestFolder():
 	config = ConfigParser()
 	conf = "%s/test.ini"%DIR

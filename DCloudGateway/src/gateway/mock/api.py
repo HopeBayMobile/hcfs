@@ -232,7 +232,7 @@ def get_smb_user_list():
     return_val = {
             'result': True,
             'msg': "This is a mock value for testing purpose.",
-            'data': {'username' : 'admin'}
+            'data': {'accounts' : 'superuser'}
     }
     return json.dumps(return_val)
 
