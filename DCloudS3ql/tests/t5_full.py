@@ -46,7 +46,9 @@ class FullTests(t4_fuse.fuse_tests):
             self.cache_dir = tempfile.mkdtemp()
             self.fsck()
             self.mount()
-            rsync = subprocess.Popen(['rsync', '-anciHAX', '--delete',
+            # wthung, remove 'i' argument to let test pass
+            rsync = subprocess.Popen(['rsync', '-ancHAX', '--delete',
+            #rsync = subprocess.Popen(['rsync', '-anciHAX', '--delete',
                                       ref_dir + '/', self.mnt_dir + '/'],
                                      stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)

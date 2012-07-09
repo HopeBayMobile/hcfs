@@ -54,6 +54,7 @@ class fsck_tests(TestCase):
         self.assertFalse(self.fsck.found_errors)
 
     def test_cache(self):
+        
         inode = self.db.rowid("INSERT INTO inodes (mode,uid,gid,mtime,atime,ctime,refcount,size) "
                               "VALUES (?,?,?,?,?,?,?,?)",
                               (stat.S_IFREG | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
@@ -88,7 +89,7 @@ class fsck_tests(TestCase):
 
 
     def test_lof1(self):
-
+        
         # Make lost+found a file
         inode = self.db.get_val("SELECT inode FROM contents_v WHERE name=? AND parent_inode=?",
                                 (b"lost+found", ROOT_INODE))
@@ -201,14 +202,16 @@ class fsck_tests(TestCase):
                         (self._add_name(name), inode, ROOT_INODE))
 
     def test_inodes_size(self):
-
+        # insert an inode, size 128
         id_ = self.db.rowid("INSERT INTO inodes (mode,uid,gid,mtime,atime,ctime,refcount,size) "
                             "VALUES (?,?,?,?,?,?,?,?)",
                             (stat.S_IFREG | stat.S_IRUSR | stat.S_IWUSR,
                              0, 0, time.time(), time.time(), time.time(), 1, 128))
         self._link('test-entry', id_)
 
+        # obj size 36
         obj_id = self.db.rowid('INSERT INTO objects (refcount,size) VALUES(?,?)', (1, 36))
+        # block size 512
         block_id = self.db.rowid('INSERT INTO blocks (refcount, obj_id, size) VALUES(?,?,?)',
                                  (1, obj_id, 512))
         self.bucket['s3ql_data_%d' % obj_id] = 'foo'
@@ -217,6 +220,14 @@ class fsck_tests(TestCase):
         self.db.execute('UPDATE inodes SET size=? WHERE id=?', (self.max_obj_size + 120, id_))
         self.db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) VALUES(?, ?, ?)',
                         (id_, 1, block_id))
+        # wthung, to work around our modification
+        # Create new block
+        fh = open(self.cachedir + '/%d-0' % id_, 'wb')
+        fh.write('somedata')
+        fh.close()
+        os.chmod(self.cachedir + '/%d-0' % id_, 0)
+        self.fsck.check_cached_blocks()
+        
         self.assert_fsck(self.fsck.check_inodes_size)
 
         # Case 2
