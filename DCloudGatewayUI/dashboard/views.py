@@ -272,12 +272,12 @@ def sync(request):
 
     if request.method == "POST":
         query = request.POST
-        day = query['day']
-        bandwidth_option = query['bandwidth_option']
-        interval_to = query['interval_to']
-        interval_from = query['interval_from']
-        bandwidth = query['bandwidth']
-        no_upload = query['no_upload']
+        day = query.get('day')
+        bandwidth_option = query.get('bandwidth_option')
+        interval_to = query.get('interval_to')
+        interval_from = query.get('interval_from')
+        bandwidth = query.get('bandwidth')
+        no_upload = query.get('no_upload')
 
         for value in data:
             if value[0] == day:
