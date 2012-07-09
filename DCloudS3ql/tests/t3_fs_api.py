@@ -703,6 +703,9 @@ class fs_api_tests(TestCase):
 
         # ..with a 3rd hardlink
         f2_inode = self.server.link(f2_inode.id, d1_inode.id, 'file2_hardlink')
+        
+        # wthung, upload cache before copy
+        self.block_cache.commit()
 
         # Replicate
         self.server.copy_tree(src_inode.id, dst_inode.id)
@@ -758,6 +761,9 @@ class fs_api_tests(TestCase):
         self.server.write(fh, self.max_obj_size, 'block 1 contents')
         self.server.release(fh)
         self.server.forget([(inode.id, 1)])
+        
+        # wthung, upload cache before copy
+        self.block_cache.commit()
 
         self.server.copy_tree(src_inode.id, dst_inode.id)
 

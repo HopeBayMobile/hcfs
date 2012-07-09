@@ -211,3 +211,6 @@ class DumpTests(TestCase):
 # Somehow important according to pyunit documentation
 def suite():
     return unittest.makeSuite(DumpTests)
+
+if __name__ == "__main__":
+    unittest.main()

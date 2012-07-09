@@ -39,12 +39,19 @@ class cpTests(t4_fuse.fuse_tests):
         # Extract tar
         data_file = os.path.join(os.path.dirname(__file__), 'data.tar.bz2')
         tempdir = tempfile.mkdtemp()
+        
         try:
             tarfile.open(data_file).extractall(tempdir)
 
             # Rsync
             subprocess.check_call(['rsync', '-aHAX', tempdir + '/',
                                    os.path.join(self.mnt_dir, 'orig') + '/'])
+
+            # wthung, because JiaHong modified the code to raise exception 
+            #    if dirty cache is not empty on copy.
+            # we need to flush cache before the test of copy
+            print("Trying to flush cache before copy")
+            os.system("sudo s3qlctrl flushcache %s" % self.mnt_dir)
 
             # copy
             subprocess.check_call([os.path.join(t4_fuse.BASEDIR, 'bin', 's3qlcp'),

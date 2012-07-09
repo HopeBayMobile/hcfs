@@ -568,6 +568,11 @@ def _check_HDD():
         all_disk = common.getAllDisks()
         nu_all_disk = len(all_disk)
         op_all_disk = 0
+        
+        # wthung, 2012/7/6
+        # check if hdds number is 3. If not, return false immediately
+        if nu_all_disk < 3:
+            return False
     
         for i in all_disk:
             cmd ="sudo smartctl -a %s"%i
@@ -3160,5 +3165,5 @@ if __name__ == '__main__':
     #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
     #print data
     #print get_gateway_indicators()
-    _check_nfs_service()
+    print _check_HDD()
     pass
