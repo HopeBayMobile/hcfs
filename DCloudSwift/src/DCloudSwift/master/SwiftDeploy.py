@@ -236,7 +236,7 @@ class SwiftDeploy:
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
             versBase = int(time.time()) * 100000
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
             if os.path.isdir(swiftDir):
                 os.system("rm -rf %s" % swiftDir)
@@ -274,7 +274,7 @@ class SwiftDeploy:
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
@@ -301,7 +301,7 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
+            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
             self.__setUpdateMetadataProgress(code=0, finished=True, progress=100)
 
         except Exception as e:
@@ -315,7 +315,7 @@ class SwiftDeploy:
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
             oriProxyList = []
@@ -348,7 +348,7 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
+            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
 
             self.__setUpdateMetadataProgress(finished=True, code=0)
         except Exception as e:
@@ -382,7 +382,7 @@ class SwiftDeploy:
                 raise DeployProxyError(errMsg)
 
             #cmd = "scp -r /etc/delta/swift root@%s:%s" % (proxyIP, pathname)
-            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, proxyIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, proxyIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
@@ -446,7 +446,7 @@ class SwiftDeploy:
                 raise DeployStorageError(errMsg)
 
             #cmd = "scp -r /etc/delta/swift root@%s:%s" % (storageIP, pathname)
-            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, storageIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, storageIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
@@ -537,7 +537,8 @@ class SwiftDeploy:
                 errMsg = "Failed to clear /etc/delta/master for %s" % (nodeIP, stderr)
                 raise SpreadRingFilesError(errMsg)
 
-            cmd = "scp -r /etc/delta/swift root@%s:%s" % (nodeIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, nodeIP, pathname)
+            #cmd = "scp -r /etc/swift root@%s:%s" % (nodeIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp ring files to %s for %s" % (nodeIP, stderr)
@@ -1113,7 +1114,7 @@ def deploy():
         return ret
 
 if __name__ == '__main__':
-    print util.getNumOfReplica("/etc/delta/swift")
+    print util.getNumOfReplica("/etc/swift")
     #t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
     #t = Thread(target=SD.spreadRingFiles, args=())
     #t.start()
