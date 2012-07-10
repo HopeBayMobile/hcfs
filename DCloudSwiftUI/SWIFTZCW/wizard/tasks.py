@@ -147,14 +147,18 @@ def do_meta_form(data):
                                      progress["message"],
                                      None)
 
-    if progress['code'] == 0:
-        do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
-    else:
+    if progress['code'] != 0:
         raise Exception('Swift deployment failed for %s' % progress['message'])
 
+    check = SD.isDeploymentOk(proxyList=hosts,
+                              storageList=hosts, 
+                              blackList=progress['blackList'], 
+                              numOfReplica=int(data["replica_number"]))
+    if not check.val:
+        raise Exception("Swift deploy failed for %s" % check.msg)
+    else:
+        do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
     do_meta_form.report_progress(100, True, "Creating a default user...", None)
     cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (PASSWORD, hosts[0]["ip"])
     os.system(cmd)
     os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (hosts[0]["ip"], PASSWORD))
-
-
