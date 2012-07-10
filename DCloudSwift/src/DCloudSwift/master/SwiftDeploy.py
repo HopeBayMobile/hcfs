@@ -175,7 +175,7 @@ class SwiftDeploy:
                 self.__deployProgress['blackList'].append(ip)
                 self.__deployProgress['message'].append(msg)
             if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
-                swiftDir = '/etc/swift'
+                swiftDir = "/etc/swift"
                 numOfReplica = util.getNumOfReplica(swiftDir)
 
                 if numOfReplica is None:
