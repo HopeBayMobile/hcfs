@@ -175,20 +175,6 @@ class SwiftDeploy:
                 self.__deployProgress['blackList'].append(ip)
                 self.__deployProgress['message'].append(msg)
             if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
-                swiftDir = "/etc/swift"
-                numOfReplica = util.getNumOfReplica(swiftDir)
-
-                if numOfReplica is None:
-                    self.__deployProgress['code'] = 1
-                    self.__deployProgress['message'].append("Failed to get numOfReplica")
-                else:
-                    ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'], numOfReplica)
-                    if ret.val == False:
-                        self.__deployProgress['code'] = 1
-                        self.__deployProgress['message'].append(ret.msg)
-                    else:
-                        self.__deployProgress['code'] = 0
-
                 self.__deployProgress['finished'] = True
         finally:
             lock.release()
@@ -630,7 +616,7 @@ class SwiftDeploy:
             Bool = collections.namedtuple("Bool", "val msg")
             return Bool(val, msg)
 
-    def __isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
+    def isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
         zidSet = set()
         failedZones = set()
         proxyIpSet = set()
@@ -1094,17 +1080,19 @@ def deploy():
             print progress
             progress = SD.getDeployProgress()
 
-        if progress['code'] == 0:
+        check = SD.isDeploymentOk(proxyList, storageList, progress['blackList'], numOfReplica)
+        if progress["code"]!=0:
+            print "Swift deploy failed for %s" % progress["message"]
+        elif not check.val:
+            print "Swift deploy failed for %s" % check.msg
+        else:
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
             cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, proxyList[0]["ip"])
             os.system(cmd)
             os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (proxyList[0]["ip"], password))
-        else:
-            print "Swift deploy failed"
 
-        return 0
     except Exception as e:
         print >>sys.stderr, str(e)
     finally:
