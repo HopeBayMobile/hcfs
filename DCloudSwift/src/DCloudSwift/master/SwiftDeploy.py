@@ -175,7 +175,7 @@ class SwiftDeploy:
                 self.__deployProgress['blackList'].append(ip)
                 self.__deployProgress['message'].append(msg)
             if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
-                swiftDir = self.__deltaDir + '/swift'
+                swiftDir = '/etc/swift'
                 numOfReplica = util.getNumOfReplica(swiftDir)
 
                 if numOfReplica is None:
@@ -259,7 +259,6 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
         except Exception as e:
             logger.error(str(e))
@@ -301,7 +300,6 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
             self.__setUpdateMetadataProgress(code=0, finished=True, progress=100)
 
         except Exception as e:
@@ -348,7 +346,6 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
 
             self.__setUpdateMetadataProgress(finished=True, code=0)
         except Exception as e:
@@ -601,7 +598,7 @@ class SwiftDeploy:
         msg = ""
 
         if swiftDir is None:
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
         try:
 
@@ -682,7 +679,7 @@ class SwiftDeploy:
             return Bool(val, msg)
 
     def spreadRingFiles(self):
-        swiftDir = "%s/swift" % self.__deltaDir
+        swiftDir = "/etc/swift"
         swiftNodeIpList = util.getSwiftNodeIpList(swiftDir)
 
         self.__nodes2Process = swiftNodeIpList
