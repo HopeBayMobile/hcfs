@@ -26,6 +26,7 @@ from util.SwiftCfg import SwiftCfg
 from util.util import GlobalVar
 
 UNNECESSARYFILES = "cert* *.conf backups"
+EXCLUDE = "--exclude cert* --exclude *.conf --exclude backups"
 lock = threading.Lock()
 
 
@@ -258,7 +259,7 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
+            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
         except Exception as e:
             logger.error(str(e))
@@ -380,7 +381,8 @@ class SwiftDeploy:
                 errMsg = "Failed to scp proxy deploy scripts to %s for %s" % (proxyIP, stderr)
                 raise DeployProxyError(errMsg)
 
-            cmd = "scp -r /etc/delta/swift root@%s:%s" % (proxyIP, pathname)
+            #cmd = "scp -r /etc/delta/swift root@%s:%s" % (proxyIP, pathname)
+            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, proxyIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
@@ -443,7 +445,8 @@ class SwiftDeploy:
                 errMsg = "Failed to scp storage scripts to %s for %s" % (storageIP, stderr)
                 raise DeployStorageError(errMsg)
 
-            cmd = "scp -r /etc/delta/swift root@%s:%s" % (storageIP, pathname)
+            #cmd = "scp -r /etc/delta/swift root@%s:%s" % (storageIP, pathname)
+            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, storageIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
