@@ -219,6 +219,11 @@ class SwiftDeploy:
         logger = util.getLogger(name="createMetadata")
         try:
             self.__setUpdateMetadataProgress()
+            
+            # It is not allowed to deploy swift on the master node
+            if self.isMasterNodeInside(proxyList + storageList):
+                raise Exception("Master node is not allowed to be deployed!!")
+
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
             versBase = int(time.time()) * 100000
@@ -255,6 +260,10 @@ class SwiftDeploy:
         logger = util.getLogger(name="__updateMetadata2AddNodes")
         try:
             self.__setUpdateMetadataProgress()
+            
+            # It is not allowed to deploy swift on the master node
+            if self.isMasterNodeInside(proxyList + storageList ):
+                raise Exception("Master node is not allowed to be deployed!!")
 
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
@@ -394,6 +403,7 @@ class SwiftDeploy:
     def __proxyDeploy(self):
         logger = util.getLogger(name="proxyDeploy")
         argumentList = []
+
         for i in [node["ip"] for node in self.__proxyList]:
             argumentList.append(([i], None))
         pool = threadpool.ThreadPool(10)
@@ -459,6 +469,7 @@ class SwiftDeploy:
     def __storageDeploy(self):
         logger = util.getLogger(name="storageDeploy")
         argumentList = []
+
         for i in [node["ip"] for node in self.__storageList]:
                 argumentList.append(([i], None))
         pool = threadpool.ThreadPool(20)
@@ -664,6 +675,22 @@ class SwiftDeploy:
             Bool = collections.namedtuple("Bool", "val msg")
             return Bool(val, msg)
 
+    def isMasterNodeInside(self, nodeList):
+        '''
+            Check if the input node list contains the maser node
+            @type  nodeList: list
+            @param nodeList: a list of nodes to deploy
+            @param numOfReplica: number of replica for each object
+            @rtype: Bool
+            @return: If the master node is not in the list then return True.
+                     Otherwise, return False.
+        '''
+        masterIp = util.getIpAddress()
+        for node in nodeList:
+            if node["ip"] == masterIp:
+                return True
+        return False
+
     def spreadRingFiles(self):
         swiftDir = "/etc/swift"
         swiftNodeIpList = util.getSwiftNodeIpList(swiftDir)
@@ -686,6 +713,11 @@ class SwiftDeploy:
 
     def addNodes(self, proxyList=[], storageList=[]):
         logger = util.getLogger(name="addStorage")
+
+        # It is not allowed to deploy swift on the master node
+        if self.isMasterNodeInside(proxyList + storageList ):
+            raise Exception("%s is the master node!!" % masterIp)
+
         try:
             self.__updateMetadata2AddNodes(proxyList=proxyList, storageList=storageList)
         except UpdateMetadataError as e:
