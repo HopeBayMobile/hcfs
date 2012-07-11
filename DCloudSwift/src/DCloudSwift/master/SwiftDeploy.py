@@ -250,6 +250,13 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
+
+            if util.generateMasterProxyConfig() !=0:
+                raise Exception("Failed to create master proxy config!!")
+
+            if util.restartSwiftProxy() !=0:
+                raise Exception("Failed to start master proxy after generating metadata")
+
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
         except Exception as e:
             logger.error(str(e))
@@ -510,6 +517,7 @@ class SwiftDeploy:
             os.system("rm %s" % GlobalVar.ACCOUNT_DB)
             self.__createMetadata(proxyList, storageList, numOfReplica)
             self.__deploySwift(proxyList, storageList)
+
         except UpdateMetadataError, DeploySwiftError:
             return
 
@@ -1121,9 +1129,9 @@ def deploy():
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, proxyList[0]["ip"])
+            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, util.getIpAddress())
             os.system(cmd)
-            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (proxyList[0]["ip"], password))
+            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
 
     except Exception as e:
         print >>sys.stderr, str(e)
@@ -1131,7 +1139,8 @@ def deploy():
         return ret
 
 if __name__ == '__main__':
-    print util.getNumOfReplica("/etc/swift")
+    #print util.getNumOfReplica("/etc/swift")
+    print util.restartSwiftProxy()
     #t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
     #t = Thread(target=SD.spreadRingFiles, args=())
     #t.start()

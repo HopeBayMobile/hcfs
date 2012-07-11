@@ -99,7 +99,6 @@ def set_portal_url(portal_url):
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
     from time import sleep
-    print data["cluster_name"]
 
     #  Contruct URL of portal and write it to SWIFTCONF
     if data["portal_port"] < 1 or data["portal_port"] > 65536:

@@ -13,6 +13,7 @@ import math
 import pickle
 import time
 import functools
+import errno
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
@@ -86,7 +87,7 @@ def retry(tries, delay=3):
             mtries, mdelay = tries, delay  # make mutable
             rv = f(*args, **kwargs)  # first attempt
             while mtries > 0:
-                if rv == 0 or rv == True:  # Done on success
+                if rv is 0 or rv is True:  # Done on success
                     return rv
                 mtries -= 1      # consume an attempt
                 time.sleep(mdelay)  # wait...
@@ -201,6 +202,33 @@ def startAllServices():
     startRsync()
     startMemcached()
     startSwiftServices()
+
+
+def restartSwiftProxy():
+    logger = getLogger(name="restartProxy")
+
+    cmd = "swift-init proxy start"
+    po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output = po.stdout.read()
+    po.wait()
+
+    if po.returncode !=0:
+        return po.returncode
+
+    cmd = "swift-init proxy stop"
+    po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output = po.stdout.read()
+    po.wait()
+
+    if po.returncode != 0:
+        return po.returncode
+
+    cmd = "swift-init proxy start"
+    po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    output = po.stdout.read()
+    po.wait()
+
+    return po.returncode
 
 
 def restartRsync():
@@ -340,7 +368,8 @@ def getLogger(name=None, conf=SWIFTCONF):
 
 def getPortalUrl():
     '''
-    get protalUrl from Swift.ini
+    Parse SWIFTCONF to find and return protalUrl.
+    Return None if failed.
     '''
     logger = getLogger(name="getPortalUrl")
     portalUrl = None
@@ -359,7 +388,8 @@ def getProxyPort():
     get proxyPort by reading SWIFTCONF
 
     @rtype: integer
-    @return: no return
+    @return: Parse the config file to find and return the proxy port. 
+             Return None if failed.
     '''
     logger = getLogger(name="getProxyPort")
     proxyPort = None
@@ -371,6 +401,34 @@ def getProxyPort():
         logger.error(str(e))
 
     return proxyPort
+
+
+def generateMasterProxyConfig():
+    """
+    Generate proxy config files for master.
+
+    @rtype: integer
+    @return: 0 iff the proxy Config is successfully generated.
+    """
+    logger = getLogger(name="generateMasterProxyConfig")
+    ip = getIpAddress()
+    proxyPort = getProxyPort()
+    portalUrl = getPortalUrl()
+
+    if proxyPort and ip and portalUrl:
+        cmd = "sh %s/DCloudSwift/proxy/CreateMasterProxyConfig.sh %d %s %s" % (BASEDIR, proxyPort, ip, portalUrl)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+        po.wait()
+
+        if po.returncode != 0:
+            logger.error("Failed to run %s for %s" % (cmd, lines))
+            return 1
+    else:
+        logger.error("Failed to generate master proxy config due to incompte arguments")
+        return 1
+
+    return 0
 
 
 def generateSwiftConfig():
@@ -898,5 +956,6 @@ class TryLockError(Exception):
 
 if __name__ == '__main__':
     #createRamdiskDirs()
-    print hostname2Ip("GDFGSDFSD")
+    #print hostname2Ip("GDFGSDFSD")
+    #print restartSwiftProxy()
     pass
