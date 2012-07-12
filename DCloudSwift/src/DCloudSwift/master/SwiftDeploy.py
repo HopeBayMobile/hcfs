@@ -257,6 +257,9 @@ class SwiftDeploy:
             if util.restartSwiftProxy() !=0:
                 raise Exception("Failed to start master proxy after generating metadata")
 
+            if util.restartMemcached() !=0:
+                raise Exception("Failed to start memcached after generating metadata")
+
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
         except Exception as e:
             logger.error(str(e))

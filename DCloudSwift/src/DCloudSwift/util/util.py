@@ -259,7 +259,6 @@ def restartMemcached():
     os.system("/etc/init.d/memcached stop")
     os.system("rm /var/run/memcached.pid")
 
-    #cmd = "/etc/init.d/memcached start 1>/dev/null 2>/dev/null &"
     cmd = "/etc/init.d/memcached start"
     po = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
 
