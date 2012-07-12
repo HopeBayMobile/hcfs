@@ -34,7 +34,7 @@ class Test_isDeploymentOk:
 			node = {"ip":ip, "zid":i}
 			storageList.append(node)
 
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==False)
 
@@ -53,7 +53,7 @@ class Test_isDeploymentOk:
 			node = {"ip":ip, "zid":i}
 			storageList.append(node)
 
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==True)
 
@@ -75,7 +75,7 @@ class Test_isDeploymentOk:
 		for i in range(self.numOfReplica):
 			blackList.append("192.168.12.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 
 		nose.tools.ok_(result.val==False)
 
@@ -97,7 +97,7 @@ class Test_isDeploymentOk:
 		for i in range(self.numOfReplica-1):
 			blackList.append("192.168.12.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==True, result.msg)
 
 	def test_allProxyFailed(self):
@@ -118,7 +118,7 @@ class Test_isDeploymentOk:
 		for i in range(2):
 			blackList.append("192.168.13.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==False)
 
 	def test_someProxyFailed(self):
@@ -139,7 +139,7 @@ class Test_isDeploymentOk:
 		for i in range(1):
 			blackList.append("192.168.13.%d"%i)
 			
-		result = self.SD._SwiftDeploy__isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
+		result = self.SD.isDeploymentOk(proxyList, storageList, blackList, self.numOfReplica)
 		nose.tools.ok_(result.val==True, result.msg)
 
 	def teardown(self):
