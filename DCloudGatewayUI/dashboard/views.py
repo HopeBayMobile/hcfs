@@ -484,7 +484,6 @@ def snapshot(request, action=None):
 
 def get_snapshot_default_value():
     return_hash = {'the_day': {}}
-    the_day = {}
     for i in range(0, 24):
         if i < 12:
             val = str(i) + " am"
