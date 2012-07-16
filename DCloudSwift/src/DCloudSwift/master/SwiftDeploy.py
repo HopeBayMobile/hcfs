@@ -107,7 +107,7 @@ class SwiftDeploy:
                 'progress': progress,
                 'finished': finished,
                 'code': code,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -124,7 +124,7 @@ class SwiftDeploy:
                 'deployedProxy': deployedProxy,
                 'deployedStorage': deployedStorage,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -140,7 +140,7 @@ class SwiftDeploy:
                 'finished': finished,
                 'code': code,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -156,7 +156,7 @@ class SwiftDeploy:
                 'finished': finished,
                 'code': code,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -219,7 +219,7 @@ class SwiftDeploy:
         logger = util.getLogger(name="createMetadata")
         try:
             self.__setUpdateMetadataProgress()
-            
+
             # It is not allowed to deploy swift on the master node
             if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
@@ -251,13 +251,13 @@ class SwiftDeploy:
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
 
-            if util.generateMasterProxyConfig() !=0:
+            if util.generateMasterProxyConfig() != 0:
                 raise Exception("Failed to create master proxy config!!")
 
-            if util.restartSwiftProxy() !=0:
+            if util.restartSwiftProxy() != 0:
                 raise Exception("Failed to start master proxy after generating metadata")
 
-            if util.restartMemcached() !=0:
+            if util.restartMemcached() != 0:
                 raise Exception("Failed to start memcached after generating metadata")
 
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
@@ -270,9 +270,9 @@ class SwiftDeploy:
         logger = util.getLogger(name="__updateMetadata2AddNodes")
         try:
             self.__setUpdateMetadataProgress()
-            
+
             # It is not allowed to deploy swift on the master node
-            if self.isMasterNodeInside(proxyList + storageList ):
+            if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
 
             deviceCnt = self.__kwparams['deviceCnt']
@@ -726,7 +726,7 @@ class SwiftDeploy:
         logger = util.getLogger(name="addStorage")
 
         # It is not allowed to deploy swift on the master node
-        if self.isMasterNodeInside(proxyList + storageList ):
+        if self.isMasterNodeInside(proxyList + storageList):
             raise Exception("%s is the master node!!" % masterIp)
 
         try:
@@ -1017,7 +1017,7 @@ def addNodes():
 
                 return 0
         except Exception as e:
-                print >>sys.stderr, str(e)
+                print >> sys.stderr, str(e)
         finally:
             return ret
 
@@ -1066,7 +1066,7 @@ def deleteNodes():
 
                 return 0
         except Exception as e:
-                print >>sys.stderr, str(e)
+                print >> sys.stderr, str(e)
         finally:
                 return ret
 
@@ -1088,12 +1088,12 @@ def deploy():
     '''
 
     if (len(sys.argv) != 2) or not sys.argv[1].isdigit():
-        print >>sys.stderr, Usage
+        print >> sys.stderr, Usage
         sys.exit(1)
 
     numOfReplica = int(sys.argv[1])
     if numOfReplica < 1 or numOfReplica > 9:
-        print >>sys.stderr, Usage
+        print >> sys.stderr, Usage
         sys.exit(1)
 
     inputFile = "/etc/delta/inputFile"
@@ -1124,7 +1124,7 @@ def deploy():
             progress = SD.getDeployProgress()
 
         check = SD.isDeploymentOk(proxyList, storageList, progress['blackList'], numOfReplica)
-        if progress["code"]!=0:
+        if progress["code"] != 0:
             print "Swift deploy failed for %s" % progress["message"]
         elif not check.val:
             print "Swift deploy failed for %s" % check.msg
@@ -1137,7 +1137,7 @@ def deploy():
             os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
 
     except Exception as e:
-        print >>sys.stderr, str(e)
+        print >> sys.stderr, str(e)
     finally:
         return ret
 
