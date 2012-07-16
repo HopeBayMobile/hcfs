@@ -5,17 +5,7 @@ from delta.forms import get_config_form
 meta = json.loads(
 """
 {
-        "cluster_name": {
-        "description": "Swift cluster name",
-        "type": "text",
-        "max": 20,
-        "min": 5,
-        "required": true,
-        "default": "DCloudSwift",
-        "order": 0
-        },
-	
-	"portal_domain": {
+	    "portal_domain": {
         "description": "Portal ip or domain name",
         "type": "text",
         "required": true,

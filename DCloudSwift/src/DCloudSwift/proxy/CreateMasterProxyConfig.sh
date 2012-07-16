@@ -49,12 +49,13 @@ pipeline = healthcheck cache swauth proxy-server
 
 [app:proxy-server]
 use = egg:swift#proxy
-allow_account_management = false
+allow_account_management = true
 
 [filter:swauth]
 use = egg:swauth#swauth
 set log_name = root
 default_swift_cluster = local#$PORTAL_URL/v1#https://127.0.0.1:$BIND_PORT/v1
+super_admin_key = deltacloud
 
 [filter:healthcheck]
 use = egg:swift#healthcheck

@@ -57,6 +57,13 @@
                                 if (indic == "HTTP_proxy_srv"){
                                     if (!http_proxy_updating){
                                         $("#http_proxy").attr("checked", data[indic]);
+                                        if (data[indic]){
+                                            $("#http_proxy").addClass("checked");
+                                            $("#http_proxy").attr("checked", true)
+                                        } else {
+                                            $("#http_proxy").removeClass("checked");
+                                            $("#http_proxy").attr("checked", false)
+                                        }
                                     } else {
                                         continue;
                                     }
