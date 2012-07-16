@@ -140,8 +140,8 @@ echo "    Squid3 configuration has been written."
 
 # add a private of APT repository server
 cat >/etc/apt/sources.list.d/delta-server.list <<EOF
-deb http://172.16.229.87/packages/ubuntu/ natty main
-deb-src http://172.16.229.87/packages/ubuntu natty main
+deb http://www.deltacloud.tw/packages/ubuntu/ natty main
+deb-src http://www.deltacloud.tw/packages/ubuntu natty main
 EOF
 
 sleep 3
