@@ -4,7 +4,6 @@
 import nose
 import sys
 import os
-import json
 import random
 import string
 
