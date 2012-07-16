@@ -57,6 +57,8 @@ def main():
         os.system("cp gateway_scripts/post-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/check-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/reorder_eth.conf /etc/init/")
+        os.system("cp gateway_scripts/nmbd.conf /etc/init/")
+        os.system("cp gateway_scripts/smbd.conf /etc/init/")
         os.system("cp config/smb.conf %s/"%SMBDIR)
         os.system("cp config/sudoers /etc")
         os.system("cp gateway_scripts/snapshot_bot %s/"%CONFDIR)
