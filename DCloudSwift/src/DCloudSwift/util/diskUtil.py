@@ -254,7 +254,7 @@ def mountUmountedSwiftDevices():
 
 def cleanMetadata(disk):
     logger = util.getLogger(name="cleanFingerprint")
-    mountpoint = "/temp/%s" % disk
+    mountpoint = "/tmp/%s" % disk
 
     ret = 1
     if mountDisk(disk, mountpoint) != 0:
@@ -385,7 +385,7 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
 def readFingerprint(disk):
     logger = util.getLogger(name="readFingerprint")
     fingerprint = {}
-    mountpoint = "/temp/%s" % disk
+    mountpoint = "/tmp/%s" % disk
     os.system("mkdir -p %s" % mountpoint)
 
     #TODO: chechsum
@@ -438,7 +438,7 @@ def getLatestVers():
 
 def __loadSwiftMetadata(disk):
     logger = util.getLogger(name="__loadSwiftMetadata")
-    mountpoint = "/temp/%s" % disk
+    mountpoint = "/tmp/%s" % disk
     os.system("mkdir -p %s" % mountpoint)
 
     #TODO: chechsum
@@ -572,7 +572,7 @@ def lazyUmountSwiftDevices():
 def __loadScripts(disk):
     logger = util.getLogger(name="__loadSripts")
     metadata = {}
-    mountpoint = "/temp/%s" % disk
+    mountpoint = "/tmp/%s" % disk
     os.system("mkdir -p %s" % mountpoint)
 
     #TODO: chechsum
@@ -710,7 +710,7 @@ def updateMetadataOnDisks(oriVers):
 def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
     logger = util.getLogger(name="writeMetadata")
 
-    mountpoint = "/temp/%s" % disk
+    mountpoint = "/tmp/%s" % disk
     os.system("mkdir -p %s" % mountpoint)
     if os.path.ismount(mountpoint):
         os.system("umount -l %s" % mountpoint)

@@ -147,8 +147,8 @@ class SwiftAccountMgr:
                  admin=False, reseller=False, retry=3):
         '''
         The steps of this function is as following:
-        1. Add user 
-        2. Admin user of account creates a container for user 
+        1. Add user
+        2. Admin user of account creates a container for user
         3. Set metadata of container
         4. Set container ACL r/w to user
         to the database and backend swift
@@ -302,12 +302,12 @@ class SwiftAccountMgr:
     def add_admin_user(self, account, admin_user, admin_password,\
                        admin=True, reseller=False, retry=3):
         '''
-        Add admin_user for an new created account to the 
+        Add admin_user for an new created account to the
         database and backend swift
-        
+
         The steps of this function is as following:
-        1. Add admin user 
-        2. Creates a container 
+        1. Add admin user
+        2. Creates a container
         3. Set metadata of container
         to the database and backend swift
 

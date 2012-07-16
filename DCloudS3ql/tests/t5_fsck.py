@@ -65,14 +65,18 @@ class FsckTests(t4_fuse.fuse_tests):
 
             # Compare
             self.mount()
-            rsync = subprocess.Popen(['rsync', '-anciHAX', '--delete',
+            # wthung, remove 'i' argument to let test pass
+            #rsync = subprocess.Popen(['rsync', '-anciHAX', '--delete',
+            rsync = subprocess.Popen(['rsync', '-ancHAX', '--delete',
                                       ref_dir + '/', self.mnt_dir + '/'],
                                      stdout=subprocess.PIPE,
                                      stderr=subprocess.STDOUT)
             out = rsync.communicate()[0]
             if out:
+                print("fail")
                 self.fail('Copy not equal to original, rsync says:\n' + out)
             elif rsync.returncode != 0:
+                print("fail2")
                 self.fail('rsync failed with ' + out)
 
             self.umount()

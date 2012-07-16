@@ -981,6 +981,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('read(%d, %d, %d): start', fh, offset, length)
+
         buf = StringIO()
         inode = self.inodes[fh]
 

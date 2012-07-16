@@ -13,6 +13,7 @@ export PORTAL_URL=$3
 
 mkdir -p /etc/swift
 chown -R swift:swift /etc/swift/
+cd /etc/swift
 
 
 cat >/etc/swift/swift.conf <<EOF
@@ -31,8 +32,6 @@ CTC
 CW
 cw.luo@delta.com.tw
 EOF
-mv cert.key /etc/swift
-mv cert.crt /etc/swift
 
 
 perl -pi -e "s/-l *.*.*.*/-l $PROXY_LOCAL_NET_IP/" /etc/memcached.conf
@@ -50,13 +49,12 @@ pipeline = healthcheck cache swauth proxy-server
 
 [app:proxy-server]
 use = egg:swift#proxy
-allow_account_management = true
+allow_account_management = false
 
 [filter:swauth]
 use = egg:swauth#swauth
 set log_name = root
 default_swift_cluster = local#$PORTAL_URL/v1#https://127.0.0.1:$BIND_PORT/v1
-super_admin_key = deltacloud
 
 [filter:healthcheck]
 use = egg:swift#healthcheck

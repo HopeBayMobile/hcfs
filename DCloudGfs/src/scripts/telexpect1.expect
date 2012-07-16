@@ -1,9 +1,0 @@
-#!/usr/bin/expect -f
-
-spawn telnet localhost
-sleep 5
-expect "login:"
-send expect\n
-expect "Password:"
-send a\n
-interact

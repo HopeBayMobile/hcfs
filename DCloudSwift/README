@@ -9,7 +9,8 @@
 2. How to use the scripts:
 	(1) Copy the folder 'DCloudSwift' to the master node.
 	(2) Change your privilege to root.
-	(3) Edit ./Swift.ini:
+	(3) Execute 'python setup.py install'
+	(4) Edit ./Swift.ini:
 	    [storage]
             password = password of root in swift nodes
             deviceCnt = how many disks to use in each swift node
@@ -17,14 +18,14 @@
 	   
             [portal]
             url = url of the public access portal for users
-`
-	(4) Execute 'python setup.py install'
         (5) Add [deploy] section to /etc/delta/inputFile in the following format:
               ip1 zid1
               ip2 zid2
               ...
             
               where zid has to be a positive integer less than 10.
+              Note that the master node to run this deploy script cannot be included 
+              in this list.
               
 	(6) execute "dcloud_swift_deploy numOfReplcia"
 
@@ -45,3 +46,5 @@
 
 4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
    Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py
+
+5. For PDCM0.4, please create /srv and /DCloudSwift when building golden image.

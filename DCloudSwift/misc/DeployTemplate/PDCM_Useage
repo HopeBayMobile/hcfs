@@ -1,4 +1,0 @@
-1. execute /PDCM/task/worker python task_worker.py
-2. install: execute /PDCM/deploy ./server-deploy.sh
-3. StorageTemplate.py should be placed in the following path:
-   /var/www/PDCM/task/worker/workers

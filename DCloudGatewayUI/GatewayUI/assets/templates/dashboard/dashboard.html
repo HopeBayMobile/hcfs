@@ -3,9 +3,9 @@
 <script type="text/javascript">
 	$(function(){
 		$(".control .upgrade").on("click", function(){
-			$("#errormsgbox").hide()
-			$("#delta-popup .popup-box.confirm").show()
-			$("#delta-popup").fadeIn(1000)
+			$("#errormsgbox").hide();
+			$("#delta-popup .popup-box.confirm").show();
+			$("#delta-popup").fadeIn(1000);
 		});
 
 		function update_dashboard(){
@@ -17,7 +17,7 @@
 	            }
 	            var cache_data = data["gateway_cache_usage"]
 	            for (key in cache_data){
-	            	$('#'+key).find('span').text(cache_data[key])
+	            	$('#'+key).find('span').text(cache_data[key]);
 	            }
 	            used_cache_percentage = Math.round(cache_data['used_cache_size'] * 100 / cache_data['max_cache_size']);
 	            $(".cache-usage-bar .usage .used").css('background-size', used_cache_percentage + "% 100%");
@@ -26,17 +26,29 @@
 
 				var cloud_data = data["cloud_storage_usage"]
 				for (key in cloud_data){
-					$('#'+key).find('span').text(cloud_data[key])
+					$('#'+key).find('span').text(cloud_data[key]);
 				}
 	        });
 	    }
-	    $("#http_proxy").on("click", function(e){
-	    	var action = "off";
-	    	if($(this).is(':checked')){
-	    		action = "on"
+	    $("body").on("click", "#http-proxy-switch:not([disabled])", function(e){
+	    	var $me = $(this);
+	    	var $chk = $me.find("#http_proxy");
+	    	function toggle_switch($target){
+	    		if ($target.is(".checked")) {
+	    			$target.removeClass("checked");
+	    			$target.attr("checked", false);
+	    		} else {
+	    			$target.addClass("checked");
+	    			$target.attr("checked", true);
+	    		}
 	    	}
+	    	toggle_switch($chk);
+	    	var action = $chk.is(":checked") ? "on" : "off";
+	    	http_proxy_updating = true;
+    		$me.attr("disabled", true);
 	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
-	    		console.log(action);
+	    		setTimeout(function(){http_proxy_updating = false;
+	    			$me.attr("disabled", false);}, 1500);
     		});
 	    })
 	    setInterval(update_dashboard, 10000);
@@ -63,7 +75,7 @@
 			<div class="upgrade hide">New<br>Version</div>
 		</div>
         <ul>
-            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
+            <li id="http-proxy-switch"><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
         </ul>
 	</div>
 	<p style="clear:both;"></p>
