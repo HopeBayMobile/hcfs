@@ -4,13 +4,11 @@
 import nose
 import sys
 import os
-import json
 import random
 import string
 import socket
 import subprocess
 import time
-import socket
 
 # Import packages to be tested
 sys.path.append('../src/DCloudSwift/')
@@ -638,6 +636,7 @@ class Test_generateSwiftConfig:
             nose.tools.ok_(os.path.exists(path + file_name), "Configuration file %s does not exist!" % file_name)
 
 
+"""
 class Test_restartAllServices:
     '''
     Test the function restartAllServices() in util.py.
@@ -777,8 +776,9 @@ class Test_restartAllServices:
 
         nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by restartAllServices()!")
         nose.tools.ok_(swift_restart_flag, "Failed to restart Swift daemon by invoking restartAllServices()!")
+"""
 
-
+"""
 class Test_startAllServices:
     '''
     Test the function startAllServices() in util.py.
@@ -902,6 +902,7 @@ class Test_startAllServices:
         test_swift_started = test_swift_status.getSwiftHealth()
 
         nose.tools.ok_(test_swift_started, "Daemon Swift does not be started by startAllServices()!")
+"""
 
 
 class Test_findLine:
