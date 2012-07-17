@@ -28,9 +28,7 @@ def main():
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
                              (ETCDIR, ['config/hosts.deny']),
-                             (ETCDIR, ['config/exports']),
-                             (ETCDIR, ['config/rc.local']),
-                             (ETCDIR, ['config/crontab'])
+                             (ETCDIR, ['config/exports'])
                            ], 
 		
 		test_suite='unittest',
@@ -41,6 +39,9 @@ def main():
 		],
 	)
 
+        os.system("cp config/rc.local /etc")
+        os.system("cp config/crontab /etc")
+        os.system("chmod 600 /etc/crontab")
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 666 %s/Gateway.ini"%CONFDIR)
         os.system("cp config/interfaces /etc/network/interfaces")
