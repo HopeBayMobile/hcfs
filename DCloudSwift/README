@@ -24,6 +24,8 @@
               ...
             
               where zid has to be a positive integer less than 10.
+              Note that the master node to run this deploy script cannot be included 
+              in this list.
               
 	(6) execute "dcloud_swift_deploy numOfReplcia"
 

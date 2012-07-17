@@ -28,9 +28,7 @@ def main():
 
 		data_files=[ (CONFDIR, ['Gateway.ini']),  
                              (ETCDIR, ['config/hosts.deny']),
-                             (ETCDIR, ['config/exports']),
-                             (ETCDIR, ['config/rc.local']),
-                             (ETCDIR, ['config/crontab'])
+                             (ETCDIR, ['config/exports'])
                            ], 
 		
 		test_suite='unittest',
@@ -41,6 +39,9 @@ def main():
 		],
 	)
 
+        os.system("cp config/rc.local /etc")
+        os.system("cp config/crontab /etc")
+        os.system("chmod 600 /etc/crontab")
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 666 %s/Gateway.ini"%CONFDIR)
         os.system("cp config/interfaces /etc/network/interfaces")
@@ -57,6 +58,8 @@ def main():
         os.system("cp gateway_scripts/post-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/check-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/reorder_eth.conf /etc/init/")
+        os.system("cp gateway_scripts/nmbd.conf /etc/init/")
+        os.system("cp gateway_scripts/smbd.conf /etc/init/")
         os.system("cp config/smb.conf %s/"%SMBDIR)
         os.system("cp config/sudoers /etc")
         os.system("cp gateway_scripts/snapshot_bot %s/"%CONFDIR)

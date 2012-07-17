@@ -1,6 +1,5 @@
 import os
 import sys
-import subprocess
 import fcntl
 import threading
 import random
@@ -9,7 +8,6 @@ import socket
 import struct
 import math
 import pickle
-import time
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(WORKING_DIR)

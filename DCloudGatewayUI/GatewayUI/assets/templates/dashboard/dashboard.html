@@ -30,9 +30,20 @@
 				}
 	        });
 	    }
-	    $("body").on("click", "#http_proxy:not([disabled])", function(e){
+	    $("body").on("click", "#http-proxy-switch:not([disabled])", function(e){
 	    	var $me = $(this);
-	    	var action = $me.is(':checked') ? "on" : "off";
+	    	var $chk = $me.find("#http_proxy");
+	    	function toggle_switch($target){
+	    		if ($target.is(".checked")) {
+	    			$target.removeClass("checked");
+	    			$target.attr("checked", false);
+	    		} else {
+	    			$target.addClass("checked");
+	    			$target.attr("checked", true);
+	    		}
+	    	}
+	    	toggle_switch($chk);
+	    	var action = $chk.is(":checked") ? "on" : "off";
 	    	http_proxy_updating = true;
     		$me.attr("disabled", true);
 	    	$.post("/dashboard/http_proxy/" + action, function(ctnt, success, opts){
@@ -64,7 +75,7 @@
 			<div class="upgrade hide">New<br>Version</div>
 		</div>
         <ul>
-            <li><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
+            <li id="http-proxy-switch"><div class="control-box"><label for="http_proxy"><input type="checkbox" name="http_proxy" id="http_proxy" /><span class="toggle-btn"></span></label></div><span>HTTP Proxy</span></li>
         </ul>
 	</div>
 	<p style="clear:both;"></p>

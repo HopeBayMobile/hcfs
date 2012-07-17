@@ -268,6 +268,9 @@ class BlockCache(object):
         self.last_checked = time.time()
         self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
         self.thread_checking = False #Jiahong: New flag for knowing if the upload thread respawning check is in progress
+        self.quick_inode = -1 # Jiahong: New mechanism for caching block pointer
+        self.quick_block = -1 # Jiahong: New mechanism for caching block pointer
+        self.quick_pointer = None
 
 
         if os.access(self.path,os.F_OK):
@@ -667,6 +670,12 @@ class BlockCache(object):
             self.expire()
 
         el = None
+        if (self.quick_pointer is not None):
+            if (inode == self.quick_inode) and (blockno == self.quick_block):
+                el = self.quick_pointer
+            else:
+                self.quick_pointer = None
+
         while el is None:
             # Don't allow changing objects while they're being uploaded
             if (inode, blockno) in self.in_transit:
@@ -796,6 +805,11 @@ class BlockCache(object):
         oldsize = el.size
         was_dirty = el.dirty
 
+        if (self.quick_pointer is None):
+            self.quick_pointer = el
+            self.quick_inode = inode
+            self.quick_block = blockno
+
         # Provide fh to caller
         try:
             #log.debug('get(inode=%d, block=%d): yield', inode, blockno)
@@ -833,6 +847,8 @@ class BlockCache(object):
         log.debug('expire: start')
 #Jiahong: TODO: put some mechanism here to check for network connection before
 #actually trying to expire any blocks
+
+        self.quick_pointer = None  # Reset the cached block pointer
 
         try:
             with self.bucket_pool() as bucket:

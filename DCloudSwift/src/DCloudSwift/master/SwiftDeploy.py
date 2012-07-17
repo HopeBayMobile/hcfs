@@ -107,7 +107,7 @@ class SwiftDeploy:
                 'progress': progress,
                 'finished': finished,
                 'code': code,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -124,7 +124,7 @@ class SwiftDeploy:
                 'deployedProxy': deployedProxy,
                 'deployedStorage': deployedStorage,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -140,7 +140,7 @@ class SwiftDeploy:
                 'finished': finished,
                 'code': code,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -156,7 +156,7 @@ class SwiftDeploy:
                 'finished': finished,
                 'code': code,
                 'blackList': blackList,
-                'message': message
+                'message': message,
             }
 
         finally:
@@ -175,20 +175,6 @@ class SwiftDeploy:
                 self.__deployProgress['blackList'].append(ip)
                 self.__deployProgress['message'].append(msg)
             if self.__deployProgress['deployedProxy'] == len(self.__proxyList) and self.__deployProgress['deployedStorage'] == len(self.__storageList):
-                swiftDir = self.__deltaDir + '/swift'
-                numOfReplica = util.getNumOfReplica(swiftDir)
-
-                if numOfReplica is None:
-                    self.__deployProgress['code'] = 1
-                    self.__deployProgress['message'].append("Failed to get numOfReplica")
-                else:
-                    ret = self.__isDeploymentOk(self.__proxyList, self.__storageList, self.__deployProgress['blackList'], numOfReplica)
-                    if ret.val == False:
-                        self.__deployProgress['code'] = 1
-                        self.__deployProgress['message'].append(ret.msg)
-                    else:
-                        self.__deployProgress['code'] = 0
-
                 self.__deployProgress['finished'] = True
         finally:
             lock.release()
@@ -233,10 +219,15 @@ class SwiftDeploy:
         logger = util.getLogger(name="createMetadata")
         try:
             self.__setUpdateMetadataProgress()
+
+            # It is not allowed to deploy swift on the master node
+            if self.isMasterNodeInside(proxyList + storageList):
+                raise Exception("Master node is not allowed to be deployed!!")
+
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
             versBase = int(time.time()) * 100000
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
             if os.path.isdir(swiftDir):
                 os.system("rm -rf %s" % swiftDir)
@@ -259,7 +250,16 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            #os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
+
+            if util.generateMasterProxyConfig() != 0:
+                raise Exception("Failed to create master proxy config!!")
+
+            if util.restartSwiftProxy() != 0:
+                raise Exception("Failed to start master proxy after generating metadata")
+
+            if util.restartMemcached() != 0:
+                raise Exception("Failed to start memcached after generating metadata")
+
             self.__setUpdateMetadataProgress(progress=100, code=0, finished=True)
         except Exception as e:
             logger.error(str(e))
@@ -271,10 +271,14 @@ class SwiftDeploy:
         try:
             self.__setUpdateMetadataProgress()
 
+            # It is not allowed to deploy swift on the master node
+            if self.isMasterNodeInside(proxyList + storageList):
+                raise Exception("Master node is not allowed to be deployed!!")
+
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
@@ -301,7 +305,6 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
             self.__setUpdateMetadataProgress(code=0, finished=True, progress=100)
 
         except Exception as e:
@@ -315,7 +318,7 @@ class SwiftDeploy:
             deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
             oriProxyList = []
@@ -348,7 +351,6 @@ class SwiftDeploy:
                     os.system(cmd)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
-            os.system("cd %s; rm -rf %s" % (swiftDir, UNNECESSARYFILES))
 
             self.__setUpdateMetadataProgress(finished=True, code=0)
         except Exception as e:
@@ -382,7 +384,7 @@ class SwiftDeploy:
                 raise DeployProxyError(errMsg)
 
             #cmd = "scp -r /etc/delta/swift root@%s:%s" % (proxyIP, pathname)
-            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, proxyIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, proxyIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
@@ -411,6 +413,7 @@ class SwiftDeploy:
     def __proxyDeploy(self):
         logger = util.getLogger(name="proxyDeploy")
         argumentList = []
+
         for i in [node["ip"] for node in self.__proxyList]:
             argumentList.append(([i], None))
         pool = threadpool.ThreadPool(10)
@@ -446,7 +449,7 @@ class SwiftDeploy:
                 raise DeployStorageError(errMsg)
 
             #cmd = "scp -r /etc/delta/swift root@%s:%s" % (storageIP, pathname)
-            cmd = "rsync -a %s /etc/delta/swift root@%s:%s" % (EXCLUDE, storageIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, storageIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
@@ -476,6 +479,7 @@ class SwiftDeploy:
     def __storageDeploy(self):
         logger = util.getLogger(name="storageDeploy")
         argumentList = []
+
         for i in [node["ip"] for node in self.__storageList]:
                 argumentList.append(([i], None))
         pool = threadpool.ThreadPool(20)
@@ -516,6 +520,7 @@ class SwiftDeploy:
             os.system("rm %s" % GlobalVar.ACCOUNT_DB)
             self.__createMetadata(proxyList, storageList, numOfReplica)
             self.__deploySwift(proxyList, storageList)
+
         except UpdateMetadataError, DeploySwiftError:
             return
 
@@ -537,7 +542,8 @@ class SwiftDeploy:
                 errMsg = "Failed to clear /etc/delta/master for %s" % (nodeIP, stderr)
                 raise SpreadRingFilesError(errMsg)
 
-            cmd = "scp -r /etc/delta/swift root@%s:%s" % (nodeIP, pathname)
+            cmd = "rsync -a %s /etc/swift root@%s:%s" % (EXCLUDE, nodeIP, pathname)
+            #cmd = "scp -r /etc/swift root@%s:%s" % (nodeIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
             if status != 0:
                 errMsg = "Failed to scp ring files to %s for %s" % (nodeIP, stderr)
@@ -600,7 +606,7 @@ class SwiftDeploy:
         msg = ""
 
         if swiftDir is None:
-            swiftDir = "%s/swift" % self.__deltaDir
+            swiftDir = "/etc/swift"
 
         try:
 
@@ -632,7 +638,7 @@ class SwiftDeploy:
             Bool = collections.namedtuple("Bool", "val msg")
             return Bool(val, msg)
 
-    def __isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
+    def isDeploymentOk(self, proxyList, storageList, blackList, numOfReplica):
         zidSet = set()
         failedZones = set()
         proxyIpSet = set()
@@ -680,8 +686,24 @@ class SwiftDeploy:
             Bool = collections.namedtuple("Bool", "val msg")
             return Bool(val, msg)
 
+    def isMasterNodeInside(self, nodeList):
+        '''
+            Check if the input node list contains the maser node
+            @type  nodeList: list
+            @param nodeList: a list of nodes to deploy
+            @param numOfReplica: number of replica for each object
+            @rtype: Bool
+            @return: If the master node is not in the list then return True.
+                     Otherwise, return False.
+        '''
+        masterIp = util.getIpAddress()
+        for node in nodeList:
+            if node["ip"] == masterIp:
+                return True
+        return False
+
     def spreadRingFiles(self):
-        swiftDir = "%s/swift" % self.__deltaDir
+        swiftDir = "/etc/swift"
         swiftNodeIpList = util.getSwiftNodeIpList(swiftDir)
 
         self.__nodes2Process = swiftNodeIpList
@@ -702,6 +724,11 @@ class SwiftDeploy:
 
     def addNodes(self, proxyList=[], storageList=[]):
         logger = util.getLogger(name="addStorage")
+
+        # It is not allowed to deploy swift on the master node
+        if self.isMasterNodeInside(proxyList + storageList):
+            raise Exception("%s is the master node!!" % masterIp)
+
         try:
             self.__updateMetadata2AddNodes(proxyList=proxyList, storageList=storageList)
         except UpdateMetadataError as e:
@@ -990,7 +1017,7 @@ def addNodes():
 
                 return 0
         except Exception as e:
-                print >>sys.stderr, str(e)
+                print >> sys.stderr, str(e)
         finally:
             return ret
 
@@ -1039,7 +1066,7 @@ def deleteNodes():
 
                 return 0
         except Exception as e:
-                print >>sys.stderr, str(e)
+                print >> sys.stderr, str(e)
         finally:
                 return ret
 
@@ -1061,12 +1088,12 @@ def deploy():
     '''
 
     if (len(sys.argv) != 2) or not sys.argv[1].isdigit():
-        print >>sys.stderr, Usage
+        print >> sys.stderr, Usage
         sys.exit(1)
 
     numOfReplica = int(sys.argv[1])
     if numOfReplica < 1 or numOfReplica > 9:
-        print >>sys.stderr, Usage
+        print >> sys.stderr, Usage
         sys.exit(1)
 
     inputFile = "/etc/delta/inputFile"
@@ -1096,24 +1123,27 @@ def deploy():
             print progress
             progress = SD.getDeployProgress()
 
-        if progress['code'] == 0:
+        check = SD.isDeploymentOk(proxyList, storageList, progress['blackList'], numOfReplica)
+        if progress["code"] != 0:
+            print "Swift deploy failed for %s" % progress["message"]
+        elif not check.val:
+            print "Swift deploy failed for %s" % check.msg
+        else:
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, proxyList[0]["ip"])
+            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, util.getIpAddress())
             os.system(cmd)
-            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (proxyList[0]["ip"], password))
-        else:
-            print "Swift deploy failed"
+            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
 
-        return 0
     except Exception as e:
-        print >>sys.stderr, str(e)
+        print >> sys.stderr, str(e)
     finally:
         return ret
 
 if __name__ == '__main__':
-    print util.getNumOfReplica("/etc/delta/swift")
+    #print util.getNumOfReplica("/etc/swift")
+    print util.restartSwiftProxy()
     #t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
     #t = Thread(target=SD.spreadRingFiles, args=())
     #t.start()

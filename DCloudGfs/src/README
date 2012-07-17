@@ -1,7 +1,0 @@
-1. Edit "DCloudGfs.ini" and modify the username and password attributes in the main section.
-
-2. Edit "Global.ini" and modify the codeDir (source code directory) atribute in the glusterfs section.
-
-3. Edit /etc/sudoers and add "xxx   ALL= (ALL) NOPASSWD: ALL" under "#includedir /etc/sudoers.d",
-   where xxx must be the username attribute in the main section of "DCloudGfs.ini".
-

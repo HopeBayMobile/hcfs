@@ -4,9 +4,7 @@ import socket
 import posixfile
 import time
 import json
-import subprocess
 import shlex
-import random
 import fcntl
 import pickle
 from decimal import *
@@ -62,7 +60,7 @@ def triggerUpdateMetadata(confDir):
                 if not util.isDaemonAlive("swiftMonitor"):
                     os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
-    except maintenance.UpdateMedatataError:
+    except maintenance.UpdateMetadataError:
         raise
     except Exception as e:
         msg = "Failed update Metadata for unexpected exception %s" % str(e)
@@ -154,10 +152,10 @@ def main():
         usage()
         returncode = 1
     except ValueError:
-        print >>sys.stderr, "Usage error: Ivalid json format"
+        print >> sys.stderr, "Usage error: Ivalid json format"
         returncode = 1
     except Exception as e:
-        print >>sys.stderr, str(e)
+        print >> sys.stderr, str(e)
         returncode = 1
     finally:
         return returncode
@@ -167,7 +165,7 @@ if __name__ == '__main__':
     try:
         retcode = main()
     except util.TryLockError as e:
-        print >>sys.stderr, str(e)
+        print >> sys.stderr, str(e)
         retcode = 1
 
     sys.exit(retcode)

@@ -625,13 +625,6 @@ tr{
 		vertical-align: middle;
 	}
 
-	.control-box{
-		margin: 0 10px;
-		display: inline-block;
-		text-align: center;
-		vertical-align: middle;
-	}
-
 	& > div{
 		height: 280px;
 		li{
@@ -666,19 +659,33 @@ tr{
 		padding: 6px 0 0 0;
 	}
 
-	input[type="checkbox"]{
-		display: none;
-	}
+	.control{
 
-	input[type="checkbox"] + .toggle-btn{
-		display: inline-block;
-		width: 71px;
-		height: 40px;
-		background: transparent url('/@{dashboard-image-path}/on_off_switch01.png') no-repeat;
-	}
+		.control-box{
+			margin: 0 10px;
+			display: inline-block;
+			text-align: center;
+			vertical-align: middle;
+		}
 
-	input[type="checkbox"]:checked + .toggle-btn{
-		background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
+		li[disabled]{
+			color: gray;
+		}
+
+		input[type="checkbox"]{
+			display: none;
+		}
+
+		input[type="checkbox"] + .toggle-btn{
+			display: inline-block;
+			width: 71px;
+			height: 40px;
+			background: transparent url('/@{dashboard-image-path}/on_off_switch01.png') no-repeat;
+		}
+
+		input[type="checkbox"].checked + .toggle-btn{
+			background: transparent url('/@{dashboard-image-path}/on_off_switch02.png') no-repeat;
+		}
 	}
 }
 
