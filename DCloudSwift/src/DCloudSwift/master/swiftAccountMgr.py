@@ -497,7 +497,7 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_account(self, account, quota, description="", retry=3):
+    def add_account(self, account, quota, admin_password="", description="", retry=3):
         '''
         Add a new account, including the following things::
             (1) Create the account and the admin user
@@ -508,7 +508,9 @@ class SwiftAccountMgr:
         @type  account: string
         @param account: the name of the given account
         @type  quota: string
-        @param quota: the password to be set
+        @param quota: the quota of the account
+        @type  admin_password: string
+        @param admin_password: the password of the admin user
         @type  description: string
         @param description: the description of the account
         @type  retry: integer
@@ -526,7 +528,9 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
 
         admin_user = account + self.__admin_name_suffix
-        admin_password = self.__admin_default_password
+
+        if admin_password == "":
+            admin_password = self.__admin_default_password
 
         admin_metadata = {
             "Account-Enable": True,
@@ -544,18 +548,29 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
+        check_account_existence = self.account_existence(account)
+        if check_account_existence.val == False:
+            val = False
+            msg = check_account_existence.msg
+            return Bool(val, msg)
+        elif check_account_existence.result == True:
+            val = False
+            msg = "Account %s has existed!" % account
+            return Bool(val, msg)
+
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
                                            user=admin_user, password=admin_password, admin=True, reseller=False)
 
         if val == False:
             logger.error(msg)
             return Bool(val, msg)
-        else:
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
-                                               account=".super_admin", container=admin_user, admin_password=self.__password,\
-                                               metadata_content=admin_metadata)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                           account=".super_admin", container=account, admin_user=".super_admin",\
+                                           admin_password=self.__password, metadata_content=admin_metadata)
 
         if val == False:
+            #TODO: need to roll-back
             logger.error(msg)
             return Bool(val, msg)
         else:
@@ -564,37 +579,27 @@ class SwiftAccountMgr:
     @util.timeout(300)
     def __delete_account(self, proxyIp, account):
         logger = util.getLogger(name="__delete_account")
-
         url = "https://%s:8080/auth/" % proxyIp
 
-        cmd = "swauth-delete-account -K %s -A %s %s"\
-              % (self.__password, url, account)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swauth-delete-account -K %s -A %s %s" % (self.__password, url, account)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         msg = ""
         val = False
 
-        if po.returncode != 0 and '409' not in stderrData and\
-           '404' not in stderrData:
-
+        if po.returncode != 0 and '409' not in stderrData and '404' not in stderrData:
             logger.error(stderrData)
             msg = stderrData
             val = False
-
         elif '404' in stderrData:
             msg = "Account %s does not exist" % account
             logger.warn(msg)
             val = False
-
         elif '409' in stderrData:
             msg = "Still have user(s) in account %s." % (account)
             logger.warn(msg)
             val = False
-
         else:
             logger.info(stdoutData)
             msg = stdoutData
@@ -605,18 +610,20 @@ class SwiftAccountMgr:
 
     def delete_account(self, account, retry=3):
         '''
-        Delete account from database and backend swift after
-        checking that there's no users in the account.
+        Delete an account from backend swift after checking that there's no users in the account.
 
         @type  account: string
         @param account: the name of the given account
         @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
+        @param retry: the maximum number of times to retry
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg).
+        @return: a tuple Bool(val, msg). If the account is successfully deleted, then Bool.val ==
+            True. Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
+
         logger = util.getLogger(name="delete_account")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -629,22 +636,7 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__delete_account,\
-                                           account=account)
-
-        try:
-            if val == True:
-                self.__accountDb.delete_account(account=account)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-
-            errMsg = "Failed to clean account %s from database for %s"\
-                     % (account, str(e))
-
-            logger.error(errMsg)
-            raise InconsistentDatabaseError(errMsg)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_account, account=account)
 
         return Bool(val, msg)
 
