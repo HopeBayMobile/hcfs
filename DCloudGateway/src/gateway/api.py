@@ -412,8 +412,57 @@ def _check_http_proxy_service():
 
     #log.info("[2] _check_http_proxy end")
     return op_proxy_check
-    
-    
+
+
+# Code written by Jiahong Wu (traceroute)
+def _traceroute_backend(backend_IP = None):
+    """
+    Return a traceroute message from gateway to backend
+
+    @type backend_IP: string
+    @param backend_IP: IP of backend. If the value is None, the url stored in authinfo2 is used.
+    @rtype: string
+    @return: traceroute info from gateway to backend
+    """
+
+    op_msg = "Unable to obtain traceroute info to the backend"
+    log.info("_check_network start")
+    try:
+        if backend_IP == None:
+            op_config = ConfigParser.ConfigParser()
+            with open('/root/.s3ql/authinfo2') as op_fh:
+                op_config.readfp(op_fh)
+
+            section = "CloudStorageGateway"
+            op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
+            index = op_storage_url.find(":")
+            if index != -1:
+                op_storage_url = op_storage_url[0:index]
+        else:
+            op_storage_url = backend_IP
+
+        cmd = "sudo traceroute %s" % op_storage_url
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
+        if po.returncode == 0:
+            op_msg = "Traceroute message to the backend as follows:\n" + output
+        else:
+            op_msg = op_msg + '\nBackend url: ' + op_storage_url
+
+    except IOError as e:
+            op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+            log.error(str(e))
+    except Exception as e:
+            op_msg = 'Unable to obtain storage url or login info.'
+            log.error(str(e))
+
+    finally:
+        log.info("_check_network end")
+    return op_msg
+
+
 # check network connection from gateway to storage by Rice
 def _check_network():
     """
@@ -431,7 +480,6 @@ def _check_network():
         with open('/root/.s3ql/authinfo2') as op_fh:
             op_config.readfp(op_fh)
 
-    
         section = "CloudStorageGateway"
         op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
         index = op_storage_url.find(":")
@@ -755,7 +803,7 @@ def apply_storage_account(storage_url, account, password, test=True):
     log.info("apply_storage_account start")
 
     op_ok = False
-    op_msg = 'Failed to apply storage accounts for unexpetced errors.'
+    op_msg = 'Failed to apply storage accounts for unexpected errors.'
 
     if test:
         test_gw_results = json.loads(test_storage_account(storage_url, account, password))
@@ -821,7 +869,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
     log.info("apply_user_enc_key start")
 
     op_ok = False
-    op_msg = 'Failed to change encryption keys for unexpetced errors.'
+    op_msg = 'Failed to change encryption keys for unexpected errors.'
 
     try:
         #Check if the new key is of valid format
@@ -1259,7 +1307,7 @@ def build_gateway(user_key):
     #log.info("build_gateway start")
 
     op_ok = False
-    op_msg = 'Failed to apply storage accounts for unexpetced errors.'
+    op_msg = 'Failed to apply storage accounts for unexpected errors.'
 
     try:
 
@@ -1530,7 +1578,7 @@ def shutdown_gateway():
     return json.dumps(return_val)
 
 
-@common.timeout(180)
+@common.timeout(30)
 def _test_storage_account(storage_url, account, password):
     """
     Test the storage account to see if it works.
@@ -1583,7 +1631,7 @@ def test_storage_account(storage_url, account, password):
     log.info("test_storage_account start")
 
     op_ok = False
-    op_msg = 'Test storage account failed for unexpetced errors.'
+    op_msg = 'Test storage account failed for unexpected errors.'
 
     try:
         _test_storage_account(storage_url=storage_url, account=account, password=password)
@@ -1598,13 +1646,22 @@ def test_storage_account(storage_url, account, password):
         log.error(op_msg)
     except Exception as e:
         log.error(str(e))
-    finally:
-        return_val = {'result' : op_ok,
+
+    #Jiahong: Insert traceroute info in the case of a failed test
+    if op_ok is False:
+        try:
+            traceroute_info = _traceroute_backend(storage_url)
+            log.error(traceroute_info)
+            op_msg = op_msg + '\n' + traceroute_info
+        except Exception as e:
+            log.error('Error in traceroute:\n' + str(e))
+
+    return_val = {'result' : op_ok,
                   'msg'    : op_msg,
                   'data'   : {}}
     
-        log.info("test_storage_account end")
-        return json.dumps(return_val)
+    log.info("test_storage_account end")
+    return json.dumps(return_val)
 
 def get_network():
     """
@@ -3158,15 +3215,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
-    #print build_gateway("1234567")
-    #print apply_user_enc_key("123456", "1234567")
-    
-    #_createS3qlConf("172.16.228.53:8080")
-    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    #print data
-    #print get_gateway_indicators()
-    #_check_nfs_service()
-    print get_smb_user_list()
-    print set_smb_user_list("superuser", "superuser")
-    print get_smb_user_list()
+    print _traceroute_backend('aaa')
     pass
