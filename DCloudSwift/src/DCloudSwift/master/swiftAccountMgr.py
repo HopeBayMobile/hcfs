@@ -142,14 +142,13 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password, admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password, description="", admin=False, reseller=False, retry=3):
         '''
-        The steps of this function is as following:
-        1. Add user
-        2. Admin user of account creates a container for user
-        3. Set metadata of container
-        4. Set container ACL r/w to user
-        to the database and backend swift
+        Add a user into a given account, including the following steps::
+            (1) Add a user
+            (2) Create a private container for the user by the admin user
+            (3) Create a metadata container for the user stored in the admin user's container
+            (4) Set quota, ACL, and metdata in the metadata container for the user
 
         @type  account: string
         @param account: the name of the given account
@@ -157,18 +156,21 @@ class SwiftAccountMgr:
         @param user: the name of the given user
         @type  password: string
         @param password: the password to be set
+        @type  description: string
+        @param description: the description of the user
         @type  admin: boolean
         @param admin: admin or not
         @type  reseller: boolean
         @param reseller: reseller or not
         @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
+        @param retry: the maximum number of times to retry
         @rtype:  named tuple
         @return: a tuple Bool(val, msg). If the user is successfully added to
             both the database and backend swift then Bool.val == True and msg
             records the standard output. Otherwise, val == False and msg
             records the error message.
         '''
+
         logger = util.getLogger(name="add_user")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 
@@ -206,27 +208,16 @@ class SwiftAccountMgr:
             msg = str(e)
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__add_user,\
-                                           account=account,\
-                                           user=user,\
-                                           password=password,\
-                                           admin=admin,\
-                                           reseller=reseller)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
+                                           user=user, password=password, admin=admin, reseller=reseller)
+
         try:
             if val == False:
                 self.__accountDb.delete_user(account=account, name=user)
             else:
                 #Todo: crate container
-                (val, msg) = self.__functionBroker(\
-                                proxy_ip_list=proxy_ip_list,\
-                                retry=retry,\
-                                fn=self.__create_container,\
-                                account=account,\
-                                admin_user=admin_user,\
-                                admin_password=admin_password,\
-                                container=container)
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container,\
+                                account=account, admin_user=admin_user, admin_password=admin_password, container=container)
                 #Todo: set metadata of container
                 if val == False:
                     msg = "Failed to create container"
@@ -549,6 +540,7 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         check_account_existence = self.account_existence(account)
+
         if check_account_existence.val == False:
             val = False
             msg = check_account_existence.msg
