@@ -67,9 +67,11 @@ class SwiftMasterCfg:
         config.readfp(open(self.__configFile))
 
         self.__eventMgrPort = config.get('eventMgr', 'port')
+        self.__eventMgrPage = config.get('eventMgr', 'page')
 
         self.__kwparams = {
-            'eventMgrPort': self.__eventMgrPort
+            'eventMgrPort': self.__eventMgrPort,
+            'eventMgrPage': self.__eventMgrPage,
         }
 
     def getKwparams(self):

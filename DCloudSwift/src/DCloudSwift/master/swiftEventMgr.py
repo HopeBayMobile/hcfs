@@ -26,12 +26,7 @@ class SwiftEventMgr(Daemon):
 
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         self.port = self.masterCfg.getKwparams()["eventMgrPort"]
-
-    def subscribe(self):
-        pass
-
-    def unSubscribe(self):
-        pass
+        self.page = self.masterCfg.getKwparams()["eventMgrPage"]
 
     def isValidNotification(self, notification):
         '''
@@ -48,11 +43,11 @@ class SwiftEventMgr(Daemon):
 
     class EventsPage(Resource):
             def render_GET(self, request):
-                #return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
+                # return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
                 return '<html><body>I am the swift event manager!!</body></html>'
 
             def render_POST(self, request):
-                #reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
+                # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
                 reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
                 return '<html><body>Got it!!</body></html>'
 
@@ -61,7 +56,7 @@ class SwiftEventMgr(Daemon):
         logger.info("%s" % self.port)
 
         root = Resource()
-        root.putChild("events", SwiftEventMgr.EventsPage())
+        root.putChild(self.page, SwiftEventMgr.EventsPage())
         factory = Site(root)
 
         try:
