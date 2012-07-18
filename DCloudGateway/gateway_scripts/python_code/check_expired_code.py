@@ -8,6 +8,7 @@ import os.path
 import common
 import time
 from datetime import datetime
+from gateway import snapshot
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -113,6 +114,7 @@ def _translate_db(db_list):
       4. "num_files": Total number of files included in this snapshot.
       5. "total_size": Total data size include in this snapshot.
       6. "exposed": Whether this snapshot is exposed as a samba share.
+      7. "auto_exposed": Whether this snapshot is auto exposed as a samba service.
 
     @type db_list:  Array of strings
     @param db_list: Lines in the snapshot database (as array of strings).
@@ -124,17 +126,25 @@ def _translate_db(db_list):
         for entry in db_list:
             tmp_items = entry.split(',')
 
-            if tmp_items[5] == 'true\n':
+            if tmp_items[5] == 'true':
                 tmp_exposed = True
             else:
                 tmp_exposed = False
+            
+            # wthung, 2012/7/17
+            # add for auto_exposed feature
+            if tmp_items[6] == 'true\n':
+                tmp_auto_exposed = True
+            else:
+                tmp_auto_exposed = False
 
             temp_obj = {'name': tmp_items[0], \
                         'start_time': float(tmp_items[1]), \
                         'finish_time': float(tmp_items[2]),\
                         'num_files': int(tmp_items[3]), \
                         'total_size': int(tmp_items[4]), \
-                        'exposed': tmp_exposed}
+                        'exposed': tmp_exposed, \
+                        'auto_exposed': tmp_auto_exposed}
             snapshots = snapshots + [temp_obj]
     except:
         raise SnapshotError('Unable to convert snapshot db')
@@ -144,7 +154,6 @@ def _translate_db(db_list):
 def _write_snapshot_db(snapshot_list):
     """
     Write updated snapshot database entries to the database file.
-    Note that this is not the same version as the one in the API.
 
     @type snapshot_list:  Array of snapshot database entries
     @param snapshot_list: Array of updated snapshot database entries
@@ -157,8 +166,9 @@ def _write_snapshot_db(snapshot_list):
         if os.path.exists(temp_snapshot_db):
             os.system('sudo rm -rf %s' % temp_snapshot_db)
 
-        # We don't need to chown to www-data here as the script is
-        # run from a cron job
+        # Since the API is run from www-data account, we need to chown
+        os.system('sudo touch %s' % temp_snapshot_db)
+        os.system('sudo chown www-data:www-data %s' % temp_snapshot_db)
 
         with open(temp_snapshot_db, 'w') as fh:
             for entry in snapshot_list:
@@ -166,11 +176,18 @@ def _write_snapshot_db(snapshot_list):
                     is_exposed = 'true'
                 else:
                     is_exposed = 'false'
+                
+                # wthung, 2012/7/17
+                # add a entry of auto_exposed
+                if entry['auto_exposed']:
+                    is_auto_exposed = 'true'
+                else:
+                    is_auto_exposed = 'false'
 
-                fh.write('%s,%f,%f,%d,%d,%s\n' % (entry['name'],\
-                       entry['start_time'], entry['finish_time'],\
-                       entry['num_files'], entry['total_size'],\
-                       is_exposed))
+                fh.write('%s,%f,%f,%d,%d,%s,%s\n' % (entry['name'],\
+                        entry['start_time'], entry['finish_time'],\
+                        entry['num_files'], entry['total_size'],\
+                        is_exposed, is_auto_exposed))
 
         os.system('sudo cp %s %s' % (temp_snapshot_db, snapshot_db))
 
@@ -282,11 +299,55 @@ def check_expired_snapshots():
         raise SnapshotError(str(Err))
 
 
+# wthung, 2012/7/18
+def check_auto_exposed_snapshot():
+    """
+    Check if a auto-exposed snapshot is created 7 days ago.
+    If so, disable exporting. 
+
+    @rtype: N/A
+    @return: None
+    """
+    log.info('Start checking auto-exposed snapshots')
+
+    try:
+        current_time = time.time()
+        to_keep_exposed = []
+
+        db_list = _acquire_db_list()
+        snapshot_list = _translate_db(db_list)
+
+        # iterate all snapshots to decide which to keep exposed
+        for index in reversed(range(len(snapshot_list))):
+            if not snapshot_list[index]['exposed']:
+                pass
+            elif not snapshot_list[index]['auto_exposed']:
+                # if this ss is exposed but not by auto-exposed, keep exposed
+                to_keep_exposed.append(snapshot_list[index]['name'])
+            else:
+                time_diff = current_time - snapshot_list[index]['finish_time']
+                
+#                print 'name=%s, time diff=%d' % (snapshot_list[index]['name'], time_diff)
+                # check if a snapshot is auto exposed
+                if time_diff < 604800:
+                    # if ss is auto exposed and creation time is within 7 days, keep it
+                    to_keep_exposed.append(snapshot_list[index]['name'])
+
+#        for name in to_keep_exposed:
+#            print 'keep exposed: %s' % name
+        # here we got all names of snapshots which should be exposed. call expose_snapshot()
+        snapshot.expose_snapshot(to_keep_exposed)
+        log.info('Finished checking auto-exposed snapshots')
+
+    except Exception as Err:
+        raise SnapshotError(str(Err))
+
 ################################################################
 
 if __name__ == '__main__':
     try:
         check_expired_snapshots()
+        check_auto_exposed_snapshot()
     except Exception as err:
         log.info('Error in checking expired snapshots')
         log.info('%s' % str(err))

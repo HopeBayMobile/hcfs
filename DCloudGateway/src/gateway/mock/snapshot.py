@@ -97,3 +97,10 @@ def get_snapshot_lifespan():
                   'msg': 'Finished setting lifespan of snapshots.',
                   'data': {'days_to_live': 365}}
     return json.dumps(return_val)
+
+# wthung, 2012/7/17
+def get_snapshot_last_status():
+    return_val = {'result': True,
+                  'msg': 'Latest snapshot is successfully finished',
+                  'latest_snapshot_time': 12345}
+    return json.dumps(return_val)
