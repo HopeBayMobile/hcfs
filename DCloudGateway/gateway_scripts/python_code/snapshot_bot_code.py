@@ -94,7 +94,9 @@ def new_database_entry():
                 os.system('rm -rf %s' % temp_snapshot_db)
 
             with open(temp_snapshot_db, 'w') as fh:
-                fh.write('new_snapshot,%f,-1,0,0,false\n' % time.time())
+                # wthung, 2012/7/17
+                # add last field to represent auto_exposed. default is true
+                fh.write('new_snapshot,%f,-1,0,0,false,true\n' % time.time())
 
             if not os.path.exists(snapshot_db):
                 os.system('sudo mv %s %s' % (temp_snapshot_db, snapshot_db))
@@ -269,7 +271,9 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
                 os.system('sudo rm -rf %s' % temp_snapshot_db)
 
             with open(temp_snapshot_db, 'w') as fh:
-                fh.write('%s,%f,%f,%d,%d,false\n' % (new_snapshot_name,\
+                # wthung, 2012/7/17
+                # add last field to represent auto_exposed. default to true
+                fh.write('%s,%f,%f,%d,%d,false,true\n' % (new_snapshot_name,\
                        start_time, finish_time, total_files, total_size))
                 if create_new_entry:
                     #Write the original db
@@ -436,6 +440,7 @@ def execute_take_snapshot():
     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
     os.system('sudo python /usr/local/bin/s3qlctrl upload-meta %s' % mount_point)
     os.system('sudo rm -rf %s' % snapshot_tag)
+    
 
     log.info('Snapshotting finished at %s' % str(ftime_format))
 
