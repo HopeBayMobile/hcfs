@@ -198,7 +198,8 @@ def get_gw_indicator():
         'NFS_srv': False,
         'SMB_srv': False,
         'snapshot_in_progress': False,
-        'HTTP_proxy_srv': False}}
+        'HTTP_proxy_srv': False,
+        'S3QL_ok': False}}
 
     try:
         return_val = api.get_indicators()
