@@ -20,12 +20,6 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 
-FROM_MONITOR = 'output'
-TO_MONITOR = 'input'
-
-MAX_DELAYED_CALLS = 5000
-
-
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
@@ -54,11 +48,13 @@ class SwiftEventMgr(Daemon):
 
     class EventsPage(Resource):
             def render_GET(self, request):
-                return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
+                #return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
+                return '<html><body>I am the swift event manager!!</body></html>'
 
             def render_POST(self, request):
-                reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
-                return '<html><body>Thank you!</body></html>'
+                #reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
+                reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
+                return '<html><body>Got it!!</body></html>'
 
     def run(self):
         logger = util.getLogger(name="SwiftEventMgr.run")
