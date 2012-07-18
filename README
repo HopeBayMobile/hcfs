@@ -6,3 +6,5 @@ Known issues:
     * /etc/init/pre-gwstart.conf will not be changed for 'STORAGE_ADDR' when the user applys a new system configuration on GUI.
     * /etc/delta/gw_bktask.py was not launched after boot on some gateways.
     * api_restore_conf.py should be refined for better performance.
+
+    add

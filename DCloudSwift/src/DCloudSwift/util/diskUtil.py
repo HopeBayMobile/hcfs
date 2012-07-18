@@ -1,10 +1,7 @@
 import os
 import subprocess
-import logging
 import threading
 import sys
-import time
-import json
 import pickle
 import socket
 import util
@@ -415,7 +412,8 @@ def getLatestFingerprint():
     for disk in disks:
         (ret, fingerprint) = readFingerprint(disk)
         if ret == 0:
-            latestFingerprint = fingerprint  if latestFingerprint is None or latestFingerprint["vers"] < fingerprint["vers"]  else latestFingerprint
+            if latestFingerprint is None or latestFingerprint["vers"] < fingerprint["vers"]:
+                latestFingerprint = fingerprint
 
     logger.debug("getLatestFingerprint end")
     return latestFingerprint
@@ -430,7 +428,8 @@ def getLatestVers():
     for disk in disks:
         (ret, fingerprint) = readFingerprint(disk)
         if ret == 0:
-            latestVers = fingerprint["vers"]  if latestVers is None or latestVers < fingerprint["vers"]  else latestVers
+            if latestVers is None or latestVers < fingerprint["vers"]:
+                latestVers = fingerprint["vers"]
 
     logger.info("end")
     return latestVers
@@ -558,7 +557,7 @@ def lazyUmount(mountpoint):
                 returncode = 1
 
     except OSError as e:
-        logger.error("Failed to umount -l %s for %s" % (disk, e))
+        logger.error("Failed to umount -l %s for %s" % (mountpoint, e))
         returncode = 1
 
     return returncode
@@ -746,7 +745,7 @@ def writeMetadata(disk, vers, deviceCnt, devicePrx, deviceNum):
         return 1
     finally:
         if lazyUmount(mountpoint) != 0:
-            logger.warn("Failed to lazy umount disk %s from %s %s" % (disk, mountpoint))
+            logger.warn("Failed to lazy umount disk %s from %s" % (disk, mountpoint))
 
 
 if __name__ == '__main__':

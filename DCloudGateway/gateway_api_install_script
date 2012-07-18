@@ -1,4 +1,4 @@
-apt-get install -y python-setuptools python-software-properties curl portmap nfs-kernel-server samba
+apt-get install -y python-setuptools python-software-properties curl portmap nfs-kernel-server samba ntpdate chkconfig
 apt-get install -y python-profiler
 add-apt-repository ppa:swift-core/release
 apt-get update
@@ -14,3 +14,7 @@ cd ..
 cd ..
 
 python setup.py install
+
+sudo ln -s /usr/lib/insserv/insserv /sbin/insserv
+sudo chkconfig --level 2345 nfs-kernel-server off
+

@@ -62,10 +62,14 @@ class SwiftAccountMgr:
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
 
-        if not util.findLine("/etc/ssh/ssh_config",\
-                             "StrictHostKeyChecking no"):
-            os.system("echo \"    StrictHostKeyChecking no\"\
-                      >> /etc/ssh/ssh_config")
+        self.__admin_name_suffix = "_admin"
+        self.__admin_default_password = "admin"
+        self.__metadata_container_suffix = "_metadata_container"
+        self.__private_container_suffix = "_private_container"
+        self.__shared_container_suffix = "_shared_container"
+
+        if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
+            os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
 
     def __functionBroker(self, proxy_ip_list, retry, fn, **kwargs):
         '''
@@ -97,8 +101,7 @@ class SwiftAccountMgr:
                     msg = output.msg
                     break
                 else:
-                    errMsg = "Failed to run %s thru %s for %s"\
-                             % (fn.__name__, ip, output.msg)
+                    errMsg = "Failed to run %s thru %s for %s" % (fn.__name__, ip, output.msg)
                     msg = msg + '\n' + errMsg
 
             except util.TimeoutError:
@@ -109,8 +112,7 @@ class SwiftAccountMgr:
         return (val, msg)
 
     @util.timeout(300)
-    def __add_user(self, proxyIp, account, user, password,\
-                   admin=False, reseller=False):
+    def __add_user(self, proxyIp, account, user, password, admin=False, reseller=False):
         logger = util.getLogger(name="__add_user")
         self.__class__.__add_user.__name__
 
@@ -122,11 +124,9 @@ class SwiftAccountMgr:
         reseller_opt = "-r " if reseller  else ""
         optStr = admin_opt + reseller_opt
 
-        cmd = "swauth-add-user -K %s -A %s %s %s %s %s"\
-              % (self.__password, url, optStr, account, user, password)
+        cmd = "swauth-add-user -K %s -A %s %s %s %s %s" % (self.__password, url, optStr, account, user, password)
 
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         (stdoutData, stderrData) = po.communicate()
 
@@ -134,7 +134,6 @@ class SwiftAccountMgr:
             logger.error(stderrData)
             msg = stderrData
             val = False
-
         else:
             logger.info(stdoutData)
             msg = stdoutData
@@ -143,12 +142,11 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password,\
-                 admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password, admin=False, reseller=False, retry=3):
         '''
         The steps of this function is as following:
-        1. Add user 
-        2. Admin user of account creates a container for user 
+        1. Add user
+        2. Admin user of account creates a container for user
         3. Set metadata of container
         4. Set container ACL r/w to user
         to the database and backend swift
@@ -263,6 +261,7 @@ class SwiftAccountMgr:
 
             return Bool(val, msg)
 
+    '''
     @util.timeout(300)
     def __add_admin_user(self, proxyIp, account, admin_user,\
                          admin_password, admin=True, reseller=False):
@@ -298,18 +297,14 @@ class SwiftAccountMgr:
 
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
+    '''
 
-    def add_admin_user(self, account, admin_user, admin_password,\
-                       admin=True, reseller=False, retry=3):
+    def add_admin_user(self, account, admin_user, admin_password, admin=True, reseller=False, retry=3):
         '''
-        Add admin_user for an new created account to the 
-        database and backend swift
-        
-        The steps of this function is as following:
-        1. Add admin user 
-        2. Creates a container 
-        3. Set metadata of container
-        to the database and backend swift
+        Add the admin user for a new created account, including the following things::
+            (1) Add the admin user for the account
+            (2) Create the private container of the admin user
+            (3) Update the metadata stored in super_admin's container
 
         @type  account: string
         @param account: the name of the given account
@@ -324,23 +319,24 @@ class SwiftAccountMgr:
         @type  retry: integer
         @param retry: the maximum number of times to retry when fn return False
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user is successfully added to
-            both the database and backend swift then Bool.val == True and msg
-            records the standard output. Otherwise, val == False and msg
+        @return: a tuple Bool(val, msg). If the user is successfully added to both the database and backend
+            swift then Bool.val == True and msg records the standard output. Otherwise, val == False and msg
             records the error message.
         '''
+
         logger = util.getLogger(name="add_admin_user")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
-        container = "ctn_" + admin_user
+        #container = "ctn_" + admin_user
 
         metadata_content = {"Account-Enable": True,
                             "User-Enable": True,
                             "Password": admin_password,
-                            "Quota": 0}
+                            "Quota": 0,
+        }
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found"
@@ -348,20 +344,6 @@ class SwiftAccountMgr:
 
         if retry < 1:
             msg = "Argument retry has to >= 1"
-            return Bool(val, msg)
-
-        try:
-            row = self.__accountDb.add_user(account=account, name=admin_user)
-
-            if row is None:
-                msg = "User %s:%s already exists" % (account, admin_user)
-                return Bool(val, msg)
-            elif row is False:
-                msg = "Account %s does not exist" % account
-                return Bool(val, msg)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            msg = str(e)
             return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
@@ -499,12 +481,8 @@ class SwiftAccountMgr:
         msg = ""
         val = False
 
-        cmd = "swauth-add-account -K %s -A %s %s"\
-              % (self.__password, url, account)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swauth-add-account -K %s -A %s %s" % (self.__password, url, account)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
@@ -519,29 +497,44 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_account(self, account, retry=3):
+    def add_account(self, account, quota, description="", retry=3):
         '''
-        Add account and create an default admin user to the database
-        and backend swift.
+        Add a new account, including the following things::
+            (1) Create the account and the admin user
+            (2) Create the private container for the admin user
+            (3) Create the metadata container for the admin user stored in super_admin's container
+            (4) Update the metadata and set the quota for the account
 
         @type  account: string
         @param account: the name of the given account
-        @type  password: string
-        @param password: the password to be set
+        @type  quota: string
+        @param quota: the password to be set
+        @type  description: string
+        @param description: the description of the account
         @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
+        @param retry: the maximum number of times to retry
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg).
+        @return: a tuple Bool(val, msg). When the account is successfully created, Bool.val == True.
+            Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
+
         logger = util.getLogger(name="add_account")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
-        admin_user = "admin"
-        admin_password = "admin"
-        container = "ctn_" + admin_user
+
+        admin_user = account + self.__admin_name_suffix
+        admin_password = self.__admin_default_password
+
+        admin_metadata = {
+            "Account-Enable": True,
+            "User-Enable": True,
+            "Quota": quota,
+            "Password": admin_password,
+            "Description": description,
+        }
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found"
@@ -551,38 +544,22 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
-        try:
-            row = self.__accountDb.add_account(account=account)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
+                                           user=admin_user, password=admin_password, admin=True, reseller=False)
 
-            if row is None:
-                msg = "Account %s already exists in database" % account
-                return Bool(val, msg)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            msg = str(e)
+        if val == False:
+            logger.error(msg)
             return Bool(val, msg)
+        else:
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                               account=".super_admin", container=admin_user, admin_password=self.__password,\
+                                               metadata_content=admin_metadata)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__add_account,\
-                                           account=account)
-
-        try:
-            if val == False:
-                self.__accountDb.delete_account(account=account)
-            else:
-                self.add_admin_user(account=account, admin_user=admin_user,\
-                admin_password=admin_password, admin=True, reseller=False)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-
-            errMsg = "Failed to clean account %s from database for %s"\
-                     % (account, str(e))
-
-            logger.error(errMsg)
-            raise InconsistentDatabaseError(errMsg)
-
-        return Bool(val, msg)
+        if val == False:
+            logger.error(msg)
+            return Bool(val, msg)
+        else:
+            return Bool(val, msg)
 
     @util.timeout(300)
     def __delete_account(self, proxyIp, account):

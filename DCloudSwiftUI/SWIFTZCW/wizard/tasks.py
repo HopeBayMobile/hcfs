@@ -99,7 +99,6 @@ def set_portal_url(portal_url):
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
     from time import sleep
-    print data["cluster_name"]
 
     #  Contruct URL of portal and write it to SWIFTCONF
     if data["portal_port"] < 1 or data["portal_port"] > 65536:
@@ -110,12 +109,6 @@ def do_meta_form(data):
     # Get list of hosts
     hosts = do_meta_form.get_zone_hosts()
 
-    # Assign swift zone id for each host
-    do_meta_form.report_progress(0, True, 'Calculating swift zone id for each host...', None)
-    hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
-    if hosts is None:
-        raise Exception("Replica number > number of hosts!!")
-    
     # Lookup ip of each host
     do_meta_form.report_progress(5, True, 'Looking up ip for each host...', None)
     hosts = dns_lookup(hosts=hosts)
@@ -123,6 +116,16 @@ def do_meta_form(data):
         if host["ip"] is None:
             raise Exception("Failed to lookup the ip of %s" % host["hostname"])
 
+    # remove master node from hosts
+    master_ip = util.getIpAddress()
+    hosts = [host for host in hosts if host["ip"] != master_ip]
+
+    # Assign swift zone id for each host
+    do_meta_form.report_progress(0, True, 'Calculating swift zone id for each host...', None)
+    hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
+    if hosts is None:
+        raise Exception("Replica number > number of hosts!!")
+    
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
