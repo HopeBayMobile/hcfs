@@ -142,15 +142,21 @@ class Test_takesnapshot:
 
         # Test if the snapshot is taken correctly
         nose.tools.ok_(new_snapshot_list[0]['finish_time'] > 0)
-        nose.tools.eq_(new_snapshot_list[0]['exposed'], False)
+        # wthung, 2012/7/18
+        # by auto-exposed feature, "exposed" and "auto_exposed" should be both true
+        #nose.tools.eq_(new_snapshot_list[0]['exposed'], False)
+        nose.tools.eq_(new_snapshot_list[0]['exposed'], True)
+        nose.tools.eq_(new_snapshot_list[0]['auto_exposed'], True)
         test_file_path = os.path.join(snapshot_dir, newest_snapshot)
         test_file_name = os.path.join(test_file_path,\
                            'sambashare/testing_snapshot/testfile')
         nose.tools.ok_(os.path.exists(test_file_name))
 
+        # wthung, 2012/7/18
+        # since snapshot is auto-exposed, we will try to delete directly
+        
         # Let's now share this snapshot
-
-        result = snapshot.expose_snapshot([newest_snapshot])
+        #result = snapshot.expose_snapshot([newest_snapshot])
         # Attempt to delete this snapshot will fail
         result = snapshot.delete_snapshot(newest_snapshot)
         result_val = json.loads(result)
@@ -209,3 +215,48 @@ class Test_takesnapshot:
         result_tmp = snapshot.get_snapshot_lifespan()
         result = json.loads(result_tmp)
         nose.tools.eq_(result['data']['days_to_live'], 100)
+    
+    def test_get_snapshot_last_status(self):
+        """
+        Test get status of last snapshot.
+        """
+
+        db_file = '/root/.s3ql/snapshot_db.txt'
+        db_file_bak = '/root/.s3ql/snapshot_db.txt.bak'
+        
+        # backup existing db file if any
+        if os.path.exists(db_file):
+            os.system('sudo mv %s %s' % (db_file, db_file_bak))
+        
+        #---------------------------------------------------------------------
+        # create temp db file
+        os.system('sudo touch %s' % db_file)
+        with open(db_file, 'w') as fh:
+            fh.write('snapshot_2012_7_7_7_7_7,100,-1,10,10,true,true\n')
+        
+        # expect false result
+        result_val = json.loads(snapshot.get_snapshot_last_status())
+        nose.tools.eq_(result_val['result'], False)
+        nose.tools.eq_(result_val['latest_snapshot_time'], -1)
+        
+        # delete temp db file
+        os.system('sudo rm -rf %s' % db_file)
+        
+        #---------------------------------------------------------------------
+        # create temp db file
+        os.system('sudo touch %s' % db_file)
+        with open(db_file, 'w') as fh:
+            fh.write('snapshot_2012_7_7_7_7_7,100,120,10,10,true,true\n')
+            
+        # expect true result
+        result_val = json.loads(snapshot.get_snapshot_last_status())
+        nose.tools.eq_(result_val['result'], True)
+        nose.tools.eq_(result_val['latest_snapshot_time'], 120)
+        
+        # delete temp db file
+        os.system('sudo rm -rf %s' % db_file)
+        
+        #---------------------------------------------------------------------
+        # restore backup db file if any
+        if os.path.exists(db_file_bak):
+            os.system('sudo mv %s %s' % (db_file_bak, db_file))

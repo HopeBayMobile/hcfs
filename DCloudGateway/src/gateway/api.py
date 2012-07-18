@@ -265,10 +265,10 @@ def get_indicators():
             - SMB_srv: If Samba service is alive.
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
-    
+            - S3QL_ok: If S3QL service is running.
     """
     
-    log.info("get_indicators start")
+    #log.info("get_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
@@ -282,21 +282,23 @@ def get_indicators():
           'NFS_srv' : False,
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
-          'HTTP_proxy_srv' : False }}
-    
+          'HTTP_proxy_srv' : False,
+          'S3QL_ok': False }}
+
     try:
         op_network_ok = _check_network()
-        op_system_check = _check_system()
+        op_system_check = _check_process_alive('fsck.s3ql')
         op_flush_inprogress = _check_flush()
         op_dirtycache_nearfull = _check_dirtycache()
         op_HDD_ok = _check_HDD()
         op_NFS_srv = _check_nfs_service()
         op_SMB_srv = _check_smb_service()
         op_snapshot_in_progress = _check_snapshot_in_progress()
-        op_Proxy_srv = _check_http_proxy_service()
+        op_Proxy_srv = _check_process_alive('squid3')
+        op_s3ql_ok = _check_process_alive('mount.s3ql')
 
         op_ok = True
-        op_msg = "Gateway indocators read successfully."
+        op_msg = "Gateway indicators read successfully."
     
         return_val = {
               'result' : op_ok,
@@ -309,13 +311,14 @@ def get_indicators():
               'NFS_srv' : op_NFS_srv,
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
-              'HTTP_proxy_srv' : op_Proxy_srv }}
+              'HTTP_proxy_srv' : op_Proxy_srv,
+              'S3QL_ok': op_s3ql_ok }}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
         return return_val
     
-    log.info("get_indicators end successfully")
+    #log.info("get_indicators end successfully")
     return return_val
 
 # by Rice
@@ -339,7 +342,7 @@ def get_gateway_indicators():
             - SMB_srv: If Samba service is alive.
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
-    
+            - S3QL_ok: If S3QL service is running.
     """
 
     #log.info("get_gateway_indicators start")
@@ -356,7 +359,8 @@ def get_gateway_indicators():
           'NFS_srv' : False,
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
-          'HTTP_proxy_srv' : False }}
+          'HTTP_proxy_srv' : False,
+          'S3QL_ok': False }}
 
     # test, for fast UI integration
     #return json.dumps(return_val)
@@ -384,36 +388,36 @@ def get_gateway_indicators():
     #log.info("get_gateway_indicators end")
     return json.dumps(return_val)
 
-def _check_http_proxy_service():
-    """
-    Check whether Squid3 is running.
-    
-    @rtype: boolean
-    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
-    
-    """
-    
-    op_proxy_check = False
-    #log.info("[2] _check_http_proxy start")
+# wthung, 2012/7/17, retire this function and replace by _check_process_alive
+#def _check_http_proxy_service():
+#    """
+#    Check whether Squid3 is running.
+#    
+#    @rtype: boolean
+#    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
+#    
+#    """
+#    
+#    op_proxy_check = False
+#    #log.info("[2] _check_http_proxy start")
+#
+#    try:
+#        cmd = "sudo ps aux | grep squid3"
+#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#        lines = po.stdout.readlines()
+#        po.wait()
+#
+#        if po.returncode == 0:
+#            if len(lines) > 2:
+#                op_proxy_check = True
+#        else:
+#            log.info(output)
+#    except:
+#        pass
+#
+#    #log.info("[2] _check_http_proxy end")
+#    return op_proxy_check
 
-    try:
-        cmd = "sudo ps aux | grep squid3"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        lines = po.stdout.readlines()
-        po.wait()
-
-        if po.returncode == 0:
-            if len(lines) > 2:
-                op_proxy_check = True
-        else:
-            log.info(output)
-    except:
-        pass
-
-    #log.info("[2] _check_http_proxy end")
-    return op_proxy_check
-    
-    
 # check network connection from gateway to storage by Rice
 def _check_network():
     """
@@ -460,35 +464,65 @@ def _check_network():
         log.info("_check_network end")
     return op_network_ok
 
-# check fsck.s3ql daemon by Rice
-def _check_system():
+# wthung, 2012/7/17
+# check input process name is running
+def _check_process_alive(process_name=None):
     """
-    Check fsck.s3ql daemon.
+    Check if input process is running.
     
     @rtype: boolean
-    @return: True if fsck.s3ql is alive. Otherwise false.
-    
+    @return: True if input process is alive. Otherwise false.
     """
-    
-    op_system_check = False
-    log.info("_check_system start")
 
-    try:
-        cmd = "sudo ps aux | grep fsck.s3ql"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        lines = po.stdout.readlines()
-        po.wait()
-    
-        if po.returncode == 0:
-            if len(lines) > 2:
-                op_system_check = True
-        else:
-            log.info(output)
-    except:
-        pass
+    op = False
 
-    log.info("_check_system end")
-    return op_system_check
+    if process_name is not None:
+        try:
+            cmd = "sudo ps aux | grep %s" % process_name
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            lines = po.stdout.readlines()
+            po.wait()
+
+            if po.returncode == 0:
+                if len(lines) > 2:
+                    op = True
+            else:
+                log.info(output)
+        except:
+            pass
+
+    return op
+
+# wthung, 2012/7/17, retire this function and replace by _check_process_alive
+# check fsck.s3ql daemon by Rice
+#def _check_system():
+#    """
+#    Check fsck.s3ql daemon.
+#    
+#    @rtype: boolean
+#    @return: True if fsck.s3ql is alive. Otherwise false.
+#    
+#    """
+#    
+#    op_system_check = False
+#    log.info("_check_system start")
+#
+#    try:
+#        cmd = "sudo ps aux | grep fsck.s3ql"
+#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#        lines = po.stdout.readlines()
+#        po.wait()
+#    
+#        if po.returncode == 0:
+#            if len(lines) > 2:
+#                op_system_check = True
+#        else:
+#            log.info(output)
+#    except:
+#        pass
+#
+#    log.info("_check_system end")
+#    return op_system_check
 
 # flush check by Rice
 def _check_flush():
