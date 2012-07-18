@@ -265,10 +265,10 @@ def get_indicators():
             - SMB_srv: If Samba service is alive.
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
-    
+            - S3QL_ok: If S3QL service is running.
     """
     
-    log.info("get_indicators start")
+    #log.info("get_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
@@ -282,21 +282,23 @@ def get_indicators():
           'NFS_srv' : False,
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
-          'HTTP_proxy_srv' : False }}
-    
+          'HTTP_proxy_srv' : False,
+          'S3QL_ok': False }}
+
     try:
         op_network_ok = _check_network()
-        op_system_check = _check_system()
+        op_system_check = _check_process_alive('fsck.s3ql')
         op_flush_inprogress = _check_flush()
         op_dirtycache_nearfull = _check_dirtycache()
         op_HDD_ok = _check_HDD()
         op_NFS_srv = _check_nfs_service()
         op_SMB_srv = _check_smb_service()
         op_snapshot_in_progress = _check_snapshot_in_progress()
-        op_Proxy_srv = _check_http_proxy_service()
+        op_Proxy_srv = _check_process_alive('squid3')
+        op_s3ql_ok = _check_process_alive('mount.s3ql')
 
         op_ok = True
-        op_msg = "Gateway indocators read successfully."
+        op_msg = "Gateway indicators read successfully."
     
         return_val = {
               'result' : op_ok,
@@ -309,13 +311,14 @@ def get_indicators():
               'NFS_srv' : op_NFS_srv,
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
-              'HTTP_proxy_srv' : op_Proxy_srv }}
+              'HTTP_proxy_srv' : op_Proxy_srv,
+              'S3QL_ok': op_s3ql_ok }}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
         return return_val
     
-    log.info("get_indicators end successfully")
+    #log.info("get_indicators end successfully")
     return return_val
 
 # by Rice
@@ -339,7 +342,7 @@ def get_gateway_indicators():
             - SMB_srv: If Samba service is alive.
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
-    
+            - S3QL_ok: If S3QL service is running.
     """
 
     #log.info("get_gateway_indicators start")
@@ -356,7 +359,8 @@ def get_gateway_indicators():
           'NFS_srv' : False,
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
-          'HTTP_proxy_srv' : False }}
+          'HTTP_proxy_srv' : False,
+          'S3QL_ok': False }}
 
     # test, for fast UI integration
     #return json.dumps(return_val)
@@ -384,36 +388,86 @@ def get_gateway_indicators():
     #log.info("get_gateway_indicators end")
     return json.dumps(return_val)
 
-def _check_http_proxy_service():
-    """
-    Check whether Squid3 is running.
-    
-    @rtype: boolean
-    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
-    
-    """
-    
-    op_proxy_check = False
-    #log.info("[2] _check_http_proxy start")
+# wthung, 2012/7/17, retire this function and replace by _check_process_alive
+#def _check_http_proxy_service():
+#    """
+#    Check whether Squid3 is running.
+#    
+#    @rtype: boolean
+#    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
+#    
+#    """
+#    
+#    op_proxy_check = False
+#    #log.info("[2] _check_http_proxy start")
+#
+#    try:
+#        cmd = "sudo ps aux | grep squid3"
+#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#        lines = po.stdout.readlines()
+#        po.wait()
+#
+#        if po.returncode == 0:
+#            if len(lines) > 2:
+#                op_proxy_check = True
+#        else:
+#            log.info(output)
+#    except:
+#        pass
+#
+#    #log.info("[2] _check_http_proxy end")
+#    return op_proxy_check
 
+
+# Code written by Jiahong Wu (traceroute)
+def _traceroute_backend(backend_IP = None):
+    """
+    Return a traceroute message from gateway to backend
+
+    @type backend_IP: string
+    @param backend_IP: IP of backend. If the value is None, the url stored in authinfo2 is used.
+    @rtype: string
+    @return: traceroute info from gateway to backend
+    """
+
+    op_msg = "Unable to obtain traceroute info to the backend"
+    log.info("_check_network start")
     try:
-        cmd = "sudo ps aux | grep squid3"
+        if backend_IP == None:
+            op_config = ConfigParser.ConfigParser()
+            with open('/root/.s3ql/authinfo2') as op_fh:
+                op_config.readfp(op_fh)
+
+            section = "CloudStorageGateway"
+            op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
+            index = op_storage_url.find(":")
+            if index != -1:
+                op_storage_url = op_storage_url[0:index]
+        else:
+            op_storage_url = backend_IP
+
+        cmd = "sudo traceroute %s" % op_storage_url
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        lines = po.stdout.readlines()
+        output = po.stdout.read()
         po.wait()
 
         if po.returncode == 0:
-            if len(lines) > 2:
-                op_proxy_check = True
+            op_msg = "Traceroute message to the backend as follows:\n" + output
         else:
-            log.info(output)
-    except:
-        pass
+            op_msg = op_msg + '\nBackend url: ' + op_storage_url
 
-    #log.info("[2] _check_http_proxy end")
-    return op_proxy_check
-    
-    
+    except IOError as e:
+            op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+            log.error(str(e))
+    except Exception as e:
+            op_msg = 'Unable to obtain storage url or login info.'
+            log.error(str(e))
+
+    finally:
+        log.info("_check_network end")
+    return op_msg
+
+
 # check network connection from gateway to storage by Rice
 def _check_network():
     """
@@ -431,7 +485,6 @@ def _check_network():
         with open('/root/.s3ql/authinfo2') as op_fh:
             op_config.readfp(op_fh)
 
-    
         section = "CloudStorageGateway"
         op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
         index = op_storage_url.find(":")
@@ -460,35 +513,65 @@ def _check_network():
         log.info("_check_network end")
     return op_network_ok
 
-# check fsck.s3ql daemon by Rice
-def _check_system():
+# wthung, 2012/7/17
+# check input process name is running
+def _check_process_alive(process_name=None):
     """
-    Check fsck.s3ql daemon.
+    Check if input process is running.
     
     @rtype: boolean
-    @return: True if fsck.s3ql is alive. Otherwise false.
-    
+    @return: True if input process is alive. Otherwise false.
     """
-    
-    op_system_check = False
-    log.info("_check_system start")
 
-    try:
-        cmd = "sudo ps aux | grep fsck.s3ql"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        lines = po.stdout.readlines()
-        po.wait()
-    
-        if po.returncode == 0:
-            if len(lines) > 2:
-                op_system_check = True
-        else:
-            log.info(output)
-    except:
-        pass
+    op = False
 
-    log.info("_check_system end")
-    return op_system_check
+    if process_name is not None:
+        try:
+            cmd = "sudo ps aux | grep %s" % process_name
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            lines = po.stdout.readlines()
+            po.wait()
+
+            if po.returncode == 0:
+                if len(lines) > 2:
+                    op = True
+            else:
+                log.info(lines)
+        except:
+            pass
+
+    return op
+
+# wthung, 2012/7/17, retire this function and replace by _check_process_alive
+# check fsck.s3ql daemon by Rice
+#def _check_system():
+#    """
+#    Check fsck.s3ql daemon.
+#    
+#    @rtype: boolean
+#    @return: True if fsck.s3ql is alive. Otherwise false.
+#    
+#    """
+#    
+#    op_system_check = False
+#    log.info("_check_system start")
+#
+#    try:
+#        cmd = "sudo ps aux | grep fsck.s3ql"
+#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+#        lines = po.stdout.readlines()
+#        po.wait()
+#    
+#        if po.returncode == 0:
+#            if len(lines) > 2:
+#                op_system_check = True
+#        else:
+#            log.info(output)
+#    except:
+#        pass
+#
+#    log.info("_check_system end")
+#    return op_system_check
 
 # flush check by Rice
 def _check_flush():
@@ -755,7 +838,7 @@ def apply_storage_account(storage_url, account, password, test=True):
     log.info("apply_storage_account start")
 
     op_ok = False
-    op_msg = 'Failed to apply storage accounts for unexpetced errors.'
+    op_msg = 'Failed to apply storage accounts for unexpected errors.'
 
     if test:
         test_gw_results = json.loads(test_storage_account(storage_url, account, password))
@@ -821,7 +904,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
     log.info("apply_user_enc_key start")
 
     op_ok = False
-    op_msg = 'Failed to change encryption keys for unexpetced errors.'
+    op_msg = 'Failed to change encryption keys for unexpected errors.'
 
     try:
         #Check if the new key is of valid format
@@ -1259,7 +1342,7 @@ def build_gateway(user_key):
     #log.info("build_gateway start")
 
     op_ok = False
-    op_msg = 'Failed to apply storage accounts for unexpetced errors.'
+    op_msg = 'Failed to apply storage accounts for unexpected errors.'
 
     try:
 
@@ -1530,7 +1613,7 @@ def shutdown_gateway():
     return json.dumps(return_val)
 
 
-@common.timeout(180)
+@common.timeout(30)
 def _test_storage_account(storage_url, account, password):
     """
     Test the storage account to see if it works.
@@ -1583,7 +1666,7 @@ def test_storage_account(storage_url, account, password):
     log.info("test_storage_account start")
 
     op_ok = False
-    op_msg = 'Test storage account failed for unexpetced errors.'
+    op_msg = 'Test storage account failed for unexpected errors.'
 
     try:
         _test_storage_account(storage_url=storage_url, account=account, password=password)
@@ -1598,13 +1681,22 @@ def test_storage_account(storage_url, account, password):
         log.error(op_msg)
     except Exception as e:
         log.error(str(e))
-    finally:
-        return_val = {'result' : op_ok,
+
+    #Jiahong: Insert traceroute info in the case of a failed test
+    if op_ok is False:
+        try:
+            traceroute_info = _traceroute_backend(storage_url)
+            log.error(traceroute_info)
+            op_msg = op_msg + '\n' + traceroute_info
+        except Exception as e:
+            log.error('Error in traceroute:\n' + str(e))
+
+    return_val = {'result' : op_ok,
                   'msg'    : op_msg,
                   'data'   : {}}
     
-        log.info("test_storage_account end")
-        return json.dumps(return_val)
+    log.info("test_storage_account end")
+    return json.dumps(return_val)
 
 def get_network():
     """
@@ -2165,7 +2257,7 @@ def set_smb_user_list(username, password):
     #Resetting smb service
     smb_return_val = json.loads(restart_smb_service())
     
-    if smb_return_val['result'] == False:
+    if not smb_return_val['result']:
         return_val['msg'] = 'Error in restarting smb service.'
         return json.dumps(return_val) 
     
@@ -2272,13 +2364,14 @@ def set_compression(switch):
     try:
         config = getGatewayConfig()
     
-        if switch == True:
+        if switch:
             config.set("s3ql", "compress", "true")
-        elif switch == False:
-            config.set("s3ql", "compress", "false")
-    
         else:
-            raise Exception("The input argument has to be True or False")
+            config.set("s3ql", "compress", "false")
+        # wthung, 2012/7/18
+        # mark below code
+#        else:
+#            raise Exception("The input argument has to be True or False")
     
         storage_url = getStorageUrl()
         if storage_url is None:
@@ -2300,7 +2393,7 @@ def set_compression(switch):
     except Exception as e:
         op_msg = str(e)
     finally:
-        if op_ok == False:
+        if not op_ok:
             log.error(op_msg)
 
         return_val = {'result' : op_ok,
@@ -2388,7 +2481,7 @@ def set_nfs_access_ip_list (array_of_ip):
         #Resetting nfs service
         nfs_return_val = json.loads(restart_nfs_service())
     
-        if nfs_return_val['result'] == False:
+        if not nfs_return_val['result']:
             return_val['result'] = False
             return_val['msg'] = 'Error in restarting NFS service.'
             return json.dumps(return_val)
@@ -2551,7 +2644,7 @@ def month_number(monthabbr):
     index = MONTHS.index(monthabbr)
     return index
 
-def classify_logs (log, keyword_filter=KEYWORD_FILTER):
+def classify_logs (logs, keyword_filter=KEYWORD_FILTER):
     """
     Give a log message and a keyword filter {key=category, val = [keyword]}.
     Find out which category the log belongs to. 
@@ -2565,12 +2658,12 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-    #print log
+    #print logs
     for category in sorted(keyword_filter.keys()):
 
         for keyword in keyword_filter[category]:
             #print "in keyword = " + keyword
-            if re.search(keyword, log):
+            if re.search(keyword, logs):
                 #print "match"
                 return category
             else:
@@ -3158,15 +3251,5 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
-    #print build_gateway("1234567")
-    #print apply_user_enc_key("123456", "1234567")
-    
-    #_createS3qlConf("172.16.228.53:8080")
-    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    #print data
-    #print get_gateway_indicators()
-    #_check_nfs_service()
-    print get_smb_user_list()
-    print set_smb_user_list("superuser", "superuser")
-    print get_smb_user_list()
+    print _traceroute_backend('aaa')
     pass

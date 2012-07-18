@@ -32,6 +32,7 @@ snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
 snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
 temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
+ss_auto_exposed_file = "/root/.s3ql/.ss_auto_exposed"
 
 ####### Exception class definition ###############
 
@@ -120,17 +121,21 @@ def _initialize_snapshot():
         raise SnapshotError("Could not initialize the snapshot bot.")
 
 
+# wthung, 2012/7/17
+# modify to return latest snapshot name
 def _wait_snapshot(old_len):
     """
     Wait for the new entry to appear in the database.
 
     @type old_len: integer
     @param old_len: Number of entries in database before taking snapshot
+    @rtype: string
+    @return: Last snapshot name.
     """
 
     finished = False
-
     retries = 20
+    snapshots = []
 
     # Wait for the snapshotting process to finish
     while not finished:
@@ -140,10 +145,16 @@ def _wait_snapshot(old_len):
 
         new_len = len(snapshots)
 
+        # except for checking the length of snapshots,
+        # we check the snapshot name is starting with 'snapshot' as well
         if new_len > old_len:
-            finished = True
+            latest_snapshot = snapshots[0]
+            if 'new_' not in latest_snapshot['name']:
+                finished = True
         else:
             time.sleep(0.5)
+
+    return latest_snapshot['name']
 
 
 def take_snapshot():
@@ -166,7 +177,11 @@ def take_snapshot():
             old_len = len(snapshots)
 
             _initialize_snapshot()
-            _wait_snapshot(old_len)
+            latest_ss_name = _wait_snapshot(old_len)
+            log.info('[2] Latest snapshot name: %s' % latest_ss_name)
+            # wthung, 2012/7/17
+            # automatically expose this new snapshot
+            expose_snapshot(latest_ss_name, True)
             return_result = True
             return_msg = 'Completed take_snapshot'
     except SnapshotError as Err:
@@ -256,6 +271,33 @@ def get_snapshot_schedule():
     return json.dumps(return_val)
 
 
+def get_snapshot_auto_exposed():
+    """
+    Get the status of snapshot auto exposed feature.
+    
+    @rtype: boolean
+    @return: True if auto exposed feature is enabled. Otherwise, false.
+    """
+    
+    if os.path.exists(ss_auto_exposed_file):
+        return True
+    return False
+
+def set_snapshot_auto_exposed(enabled=True):
+    """
+    Set the status of snapshot auto exposed feature.
+    
+    @type enabled: boolean
+    @param enabled: Status of snapshot auto exposed feature.
+    @rtype: N/A
+    @return: N/A
+    """
+
+    if enabled:
+        os.system('sudo touch %s' % ss_auto_exposed_file)
+    else:
+        os.system('sudo rm -rf %s' % ss_auto_exposed_file)
+
 def _acquire_db_list():
     """
     Helper function for reading snapshot database without parsing
@@ -291,6 +333,7 @@ def _translate_db(db_list):
       4. "num_files": Total number of files included in this snapshot.
       5. "total_size": Total data size include in this snapshot.
       6. "exposed": Whether this snapshot is exposed as a samba share.
+      7. "auto_exposed": Whether this snapshot is auto exposed as a samba service.
 
     @type db_list:  Array of strings
     @param db_list: Lines in the snapshot database (as array of strings).
@@ -302,17 +345,25 @@ def _translate_db(db_list):
         for entry in db_list:
             tmp_items = entry.split(',')
 
-            if tmp_items[5] == 'true\n':
+            if tmp_items[5] == 'true':
                 tmp_exposed = True
             else:
                 tmp_exposed = False
+            
+            # wthung, 2012/7/17
+            # add for auto_exposed feature
+            if tmp_items[6] == 'true\n':
+                tmp_auto_exposed = True
+            else:
+                tmp_auto_exposed = False
 
             temp_obj = {'name': tmp_items[0], \
                         'start_time': float(tmp_items[1]), \
                         'finish_time': float(tmp_items[2]),\
                         'num_files': int(tmp_items[3]), \
                         'total_size': int(tmp_items[4]), \
-                        'exposed': tmp_exposed}
+                        'exposed': tmp_exposed, \
+                        'auto_exposed': tmp_auto_exposed}
             snapshots = snapshots + [temp_obj]
     except:
         raise SnapshotError('Unable to convert snapshot db')
@@ -383,6 +434,46 @@ def get_snapshot_in_progress():
     return json.dumps(return_val)
 
 
+# wthung, 2012/7/17
+def get_snapshot_last_status():
+    """
+    Get status of latest snapshot.
+    
+    @rtype:    Json object
+    @return:   A json object with function result, returned message,
+               and the finish time of latest snapshot (return -1 if latest snapshot is failed).
+    """
+
+    return_val = {'result': False,
+                  'msg': 'Latest snapshot is failed',
+                  'latest_snapshot_time': -1}
+    
+    return_result = False
+    last_ss_time = -1
+    
+    try:
+        db_list = _acquire_db_list()
+        snapshot_list = _translate_db(db_list)
+        
+        last_ss = snapshot_list[0]
+        last_ss_time = last_ss['finish_time']
+        if last_ss_time > 0:
+            # should be success
+            return_result = True
+            return_msg = 'Latest snapshot is successfully finished.'
+    
+    except:
+        return_msg = '[2] Unable to get status of last snapshot.'
+        last_ss_time = -1
+
+    log.info(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
+                  'latest_snapshot_time': int(last_ss_time)}
+    
+    return json.dumps(return_val)
+
+
 def _append_samba_entry(entry):
     """
     Append new entry to a list of new exposed samba shared folders.
@@ -441,11 +532,18 @@ def _write_snapshot_db(snapshot_list):
                     is_exposed = 'true'
                 else:
                     is_exposed = 'false'
+                
+                # wthung, 2012/7/17
+                # add a entry of auto_exposed
+                if entry['auto_exposed']:
+                    is_auto_exposed = 'true'
+                else:
+                    is_auto_exposed = 'false'
 
-                fh.write('%s,%f,%f,%d,%d,%s\n' % (entry['name'],\
-                       entry['start_time'], entry['finish_time'],\
-                       entry['num_files'], entry['total_size'],\
-                       is_exposed))
+                fh.write('%s,%f,%f,%d,%d,%s,%s\n' % (entry['name'],\
+                        entry['start_time'], entry['finish_time'],\
+                        entry['num_files'], entry['total_size'],\
+                        is_exposed, is_auto_exposed))
 
         os.system('sudo cp %s %s' % (temp_snapshot_db, snapshot_db))
 
@@ -455,7 +553,7 @@ def _write_snapshot_db(snapshot_list):
         del db_lock
 
 
-def expose_snapshot(to_expose):
+def expose_snapshot(to_expose, expose_after_creation=False):
     """
     API function for exposing snapshot entries as samba shares.
 
@@ -482,12 +580,24 @@ def expose_snapshot(to_expose):
         # Initial tmp samba config
         os.system('sudo cp %s %s' % (org_smb_conf, tmp_smb_conf))
 
+        # wthung, 2012/7/17
+        # if auto_exposed was ever set to false, we should not set it to true anymore
         for entry in snapshot_list:
             if entry['name'] in to_expose:
                 entry['exposed'] = True
-                _append_samba_entry(entry)
+                #_append_samba_entry(entry)
             else:
-                entry['exposed'] = False
+                # by expose_after_creation, we don't disable export on item which is not in input list
+                # because in take_snapshot, we only input latest snapshot to export
+                # this avoids other exported item to be disabled exporting
+                if not expose_after_creation:
+                    entry['exposed'] = False
+                    entry['auto_exposed'] = False
+
+        # we must iterate snapshots again for export 
+        for entry in snapshot_list:
+            if entry['exposed']:
+                _append_samba_entry(entry)
 
         # Restart samba service
         os.system('sudo /etc/init.d/smbd stop')
@@ -684,5 +794,6 @@ def get_snapshot_lifespan():
 ################################################################
 
 if __name__ == '__main__':
-    print delete_snapshot('snapshot_2012_6_25_17_46_24')
+    #print delete_snapshot('snapshot_2012_6_25_17_46_24')
+    print get_snapshot_last_status()
     pass
