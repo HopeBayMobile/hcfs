@@ -487,7 +487,7 @@ def _check_process_alive(process_name=None):
                 if len(lines) > 2:
                     op = True
             else:
-                log.info(output)
+                log.info(lines)
         except:
             pass
 
@@ -2199,7 +2199,7 @@ def set_smb_user_list(username, password):
     #Resetting smb service
     smb_return_val = json.loads(restart_smb_service())
     
-    if smb_return_val['result'] == False:
+    if not smb_return_val['result']:
         return_val['msg'] = 'Error in restarting smb service.'
         return json.dumps(return_val) 
     
@@ -2306,13 +2306,14 @@ def set_compression(switch):
     try:
         config = getGatewayConfig()
     
-        if switch == True:
+        if switch:
             config.set("s3ql", "compress", "true")
-        elif switch == False:
-            config.set("s3ql", "compress", "false")
-    
         else:
-            raise Exception("The input argument has to be True or False")
+            config.set("s3ql", "compress", "false")
+        # wthung, 2012/7/18
+        # mark below code
+#        else:
+#            raise Exception("The input argument has to be True or False")
     
         storage_url = getStorageUrl()
         if storage_url is None:
@@ -2334,7 +2335,7 @@ def set_compression(switch):
     except Exception as e:
         op_msg = str(e)
     finally:
-        if op_ok == False:
+        if not op_ok:
             log.error(op_msg)
 
         return_val = {'result' : op_ok,
@@ -2422,7 +2423,7 @@ def set_nfs_access_ip_list (array_of_ip):
         #Resetting nfs service
         nfs_return_val = json.loads(restart_nfs_service())
     
-        if nfs_return_val['result'] == False:
+        if not nfs_return_val['result']:
             return_val['result'] = False
             return_val['msg'] = 'Error in restarting NFS service.'
             return json.dumps(return_val)
@@ -2585,7 +2586,7 @@ def month_number(monthabbr):
     index = MONTHS.index(monthabbr)
     return index
 
-def classify_logs (log, keyword_filter=KEYWORD_FILTER):
+def classify_logs (logs, keyword_filter=KEYWORD_FILTER):
     """
     Give a log message and a keyword filter {key=category, val = [keyword]}.
     Find out which category the log belongs to. 
@@ -2599,12 +2600,12 @@ def classify_logs (log, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-    #print log
+    #print logs
     for category in sorted(keyword_filter.keys()):
 
         for keyword in keyword_filter[category]:
             #print "in keyword = " + keyword
-            if re.search(keyword, log):
+            if re.search(keyword, logs):
                 #print "match"
                 return category
             else:
