@@ -116,7 +116,13 @@ echo "DCloudGatewayUI setup completed..."
 # vvvvv-- install GUI API -----------------------------------------------------------------------------
 cd ../DCloudGateway
 python setup.py install
-    # install squid3 proxy
+# install kernel and fuse patches
+dpkg -i kernel_fuse_patches/linux-image-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb
+dpkg -i kernel_fuse_patches/linux-headers-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb
+dpkg -i kernel_fuse_patches/fuse-utils_2.8.4-1.1ubuntu4_amd64.deb
+dpkg -i kernel_fuse_patches/libfuse2_2.8.4-1.1ubuntu4_amd64.deb
+dpkg -i kernel_fuse_patches/libfuse-dev_2.8.4-1.1ubuntu4_amd64.deb
+# install squid3 proxy
 CACHEDIR="/storage/http_proxy_cache/"
 mkdir -p $CACHEDIR
 cat > /etc/squid3/squid.conf << EOF

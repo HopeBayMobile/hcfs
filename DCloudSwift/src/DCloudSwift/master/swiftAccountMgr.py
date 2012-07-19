@@ -64,6 +64,7 @@ class SwiftAccountMgr:
 
         self.__admin_name_suffix = "_admin"
         self.__admin_default_password = "admin"
+        self.__user_default_password = "user"
         self.__metadata_container_suffix = "_metadata_container"
         self.__private_container_suffix = "_private_container"
         self.__shared_container_suffix = "_shared_container"
@@ -142,7 +143,7 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password, description="", admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password="", description="", admin=False, reseller=False, retry=3):
         '''
         Add a user into a given account, including the following steps::
             (1) Add a user
@@ -177,14 +178,23 @@ class SwiftAccountMgr:
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
-        admin_user = "admin"
+
+        admin_user = account + self.__admin_name_suffix
+
+        #TODO: need to check the characters of the password
+        if password == "":
+            password = self.__user_default_password
+
         admin_password = self.get_user_password(account, admin_user).msg
-        container = "ctn_" + user
+        #container = "ctn_" + user
+
         metadata_content = {
                 "Account-Enable": True,
                 "User-Enable": True,
                 "Password": password,
-                "Quota": 0}
+                "Quota": 0,
+                "Description": description,
+        }
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found"
@@ -194,44 +204,24 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
-        try:
-            row = self.__accountDb.add_user(account=account, name=user)
+        check_account_existence = self.account_existence(account)
 
-            if row is None:
-                msg = "User %s:%s already exists" % (account, user)
-                return Bool(val, msg)
-            elif row is False:
-                msg = "Account %s does not exist" % account
-                return Bool(val, msg)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            msg = str(e)
+        if check_account_existence.val == False:
+            val = False
+            msg = check_account_existence.msg
+            return Bool(val, msg)
+        elif check_account_existence.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
             return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
                                            user=user, password=password, admin=admin, reseller=reseller)
 
-        try:
-            if val == False:
-                self.__accountDb.delete_user(account=account, name=user)
-            else:
-                #Todo: crate container
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container,\
-                                account=account, admin_user=admin_user, admin_password=admin_password, container=container)
-                #Todo: set metadata of container
-                if val == False:
-                    msg = "Failed to create container"
-                    return Bool(val, msg)
-                else:
-                    (val, msg) = self.__functionBroker(\
-                                    proxy_ip_list=proxy_ip_list,\
-                                    retry=retry,\
-                                    fn=self.__set_container_metadata,\
-                                    account=account,\
-                                    admin_user=admin_user,\
-                                    admin_password=admin_password,\
-                                    container=container,\
-                                    metadata_content=metadata_content)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                           account=account, admin_user=admin_user, admin_password=admin_password,\
+                                           container=container, metadata_content=metadata_content)
+
                     if val == False:
                         msg = "Failed to set metadata of container %s"\
                               % container
@@ -520,6 +510,7 @@ class SwiftAccountMgr:
 
         admin_user = account + self.__admin_name_suffix
 
+        #TODO: need to check the characters of the password
         if admin_password == "":
             admin_password = self.__admin_default_password
 
@@ -2317,10 +2308,9 @@ class SwiftAccountMgr:
         return Bool(result, val, msg)
 
     @util.timeout(300)
-    def __get_read_acl(self, proxyIp, account,\
-                       container, admin_user, admin_password):
+    def __get_container_acl(self, proxyIp, account, container, admin_user, admin_password):
         '''
-        Get the read acl of the container
+        Get ACL of the container
 
         @type  proxyIp: string
         @param proxyIp: IP of the proxy node
@@ -2337,19 +2327,17 @@ class SwiftAccountMgr:
             gotten, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
-        logger = util.getLogger(name="__get_read_acl")
+
+        logger = util.getLogger(name="__get_container_acl")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
+        acl = {}
         msg = "Failed to get the read acl of container %s:" % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s stat %s"\
-              % (url, account, admin_user, admin_password, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swift -A %s -U %s:%s -K %s stat %s" % (url, account, admin_user, admin_password, container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
@@ -2362,15 +2350,20 @@ class SwiftAccountMgr:
 
         for line in lines:
             if "Read" in line:
-                msg = line.split("ACL: ")[1]
-                logger.info(msg)
-                val = True
+                acl["Read"] = line.split("ACL: ")[1]
+            elif "Write" in line:
+                acl["Write"] = line.split("ACL: ")[1]
 
-        if val == False:
+        if acl.get("Read") is None or acl.get("Write") is None:
             msg = msg + " " + stderrData
+            val = False
+        else:
+            val = True
+            msg = acl
 
         return Bool(val, msg)
 
+    """
     @util.timeout(300)
     def __get_write_acl(self, proxyIp, account,\
                         container, admin_user, admin_password):
@@ -2425,10 +2418,11 @@ class SwiftAccountMgr:
             msg = msg + " " + stderrData
 
         return Bool(val, msg)
+    """
 
+    """
     @util.timeout(300)
-    def __set_read_acl(self, proxyIp, account, container,\
-                       admin_user, admin_password, read_acl):
+    def __set_read_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl):
         '''
         Set the read acl of the container
 
@@ -2475,12 +2469,12 @@ class SwiftAccountMgr:
             val = True
 
         return Bool(val, msg)
+    """
 
     @util.timeout(300)
-    def __set_write_acl(self, proxyIp, account, container,\
-                        admin_user, admin_password, write_acl):
+    def __set_container_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl, write_acl):
         '''
-        Set the write acl of the container
+        Set ACL of the container
 
         @type  proxyIp: string
         @param proxyIp: IP of the proxy node

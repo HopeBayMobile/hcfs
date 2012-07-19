@@ -40,8 +40,10 @@ else
     case $yn in
         Yes ) 
             echo $yn
-            # make mount point
-            mkdir /storage
+            if [ ! -e "/storage" ]; then
+                 # make mount point
+                 mkdir /storage
+            fi
         
             # assume two hdds are /dev/sdb /dev/sdc
             # Notice that all data will lose
@@ -93,6 +95,9 @@ else
             rm -r /root/.s3ql
             ln -s /storage/log /var/log
             ln -s /storage/s3ql /root/.s3ql
+            # modify grub conf to set timeout value
+            sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
+            mv grub.tmp /boot/grub/grub.cfg
         break;;
         No ) exit;;
     esac
@@ -111,8 +116,10 @@ cat >/root/build_raid1.sh <<EOF
         # just finish, do nothing.
             echo "RAID1 inited"
     else
-            # make mount point
-            mkdir /storage
+            if [ ! -e "/storage" ]; then
+                 # make mount point
+                 mkdir /storage
+            fi
         
             # assume two hdds are /dev/sdb /dev/sdc
             # Notice that all data will lose
@@ -164,6 +171,9 @@ cat >/root/build_raid1.sh <<EOF
             rm -r /root/.s3ql
             ln -s /storage/log /var/log
             ln -s /storage/s3ql /root/.s3ql
+            # modify grub conf to set timeout value
+            sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
+            mv grub.tmp /boot/grub/grub.cfg
     fi
 EOF
 
