@@ -106,7 +106,11 @@
 
                 $.get('/dashboard/syslog/', function(ctnt, success, opt){
                     var msgs = JSON.parse(ctnt);
-                    $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
+                    if (msgs == ""){
+                        $("#errormsgbox").hide();
+                    } else {
+                        $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
+                    }
                 });
 
                 $(".notify-box-row-NW > div").tooltip();
@@ -168,6 +172,7 @@
         </div>
 
         <div id="errormsgbox"></div>
+
         <div class="main-row main-bg">
             <div class="main-content">
                 <div class="main-content-spacer"></div>
