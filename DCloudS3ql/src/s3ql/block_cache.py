@@ -845,18 +845,8 @@ class BlockCache(object):
         # the database before we remove it from the cache!
 
         log.debug('expire: start')
-#Jiahong: TODO: put some mechanism here to check for network connection before
-#actually trying to expire any blocks
 
         self.quick_pointer = None  # Reset the cached block pointer
-
-        try:
-            with self.bucket_pool() as bucket:
-                bucket.store('cloud_gw_test_connection','nodata')
-        except:
-            log.error('Network appears to be down. Failing expire cache.')
-            raise(llfuse.FUSEError(errno.EIO))
-#Implement the rest...
 
 
         did_nothing_count = 0
@@ -893,6 +883,14 @@ class BlockCache(object):
                 break
 
             # Try to upload just enough
+            #Jiahong: First check if swift is good
+            try:
+                with self.bucket_pool() as bucket:
+                    bucket.store('cloud_gw_test_connection','nodata')
+            except:
+                log.error('Network appears to be down. Failing expire cache.')
+                raise(llfuse.FUSEError(errno.EIO))
+
             for el in self.entries.values_rev():
                 if el.dirty and (el.inode, el.blockno) not in self.in_transit:
                     log.debug('expire: uploading %s..', el)

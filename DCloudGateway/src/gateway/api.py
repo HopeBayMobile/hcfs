@@ -634,6 +634,41 @@ def _check_dirtycache():
     log.info("_check_dirtycache end")
     return op_dirtycache_nearfull
 
+def _get_serial_number(disk):
+    """
+    Get disk serial number by hdparm utility.
+    
+    @type disk: string
+    @param disk: HDD device name. e.g., /dev/sda
+    @rtype: string
+    @return: The serial number of input HDD device. Return '00000000' if failed.
+    """
+    
+    target_str = 'SerialNo='
+    sn = '00000000'
+    
+    try:
+        cmd = "sudo hdparm -i %s" % disk
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.readlines()
+        po.wait()
+    
+        if po.returncode == 0:
+            # grep the serial number
+            for line in output:
+                if target_str not in line:
+                    continue
+                
+                index = line.find(target_str)
+                sn = line[index + len(target_str):]
+                break
+        else:
+            log.info('[2] Some error occurred when getting serial number of %s' % disk)
+    except:
+        pass
+    
+    return sn.rstrip()
+
 # check disks on gateway by Rice
 def _check_HDD():
     """
@@ -645,17 +680,22 @@ def _check_HDD():
     """
     
     op_HDD_ok = False
-    log.info("_check_HDD start")
+    op_disk_num = True
+    #log.info("_check_HDD start")
 
     try:
         all_disk = common.getAllDisks()
         nu_all_disk = len(all_disk)
         op_all_disk = 0
         
-        # wthung, 2012/7/6
-        # check if hdds number is 3. If not, return false immediately
+        # wthung, 2012/7/18
+        # check if hdds number is 3. If not, report the serial number of alive hdd to log
         if nu_all_disk < 3:
-            return False
+            log.info('[0] Some disks were lost. Please check immediately')
+            for disk in all_disk:
+                disk_sn = _get_serial_number(disk)
+                log.info('[0] Alive disk serial number: %s' % disk_sn)
+            op_disk_num = False
     
         for i in all_disk:
             cmd = "sudo smartctl -a %s" % i
@@ -663,20 +703,19 @@ def _check_HDD():
             po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = po.stdout.read()
             po.wait()
-    
-    #          if po.returncode == 0:
+
             if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
                 op_all_disk += 1 
             else:
-                log.info("%s test result: NOT PASSED" % i)
+                log.info("[0] %s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
         
-        if op_all_disk == len(all_disk):
+        if (op_all_disk == len(all_disk)) and op_disk_num:
             op_HDD_ok = True
 
     except:
         pass
 
-    log.info("_check_HDD end")
+    #log.info("_check_HDD end")
     return op_HDD_ok
 
 # check nfs daemon by Rice
@@ -3251,5 +3290,15 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
+    #print build_gateway("1234567")
+    #print apply_user_enc_key("123456", "1234567")
+    
+    #_createS3qlConf("172.16.228.53:8080")
+    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
+    #print data
+    #_check_nfs_service()
+#    print get_smb_user_list()
+#    print set_smb_user_list("superuser", "superuser")
+#    print get_smb_user_list()
     print _traceroute_backend('aaa')
     pass
