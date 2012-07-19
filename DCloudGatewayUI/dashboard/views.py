@@ -62,7 +62,7 @@ def system(request, action=None):
     print network_data
 
     class Gateway(RenderFormMixinClass, forms.Form):
-        storage_url = forms.CharField(label='Cloud storage url')
+        storage_url = forms.CharField(label='Cloud storage server')
         account = forms.CharField()
         password = forms.CharField(widget=forms.PasswordInput)
         retype_password = forms.CharField(widget=forms.PasswordInput)
@@ -156,8 +156,8 @@ def system(request, action=None):
 
     forms_group['Network'] = forms_group.get('Network', Network(initial=network_data))
     forms_group['Cloud Storage Access'] = forms_group.get('Gateway', Gateway(initial=gateway_data))
-    forms_group['Admin Password'] = forms_group.get('AdminPassword', AdminPassword())
     forms_group['Encryption Key'] = forms_group.get('EncryptionKey', EncryptionKey())
+    forms_group['Administrator Password'] = forms_group.get('AdminPassword', AdminPassword())
 
     return render(request, 'dashboard/form_tab.html', {'tab': 'system', 'forms_group': forms_group, 'action_error': action_error})
 

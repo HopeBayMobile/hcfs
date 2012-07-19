@@ -146,9 +146,9 @@
             <li class=""><a href="#schedule" data-toggle="tab">Schedule</a></li>
         {% endif %}
         {% if tab == "lifecycle" %}
-            <li class="active"><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+            <li class="active"><a href="#lifecycle" data-toggle="tab">Maintenance</a></li>
         {% else %}
-            <li class=""><a href="#lifecycle" data-toggle="tab">Life Cycle</a></li>
+            <li class=""><a href="#lifecycle" data-toggle="tab">Maintenance</a></li>
         {% endif %}
     </ul>
     <div class="tab-content">
@@ -303,8 +303,7 @@
             <form action="/dashboard/snapshot/lifecycle" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
-                SnapShot Life Cycle:<br /><br />
-                Snapshots will be delete after<br />
+                Snapshots will be delete after:<br />
                 <div class="days_div">
                     <input name="days" type="number" min="1" max="365" value="{{ default_day }}" /> days
                 </div>

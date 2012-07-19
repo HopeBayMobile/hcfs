@@ -31,6 +31,7 @@ class SwiftMaintainer:
         data = json.dumps(data)
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         
+        #TODO: time out mechanism
         response = None
         f = urllib2.urlopen(req)
         response = f.read()
@@ -75,7 +76,8 @@ class SwiftMaintainer:
 
 if __name__ == "__main__":
     SM = SwiftMaintainer("172.16.229.220:8080")
+    data = {}
     #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
-    #response = SM.post_data("http://172.16.229.63:5308/events", data)
-    response = SM.subscribe(event='cpu temperature')
+    response = SM.post_data("http://172.16.229.63:5308/events", data)
+    #response = SM.subscribe(event='cpu temperature')
     print response

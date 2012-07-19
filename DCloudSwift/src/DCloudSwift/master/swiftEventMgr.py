@@ -9,7 +9,7 @@ import json
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor
-
+from twisted.internet.task import deferLater
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
@@ -41,14 +41,21 @@ class SwiftEventMgr(Daemon):
         logger.info("%s" % notification)
         #Add your code here
 
+        time.sleep(10)
+
     class EventsPage(Resource):
             def render_GET(self, request):
                 # return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
                 return '<html><body>I am the swift event manager!!</body></html>'
 
             def render_POST(self, request):
-                # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.args[FROM_MONITOR][0])
-                reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
+                # body=request.args['body'][0]
+                # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
+                # d = deferLater(reactor, 0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
+                # d.addCallback(printResult)
+                #from twisted.internet import  threads
+                d = threads.deferToThread(SwiftEventMgr.handleEvents, request.content.getvalue())
+
                 return '<html><body>Got it!!</body></html>'
 
     def run(self):
