@@ -23,6 +23,7 @@ class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
 
+        logger = util.getLogger(name="swifteventmgr.handleEvents")
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         self.port = self.masterCfg.getKwparams()["eventMgrPort"]
         self.page = self.masterCfg.getKwparams()["eventMgrPage"]
@@ -48,12 +49,16 @@ class SwiftEventMgr(Daemon):
                 return '<html><body>I am the swift event manager!!</body></html>'
 
             def render_POST(self, request):
+                logger = util.getLogger(name="swifteventmgr.render_POST")
                 # body=request.args['body'][0]
                 # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
                 # d = deferLater(reactor, 0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
                 # d.addCallback(printResult)
-                from twisted.internet import  threads
-                d = threads.deferToThread(SwiftEventMgr.handleEvents, request.content.getvalue())
+                from twisted.internet import threads
+                try:
+                    d = threads.deferToThread(SwiftEventMgr.handleEvents, request.content.getvalue())
+                except Exception as e:
+                    logger.error("%s" % str(e))
 
                 return '<html><body>Got it!!</body></html>'
 
