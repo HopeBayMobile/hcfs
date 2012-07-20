@@ -64,6 +64,7 @@ class SwiftAccountMgr:
 
         self.__admin_name_suffix = "_admin"
         self.__admin_default_password = "admin"
+        self.__user_default_password = "user"
         self.__metadata_container_suffix = "_metadata_container"
         self.__private_container_suffix = "_private_container"
         self.__shared_container_suffix = "_shared_container"
@@ -142,7 +143,7 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password, description="", admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password="", description="", admin=False, reseller=False, retry=3):
         '''
         Add a user into a given account, including the following steps::
             (1) Add a user
@@ -177,14 +178,23 @@ class SwiftAccountMgr:
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
-        admin_user = "admin"
+
+        admin_user = account + self.__admin_name_suffix
+
+        #TODO: need to check the characters of the password
+        if password == "":
+            password = self.__user_default_password
+
         admin_password = self.get_user_password(account, admin_user).msg
-        container = "ctn_" + user
+        #container = "ctn_" + user
+
         metadata_content = {
                 "Account-Enable": True,
                 "User-Enable": True,
                 "Password": password,
-                "Quota": 0}
+                "Quota": 0,
+                "Description": description,
+        }
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found"
@@ -194,44 +204,24 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
-        try:
-            row = self.__accountDb.add_user(account=account, name=user)
+        check_account_existence = self.account_existence(account)
 
-            if row is None:
-                msg = "User %s:%s already exists" % (account, user)
-                return Bool(val, msg)
-            elif row is False:
-                msg = "Account %s does not exist" % account
-                return Bool(val, msg)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            msg = str(e)
+        if check_account_existence.val == False:
+            val = False
+            msg = check_account_existence.msg
+            return Bool(val, msg)
+        elif check_account_existence.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
             return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
                                            user=user, password=password, admin=admin, reseller=reseller)
 
-        try:
-            if val == False:
-                self.__accountDb.delete_user(account=account, name=user)
-            else:
-                #Todo: crate container
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container,\
-                                account=account, admin_user=admin_user, admin_password=admin_password, container=container)
-                #Todo: set metadata of container
-                if val == False:
-                    msg = "Failed to create container"
-                    return Bool(val, msg)
-                else:
-                    (val, msg) = self.__functionBroker(\
-                                    proxy_ip_list=proxy_ip_list,\
-                                    retry=retry,\
-                                    fn=self.__set_container_metadata,\
-                                    account=account,\
-                                    admin_user=admin_user,\
-                                    admin_password=admin_password,\
-                                    container=container,\
-                                    metadata_content=metadata_content)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                           account=account, admin_user=admin_user, admin_password=admin_password,\
+                                           container=container, metadata_content=metadata_content)
+
                     if val == False:
                         msg = "Failed to set metadata of container %s"\
                               % container
@@ -488,7 +478,7 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_account(self, account, quota, admin_password="", description="", retry=3):
+    def add_account(self, account, quota, admin_user="", admin_password="", description="", retry=3):
         '''
         Add a new account, including the following things::
             (1) Create the account and the admin user
@@ -500,6 +490,8 @@ class SwiftAccountMgr:
         @param account: the name of the given account
         @type  quota: string
         @param quota: the quota of the account
+        @type  admin_user: string
+        @param admin_user: the name of admin_user
         @type  admin_password: string
         @param admin_password: the password of the admin user
         @type  description: string
@@ -518,8 +510,11 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        admin_user = account + self.__admin_name_suffix
+        #TODO: need to check the characters of the name of admin_user
+        if admin_user == "":
+            admin_user = account + self.__admin_name_suffix
 
+        #TODO: need to check the characters of the password
         if admin_password == "":
             admin_password = self.__admin_default_password
 
@@ -2317,10 +2312,9 @@ class SwiftAccountMgr:
         return Bool(result, val, msg)
 
     @util.timeout(300)
-    def __get_read_acl(self, proxyIp, account,\
-                       container, admin_user, admin_password):
+    def __get_container_acl(self, proxyIp, account, container, admin_user, admin_password):
         '''
-        Get the read acl of the container
+        Get ACL of the container
 
         @type  proxyIp: string
         @param proxyIp: IP of the proxy node
@@ -2337,19 +2331,17 @@ class SwiftAccountMgr:
             gotten, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
-        logger = util.getLogger(name="__get_read_acl")
+
+        logger = util.getLogger(name="__get_container_acl")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to get the read acl of container %s:" % container
+        acl = {}
+        msg = "Failed to get ACL of container %s:" % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s stat %s"\
-              % (url, account, admin_user, admin_password, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swift -A %s -U %s:%s -K %s stat %s" % (url, account, admin_user, admin_password, container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
@@ -2362,15 +2354,21 @@ class SwiftAccountMgr:
 
         for line in lines:
             if "Read" in line:
-                msg = line.split("ACL: ")[1]
-                logger.info(msg)
-                val = True
+                acl["Read"] = line.split("ACL: ")[1]
+            elif "Write" in line:
+                acl["Write"] = line.split("ACL: ")[1]
 
-        if val == False:
+        if acl.get("Read") is None or acl.get("Write") is None:
             msg = msg + " " + stderrData
+            logger.error(msg)
+            val = False
+        else:
+            val = True
+            msg = acl
 
         return Bool(val, msg)
 
+    """
     @util.timeout(300)
     def __get_write_acl(self, proxyIp, account,\
                         container, admin_user, admin_password):
@@ -2425,10 +2423,11 @@ class SwiftAccountMgr:
             msg = msg + " " + stderrData
 
         return Bool(val, msg)
+    """
 
+    """
     @util.timeout(300)
-    def __set_read_acl(self, proxyIp, account, container,\
-                       admin_user, admin_password, read_acl):
+    def __set_read_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl):
         '''
         Set the read acl of the container
 
@@ -2475,12 +2474,12 @@ class SwiftAccountMgr:
             val = True
 
         return Bool(val, msg)
+    """
 
     @util.timeout(300)
-    def __set_write_acl(self, proxyIp, account, container,\
-                        admin_user, admin_password, write_acl):
+    def __set_container_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl, write_acl):
         '''
-        Set the write acl of the container
+        Set ACL of the container
 
         @type  proxyIp: string
         @param proxyIp: IP of the proxy node
@@ -2493,26 +2492,26 @@ class SwiftAccountMgr:
         @type  admin_password: string
         @param admin_password: the password of admin_user
         @type  read_acl: string
-        @param read_acl: the write acl to be set to that of the container
+        @param read_acl: the read acl to be set to that of the container
+        @type  write_acl: string
+        @param write_acl: the write acl to be set to that of the container
         @rtype:  named tuple
         @return: a named tuple Bool(val, msg). If the write acl is successfully
             set, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
-        logger = util.getLogger(name="__set_write_acl")
+
+        logger = util.getLogger(name="__set_container_acl")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to set the write acl of container %s:" % container
+        msg = "Failed to set ACL of container %s:" % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s post -w \'%s\' %s"\
-              % (url, account, admin_user,\
-                 admin_password, write_acl, container)
+        cmd = "swift -A %s -U %s:%s -K %s post -r \'%s\' -w \'%s\' %s"\
+              % (url, account, admin_user, admin_password, read_acl, write_acl, container)
 
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0 or stderrData != "":
@@ -2520,7 +2519,6 @@ class SwiftAccountMgr:
             logger.error(msg)
             val = False
             return Bool(val, msg)
-
         else:
             msg = stdoutData
             logger.info(msg)
@@ -2547,11 +2545,13 @@ class SwiftAccountMgr:
             successfully assigned, then val == True and msg == "".
             Otherwise, val == False and msg records the error message.
         '''
+
         logger = util.getLogger(name="assign_read_acl")
 
         #TODO: Check the existence of container
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         ori_read_acl = ""
+        ori_write_acl = ""
         admin_password = ""
 
         msg = ""
@@ -2567,27 +2567,25 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         get_user_password_output = self.get_user_password(account, admin_user)
+
         if get_user_password_output.val == True:
             admin_password = get_user_password_output.msg
         else:
             val = False
-            msg = "Failed to get the password of the admin user %s: %s"\
-                  % (admin_user, get_user_password_output.msg)
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_read_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_acl, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
 
         if val == False:
+            msg = "Failed to get the container ACL: " + msg
+            logger.error(msg)
             return Bool(val, msg)
-
         else:
-            ori_read_acl = msg
+            ori_read_acl = msg["Read"]
+            ori_write_acl = msg["Write"]
 
             if "%s:%s" % (account, user) in ori_read_acl:
                 val = True
@@ -2596,14 +2594,13 @@ class SwiftAccountMgr:
 
             ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__set_read_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password,\
-                                           read_acl=ori_read_acl)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_acl,\
+                                           account=account, container=container, admin_user=admin_user,\
+                                           admin_password=admin_password, read_acl=ori_read_acl, write_acl=ori_write_acl)
+
+        if val == False:
+            msg = "Failed to set the container ACL: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
@@ -2626,6 +2623,7 @@ class SwiftAccountMgr:
             successfully assigned, then val == True and msg == "".
             Otherwise, val == False and msg records the error message.
         '''
+
         logger = util.getLogger(name="assign_write_acl")
 
         #TODO: Check the existence of container
@@ -2646,46 +2644,44 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         get_user_password_output = self.get_user_password(account, admin_user)
+
         if get_user_password_output.val == True:
             admin_password = get_user_password_output.msg
-
         else:
             val = False
-
-            msg = "Failed to get the password of the admin user %s: %s"\
-                  % (admin_user, get_user_password_output.msg)
-
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_write_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_acl, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
 
         if val == False:
+            msg = "Failed to get the container ACL: " + msg
+            logger.error(msg)
             return Bool(val, msg)
-
         else:
-            ori_write_acl = msg
+            ori_read_acl = msg["Read"]
+            ori_write_acl = msg["Write"]
 
-            if "%s:%s" % (account, user) in ori_write_acl:
+            if "%s:%s" % (account, user) in ori_write_acl and "%s:%s" % (account, user) in ori_read_acl:
                 val = True
                 msg = ""
                 return Bool(val, msg)
 
-            ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
+            if "%s:%s" % (account, user) not in ori_read_acl:
+                ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__set_write_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password,\
-                                           write_acl=ori_write_acl)
+            if "%s:%s" % (account, user) not in ori_write_acl:
+                ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_acl,\
+                                           account=account, container=container, admin_user=admin_user,\
+                                           admin_password=admin_password, read_acl=ori_read_acl, write_acl=ori_write_acl)
+
+        if val == False:
+            msg = "Failed to set the container ACL: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
@@ -2708,11 +2704,13 @@ class SwiftAccountMgr:
             removed, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
+
         logger = util.getLogger(name="remove_read_acl")
 
         #TODO: Check the existence of container
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         ori_read_acl = ""
+        ori_write_acl = ""
         admin_password = ""
 
         msg = ""
@@ -2728,46 +2726,51 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         get_user_password_output = self.get_user_password(account, admin_user)
+
         if get_user_password_output.val == True:
             admin_password = get_user_password_output.msg
         else:
             val = False
-
-            msg = "Failed to get the password of the admin user %s: %s"\
-                  % (admin_user, get_user_password_output.msg)
-
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_read_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_acl, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
 
         if val == False:
+            msg = "Failed to get the container ACL: " + msg
+            logger.error(msg)
             return Bool(val, msg)
+        else:
+            ori_read_acl = msg["Read"]
+            ori_write_acl = msg["Read"]
 
-        ori_read_acl = msg
         new_read_acl = ""
+        new_write_acl = ""
         ori_read_acl = ori_read_acl.split(",")
+        ori_write_acl = ori_write_acl.split(",")
         account_user_pattern = account + ":" + user
 
         while account_user_pattern in ori_read_acl:
             ori_read_acl.remove(account_user_pattern)
 
+        while account_user_pattern in ori_write_acl:
+            ori_write_acl.remove(account_user_pattern)
+
         for item in ori_read_acl:
             new_read_acl = new_read_acl + item + ","
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__set_read_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password,\
-                                           read_acl=new_read_acl)
+        for item in ori_write_acl:
+            new_write_acl = new_write_acl + item + ","
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_acl,\
+                                           account=account, container=container, admin_user=admin_user,\
+                                           admin_password=admin_password, read_acl=new_read_acl, write_acl=new_write_acl)
+
+        if val == False:
+            msg = "Failed to set the container ACL: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
@@ -2790,10 +2793,12 @@ class SwiftAccountMgr:
             removed, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
+
         logger = util.getLogger(name="remove_write_acl")
 
         #TODO: Check the existence of container
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        ori_read_acl = ""
         ori_write_acl = ""
         admin_password = ""
 
@@ -2810,26 +2815,26 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         get_user_password_output = self.get_user_password(account, admin_user)
+
         if get_user_password_output.val == True:
             admin_password = get_user_password_output.msg
         else:
             val = False
-            msg = "Failed to get the password of the admin user %s: %s"\
-            % (admin_user, get_user_password_output.msg)
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_write_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_acl, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
 
         if val == False:
+            msg = "Failed to get the container ACL: " + msg
+            logger.error(msg)
             return Bool(val, msg)
 
-        ori_write_acl = msg
+        ori_read_acl = msg["Read"]
+        ori_write_acl = msg["Write"]
+
         new_write_acl = ""
         ori_write_acl = ori_write_acl.split(",")
         account_user_pattern = account + ":" + user
@@ -2840,43 +2845,18 @@ class SwiftAccountMgr:
         for item in ori_write_acl:
             new_write_acl = new_write_acl + item + ","
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__set_write_acl,\
-                                           account=account,\
-                                           container=container,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password,\
-                                           write_acl=new_write_acl)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_acl,\
+                                           account=account, container=container, admin_user=admin_user,\
+                                           admin_password=admin_password, read_acl=ori_read_acl, write_acl=new_write_acl)
+
+        if val == False:
+            msg = "Failed to set container ACL: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
     @util.timeout(300)
-    def __create_container(self, proxyIp, account,\
-                           admin_user, admin_password, container):
-        '''
-        Create a container by account admin user.
-        The name of container would be ctn_{username}.
-
-        @type  proxyIp: string
-        @param proxyIp: IP of the proxy node
-        @type  account: string
-        @param account: the account of the container
-        @type  container: string
-        @param container: the container to set metadata
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
-        @type  admin_password: string
-        @param admin_password: the password of admin_user
-        @type  metadata_content: dictionary
-        @param metadata_content: the content to be set to metadata
-            of the container
-        @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the operation is successfully
-            done, then val == True and msg will record the
-            information. Otherwise, val == False, and msg will
-            record the error message.
-        '''
+    def __create_container(self, proxyIp, account, container, admin_user, admin_password):
         logger = util.getLogger(name="__create_container")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -2884,12 +2864,8 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s post %s"\
-              % (url, account, admin_user, admin_password, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swift -A %s -U %s:%s -K %s post %s" % (url, account, admin_user, admin_password, container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
@@ -2902,9 +2878,63 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def create_container(self, account, container, admin_user, retry=3):
+        '''
+        Create a new container in the account by admin_user.
+
+        @type  account: string
+        @param account: the account to create a container
+        @type  container: string
+        @param container: the container to be created
+        @type  admin_user: string
+        @param admin_user: the admin user of the account
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the creation is successfully
+            done, then val == True and msg == "". Otherwise, val ==
+            False and msg records the error message.
+        '''
+
+        logger = util.getLogger(name="create_container")
+
+        #TODO: Check whether the container exists
+        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        admin_password = ""
+
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found"
+            return Bool(val, msg)
+
+        if retry < 1:
+            msg = "Argument retry has to >= 1"
+            return Bool(val, msg)
+
+        get_user_password_output = self.get_user_password(account, admin_user)
+
+        if get_user_password_output.val == True:
+            admin_password = get_user_password_output.msg
+        else:
+            val = False
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__create_container, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
+
+        if val == False:
+            msg = "Failed to create the container: " + msg
+            logger.error(msg)
+
+        return Bool(val, msg)
+
     @util.timeout(300)
-    def __set_container_metadata(self, proxyIp, account, container,\
-                                 admin_user, admin_password, metadata_content):
+    def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
         '''
         Set self-defined metadata of the given container.
         The self-defined metadata are associatied with a user and include::
@@ -2912,13 +2942,15 @@ class SwiftAccountMgr:
             (2) User-Enable: True/False
             (3) Password: the original password for the user
             (4) Quota: quota of the user (Number of bytes, int)
+            (5) Description: the description about the owner of the container
 
         The following is the details of metadata_content::
             metadata_content = {
                 "Account-Enable": True/False,
                 "User-Enable": True/False,
                 "Password": user password,
-                "Quota": number of bytes
+                "Quota": number of bytes,
+                "Description": string,
             }
 
         @type  proxyIp: string
@@ -2939,6 +2971,7 @@ class SwiftAccountMgr:
             set, then val == True and msg == "". Otherwise, val ==
             False and msg records the error message.
         '''
+
         logger = util.getLogger(name="__set_container_metadata")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -2946,16 +2979,13 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s post %s"\
-              % (url, account, admin_user, admin_password, container)
+        cmd = "swift -A %s -U %s:%s -K %s post %s" % (url, account, admin_user, admin_password, container)
 
         #TODO: check whether the format of metadata_content is correct
         for field, value in metadata_content.items():
             cmd = cmd + " -m \'%s:%s\'" % (field, value)
 
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0 or stderrData != "":
@@ -2963,7 +2993,6 @@ class SwiftAccountMgr:
             logger.error(msg)
             val = False
             return Bool(val, msg)
-
         else:
             msg = stdoutData
             logger.info(msg)
@@ -2972,8 +3001,7 @@ class SwiftAccountMgr:
         return Bool(val, msg)
 
     @util.timeout(300)
-    def __get_container_metadata(self, proxyIp, account,\
-                                 container, admin_user, admin_password):
+    def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
         '''
         Get self-defined metadata of the given container as a dictionary.
         The self-defined metadata are associatied with a user and include::
@@ -2981,13 +3009,15 @@ class SwiftAccountMgr:
             (2) User-Enable: True/False
             (3) Password: the original password for the user
             (4) Quota: quota of the user (Number of bytes, int)
+            (5) Description: the description about the owner of the container
 
         The following is the details of metadata::
             {
                 "Account-Enable": True/False,
                 "User-Enable": True/False,
                 "Password": user password,
-                "Quota": number of bytes
+                "Quota": number of bytes,
+                "Description": string
             }
 
         @type  proxyIp: string
@@ -3005,6 +3035,7 @@ class SwiftAccountMgr:
             got, then val == True and msg records the metadata. Otherwise,
             val == False and msg records the error message.
         '''
+
         logger = util.getLogger(name="__get_container_metadata")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -3013,12 +3044,8 @@ class SwiftAccountMgr:
         metadata_content = {}
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s stat %s"\
-              % (url, account, admin_user, admin_password, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swift -A %s -U %s:%s -K %s stat %s" % (url, account, admin_user, admin_password, container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:

@@ -106,7 +106,11 @@
 
                 $.get('/dashboard/syslog/', function(ctnt, success, opt){
                     var msgs = JSON.parse(ctnt);
-                    $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
+                    if (msgs == ""){
+                        $("#errormsgbox").hide();
+                    } else {
+                        $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
+                    }
                 });
 
                 $(".notify-box-row-NW > div").tooltip();
@@ -124,20 +128,23 @@
             </div>
             <div class="notify-box-group">
                 <div class="notify-box-row-NW">
-                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot Inprogress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
+                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot in progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
                     </div>
                     <div id="system_check" rel="tooltip" title="System Check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                     </div>
                     <div id="network_ok" rel="tooltip" title="Network" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
                     </div>
-                    <div id="flush_inprogress" rel="tooltip" title="Flush Inprogress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
+                    <div id="flush_inprogress" rel="tooltip" title="Flush in progress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
                     </div>
-                    <div id="dirtycache_nearfull" rel="tooltip" title="Dirty Cache Near Full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    <div id="dirtycache_nearfull" rel="tooltip" title="Data not yet protected near full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
                     </div>
                 </div>
                 <div class="notify-box-row-NE">
-                    {{ user.username }}<a href="/logout"><img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a></p>
+                    {{ user.username }}
                 </div>
+                    <div id="logout_button" class="logout_button notify-box" rel="tooltip" title="Logout">
+                        <a href="/logout"><img src="/static/img/dashboard/indicator_logout_icon.png" alt=""></a>
+                    </div>
                 <div class="notify-box-row-SE">
                     <p id="basic-bandwidth">
                         Download / Upload:<br>
@@ -153,18 +160,19 @@
                 <ul class="tab-btn" id="site-tab">
                   <li class=""><a href="{% url dashboard:index %}">Dashboard</a></li>
                   <!--<li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>-->
-                  <li class=""><a href="{% url dashboard:system action=None %}">System Configurations</a></li>
-                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folder</a></li>
-                  <li class=""><a href="{% url dashboard:sync %}">Sync</a></li>
-                  <li class=""><a href="{% url dashboard:snapshot action=None %}">Snapshot</a></li>
-                  <li class=""><a href="{% url dashboard:syslog %}">System Log</a></li>
+                  <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
                   <li class=""><a href="{% url dashboard:config action=None %}">Configuration</a></li>
+                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folders</a></li>
+                  <li class=""><a href="{% url dashboard:sync %}">Sync to Cloud</a></li>
+                  <li class=""><a href="{% url dashboard:snapshot action=None %}">Snapshots</a></li>
+                  <li class=""><a href="{% url dashboard:syslog %}">System Logs</a></li>
                   <li class=""><a href="{% url dashboard:power action=None %}"><img src="/static/img/dashboard/power_icon.png"></a></li>
                 </ul>
             </div>
         </div>
 
         <div id="errormsgbox"></div>
+
         <div class="main-row main-bg">
             <div class="main-content">
                 <div class="main-content-spacer"></div>
