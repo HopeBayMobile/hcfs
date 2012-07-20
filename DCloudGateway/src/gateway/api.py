@@ -1,4 +1,3 @@
-import os.path
 import sys
 import csv
 import json
@@ -7,7 +6,6 @@ import ConfigParser
 import common
 import subprocess
 import time
-import errno
 import re
 from datetime import datetime
 
@@ -154,7 +152,7 @@ def getGatewayConfig():
             raise GatewayConfError("Failed to find option 'compress' in section [s3q] in the config file")
     
         return config
-    except IOError as e:
+    except IOError:
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
     
@@ -216,7 +214,7 @@ def get_compression():
     except Exception as e:
         op_msg = str(e)
     finally:
-        if op_ok == False:
+        if not op_ok:
             log.error(op_msg)
     
         return_val = {'result' : op_ok,
@@ -497,16 +495,16 @@ def _check_network():
         po.wait()
     
         if po.returncode == 0:
-            if output.find("cmp_req" and "ttl" and "time") != -1:
+            if output.find("icmp_req" and "ttl" and "time") != -1:
                 op_network_ok = True
         else:
             log.info(output)
 
     except IOError as e:
-            op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+            log.error('Unable to access /root/.s3ql/authinfo2.')
             log.error(str(e))
     except Exception as e:
-            op_msg = 'Unable to obtain storage url or login info.'
+            log.error('Unable to obtain storage url or login info.')
             log.error(str(e))
 
     finally:
@@ -881,7 +879,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 
     if test:
         test_gw_results = json.loads(test_storage_account(storage_url, account, password))
-        if test_gw_results['result'] == False:
+        if not test_gw_results['result']:
             return json.dumps(test_gw_results)
 
     try:
@@ -1424,7 +1422,7 @@ def build_gateway(user_key):
     except Exception as e:
         op_msg = str(e)
     finally:
-        if op_ok == False:
+        if not op_ok:
             log.error(op_msg)
             log.info("[0] Gateway building error. " + op_msg)
         else:
@@ -1460,7 +1458,6 @@ def restart_nfs_service():
     try:
         cmd = "sudo /etc/init.d/nfs-kernel-server restart"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output = po.stdout.read()
         po.wait()
     
         if po.returncode == 0:
@@ -1594,13 +1591,11 @@ def reset_gateway():
         - data: JSON object. Always return empty.
         
     """
-    
-    log.info("reset_gateway start")
     log.info("[2] Gateway restarting")
 
-    return_val = {}
-    op_ok = True
-    op_msg = "Succeeded to reset the gateway."
+    return_val = {'result': True,
+                  'msg': "Succeeded to reset the gateway.",
+                  'data': {}}
     
     try:
         pid = os.fork()
@@ -1610,7 +1605,6 @@ def reset_gateway():
             os.system("sudo reboot")
         else:
             log.info("[2] Gateway will restart after ten seconds")
-            log.info("The gateway will restart after ten seconds.")
     except:
         pass
     
@@ -1629,13 +1623,11 @@ def shutdown_gateway():
         - data: JSON object. Always return empty.
         
     """
-    
-    log.info("shutdown_gateway start")
     log.info("[2] Gateway shutdowning")
     
-    return_val = {}
-    op_ok = True
-    op_msg = "Succeeded to shutdown the gateway."
+    return_val = {'result': True,
+                  'msg': "Succeeded to shutdown the gateway.",
+                  'data': {}}
 
     try:
         pid = os.fork()
@@ -1645,7 +1637,6 @@ def shutdown_gateway():
             os.system("sudo poweroff")
         else:
             log.info("[2] Gateway will shutdown after ten seconds")
-            log.info("The gateway will shutdown after ten seconds.")
     except:
         pass
     
@@ -1863,8 +1854,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         log.error(str(e))
 
     finally:
-        if op_ok == False:
-    
+        if not op_ok:
             return_val = {
             'result': op_ok,
             'msg': op_msg,
@@ -1888,7 +1878,6 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
             try:
                 cmd = "sudo /etc/init.d/networking restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                output = po.stdout.read()
                 po.wait()
 
             except:
@@ -2175,7 +2164,7 @@ def get_smb_user_list ():
         op_ok = True
         op_msg = 'Obtained smb account information'
         
-    except ConfigParser.ParsingError, err:
+    except ConfigParser.ParsingError:
         #print err
         op_msg = smb_conf_file + ' is not readable.'
         
@@ -2253,26 +2242,26 @@ def set_smb_user_list(username, password):
         return json.dumps(return_val)
     
     # get current user list
-    try:
-        current_users = get_smb_user_list ()
-        load_userlist = json.loads(current_users)    
-        username_arr = load_userlist["data"]["accounts"]
-        
-        #print username_arr
-    except:
-        log.error("set_smb_user_list fails")
-        return_val['msg'] = 'cannot read current user list.'
-        return json.dumps(return_val)
+#    try:
+#        current_users = get_smb_user_list ()
+#        #load_userlist = json.loads(current_users)    
+#        #username_arr = load_userlist["data"]["accounts"]
+#        
+#        #print username_arr
+#    except:
+#        log.error("set_smb_user_list fails")
+#        return_val['msg'] = 'cannot read current user list.'
+#        return json.dumps(return_val)
     
     # for new user, add the new user to linux, update smb.conf, and set password
     # TODO: impl.
     
     # admin must in the current user list
-    flag = False
-    for u in username_arr:
-        #print u
-        if u == default_user_id:
-            flag = True
+    #flag = False
+#    for u in username_arr:
+#        #print u
+#        if u == default_user_id:
+#            flag = True
     '''
     if flag == False: # should not happen
         log.info("set_smb_user_list fails")
@@ -2355,7 +2344,7 @@ def get_nfs_access_ip_list ():
 
                 # got good format
                 # key = services allowed, val = ip lists
-                services = str(arr[0]).strip()
+                #services = str(arr[0]).strip()
                 iplist = arr[1]
                 ips = iplist.strip().split(", ") #
             
@@ -2398,7 +2387,7 @@ def set_compression(switch):
     log.info("set_compression start")
     op_ok = False
     op_msg = ''
-    op_switch = True
+    #op_switch = True
 
     try:
         config = getGatewayConfig()
@@ -2489,8 +2478,8 @@ def set_nfs_access_ip_list (array_of_ip):
             # got good format
             # key = services allowed, val = ip lists
                 services = str(arr[0]).strip()
-                iplist = arr[1]
-                ips = iplist.strip().split(", ") #
+                #iplist = arr[1]
+                #ips = iplist.strip().split(", ") #
             
             
     except :
@@ -2789,7 +2778,7 @@ def parse_log (type, log_cnt):
 
     try:
         timestamp = datetime(year, month, day, hour, minute, second) # timestamp
-    except Exception as err:
+    except Exception:
         #print "datatime error"
         #print Exception
         #print err
@@ -2833,13 +2822,13 @@ def read_logs(logfiles_dict, offset, num_lines):
 
     ret_log_cnt = {}
 
-    for type in logfiles_dict.keys():
-        ret_log_cnt[type] = []
+    for logtype in logfiles_dict.keys():
+        ret_log_cnt[logtype] = []
 
         log_buf = []
 
         try:
-            log_buf = [line.strip() for line in open(logfiles_dict[type])]
+            log_buf = [line.strip() for line in open(logfiles_dict[logtype])]
             log_buf.reverse()
 
             #print log_buf
@@ -2855,9 +2844,9 @@ def read_logs(logfiles_dict, offset, num_lines):
             else:
                 nums = num_lines
 
-            for log in log_buf[ offset : offset + nums]:
+            for alog in log_buf[ offset : offset + nums]:
                 #print log
-                log_entry = parse_log(type, log)
+                log_entry = parse_log(type, alog)
                 if not log_entry == None: #ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
 
@@ -3262,6 +3251,10 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
                            "info_log" : []
                          }
                }
+    # wthung, 2012/7/19
+    # to suppress warning from pychecker of not using var
+    if "0" in category_mask:
+        pass
     
     try:
         logs = read_logs(LOGFILES, 0 , None) #query all logs
@@ -3270,12 +3263,12 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
             for logfile in logs: # mount, syslog, ...
                 counter = 0  # for each info src, it has number_of_msg returned
     
-                for log in logs[logfile]: # log entries
+                for alog in logs[logfile]: # log entries
                     if counter >= number_of_msg:
                         break # full, finish this src
                     try:
-                        if log["category"] == level:
-                            ret_val["data"][level].append(log)
+                        if alog["category"] == level:
+                            ret_val["data"][level].append(alog)
                             counter = counter + 1
                         else:
                             pass
@@ -3294,11 +3287,9 @@ if __name__ == '__main__':
     #print apply_user_enc_key("123456", "1234567")
     
     #_createS3qlConf("172.16.228.53:8080")
-    #data = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
-    #print data
-    #_check_nfs_service()
+    _check_network()
 #    print get_smb_user_list()
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
-    print _traceroute_backend('aaa')
+    #print _traceroute_backend('aaa')
     pass

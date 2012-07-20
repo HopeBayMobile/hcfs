@@ -57,7 +57,6 @@ def timeout(timeout_time):
 					self.kwargs = kwargs
 					self.result = None
         			def run(self):
-					result = None
 					try:
 						self.result = (0,self.f(*(self.args), **(self.kwargs)))
 						
