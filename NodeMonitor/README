@@ -1,0 +1,28 @@
+[Description]:
+1. The scripts is used to detect events occurred in this node and send events to receiver. 
+   The development environment is listed in the following.
+	(1) OS: Ubuntu 11.04 64 bits
+	(2) Language: python and bash shell
+	(3) Hardware: AMD 64bit
+
+
+2. How to use the scripts:
+	(1) Change your privilege to root.
+	(2) Execute 'python setup.py install'
+	(3) Edit /etc/delta/node_monitor:
+            [receiver]
+            url = url of receiver
+
+            [log]
+            level = DEBUG
+            dir = /var/log/deltaSwift/
+            name = nodeMonitor.log
+
+            [interval]
+            max = maximum time-window between event detection in seconds
+            min = minimum time-window between event detection in seconds
+              
+	(6) execute "/etc/init.d/node-monitor start"
+
+
+[Note]:
