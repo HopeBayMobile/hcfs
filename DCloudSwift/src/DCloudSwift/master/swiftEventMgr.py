@@ -9,7 +9,6 @@ import json
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor
-from twisted.internet.task import deferLater
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
@@ -53,7 +52,7 @@ class SwiftEventMgr(Daemon):
                 # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
                 # d = deferLater(reactor, 0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
                 # d.addCallback(printResult)
-                #from twisted.internet import  threads
+                from twisted.internet import  threads
                 d = threads.deferToThread(SwiftEventMgr.handleEvents, request.content.getvalue())
 
                 return '<html><body>Got it!!</body></html>'

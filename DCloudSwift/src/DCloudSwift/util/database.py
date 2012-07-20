@@ -99,7 +99,6 @@ class DatabaseBroker(object):
             conn.close()
             raise
 
-
 class AccountDatabaseBroker(DatabaseBroker):
     """Encapsulates working with a Account database."""
 
@@ -246,20 +245,17 @@ class AccountDatabaseBroker(DatabaseBroker):
 if __name__ == '__main__':
 
     os.system("rm /etc/test/test.db")
-    db = AccountDatabaseBroker("/etc/test/test.db")
+    db = MonitorDatabaseBroker("/etc/test/test.db")
     db.initialize()
 
-    print db.add_user(account="system", name="root", password="testpass", admin=True, reseller=False)
-    print db.add_user(account="system", name="root", password="pass", admin=False, reseller=True)
-    print db.delete_user(account="system", name="root")
-    print db.add_user(account="system", name="root", password="pass", admin=False, reseller=True)
+    print db.add_node(hostname="system", ipaddress=None)
 
-    print db.get_password("system", "root")
-    print db.get_password("system1", "root")
-    print db.is_enabled("system", "root")
-    print db.is_admin("system", "root")
-    print db.is_reseller("system", "root")
-    print db.get_password("system", "root")
-    db.disable_user("system", "root")
-    print db.is_enabled("system", "root")
+#    print db.get_password("system", "root")
+#    print db.get_password("system1", "root")
+#    print db.is_enabled("system", "root")
+#    print db.is_admin("system", "root")
+#    print db.is_reseller("system", "root")
+#    print db.get_password("system", "root")
+#    db.disable_user("system", "root")
+#    print db.is_enabled("system", "root")
     pass
