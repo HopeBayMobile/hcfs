@@ -76,8 +76,8 @@ class SwiftMaintainer:
 
 if __name__ == "__main__":
     SM = SwiftMaintainer("172.16.229.220:8080")
-    data = {}
+    data = {"name": "Rice"}
     #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
-    response = SM.post_data("http://172.16.229.63:5308/events", data)
+    response = SM.post_data("http://172.16.229.88:5308/events", data)
     #response = SM.subscribe(event='cpu temperature')
     print response
