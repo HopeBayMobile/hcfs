@@ -215,8 +215,6 @@ if __name__ == '__main__':
     '''
     main()
     '''
-    #DI = DiskInfo()
-    #print DI.check_all_disks()
 
     for i in range(len(sys.argv)):    
         if sys.argv[i] == "--init":
