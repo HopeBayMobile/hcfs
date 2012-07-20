@@ -2669,10 +2669,13 @@ class SwiftAccountMgr:
                 msg = ""
                 return Bool(val, msg)
 
-        ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
-        ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
+            if "%s:%s" % (account, user) not in ori_read_acl:
+                ori_read_acl = ori_read_acl + "," + "%s:%s" % (account, user)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_write_acl,\
+            if "%s:%s" % (account, user) not in ori_write_acl:
+                ori_write_acl = ori_write_acl + "," + "%s:%s" % (account, user)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_acl,\
                                            account=account, container=container, admin_user=admin_user,\
                                            admin_password=admin_password, read_acl=ori_read_acl, write_acl=ori_write_acl)
 
