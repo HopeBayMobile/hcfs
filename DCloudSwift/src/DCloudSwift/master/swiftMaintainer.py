@@ -17,7 +17,6 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 
-
 class SwiftMaintainer:
     def __init__(self, api_server):
         # TODO: error checking
@@ -76,8 +75,13 @@ class SwiftMaintainer:
 
 if __name__ == "__main__":
     SM = SwiftMaintainer("172.16.229.220:8080")
-    data = {"name": "Rice"}
+    data = {}
     #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
     response = SM.post_data("http://172.16.229.88:5308/events", data)
+    #SM = SwiftMaintainer("172.16.229.220:8080")
+    #data = {}
+    #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
+    #response = SM.post_data("http://172.16.229.63:5308/events", data)
     #response = SM.subscribe(event='cpu temperature')
-    print response
+    #print response
+    print swiftEvents.HDD.healthy.YES

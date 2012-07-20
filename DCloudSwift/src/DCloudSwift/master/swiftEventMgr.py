@@ -9,7 +9,6 @@ import json
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor
-from twisted.internet.task import deferLater
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))

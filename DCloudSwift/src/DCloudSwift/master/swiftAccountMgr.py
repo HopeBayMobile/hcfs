@@ -54,10 +54,6 @@ class SwiftAccountMgr:
         self.__deltaDir = GlobalVar.DELTADIR
         self.__swiftDir = self.__deltaDir + "/swift"
 
-        self.__accountDb = AccountDatabaseBroker(GlobalVar.ACCOUNT_DB)
-        if not os.path.exists(GlobalVar.ACCOUNT_DB):
-            self.__accountDb.initialize()
-
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
@@ -91,10 +87,12 @@ class SwiftAccountMgr:
             then val == True and msg records the standard output. Otherwise,
             val == False and msg records the error message.
         '''
+        #TODO: need to modify proxy_ip_list due to the security issues
         val = False
         msg = ""
         for t in range(retry):
             ip = random.choice(proxy_ip_list)
+
             try:
                 output = fn(ip, **kwargs)
                 if output.val == True:
@@ -104,7 +102,6 @@ class SwiftAccountMgr:
                 else:
                     errMsg = "Failed to run %s thru %s for %s" % (fn.__name__, ip, output.msg)
                     msg = msg + '\n' + errMsg
-
             except util.TimeoutError:
                 errMsg = "Failed to run %s thru %s in time" % (fn.__name__, ip)
                 #logger.error(errMsg)
@@ -115,7 +112,6 @@ class SwiftAccountMgr:
     @util.timeout(300)
     def __add_user(self, proxyIp, account, user, password, admin=False, reseller=False):
         logger = util.getLogger(name="__add_user")
-        self.__class__.__add_user.__name__
 
         url = "https://%s:8080/auth/" % proxyIp
         msg = ""
@@ -126,9 +122,7 @@ class SwiftAccountMgr:
         optStr = admin_opt + reseller_opt
 
         cmd = "swauth-add-user -K %s -A %s %s %s %s %s" % (self.__password, url, optStr, account, user, password)
-
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
@@ -186,7 +180,7 @@ class SwiftAccountMgr:
             password = self.__user_default_password
 
         admin_password = self.get_user_password(account, admin_user).msg
-        #container = "ctn_" + user
+        container = container + self.__private_container_suffix
 
         metadata_content = {
                 "Account-Enable": True,
@@ -218,155 +212,31 @@ class SwiftAccountMgr:
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
                                            user=user, password=password, admin=admin, reseller=reseller)
 
+        if val == False:
+            msg = "Failed to add user: " + msg
+            logger.error(msg)
+            return Bool(val, msg)
+
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
                                            account=account, admin_user=admin_user, admin_password=admin_password,\
                                            container=container, metadata_content=metadata_content)
 
-                    if val == False:
-                        msg = "Failed to set metadata of container %s"\
-                              % container
-                    else:
-                        self.assign_read_acl(account=account,\
-                                             container=container,\
-                                             user=user,\
-                                             admin_user=admin_user)
-                        self.assign_write_acl(account=account,\
-                                              container=container,\
-                                              user=user,\
-                                              admin_user=admin_user)
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-            errMsg = "Failed to clean user %s:%s from database for %s"\
-                     % (account, user, str(e))
-            logger.error(errMsg)
-            raise InconsistentDatabaseError(errMsg)
-
+        if val == False:
+            #TODO: need to rollback
+            msg = "Failed to set container metadata: " + msg
+            logger.error(msg)
             return Bool(val, msg)
 
-    '''
-    @util.timeout(300)
-    def __add_admin_user(self, proxyIp, account, admin_user,\
-                         admin_password, admin=True, reseller=False):
+        assign_write_acl_output = self.assign_write_acl(account=account, container=container, user=user, admin_user=admin_user)
 
-        logger = util.getLogger(name="__add_admin_user")
-        self.__class__.__add_user.__name__
-
-        url = "https://%s:8080/auth/" % proxyIp
-        msg = ""
-        val = False
-
-        admin_opt = "-a " if admin else ""
-        reseller_opt = "-r " if reseller  else ""
-        optStr = admin_opt + reseller_opt
-
-        cmd = "swauth-add-user -K %s -A %s %s %s %s %s"\
-              % (self.__password, url, optStr, account,\
-                 admin_user, admin_password)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
-        (stdoutData, stderrData) = po.communicate()
-
-        if po.returncode != 0:
-            logger.error(stderrData)
-            msg = stderrData
-            val = False
+        if assign_write_acl_output.val == False:
+            #TODO: need to rollback
+            val == False
+            msg = "Failed to assign write acl: " + msg
+            logger.error(msg)
         else:
-            logger.info(stdoutData)
-            msg = stdoutData
             val = True
-
-        Bool = collections.namedtuple("Bool", "val msg")
-        return Bool(val, msg)
-    '''
-
-    def add_admin_user(self, account, admin_user, admin_password, admin=True, reseller=False, retry=3):
-        '''
-        Add the admin user for a new created account, including the following things::
-            (1) Add the admin user for the account
-            (2) Create the private container of the admin user
-            (3) Update the metadata stored in super_admin's container
-
-        @type  account: string
-        @param account: the name of the given account
-        @type  admin_user: string
-        @param admin_user: the name of the given user
-        @type  admin_password: string
-        @param admin_password: the password to be set
-        @type  admin: boolean
-        @param admin: admin or not
-        @type  reseller: boolean
-        @param reseller: reseller or not
-        @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
-        @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user is successfully added to both the database and backend
-            swift then Bool.val == True and msg records the standard output. Otherwise, val == False and msg
-            records the error message.
-        '''
-
-        logger = util.getLogger(name="add_admin_user")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-
-        msg = ""
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-        #container = "ctn_" + admin_user
-
-        metadata_content = {"Account-Enable": True,
-                            "User-Enable": True,
-                            "Password": admin_password,
-                            "Quota": 0,
-        }
-
-        if proxy_ip_list is None or len(proxy_ip_list) == 0:
-            msg = "No proxy node is found"
-            return Bool(val, msg)
-
-        if retry < 1:
-            msg = "Argument retry has to >= 1"
-            return Bool(val, msg)
-
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__add_admin_user,\
-                                           account=account,\
-                                           admin_user=admin_user,\
-                                           admin_password=admin_password,\
-                                           admin=admin, reseller=reseller)
-
-        try:
-            if val == False:
-                self.__accountDb.delete_user(account=account, name=admin_user)
-            else:
-                #Todo: crate container
-                (val, msg) = self.__functionBroker(\
-                                proxy_ip_list=proxy_ip_list, retry=retry,\
-                                fn=self.__create_container, account=account,\
-                                admin_user=admin_user,\
-                                admin_password=admin_password,\
-                                container=container)
-
-                #Todo: set metadata of container
-                if val == False:
-                    msg = "Failed to create container"
-                    return Bool(val, msg)
-                else:
-                    (val, msg) = self.__functionBroker(\
-                                    proxy_ip_list=proxy_ip_list, retry=retry,\
-                                    fn=self.__set_container_metadata,\
-                                    account=account, admin_user=admin_user,\
-                                    admin_password=admin_password,\
-                                    container=container,\
-                                    metadata_content=metadata_content)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-
-            errMsg = "Failed to clean user %s:%s from database for %s"\
-                     % (account, admin_user, str(e))
-
-            logger.error(errMsg)
-            raise InconsistentDatabaseError(errMsg)
+            msg = ""
 
         return Bool(val, msg)
 
@@ -375,12 +245,9 @@ class SwiftAccountMgr:
         logger = util.getLogger(name="__delete_user")
 
         url = "https://%s:8080/auth/" % proxyIp
-        cmd = "swauth-delete-user -K %s -A %s %s %s"\
-              % (self.__password, url, account, user)
 
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swauth-delete-user -K %s -A %s %s %s" % (self.__password, url, account, user)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         msg = ""
@@ -390,12 +257,10 @@ class SwiftAccountMgr:
             logger.error(stderrData)
             msg = stderrData
             val = False
-
         elif '404' in stderrData:
-            msg = "user %s:%s does not exist" % (account, user)
+            msg = "User %s:%s does not exist" % (account, user)
             logger.warn(msg)
             val = True
-
         else:
             logger.info(stdoutData)
             msg = stdoutData
@@ -420,6 +285,7 @@ class SwiftAccountMgr:
             Bool.val == True and msg records the standard output. Otherwise,
             val == False and msg records the error message.
         '''
+
         logger = util.getLogger(name="delete_user")
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 
@@ -435,22 +301,11 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__delete_user,\
-                                           account=account, user=user)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_user, account=account, user=user)
 
-        try:
-            if val == True:
-                self.__accountDb.delete_user(account=account, name=user)
-
-        except (DatabaseConnectionError, sqlite3.DatabaseError) as e:
-
-            errMsg = "Failed to clean user %s:%s from database for %s"\
-                     % (account, user, str(e))
-
-            logger.error(errMsg)
-            raise InconsistentDatabaseError(errMsg)
+        if val == False:
+            msg = "Failed to delete user: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
@@ -623,7 +478,13 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
+        list_user_output = self.list_user(account)
+
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_account, account=account)
+
+        if val == False:
+            msg = "Failed to delete account: " + msg
+            logger.error(msg)
 
         return Bool(val, msg)
 
@@ -2158,8 +2019,7 @@ class SwiftAccountMgr:
         return Bool(val, msg)
 
     @util.timeout(300)
-    def __get_container_info(self, proxyIp, account,\
-                             admin_user, admin_password):
+    def __get_container_info(self, proxyIp, account, admin_user, admin_password):
         '''
         Return the container information of a given account.
 
@@ -2184,19 +2044,14 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        cmd = "swift -A %s -U %s:%s -K %s list"\
-              % (url, account, admin_user, admin_password)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        cmd = "swift -A %s -U %s:%s -K %s list" % (url, account, admin_user, admin_password)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0:
             msg = stderrData
             logger.error(msg)
             val = False
-
         else:
             msg = stdoutData
             val = True
@@ -2226,22 +2081,17 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
 
         cmd = "swauth-list -K %s -A %s %s" % (self.__password, url, account)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0 and '404' not in stderrData:
             logger.error(stderrData)
             msg = stderrData
             val = False
-
         elif '404' in stderrData:
             msg = ""
             logger.warn(msg)
             val = True
-
         else:
             logger.info(stdoutData)
             msg = stdoutData
@@ -2284,10 +2134,7 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(result, val, msg)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_user_info,\
-                                           account=account)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
         if val == False:
             result = False
@@ -2297,7 +2144,6 @@ class SwiftAccountMgr:
             user_info = json.loads(msg)
             val = True
             msg = ""
-
         except Exception as e:
             msg = "Failed to load the json string: %s" % str(e)
             logger.error(msg)
@@ -2367,114 +2213,6 @@ class SwiftAccountMgr:
             msg = acl
 
         return Bool(val, msg)
-
-    """
-    @util.timeout(300)
-    def __get_write_acl(self, proxyIp, account,\
-                        container, admin_user, admin_password):
-        '''
-        Get the write acl of the container
-
-        @type  proxyIp: string
-        @param proxyIp: IP of the proxy node
-        @type  account: string
-        @param account: the account of the container
-        @type  container: string
-        @param container: the container to get the write acl
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
-        @type  admin_password: string
-        @param admin_password: the password of admin_user
-        @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If the write acl is successfully
-            gotten, then val == True and msg == "". Otherwise, val ==
-            False and msg records the error message.
-        '''
-        logger = util.getLogger(name="__get_write_acl")
-
-        url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to get the write acl of container %s:" % container
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-
-        cmd = "swift -A %s -U %s:%s -K %s stat %s"\
-              % (url, account, admin_user, admin_password, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
-        (stdoutData, stderrData) = po.communicate()
-
-        if po.returncode != 0:
-            msg = msg + " " + stderrData
-            logger.error(msg)
-            val = False
-            return Bool(val, msg)
-
-        lines = stdoutData.split("\n")
-
-        for line in lines:
-            if "Write" in line:
-                msg = line.split("ACL: ")[1]
-                logger.info(msg)
-                val = True
-
-        if val == False:
-            msg = msg + " " + stderrData
-
-        return Bool(val, msg)
-    """
-
-    """
-    @util.timeout(300)
-    def __set_read_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl):
-        '''
-        Set the read acl of the container
-
-        @type  proxyIp: string
-        @param proxyIp: IP of the proxy node
-        @type  account: string
-        @param account: the account of the container
-        @type  container: string
-        @param container: the container to set the read acl
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
-        @type  admin_password: string
-        @param admin_password: the password of admin_user
-        @type  read_acl: string
-        @param read_acl: the read acl to be set to that of the container
-        @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If the read acl is successfully
-            set, then val == True and msg == "". Otherwise, val ==
-            False and msg records the error message.
-        '''
-        logger = util.getLogger(name="__set_read_acl")
-
-        url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to set the read acl of container %s:" % container
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-
-        cmd = "swift -A %s -U %s:%s -K %s post -r \'%s\' %s"\
-              % (url, account, admin_user, admin_password, read_acl, container)
-
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-                              stderr=subprocess.PIPE)
-
-        (stdoutData, stderrData) = po.communicate()
-
-        if po.returncode != 0 or stderrData != "":
-            msg = msg + " " + stderrData
-            logger.error(msg)
-            val = False
-            return Bool(val, msg)
-        else:
-            msg = stdoutData
-            logger.info(msg)
-            val = True
-
-        return Bool(val, msg)
-    """
 
     @util.timeout(300)
     def __set_container_acl(self, proxyIp, account, container, admin_user, admin_password, read_acl, write_acl):
@@ -3062,10 +2800,8 @@ class SwiftAccountMgr:
 
                 if line.split()[2] == "True":
                     metadata_content[line.split()[1][:-1]] = True
-
                 elif line.split()[2] == "False":
                     metadata_content[line.split()[1][:-1]] = False
-
                 else:
                     metadata_content[line.split()[1][:-1]] = line.split()[2]
 
