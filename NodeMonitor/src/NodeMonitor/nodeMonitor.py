@@ -14,6 +14,9 @@ from util.util import GlobalVar
 from util import util
 from components.disk_info import DiskInfo
 
+timeout = 60
+socket.setdefaulttimeout(timeout)
+
 '''
 Notification Data Format.
 {
@@ -30,6 +33,31 @@ Exception Data Format.
     component_name:[component name],
     message:[message],
     time:[date time]
+}
+'''
+
+'''
+Heartbeat Publish Format
+{
+    event: "heartbeat",
+    nodes:
+    [
+        {
+            hostname:<hostname>,
+            role:<enum:MH,MA,MD,MMS>,
+            status:<enum:alive,unknown,dead>
+        },...
+    ]
+}
+
+Event Publish Format
+{
+    compenent_name: " sensor component name",
+    event: "event name",
+    level: "level name",
+    hostname: "node's hostname",
+    data: "performance data",
+    time: "trigger time",
 }
 '''
 
@@ -71,7 +99,7 @@ class DiskChecker:
         return ret
 
     def decide_event_level(self, disk_info):
-        ret = "WARNING"
+        ret = "INFO"
         for info in disk_info:
             if not info["healthy"]:
                 ret = "ERROR"
@@ -87,14 +115,15 @@ class DiskChecker:
         try:
             disk_info = self.check_all_disks()
             event = {
+                "hostname": socket.gethostname(),
                 "component_name": self.component_name,
                 "event": self.event_name,
                 "level": self.decide_event_level(disk_info),
                 "data": json.dumps(disk_info),
                 "time": str(datetime.now()),
-                "message": "",
             }
             event2post = json.dumps(event)
+            logger.info(event2post)
 
         except Exception as e:
             logger.error(str(e))
@@ -103,11 +132,48 @@ class DiskChecker:
                 "message": str(e),
                 "time": str(datetime.now()),
             }
-            event2post = json.dumps(event)
+            logger.error(json.dumps(event))
 
-        logger.info(event2post)
-        post_data(self.receiverUrl, event2post)
+        if event2post:
+            post_data(self.receiverUrl, event2post)
 
+class Heartbeat:
+    def __init__(self, receiverUrl):
+        self.receiverUrl = receiverUrl
+
+    def send_heartbeat(self):
+        """
+        send heartbeat to the receiver 
+        """
+        logger = util.getLogger(name="Heartbeat")
+        heartbeat2post = None
+        try:
+    
+            heartbeat = {
+                "event": "heartbeat",
+                "nodes": [
+                             {
+                               "hostname": socket.gethostname(),
+                               "role": "MH",
+                               "status": "alive",
+                             },
+                         ]
+            }
+
+            heartbeat2post = json.dumps(heartbeat)
+            logger.info(heartbeat2post)
+
+        except Exception as e:
+            logger.error(str(e))
+            event = {
+                "component_name": "Heartbeat",
+                "message": str(e),
+                "time": str(datetime.now()),
+            }
+            logger.error(json.dumps(event))
+
+        if heartbeat2post:
+            post_data(self.receiverUrl, heartbeat2post)
         
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
@@ -124,12 +190,12 @@ class NodeMonitor(Daemon):
             self.sensorInterval = (30, 60)
 
         self.DC = DiskChecker(self.receiverUrl)
+        self.HB = Heartbeat(self.receiverUrl)
 
     def post_data(self, url, data):
         data = json.dumps(data)
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         
-        #TODO: time out mechanism
         response = None
         f = urllib2.urlopen(req)
         response = f.read()
@@ -140,13 +206,15 @@ class NodeMonitor(Daemon):
         logger = util.getLogger(name="NodeMonitor.run")
         logger.info("start")
 
-        try:
-            while True:
-                self.DC.send_disk_event()
-                window = random.randint(*self.sensorInterval)
-                time.sleep(window)
-        except Exception as e:
-            logger.error(str(e))
+        while True:
+            try:
+                while True:
+                    self.DC.send_disk_event()
+                    self.HB.send_heartbeat()
+                    window = random.randint(*self.sensorInterval)
+                    time.sleep(window)
+            except Exception as e:
+                logger.error(str(e))
 
 if __name__ == "__main__":
     daemon = NodeMonitor('/var/run/NodeMonitor.pid')
