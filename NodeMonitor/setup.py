@@ -54,7 +54,7 @@ def main():
     os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
 
     os.system("update-rc.d -f node-monitor remove")
-    os.system("update-rc.d -n node-monitor defaults")
+    os.system("update-rc.d node-monitor defaults")
 
 if __name__ == '__main__':
     main()
