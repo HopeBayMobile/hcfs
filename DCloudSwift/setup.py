@@ -89,7 +89,7 @@ def main():
     os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
 
     os.system("update-rc.d -f swift-event-manager remove")
-    os.system("update-rc.d -n swift-event-manager defaults")
+    os.system("update-rc.d swift-event-manager defaults")
 
 if __name__ == '__main__':
     main()
