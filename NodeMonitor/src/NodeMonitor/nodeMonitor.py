@@ -208,11 +208,19 @@ class NodeMonitor(Daemon):
 
         while True:
             try:
-                while True:
-                    self.DC.send_disk_event()
+                try: 
                     self.HB.send_heartbeat()
-                    window = random.randint(*self.sensorInterval)
-                    time.sleep(window)
+                except Exception as e:
+                    logger.error(str(e))
+
+                try:
+                    self.DC.send_disk_event()
+                except Exception as e:
+                    logger.error(str(e))
+
+                window = random.randint(*self.sensorInterval)
+                time.sleep(window)
+
             except Exception as e:
                 logger.error(str(e))
 
