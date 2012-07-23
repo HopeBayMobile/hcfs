@@ -241,100 +241,101 @@ class AccountDatabaseBroker(DatabaseBroker):
             else:
                 return False
 
-class EventInfoDatabaseBroker(DatabaseBroker):
+class NodeInfoDatabaseBroker(DatabaseBroker):
     """Encapsulates working with a event list database."""
 
     def _initialize(self, conn):
-        self.create_event_list_table(conn)
+        self.create_node_info_table(conn)
 
-    def create_event_info_table(self, conn):
+    def create_node_info_table(self, conn):
         """
-        Create event list table which is specific to the event DB.
+        Create node information table which is specific to the event DB.
         
         @type  conn: object
         @param conn: DB connection object
         """
         conn.executescript("""
-            CREATE TABLE event_info (
-                node_ipv4 TEXT NOT NULL,
-                component_name TEXT NOT NULL,
-                event_name TEXT NOT NULL,
-                level_name TEXT NOT NULL,
-                data TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                message TEXT NOT NULL,
-                PRIMARY KEY (node_ipv4, component, event_name, level_name, timestamp)
+            CREATE TABLE node_info (
+                hostname TEXT NOT NULL,
+                status TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                disk TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                switchpoint INTEGER NOT NULL,
+                PRIMARY KEY hostname
             );
         """)
 
-    def show_event_list_table(self):
+    def show_node_info_table(self):
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM event_info").fetchall()
+            row = conn.execute("SELECT * FROM node_info").fetchall()
             return row
 
-    def add_event(self, node_ipv4, component_name,\
-                  event_name, level_name, data, timestamp, message):
+    def update_node_status(self, hostname, status, timestamp):
         """
-        add event into the db
+        update node status information to db
 
-        @type  node_ipv4: string
-        @param node_ipv4: node ip in ipv4 form
-        @type  component_name: string
-        @param component_name: component name
-        @type  event_name: string
-        @param event_name: event name
-        @type  level_name: string
-        @param level_name: OK | Warning | Err
-        @type  data: json string
-        @param data: data
-        @type  timestamp: string
-        @param timestamp: time
-        @type  message: string
-        @param message: event message
-        @rtype: String
-        @return: Return None if the event already exists. 
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  status: enum(alive, unknown, dead)
+        @param status: status of the node
+        @type  timestamp: integer
+        @param timestamp: date of the latest heartbeat
+        @rtype: string
+        @return: Return None if the node info already exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM event_info where node_ipv4=? AND component_name=? AND event_name=? AND level_name=? AND timestamp=?", (node_ipv4, component_name, event_name, level_name, timestamp)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=? AND status=? AND timestamp=?", (hostname, status, timestamp)).fetchone()
             if row:
                 return None
             else:
-                conn.execute("INSERT INTO event_info VALUES (?,?,?,?,?,?,?)", (node_ipv4, component_name, event_name, level_name, data, timestamp, message))
+                conn.execute("UPDATE node_info SET status=?, timestamp=? WHERE hostname=?", (status, timestamp, hostname))
                 conn.commit()
-                row = conn.execute("SELECT * FROM event_info where node_ipv4=? AND component_name=? AND event_name=? AND level_name=? AND timestamp=?", (node_ipv4, component_name, event_name, level_name, timestamp)).fetchone()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
                 return row
 
-    def delete_event(self, node_ipv4, component_name, event_name, level_name, data, timestamp, message):
+    def update_node_disk(self, hostname, disk):
         """
-        delete event from db
+        update disk information into db
 
-        @type  node_ipv4: string
-        @param node_ipv4: node ip in ipv4 form
-        @type  component_name: string
-        @param component_name: component name
-        @type  event_name: string
-        @param event_name: event name
-        @type  level_name: string
-        @param level_name: OK | Warning | Err
-        @type  data: json string
-        @param data: data
-        @type  timestamp: string
-        @param timestamp: time
-        @type  message: string
-        @param message: event message
-        @rtype: String
-        @return: Return None if the event already exists. 
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  disk: encoding json string
+        @param disk: disk status of the node
+        @rtype: string
+        @return: Return None if the node info already exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM event_info where node_ipv4=? AND component_name=? AND event_name=? AND level_name=? AND timestamp=?", (node_ipv4, component_name, event_name, level_name, timestamp)).fetchone()
+            conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
+            conn.commit()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            return row
+
+    def update_node_mode(self, hostname, mode, switchpoint):
+        """
+        update disk mode information into db
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  mode: enum(service, waiting)
+        @param mode: mode of node
+        @type  switchpoint: integer
+        @param switchpoint: date of the latest mode switching
+        @rtype: string
+        @return: Return None if the node info already exists. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=? AND mode=?", (hostname, mode)).fetchone()
             if row:
-                conn.execute("DELETE FROM event_info WHERE node_ipv4=? AND component_name=? AND event_name=? AND level_name=? AND timestamp=?", (node_ipv4, component_name, event_name, level_name, timestamp))
-                conn.commit()
-                return row
-            else:
                 return None
+            else:
+                conn.execute("UPDATE node_info SET mode=?, switchpoint=? WHERE hostname=?", (mode, switchpoint, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+                return row
 
 if __name__ == '__main__':
 
