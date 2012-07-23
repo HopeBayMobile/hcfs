@@ -286,7 +286,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=? AND status=? AND timestamp=?", (hostname, status, timestamp)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
             if row:
                 return None
             else:
@@ -308,10 +308,14 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
-            conn.commit()
             row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
-            return row
+            if row:
+                return None
+            else:
+                conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+                return row
 
     def update_node_mode(self, hostname, mode, switchpoint):
         """
@@ -328,7 +332,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=? AND mode=?", (hostname, mode)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=? AND mode=?", (hostname, node)).fetchone()
             if row:
                 return None
             else:
