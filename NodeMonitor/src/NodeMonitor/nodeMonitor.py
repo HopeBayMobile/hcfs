@@ -24,7 +24,7 @@ Notification Data Format.
     event=[event name],
     level:[level name],
     data:{[performance_data]},
-    time:[date time string],
+    time:[integer],
     message:[reserve]
 }
 
@@ -32,7 +32,7 @@ Exception Data Format.
 {
     component_name:[component name],
     message:[message],
-    time:[date time]
+    time: [integer]
 }
 '''
 
@@ -120,7 +120,7 @@ class DiskChecker:
                 "event": self.event_name,
                 "level": self.decide_event_level(disk_info),
                 "data": json.dumps(disk_info),
-                "time": str(datetime.now()),
+                "time": int(time.time()),
             }
             event2post = json.dumps(event)
             logger.info(event2post)
@@ -130,7 +130,7 @@ class DiskChecker:
             event = {
                 "component_name": self.component_name,
                 "message": str(e),
-                "time": str(datetime.now()),
+                "time": int(time.time()),
             }
             logger.error(json.dumps(event))
 
@@ -168,7 +168,7 @@ class Heartbeat:
             event = {
                 "component_name": "Heartbeat",
                 "message": str(e),
-                "time": str(datetime.now()),
+                "time": int(time.time()),
             }
             logger.error(json.dumps(event))
 
