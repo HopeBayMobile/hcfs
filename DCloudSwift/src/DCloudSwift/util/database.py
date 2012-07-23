@@ -249,7 +249,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
 
     def create_node_info_table(self, conn):
         """
-        Create node information table which is specific to the event DB.
+        Create node information table which is specific to the DB.
         
         @type  conn: object
         @param conn: DB connection object
@@ -407,6 +407,63 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+
+class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
+    """Encapsulates working with a event list database."""
+
+    def _initialize(self, conn):
+        self.create_maintenance_backlog_table(conn)
+
+    def create_maintenance_backlog_table(self, conn):
+        """
+        Create maintenance backlog table which is specific to the DB.
+        
+        @type  conn: object
+        @param conn: DB connection object
+        """
+        conn.executescript("""
+            CREATE TABLE maintenance_backlog (
+                target TEXT NOT NULL,
+                hostname TEXT NOT NULL,
+                disks_to_reserve TEXT,
+                disks_to_replace TEXT,
+                timestamp INTEGER NOT NULL,
+                PRIMARY KEY hostname
+            );
+        """)
+
+    def show_maintenance_backlog_table(self):
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM maintenance_backlog").fetchall()
+            return row
+
+    def update_maintenance_backlog_status(self, target, hostname, disk_to_reserve, disk_to_replace, timestamp):
+        """
+        update maintenance backlog information to db
+
+        @type  target: enum(node_missing, disk_broken, disk_missing)
+        @param target: status of the node
+        @type  hostname: string
+        @param hostname: hostname of the node to maintain
+        @type  disks_to_reserve: json string
+        @param disks_to_reserve: SN list of disks to reserve
+        @type  disks_to_replace: json string
+        @param disks_to_replace: SN list of disks to replace
+        @type  timestamp: integer
+        @param timestamp: the time when this task is created
+        @rtype: string
+        @return: Return None if the host doesn't exist. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
+            if row:
+                return None
+            else:
+                ## add code here
+                pass
+            
+            
 if __name__ == '__main__':
     #os.system("rm /etc/test/test.db")
     #db = MonitorDatabaseBroker("/etc/test/test.db")
