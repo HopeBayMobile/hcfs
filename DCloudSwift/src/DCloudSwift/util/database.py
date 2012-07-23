@@ -282,12 +282,12 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  timestamp: integer
         @param timestamp: date of the latest heartbeat
         @rtype: string
-        @return: Return None if the node info already exists. 
-            Otherwise return the newly added row.            
+        @return: Return None if the host does not exist. 
+            Otherwise return the newly updated row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=? AND status=? AND timestamp=?", (hostname, status, timestamp)).fetchone()
-            if row:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            if not row:
                 return None
             else:
                 conn.execute("UPDATE node_info SET status=?, timestamp=? WHERE hostname=?", (status, timestamp, hostname))
@@ -304,10 +304,13 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  disk: encoding json string
         @param disk: disk status of the node
         @rtype: string
-        @return: Return None if the node info already exists. 
+        @return: Return None if the node does not exist. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            if not row:
+                return None
             conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
             conn.commit()
             row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
@@ -324,12 +327,12 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  switchpoint: integer
         @param switchpoint: date of the latest mode switching
         @rtype: string
-        @return: Return None if the node info already exists. 
+        @return: Return None if the node does not exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=? AND mode=?", (hostname, mode)).fetchone()
-            if row:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            if not row:
                 return None
             else:
                 conn.execute("UPDATE node_info SET mode=?, switchpoint=? WHERE hostname=?", (mode, switchpoint, hostname))

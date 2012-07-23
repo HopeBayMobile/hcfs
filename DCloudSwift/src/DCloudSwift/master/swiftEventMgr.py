@@ -29,13 +29,6 @@ class SwiftEventMgr(Daemon):
         self.port = self.masterCfg.getKwparams()["eventMgrPort"]
         self.page = self.masterCfg.getKwparams()["eventMgrPage"]
 
-    def isValidNotification(self, notification):
-        '''
-        Check if notification is a valid json str representing an event list
-        '''
-        #Add your code here
-        return True
-
     @staticmethod
     def getExpectedDiskCount(hostname):
         '''
@@ -80,9 +73,7 @@ class SwiftEventMgr(Daemon):
     }
     '''
     @staticmethod
-    def extractDiskInfo(event):
-        logger = util.getLogger(name="swifteventmgr.extractDiskInfo")
-   
+    def isValidDiskEvent(event):
         try:
             hostname = event["hostname"]
             expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
@@ -90,34 +81,20 @@ class SwiftEventMgr(Daemon):
             brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and disk["SN"]]
             timestamp = event["time"]
         except Exception as e:
-            logger.error("Failed to extract disk info due to format errors")
-            return None
+            return False
 
         if not isinstance(hostname, str) or not isinstance(timestamp, int):
-            logger.error("Illegal values of Hostname and timestamp")
-            return None
+            return False
 
         if expectedDiskCount is None:
-            logger.error("Failed to get expected disk count of %s" % hostname)
-            return None
+            return False
 
-        ret = {   
-                  "hostname": hostname,
-                  "expectedDiskCount": expectedDiskCount,
-                  "healthyDisks": healthyDisks,
-                  "brokenDisks": brokenDisks,
-                  "timestamp": timestamp,
-              }
-
-        return ret
+        return True
 
     @staticmethod
     def handleHDD(event):
         logger = util.getLogger(name="swifteventmgr.handleHDD")
-        N = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
-        healthyDisks = [disk["SN"] for disk in event["data"] if disk["healthy"]]
-        brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and not disk["SN"]]
-        pass
+        new_disk_info = SwiftEventMgr.extractDiskInfo(event)
 
     @staticmethod
     def handleEvents(notification):

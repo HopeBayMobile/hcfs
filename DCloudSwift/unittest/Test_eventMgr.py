@@ -29,9 +29,9 @@ class Test_getExpectedDeviceCnt:
         os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
 
 
-class Test_extractDiskInfo:
+class Test_isValidDiskEvent:
     '''
-    Test the fucntion SwiftEventMgr.extractDiskInfo
+    Test the fucntion SwiftEventMgr.isValidDiskEvent
     '''
 
     def setup(self):
@@ -140,28 +140,24 @@ class Test_extractDiskInfo:
         }
 
     def test_normal_value(self):
-        disk_info = SwiftEventMgr.extractDiskInfo(self.validEvent)
-        nose.tools.ok_(disk_info["hostname"] == "ThinkPad", "Wrong hostname")
-        nose.tools.ok_(set(disk_info["healthyDisks"]) == set(["1", "4", "5"]), "Wrong healthy disks")
-        nose.tools.ok_(set(disk_info["brokenDisks"]) == set(["2", "3"]), "Wrong broken disks")
-        nose.tools.ok_(int(disk_info["expectedDiskCount"]) == 6, "Wrong expectedDiskCount")
-        nose.tools.ok_(disk_info["timestamp"] == self.date, "Wrong timestamp")
+        ret = SwiftEventMgr.isValidDiskEvent(self.validEvent)
+        nose.tools.ok_(ret is True, "False alarm")
 
     def test_invalid_format_1(self):
-        disk_info = SwiftEventMgr.extractDiskInfo(self.invalidEvent1)
-        nose.tools.ok_(disk_info is None, "Failed to detect wrong format of missing SN")
+        ret = SwiftEventMgr.isValidDiskEvent(self.invalidEvent1)
+        nose.tools.ok_(ret is False, "Failed to detect wrong format of missing SN")
 
     def test_invalid_format_2(self):
-        disk_info = SwiftEventMgr.extractDiskInfo(self.invalidEvent2)
-        nose.tools.ok_(disk_info is None, "Failed to detct wrong format of missing heatlthy")
+        ret = SwiftEventMgr.isValidDiskEvent(self.invalidEvent2)
+        nose.tools.ok_(ret is False, "Failed to detct wrong format of missing heatlthy")
 
     def test_illegalHostname(self):
-        disk_info = SwiftEventMgr.extractDiskInfo(self.illegalHostname)
-        nose.tools.ok_(disk_info is None, "Failed to detect hostname is None")
+        ret = SwiftEventMgr.isValidDiskEvent(self.illegalHostname)
+        nose.tools.ok_(ret is False, "Failed to detect hostname is None")
 
     def test_illegalTimestamp(self):
-        disk_info = SwiftEventMgr.extractDiskInfo(self.illegalTimestamp)
-        nose.tools.ok_(disk_info is None, "Failed to detect timestamp is None")
+        ret = SwiftEventMgr.isValidDiskEvent(self.illegalTimestamp)
+        nose.tools.ok_(ret is False, "Failed to detect timestamp is None")
 
     def teardown(self):
         os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
