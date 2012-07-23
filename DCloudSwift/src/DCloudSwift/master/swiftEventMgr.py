@@ -6,6 +6,7 @@ import random
 import pickle
 import signal
 import json
+from ConfigParser import ConfigParser
 from twisted.web.server import Site
 from twisted.web.resource import Resource
 from twisted.internet import reactor
@@ -36,11 +37,99 @@ class SwiftEventMgr(Daemon):
         return True
 
     @staticmethod
+    def getExpectedDiskCount(hostname):
+        '''
+        Get expected disk count of a node
+
+        @type  hostname: string
+        @param hostname: hostname of the node to query expected disk count
+        @rtype: integer
+        @return: expected disk count of the queried node. Return None in case of exception.
+        '''
+        config = ConfigParser()
+
+        try:
+            with open(GlobalVar.ORI_SWIFTCONF, "rb") as fh:
+                config.readfp(fh)
+
+            return int(config.get('storage', 'deviceCnt'))
+        except:
+            logger.error("Failed to read deviceCnt from %s" %  GlobalVar.ORI_SWIFTCONF)
+            return None
+
+
+    '''
+    HDD event format
+    {
+        component_name: "disk_info",
+        event: "HDD",
+        level: INFO|WARNING|ERROR,
+        hostname: <hostname>
+        data: [
+                  { 
+                     SN: <serial number>,
+                     healthy: True|False
+                  }, 
+
+                  {
+                      SN: <string: serial number>,
+                      healthy: True|False
+                  }, ... 
+              ],
+        time: <integer>
+    }
+    '''
+    @staticmethod
+    def extractDiskInfo(event):
+        logger = util.getLogger(name="swifteventmgr.extractDiskInfo")
+   
+        try:
+            hostname = event["hostname"]
+            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
+            healthyDisks = [disk["SN"] for disk in event["data"] if disk["healthy"] and disk["SN"]]
+            brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and disk["SN"]]
+            timestamp = event["time"]
+        except Exception as e:
+            logger.error("Failed to extract disk info due to format errors")
+            return None
+
+        if not isinstance(hostname, str) or not isinstance(timestamp, int):
+            logger.error("Illegal values of Hostname and timestamp")
+            return None
+
+        if expectedDiskCount is None:
+            logger.error("Failed to get expected disk count of %s" % hostname)
+            return None
+
+        ret = {   
+                  "hostname": hostname,
+                  "expectedDiskCount": expectedDiskCount,
+                  "healthyDisks": healthyDisks,
+                  "brokenDisks": brokenDisks,
+                  "timestamp": timestamp,
+              }
+
+        return ret
+
+    @staticmethod
+    def handleHDD(event):
+        logger = util.getLogger(name="swifteventmgr.handleHDD")
+        N = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
+        healthyDisks = [disk["SN"] for disk in event["data"] if disk["healthy"]]
+        brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and not disk["SN"]]
+        pass
+
+    @staticmethod
     def handleEvents(notification):
         logger = util.getLogger(name="swifteventmgr.handleEvents")
         logger.info("%s" % notification)
-        #Add your code here
+        event = None
+        try:
+            event = json.loads(notification)
+        except:
+            logger.error("Notification %s is not a legal json string" % notification)
 
+        #Add your code here
         time.sleep(10)
 
     class EventsPage(Resource):
