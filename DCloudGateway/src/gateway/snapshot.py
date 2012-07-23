@@ -160,6 +160,9 @@ def _wait_snapshot(old_len):
 def take_snapshot():
     """
     API function for taking snapshots manually.
+    
+    Note that this function just inform that the action of taking snapshot is performing.
+    Return from this function is not equal to the finish of taking snapshot.
 
     @rtype:    Json object
     @return:   A json object with function result and returned message.
@@ -177,11 +180,12 @@ def take_snapshot():
             old_len = len(snapshots)
 
             _initialize_snapshot()
-            latest_ss_name = _wait_snapshot(old_len)
-            log.info('[2] Latest snapshot name: %s' % latest_ss_name)
-            # wthung, 2012/7/17
-            # automatically expose this new snapshot
-            expose_snapshot(latest_ss_name, True)
+            _wait_snapshot(old_len)
+#            latest_ss_name = _wait_snapshot(old_len)
+#            log.info('[2] Latest snapshot name: %s' % latest_ss_name)
+#            # wthung, 2012/7/17
+#            # automatically expose this new snapshot
+#            expose_snapshot(latest_ss_name, True)
             return_result = True
             return_msg = 'Completed take_snapshot'
     except SnapshotError as Err:

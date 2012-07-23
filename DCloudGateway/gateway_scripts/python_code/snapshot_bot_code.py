@@ -9,73 +9,17 @@ import common
 import subprocess
 import time
 from datetime import datetime
+from gateway import snapshot
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
 
-snapshot_tag = "/root/.s3ql/.snapshotting"
-snapshot_db = "/root/.s3ql/snapshot_db.txt"
-temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
-temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
 temp_folder = "/mnt/cloudgwfiles/tempsnapshot"
 snapshot_statistics = "/root/.s3ql/snapshot.log"
 samba_folder = "/mnt/cloudgwfiles/sambashare"
 nfs_folder = "/mnt/cloudgwfiles/nfsshare"
 mount_point = "/mnt/cloudgwfiles"
-snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 samba_user = "superuser:superuser"
-snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
-
-
-class SnapshotError(Exception):
-    pass
-
-
-class Snapshot_Db_Lock():
-    """
-    Same snapshot database lock class as in the API.
-    """
-    def __init__(self):
-
-        self.locked = False
-        try:
-            finish = False
-            while not finish:
-                if os.path.exists(snapshot_db_lock):
-                    time.sleep(0.5)
-                else:
-                    os.system('sudo touch %s' % snapshot_db_lock)
-                    finish = True
-        except:
-            raise SnapshotError('Unable to acquire snapshot db lock')
-        self.locked = True
-
-    def __del__(self):
-
-        try:
-            if self.locked:
-                self.locked = False
-                if os.path.exists(snapshot_db_lock):
-                    os.system('sudo rm -rf %s' % snapshot_db_lock)
-        except:
-            raise SnapshotError('Unable to release snapshot sb lock')
-
-
-def _check_snapshot_in_progress():
-    """
-    Helper function for checking if a snapshot process exists.
-
-    @rtype: Boolean value
-    @Return: Whether a snapshotting process is in progress.
-    """
-    try:
-        if os.path.exists(snapshot_tag):
-            return True
-        return False
-    except:
-        raise\
-          SnapshotError("Could not decide whether a snapshot is in progress.")
-
 
 def new_database_entry():
     """
@@ -88,22 +32,22 @@ def new_database_entry():
     finished = False
 
     while not finished:
-        db_lock = Snapshot_Db_Lock()
+        db_lock = snapshot.Snapshot_Db_Lock()
         try:
-            if os.path.exists(temp_snapshot_db):
-                os.system('rm -rf %s' % temp_snapshot_db)
+            if os.path.exists(snapshot.temp_snapshot_db):
+                os.system('rm -rf %s' % snapshot.temp_snapshot_db)
 
-            with open(temp_snapshot_db, 'w') as fh:
+            with open(snapshot.temp_snapshot_db, 'w') as fh:
                 # wthung, 2012/7/17
                 # add last field to represent auto_exposed. default is true
                 fh.write('new_snapshot,%f,-1,0,0,false,true\n' % time.time())
 
-            if not os.path.exists(snapshot_db):
-                os.system('sudo mv %s %s' % (temp_snapshot_db, snapshot_db))
+            if not os.path.exists(snapshot.snapshot_db):
+                os.system('sudo mv %s %s' % (snapshot.temp_snapshot_db, snapshot.snapshot_db))
             else:
-                os.system('sudo cat %s %s > %s' % (temp_snapshot_db,\
-                               snapshot_db, temp_snapshot_db1))
-                os.system('sudo cp %s %s' % (temp_snapshot_db1, snapshot_db))
+                os.system('sudo cat %s %s > %s' % (snapshot.temp_snapshot_db,\
+                               snapshot.snapshot_db, snapshot.temp_snapshot_db1))
+                os.system('sudo cp %s %s' % (snapshot.temp_snapshot_db1, snapshot.snapshot_db))
 
             finished = True
 
@@ -112,7 +56,7 @@ def new_database_entry():
             time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not write new entry to snapshot database"
-                raise SnapshotError(error_msg)
+                raise snapshot.SnapshotError(error_msg)
         finally:
             del db_lock
 
@@ -137,9 +81,9 @@ def actually_not_in_progress():
     updated.
     """
 
-    db_lock = Snapshot_Db_Lock()
+    db_lock = snapshot.Snapshot_Db_Lock()
     try:
-        with open(snapshot_db, 'r') as fh:
+        with open(snapshot.snapshot_db, 'r') as fh:
             db_lines = fh.readlines()
             if len(db_lines) < 1:
                 no_new_entry = True
@@ -150,7 +94,7 @@ def actually_not_in_progress():
                 else:
                     no_new_entry = False
     except:
-        raise SnapshotError('Unable to determine if snapshot is in progress')
+        raise snapshot.SnapshotError('Unable to determine if snapshot is in progress')
     finally:
         del db_lock
 
@@ -170,21 +114,21 @@ def recover_database():
 
     while not finished:
 
-        db_lock = Snapshot_Db_Lock()
+        db_lock = snapshot.Snapshot_Db_Lock()
         try:
             #First check if the temp snapshot folder still exists
             if os.path.exists(temp_folder):
                 #Check if the path of the newest snapshot exists
-                with open(snapshot_db, 'r') as fh:
+                with open(snapshot.snapshot_db, 'r') as fh:
                     first_line = fh.readline()
                     first_entries = first_line.split(',')
                     new_snapshot_name = first_entries[0]
-                    new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
+                    new_snapshot_path = os.path.join(snapshot.snapshot_dir, new_snapshot_name)
 
                 if not os.path.exists(new_snapshot_path):
                     # This should be the missing snapshot folder. Rename the temp folder.
-                    if not os.path.exists(snapshot_dir):
-                        os.system('sudo mkdir %s' % snapshot_dir)
+                    if not os.path.exists(snapshot.snapshot_dir):
+                        os.system('sudo mkdir %s' % snapshot.snapshot_dir)
                     os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
                     os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
                     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
@@ -198,7 +142,7 @@ def recover_database():
                              ftime_format.tm_min, ftime_format.tm_sec)
                     update_new_entry(new_snapshot_name, finish_time, 0, 0)
 
-                    new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
+                    new_snapshot_path = os.path.join(snapshot.snapshot_dir, new_snapshot_name)
 
                     os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
                     os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
@@ -206,11 +150,11 @@ def recover_database():
                     log.info('Recovered snapshot' % new_snapshot_name)
             else:
                 try:  # We just need to lock the snapshot dir and change the ownership
-                    with open(snapshot_db, 'r') as fh:
+                    with open(snapshot.snapshot_db, 'r') as fh:
                         first_line = fh.readline()
                         first_entries = first_line.split(',')
                         new_snapshot_name = first_entries[0]
-                        new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
+                        new_snapshot_path = os.path.join(snapshot.snapshot_dir, new_snapshot_name)
 
                     os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
                     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
@@ -218,7 +162,7 @@ def recover_database():
                     pass  # Perhaps we already had done these
 
             os.system('sudo python /usr/local/bin/s3qlctrl upload-meta %s' % mount_point)
-            os.system('sudo rm -rf %s' % snapshot_tag)
+            os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
             finished = True
 
         except:
@@ -226,7 +170,7 @@ def recover_database():
             time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not recover snapshot database"
-                raise SnapshotError(error_msg)
+                raise snapshot.SnapshotError(error_msg)
         finally:
             del db_lock
 
@@ -249,9 +193,9 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
 
     while not finished:
 
-        db_lock = Snapshot_Db_Lock()
+        db_lock = snapshot.Snapshot_Db_Lock()
         try:
-            with open(snapshot_db, 'r') as fh:
+            with open(snapshot.snapshot_db, 'r') as fh:
                 db_lines = fh.readlines()
                 if len(db_lines) < 1:
                     create_new_entry = True
@@ -267,10 +211,10 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
                 else:
                     start_time = float(first_entries[1])
 
-            if os.path.exists(temp_snapshot_db):
-                os.system('sudo rm -rf %s' % temp_snapshot_db)
+            if os.path.exists(snapshot.temp_snapshot_db):
+                os.system('sudo rm -rf %s' % snapshot.temp_snapshot_db)
 
-            with open(temp_snapshot_db, 'w') as fh:
+            with open(snapshot.temp_snapshot_db, 'w') as fh:
                 # wthung, 2012/7/17
                 # add last field to represent auto_exposed. default to true
                 fh.write('%s,%f,%f,%d,%d,false,true\n' % (new_snapshot_name,\
@@ -282,7 +226,7 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
                     #Skip the first line of the original db
                     fh.writelines(db_lines[1:])
 
-            os.system('sudo cp %s %s' % (temp_snapshot_db, snapshot_db))
+            os.system('sudo cp %s %s' % (snapshot.temp_snapshot_db, snapshot.snapshot_db))
             finished = True
 
         except:
@@ -290,7 +234,7 @@ def update_new_entry(new_snapshot_name, finish_time, total_files, total_size):
             time.sleep(5)
             if retries <= 0:
                 error_msg = "Could not update new entry in snapshot database"
-                raise SnapshotError(error_msg)
+                raise snapshot.SnapshotError(error_msg)
         finally:
             del db_lock
 
@@ -301,12 +245,12 @@ def execute_take_snapshot():
     """
     log.info('Begin snapshotting bot tasks')
 
-    if not _check_snapshot_in_progress():
+    if not snapshot._check_snapshot_in_progress():
         # if we are initializing a new snapshot process
         try:
-            os.system("sudo touch %s" % snapshot_tag)  # Tag snapshotting
+            os.system("sudo touch %s" % snapshot.snapshot_tag)  # Tag snapshotting
             new_database_entry()
-        except SnapshotError as Err:
+        except snapshot.SnapshotError as Err:
             err_msg = str(Err)
             log.info('[2] Unexpected error in snapshotting.')
             log.info('Error message: %s' % err_msg)
@@ -356,7 +300,7 @@ def execute_take_snapshot():
 
                     invalidate_entry()  # Cannot finish the snapshot for some reason
                     log.info('[2] Unable to finish the current snapshotting process. Aborting.')
-                    os.system('sudo rm -rf %s' % snapshot_tag)
+                    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     return
             else:
                 # Record statistics for samba share
@@ -365,7 +309,7 @@ def execute_take_snapshot():
                     # Statistics does not exists
                     log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
                     invalidate_entry()  # Cannot finish the snapshot for some reason
-                    os.system('sudo rm -rf %s' % snapshot_tag)
+                    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     return
 
                 with open(snapshot_statistics, 'r') as fh:
@@ -392,7 +336,7 @@ def execute_take_snapshot():
 
                         invalidate_entry()
                         log.info('[2] Unable to finish the current snapshotting process. Aborting.')
-                        os.system('sudo rm -rf %s' % snapshot_tag)
+                        os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                         return
                 else:
                     # Record statistics for NFS share
@@ -401,7 +345,7 @@ def execute_take_snapshot():
                         # Statistics does not exists
                         log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
                         invalidate_entry()  # Cannot finish the snapshot for some reason
-                        os.system('sudo rm -rf %s' % snapshot_tag)
+                        os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                         return
 
                     with open(snapshot_statistics, 'r') as fh:
@@ -429,17 +373,20 @@ def execute_take_snapshot():
               ftime_format.tm_min, ftime_format.tm_sec)
     update_new_entry(new_snapshot_name, finish_time, samba_files + nfs_files,\
               samba_size + nfs_size)
-
+    
+    # wthung, 2012/7/23
+    # auto expose this new created snapshot
+    snapshot.expose_snapshot(new_snapshot_name, True)
 
     # Make necessary changes to the directory structure and lock the snapshot
-    if not os.path.exists(snapshot_dir):
-        os.system('sudo mkdir %s' % snapshot_dir)
-    new_snapshot_path = os.path.join(snapshot_dir, new_snapshot_name)
+    if not os.path.exists(snapshot.snapshot_dir):
+        os.system('sudo mkdir %s' % snapshot.snapshot_dir)
+    new_snapshot_path = os.path.join(snapshot.snapshot_dir, new_snapshot_name)
     os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
     os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
     os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
     os.system('sudo python /usr/local/bin/s3qlctrl upload-meta %s' % mount_point)
-    os.system('sudo rm -rf %s' % snapshot_tag)
+    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
     
 
     log.info('Snapshotting finished at %s' % str(ftime_format))
@@ -451,3 +398,4 @@ if __name__ == '__main__':
         execute_take_snapshot()
     except Exception as err:
         log.info('%s' % str(err))
+        print('%s' % str(err))
