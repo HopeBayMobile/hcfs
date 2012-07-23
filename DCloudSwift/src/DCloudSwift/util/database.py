@@ -254,6 +254,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  conn: object
         @param conn: DB connection object
         """
+
         conn.executescript("""
             CREATE TABLE node_info (
                 hostname TEXT NOT NULL,
@@ -262,7 +263,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 disk TEXT NOT NULL,
                 mode TEXT NOT NULL,
                 switchpoint INTEGER NOT NULL,
-                PRIMARY KEY hostname
+                PRIMARY KEY (hostname)
             );
         """)
 
@@ -270,6 +271,72 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         with self.get() as conn:
             row = conn.execute("SELECT * FROM node_info").fetchall()
             return row
+
+    def add_node(self, hostname, status, timestamp, disk, mode, switchpoint):
+        """
+        add node to node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  status: enum(alive, unknown, dead)
+        @param status: status of the node
+        @type  timestamp: integer
+        @param timestamp: time of the latest status update
+        @type  disk: json string
+        @param disk: disk information of the node
+        @type mode: enum(service, waiting)
+        @param mode: mode of the node
+        @type switchpoint: integer
+        @param switchpoint: time of the latest mode update
+        @rtype: string
+        @return: Return None if the host does not exist. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+            if row:
+                return None
+            else:
+                conn.execute("INSERT INTO node_info VALUES (?,?,?,?,?,?)", (hostname, status, timestamp, disk, mode, switchpoint))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+                return row
+
+    def delete_node(self, hostname):
+        """
+        delete a node from node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @rtype: string
+        @return: Return None if the host does not exist. 
+            Otherwise return the deleted row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+            if row:
+                conn.execute("DELETE FROM node_info WHERE hostname=?", (hostname,))
+                conn.commit()
+                return row
+            else:
+                return None
+
+    def get_info(self, hostname):
+        """
+        retrieve information of a node from node_info
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @rtype: string
+        @return: Return None if the host does not exist. 
+            Otherwise return the seleted row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                return row
+ 
 
     def update_node_status(self, hostname, status, timestamp):
         """
@@ -286,13 +353,13 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly updated row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             if not row:
                 return None
             else:
                 conn.execute("UPDATE node_info SET status=?, timestamp=? WHERE hostname=?", (status, timestamp, hostname))
                 conn.commit()
-                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
     def update_node_disk(self, hostname, disk):
@@ -308,12 +375,12 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             if not row:
                 return None
             conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
             conn.commit()
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             return row
 
     def update_node_mode(self, hostname, mode, switchpoint):
@@ -331,29 +398,18 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             if not row:
                 return None
             else:
                 conn.execute("UPDATE node_info SET mode=?, switchpoint=? WHERE hostname=?", (mode, switchpoint, hostname))
                 conn.commit()
-                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname)).fetchone()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
 if __name__ == '__main__':
-
-    os.system("rm /etc/test/test.db")
-    db = MonitorDatabaseBroker("/etc/test/test.db")
-    db.initialize()
-
-    print db.add_node(hostname="system", ipaddress=None)
-
-#    print db.get_password("system", "root")
-#    print db.get_password("system1", "root")
-#    print db.is_enabled("system", "root")
-#    print db.is_admin("system", "root")
-#    print db.is_reseller("system", "root")
-#    print db.get_password("system", "root")
-#    db.disable_user("system", "root")
-#    print db.is_enabled("system", "root")
+    #os.system("rm /etc/test/test.db")
+    #db = MonitorDatabaseBroker("/etc/test/test.db")
+    #db.initialize()
+    #print db.add_node(hostname="system", ipaddress=None)
     pass
