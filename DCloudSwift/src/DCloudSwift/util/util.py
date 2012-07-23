@@ -460,7 +460,6 @@ def getDeviceCnt():
     logger = getLogger(name="getDeviceCnt")
 
     config = ConfigParser()
-    config.readfp(open(SWIFTCONF))
 
     try:
         with open(SWIFTCONF, "rb") as fh:
