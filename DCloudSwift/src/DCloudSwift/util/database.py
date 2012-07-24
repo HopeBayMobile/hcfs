@@ -466,7 +466,8 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
             
 if __name__ == '__main__':
     #os.system("rm /etc/test/test.db")
-    #db = MonitorDatabaseBroker("/etc/test/test.db")
+    #db = NodeInfoDatabaseBroker("/etc/test/test.db")
     #db.initialize()
+    #db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
     #print db.add_node(hostname="system", ipaddress=None)
     pass
