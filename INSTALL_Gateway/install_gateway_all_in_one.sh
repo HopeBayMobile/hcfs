@@ -40,6 +40,7 @@ cp -rs /usr/bin/*s3ql* /usr/local/bin/
 # vvvvv-- install GUI --------------------------------------------------------------------------------
 cd ../DCloudGatewayUI
 ./setup.sh
+update-rc.d celeryd defaults
 # ^^^^^-- install GUI --------------------------------------------------------------------------------
 
 
