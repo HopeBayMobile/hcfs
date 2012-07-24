@@ -70,12 +70,14 @@ class SwiftMasterCfg:
         self.__eventMgrPage = config.get('eventMgr', 'page')
         self.__maintainCheckerReplTime = config.get('maintain_checker', 'replication_time')
         self.__maintainCheckerRefreshTime = config.get('maintain_checker', 'refresh_time')
+        self.__maintainCheckerDaemonSleep = config.get('maintain_checker', 'daemon_sleep')
 
         self.__kwparams = {
             'eventMgrPort': self.__eventMgrPort,
             'eventMgrPage': self.__eventMgrPage,
-            'maintainCheckerReplTime': self.__maintainCheckerReplication,
+            'maintainCheckerReplTime': self.__maintainCheckerReplTime,
             'maintainCheckerRefreshTime': self.__maintainCheckerRefreshTime,
+            'maintainCheckerDaemonSleep': self.__maintainCheckerDaemonSleep,
         }
 
     def getKwparams(self):
