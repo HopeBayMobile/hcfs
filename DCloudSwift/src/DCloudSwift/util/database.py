@@ -268,6 +268,12 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         """)
 
     def show_node_info_table(self):
+        """
+        show node_info table
+        
+        @rtype:  string
+        @return: return node_info table
+        """
         with self.get() as conn:
             row = conn.execute("SELECT * FROM node_info").fetchall()
             return row
@@ -289,7 +295,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type switchpoint: integer
         @param switchpoint: time of the latest mode update
         @rtype: string
-        @return: Return None if the host does not exist. 
+        @return: Return None if the host already exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
@@ -321,9 +327,23 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 return None
 
+    def query_node_info_table(self, conditions):
+        """
+        query node_info according to conditions
+
+        @type  conditions: string
+        @param conditions: query conditions
+        @rtype: string
+        @return: Return the result.            
+        """
+        with self.get() as conn:
+            ret = conn.execute("SELECT * FROM node_info WHERE %s", (conditions,))
+            return ret
+        
     def get_info(self, hostname):
         """
         retrieve information of a node from node_info
+        
         @type  hostname: string
         @param hostname: hostname of the node
         @rtype: string
@@ -340,7 +360,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
 
     def update_node_status(self, hostname, status, timestamp):
         """
-        update node status information to db
+        update node status information to node_info
 
         @type  hostname: string
         @param hostname: hostname of the node
@@ -364,7 +384,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
 
     def update_node_disk(self, hostname, disk):
         """
-        update disk information into db
+        update disk information into node_info
 
         @type  hostname: string
         @param hostname: hostname of the node
@@ -378,14 +398,15 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             if not row:
                 return None
-            conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
-            conn.commit()
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
-            return row
+            else:
+                conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+                return row
 
     def update_node_mode(self, hostname, mode, switchpoint):
         """
-        update disk mode information into db
+        update disk mode information into node_info
 
         @type  hostname: string
         @param hostname: hostname of the node
@@ -394,7 +415,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  switchpoint: integer
         @param switchpoint: date of the latest mode switching
         @rtype: string
-        @return: Return None if the node does not exists. 
+        @return: Return None if the node does not exist. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
@@ -416,7 +437,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
 
     def create_maintenance_backlog_table(self, conn):
         """
-        Create maintenance backlog table which is specific to the DB.
+        Create maintenance_backlog which is specific to the DB.
         
         @type  conn: object
         @param conn: DB connection object
@@ -433,13 +454,19 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
         """)
 
     def show_maintenance_backlog_table(self):
+        """
+        show maintenance_backlog table
+        
+        @rtype:  string
+        @return: return maintenance_backlog table
+        """
         with self.get() as conn:
             row = conn.execute("SELECT * FROM maintenance_backlog").fetchall()
             return row
 
-    def update_maintenance_backlog_status(self, target, hostname, disk_to_reserve, disk_to_replace, timestamp):
+    def add_maintenance_backlog(self, target, hostname, disk_to_reserve, disk_to_replace, timestamp):
         """
-        update maintenance backlog information to db
+        add backlog to maintenance_backlog
 
         @type  target: enum(node_missing, disk_broken, disk_missing)
         @param target: status of the node
@@ -452,7 +479,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
         @type  timestamp: integer
         @param timestamp: the time when this task is created
         @rtype: string
-        @return: Return None if the host doesn't exist. 
+        @return: Return None if the node already exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
@@ -460,10 +487,60 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
             if row:
                 return None
             else:
-                ## add code here
-                pass
-            
-            
+                conn.execute("INSERT INTO maintenance_backlog VALUES (?,?,?,?,?)", (target, hostname, disk_to_reserve, disk_to_replace, timestamp))
+                conn.commit()
+                row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
+                return row
+
+    def delete_maintenance_backlog(self, hostname):
+        """
+        delete backlog to maintenance_backlog
+
+        @type  hostname: string
+        @param hostname: hostname of the node to maintain
+        @rtype: string
+        @return: Return None if the node does not exist. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
+            if row:
+                conn.execute("DELETE FROM maintenance_backlog WHERE hostname=?", (hostname,))
+                conn.commit()
+                return row
+            else:
+                return None
+
+    def query_maintenance_backlog_table(self, conditions):
+        """
+        query maintenance_backlog according to the conditions
+
+        @type  conditions: string
+        @param conditions: query conditions
+        @rtype: string
+        @return: Return the result.            
+        """
+        with self.get() as conn:
+            ret = conn.execute("SELECT * FROM maintenance_backlog WHERE %s", (conditions,))
+            return ret
+
+    def get_info(self, hostname):
+        """
+        retrieve information of a node from maintenance_backlog
+
+        @type  hostname: string
+        @param hostname: hostname of the node to maintain3
+        @rtype: string
+        @return: Return None if the host doesn't exist. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                return row
+
 if __name__ == '__main__':
     #os.system("rm /etc/test/test.db")
     #db = NodeInfoDatabaseBroker("/etc/test/test.db")
