@@ -18,7 +18,7 @@ apt-get install -y --force-yes libfuse-dev libattr1-dev python-all-dev python-sp
 apt-get install -y --force-yes python-profiler python-argparse fuse-utils 
 apt-get install -y --force-yes python-pip python-setuptools python-profiler
 apt-get install -y --force-yes python-software-properties curl portmap nfs-kernel-server samba
-add-apt-repository ppa:swift-core/release
+add-apt-repository -y ppa:swift-core/release
 apt-get update
 apt-get install -y --force-yes swift apt-show-versions squid3
     # install apache and mod_wsgi
