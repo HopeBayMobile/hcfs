@@ -242,7 +242,7 @@ class AccountDatabaseBroker(DatabaseBroker):
                 return False
 
 class NodeInfoDatabaseBroker(DatabaseBroker):
-    """Encapsulates working with a event list database."""
+    """Encapsulates working with a node information database."""
 
     def _initialize(self, conn):
         self.create_node_info_table(conn)
@@ -254,7 +254,6 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  conn: object
         @param conn: DB connection object
         """
-
         conn.executescript("""
             CREATE TABLE node_info (
                 hostname TEXT NOT NULL,
