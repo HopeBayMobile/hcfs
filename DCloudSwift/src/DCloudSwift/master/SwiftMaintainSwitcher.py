@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
-# backup gateway configuration from gateway to cloud
+# Mode Switcher (for Swift maintenance)
 
 import os
 import sys
