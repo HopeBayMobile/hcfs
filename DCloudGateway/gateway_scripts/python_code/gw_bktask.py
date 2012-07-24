@@ -121,7 +121,7 @@ def thread_aptget():
         os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
         
         # sleep for some time by a for loop in order to break at any time
-        for x in range(600):
+        for _ in range(600):
             time.sleep(1)
             if g_program_exit:
                 break
@@ -264,7 +264,7 @@ def start_background_tasks(singleloop=False):
             break
 
         # sleep for some time by a for loop in order to break at any time
-        for x in range(20):
+        for _ in range(20):
             time.sleep(1)
             if g_program_exit:
                 break
