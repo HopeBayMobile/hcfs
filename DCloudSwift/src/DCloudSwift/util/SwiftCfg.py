@@ -74,7 +74,7 @@ class SwiftMasterCfg:
         self.__kwparams = {
             'eventMgrPort': self.__eventMgrPort,
             'eventMgrPage': self.__eventMgrPage,
-            'maintainCheckerReplTime': self.__maintainCheckerReplication,
+            'maintainCheckerReplTime': self.__maintainCheckerReplTime,
             'maintainCheckerRefreshTime': self.__maintainCheckerRefreshTime,
         }
 
