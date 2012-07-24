@@ -289,7 +289,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type switchpoint: integer
         @param switchpoint: time of the latest mode update
         @rtype: string
-        @return: Return None if the host does not exist. 
+        @return: Return None if the host already exists. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
@@ -378,10 +378,11 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
             if not row:
                 return None
-            conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
-            conn.commit()
-            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
-            return row
+            else:
+                conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+                return row
 
     def update_node_mode(self, hostname, mode, switchpoint):
         """
@@ -394,7 +395,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  switchpoint: integer
         @param switchpoint: date of the latest mode switching
         @rtype: string
-        @return: Return None if the node does not exists. 
+        @return: Return None if the node does not exist. 
             Otherwise return the newly added row.            
         """
         with self.get() as conn:
