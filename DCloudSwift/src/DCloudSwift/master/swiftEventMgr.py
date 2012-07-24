@@ -19,6 +19,7 @@ from util.SwiftCfg import SwiftMasterCfg
 from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
+from util.database import NodeInfoDatabaseBroker
 
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
@@ -72,15 +73,19 @@ class SwiftEventMgr(Daemon):
         time: <integer>
     }
     '''
+
     @staticmethod
     def isValidDiskEvent(event):
+        logger = util.getLogger(name="SwiftEventMgr.isValidDiskEvent")
         try:
             hostname = event["hostname"]
+            data = json.loads(event["data"])
             expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
-            healthyDisks = [disk["SN"] for disk in event["data"] if disk["healthy"] and disk["SN"]]
-            brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and disk["SN"]]
+            healthyDisks = [disk["SN"] for disk in data if disk["healthy"] and disk["SN"]]
+            brokenDisks = [disk["SN"] for disk in data if not disk["healthy"] and disk["SN"]]
             timestamp = event["time"]
         except Exception as e:
+            logger.error(str(e))
             return False
 
         if not isinstance(hostname, str) or not isinstance(timestamp, int):
@@ -90,6 +95,82 @@ class SwiftEventMgr(Daemon):
             return False
 
         return True
+
+
+    @staticmethod
+    def updateDiskInfo(event, nodeInfoDbPath=None):
+        '''
+        update disk info according to the event
+
+        @type  event: dictioary
+        @param event: disk event
+        @rtype: dictionary
+        @return: updated disk info
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updateDiskInfo")
+        new_disk_info = {
+                            "timestamp": 0,
+                            "missing": {
+                                           "count": 0,
+                                           "timestamp": 0,
+                                       },
+                            "broken": [],
+                            "healthy": [],
+        }
+
+        nodeInfoDb = None
+        if not nodeInfoDbPath:
+            nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+        else:
+            nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+
+        if not SwiftEventMgr.isValidDiskEvent(event):
+            logger.error("Invalid disk event!!")
+            return None
+
+        try:
+            hostname = event["hostname"]
+            data = json.loads(event["data"])
+            old_disk_info = json.loads(nodeInfoDb.get_info(hostname)["disk"])
+            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
+
+            detectedDiskSNs = {disk["SN"] for disk in data if disk["SN"]}
+            knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"]+old_disk_info["healthy"] if disk["SN"]}
+
+
+            if old_disk_info["timestamp"] >= event["time"]:
+                return old_disk_info
+            else:
+                new_disk_info["timestamp"] = event["time"]
+
+            # Fill in missing info
+            new_disk_info["missing"]["count"] = expectedDiskCount - len(detectedDiskSNs)
+            if len(knownDiskSNs-detectedDiskSNs) > 0 and len(detectedDiskSNs) < expectedDiskCount:
+                new_disk_info["missing"]["timestamp"] = event["time"]
+            else:
+                new_disk_info["missing"]["timestamp"] = old_disk_info["missing"]["timestamp"]
+            
+            # Fill in healthy info
+            detectedHealthyDisks = [disk for disk in data if disk["healthy"]]
+            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["timestamp"]} for disk in detectedHealthyDisks]
+
+            # Fill in broken info
+            detectedBrokenDisks = [disk for disk in data if disk["broken"]]
+            detectedBrokenDiskSNs = [disk["SN"] for disk in data if disk["broken"]]
+            knownBrokenDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] if disk["SN"]}
+            
+            new_disk_info["broken"] = [{"SN": disk["SN"], "timestamp": event["timestamp"]} for disk in detectedBrokenDisks
+                                        if not disk["SN"] in knownBrokenDiskSNs and disk["SN"]]
+
+            new_disk_info["broken"] += [{"SN": disk["SN"], "timestamp": disk["timestamp"]} for disk in old_disk_info["broken"]
+                                        if not disk["SN"] in detectedBrokenDiskSNs and disk["SN"]]
+
+        except Exception as e:
+            logger.error(str(e))
+            return None 
+
+        return new_disk_info
+
 
     @staticmethod
     def handleHDD(event):
@@ -153,9 +234,12 @@ if __name__ == "__main__":
         elif 'restart' == sys.argv[1]:
             daemon.restart()
         else:
-            print "Unknown command"
             sys.exit(2)
-        sys.exit(0)
     else:
+        fakedb = "/etc/test.db"
+        os.system("rm /etc/test.db")
+        print SwiftEventMgr.updateDiskInfo({}, fakedb)
+
+        print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)
