@@ -176,33 +176,35 @@ class Test_updateDiskInfo:
         self.db = NodeInfoDatabaseBroker("/etc/test/test.db")
         self.db.initialize()
         
-        self.disk_info = {
-                             "timestamp": 1000,
-                             "missing": {
-                                            "count": 2,
-                                            "timestamp": 500
-                                        },
+    def test_older_event(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
 
-                             "broken": [
-                                         {"SN": 1, "timestamp": 101},
-                                         {"SN": 2, "timestamp": 102}, 
-                                       ],
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500}, 
+                                   ],
 
-                             "healthy": [
-                                         {"SN": 3, "timestamp": 999},
-                                         {"SN": 4, "timestamp": 999}, 
-                                       ]
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999}, 
+                                   ]
         }
 
-        self.node = {"hostname": "ThinkPad",
-                     "status": "alive",
-                     "timestamp": 123,
-                     "disk": json.dumps(self.disk_info),
-                     "mode": "service",
-                     "switchpoint": 123,}
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 124,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
 
-    def test_older_event(self):
-        Event = {
+        event = {
                   "component_name": "disk_info",
                   "event": "HDD",
                   "level": "ERROR",
@@ -210,31 +212,41 @@ class Test_updateDiskInfo:
                   "data": "{}",
                   "time": 123,
         }
-        info = self.db.add_node(**self.node)
+
+        info = self.db.add_node(**node)
         nose.tools.ok_(info)
 
-        ret = SwiftEventMgr.updateDiskInfo(Event, "/etc/test/test.db")
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
         nose.tools.ok_(ret is None)
 
-    def test_older_event(self):
-        data = json.dumps([])
-        Event = {
-                  "component_name": "disk_info",
-                  "event": "HDD",
-                  "level": "ERROR",
-                  "hostname": "ThinkPad",
-                  "data": data,
-                  "time": 1001,
+    def test_healthy_2_broken(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500}, 
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999}, 
+                                   ]
         }
 
-        info = self.db.add_node(**self.node)
-        nose.tools.ok_(info)
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
 
-        ret = SwiftEventMgr.updateDiskInfo(Event, "/etc/test/test.db")
-        nose.tools.ok_(ret is None)
-
-
-    def test_new_broken(self):
         data = [
                    {"SN": 1, "healthy": False},
                    {"SN": 2, "healthy": False},
@@ -242,9 +254,7 @@ class Test_updateDiskInfo:
                    {"SN": 4, "healthy": True},
         ]
 
-        data =[]
-
-        Event = {
+        event = {
                   "component_name": "disk_info",
                   "event": "HDD",
                   "level": "ERROR",
@@ -253,11 +263,554 @@ class Test_updateDiskInfo:
                   "time": 1001,
         }
 
-        info = self.db.add_node(**self.node)
-        nose.tools.ok_(info)
-
-        ret = SwiftEventMgr.updateDiskInfo(Event, "/etc/test/test.db")
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
         nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==2)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==3)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,2,3])
+            if disk["SN"] == 3:
+                nose.tools.ok_(disk["timestamp"]==1001)
+            else:
+                nose.tools.ok_(disk["timestamp"]==500)
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==1)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] == 4)
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_new_missing(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 1,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": 5, "timestamp": 999}, 
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": False},
+                   {"SN": 3, "healthy": False},
+                   {"SN": 4, "healthy": True},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==2)
+        nose.tools.ok_(ret["missing"]["timestamp"]==1001)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==3)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,2,3])
+            if disk["SN"] == 3:
+                nose.tools.ok_(disk["timestamp"]==1001)
+            else:
+                nose.tools.ok_(disk["timestamp"]==500)
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==1)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] == 4)
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_broken_2_healthy(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": True},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 4, "healthy": True},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==2)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==1)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"]== 1)
+            nose.tools.ok_(disk["timestamp"]==500)
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==3)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [2,3,4])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_pure_broken_replacement(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 0,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": 5, "timestamp": 999},
+                                     {"SN": 6, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 7, "healthy": True},
+                   {"SN": 8, "healthy": True},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 4, "healthy": True},
+                   {"SN": 5, "healthy": True},
+                   {"SN": 6, "healthy": True},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==0)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==0)
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==6)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [3,4,5,6,7,8])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_pure_missing_replacement(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": False},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 4, "healthy": True},
+                   {"SN": 5, "healthy": True},
+                   {"SN": 6, "healthy": True},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==0)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==2)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,2])
+            nose.tools.ok_(disk["timestamp"]==500)
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==4)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [3,4,5,6])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_mixed_replacement(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": True},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 4, "healthy": True},
+                   {"SN": 5, "healthy": False},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==1)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==2)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,5])
+            if disk["SN"] == 1:
+                nose.tools.ok_(disk["timestamp"]==500)
+            else:
+                nose.tools.ok_(disk["timestamp"]==1001)
+      
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==3)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [2,3,4])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_new_missing(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": True},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 5, "healthy": False},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        ret = SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==2)
+        nose.tools.ok_(ret["missing"]["timestamp"]==1001)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==2)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,5])
+            if disk["SN"] == 1:
+                nose.tools.ok_(disk["timestamp"]==500)
+            else:
+                nose.tools.ok_(disk["timestamp"]==1001)
+      
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==2)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [2,3])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_too_many_disks(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+                   {"SN": 1, "healthy": False},
+                   {"SN": 2, "healthy": True},
+                   {"SN": 3, "healthy": True},
+                   {"SN": 4, "healthy": False},
+                   {"SN": 5, "healthy": False},
+                   {"SN": 6, "healthy": True},
+                   {"SN": 7, "healthy": True},
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        ret = json.loads(self.db.get_info("ThinkPad")["disk"])
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==0)
+        nose.tools.ok_(ret["missing"]["timestamp"]==500)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==3)
+        for disk in brokenDisks:
+            nose.tools.ok_(disk["SN"] in [1,4,5])
+            if disk["SN"] == 1:
+                nose.tools.ok_(disk["timestamp"]==500)
+            else:
+                nose.tools.ok_(disk["timestamp"]==1001)
+      
+            
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==4)
+        for disk in healthyDisks:
+            nose.tools.ok_(disk["SN"] in [2,3,6,7])
+            nose.tools.ok_(disk["timestamp"]==1001)
+
+    def test_no_disks(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": 1, "timestamp": 500},
+                                     {"SN": 2, "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": 3, "timestamp": 999},
+                                     {"SN": 4, "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        data = [
+        ]
+
+        event = {
+                  "component_name": "disk_info",
+                  "event": "HDD",
+                  "level": "ERROR",
+                  "hostname": "ThinkPad",
+                  "data": json.dumps(data),
+                  "time": 1001,
+        }
+
+        info = self.db.add_node(**node)
+        SwiftEventMgr.updateDiskInfo(event, "/etc/test/test.db")
+        ret = json.loads(self.db.get_info("ThinkPad")["disk"])
+        nose.tools.ok_(ret)
+        nose.tools.ok_(ret["timestamp"]==1001)
+
+        nose.tools.ok_(ret["missing"]["count"]==6)
+        nose.tools.ok_(ret["missing"]["timestamp"]==1001)
+
+        brokenDisks = [disk for disk in ret["broken"]]
+        nose.tools.ok_(len(brokenDisks)==0)
+        healthyDisks = [disk for disk in ret["healthy"]]
+        nose.tools.ok_(len(healthyDisks)==0)
 
     def teardown(self):
         os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
