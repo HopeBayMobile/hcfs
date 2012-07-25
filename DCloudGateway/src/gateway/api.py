@@ -15,14 +15,14 @@ DIR = os.path.dirname(os.path.realpath(__file__))
 ################################################################################
 # Configuration
 
-# Global section 
+# Global section
 # Timeout for running system commands
 RUN_CMD_TIMEOUT = 15
 
-# Switch of enabling showing some debug log 
+# Switch of enabling showing some debug log
 enable_log = False
 
-# script of s3qlstat  
+# script of s3qlstat
 CMD_CHK_STO_CACHE_STATE = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
 
 # Which NIC to monitoring
@@ -46,43 +46,43 @@ nfs_hosts_allow_file = "/etc/hosts.allow"
 # Log section
 
 # source of log files. There are too much info from the syslog,mount,fsck logs.
-# We don't use them. Instead, we use gateway log, where records the results of 
-# invoking gateway's API. 
+# We don't use them. Instead, we use gateway log, where records the results of
+# invoking gateway's API.
 LOGFILES = {
             #"syslog" : "/var/log/syslog",
             #"mount" : "/root/.s3ql/mount.log",
             #"fsck" : "/root/.s3ql/fsck.log",
-            "gateway" : "/var/log/delta/Gateway.log"
+            "gateway": "/var/log/delta/Gateway.log"
             }
 
-# ****Note that not all logs will be displayed.****  
-# Only those with certain KEYWORDs that is defined by KEYWORD_FILTER, in log  
+# ****Note that not all logs will be displayed.****
+# Only those with certain KEYWORDs that is defined by KEYWORD_FILTER, in log
 # content will be shown and classified into three categories error,warning,info
 KEYWORD_FILTER = {
-                  "error_log" : ["\[0\]"], #["error", "exception"], # 0
-                  "warning_log" : ["\[1\]"], #["warning"], # 1
-                  "info_log" : ["\[2\]"], #["nfs", "cifs" , "."], #2
-                  # the pattern . matches any log, 
+                  "error_log": ["\[0\]"],  # ["error", "exception"], # 0
+                  "warning_log": ["\[1\]"],  # ["warning"], # 1
+                  "info_log": ["\[2\]"],  # ["nfs", "cifs" , "."], #2
+                  # the pattern . matches any log,
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
 
 # This is used to eliminate the prefix of a log msg.
-LOG_LEVEL_PREFIX_LEN = 4 # len("[0] ") 
+LOG_LEVEL_PREFIX_LEN = 4  # len("[0] ")
 
 # Log files use different timestamp format. To unify the format, the LOG_PARSER defines
-# regexp string for a log format. Log msg that mismatch the format will be ignored.     
+# regexp string for a log format. Log msg that mismatch the format will be ignored.
 LOG_PARSER = {
              #"syslog" : re.compile("^(?P<year>[\d]?)(?P<month>[a-zA-Z]{3})\s+(?P<day>\d\d?)\s(?P<hour>\d\d)\:(?P<minute>\d\d):(?P<second>\d\d)(?:\s(?P<suppliedhost>[a-zA-Z0-9_-]+))?\s(?P<host>[a-zA-Z0-9_-]+)\s(?P<process>[a-zA-Z0-9\/_-]+)(\[(?P<pid>\d+)\])?:\s(?P<message>.+)$"),
              #"mount" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
              #"fsck" : re.compile("^(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2})\.(?P<ms>[\d]+)\s+(\[(?P<pid>[\d]+)\])\s+(?P<message>.+)$"),
-             "gateway" : re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
+             "gateway": re.compile("^\[(?P<year>[\d]{4})\-(?P<month>[\d]{2})\-(?P<day>[\d]{2})\s+(?P<hour>[\d]{2})\:(?P<minute>[\d]{2}):(?P<second>[\d]{2}),(?P<ms>[\d]+)\]\s+(?P<message>.+)$"),
              }
 # define how many categories of log are shown.
-# 0 => show all logs, 2 => show only error log 
+# 0 => show all logs, 2 => show only error log
 SHOW_LOG_LEVEL = {
-            0 : ["error_log", "warning_log", "info_log"],
-            1 : ["error_log", "warning_log"],
-            2 : ["error_log"],
+            0: ["error_log", "warning_log", "info_log"],
+            1: ["error_log", "warning_log"],
+            2: ["error_log"],
             }
 
 # How many log records to show
@@ -93,78 +93,87 @@ snapshot_tag = "/root/.s3ql/.snapshotting"
 
 ################################################################################
 
+
 class BuildGWError(Exception):
     pass
+
 
 class EncKeyError(Exception):
     pass
 
+
 class MountError(Exception):
     pass
+
 
 class TestStorageError(Exception):
     pass
 
+
 class GatewayConfError(Exception):
     pass
+
 
 class UmountError(Exception):
     pass
 
+
 class SnapshotError(Exception):
     pass
+
 
 def getGatewayConfig():
     """
     Get gateway configuration from /etc/delta/Gateway.ini.
-    
+
     Will raise GatewayConfError if some error ocurred.
-    
+
     @rtype: ConfigParser
     @return: Instance of ConfigParser.
-    
+
     """
-    
+
     try:
         config = ConfigParser.ConfigParser()
         with open('/etc/delta/Gateway.ini', 'rb') as fh:
             config.readfp(fh)
-    
+
         if not config.has_section("mountpoint"):
             raise GatewayConfError("Failed to find section [mountpoint] in the config file")
-    
+
         if not config.has_option("mountpoint", "dir"):
             raise GatewayConfError("Failed to find option 'dir'  in section [mountpoint] in the config file")
-    
+
         if not config.has_section("network"):
             raise GatewayConfError("Failed to find section [network] in the config file")
-    
+
         if not config.has_option("network", "iface"):
             raise GatewayConfError("Failed to find option 'iface' in section [network] in the config file")
-    
+
         if not config.has_section("s3ql"):
             raise GatewayConfError("Failed to find section [s3q] in the config file")
-    
+
         if not config.has_option("s3ql", "mountOpt"):
             raise GatewayConfError("Failed to find option 'mountOpt' in section [s3q] in the config file")
-    
+
         if not config.has_option("s3ql", "compress"):
             raise GatewayConfError("Failed to find option 'compress' in section [s3q] in the config file")
-    
+
         return config
     except IOError:
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
-    
+
+
 def getStorageUrl():
     """
     Get storage URL from /root/.s3ql/authinfo2.
-    
+
     @rtype: string
     @return: Storage URL or None if failed.
-    
+
     """
-    
+
     log.info("getStorageUrl start")
     storage_url = None
 
@@ -180,21 +189,22 @@ def getStorageUrl():
     finally:
         log.info("getStorageUrl end")
     return storage_url
-    
+
+
 def get_compression():
     """
     Get status of compression switch.
-    
+
     @rtype: JSON object
     @return: Compress switch.
-    
+
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object.
             - switch: True if compression is ON. Otherwise, false.
-    
+
     """
-    
+
     log.info("get_compression start")
     op_ok = False
     op_msg = ''
@@ -216,21 +226,22 @@ def get_compression():
     finally:
         if not op_ok:
             log.error(op_msg)
-    
-        return_val = {'result' : op_ok,
-                  'msg'    : op_msg,
-                  'data'   : {'switch': op_switch}}
-    
+
+        return_val = {'result': op_ok,
+                      'msg': op_msg,
+                      'data': {'switch': op_switch}}
+
         log.info("get_compression end")
     return json.dumps(return_val)
+
 
 def _check_snapshot_in_progress():
     """
     Check if the tag /root/.s3ql/.snapshotting exists.
-    
+
     @rtype: boolean
     @return: True if snapshotting is in progress. Otherwise false.
-    
+
     """
 
     try:
@@ -239,18 +250,19 @@ def _check_snapshot_in_progress():
         return False
     except:
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
+
     
 def get_indicators():
     """
     Get gateway services' indicators by calling internal functions.
     This function may return up to several seconds.
     Use it carefully in environment which needs fast response time.
-    
+
     This function may be called by gateway background task.
-    
+
     @rtype: dictionary
     @return: Gateway services' indicators.
-    
+
         - result: Function call result.
         - msg: Explanation of result.
         - data: dictionary
@@ -418,7 +430,7 @@ def get_gateway_indicators():
 
 
 # Code written by Jiahong Wu (traceroute)
-def _traceroute_backend(backend_IP = None):
+def _traceroute_backend(backend_IP=None):
     """
     Return a traceroute message from gateway to backend
 
@@ -496,7 +508,26 @@ def _check_network():
     
         if po.returncode == 0:
             if output.find("icmp_req" and "ttl" and "time") != -1:
-                op_network_ok = True
+                # Jiahong: Add check to see if swift is working
+                op_user = op_config.get(section, 'backend-login')
+                op_pass = op_config.get(section, 'backend-password')
+                cmd = "sudo swift -A https://%s:8080/auth/v1.0 -U %s -K %s stat" % (op_storage_url, op_user, op_pass)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                countdown = 30
+                while countdown > 0:
+                    po.poll()
+                    if po.returncode != 0:
+                        countdown = countdown - 1
+                        if countdown <= 0:
+                            po.kill()
+                            break
+                        else:
+                            time.sleep(1)
+                    else:
+                        if output.find("Bytes:") != -1:
+                            op_network_ok = True
+                        break
         else:
             log.info(output)
 
@@ -962,7 +993,6 @@ def apply_user_enc_key(old_key=None, new_key=None):
             op_msg = "Section CloudStorageGateway is not found."
             raise Exception(op_msg)
     
-        
         #TODO: deal with the case where the key stored in /root/.s3ql/authoinfo2 is Wrong
         key = op_config.get(section, 'bucket-passphrase')
         if key != old_key:
@@ -1050,7 +1080,6 @@ def _createS3qlConf(storage_url):
         if ret != 0:
             log.error("Failed to create s3ql config for %s" % output)
 
-
     except Exception as e:
         log.error("Failed to create s3ql config for %s" % str(e))
     finally:
@@ -1095,6 +1124,7 @@ def _openContainter(storage_url, account, password):
     finally:
         log.info("_openContainer end")
 
+
 @common.timeout(180)
 def _mkfs(storage_url, key):
     """
@@ -1133,7 +1163,6 @@ def _mkfs(storage_url, key):
                 else:
                     log.info("fsck completed")
 
- 
     finally:
         log.info("_mkfs end")
 
@@ -1201,7 +1230,6 @@ def _umount():
             log.info("[2] Gateway umounted")
 
 
-
 @common.timeout(360)
 def _mount(storage_url):
     """
@@ -1224,18 +1252,17 @@ def _mount(storage_url):
         mountOpt = config.get("s3ql", "mountOpt")
         compressOpt = "lzma" if config.get("s3ql", "compress") == "true" else "none"    
         mountOpt = mountOpt + " --compress %s" % compressOpt
-    
-    
+
         authfile = "/root/.s3ql/authinfo2"
-    
+
         os.system("sudo mkdir -p %s" % mountpoint)
-        
+
         if os.path.ismount(mountpoint):
             raise BuildGWError("A filesystem is mounted on %s" % mountpoint)
-    
+
         if _createS3qlConf(storage_url) != 0:
             raise BuildGWError("Failed to create s3ql conf")
-    
+
         #mount s3ql
         cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/gateway/delta %s" % (mountOpt, authfile, storage_url, mountpoint)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1261,7 +1288,6 @@ def _mount(storage_url):
         po.wait()
         if po.returncode != 0:
             raise BuildGWError(output)
-
 
         #mkdir in the mountpoint for nfs share
         cmd = "sudo mkdir -p %s/nfsshare" % mountpoint
@@ -2133,7 +2159,7 @@ def get_scheduling_rules():        # by Yen
     }
     return json.dumps(return_val)
 
-def get_smb_user_list ():
+def get_smb_user_list():
     """
     Get Samba user by reading /etc/samba/smb.conf.
     
@@ -2174,7 +2200,7 @@ def get_smb_user_list ():
         
         log.error(op_msg)
             
-        username.append(default_user_id) # default
+        username.append(default_user_id)  # default
         
         #print "file is not readable"
     
@@ -2208,7 +2234,7 @@ def _chSmbPasswd(username, password):
                             stderr=subprocess.STDOUT)
             
     results = proc.stdout.read()
-    ret_val = proc.wait() # 0 : success
+    ret_val = proc.wait()  # 0 : success
 
     log.info("change smb val: %d, message %s" % (ret_val, results))
     if ret_val != 0:
@@ -2301,7 +2327,7 @@ def set_smb_user_list(username, password):
 
     return json.dumps(return_val)
 
-def get_nfs_access_ip_list ():
+def get_nfs_access_ip_list():
     """
     Get IP addresses allowed to access NFS.
     
@@ -2350,7 +2376,7 @@ def get_nfs_access_ip_list ():
                 # key = services allowed, val = ip lists
                 #services = str(arr[0]).strip()
                 iplist = arr[1]
-                ips = iplist.strip().split(", ") #
+                ips = iplist.strip().split(", ")
             
                 #print services
                 #print ips
@@ -2435,7 +2461,7 @@ def set_compression(switch):
         log.info("set_compression end")
         return json.dumps(return_val)
 
-def set_nfs_access_ip_list (array_of_ip):
+def set_nfs_access_ip_list(array_of_ip):
     """
     Update new IP addresses allowed to access NFS.
     
@@ -2458,7 +2484,6 @@ def set_nfs_access_ip_list (array_of_ip):
                   'result' : False,
                   'msg' : 'get NFS access ip list failed unexpectedly.',
                   'data' : {} }
-
 
     log.info("set_nfs_access_ip_list starts")
 
@@ -2484,8 +2509,7 @@ def set_nfs_access_ip_list (array_of_ip):
                 services = str(arr[0]).strip()
                 #iplist = arr[1]
                 #ips = iplist.strip().split(", ") #
-            
-            
+
     except :
         log.info("cannot parse " + str(nfs_hosts_allow_file))
           
@@ -2505,9 +2529,8 @@ def set_nfs_access_ip_list (array_of_ip):
         return_val['msg'] = "Update ip list successfully"
     except:
         log.info("cannot write to " + str(nfs_hosts_allow_file))
-          
-        return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
+        return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
     try:
         #Resetting nfs service
@@ -2523,8 +2546,7 @@ def set_nfs_access_ip_list (array_of_ip):
     log.info("set_nfs_access_ip_list end")
     
     return json.dumps(return_val)
-    
-    
+
 
 # example schedule: [ [1,0,24,512],[2,0,24,1024], ... ]
 def apply_scheduling_rules(schedule):        # by Yen
@@ -2676,7 +2698,7 @@ def month_number(monthabbr):
     index = MONTHS.index(monthabbr)
     return index
 
-def classify_logs (logs, keyword_filter=KEYWORD_FILTER):
+def classify_logs(logs, keyword_filter=KEYWORD_FILTER):
     """
     Give a log message and a keyword filter {key=category, val = [keyword]}.
     Find out which category the log belongs to. 
@@ -2704,7 +2726,7 @@ def classify_logs (logs, keyword_filter=KEYWORD_FILTER):
 
     return None
 
-def parse_log (type, log_cnt):
+def parse_log(type, log_cnt):
     """
     Parse a log line to log_entry data structure.
     Different types require different parser.
@@ -2776,12 +2798,12 @@ def parse_log (type, log_cnt):
     msg = m.group('message')
     #print msg
 
-    if msg == None: # skip empty log
+    if msg == None:  # skip empty log
         return None
     #now = datetime.datetime.utcnow()
 
     try:
-        timestamp = datetime(year, month, day, hour, minute, second) # timestamp
+        timestamp = datetime(year, month, day, hour, minute, second)  # timestamp
     except Exception:
         #print "datatime error"
         #print Exception
@@ -2794,11 +2816,11 @@ def parse_log (type, log_cnt):
     #print msg
     
     category = classify_logs(msg, KEYWORD_FILTER)
-    if category == None: # skip invalid log
+    if category == None:  # skip invalid log
         return None
     
     log_entry["category"] = category
-    log_entry["timestamp"] = str(timestamp) #str(timestamp.now()) # don't include ms
+    log_entry["timestamp"] = str(timestamp)  # str(timestamp.now()) # don't include ms
     log_entry["msg"] = msg[LOG_LEVEL_PREFIX_LEN:]
     return log_entry
 
@@ -2844,14 +2866,14 @@ def read_logs(logfiles_dict, offset, num_lines):
             # parse the log file line by line
             nums = NUM_LOG_LINES
             if num_lines == None:
-                nums = len(log_buf) - offset # all
+                nums = len(log_buf) - offset  # all
             else:
                 nums = num_lines
 
-            for alog in log_buf[ offset : offset + nums]:
+            for alog in log_buf[offset : offset + nums]:
                 #print log
                 log_entry = parse_log(type, alog)
-                if not log_entry == None: #ignore invalid log line 
+                if not log_entry == None:  # ignore invalid log line 
                     ret_log_cnt[type].append(log_entry)
 
         except :
@@ -2941,7 +2963,7 @@ def storage_cache_usage():
         #print ret_val
         real_cloud_data = 0
 
-        if po.returncode == 0: # success
+        if po.returncode == 0:  # success
             '''
             very boring string parsing process.
             the format should be fixed. otherwise, won't work (no error checking)  
@@ -2953,7 +2975,7 @@ def storage_cache_usage():
                     val = tokens[1].replace("MB", "").strip()
                     #print int(float(val)/1024.0)
                     real_cloud_data = float(val)
-                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0) # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0)  # MB -> GB 
                     #print val
 
                 if line.startswith("After de-duplication:"):
@@ -2961,7 +2983,7 @@ def storage_cache_usage():
                     #print tokens[1]
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024 # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024  # MB -> GB 
                     #print val
 
                 if line.startswith("After compression:"):
@@ -2969,7 +2991,7 @@ def storage_cache_usage():
                     #print tokens[1]
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024 # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024  # MB -> GB 
                     #print val
 
                 if line.startswith("Cache size: current:"):
@@ -2980,12 +3002,12 @@ def storage_cache_usage():
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
-                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
                     #print crt_val
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
-                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024 # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024  # MB -> GB 
                     #print max_val
 
                 if line.startswith("Cache entries: current:"):
@@ -3013,7 +3035,7 @@ def storage_cache_usage():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     real_cloud_data = real_cloud_data - float(crt_val)
-                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024 # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
                     #print crt_val
 
                     max_tokens = str(max_size).strip().split(" ")
@@ -3062,7 +3084,7 @@ def calculate_net_speed(iface_name):
     next_status = get_network_status(iface_name)
 
     try:
-        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024 # KB 
+        ret_val["downlink_usage"] = int(int(next_status["recv_bytes"]) - int(pre_status["recv_bytes"])) / 1024  # KB 
         ret_val["uplink_usage"] = int(int(next_status["trans_bytes"]) - int(pre_status["trans_bytes"])) / 1024
     except:
         ret_val["downlink_usage"] = 0 
@@ -3070,7 +3092,7 @@ def calculate_net_speed(iface_name):
     
     return ret_val
 
-def get_network_speed(iface_name): # iface_name = eth1
+def get_network_speed(iface_name):  # iface_name = eth1
     """
     Get network speed by reading file or call functions.
     The later case will consume at least one second to return.
@@ -3120,7 +3142,7 @@ def get_network_speed(iface_name): # iface_name = eth1
     return ret_val
 
 ##############################
-def get_network_status(iface_name): # iface_name = eth1
+def get_network_status(iface_name):  # iface_name = eth1
     """
     Get network usage.
     So far, cannot get current uplink, downlink numbers,
@@ -3141,14 +3163,15 @@ def get_network_status(iface_name): # iface_name = eth1
 
     columnLine = lines[1]
     _, receiveCols , transmitCols = columnLine.split("|")
-    receiveCols = map(lambda a:"recv_" + a, receiveCols.split())
-    transmitCols = map(lambda a:"trans_" + a, transmitCols.split())
+    receiveCols = map(lambda a: "recv_" + a, receiveCols.split())
+    transmitCols = map(lambda a: "trans_" + a, transmitCols.split())
 
     cols = receiveCols + transmitCols
 
     faces = {}
     for line in lines[2:]:
-        if line.find(":") < 0: continue
+        if line.find(":") < 0:
+            continue
         face, data = line.split(":")
         faceData = dict(zip(cols, data.split()))
         face = face.strip()
@@ -3157,7 +3180,7 @@ def get_network_status(iface_name): # iface_name = eth1
     try:
         ret_network = faces[iface_name]
     except:
-        ret_network = faces # return all
+        ret_network = faces  # return all
         pass
 
     return ret_network
@@ -3220,7 +3243,7 @@ def get_gateway_status():
     return json.dumps(ret_val)
 
 ################################################################################
-def get_gateway_system_log (log_level, number_of_msg, category_mask):
+def get_gateway_system_log(log_level, number_of_msg, category_mask):
     """
     Get sytem logs in gateway.
     
@@ -3248,12 +3271,12 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
     
     """
 
-    ret_val = { "result" : True,
-                "msg" : "gateway system logs",
-                "data" : { "error_log" : [],
-                           "warning_log" : [],
-                           "info_log" : []
-                         }
+    ret_val = {"result" : True,
+               "msg": "gateway system logs",
+               "data": {"error_log": [],
+                         "warning_log": [],
+                         "info_log": []
+                       }
                }
     # wthung, 2012/7/19
     # to suppress warning from pychecker of not using var
@@ -3261,15 +3284,15 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
         pass
     
     try:
-        logs = read_logs(LOGFILES, 0 , None) #query all logs
+        logs = read_logs(LOGFILES, 0 , None)  # query all logs
     
         for level in SHOW_LOG_LEVEL[log_level]:
-            for logfile in logs: # mount, syslog, ...
+            for logfile in logs:  # mount, syslog, ...
                 counter = 0  # for each info src, it has number_of_msg returned
     
-                for alog in logs[logfile]: # log entries
+                for alog in logs[logfile]:  # log entries
                     if counter >= number_of_msg:
-                        break # full, finish this src
+                        break  # full, finish this src
                     try:
                         if alog["category"] == level:
                             ret_val["data"][level].append(alog)
@@ -3277,7 +3300,7 @@ def get_gateway_system_log (log_level, number_of_msg, category_mask):
                         else:
                             pass
                     except:
-                        pass # any except, skip this line
+                        pass  # any except, skip this line
     except:
         pass
     
@@ -3291,7 +3314,6 @@ if __name__ == '__main__':
     #print apply_user_enc_key("123456", "1234567")
     
     #_createS3qlConf("172.16.228.53:8080")
-    _check_network()
 #    print get_smb_user_list()
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
