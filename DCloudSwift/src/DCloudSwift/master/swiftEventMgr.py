@@ -6,6 +6,7 @@ import random
 import pickle
 import signal
 import json
+import sqlite3
 from ConfigParser import ConfigParser
 from twisted.web.server import Site
 from twisted.web.resource import Resource
@@ -251,7 +252,7 @@ class SwiftEventMgr(Daemon):
         #Add your code here
         if event["event"].lower() == "hdd":
             SwiftEventMgr.handleHDD(event)
-        else if event["event"].lower() == "heartbeat":
+        elif event["event"].lower() == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
             
         time.sleep(10)
@@ -285,6 +286,131 @@ class SwiftEventMgr(Daemon):
             logger(str(e))
 
 
+def getSection(inputFile, section):
+    ret = []
+    with open(inputFile) as fh:
+        lines = fh.readlines()
+        start = 0
+        for i in range(len(lines)):
+            line = lines[i].strip()
+            if line.startswith('[') and section in line:
+                start = i + 1
+                break
+        end = len(lines)
+        for i in range(start, len(lines)):
+            line = lines[i].strip()
+            if line.startswith('['):
+                end = i
+                break
+
+        for line in lines[start:end]:
+            line = line.strip()
+            if len(line) > 0:
+                ret.append(line)
+
+        return ret
+
+
+def parseNodeListSection(inputFile):
+    lines = getSection(inputFile, "nodeList")
+    try:
+        nodeList = []
+        nameSet = set()
+        for line in lines:
+            line = line.strip()
+            if len(line) > 0:
+                tokens = line.split()
+                if len(tokens) != 1:
+                    raise Exception("[nodeList] contains an invalid line %s" % line)
+
+                name = tokens[0]
+                if name in nameSet:
+                    raise Exception("[nodeList] contains duplicate names")
+
+                nodeList.append({"hostname": name})
+                nameSet.add(name)
+
+        return nodeList
+    except IOError as e:
+        msg = "Failed to access input files for %s" % str(e)
+        raise Exception(msg)
+
+
+def initializeNodeInfo():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_initialize_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    inputFile = "/etc/delta/inputFile"
+    nodeList = parseNodeListSection(inputFile)
+
+    try:
+        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+        nodeInfoDb.initialize()
+    except sqlite3.OperationalError as e:
+        print >> sys.stderr, "Node info already exists!!"
+        sys.exit(1)
+
+    for node in nodeList:
+        hostname = node["hostname"]
+        status = "alive"
+        timestamp = int(time.time())
+
+        disk_info = {
+                        "timestamp": timestamp,
+                        "missing": {"count": 0, "timestamp": timestamp},
+                        "broken": [],
+                        "healthy": [],
+        }
+        disk = json.dumps(disk_info)
+
+        mode = "service"
+        switchpoint = timestamp  
+
+        nodeInfoDb.add_node(hostname=hostname, 
+                            status=status, 
+                            timestamp=timestamp, 
+                            disk=disk, 
+                            mode=mode, 
+                            switchpoint=switchpoint)
+
+def clearNodeInfo():
+    '''
+    Command line implementation of node info clear
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    if os.path.exists(GlobalVar.NODE_DB):
+        os.system("rm %s" % GlobalVar.NODE_DB)
+        ret = 0
+
+    return ret
+
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
@@ -297,9 +423,8 @@ if __name__ == "__main__":
         else:
             sys.exit(2)
     else:
-        fakedb = "/etc/test.db"
-        os.system("rm /etc/test.db")
-        print SwiftEventMgr.updateDiskInfo({}, fakedb)
+        clearNodeInfo()
+        initializeNodeInfo()    
 
         print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
