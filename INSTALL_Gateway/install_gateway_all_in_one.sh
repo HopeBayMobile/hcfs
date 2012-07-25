@@ -27,7 +27,7 @@ cp -rs /usr/bin/*s3ql* /usr/local/bin/
 
 # vvvvv-- install GUI API -----------------------------------------------------------------------------
 cd ../DCloudGateway
-python setup.py install
+./gateway_api_install_script
 # install kernel and fuse patches
 dpkg -i kernel_fuse_patches/linux-image-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb
 dpkg -i kernel_fuse_patches/linux-headers-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb
