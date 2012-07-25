@@ -18,7 +18,8 @@ from util.util import GlobalVar
 from util.SwiftCfg import SwiftMasterCfg
 from util import util
 
-from common import *
+from common.events import HDD
+from common.events import HEARTBEAT
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
@@ -46,17 +47,17 @@ class SwiftMaintainSwitcher(Daemon):
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if replicationTime is None:
             self.replicationTime = self.masterCfg \
-                .getKwparams()['maintainCheckerReplTime']
+                .getKwparams()['maintainReplTime']
         else:
             self.replicationTime = replicationTime
         if refreshTime is None:
             self.refreshTime = self.masterCfg \
-                .getKwparams()['maintainCheckerRefreshTime']
+                .getKwparams()['maintainRefreshTime']
         else:
             self.refreshTime = refreshTime
         if daemonSleep is None:
             self.daemonSleep = self.masterCfg \
-                .getKwparams()['maintainCheckerDaemonSleep']
+                .getKwparams()['maintainDaemonSleep']
         else:
             self.daemonSleep = daemonSleep
         self.db = NodeInfoDatabaseBroker()

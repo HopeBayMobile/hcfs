@@ -13,21 +13,13 @@ fi
 # the changes may not take effect. We will have to somehow verify this at some point for 11.04 and 12.04.
 
 # install dependent packages via apt-get
-apt-get install -y --force-yes python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma 
-apt-get install -y --force-yes libfuse-dev libattr1-dev python-all-dev python-sphinx build-essential 
-apt-get install -y --force-yes python-profiler python-argparse fuse-utils 
-apt-get install -y --force-yes python-pip python-setuptools python-profiler
-apt-get install -y --force-yes python-software-properties curl portmap nfs-kernel-server samba
-add-apt-repository -y ppa:swift-core/release
-apt-get update
-apt-get install -y --force-yes swift apt-show-versions squid3
+apt-get install -y --force-yes squid3
 
 # vvvvv-- install S3QL and its dependent packages ---------------------------------------------------
 dpkg -i ../DCloudS3ql/debsrc/python-llfuse_0.37.1-2_amd64.deb 
 dpkg -i ../DCloudS3ql/debsrc/cython_0.15.1-2_amd64.deb 
 dpkg -i ../DCloudS3ql/debsrc/smartmontools_5.39.1+svn3124-2_amd64.deb
 dpkg -i ../DCloudS3ql/debsrc/s3ql_1.12.0~natty1_amd64.deb
-dpkg -i ../DCloudGateway/sudo_1.8.5-2_amd64.deb
 
 # create soft link for s3ql program
 cp -rs /usr/bin/*s3ql* /usr/local/bin/
@@ -35,7 +27,7 @@ cp -rs /usr/bin/*s3ql* /usr/local/bin/
 
 # vvvvv-- install GUI API -----------------------------------------------------------------------------
 cd ../DCloudGateway
-python setup.py install
+./gateway_api_install_script
 # install kernel and fuse patches
 dpkg -i kernel_fuse_patches/linux-image-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb
 dpkg -i kernel_fuse_patches/linux-headers-2.6.38.8-gateway_2.6.38.8-gateway-10.00.Custom_amd64.deb

@@ -68,7 +68,9 @@ def main():
                     'console_scripts': [
                     'dcloud_swift_deploy = DCloudSwift.master.SwiftDeploy:deploy',
                     'dcloud_swift_addNodes = DCloudSwift.master.SwiftDeploy:addNodes',
-                    'dcloud_swift_deleteNodes = DCloudSwift.master.SwiftDeploy:deleteNodes'
+                    'dcloud_swift_deleteNodes = DCloudSwift.master.SwiftDeploy:deleteNodes',
+                    'dcloud_initialize_node_info = DCloudSwift.master.swiftEventMgr:initializeNodeInfo',
+                    'dcloud_clear_node_info = DCloudSwift.master.swiftEventMgr:clearNodeInfo',
                     ]
         },
 
