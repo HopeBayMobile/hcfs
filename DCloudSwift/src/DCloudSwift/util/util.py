@@ -34,6 +34,7 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          MASTERCONF='%s/swift_master.ini' % DELTADIR,
          ACCOUNT_DB='%s/swift_account.db' % DELTADIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
+         MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
          OBJBUILDER='object.builder')
 
 
