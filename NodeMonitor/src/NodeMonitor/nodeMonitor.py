@@ -46,6 +46,7 @@ Heartbeat Publish Format
             hostname:<hostname>,
             role:<enum:MH,MA,MD,MMS>,
             status:<enum:alive,unknown,dead>
+            time: <integer>
         },...
     ]
 }
@@ -156,6 +157,7 @@ class Heartbeat:
                                "hostname": socket.gethostname(),
                                "role": "MH",
                                "status": "alive",
+                               "time": int(time.time())
                              },
                          ]
             }
