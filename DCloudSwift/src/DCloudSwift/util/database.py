@@ -336,7 +336,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @return: Return the result.            
         """
         with self.get() as conn:
-            ret = conn.execute("SELECT * FROM node_info WHERE %s", (conditions,))
+            ret = conn.execute("SELECT * FROM node_info WHERE %s" % conditions)
             return ret
         
     def get_info(self, hostname):
@@ -520,7 +520,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
         @return: Return the result.            
         """
         with self.get() as conn:
-            ret = conn.execute("SELECT * FROM maintenance_backlog WHERE %s", (conditions,))
+            ret = conn.execute("SELECT * FROM maintenance_backlog WHERE %s" % conditions)
             return ret
 
     def get_info(self, hostname):
@@ -541,9 +541,10 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 return row
 
 if __name__ == '__main__':
-    #os.system("rm /etc/test/test.db")
-    #db = NodeInfoDatabaseBroker("/etc/test/test.db")
-    #db.initialize()
-    #db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+    os.system("rm /etc/test/test.db")
+    db = NodeInfoDatabaseBroker("/etc/test/test.db")
+    db.initialize()
+    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+    print db.query_node_info_table("mode=\"service\"").fetchall()
     #print db.add_node(hostname="system", ipaddress=None)
     pass
