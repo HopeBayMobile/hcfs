@@ -51,7 +51,6 @@ class SwiftEventMgr(Daemon):
             logger.error("Failed to read deviceCnt from %s" %  GlobalVar.ORI_SWIFTCONF)
             return None
 
-
     '''
     HDD event format
     {
@@ -73,7 +72,6 @@ class SwiftEventMgr(Daemon):
         time: <integer>
     }
     '''
-
     @staticmethod
     def isValidDiskEvent(event):
         logger = util.getLogger(name="SwiftEventMgr.isValidDiskEvent")
@@ -100,7 +98,7 @@ class SwiftEventMgr(Daemon):
     @staticmethod
     def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         '''
-        update disk info according to the event
+        update disk info according to the disk event
 
         @type  event: dictioary
         @param event: disk event
@@ -176,7 +174,69 @@ class SwiftEventMgr(Daemon):
     @staticmethod
     def handleHDD(event):
         logger = util.getLogger(name="swifteventmgr.handleHDD")
-        new_disk_info = SwiftEventMgr.extractDiskInfo(event)
+        new_disk_info = SwiftEventMgr.updateDiskInfo(event)
+
+    #'''
+    #Heartbeat format
+    #{
+    #    event: "heartbeat",
+    #    nodes:
+    #    [
+    #        {
+    #            hostname:<hostname>,
+    #            role:<enum:MH,MA,MD,MMS>,
+    #            status:<enum:alive,unknown,dead>
+    #            time:<integer>
+    #        },...
+    #    ]
+    #}
+    #'''
+    #@staticmethod
+    #def isValidHeartbeat(event):
+    #    logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
+    #    try:
+    #        for node in event["nodes"]:
+    #            hostname = node["hostname"]
+    #            role = node["MH"]
+    #            status = node["status"]
+    #            time = node["time"]
+    #            if not isinstance(hostname, str):
+    #                logger.error("Wrong type of hostname!")
+    #                return False
+    #            if not isinstance(role, str):
+    #                logger.error("Wrong type of role!")
+    #                return False
+    #            if not isinstance(status, str):
+    #                logger.error("Wrong type of status!")
+    #                return False
+    #            if not isinstance(time, str):
+    #                logger.error("Wrong type of time!")
+    #                return False
+    #    except Exception as e:
+    #        logger.error(str(e))
+    #        return False
+
+    #    return True
+
+    #@staticmethod
+    #def updateNodeStatus(event, node, nodeInfoDbPath=GlobalVar.NODE_DB):
+    #    logger = util.getLogger(name="SwiftEventMgr.updateNodeStatus")
+    #    try:
+    #            hostname = node["hostname"]
+    #            status = node["status"]
+    #            time = node["time"]
+    #            nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+    #            row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
+    #            return row
+
+    #    except Exception as e:
+    #        logger.error(str(e))
+    #        return None
+
+    #@staticmethod
+    #def handleHeartbeat(event):
+    #    logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
+    #    new_disk_info = SwiftEventMgr.updateNodeStatus(event)
 
     @staticmethod
     def handleEvents(notification):
@@ -189,6 +249,11 @@ class SwiftEventMgr(Daemon):
             logger.error("Notification %s is not a legal json string" % notification)
 
         #Add your code here
+        if event["event"].lower() == "hdd":
+            SwiftEventMgr.handleHDD(event)
+        else if event["event"].lower() == "heartbeat":
+            SwiftEventMgr.handleHeartbeat(event)
+            
         time.sleep(10)
 
     class EventsPage(Resource):
