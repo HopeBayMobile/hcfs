@@ -58,7 +58,7 @@ class SwiftAccountMgr:
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
 
-        self.__admin_name_suffix = "_admin"
+        self.__admin_default_name = "admin"
         self.__admin_default_password = "admin"
         self.__user_default_password = "user"
         self.__metadata_container_suffix = "_metadata_container"
@@ -83,13 +83,14 @@ class SwiftAccountMgr:
         @param fn: private function to call
         @param kwargs: keyword arguments to fn
         @rtype:  tuple
-        @return: a tuple (val, msg). If fn is executed successfully,
-            then val == True and msg records the standard output. Otherwise,
-            val == False and msg records the error message.
+        @return: a tuple (val, msg). If fn is executed successfully, then val == True and msg records
+            the standard output. Otherwise, val == False and msg records the error message.
         '''
+
         #TODO: need to modify proxy_ip_list due to the security issues
         val = False
         msg = ""
+
         for t in range(retry):
             ip = random.choice(proxy_ip_list)
 
@@ -373,7 +374,7 @@ class SwiftAccountMgr:
 
         #TODO: need to check the characters of the name of admin_user
         if admin_user == "":
-            admin_user = account + self.__admin_name_suffix
+            admin_user = self.__admin_default_name
 
         #TODO: need to check the characters of the password
         if admin_password == "":
@@ -1901,11 +1902,10 @@ class SwiftAccountMgr:
         @type  admin_password: string
         @param admin_password: the password of the admin user
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the operation is successfully
-            done, then val == True and msg records the container
-            information. Otherwise, val == False and msg records
-            the error message.
+        @return: a tuple Bool(val, msg). If the operation is successfully done, then val == True and msg records
+            the container information. Otherwise, val == False and msg records the error message.
         '''
+
         logger = util.getLogger(name="__get_container_info")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
@@ -2453,7 +2453,6 @@ class SwiftAccountMgr:
             logger.error(msg)
             return Bool(val, msg)
 
-        #ori_read_acl = msg["Read"]
         ori_write_acl = msg["Write"]
 
         new_write_acl = ""
@@ -2483,7 +2482,7 @@ class SwiftAccountMgr:
         logger = util.getLogger(name="__create_container")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Fail to create container %s" % container
+        msg = "Fail to create the container %s: " % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
@@ -2491,13 +2490,14 @@ class SwiftAccountMgr:
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        if po.returncode != 0:
-            msg = stderrData
-            logger.error(msg)
+        if po.returncode != 0 or stderrData != "":
             val = False
+            msg = msg + stderrData
+            logger.error(msg)
         else:
-            msg = stdoutData
             val = True
+            msg = stdoutData
+            logger.info(msg)
 
         return Bool(val, msg)
 
@@ -2514,17 +2514,13 @@ class SwiftAccountMgr:
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If the creation is successfully
-            done, then val == True and msg == "". Otherwise, val ==
-            False and msg records the error message.
+        @return: a named tuple Bool(val, msg). If the creation is successfully done, then val == True and msg == "".
+            Otherwise, val == False and msg records the error message.
         '''
-
         logger = util.getLogger(name="create_container")
 
-        #TODO: Check whether the container exists
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         admin_password = ""
-
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2536,6 +2532,18 @@ class SwiftAccountMgr:
         if retry < 1:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
+
+        list_container_output = self.list_container(account, admin_user)
+
+        if list_container_output.val == False:
+            val = False
+            msg = list_container_output.msg
+            return Bool(val, msg)
+        else:
+            if container in msg:
+                val = False
+                msg = "Container %s has existed!" % container
+                return Bool(val, msg)
 
         get_user_password_output = self.get_user_password(account, admin_user)
 
@@ -2551,7 +2559,94 @@ class SwiftAccountMgr:
                                            container=container, admin_user=admin_user, admin_password=admin_password)
 
         if val == False:
-            msg = "Failed to create the container: " + msg
+            msg = "Failed to create the container %s: %s" % (container, msg)
+            logger.error(msg)
+
+        return Bool(val, msg)
+
+    @util.timeout(300)
+    def __delete_container(self, proxyIp, account, container, admin_user, admin_password):
+        logger = util.getLogger(name="__delete_container")
+
+        url = "https://%s:8080/auth/v1.0" % proxyIp
+        msg = "Fail to delete the container %s: " % container
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        cmd = "swift -A %s -U %s:%s -K %s delete %s" % (url, account, admin_user, admin_password, container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0 or stderrData != "":
+            val = False
+            msg = msg + stderrData
+            logger.error(msg)
+        else:
+            val = True
+            msg = stdoutData
+            logger.info(msg)
+
+        return Bool(val, msg)
+
+    def delete_container(self, account, container, admin_user, retry=3):
+        '''
+        Delete a container in the account by admin_user.
+
+        @type  account: string
+        @param account: the account to delete a container
+        @type  container: string
+        @param container: the container to be deleted
+        @type  admin_user: string
+        @param admin_user: the admin user of the account
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the deletion is successfully done, then val == True
+            and msg == "". Otherwise, val == False and msg records the error message.
+        '''
+        logger = util.getLogger(name="delete_container")
+
+        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        admin_password = ""
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found"
+            return Bool(val, msg)
+
+        if retry < 1:
+            msg = "Argument retry has to >= 1"
+            return Bool(val, msg)
+
+        list_container_output = self.list_container(account, admin_user)
+
+        if list_container_output.val == False:
+            val = False
+            msg = list_container_output.msg
+            return Bool(val, msg)
+        else:
+            if container not in msg:
+                val = False
+                msg = "Container %s does not exist!" % container
+                return Bool(val, msg)
+
+        get_user_password_output = self.get_user_password(account, admin_user)
+
+        if get_user_password_output.val == True:
+            admin_password = get_user_password_output.msg
+        else:
+            val = False
+            msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
+            logger.error(msg)
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_container, account=account,\
+                                           container=container, admin_user=admin_user, admin_password=admin_password)
+
+        if val == False:
+            msg = "Failed to delete the container %s: %s" % (container, msg)
             logger.error(msg)
 
         return Bool(val, msg)
@@ -2559,13 +2654,15 @@ class SwiftAccountMgr:
     @util.timeout(300)
     def __set_container_metadata(self, proxyIp, account, container, admin_user, admin_password, metadata_content):
         '''
-        Set self-defined metadata of the given container.
-        The self-defined metadata are associatied with a user and include::
+        Set the metadata of the given container.
+        The metadata are associatied with a user and include::
             (1) Account-Enable: True/False
             (2) User-Enable: True/False
             (3) Password: the original password for the user
             (4) Quota: quota of the user (Number of bytes, int)
             (5) Description: the description about the owner of the container
+            (6) Read: read ACL list
+            (7) Write: write ACL list
 
         The following is the details of metadata_content::
             metadata_content = {
@@ -2589,18 +2686,15 @@ class SwiftAccountMgr:
         @type  admin_password: string
         @param admin_password: the password of admin_user
         @type  metadata_content: dictionary
-        @param metadata_content: the content to be set to metadata
-            of the container
+        @param metadata_content: the content to be set to metadata of the container
         @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If the metadata are successfully
-            set, then val == True and msg == "". Otherwise, val ==
-            False and msg records the error message.
+        @return: a named tuple Bool(val, msg). If the metadata are successfully set, then val == True and msg == "".
+            Otherwise, val == False and msg records the error message.
         '''
-
         logger = util.getLogger(name="__set_container_metadata")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to set the metadata of container %s:" % container
+        msg = "Failed to set the metadata of the container %s: " % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
@@ -2619,27 +2713,28 @@ class SwiftAccountMgr:
         (stdoutData, stderrData) = po.communicate()
 
         if po.returncode != 0 or stderrData != "":
-            msg = msg + " " + stderrData
-            logger.error(msg)
             val = False
-            return Bool(val, msg)
+            msg = msg + stderrData
+            logger.error(msg)
         else:
+            val = True
             msg = stdoutData
             logger.info(msg)
-            val = True
 
         return Bool(val, msg)
 
     @util.timeout(300)
     def __get_container_metadata(self, proxyIp, account, container, admin_user, admin_password):
         '''
-        Get self-defined metadata of the given container as a dictionary.
-        The self-defined metadata are associatied with a user and include::
+        Get the metadata of the given container as a dictionary.
+        The metadata are associatied with a user and include::
             (1) Account-Enable: True/False
             (2) User-Enable: True/False
             (3) Password: the original password for the user
             (4) Quota: quota of the user (Number of bytes, int)
             (5) Description: the description about the owner of the container
+            (6) Read ACL: read ACL list
+            (7) Write ACL: write ACL list
 
         The following is the details of metadata::
             {
@@ -2657,21 +2752,19 @@ class SwiftAccountMgr:
         @type  account: string
         @param account: the account of the container
         @type  container: string
-        @param container: the container to set metadata
+        @param container: the container to get metadata
         @type  admin_user: string
         @param admin_user: the admin user of the account
         @type  admin_password: string
         @param admin_password: the password of admin_user
         @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If the metadata are successfully
-            got, then val == True and msg records the metadata. Otherwise,
-            val == False and msg records the error message.
+        @return: a named tuple Bool(val, msg). If the metadata are successfully got, then val == True and msg
+            records the metadata. Otherwise, val == False and msg records the error message.
         '''
-
         logger = util.getLogger(name="__get_container_metadata")
 
         url = "https://%s:8080/auth/v1.0" % proxyIp
-        msg = "Failed to get the metadata of container %s:" % container
+        msg = "Failed to get the metadata of the container %s: " % container
         val = False
         metadata_content = {}
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2680,13 +2773,13 @@ class SwiftAccountMgr:
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        if po.returncode != 0:
-            msg = msg + " " + stderrData
-            logger.error(msg)
+        if po.returncode != 0 or stderrData != "":
             val = False
+            msg = msg + stderrData
+            logger.error(msg)
             return Bool(val, msg)
-
-        lines = stdoutData.split("\n")
+        else:
+            lines = stdoutData.split("\n")
 
         for line in lines:
             if "Meta" in line:
@@ -2704,6 +2797,7 @@ class SwiftAccountMgr:
         if len(metadata_content) != 7:
             val == False
             msg = "Some metadata cannot be accessed: " + stderrData
+            logger.error(msg)
         else:
             val == True
             msg = metadata_content

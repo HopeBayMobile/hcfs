@@ -448,7 +448,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 disks_to_reserve TEXT,
                 disks_to_replace TEXT,
                 timestamp INTEGER NOT NULL,
-                PRIMARY KEY hostname
+                PRIMARY KEY (hostname)
             );
         """)
 
@@ -541,9 +541,9 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
 
 if __name__ == '__main__':
     os.system("rm /etc/test/test.db")
-    db = NodeInfoDatabaseBroker("/etc/test/test.db")
+    db = MaintenanceBacklogDatabaseBroker("/etc/test/test.db")
     db.initialize()
-    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
-    print db.query_node_info_table("mode=\"service\"").fetchall()
+#    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+#    print db.query_node_info_table("mode=\"service\"").fetchall()
     #print db.add_node(hostname="system", ipaddress=None)
     pass

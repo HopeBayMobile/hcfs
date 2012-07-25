@@ -177,67 +177,78 @@ class SwiftEventMgr(Daemon):
         logger = util.getLogger(name="swifteventmgr.handleHDD")
         new_disk_info = SwiftEventMgr.updateDiskInfo(event)
 
-    #'''
-    #Heartbeat format
-    #{
-    #    event: "heartbeat",
-    #    nodes:
-    #    [
-    #        {
-    #            hostname:<hostname>,
-    #            role:<enum:MH,MA,MD,MMS>,
-    #            status:<enum:alive,unknown,dead>
-    #            time:<integer>
-    #        },...
-    #    ]
-    #}
-    #'''
-    #@staticmethod
-    #def isValidHeartbeat(event):
-    #    logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
-    #    try:
-    #        for node in event["nodes"]:
-    #            hostname = node["hostname"]
-    #            role = node["MH"]
-    #            status = node["status"]
-    #            time = node["time"]
-    #            if not isinstance(hostname, str):
-    #                logger.error("Wrong type of hostname!")
-    #                return False
-    #            if not isinstance(role, str):
-    #                logger.error("Wrong type of role!")
-    #                return False
-    #            if not isinstance(status, str):
-    #                logger.error("Wrong type of status!")
-    #                return False
-    #            if not isinstance(time, str):
-    #                logger.error("Wrong type of time!")
-    #                return False
-    #    except Exception as e:
-    #        logger.error(str(e))
-    #        return False
+    '''
+    Heartbeat format
+    {
+        event: "heartbeat",
+        nodes:
+        [
+            {
+                hostname:<hostname>,
+                role:<enum:MH,MA,MD,MMS>,
+                status:<enum:alive,unknown,dead>
+                time:<integer>
+            },...
+        ]
+    }
+    '''
+    @staticmethod
+    def isValidHeartbeat(event):
+        logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
+        try:
+            for node in event["nodes"]:
+                hostname = nodes["hostname"]
+                role = nodes["role"]
+                status = nodes["status"]
+                time = nodes["time"]
+                if not isinstance(hostname, str):
+                    logger.error("Wrong type of hostname!")
+                    return False
+                if not isinstance(role, str):
+                    logger.error("Wrong type of role!")
+                    return False
+                if not isinstance(status, str):
+                    logger.error("Wrong type of status!")
+                    return False
+                if not isinstance(time, str):
+                    logger.error("Wrong type of time!")
+                    return False
+        except Exception as e:
+            logger.error(str(e))
+            return False
 
-    #    return True
+        return True
 
-    #@staticmethod
-    #def updateNodeStatus(event, node, nodeInfoDbPath=GlobalVar.NODE_DB):
-    #    logger = util.getLogger(name="SwiftEventMgr.updateNodeStatus")
-    #    try:
-    #            hostname = node["hostname"]
-    #            status = node["status"]
-    #            time = node["time"]
-    #            nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
-    #            row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
-    #            return row
+    @staticmethod
+    def updateNodeStatus(node, nodeInfoDbPath):
+        '''
+        update node status according to the heartbeat event
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updateNodeStatus")
 
-    #    except Exception as e:
-    #        logger.error(str(e))
-    #        return None
+        try:
+                hostname = node["hostname"]
+                status = node["status"]
+                time = node["time"]
+                nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+                row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
+                return row
 
-    #@staticmethod
-    #def handleHeartbeat(event):
-    #    logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
-    #    new_disk_info = SwiftEventMgr.updateNodeStatus(event)
+        except Exception as e:
+            logger.error(str(e))
+            return None
+
+    @staticmethod
+    def handleHeartbeat(event, nodeInfoDbPath=GlobalVar.NODE_DB):
+        logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
+        
+        if not SwiftEventMgr.isValidHeartbeat(event):
+            logger.error("Invalid heartbeat event")
+            return None
+        
+        nodes = json.loads(event["nodes"])
+        for node in nodes:
+            SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
 
     @staticmethod
     def handleEvents(notification):
