@@ -19,6 +19,7 @@ from util.SwiftCfg import SwiftMasterCfg
 from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
+from util.database import NodeInfoDatabaseBroker
 
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
@@ -72,15 +73,19 @@ class SwiftEventMgr(Daemon):
         time: <integer>
     }
     '''
+
     @staticmethod
     def isValidDiskEvent(event):
+        logger = util.getLogger(name="SwiftEventMgr.isValidDiskEvent")
         try:
             hostname = event["hostname"]
+            data = json.loads(event["data"])
             expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
-            healthyDisks = [disk["SN"] for disk in event["data"] if disk["healthy"] and disk["SN"]]
-            brokenDisks = [disk["SN"] for disk in event["data"] if not disk["healthy"] and disk["SN"]]
+            healthyDisks = [disk["SN"] for disk in data if disk["healthy"] and disk["SN"]]
+            brokenDisks = [disk["SN"] for disk in data if not disk["healthy"] and disk["SN"]]
             timestamp = event["time"]
         except Exception as e:
+            logger.error(str(e))
             return False
 
         if not isinstance(hostname, str) or not isinstance(timestamp, int):
@@ -90,6 +95,83 @@ class SwiftEventMgr(Daemon):
             return False
 
         return True
+
+
+    @staticmethod
+    def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
+        '''
+        update disk info according to the event
+
+        @type  event: dictioary
+        @param event: disk event
+        @rtype: dictionary
+        @return: updated disk info
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updateDiskInfo")
+        new_disk_info = {
+                            "timestamp": 0,
+                            "missing": {"count": 0, "timestamp": 0},
+                            "broken": [],
+                            "healthy": [],
+        }
+
+        nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+
+        if not SwiftEventMgr.isValidDiskEvent(event):
+            logger.error("Invalid disk event!!")
+            return None
+
+        # TODO: handle the exception of invalid old_disk_info
+        try:
+            hostname = event["hostname"]
+            data = json.loads(event["data"])
+            old_disk_info = json.loads(nodeInfoDb.get_info(hostname)["disk"])
+            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
+
+            detectedDiskSNs = {disk["SN"] for disk in data if disk["SN"]}
+            knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"]+old_disk_info["healthy"] if disk["SN"]}
+
+            if old_disk_info["timestamp"] >= event["time"]:
+                logger.warn("Old disk events are received")
+                return None
+            else:
+                new_disk_info["timestamp"] = event["time"]
+
+            # Update missing disks info
+            new_disk_info["missing"]["count"] = max(expectedDiskCount - len(detectedDiskSNs), 0)
+            if len( knownDiskSNs-detectedDiskSNs) > 0 and len(detectedDiskSNs) < expectedDiskCount:
+                new_disk_info["missing"]["timestamp"] = event["time"]
+            else:
+                new_disk_info["missing"]["timestamp"] = old_disk_info["missing"]["timestamp"]
+            
+            # Update healthy disks info
+            detectedHealthyDisks = [disk for disk in data if disk["healthy"]]
+            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"]} for disk in detectedHealthyDisks]
+
+            # Update broken disks info
+            detectedBrokenDisks = [disk for disk in data if not disk["healthy"]]
+            detectedBrokenDiskSNs = [disk["SN"] for disk in data if not disk["healthy"]]
+            knownBrokenDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] if disk["SN"]}
+
+            new_disk_info["broken"] = [{"SN": disk["SN"], "timestamp": event["time"]} for disk in detectedBrokenDisks
+                                        if not disk["SN"] in knownBrokenDiskSNs and disk["SN"]]
+
+            new_disk_info["broken"] += [{"SN": disk["SN"], "timestamp": disk["timestamp"]} for disk in old_disk_info["broken"]
+                                        if disk["SN"] in detectedBrokenDiskSNs and disk["SN"]]
+
+        except Exception as e:
+            logger.error(str(e))
+            return None 
+
+        try:
+            disk = json.dumps(new_disk_info)
+            nodeInfoDb.update_node_disk(event["hostname"], disk)
+        except Exception as e:
+            logger.error("Failed to update database for %s" % str(e))
+            return None
+
+        return new_disk_info
+
 
     @staticmethod
     def handleHDD(event):
@@ -111,15 +193,10 @@ class SwiftEventMgr(Daemon):
 
     class EventsPage(Resource):
             def render_GET(self, request):
-                # return '<html><body><form method="POST"><input name=%s type="text" /></form></body></html>' % FROM_MONITOR
                 return '<html><body>I am the swift event manager!!</body></html>'
 
             def render_POST(self, request):
                 logger = util.getLogger(name="swifteventmgr.render_POST")
-                # body=request.args['body'][0]
-                # reactor.callLater(0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
-                # d = deferLater(reactor, 0.1, SwiftEventMgr.handleEvents, request.content.getvalue())
-                # d.addCallback(printResult)
                 from twisted.internet import threads
                 try:
                     d = threads.deferToThread(SwiftEventMgr.handleEvents, request.content.getvalue())
@@ -153,9 +230,12 @@ if __name__ == "__main__":
         elif 'restart' == sys.argv[1]:
             daemon.restart()
         else:
-            print "Unknown command"
             sys.exit(2)
-        sys.exit(0)
     else:
+        fakedb = "/etc/test.db"
+        os.system("rm /etc/test.db")
+        print SwiftEventMgr.updateDiskInfo({}, fakedb)
+
+        print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)

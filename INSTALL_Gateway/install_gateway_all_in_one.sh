@@ -21,10 +21,6 @@ apt-get install -y --force-yes python-software-properties curl portmap nfs-kerne
 add-apt-repository -y ppa:swift-core/release
 apt-get update
 apt-get install -y --force-yes swift apt-show-versions squid3
-    # install apache and mod_wsgi
-apt-get install -y --force-yes apache2
-apt-get install -y --force-yes libapache2-mod-wsgi
-
 
 # vvvvv-- install S3QL and its dependent packages ---------------------------------------------------
 dpkg -i ../DCloudS3ql/debsrc/python-llfuse_0.37.1-2_amd64.deb 
@@ -36,13 +32,6 @@ dpkg -i ../DCloudGateway/sudo_1.8.5-2_amd64.deb
 # create soft link for s3ql program
 cp -rs /usr/bin/*s3ql* /usr/local/bin/
 # ^^^^^-- install S3QL and its dependent packages ----------------------------------------------------
-
-# vvvvv-- install GUI --------------------------------------------------------------------------------
-cd ../DCloudGatewayUI
-./setup.sh
-update-rc.d celeryd defaults
-# ^^^^^-- install GUI --------------------------------------------------------------------------------
-
 
 # vvvvv-- install GUI API -----------------------------------------------------------------------------
 cd ../DCloudGateway
@@ -80,6 +69,10 @@ cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache
 echo "    Squid3 configuration has been written."
 # ^^^^^-- install GUI API -----------------------------------------------------------------------------
 
+# vvvvv-- install GUI --------------------------------------------------------------------------------
+cd ../DCloudGatewayUI
+./setup.sh
+# ^^^^^-- install GUI --------------------------------------------------------------------------------
 
 # add a private of APT repository server
 cat >/etc/apt/sources.list.d/delta-server.list <<EOF
