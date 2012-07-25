@@ -242,7 +242,7 @@ class AccountDatabaseBroker(DatabaseBroker):
                 return False
 
 class NodeInfoDatabaseBroker(DatabaseBroker):
-    """Encapsulates working with a event list database."""
+    """Encapsulates working with a node information database."""
 
     def _initialize(self, conn):
         self.create_node_info_table(conn)
@@ -254,7 +254,6 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @type  conn: object
         @param conn: DB connection object
         """
-
         conn.executescript("""
             CREATE TABLE node_info (
                 hostname TEXT NOT NULL,
@@ -337,7 +336,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @return: Return the result.            
         """
         with self.get() as conn:
-            ret = conn.execute("SELECT * FROM node_info WHERE %s", (conditions,))
+            ret = conn.execute("SELECT * FROM node_info WHERE %s" % conditions)
             return ret
         
     def get_info(self, hostname):
@@ -449,7 +448,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 disks_to_reserve TEXT,
                 disks_to_replace TEXT,
                 timestamp INTEGER NOT NULL,
-                PRIMARY KEY hostname
+                PRIMARY KEY (hostname)
             );
         """)
 
@@ -521,7 +520,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
         @return: Return the result.            
         """
         with self.get() as conn:
-            ret = conn.execute("SELECT * FROM maintenance_backlog WHERE %s", (conditions,))
+            ret = conn.execute("SELECT * FROM maintenance_backlog WHERE %s" % conditions)
             return ret
 
     def get_info(self, hostname):
@@ -542,9 +541,10 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 return row
 
 if __name__ == '__main__':
-    #os.system("rm /etc/test/test.db")
-    #db = NodeInfoDatabaseBroker("/etc/test/test.db")
-    #db.initialize()
-    #db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+    os.system("rm /etc/test/test.db")
+    db = MaintenanceBacklogDatabaseBroker("/etc/test/test.db")
+    db.initialize()
+#    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+#    print db.query_node_info_table("mode=\"service\"").fetchall()
     #print db.add_node(hostname="system", ipaddress=None)
     pass

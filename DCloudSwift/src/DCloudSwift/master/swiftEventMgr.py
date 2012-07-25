@@ -6,6 +6,7 @@ import random
 import pickle
 import signal
 import json
+import sqlite3
 from ConfigParser import ConfigParser
 from twisted.web.server import Site
 from twisted.web.resource import Resource
@@ -51,7 +52,6 @@ class SwiftEventMgr(Daemon):
             logger.error("Failed to read deviceCnt from %s" %  GlobalVar.ORI_SWIFTCONF)
             return None
 
-
     '''
     HDD event format
     {
@@ -73,7 +73,6 @@ class SwiftEventMgr(Daemon):
         time: <integer>
     }
     '''
-
     @staticmethod
     def isValidDiskEvent(event):
         logger = util.getLogger(name="SwiftEventMgr.isValidDiskEvent")
@@ -100,7 +99,7 @@ class SwiftEventMgr(Daemon):
     @staticmethod
     def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         '''
-        update disk info according to the event
+        update disk info according to the disk event
 
         @type  event: dictioary
         @param event: disk event
@@ -176,7 +175,80 @@ class SwiftEventMgr(Daemon):
     @staticmethod
     def handleHDD(event):
         logger = util.getLogger(name="swifteventmgr.handleHDD")
-        new_disk_info = SwiftEventMgr.extractDiskInfo(event)
+        new_disk_info = SwiftEventMgr.updateDiskInfo(event)
+
+    '''
+    Heartbeat format
+    {
+        event: "heartbeat",
+        nodes:
+        [
+            {
+                hostname:<hostname>,
+                role:<enum:MH,MA,MD,MMS>,
+                status:<enum:alive,unknown,dead>
+                time:<integer>
+            },...
+        ]
+    }
+    '''
+    @staticmethod
+    def isValidHeartbeat(event):
+        logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
+        try:
+            for node in event["nodes"]:
+                hostname = nodes["hostname"]
+                role = nodes["role"]
+                status = nodes["status"]
+                time = nodes["time"]
+                if not isinstance(hostname, str):
+                    logger.error("Wrong type of hostname!")
+                    return False
+                if not isinstance(role, str):
+                    logger.error("Wrong type of role!")
+                    return False
+                if not isinstance(status, str):
+                    logger.error("Wrong type of status!")
+                    return False
+                if not isinstance(time, str):
+                    logger.error("Wrong type of time!")
+                    return False
+        except Exception as e:
+            logger.error(str(e))
+            return False
+
+        return True
+
+    @staticmethod
+    def updateNodeStatus(node, nodeInfoDbPath):
+        '''
+        update node status according to the heartbeat event
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updateNodeStatus")
+
+        try:
+                hostname = node["hostname"]
+                status = node["status"]
+                time = node["time"]
+                nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+                row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
+                return row
+
+        except Exception as e:
+            logger.error(str(e))
+            return None
+
+    @staticmethod
+    def handleHeartbeat(event, nodeInfoDbPath=GlobalVar.NODE_DB):
+        logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
+        
+        if not SwiftEventMgr.isValidHeartbeat(event):
+            logger.error("Invalid heartbeat event")
+            return None
+        
+        nodes = json.loads(event["nodes"])
+        for node in nodes:
+            SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
 
     @staticmethod
     def handleEvents(notification):
@@ -189,6 +261,11 @@ class SwiftEventMgr(Daemon):
             logger.error("Notification %s is not a legal json string" % notification)
 
         #Add your code here
+        if event["event"].lower() == "hdd":
+            SwiftEventMgr.handleHDD(event)
+        elif event["event"].lower() == "heartbeat":
+            SwiftEventMgr.handleHeartbeat(event)
+            
         time.sleep(10)
 
     class EventsPage(Resource):
@@ -220,6 +297,131 @@ class SwiftEventMgr(Daemon):
             logger(str(e))
 
 
+def getSection(inputFile, section):
+    ret = []
+    with open(inputFile) as fh:
+        lines = fh.readlines()
+        start = 0
+        for i in range(len(lines)):
+            line = lines[i].strip()
+            if line.startswith('[') and section in line:
+                start = i + 1
+                break
+        end = len(lines)
+        for i in range(start, len(lines)):
+            line = lines[i].strip()
+            if line.startswith('['):
+                end = i
+                break
+
+        for line in lines[start:end]:
+            line = line.strip()
+            if len(line) > 0:
+                ret.append(line)
+
+        return ret
+
+
+def parseNodeListSection(inputFile):
+    lines = getSection(inputFile, "nodeList")
+    try:
+        nodeList = []
+        nameSet = set()
+        for line in lines:
+            line = line.strip()
+            if len(line) > 0:
+                tokens = line.split()
+                if len(tokens) != 1:
+                    raise Exception("[nodeList] contains an invalid line %s" % line)
+
+                name = tokens[0]
+                if name in nameSet:
+                    raise Exception("[nodeList] contains duplicate names")
+
+                nodeList.append({"hostname": name})
+                nameSet.add(name)
+
+        return nodeList
+    except IOError as e:
+        msg = "Failed to access input files for %s" % str(e)
+        raise Exception(msg)
+
+
+def initializeNodeInfo():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_initialize_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    inputFile = "/etc/delta/inputFile"
+    nodeList = parseNodeListSection(inputFile)
+
+    try:
+        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+        nodeInfoDb.initialize()
+    except sqlite3.OperationalError as e:
+        print >> sys.stderr, "Node info already exists!!"
+        sys.exit(1)
+
+    for node in nodeList:
+        hostname = node["hostname"]
+        status = "alive"
+        timestamp = int(time.time())
+
+        disk_info = {
+                        "timestamp": timestamp,
+                        "missing": {"count": 0, "timestamp": timestamp},
+                        "broken": [],
+                        "healthy": [],
+        }
+        disk = json.dumps(disk_info)
+
+        mode = "service"
+        switchpoint = timestamp  
+
+        nodeInfoDb.add_node(hostname=hostname, 
+                            status=status, 
+                            timestamp=timestamp, 
+                            disk=disk, 
+                            mode=mode, 
+                            switchpoint=switchpoint)
+
+def clearNodeInfo():
+    '''
+    Command line implementation of node info clear
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    if os.path.exists(GlobalVar.NODE_DB):
+        os.system("rm %s" % GlobalVar.NODE_DB)
+        ret = 0
+
+    return ret
+
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
@@ -232,9 +434,8 @@ if __name__ == "__main__":
         else:
             sys.exit(2)
     else:
-        fakedb = "/etc/test.db"
-        os.system("rm /etc/test.db")
-        print SwiftEventMgr.updateDiskInfo({}, fakedb)
+        clearNodeInfo()
+        initializeNodeInfo()    
 
         print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
