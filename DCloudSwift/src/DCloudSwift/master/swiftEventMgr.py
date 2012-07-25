@@ -423,9 +423,13 @@ if __name__ == "__main__":
         else:
             sys.exit(2)
     else:
-        clearNodeInfo()
-        initializeNodeInfo()    
-
+#        clearNodeInfo()
+#        initializeNodeInfo()    
+#
+#        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+#        rows = nodeInfoDb.show_node_info_table()
+#        for row in rows:
+#             print row
         print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)

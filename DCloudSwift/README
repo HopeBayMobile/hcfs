@@ -6,11 +6,12 @@
 	(3) Hardware: AMD 64bit
 
 
-2. How to use the scripts:
-	(1) Copy the folder 'DCloudSwift' to the master node.
-	(2) Change your privilege to root.
-	(3) Execute 'python setup.py install'
-	(4) Edit ./Swift.ini:
+[Installation]
+1. Copy the folder 'DCloudSwift' to the master node.
+2. Deploy swift
+	(1) Change your privilege to root.
+	(2) Execute 'python setup.py install'
+	(3) Edit ./Swift.ini:
 	    [storage]
             password = password of root in swift nodes
             deviceCnt = how many disks to use in each swift node
@@ -18,7 +19,7 @@
 	   
             [portal]
             url = url of the public access portal for users
-        (5) Add [deploy] section to /etc/delta/inputFile in the following format:
+        (4) Add [deploy] section to /etc/delta/inputFile in the following format:
               ip1 zid1
               ip2 zid2
               ...
@@ -27,11 +28,20 @@
               Note that the master node to run this deploy script cannot be included 
               in this list.
               
-	(6) execute "dcloud_swift_deploy numOfReplcia"
+	(5) execute "dcloud_swift_deploy numOfReplcia"
+            where numOfReplica has to be a positive integer less than 10 
 
-              where numOfReplica has to be a positive integer less than 10 
+3. setup event manager
+        (1) Add [nodeList] section to /etc/delta/inputFile in the following format:
+              hostname1
+              hostname2
+              ...
+            
+            where hostnameX are the hostname of nodes you want to monitor.
 
-
+	(2) Execute "dcloud_clear_node_info"
+	(3) Execute "dcloud_initialize_node_info"
+        (4) Execute "/etc/init.d/swift-event-manager"
 
 [Note]:
 1. The command "dcloud_swift_deploy" is for the convenience of testing. 
