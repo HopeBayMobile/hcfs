@@ -26,5 +26,7 @@ cd ..
 cd ../DCloudGatewayUI
 ./setup.sh
 
+update-rc.d celeryd defaults
+
 sleep 3
 echo "Installation of Gateway is completed..."
