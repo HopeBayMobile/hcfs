@@ -159,6 +159,8 @@ class SwiftMaintainAgent(Daemon):
 
         if node["status"] == "dead":
             ret["target"] = "node_missing"
+        elif disk_info["missing"]["timestamp"] > deadline:
+            ret = None
         elif disk_info["missing"]["count"] != 0:
             ret["target"] = "disk_missing"
             ret["disks_to_reserve"] = json.dumps(SwiftMaintainAgent.computeDisks2Reserve(disk_info, deadline))
@@ -193,14 +195,13 @@ class SwiftMaintainAgent(Daemon):
         return tasks
 
     @staticmethod
-    def updateMaintenanceBacklog(nodeInfo, backlog, replicationTime):
+    def updateMaintenanceBacklog(nodeInfo, backlog, deadline):
         """
         update tasks in the maintenance backlog
         @return: None   
         """
-        logger = util.getLogger(name='swiftmaintainagent.deleteObsoleteTasks')
+        logger = util.getLogger(name='swiftmaintainagent.updateMaintenanceBacklog')
         tasks = backlog.show_maintenance_backlog_table()
-        deadline = int(time.time()) - replicationTime
 
         for task in tasks:
             hostname = task["hostname"]
@@ -209,7 +210,7 @@ class SwiftMaintainAgent(Daemon):
             if not node:
                 continue
 
-            ret = SwiftMaintailAgent.computeMaintenanceTask(node, deadline)
+            ret = SwiftMaintainAgent.computeMaintenanceTask(node, deadline)
             if not ret:
                 continue
             
@@ -226,7 +227,7 @@ class SwiftMaintainAgent(Daemon):
         while (True):
             SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=self.nodeInfo,
                                                         backlog=self.backlog,
-                                                        replicatinTime=self.replicationTime)
+                                                        deadline=deadline)
 
             if SwiftMaintainAgent.isBacklogEmpty():  # check whether the maintenance_backlog is empty. (C1)
                 deadline = int(time.time() - self.replicationTime)
