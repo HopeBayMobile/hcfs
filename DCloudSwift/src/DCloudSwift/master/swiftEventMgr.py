@@ -21,6 +21,7 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 from util.database import NodeInfoDatabaseBroker
+from util.database import MaintenanceBacklogDatabaseBroker
 
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
@@ -254,6 +255,7 @@ class SwiftEventMgr(Daemon):
             event = json.loads(notification)
         except:
             logger.error("Notification %s is not a legal json string" % notification)
+            return 1
 
         #Add your code here
         if event["event"].lower() == "hdd":
@@ -261,8 +263,6 @@ class SwiftEventMgr(Daemon):
         elif event["event"].lower() == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
             
-        time.sleep(10)
-
     class EventsPage(Resource):
             def render_GET(self, request):
                 return '<html><body>I am the swift event manager!!</body></html>'
@@ -286,10 +286,12 @@ class SwiftEventMgr(Daemon):
         factory = Site(root)
 
         try:
+            threadPool = reactor.getThreadPool()
+            threadPool.adjustPoolsize(minthreads=1, maxthreads=1)
             reactor.listenTCP(int(self.port), factory)
             reactor.run()
         except twisted.internet.error.CannotListenError as e:
-            logger(str(e))
+            logger.error(str(e))
 
 
 def getSection(inputFile, section):
@@ -393,6 +395,31 @@ def initializeNodeInfo():
                             mode=mode, 
                             switchpoint=switchpoint)
 
+def initializeMaintenanceBacklog():
+    '''
+    Command line implementation of maintenance backlog initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_initialize_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
+        backlog.initialize()
+    except sqlite3.OperationalError as e:
+        print >> sys.stderr, "Maintenance backlog already exists!!"
+        sys.exit(1)
+
 def clearNodeInfo():
     '''
     Command line implementation of node info clear
@@ -417,6 +444,32 @@ def clearNodeInfo():
 
     return ret
 
+
+def clearMaintenanceBacklog():
+    '''
+    Command line implementation of clearing maintenance backlog
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    if os.path.exists(GlobalVar.MAINTENANCE_BACKLOG):
+        os.system("rm %s" % GlobalVar.MAINTENANCE_BACKLOG)
+        ret = 0
+
+    return ret
+
+
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
@@ -430,7 +483,8 @@ if __name__ == "__main__":
             sys.exit(2)
     else:
 #        clearNodeInfo()
-#        initializeNodeInfo()    
+#        clearMaintenanceBacklog()
+#        initializeMaintenanceBacklog()    
 #
 #        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
 #        rows = nodeInfoDb.show_node_info_table()

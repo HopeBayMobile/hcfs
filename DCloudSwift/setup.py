@@ -71,6 +71,8 @@ def main():
                     'dcloud_swift_deleteNodes = DCloudSwift.master.SwiftDeploy:deleteNodes',
                     'dcloud_initialize_node_info = DCloudSwift.master.swiftEventMgr:initializeNodeInfo',
                     'dcloud_clear_node_info = DCloudSwift.master.swiftEventMgr:clearNodeInfo',
+                    'dcloud_initialize_backlog = DCloudSwift.master.swiftEventMgr:initializeMaintenanceBacklog',
+                    'dcloud_clear_backlog = DCloudSwift.master.swiftEventMgr:clearMaintenanceBacklog',
                     ]
         },
 
