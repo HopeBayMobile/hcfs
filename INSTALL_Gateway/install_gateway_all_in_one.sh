@@ -12,6 +12,8 @@ fi
 # remove other packages including grub2) before installing the customized libfuse2, or otherwise
 # the changes may not take effect. We will have to somehow verify this at some point for 11.04 and 12.04.
 
+sudo apt-get update
+
 # install dependent packages via apt-get
 apt-get install -y --force-yes squid3
 
@@ -34,21 +36,19 @@ dpkg -i kernel_fuse_patches/linux-headers-2.6.38.8-gateway_2.6.38.8-gateway-10.0
 dpkg -i kernel_fuse_patches/fuse-utils_2.8.4-1.1ubuntu4_amd64.deb
 dpkg -i kernel_fuse_patches/libfuse2_2.8.4-1.1ubuntu4_amd64.deb
 dpkg -i kernel_fuse_patches/libfuse-dev_2.8.4-1.1ubuntu4_amd64.deb
-# install squid3 proxy
+# ^^^^^-- install GUI API -----------------------------------------------------------------------------
+
+# vvvvv-- install squid3 proxy -------------------------------------------------------------------------
 CACHEDIR="/storage/http_proxy_cache/"
 mkdir -p $CACHEDIR
-cat > /etc/squid3/squid.conf << EOF
-http_port 3128 transparent
-acl localnet src 127.0.0.1/255.255.255.255
-http_access allow all
-http_access allow localnet
-dns_nameservers 8.8.8.8  168.95.1.1
-
-# cache_dir ufs <cache-dir> <cache size in MB> <# of L1 directories> <# of L2 directories>
-cache_dir ufs $CACHEDIR 51200 64 128
-EOF
-
 chmod 777 $CACHEDIR
+
+# run configuration generation script
+cd ../DCloudGateway/src/http_proxy
+bash gen_squid3_conf.sh $CACHEDIR
+
+# Restart Squid3 service
+service squid3 restart
 
 # add double check cache directory at each power on
 cat >/etc/init.d/make_http_proxy_cache_dir <<EOF
@@ -58,8 +58,9 @@ EOF
 chmod 777 /etc/init.d/make_http_proxy_cache_dir
 cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
 
+
 echo "    Squid3 configuration has been written."
-# ^^^^^-- install GUI API -----------------------------------------------------------------------------
+# ^^^^^-- install squid3 proxy -------------------------------------------------------------------------
 
 # vvvvv-- install GUI --------------------------------------------------------------------------------
 cd ../DCloudGatewayUI
