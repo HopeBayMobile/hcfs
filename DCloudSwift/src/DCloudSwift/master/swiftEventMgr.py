@@ -187,7 +187,6 @@ class SwiftEventMgr(Daemon):
                 hostname:<hostname>,
                 role:<enum:MH,MA,MD,MMS>,
                 status:<enum:alive,unknown,dead>
-                time:<integer>
             },...
         ]
     }
@@ -200,7 +199,6 @@ class SwiftEventMgr(Daemon):
                 hostname = nodes["hostname"]
                 role = nodes["role"]
                 status = nodes["status"]
-                time = nodes["time"]
                 if not isinstance(hostname, str):
                     logger.error("Wrong type of hostname!")
                     return False
@@ -209,9 +207,6 @@ class SwiftEventMgr(Daemon):
                     return False
                 if not isinstance(status, str):
                     logger.error("Wrong type of status!")
-                    return False
-                if not isinstance(time, str):
-                    logger.error("Wrong type of time!")
                     return False
         except Exception as e:
             logger.error(str(e))
@@ -229,7 +224,7 @@ class SwiftEventMgr(Daemon):
         try:
                 hostname = node["hostname"]
                 status = node["status"]
-                time = node["time"]
+                time = time.time()
                 nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
                 row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
                 return row
