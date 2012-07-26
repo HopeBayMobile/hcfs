@@ -39,6 +39,7 @@ Exception Data Format.
 '''
 Heartbeat Publish Format
 {
+    sn: <integer>,
     event: "heartbeat",
     nodes:
     [
@@ -46,13 +47,13 @@ Heartbeat Publish Format
             hostname:<hostname>,
             role:<enum:MH,MA,MD,MMS>,
             status:<enum:alive,unknown,dead>
-            time: <integer>
         },...
     ]
 }
 
 Event Publish Format
 {
+    sn: <integer>
     compenent_name: " sensor component name",
     event: "event name",
     level: "level name",
@@ -157,7 +158,6 @@ class Heartbeat:
                                "hostname": socket.gethostname(),
                                "role": "MH",
                                "status": "alive",
-                               "time": int(time.time())
                              },
                          ]
             }
