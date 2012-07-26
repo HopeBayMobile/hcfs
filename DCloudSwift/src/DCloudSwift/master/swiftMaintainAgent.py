@@ -49,20 +49,22 @@ class SwiftMaintainAgent(Daemon):
         logger = util.getLogger(name='swiftmaintainagent')
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if replicationTime is None:
-            self.replicationTime = self.masterCfg \
-                .getKwparams()['maintainReplTime']
+            self.replicationTime = self.masterCfg.getKwparams()['maintainReplTime']
         else:
             self.replicationTime = replicationTime
+        self.replicationTime = int(self.replicationTime)
+       
         if refreshTime is None:
-            self.refreshTime = self.masterCfg \
-                .getKwparams()['maintainRefreshTime']
+            self.refreshTime = self.masterCfg.getKwparams()['maintainRefreshTime'] 
         else:
             self.refreshTime = refreshTime
+        self.refreshTime = int(self.refreshTime)
+
         if daemonSleep is None:
-            self.daemonSleep = self.masterCfg \
-                .getKwparams()['maintainDaemonSleep']
+            self.daemonSleep = self.masterCfg.getKwparams()['maintainDaemonSleep']
         else:
             self.daemonSleep = daemonSleep
+        self.daemonSleep = int(self.daemonSleep)
 
         self.backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
         self.nodeInfo = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
@@ -172,28 +174,28 @@ class SwiftMaintainAgent(Daemon):
 
         return ret
 
-    @staticmethod
-    def getMaintenanceTasks(backlog):
-        """
-        @param backlog: maintemance backlog
-        @return: return a list of maintenance tasks
-        """
-        logger = util.getLogger(name='swiftmaintainagent.getMaintenanceTasks')
-
-        rows = backlog.show_maintenance_backlog_table()
-        tasks=[]
-
-        for row in rows:
-            task = {
-                       "target": row["target"],
-                       "hostname": row["hostname"],
-                       "disks_to_reserve": row["disks_to_reserve"],
-                       "disks_to_replace": row["disks_to_replace"],
-            }
-            tasks.append(task)
-
-        return tasks
-
+#    @staticmethod
+#    def getMaintenanceTasks(backlog):
+#        """
+#        @param backlog: maintemance backlog
+#        @return: return a list of maintenance tasks
+#        """
+#        logger = util.getLogger(name='swiftmaintainagent.getMaintenanceTasks')
+#
+#        rows = backlog.show_maintenance_backlog_table()
+#        tasks=[]
+#
+#        for row in rows:
+#            task = {
+#                       "target": row["target"],
+#                       "hostname": row["hostname"],
+#                       "disks_to_reserve": row["disks_to_reserve"],
+#                       "disks_to_replace": row["disks_to_replace"],
+#            }
+#            tasks.append(task)
+#
+#        return tasks
+#
     @staticmethod
     def updateMaintenanceBacklog(nodeInfo, backlog, deadline):
         """
@@ -225,17 +227,20 @@ class SwiftMaintainAgent(Daemon):
         """
         logger = util.getLogger(name='swiftmaintainagent.run')
         while (True):
-            SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=self.nodeInfo,
-                                                        backlog=self.backlog,
-                                                        deadline=deadline)
+            try:
+                deadline = int(time.time() - (self.replicationTime)*3600)
+                SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=self.nodeInfo,
+                                                            backlog=self.backlog,
+                                                            deadline=deadline)
 
-            if SwiftMaintainAgent.isBacklogEmpty():  # check whether the maintenance_backlog is empty. (C1)
-                deadline = int(time.time() - self.replicationTime)
-                SwiftMaintainAgent.incrementBacklog(nodeInfo=self.nodeInfo, 
-                                                    backlog=self.backlog, 
-                                                    deadline=deadline) # choose a node for repair (P1)
+                if SwiftMaintainAgent.isBacklogEmpty(backlog=self.backlog):  # check whether the maintenance_backlog is empty. (C1)
+                    SwiftMaintainAgent.incrementBacklog(nodeInfo=self.nodeInfo, 
+                                                        backlog=self.backlog, 
+                                                        deadline=deadline) # choose a node for repair (P1)
 
-            time.sleep(self.daemonSleep)
+                time.sleep(self.daemonSleep)
+            except Exception as e:
+                logger.error(str(e))
 
 
 def main():
