@@ -18,3 +18,28 @@ python setup.py install
 sudo ln -s /usr/lib/insserv/insserv /sbin/insserv
 sudo chkconfig --level 2345 nfs-kernel-server off
 
+# install squid3 proxy
+CACHEDIR="/storage/http_proxy_cache/"
+mkdir -p $CACHEDIR
+cat > /etc/squid3/squid.conf << EOF
+http_port 3128 transparent
+acl localnet src 127.0.0.1/255.255.255.255
+http_access allow all
+http_access allow localnet
+dns_nameservers 8.8.8.8  168.95.1.1
+
+# cache_dir ufs <cache-dir> <cache size in MB> <# of L1 directories> <# of L2 directories>
+cache_dir ufs $CACHEDIR 51200 64 128
+EOF
+
+chmod 777 $CACHEDIR
+
+# add double check cache directory at each power on
+cat >/etc/init.d/make_http_proxy_cache_dir <<EOF
+mkdir $CACHEDIR
+chmod 777 $CACHEDIR
+EOF
+chmod 777 /etc/init.d/make_http_proxy_cache_dir
+cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
+
+echo "    Squid3 configuration has been written."
