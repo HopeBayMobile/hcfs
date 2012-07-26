@@ -14,9 +14,6 @@ fi
 
 sudo apt-get update
 
-# install dependent packages via apt-get
-apt-get install -y --force-yes squid3
-
 # vvvvv-- install S3QL and its dependent packages ---------------------------------------------------
 dpkg -i ../DCloudS3ql/debsrc/python-llfuse_0.37.1-2_amd64.deb 
 dpkg -i ../DCloudS3ql/debsrc/cython_0.15.1-2_amd64.deb 
@@ -39,6 +36,9 @@ dpkg -i kernel_fuse_patches/libfuse-dev_2.8.4-1.1ubuntu4_amd64.deb
 # ^^^^^-- install GUI API -----------------------------------------------------------------------------
 
 # vvvvv-- install squid3 proxy -------------------------------------------------------------------------
+# install dependent packages via apt-get
+apt-get install -y --force-yes squid3
+
 CACHEDIR="/storage/http_proxy_cache/"
 mkdir -p $CACHEDIR
 chmod 777 $CACHEDIR
