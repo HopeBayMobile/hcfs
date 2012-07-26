@@ -11,7 +11,7 @@ import socket
 import random
 import pickle
 import signal
-import simplejson as json
+import json
 import sqlite3
 
 #Self defined packages
@@ -118,28 +118,25 @@ class SwiftMaintainAgent(Daemon):
         return disks_to_replace
 
     @staticmethod
-    def incrementBacklog(nodeInfo, backlog, replicationTime):
+    def incrementBacklog(nodeInfo, backlog, deadline):
         """
         Add a waiting node to the maintenance backlog
         @return: the row added to the backlog   
         """
         logger = util.getLogger(name='swiftmaintainagent.incrementBacklog')
-        nodeList = nodeInfo.query_node_info_table("mode=waiting")
+        nodeList = nodeInfo.query_node_info_table("mode='waiting'").fetchall()
 
         if len(nodeList) == 0:
             return None
         else:
             ret = None
-            deadline = int(time.time()-replicationTime)
-            disk_info = json.loads(node["disk"])
-
             for node in nodeList:
-                    ret = SwiftMaintailAgent.computeMaintenanceTask(node, deadline)
+                    ret = SwiftMaintainAgent.computeMaintenanceTask(node, deadline)
                     if ret:
                         row = backlog.add_maintenance_task(target=ret["target"],
                                                            hostname=ret["hostname"], 
-                                                           disks_to_reserve=json.dumps(ret["disks_to_reserve"]), 
-                                                           disks_to_replace=json.dumps(ret["disks_to_replace"]))
+                                                           disks_to_reserve=ret["disks_to_reserve"], 
+                                                           disks_to_replace=ret["disks_to_replace"])
                         if row:
                             return row
 
@@ -151,6 +148,7 @@ class SwiftMaintainAgent(Daemon):
         @return: return a maintenance task
         """
         logger = util.getLogger(name='swiftmaintainagent.computeMaintenanceTask')
+        disk_info = json.loads(node["disk"])
 
         ret = {
                 "target": None,
@@ -161,12 +159,14 @@ class SwiftMaintainAgent(Daemon):
 
         if node["status"] == "dead":
             ret["target"] = "node_missing"
+        elif disk_info["missing"]["timestamp"] > deadline:
+            ret = None
         elif disk_info["missing"]["count"] != 0:
             ret["target"] = "disk_missing"
-            ret["disks_to_reserve"] = SwiftMaintainAgent.computeDisks2Reserve(disk_info, deadline)
+            ret["disks_to_reserve"] = json.dumps(SwiftMaintainAgent.computeDisks2Reserve(disk_info, deadline))
         elif len(disk_info["broken"]) > 0:
             ret["target"] = "disk_broken"
-            ret["disks_to_replace"] = SwiftMaintainAgent.computeDisks2Replace(disk_info, deadline)
+            ret["disks_to_replace"] = json.dumps(SwiftMaintainAgent.computeDisks2Replace(disk_info, deadline))
         else:
             ret = None
 
@@ -195,14 +195,13 @@ class SwiftMaintainAgent(Daemon):
         return tasks
 
     @staticmethod
-    def updateMaintenanceBacklog(nodeInfo, backlog, replicationTime):
+    def updateMaintenanceBacklog(nodeInfo, backlog, deadline):
         """
         update tasks in the maintenance backlog
         @return: None   
         """
-        logger = util.getLogger(name='swiftmaintainagent.deleteObsoleteTasks')
+        logger = util.getLogger(name='swiftmaintainagent.updateMaintenanceBacklog')
         tasks = backlog.show_maintenance_backlog_table()
-        deadline = int(time.time()) - replicationTime
 
         for task in tasks:
             hostname = task["hostname"]
@@ -211,14 +210,14 @@ class SwiftMaintainAgent(Daemon):
             if not node:
                 continue
 
-            ret = SwiftMaintailAgent.computeMaintenanceTask(node, deadline)
+            ret = SwiftMaintainAgent.computeMaintenanceTask(node, deadline)
             if not ret:
                 continue
             
             backlog.add_maintenance_task(target=ret["target"],
                                          hostname=ret["hostname"], 
-                                         disks_to_reserve=json.dumps(ret["disks_to_reserve"]), 
-                                         disks_to_replace=json.dumps(ret["disks_to_replace"]))
+                                         disks_to_reserve=ret["disks_to_reserve"], 
+                                         disks_to_replace=ret["disks_to_replace"])
 
     def run(self):
         """
@@ -228,12 +227,13 @@ class SwiftMaintainAgent(Daemon):
         while (True):
             SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=self.nodeInfo,
                                                         backlog=self.backlog,
-                                                        replicatinTime=self.replicationTime)
+                                                        deadline=deadline)
 
             if SwiftMaintainAgent.isBacklogEmpty():  # check whether the maintenance_backlog is empty. (C1)
+                deadline = int(time.time() - self.replicationTime)
                 SwiftMaintainAgent.incrementBacklog(nodeInfo=self.nodeInfo, 
                                                     backlog=self.backlog, 
-                                                    replicationTime=self.replicationTime) # choose a node for repair (P1)
+                                                    deadline=deadline) # choose a node for repair (P1)
 
             time.sleep(self.daemonSleep)
 
