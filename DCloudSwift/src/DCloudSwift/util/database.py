@@ -448,7 +448,7 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 disks_to_reserve TEXT,
                 disks_to_replace TEXT,
                 timestamp INTEGER NOT NULL,
-                PRIMARY KEY hostname
+                PRIMARY KEY (hostname)
             );
         """)
 
@@ -463,9 +463,9 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
             row = conn.execute("SELECT * FROM maintenance_backlog").fetchall()
             return row
 
-    def add_maintenance_backlog(self, target, hostname, disk_to_reserve, disk_to_replace, timestamp):
+    def add_maintenance_task(self, target, hostname, disks_to_reserve, disks_to_replace):
         """
-        add backlog to maintenance_backlog
+        add task to maintenance_backlog
 
         @type  target: enum(node_missing, disk_broken, disk_missing)
         @param target: status of the node
@@ -475,8 +475,6 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
         @param disks_to_reserve: SN list of disks to reserve
         @type  disks_to_replace: json string
         @param disks_to_replace: SN list of disks to replace
-        @type  timestamp: integer
-        @param timestamp: the time when this task is created
         @rtype: string
         @return: Return None if the node already exists. 
             Otherwise return the newly added row.            
@@ -486,14 +484,15 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
             if row:
                 return None
             else:
-                conn.execute("INSERT INTO maintenance_backlog VALUES (?,?,?,?,?)", (target, hostname, disk_to_reserve, disk_to_replace, timestamp))
+                timestamp = int(time.time())
+                conn.execute("INSERT INTO maintenance_backlog VALUES (?,?,?,?,?)", (target, hostname, disks_to_reserve, disks_to_replace, timestamp))
                 conn.commit()
                 row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
                 return row
 
-    def delete_maintenance_backlog(self, hostname):
+    def delete_maintenance_task(self, hostname):
         """
-        delete backlog to maintenance_backlog
+        delete task from maintenance_backlog
 
         @type  hostname: string
         @param hostname: hostname of the node to maintain
@@ -542,9 +541,9 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
 
 if __name__ == '__main__':
     os.system("rm /etc/test/test.db")
-    db = NodeInfoDatabaseBroker("/etc/test/test.db")
+    db = MaintenanceBacklogDatabaseBroker("/etc/test/test.db")
     db.initialize()
-    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
-    print db.query_node_info_table("mode=\"service\"").fetchall()
+#    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
+#    print db.query_node_info_table("mode=\"service\"").fetchall()
     #print db.add_node(hostname="system", ipaddress=None)
     pass

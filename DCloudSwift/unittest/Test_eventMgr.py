@@ -185,13 +185,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500}, 
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500}, 
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999}, 
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999}, 
                                    ]
         }
 
@@ -228,13 +228,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500}, 
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500}, 
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999}, 
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999}, 
                                    ]
         }
 
@@ -248,10 +248,10 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": False},
-                   {"SN": 3, "healthy": False},
-                   {"SN": 4, "healthy": True},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": False},
+                   {"SN": "3", "healthy": False},
+                   {"SN": "4", "healthy": True},
         ]
 
         event = {
@@ -274,8 +274,8 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==3)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,2,3])
-            if disk["SN"] == 3:
+            nose.tools.ok_(disk["SN"] in ["1","2","3"])
+            if disk["SN"] == "3":
                 nose.tools.ok_(disk["timestamp"]==1001)
             else:
                 nose.tools.ok_(disk["timestamp"]==500)
@@ -283,7 +283,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==1)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] == 4)
+            nose.tools.ok_(disk["SN"] == "4")
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_new_missing(self):
@@ -295,14 +295,14 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
-                                     {"SN": 5, "timestamp": 999}, 
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
+                                     {"SN": "5", "timestamp": 999}, 
                                    ]
         }
 
@@ -316,10 +316,10 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": False},
-                   {"SN": 3, "healthy": False},
-                   {"SN": 4, "healthy": True},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": False},
+                   {"SN": "3", "healthy": False},
+                   {"SN": "4", "healthy": True},
         ]
 
         event = {
@@ -342,7 +342,7 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==3)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,2,3])
+            nose.tools.ok_(disk["SN"] in ["1","2","3"])
             if disk["SN"] == 3:
                 nose.tools.ok_(disk["timestamp"]==1001)
             else:
@@ -351,7 +351,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==1)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] == 4)
+            nose.tools.ok_(disk["SN"] == "4")
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_broken_2_healthy(self):
@@ -363,13 +363,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
@@ -383,10 +383,10 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": True},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 4, "healthy": True},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": True},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "4", "healthy": True},
         ]
 
         event = {
@@ -409,13 +409,13 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==1)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"]== 1)
+            nose.tools.ok_(disk["SN"]== "1")
             nose.tools.ok_(disk["timestamp"]==500)
             
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==3)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [2,3,4])
+            nose.tools.ok_(disk["SN"] in ["2","3","4"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_pure_broken_replacement(self):
@@ -427,15 +427,15 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
-                                     {"SN": 5, "timestamp": 999},
-                                     {"SN": 6, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
+                                     {"SN": "5", "timestamp": 999},
+                                     {"SN": "6", "timestamp": 999},
                                    ]
         }
 
@@ -449,12 +449,12 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 7, "healthy": True},
-                   {"SN": 8, "healthy": True},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 4, "healthy": True},
-                   {"SN": 5, "healthy": True},
-                   {"SN": 6, "healthy": True},
+                   {"SN": "7", "healthy": True},
+                   {"SN": "8", "healthy": True},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "4", "healthy": True},
+                   {"SN": "5", "healthy": True},
+                   {"SN": "6", "healthy": True},
         ]
 
         event = {
@@ -480,7 +480,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==6)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [3,4,5,6,7,8])
+            nose.tools.ok_(disk["SN"] in ["3","4","5","6","7","8"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_pure_missing_replacement(self):
@@ -492,13 +492,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
@@ -512,12 +512,12 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": False},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 4, "healthy": True},
-                   {"SN": 5, "healthy": True},
-                   {"SN": 6, "healthy": True},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": False},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "4", "healthy": True},
+                   {"SN": "5", "healthy": True},
+                   {"SN": "6", "healthy": True},
         ]
 
         event = {
@@ -540,13 +540,13 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==2)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,2])
+            nose.tools.ok_(disk["SN"] in ["1","2"])
             nose.tools.ok_(disk["timestamp"]==500)
             
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==4)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [3,4,5,6])
+            nose.tools.ok_(disk["SN"] in ["3","4","5","6"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_mixed_replacement(self):
@@ -558,13 +558,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
@@ -578,11 +578,11 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": True},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 4, "healthy": True},
-                   {"SN": 5, "healthy": False},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": True},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "4", "healthy": True},
+                   {"SN": "5", "healthy": False},
         ]
 
         event = {
@@ -605,8 +605,8 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==2)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,5])
-            if disk["SN"] == 1:
+            nose.tools.ok_(disk["SN"] in ["1","5"])
+            if disk["SN"] == "1":
                 nose.tools.ok_(disk["timestamp"]==500)
             else:
                 nose.tools.ok_(disk["timestamp"]==1001)
@@ -615,7 +615,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==3)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [2,3,4])
+            nose.tools.ok_(disk["SN"] in ["2","3","4"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_new_missing(self):
@@ -627,13 +627,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
@@ -647,10 +647,10 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": True},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 5, "healthy": False},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": True},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "5", "healthy": False},
         ]
 
         event = {
@@ -673,8 +673,8 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==2)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,5])
-            if disk["SN"] == 1:
+            nose.tools.ok_(disk["SN"] in ["1","5"])
+            if disk["SN"] == "1":
                 nose.tools.ok_(disk["timestamp"]==500)
             else:
                 nose.tools.ok_(disk["timestamp"]==1001)
@@ -683,7 +683,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==2)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [2,3])
+            nose.tools.ok_(disk["SN"] in ["2","3"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_too_many_disks(self):
@@ -695,13 +695,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
@@ -715,13 +715,13 @@ class Test_updateDiskInfo:
         }
 
         data = [
-                   {"SN": 1, "healthy": False},
-                   {"SN": 2, "healthy": True},
-                   {"SN": 3, "healthy": True},
-                   {"SN": 4, "healthy": False},
-                   {"SN": 5, "healthy": False},
-                   {"SN": 6, "healthy": True},
-                   {"SN": 7, "healthy": True},
+                   {"SN": "1", "healthy": False},
+                   {"SN": "2", "healthy": True},
+                   {"SN": "3", "healthy": True},
+                   {"SN": "4", "healthy": False},
+                   {"SN": "5", "healthy": False},
+                   {"SN": "6", "healthy": True},
+                   {"SN": "7", "healthy": True},
         ]
 
         event = {
@@ -745,8 +745,8 @@ class Test_updateDiskInfo:
         brokenDisks = [disk for disk in ret["broken"]]
         nose.tools.ok_(len(brokenDisks)==3)
         for disk in brokenDisks:
-            nose.tools.ok_(disk["SN"] in [1,4,5])
-            if disk["SN"] == 1:
+            nose.tools.ok_(disk["SN"] in ["1","4","5"])
+            if disk["SN"] == "1":
                 nose.tools.ok_(disk["timestamp"]==500)
             else:
                 nose.tools.ok_(disk["timestamp"]==1001)
@@ -755,7 +755,7 @@ class Test_updateDiskInfo:
         healthyDisks = [disk for disk in ret["healthy"]]
         nose.tools.ok_(len(healthyDisks)==4)
         for disk in healthyDisks:
-            nose.tools.ok_(disk["SN"] in [2,3,6,7])
+            nose.tools.ok_(disk["SN"] in ["2","3","6","7"])
             nose.tools.ok_(disk["timestamp"]==1001)
 
     def test_no_disks(self):
@@ -767,13 +767,13 @@ class Test_updateDiskInfo:
                                     },
 
                          "broken": [
-                                     {"SN": 1, "timestamp": 500},
-                                     {"SN": 2, "timestamp": 500},
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
                                    ],
 
                          "healthy":[
-                                     {"SN": 3, "timestamp": 999},
-                                     {"SN": 4, "timestamp": 999},
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
                                    ]
         }
 
