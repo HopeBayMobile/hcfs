@@ -255,6 +255,7 @@ class SwiftEventMgr(Daemon):
             event = json.loads(notification)
         except:
             logger.error("Notification %s is not a legal json string" % notification)
+            return 1
 
         #Add your code here
         if event["event"].lower() == "hdd":
@@ -262,8 +263,6 @@ class SwiftEventMgr(Daemon):
         elif event["event"].lower() == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
             
-        time.sleep(10)
-
     class EventsPage(Resource):
             def render_GET(self, request):
                 return '<html><body>I am the swift event manager!!</body></html>'
@@ -287,10 +286,12 @@ class SwiftEventMgr(Daemon):
         factory = Site(root)
 
         try:
+            threadPool = reactor.getThreadPool()
+            threadPool.adjustPoolsize(minthreads=1, maxthreads=1)
             reactor.listenTCP(int(self.port), factory)
             reactor.run()
         except twisted.internet.error.CannotListenError as e:
-            logger(str(e))
+            logger.error(str(e))
 
 
 def getSection(inputFile, section):
