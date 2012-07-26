@@ -1404,13 +1404,13 @@ def build_gateway(user_key):
         _mkfs(storage_url=url, key=user_key)
         _mount(storage_url=url)
         set_smb_user_list(default_user_id, default_user_pwd)
-        _restartServices()
+        #_restartServices()
         log.info("setting upload speed")
         os.system("sudo /etc/cron.hourly/hourly_run_this")
         # we need to manually exec background task program,
         #   because it is originally launched by upstart 
         # launch background task program
-        os.system("/usr/bin/python /etc/delta/gw_bktask.py")
+        #os.system("/usr/bin/python /etc/delta/gw_bktask.py")
      
         op_ok = True
         op_msg = 'Succeeded to build gateway'
