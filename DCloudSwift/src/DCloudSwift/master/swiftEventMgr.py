@@ -21,6 +21,7 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 from util.database import NodeInfoDatabaseBroker
+from util.database import MaintenanceBacklogDatabaseBroker
 
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
@@ -398,6 +399,31 @@ def initializeNodeInfo():
                             mode=mode, 
                             switchpoint=switchpoint)
 
+def initializeMaintenanceBacklog():
+    '''
+    Command line implementation of maintenance backlog initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_initialize_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
+        backlog.initialize()
+    except sqlite3.OperationalError as e:
+        print >> sys.stderr, "Maintenance backlog already exists!!"
+        sys.exit(1)
+
 def clearNodeInfo():
     '''
     Command line implementation of node info clear
@@ -422,6 +448,32 @@ def clearNodeInfo():
 
     return ret
 
+
+def clearMaintenanceBacklog():
+    '''
+    Command line implementation of clearing maintenance backlog
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    if os.path.exists(GlobalVar.MAINTENANCE_BACKLOG):
+        os.system("rm %s" % GlobalVar.MAINTENANCE_BACKLOG)
+        ret = 0
+
+    return ret
+
+
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
@@ -435,7 +487,8 @@ if __name__ == "__main__":
             sys.exit(2)
     else:
 #        clearNodeInfo()
-#        initializeNodeInfo()    
+#        clearMaintenanceBacklog()
+#        initializeMaintenanceBacklog()    
 #
 #        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
 #        rows = nodeInfoDb.show_node_info_table()
