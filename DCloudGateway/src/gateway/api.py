@@ -307,6 +307,12 @@ def get_indicators():
         op_Proxy_srv = _check_process_alive('squid3')
         op_s3ql_ok = _check_process_alive('mount.s3ql')
 
+        # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
+        if op_NFS_srv is False and op_s3ql_ok is True:
+            restart_nfs_service()
+        if op_SMB_srv is False and op_s3ql_ok is True:
+            restart_smb_service()
+
         op_ok = True
         op_msg = "Gateway indicators read successfully."
     
@@ -773,7 +779,7 @@ def _check_nfs_service():
         if po.returncode == 3:
             if output.find("not running") >= 0:
                 op_NFS_srv = False
-                restart_nfs_service()
+                # restart_nfs_service()  # Moved this line to get_indicators()
         else:
             #print 'Checking NFS server returns nonzero value!'
             #log.info(output)
@@ -807,11 +813,11 @@ def _check_smb_service():
         if po.returncode == 0:
             if output.find("running") != -1:
                 op_SMB_srv = True
-            else:
-                restart_smb_service()
+            #else:
+                # restart_smb_service()  # Moved to get_indicators()
         else:
             log.info(output)
-            restart_smb_service()
+            # restart_smb_service()  # Moved to get_indicators()
 
         # if samba service is running, go check netbios
         if op_SMB_srv:
@@ -823,10 +829,10 @@ def _check_smb_service():
             if po2.returncode == 0:
                 if output2.find("running") == -1:
                     op_SMB_srv = False
-                    restart_service("nmbd")
+                    # restart_service("nmbd")  # Moved to get_indicators()
             else:
                 log.info(output)
-                restart_service("nmbd")
+                # restart_service("nmbd")  # Moved to get_indicators()
 
     except:
         pass
@@ -1543,6 +1549,7 @@ def restart_smb_service():
         if (po.returncode == 0) and (po1.returncode == 0):
             op_ok = True
             op_msg = "Restarting samba service succeeded."
+            log.info("[2] Samba service restarted")
 
     except Exception as e:
         op_ok = False
@@ -1556,7 +1563,6 @@ def restart_smb_service():
             'data': {}
         }
     
-        log.info("[2] Samba service restarted")
         log.info("restart_smb_service end")
     return json.dumps(return_val)
 
