@@ -7,11 +7,8 @@
 import os
 import sys
 import time
-import socket
-import random
-import pickle
-import signal
 import simplejson as json
+import sqlite3
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
@@ -25,8 +22,6 @@ from util.database import NodeInfoDatabaseBroker
 
 from common.events import HDD
 from common.events import HEARTBEAT
-
-
 
 
 class SwiftMaintainSwitcher(Daemon):
@@ -49,33 +44,36 @@ class SwiftMaintainSwitcher(Daemon):
         @type replicationTime: integer
         @param replicationTime: waiting time for replication
         @type refreshTime: integer
-        @param refreshTime: after refresh time, we will claim a node is missing.
+        @param refreshTime: after refresh time,
+            we will claim a node is missing.
         @type daemonSleep: integer
         @param daemonSleep: the daemon sleep time
         """
         Daemon.__init__(self, pidfile)
         logger = util.getLogger(name='swiftmaintainswitcher')
+        logger.info('start initiailize SwiftMaintainSwitcher')
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if DBFile is None:
             self.DBFile = SwiftMasterCfg(GlobalVar.NODE_DB)
         else:
             self.DBFile = DBFile
         if replicationTime is None:
-            self.replicationTime = int(self.masterCfg \
-                .getKwparams()['maintainReplTime'])
+            self.replicationTime = \
+                int(self.masterCfg.getKwparams()['maintainReplTime'])
         else:
             self.replicationTime = replicationTime
         if refreshTime is None:
-            self.refreshTime = int(self.masterCfg \
-                .getKwparams()['maintainRefreshTime'])
+            self.refreshTime = \
+                int(self.masterCfg.getKwparams()['maintainRefreshTime'])
         else:
             self.refreshTime = refreshTime
         if daemonSleep is None:
-            self.daemonSleep = int(self.masterCfg \
-                .getKwparams()['maintainDaemonSleep'])
+            self.daemonSleep = \
+                int(self.masterCfg.getKwparams()['maintainDaemonSleep'])
         else:
             self.daemonSleep = daemonSleep
         self.db = NodeInfoDatabaseBroker(self.DBFile)
+        logger.info('end initiailize SwiftMaintainSwitcher')
 
     def checkService(self):
         """
@@ -84,7 +82,8 @@ class SwiftMaintainSwitcher(Daemon):
         logger = util.getLogger(name='swiftmaintainswitcher.checkService')
         self.nowtimeStamp = int(time.mktime(time.localtime()))
         logger.info("start check hostname which is in service mode")
-        serviceNode = self.db.query_node_info_table('mode = "service"').fetchall()
+        serviceNode = \
+            self.db.query_node_info_table('mode = "service"').fetchall()
         for row in serviceNode:
             if row[1] == HEARTBEAT.status[2]:
                 record = self.updateStatusWaiting(row[0])
@@ -95,15 +94,17 @@ class SwiftMaintainSwitcher(Daemon):
                 diskInfo = json.loads(row[3])
                 if ((self.refreshTime + row[2]) < self.nowtimeStamp):
                     record = self.updateStatusWaiting(row[0])
-                    logger.info("the record which update status to waiting: %s"
-                            % str(self.dict_from_row(record)))
+                    logger.info(
+                        "the record which update status to waiting: %s"
+                        % str(self.dict_from_row(record)))
                     continue
                 if (('missing' in diskInfo) or ('broken' in diskInfo)):
                     if (diskInfo['timestamp']
                             + self.replicationTime > self.nowtimeStamp):
                         record = self.updateStatusWaiting(row[0])
-                        logger.info("the record which update status to waiting: %s"
-                                    % str(self.dict_from_row(record)))
+                        logger.info(
+                            "the record which update status to waiting: %s"
+                            % str(self.dict_from_row(record)))
                         continue
         logger.info("end check hostname which is in service mode")
 
@@ -132,10 +133,12 @@ class SwiftMaintainSwitcher(Daemon):
         @return: Return False if hostname is None.
                  Return raw data if update success.
         """
+        logger = util.getLogger(name='swiftmaintainswitcher.updateStatus')
         if hostname is None:
             return False
         try:
-            return db.update_node_mode(hostname, status, self.nowtimeStamp)
+            return self.db.update_node_mode(
+                hostname, status, self.nowtimeStamp)
         except sqlite3.Error, e:
             logger.error('sqlite update error: %s' % e.args[0])
             return False
@@ -147,14 +150,16 @@ class SwiftMaintainSwitcher(Daemon):
         logger = util.getLogger(name='swiftmaintainswitcher.checkWaiting')
         self.nowtimeStamp = int(time.mktime(time.localtime()))
         logger.info("start check hostname which is in waiting mode")
-        waitingNode = self.db.query_node_info_table('mode = "waiting"').fetchall()
+        waitingNode = \
+            self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
             if row[1] == HEARTBEAT.status[0]:
                 diskInfo = json.loads(row[3])
                 if (('missing' not in diskInfo) or ('broken' not in diskInfo)):
                     record = self.updateStatusService(row[0])
-                    logger.info("the record which update status to waiting: %s"
-                                    % str(self.dict_from_row(record)))
+                    logger.info(
+                        "the record which update status to waiting: %s"
+                        % str(self.dict_from_row(record)))
                     continue
         logger.info("end check hostname which is in waiting mode")
 
@@ -162,7 +167,7 @@ class SwiftMaintainSwitcher(Daemon):
         dt = {}
         for clName in row.keys():
             dt[clName] = row[clName]
-        return dt 
+        return dt
 
     def run(self):
         """
@@ -177,7 +182,8 @@ class SwiftMaintainSwitcher(Daemon):
 
 
 def main(DBFile=None):
-    daemon = SwiftMaintainSwitcher('/var/run/SwiftMaintainSwitcher.pid', DBFile)
+    daemon = \
+        SwiftMaintainSwitcher('/var/run/SwiftMaintainSwitcher.pid', DBFile)
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
             print "daemon start"
@@ -196,30 +202,31 @@ def main(DBFile=None):
 
 if __name__ == "__main__":
     DBFile = '/etc/test/test.db'
-    os.system("rm -f %s" % DBFile)
-    db = NodeInfoDatabaseBroker(DBFile)
-    db.initialize()
-    timestamp = int(time.mktime(time.localtime()))
-    diskInfo = {
-                    'timestamp': timestamp,
-                    'missing': {
-                                    'count': 6,
-                                    'timestamp': timestamp,
-                                },
-                    'broken': [
-                               {
-                                    'SN': 'aaaaa',
-                                    'timestamp': timestamp,
-                               },
-                              ],
-                    'healthy': [
-                                {
-                                    'SN': 'aaaaa',
-                                    'timestamp': timestamp,
-                                }
-                               ],
-                }
-    row = db.add_node('192.168.1.20', 'dead', timestamp-100, json.dumps(diskInfo), 'service', timestamp)
-    row = db.add_node('192.168.1.100', 'alive', timestamp-100, '{}', 'waiting', timestamp)
+#    os.system("rm -f %s" % DBFile)
+#    db = NodeInfoDatabaseBroker(DBFile)
+#    db.initialize()
+#    timestamp = int(time.mktime(time.localtime()))
+#    diskInfo = {
+#                    'timestamp': timestamp,
+#                    'missing': {
+#                                    'count': 6,
+#                                    'timestamp': timestamp,
+#                                },
+#                    'broken': [
+#                               {
+#                                    'SN': 'aaaaa',
+#                                    'timestamp': timestamp,
+#                               },
+#                              ],
+#                    'healthy': [
+#                                {
+#                                    'SN': 'aaaaa',
+#                                    'timestamp': timestamp,
+#                                }
+#                               ],
+#                }
+#    row = db.add_node('192.168.1.20', 'dead', timestamp-100,
+#        json.dumps(diskInfo), 'service', timestamp)
+#    row = db.add_node('192.168.1.100', 'alive', timestamp-100,
+#        '{}', 'waiting', timestamp)
     main(DBFile)
-    
