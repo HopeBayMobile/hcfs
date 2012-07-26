@@ -211,7 +211,7 @@ class SwiftEventMgr(Daemon):
                 if not isinstance(status, str):
                     logger.error("Wrong type of status!")
                     return False
-                if not isinstance(time, str):
+                if not isinstance(time, int):
                     logger.error("Wrong type of time!")
                     return False
         except Exception as e:
