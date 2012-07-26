@@ -154,5 +154,145 @@ class Test_computeDisks2Replace:
         os.system("rm /etc/test/nodeInfo.db")
         os.system("rm /etc/test/backlog.db")
 
+class Test_computeMaintenanceTask:
+    '''
+    Test the function SwiftEventMgr.computeMaintenanceTask
+    '''
+    def setup(self):
+        if os.path.exists("/etc/test/nodeInfo.db"):
+            os.system("rm /etc/test/nodeInfo.db")
+        if os.path.exists("/etc/test/backlog.db"):
+            os.system("rm /etc/test/backlog.db")
+
+        self.backup = GlobalVar.ORI_SWIFTCONF+".bak"
+        os.system("cp %s %s" % (GlobalVar.ORI_SWIFTCONF, self.backup))
+        os.system("cp %s/fake6.ini %s" % (WORKING_DIR, GlobalVar.ORI_SWIFTCONF))
+        self.nodeInfo = NodeInfoDatabaseBroker("/etc/test/nodeInfo.db")
+        self.nodeInfo.initialize()
+
+        self.backlog = MaintenanceBacklogDatabaseBroker("/etc/test/backlog.db")
+        self.backlog.initialize()
+
+    def test_node_missing(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 3,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
+                                     {"SN": "3", "timestamp": 600},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": "4", "timestamp": 400},
+                                     {"SN": "5", "timestamp": 997},
+                                     {"SN": "6", "timestamp": 996},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "dead",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        node = self.nodeInfo.add_node(**node)
+
+        task = SwiftMaintainAgent.computeMaintenanceTask(node=node, 
+                                                         deadline=500)
+
+        nose.tools.ok_(task["target"]=="node_missing")
+
+    def test_disk_missing(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 3,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
+                                     {"SN": "3", "timestamp": 600},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": "4", "timestamp": 400},
+                                     {"SN": "5", "timestamp": 997},
+                                     {"SN": "6", "timestamp": 996},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        node = self.nodeInfo.add_node(**node)
+
+        task = SwiftMaintainAgent.computeMaintenanceTask(node=node, 
+                                                         deadline=500)
+
+        nose.tools.ok_(task["target"]=="disk_missing")
+        disks2reserve = json.loads(task["disks_to_reserve"])
+        nose.tools.ok_(sorted(disks2reserve)==["3","4","5","6"])
+        nose.tools.ok_(task["disks_to_replace"] is None)
+
+    def test_disk_broken(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 0,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
+                                     {"SN": "3", "timestamp": 600},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": "4", "timestamp": 400},
+                                     {"SN": "5", "timestamp": 997},
+                                     {"SN": "6", "timestamp": 996},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "alive",
+                  "timestamp": 123,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        node = self.nodeInfo.add_node(**node)
+
+        task = SwiftMaintainAgent.computeMaintenanceTask(node=node, 
+                                                         deadline=500)
+
+        nose.tools.ok_(task["target"]=="disk_broken")
+        nose.tools.ok_(task["disks_to_reserve"] is None)
+        disks2replace = json.loads(task["disks_to_replace"])
+        nose.tools.ok_(sorted(disks2replace)==["1","2"])
+
+    def teardown(self):
+        os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
+        os.system("rm /etc/test/nodeInfo.db")
+        os.system("rm /etc/test/backlog.db")
 if __name__ == "__main__":
     pass

@@ -151,6 +151,7 @@ class SwiftMaintainAgent(Daemon):
         @return: return a maintenance task
         """
         logger = util.getLogger(name='swiftmaintainagent.computeMaintenanceTask')
+        disk_info = json.loads(node["disk"])
 
         ret = {
                 "target": None,
@@ -163,10 +164,10 @@ class SwiftMaintainAgent(Daemon):
             ret["target"] = "node_missing"
         elif disk_info["missing"]["count"] != 0:
             ret["target"] = "disk_missing"
-            ret["disks_to_reserve"] = SwiftMaintainAgent.computeDisks2Reserve(disk_info, deadline)
+            ret["disks_to_reserve"] = json.dumps(SwiftMaintainAgent.computeDisks2Reserve(disk_info, deadline))
         elif len(disk_info["broken"]) > 0:
             ret["target"] = "disk_broken"
-            ret["disks_to_replace"] = SwiftMaintainAgent.computeDisks2Replace(disk_info, deadline)
+            ret["disks_to_replace"] = json.dumps(SwiftMaintainAgent.computeDisks2Replace(disk_info, deadline))
         else:
             ret = None
 
@@ -217,8 +218,8 @@ class SwiftMaintainAgent(Daemon):
             
             backlog.add_maintenance_task(target=ret["target"],
                                          hostname=ret["hostname"], 
-                                         disks_to_reserve=json.dumps(ret["disks_to_reserve"]), 
-                                         disks_to_replace=json.dumps(ret["disks_to_replace"]))
+                                         disks_to_reserve=ret["disks_to_reserve"], 
+                                         disks_to_replace=ret["disks_to_replace"])
 
     def run(self):
         """
