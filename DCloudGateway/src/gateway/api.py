@@ -441,7 +441,7 @@ def _traceroute_backend(backend_IP=None):
     """
 
     op_msg = "Unable to obtain traceroute info to the backend"
-    log.info("_check_network start")
+    log.info("_traceroute_backend start")
     try:
         if backend_IP == None:
             op_config = ConfigParser.ConfigParser()
@@ -474,7 +474,7 @@ def _traceroute_backend(backend_IP=None):
             log.error(str(e))
 
     finally:
-        log.info("_check_network end")
+        log.info("_traceroute_backend end")
     return op_msg
 
 
