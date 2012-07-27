@@ -80,7 +80,6 @@ class SwiftEventMgr(Daemon):
         try:
             hostname = event["hostname"]
             data = json.loads(event["data"])
-            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(event["hostname"])
             healthyDisks = [disk["SN"] for disk in data if disk["healthy"] and disk["SN"]]
             brokenDisks = [disk["SN"] for disk in data if not disk["healthy"] and disk["SN"]]
             timestamp = event["time"]
@@ -88,10 +87,14 @@ class SwiftEventMgr(Daemon):
             logger.error(str(e))
             return False
 
-        if not isinstance(hostname, str) or not isinstance(timestamp, int):
+        if not isinstance(event["hostname"], str) and not isinstance(event["hostname"], unicode):
+            logger.error("Wrong type of hostname")
             return False
-
-        if expectedDiskCount is None:
+        if not isinstance(event["time"], int):
+            logger.error("Wrong type of time")
+            return False
+        if SwiftEventMgr.getExpectedDiskCount(event["hostname"]) is None:
+            logger.error("Failed to get expected disk count of %s" % event["hostname"])
             return False
 
         return True
@@ -114,17 +117,22 @@ class SwiftEventMgr(Daemon):
                             "broken": [],
                             "healthy": [],
         }
-
+     
         nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
 
         if not SwiftEventMgr.isValidDiskEvent(event):
             logger.error("Invalid disk event!!")
             return None
 
-        # TODO: handle the exception of invalid old_disk_info
+        hostname = event["hostname"]
+        data = json.loads(event["data"])
+        node = nodeInfoDb.get_info(hostname)
+        if not node:
+            logger.error("%s is not registered!!" % hostname)
+            return None
+
+        #TODO: handle invalid old_disk_info
         try:
-            hostname = event["hostname"]
-            data = json.loads(event["data"])
             old_disk_info = json.loads(nodeInfoDb.get_info(hostname)["disk"])
             expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
 
@@ -197,16 +205,16 @@ class SwiftEventMgr(Daemon):
         logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
         try:
             for node in event["nodes"]:
-                hostname = nodes["hostname"]
-                role = nodes["role"]
-                status = nodes["status"]
-                if not isinstance(hostname, str):
+                hostname = node["hostname"]
+                role = node["role"]
+                status = node["status"]
+                if not isinstance(hostname, str) and not isinstance(hostname, unicode):
                     logger.error("Wrong type of hostname!")
                     return False
-                if not isinstance(role, str):
+                if not isinstance(role, str) and not isinstance(role, unicode):
                     logger.error("Wrong type of role!")
                     return False
-                if not isinstance(status, str):
+                if not isinstance(status, str) and not isinstance(status, unicode):
                     logger.error("Wrong type of status!")
                     return False
         except Exception as e:
@@ -251,16 +259,23 @@ class SwiftEventMgr(Daemon):
         logger = util.getLogger(name="swifteventmgr.handleEvents")
         logger.info("%s" % notification)
         event = None
+        eventName = None
         try:
             event = json.loads(notification)
         except:
             logger.error("Notification %s is not a legal json string" % notification)
             return 1
 
+        try:
+           eventName = event["event"].lower()
+        except Exception as e:
+           logger.error("Failed to get event name for %s" % str(e))
+           return 1
+
         #Add your code here
-        if event["event"].lower() == "hdd":
+        if eventName == "hdd":
             SwiftEventMgr.handleHDD(event)
-        elif event["event"].lower() == "heartbeat":
+        elif eventName == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
             
     class EventsPage(Resource):

@@ -64,14 +64,13 @@ Event Publish Format
 '''
 
 def post_data(url, data):
-    data = json.dumps(data)
     req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         
-    #TODO: time out mechanism
     response = None
     f = urllib2.urlopen(req)
     response = f.read()
     f.close
+
     return response
 
 
@@ -113,7 +112,7 @@ class DiskChecker:
         send event to the receiver 
         """
         logger = util.getLogger(name="DiskChecker")
-        event2post = None
+        eventEncoding = None
         try:
             disk_info = self.check_all_disks()
             event = {
@@ -124,8 +123,8 @@ class DiskChecker:
                 "data": json.dumps(disk_info),
                 "time": int(time.time()),
             }
-            event2post = json.dumps(event)
-            logger.info(event2post)
+            eventEncoding= json.dumps(event)
+            logger.info(eventEncoding)
 
         except Exception as e:
             logger.error(str(e))
@@ -136,8 +135,8 @@ class DiskChecker:
             }
             logger.error(json.dumps(event))
 
-        if event2post:
-            post_data(self.receiverUrl, event2post)
+        if eventEncoding:
+            post_data(self.receiverUrl, eventEncoding)
 
 class Heartbeat:
     def __init__(self, receiverUrl):
@@ -148,7 +147,7 @@ class Heartbeat:
         send heartbeat to the receiver 
         """
         logger = util.getLogger(name="Heartbeat")
-        heartbeat2post = None
+        heartbeatEncoding = None
         try:
     
             heartbeat = {
@@ -162,8 +161,8 @@ class Heartbeat:
                          ]
             }
 
-            heartbeat2post = json.dumps(heartbeat)
-            logger.info(heartbeat2post)
+            heartbeatEncoding = json.dumps(heartbeat)
+            logger.info(heartbeatEncoding)
 
         except Exception as e:
             logger.error(str(e))
@@ -174,8 +173,8 @@ class Heartbeat:
             }
             logger.error(json.dumps(event))
 
-        if heartbeat2post:
-            post_data(self.receiverUrl, heartbeat2post)
+        if heartbeatEncoding:
+            post_data(self.receiverUrl, heartbeatEncoding)
         
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
@@ -194,16 +193,6 @@ class NodeMonitor(Daemon):
         self.DC = DiskChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
 
-    def post_data(self, url, data):
-        data = json.dumps(data)
-        req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
-        
-        response = None
-        f = urllib2.urlopen(req)
-        response = f.read()
-        f.close
-        return response
-
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")
         logger.info("start")
@@ -211,10 +200,12 @@ class NodeMonitor(Daemon):
         while True:
             try:
                 try: 
+                    logger.info("hello1")
                     self.HB.send_heartbeat()
+                    logger.info("hello2")
                 except Exception as e:
                     logger.error(str(e))
-
+                 
                 try:
                     self.DC.send_disk_event()
                 except Exception as e:
