@@ -93,6 +93,9 @@ class SwiftMaintainSwitcher(Daemon):
             if row[1] == HEARTBEAT.status[0]:
                 diskInfo = json.loads(row[3])
                 if ((self.refreshTime + row[2]) < self.nowtimeStamp):
+                    self.db.update_node_status(row[0], 
+                                               HEARTBEAT.status[2], 
+                                               self.nowtimestamp)
                     record = self.updateStatusWaiting(row[0])
                     logger.info(
                         "the record which update status to waiting: %s"
