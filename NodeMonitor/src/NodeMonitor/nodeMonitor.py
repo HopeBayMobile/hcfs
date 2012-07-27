@@ -200,9 +200,7 @@ class NodeMonitor(Daemon):
         while True:
             try:
                 try: 
-                    logger.info("hello1")
                     self.HB.send_heartbeat()
-                    logger.info("hello2")
                 except Exception as e:
                     logger.error(str(e))
                  
