@@ -2386,10 +2386,17 @@ def get_nfs_access_ip_list():
             
                 #print services
                 #print ips
-            
+                # Jiahong: Hiding the first two ips in the list: 127.0.0.1 and 127.0.0.2
+                if len(ips) < 2:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+
+                    return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                    return json.dumps(return_val)
+
+
                 return_val['result'] = True
                 return_val['msg'] = "Get ip list success"
-                return_val['data']["array_of_ip"] = ips
+                return_val['data']["array_of_ip"] = ips[2:]
             
                 #return json.dumps(return_val)
             
@@ -2516,6 +2523,21 @@ def set_nfs_access_ip_list(array_of_ip):
                 #iplist = arr[1]
                 #ips = iplist.strip().split(", ") #
 
+                iplist = arr[1]
+                ips = iplist.strip().split(", ")
+
+                #print services
+                #print ips
+                if len(ips) < 2:
+                    log.info(str(nfs_hosts_allow_file) + " format error")
+
+                    return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
+                    return json.dumps(return_val)
+
+                # Jiahong: We need to keep the first two ips in the list
+                fixed_ips = ips[0:2]
+                full_ip_list = fixed_ips + array_of_ip
+
     except :
         log.info("cannot parse " + str(nfs_hosts_allow_file))
           
@@ -2526,7 +2548,7 @@ def set_nfs_access_ip_list(array_of_ip):
     nfs_hosts_allow_file_temp = '/etc/delta/hosts_allows_temp'
     try:
         ofile = open(nfs_hosts_allow_file_temp, 'w')
-        output = services + " : " + ", ".join(array_of_ip) + "\n"
+        output = services + " : " + ", ".join(full_ip_list) + "\n"
         ofile.write(output)
         ofile.close()
         os.system('sudo cp %s %s' % (nfs_hosts_allow_file_temp, nfs_hosts_allow_file))
