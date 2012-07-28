@@ -238,9 +238,10 @@ class SwiftMaintainAgent(Daemon):
                                                         backlog=self.backlog, 
                                                         deadline=deadline) # choose a node for repair (P1)
 
-                time.sleep(self.daemonSleep)
             except Exception as e:
                 logger.error(str(e))
+
+            time.sleep(self.daemonSleep)
 
 
 def main():
