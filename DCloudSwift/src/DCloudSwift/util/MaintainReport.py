@@ -29,7 +29,7 @@ class MaintainReport():
         """
         self.report = {}
         if DBFile is None:
-            self.DBFile = SwiftMasterCfg(GlobalVar.NODE_DB)
+            self.DBFile = GlobalVar.MAINTENANCE_BACKLOG
         else:
             self.DBFile = DBFile
         self.db = MaintenanceBacklogDatabaseBroker(self.DBFile)
@@ -51,6 +51,49 @@ class MaintainReport():
         for row in result:
             print row
 
+    def get_backlog(self):
+        """
+        query maintain table 
+        @return: Return raw data.
+        """
+        result = self.db.show_maintenance_backlog_table()
+        return result
+
+def print_maintenance_backlog():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_print_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        mr = MaintainReport()
+        backlog = mr.get_backlog()
+        for task in backlog:
+            output = "%s:{\n" % task["hostname"]
+            output += "    target: %s\n" % task["target"]
+            if task["target"] == "disk_missing":
+                output += "    disks_to_reserve: %s\n" % task["disks_to_reserve"]
+            elif task["target"] == "disk_broken":
+                output += "    disks_to_replace: %s\n" % task["disks_to_replace"]
+
+            output+="}"
+            print output
+
+    except Exception as e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)
 
 def main(DBFile=None):
     maintainReport = MaintainReport(DBFile)
