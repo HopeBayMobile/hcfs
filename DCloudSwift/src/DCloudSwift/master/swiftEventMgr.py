@@ -233,9 +233,9 @@ class SwiftEventMgr(Daemon):
         try:
                 hostname = node["hostname"]
                 status = node["status"]
-                time = time.time()
+                timestamp = int(time.time())
                 nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
-                row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=time)
+                row = nodeInfoDb.update_node_status(hostname=hostname, status=status, timestamp=timestamp)
                 return row
 
         except Exception as e:
@@ -250,7 +250,7 @@ class SwiftEventMgr(Daemon):
             logger.error("Invalid heartbeat event")
             return None
         
-        nodes = json.loads(event["nodes"])
+        nodes = event["nodes"]
         for node in nodes:
             SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
 

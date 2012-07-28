@@ -181,7 +181,7 @@ class SwiftMaintainSwitcher(Daemon):
         """
         logger = util.getLogger(name='swiftmaintainswitcher.run')
         while True:
-            logger.error("daemon sleep: %s" % self.daemonSleep)
+            logger.info("daemon sleep: %s" % self.daemonSleep)
             self.checkService()
             self.checkWaiting()
             time.sleep(int(self.daemonSleep))
