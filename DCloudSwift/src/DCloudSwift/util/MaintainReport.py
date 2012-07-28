@@ -15,6 +15,7 @@ from daemon import Daemon
 from util import GlobalVar
 from SwiftCfg import SwiftMasterCfg
 from database import MaintenanceBacklogDatabaseBroker
+from database import NodeInfoDatabaseBroker
 
 
 class MaintainReport():
@@ -94,6 +95,46 @@ def print_maintenance_backlog():
     except Exception as e:
         print >> sys.stderr, str(e)
         sys.exit(1)
+
+def print_node_info():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_print_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        DBFile = GlobalVar.NODE_DB
+        db = NodeInfoDatabaseBroker(DBFile)
+        nodes = db.show_node_info_table()
+
+        for node in nodes:
+            disk_list = json.loads(node["disk"])
+            output = "%s:{\n" % node["hostname"]
+            output += "    status: %s\n" % node["status"]
+            output += "    timestamp: %d\n" % node["timestamp"]
+            output += "    disk: %s\n" % node["disk"]
+            output += "    mode: %s\n" % node["mode"]
+            output += "    mode: %s\n" % node["mode"]
+            output += "    switchpoint: %s\n" % node["switchpoint"]
+            output+="}\n"
+            print output
+
+    except Exception as e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)
+
 
 def main(DBFile=None):
     maintainReport = MaintainReport(DBFile)

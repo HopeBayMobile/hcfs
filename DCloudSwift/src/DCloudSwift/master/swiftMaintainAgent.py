@@ -174,28 +174,6 @@ class SwiftMaintainAgent(Daemon):
 
         return ret
 
-#    @staticmethod
-#    def getMaintenanceTasks(backlog):
-#        """
-#        @param backlog: maintemance backlog
-#        @return: return a list of maintenance tasks
-#        """
-#        logger = util.getLogger(name='swiftmaintainagent.getMaintenanceTasks')
-#
-#        rows = backlog.show_maintenance_backlog_table()
-#        tasks=[]
-#
-#        for row in rows:
-#            task = {
-#                       "target": row["target"],
-#                       "hostname": row["hostname"],
-#                       "disks_to_reserve": row["disks_to_reserve"],
-#                       "disks_to_replace": row["disks_to_replace"],
-#            }
-#            tasks.append(task)
-#
-#        return tasks
-#
     @staticmethod
     def updateMaintenanceBacklog(nodeInfo, backlog, deadline):
         """
