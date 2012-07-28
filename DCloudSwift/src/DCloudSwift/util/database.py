@@ -540,9 +540,12 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 return row
 
 if __name__ == '__main__':
-    os.system("rm /etc/test/test.db")
-    db = MaintenanceBacklogDatabaseBroker("/etc/test/test.db")
-    db.initialize()
+#    os.system("rm /etc/test/test.db")
+    db = NodeInfoDatabaseBroker("/etc/delta/swift_node.db")
+    rows = db.show_node_info_table()
+    for row in rows:
+        print row
+  #  db.initialize()
 #    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
 #    print db.query_node_info_table("mode=\"service\"").fetchall()
     #print db.add_node(hostname="system", ipaddress=None)
