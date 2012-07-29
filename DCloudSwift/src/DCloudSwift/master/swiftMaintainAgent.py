@@ -29,23 +29,43 @@ from common.events import HDD
 from common.events import HEARTBEAT
 
 
-class SwiftMaintainAgent(Daemon):
-    """
-    SwiftMaintainAgent is a daemon which will pulling event database
-    in a period time.  It will handle disk and node failed event and
-    decide which nodes or which disks need to maintain.
-    Those nodes or disks will add or modify on maintain table.
-    """
+lockFile = "/etc/delta/swift_maintain.lock"
 
-    def __init__(self, pidfile, replicationTime=None,
-                 refreshTime=None, daemonSleep=None):
+# tryLock decorator
+def tryLock(tries=3, lockLife=900):
+    def deco_tryLock(fn):
+        def wrapper(*args, **kwargs):
+            returnVal = None
+            locked = 1
+            try:
+                os.system("mkdir -p %s" % os.path.dirname(lockFile))
+                cmd = "lockfile -11 -r %d -l %d %s" % (tries, lockLife, lockFile)
+                locked = os.system(cmd)
+                if locked == 0:
+                    returnVal = fn(*args, **kwargs)  # first attempt
+                else:
+                    raise TryLockError()
+                return returnVal
+            finally:
+                if locked == 0:
+                    os.system("rm -f %s" % lockFile)
+
+        return wrapper  # decorated function
+
+    return deco_tryLock  # @retry(arg[, ...]) -> true decorator
+
+
+class TryLockError(Exception):
+    def __str__(self):
+        return "Failed to tryLock lockFile"
+
+class SwiftMaintainAgent:
+
+    def __init__(self, replicationTime=None, refreshTime=None):
         """
-        construct SwiftMaintainAgent daemon and create pid file
-        it will read replication_time from swift_master.ini
-        @type pidfile: string
-        @param pidfile: pid file path
+        construct SwiftMaintainAgent object.
+        It will read replication_time and refreshTime from swift_master.ini
         """
-        Daemon.__init__(self, pidfile)
         logger = util.getLogger(name='swiftmaintainagent')
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if replicationTime is None:
@@ -59,12 +79,6 @@ class SwiftMaintainAgent(Daemon):
         else:
             self.refreshTime = refreshTime
         self.refreshTime = int(self.refreshTime)
-
-        if daemonSleep is None:
-            self.daemonSleep = self.masterCfg.getKwparams()['maintainDaemonSleep']
-        else:
-            self.daemonSleep = daemonSleep
-        self.daemonSleep = int(self.daemonSleep)
 
         self.backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
         self.nodeInfo = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
@@ -198,46 +212,49 @@ class SwiftMaintainAgent(Daemon):
                                          hostname=ret["hostname"], 
                                          disks_to_reserve=ret["disks_to_reserve"], 
                                          disks_to_replace=ret["disks_to_replace"])
-
-    def run(self):
+    @staticmethod
+    @tryLock()
+    def renewMaintenanceBacklog(replicationTime=None, refreshTime=None):
         """
-        start daemon and check service and waiting mode
+        1. update tasks in the maintenance backlog
+        2. add a new task to the maintance backlog if empty
+        @return: {code: <integer>, message:<string>}   
         """
-        logger = util.getLogger(name='swiftmaintainagent.run')
-        while (True):
-            try:
-                deadline = int(time.time() - (self.replicationTime)*3600)
-                SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=self.nodeInfo,
-                                                            backlog=self.backlog,
-                                                            deadline=deadline)
 
-                if SwiftMaintainAgent.isBacklogEmpty(backlog=self.backlog):  # check whether the maintenance_backlog is empty. (C1)
-                    SwiftMaintainAgent.incrementBacklog(nodeInfo=self.nodeInfo, 
-                                                        backlog=self.backlog, 
-                                                        deadline=deadline) # choose a node for repair (P1)
+        logger = util.getLogger(name='swiftmaintainagent.renewMaintenanceBacklog')
 
-            except Exception as e:
-                logger.error(str(e))
+        masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
 
-            time.sleep(self.daemonSleep)
+        if replicationTime is None:
+            replicationTime = masterCfg.getKwparams()['maintainReplTime']
+        replicationTime = int(replicationTime)
+       
+        if refreshTime is None:
+            refreshTime = masterCfg.getKwparams()['maintainRefreshTime'] 
+        refreshTime = int(refreshTime)
+
+        backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
+        nodeInfo = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+
+        try:
+            deadline = int(time.time() - (replicationTime)*3600)
+            SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=nodeInfo,
+                                                        backlog=backlog,
+                                                        deadline=deadline)
+
+            if SwiftMaintainAgent.isBacklogEmpty(backlog=backlog):  # check whether the maintenance_backlog is empty. (C1)
+                SwiftMaintainAgent.incrementBacklog(nodeInfo=nodeInfo, 
+                                                    backlog=backlog, 
+                                                    deadline=deadline) # choose a node for repair (P1)
+
+            return {"code":0, "message":True}
+        except Exception as e:
+            logger.error(str(e))
+            return {"code":1, "message":str(e)}
 
 
 def main():
-    daemon = SwiftMaintainAgent('/var/run/SwiftMaintainAgent.pid')
-    if len(sys.argv) == 2:
-        if 'start' == sys.argv[1]:
-            daemon.start()
-        elif 'stop' == sys.argv[1]:
-            daemon.stop()
-        elif 'restart' == sys.argv[1]:
-            daemon.restart()
-        else:
-            print "Unknown command"
-            sys.exit(2)
-        sys.exit(0)
-    else:
-        print "usage: %s start|stop|restart" % sys.argv[0]
-        sys.exit(2)
+    print SwiftMaintainAgent.renewMaintenanceBacklog()
 
 if __name__ == "__main__":
     main()

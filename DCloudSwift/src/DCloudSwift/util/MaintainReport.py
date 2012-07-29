@@ -16,7 +16,7 @@ from util import GlobalVar
 from SwiftCfg import SwiftMasterCfg
 from database import MaintenanceBacklogDatabaseBroker
 from database import NodeInfoDatabaseBroker
-
+from master.swiftMaintainAgent import SwiftMaintainAgent
 
 class MaintainReport():
     """
@@ -52,6 +52,14 @@ class MaintainReport():
         for row in result:
             print row
 
+    def renew_backlog(self):
+        """
+        1. update tasks in the maintenance backlog
+        2. add a new task to the maintance backlog if empty
+        @return: {code: <integer>, message:<string>}   
+        """
+        return SwiftMaintainAgent.renewMaintenanceBacklog()
+
     def get_backlog(self):
         """
         query maintain table 
@@ -80,6 +88,11 @@ def print_maintenance_backlog():
 
     try:
         mr = MaintainReport()
+        ret = mr.renew_backlog()
+        if ret["code"] !=0:
+            print >> sys.stderr, ret["message"]
+            sys.exit(1)
+
         backlog = mr.get_backlog()
         for task in backlog:
             output = "%s:{\n" % task["hostname"]
@@ -91,7 +104,6 @@ def print_maintenance_backlog():
 
             output+="}"
             print output
-
     except Exception as e:
         print >> sys.stderr, str(e)
         sys.exit(1)
@@ -122,12 +134,12 @@ def print_node_info():
         for node in nodes:
             disk_list = json.loads(node["disk"])
             output = "%s:{\n" % node["hostname"]
-            output += "    status: %s\n" % node["status"]
-            output += "    timestamp: %d\n" % node["timestamp"]
-            output += "    disk: %s\n" % node["disk"]
-            output += "    mode: %s\n" % node["mode"]
-            output += "    mode: %s\n" % node["mode"]
-            output += "    switchpoint: %s\n" % node["switchpoint"]
+            output += "status: %s\n\n" % node["status"]
+            output += "timestamp: %d\n\n" % node["timestamp"]
+            output += "disk: %s\n\n" % node["disk"]
+            output += "mode: %s\n\n" % node["mode"]
+            output += "mode: %s\n\n" % node["mode"]
+            output += "switchpoint: %s\n" % node["switchpoint"]
             output+="}\n"
             print output
 

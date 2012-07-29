@@ -38,14 +38,18 @@
               ...
             
             where hostnameX are the hostname of nodes you want to monitor.
+        (2) Edit /etc/delta/swift_master.ini if necessary
+	(3) Execute "dcloud_clear_node_info"
+        (4) Execute "dcloud_clear_backlog"
+	(5) Execute "dcloud_initialize_node_info"
+        (6) Execute "dcloud_initialize_backlog"
+        (7) Execute "/etc/init.d/swift-event-manager"
+        (8) Execute "/etc/init.d/swift-maintain-switcher"
 
-	(2) Execute "dcloud_clear_node_info"
-        (3) Execute "dcloud_clear_backlog"
-	(4) Execute "dcloud_initialize_node_info"
-        (5) Execute "dcloud_initialize_backlog"
-        (6) Execute "/etc/init.d/swift-event-manager"
-        (7) Execute "/etc/init.d/swift-maintain-switcher"
-        (8) Execute "/etc/init.d/swift-maintain-agent"
+[command lines]
+1. dcloud_print_node_info
+2. dcloud_print_backlog
+
 
 [Note]:
 1. The command "dcloud_swift_deploy" is for the convenience of testing. 
