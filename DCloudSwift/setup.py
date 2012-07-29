@@ -61,7 +61,8 @@ def main():
         },
 
         scripts=[
-        'bin/swift-event-manager'
+        'bin/swift-event-manager',
+        'bin/swift-maintain-switcher'
         ],
 
         entry_points={
@@ -96,6 +97,9 @@ def main():
 
     os.system("update-rc.d -f swift-event-manager remove")
     os.system("update-rc.d swift-event-manager defaults")
+
+    os.system("update-rc.d -f swift-maintain-switcher remove")
+    os.system("update-rc.d swift-maintain-switcher defaults")
 
 if __name__ == '__main__':
     main()

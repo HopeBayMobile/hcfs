@@ -44,6 +44,8 @@
 	(4) Execute "dcloud_initialize_node_info"
         (5) Execute "dcloud_initialize_backlog"
         (6) Execute "/etc/init.d/swift-event-manager"
+        (7) Execute "/etc/init.d/swift-maintain-switcher"
+        (8) Execute "/etc/init.d/swift-maintain-agent"
 
 [Note]:
 1. The command "dcloud_swift_deploy" is for the convenience of testing. 
