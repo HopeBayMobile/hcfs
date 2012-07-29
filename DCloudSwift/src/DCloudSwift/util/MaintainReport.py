@@ -86,6 +86,14 @@ def print_maintenance_backlog():
         print >> sys.stderr, Usage
         sys.exit(1)
 
+    if not os.path.exists("/var/run/SwiftMaintainSwitcher.pid"):
+        print >> sys.stderr, "Cannot find pidfile of swift-maintain-switcher. Is it running?"
+        sys.exit(1)
+
+    if not os.path.exists("/var/run/SwiftEventMgr.pid"):
+        print >> sys.stderr, "Cannot find pidfile of swift-event-manager. Is it running?"
+        sys.exit(1)
+
     try:
         mr = MaintainReport()
         ret = mr.renew_backlog()
