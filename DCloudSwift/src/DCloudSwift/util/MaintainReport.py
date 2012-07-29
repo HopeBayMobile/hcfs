@@ -142,12 +142,11 @@ def print_node_info():
         for node in nodes:
             disk_list = json.loads(node["disk"])
             output = "%s:{\n" % node["hostname"]
-            output += "status: %s\n\n" % node["status"]
-            output += "timestamp: %d\n\n" % node["timestamp"]
-            output += "disk: %s\n\n" % node["disk"]
-            output += "mode: %s\n\n" % node["mode"]
-            output += "mode: %s\n\n" % node["mode"]
-            output += "switchpoint: %s\n" % node["switchpoint"]
+            output += "  status: %s\n" % node["status"]
+            output += "  timestamp: %d\n" % node["timestamp"]
+            output += "  disk: %s\n" % node["disk"]
+            output += "  mode: %s\n" % node["mode"]
+            output += "  switchpoint: %s\n" % node["switchpoint"]
             output+="}\n"
             print output
 
