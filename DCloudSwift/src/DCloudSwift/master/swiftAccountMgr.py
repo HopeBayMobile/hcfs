@@ -60,16 +60,25 @@ class SwiftAccountMgr:
         self.__password = self.__kwparams['password']
 
         self.__admin_default_name = "admin"
-        chars = string.letters + string.digits
-        self.__random_password = ''.join(random.choice(chars) for x in range(8))
-        #self.__admin_default_password = ''.join(random.choice(chars) for x in range(8))
-        #self.__user_default_password = ''.join(random.choice(chars) for x in range(8))
-        #self.__metadata_container_suffix = "_metadata_container"
+        self.__random_password_size = 12
+        #chars = string.letters + string.digits
+        #self.__random_password = ''.join(random.choice(chars) for x in range(8))
         self.__private_container_suffix = "_private_container"
         self.__shared_container_suffix = "_shared_container"
 
         if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
             os.system("echo \"    StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
+
+    def __generate_random_password(self):
+        '''
+        Generate a random password.
+
+        @rtype:  string
+        @return: a random password
+        '''
+        logger = util.getLogger(name="__generate_random_password")
+        chars = string.letters + string.digits
+        return "".join(random.choice(chars) for x in range(self.__random_password_size))
 
     def __functionBroker(self, proxy_ip_list, retry, fn, **kwargs):
         '''
@@ -173,13 +182,12 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
-        admin_user = account + self.__admin_name_suffix
         private_container = user + self.__private_container_suffix
         metadata_container = account + ":" + user
 
         #TODO: need to check the characters of the password
         if password == "":
-            password = self.__random_password
+            password = self.__generate_random_password()
 
         metadata_content = {
                 "Account-Enable": True,
@@ -215,14 +223,16 @@ class SwiftAccountMgr:
                 msg = "Account %s does not exist!" % account
                 return Bool(val, msg)
 
-            get_admin_password_output = self.get_user_password(account, user)
+            user_existence_output = self.user_existence(account, user)
 
-            if get_admin_password_output.val == False:
+            if user_existence_output.val == False:
                 val = False
-                msg = get_admin_password_output.msg
+                msg = user_existence_output.msg
                 return Bool(val, msg)
-            else:
-                admin_password = get_admin_password_output.msg
+            elif user_existence_output.result == True:
+                val = False
+                msg = "User %s has existed!" % user
+                return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__add_user, account=account,\
                                            user=user, password=password, admin=admin, reseller=reseller)
@@ -242,15 +252,30 @@ class SwiftAccountMgr:
         elif user == self.__admin_default_name:
             return Bool(val, msg)
 
-        assign_write_acl_output = self.assign_write_acl(account=account, container=private_container, user=user, admin_user=admin_user)
+        get_admin_password_output = self.get_user_password(account, self.__admin_default_name)
 
-        if assign_write_acl_output.val == False:
+        if get_admin_password_output.val == False:
+            val = False
+            msg = get_admin_password_output.msg
+            return Bool(val, msg)
+        else:
+            admin_password = get_admin_password_output.msg
+
+        write_acl = {
+            "Read": account + ":" + user,
+            "Write": account + ":" + user,
+        } 
+
+        #assign_write_acl_output = self.assign_write_acl(account=account, container=private_container,\
+        #                                                user=user, admin_user=self.__admin_default_name)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata, account=account, admin_user=self.__admin_default_name, admin_password=admin_password, container=private_container, metadata_content=write_acl)
+
+        if val == False:
             #TODO: need to rollback
-            val == False
             logger.error(msg)
         else:
             val = True
-            msg = ""
+            logger.info(msg)
 
         return Bool(val, msg)
 
@@ -383,7 +408,7 @@ class SwiftAccountMgr:
 
         #TODO: need to check the characters of the password
         if admin_password == "":
-            admin_password = self.__random_password
+            admin_password = self.__generate_random_password()
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found"
@@ -1104,10 +1129,6 @@ class SwiftAccountMgr:
             val = False
             msg = "User %s does not exist!" % user
             return Bool(val, msg)
-        else:
-            val = False
-            msg = user_existence_output.msg
-            return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_detail,\
                                            account=account, user=user)
@@ -1137,7 +1158,7 @@ class SwiftAccountMgr:
         #    return Bool(val, msg)
 
         if newPassword == "":
-            newPassword = self.__random_password
+            newPassword = self.__generate_random_password()
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__change_password, account=account,\
                                            user=user, newPassword=newPassword, admin=admin, reseller=reseller)
@@ -1877,6 +1898,7 @@ class SwiftAccountMgr:
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
+        print "mark 0"
         cmd = "swift -A %s -U %s:%s -K %s list" % (url, account, admin_user, admin_password)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
@@ -1954,6 +1976,8 @@ class SwiftAccountMgr:
             val = True
             msg = msg.split("\n")
             msg.remove("")
+            print "mark -1"
+            print msg
             return Bool(val, msg)
 
     @util.timeout(300)
@@ -2244,12 +2268,16 @@ class SwiftAccountMgr:
         if list_container_output.val == False:
             val = False
             msg = list_container_output.msg
+            print "mark -3"
             return Bool(val, msg)
         else:
             if container not in msg:
                 val = False
                 msg = "Container %s does not exist!" % container
+                print "mark -4"
                 return Bool(val, msg)
+
+        print "mark2"
 
         get_user_password_output = self.get_user_password(account, admin_user)
 
@@ -2260,6 +2288,8 @@ class SwiftAccountMgr:
             msg = "Failed to get the password of the admin user %s: %s" % (admin_user, get_user_password_output.msg)
             logger.error(msg)
             return Bool(val, msg)
+
+        print "mark3"
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata, account=account,\
                                            container=container, admin_user=admin_user, admin_password=admin_password)
@@ -2285,6 +2315,8 @@ class SwiftAccountMgr:
 
             msg["Read"] = ori_read_acl
             msg["Write"] = ori_write_acl
+
+        print "mark4"
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
                                            account=account, container=container, admin_user=admin_user,\
@@ -2811,8 +2843,8 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
-
-    print SA.list_account().msg
-    print SA.add_account("ricetest09").msg
-    print SA.list_account().msg
-    print SA.list_user("ricetest09").msg
+    print SA.add_account("account1")
+    print SA.add_user("account1","user7")
+    #print SA.add_account("account8")
+    #print SA.add_user("account1","user1")
+    #print SA.add_user("account8","user1")
