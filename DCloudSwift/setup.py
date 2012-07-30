@@ -39,22 +39,6 @@ def usage():
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
-required_pkgs = ['swauth >= 1.0.2',
-                 'twisted >= 10.2.0',
-                 'swift >= 1.4.8',
-                 'webob >= 1.0.8',
-                 'eventlet >= 0.9.14',
-                 'xattr >= 0.6',
-                 'formencode >=1.2.2',
-                 'greenlet >= 0.3.1',
-                 'netifaces >= 0.5-2',
-                 'python-openid >= 2.2.4-1',
-                 'paste >= 1.7.5.1',
-                 'pastedeploy >= 1.3.3',
-                 'pastescript >= 1.7.3',
-                 'scgi >= 1.13',
-                ]
-
 def main():
     os.system("mkdir -p %s" % DELTADIR)
 
@@ -97,7 +81,6 @@ def main():
         data_files=[(DELTADIR, ['inputFile.sample', 'Swift.ini', 'swift_master.ini']),
                    ],
 
-        install_requires=required_pkgs,
         test_suite='unittest',
         long_description=read('README'),
         classifiers=[

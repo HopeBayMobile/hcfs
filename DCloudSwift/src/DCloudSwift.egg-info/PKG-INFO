@@ -1,0 +1,81 @@
+Metadata-Version: 1.1
+Name: DCloudSwift
+Version: 0.2
+Summary: Delta Inc. CTBU Storage Gateway
+Home-page: UNKNOWN
+Author: Cloud Data Team, CTBU, Delta Electronic Inc.
+Author-email: UNKNOWN
+License: Delta Inc.
+Description: [Description]:
+        1. The scripts is used to deploy Swift. The development environment is listed
+           in the following.
+        	(1) OS: Ubuntu 11.04 64 bits
+        	(2) Language: python and bash shell
+        	(3) Hardware: AMD 64bit
+        
+        
+        [Installation]
+        1. Copy the folder 'DCloudSwift' to the master node.
+        2. Deploy swift
+        	(1) Change your privilege to root.
+        	(2) Execute 'python setup.py install'
+        	(3) Edit ./Swift.ini:
+        	    [storage]
+                    password = password of root in swift nodes
+                    deviceCnt = how many disks to use in each swift node
+        	    proxyPort = the port on which the swift-proxy should listen
+        	   
+                    [portal]
+                    url = url of the public access portal for users
+                (4) Add [deploy] section to /etc/delta/inputFile in the following format:
+                      ip1 zid1
+                      ip2 zid2
+                      ...
+                    
+                      where zid has to be a positive integer less than 10.
+                      Note that the master node to run this deploy script cannot be included 
+                      in this list.
+                      
+        	(5) execute "dcloud_swift_deploy numOfReplcia"
+                    where numOfReplica has to be a positive integer less than 10 
+        
+        3. setup event manager
+                (1) Add [nodeList] section to /etc/delta/inputFile in the following format:
+                      hostname1
+                      hostname2
+                      ...
+                    
+                    where hostnameX are the hostname of nodes you want to monitor.
+                (2) Edit /etc/delta/swift_master.ini if necessary
+        	(3) Execute "dcloud_clear_node_info"
+                (4) Execute "dcloud_clear_backlog"
+        	(5) Execute "dcloud_initialize_node_info"
+                (6) Execute "dcloud_initialize_backlog"
+                (7) Execute "/etc/init.d/swift-event-manager"
+                (8) Execute "/etc/init.d/swift-maintain-switcher"
+        
+        [command lines]
+        1. dcloud_print_node_info
+        2. dcloud_print_backlog
+        
+        
+        [Note]:
+        1. The command "dcloud_swift_deploy" is for the convenience of testing. 
+           Onec PDCM is ready, we don't have to edit /etc/delta/storageNodes and /etc/delta/proxyNodes. 
+           PDCM will assign the IPs of proxy and storage nodes automatically.
+        
+        2. The logs and error handling are not ready yet! Some logs can be found 
+           in /var/log/deltaSwift.
+        
+        3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
+           Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
+        
+        4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
+           Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py
+        
+        5. For PDCM0.4, please create /srv and /DCloudSwift when building golden image.
+        
+Keywords: deploy,swift,cloud
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Topic :: FILESYSTEM
