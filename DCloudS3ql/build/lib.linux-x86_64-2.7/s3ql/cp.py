@@ -94,8 +94,15 @@ def main(args=None):
             raise
 
     fstat_t = os.stat(options.target)
-    llfuse.setxattr(ctrlfile, 'copy', pickle.dumps((fstat_s.st_ino, fstat_t.st_ino),
+    #Jiahong: adding code to handle raised OSError
+    try:
+        llfuse.setxattr(ctrlfile, 'copy', pickle.dumps((fstat_s.st_ino, fstat_t.st_ino),
                                                     pickle.HIGHEST_PROTOCOL))
+    except OSError as exc:
+        if exc.errno == errno.EAGAIN:
+            raise QuietError('Dirty cache has not been completely flushed. Please retry again later.')
+        else:
+            raise
 
 
 if __name__ == '__main__':

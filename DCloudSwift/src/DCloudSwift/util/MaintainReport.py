@@ -15,7 +15,8 @@ from daemon import Daemon
 from util import GlobalVar
 from SwiftCfg import SwiftMasterCfg
 from database import MaintenanceBacklogDatabaseBroker
-
+from database import NodeInfoDatabaseBroker
+from master.swiftMaintainAgent import SwiftMaintainAgent
 
 class MaintainReport():
     """
@@ -29,7 +30,7 @@ class MaintainReport():
         """
         self.report = {}
         if DBFile is None:
-            self.DBFile = SwiftMasterCfg(GlobalVar.NODE_DB)
+            self.DBFile = GlobalVar.MAINTENANCE_BACKLOG
         else:
             self.DBFile = DBFile
         self.db = MaintenanceBacklogDatabaseBroker(self.DBFile)
@@ -50,6 +51,108 @@ class MaintainReport():
                 'target = "%s"' % target)
         for row in result:
             print row
+
+    def renew_backlog(self):
+        """
+        1. update tasks in the maintenance backlog
+        2. add a new task to the maintance backlog if empty
+        @return: {code: <integer>, message:<string>}   
+        """
+        return SwiftMaintainAgent.renewMaintenanceBacklog()
+
+    def get_backlog(self):
+        """
+        query maintain table 
+        @return: Return raw data.
+        """
+        result = self.db.show_maintenance_backlog_table()
+        return result
+
+def print_maintenance_backlog():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_print_backlog
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    if not os.path.exists("/var/run/SwiftMaintainSwitcher.pid"):
+        print >> sys.stderr, "Cannot find pidfile of swift-maintain-switcher. Is it running?"
+        sys.exit(1)
+
+    if not os.path.exists("/var/run/SwiftEventMgr.pid"):
+        print >> sys.stderr, "Cannot find pidfile of swift-event-manager. Is it running?"
+        sys.exit(1)
+
+    try:
+        mr = MaintainReport()
+        ret = mr.renew_backlog()
+        if ret["code"] !=0:
+            print >> sys.stderr, ret["message"]
+            sys.exit(1)
+
+        backlog = mr.get_backlog()
+        for task in backlog:
+            output = "%s:{\n" % task["hostname"]
+            output += "    target: %s\n" % task["target"]
+            if task["target"] == "disk_missing":
+                output += "    disks_to_reserve: %s\n" % task["disks_to_reserve"]
+            elif task["target"] == "disk_broken":
+                output += "    disks_to_replace: %s\n" % task["disks_to_replace"]
+
+            output+="}"
+            print output
+    except Exception as e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)
+
+def print_node_info():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_print_node_info
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        DBFile = GlobalVar.NODE_DB
+        db = NodeInfoDatabaseBroker(DBFile)
+        nodes = db.show_node_info_table()
+
+        for node in nodes:
+            disk_list = json.loads(node["disk"])
+            output = "%s:{\n" % node["hostname"]
+            output += "  status: %s\n" % node["status"]
+            output += "  timestamp: %d\n" % node["timestamp"]
+            output += "  disk: %s\n" % node["disk"]
+            output += "  mode: %s\n" % node["mode"]
+            output += "  switchpoint: %s\n" % node["switchpoint"]
+            output+="}\n"
+            print output
+
+    except Exception as e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)
 
 
 def main(DBFile=None):

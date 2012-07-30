@@ -200,9 +200,7 @@ class NodeMonitor(Daemon):
         while True:
             try:
                 try: 
-                    logger.info("hello1")
                     self.HB.send_heartbeat()
-                    logger.info("hello2")
                 except Exception as e:
                     logger.error(str(e))
                  
@@ -231,5 +229,6 @@ if __name__ == "__main__":
             sys.exit(2)
         sys.exit(0)
     else:
+        post_data("http://172.16.78.79:5308/events","{}")
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)

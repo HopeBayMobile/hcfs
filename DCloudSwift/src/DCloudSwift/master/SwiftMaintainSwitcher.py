@@ -54,7 +54,7 @@ class SwiftMaintainSwitcher(Daemon):
         logger.info('start initiailize SwiftMaintainSwitcher')
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if DBFile is None:
-            self.DBFile = SwiftMasterCfg(GlobalVar.NODE_DB)
+            self.DBFile = GlobalVar.NODE_DB
         else:
             self.DBFile = DBFile
         if replicationTime is None:
@@ -84,18 +84,20 @@ class SwiftMaintainSwitcher(Daemon):
         logger.info("start check hostname which is in service mode")
         serviceNode = \
             self.db.query_node_info_table('mode = "service"').fetchall()
+
         for row in serviceNode:
             if row[1] == HEARTBEAT.status[2]:
                 record = self.updateStatusWaiting(row[0])
                 logger.info("the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
                 continue
+
             if row[1] == HEARTBEAT.status[0]:
                 diskInfo = json.loads(row[3])
                 if ((self.refreshTime + row[2]) < self.nowtimeStamp):
                     self.db.update_node_status(row[0], 
                                                HEARTBEAT.status[2], 
-                                               self.nowtimestamp)
+                                               self.nowtimeStamp)
                     record = self.updateStatusWaiting(row[0])
                     logger.info(
                         "the record which update status to waiting: %s"
@@ -109,6 +111,7 @@ class SwiftMaintainSwitcher(Daemon):
                             "the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
                         continue
+
         logger.info("end check hostname which is in service mode")
 
     def updateStatusService(self, hostname=None):
@@ -178,7 +181,7 @@ class SwiftMaintainSwitcher(Daemon):
         """
         logger = util.getLogger(name='swiftmaintainswitcher.run')
         while True:
-            logger.error("daemon sleep: %s" % self.daemonSleep)
+            logger.info("daemon sleep: %s" % self.daemonSleep)
             self.checkService()
             self.checkWaiting()
             time.sleep(int(self.daemonSleep))
@@ -204,7 +207,7 @@ def main(DBFile=None):
         sys.exit(2)
 
 if __name__ == "__main__":
-    DBFile = '/etc/test/test.db'
+#    DBFile = '/etc/test/test.db'
 #    os.system("rm -f %s" % DBFile)
 #    db = NodeInfoDatabaseBroker(DBFile)
 #    db.initialize()
@@ -232,4 +235,5 @@ if __name__ == "__main__":
 #        json.dumps(diskInfo), 'service', timestamp)
 #    row = db.add_node('192.168.1.100', 'alive', timestamp-100,
 #        '{}', 'waiting', timestamp)
+    DBFile = None
     main(DBFile)
