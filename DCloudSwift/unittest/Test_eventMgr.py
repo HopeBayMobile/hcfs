@@ -919,6 +919,52 @@ class Test_updateNodeStatus:
         SwiftEventMgr.handleHeartbeat(event, "/etc/test/test.db")
         ret = self.db.get_info("ThinkPad")
         nose.tools.ok_(ret)
+        nose.tools.ok_(ret["status"]=="dead")
+
+    def test_dead2alive_event(self):
+        disk_info = {
+                         "timestamp": 1000,
+                         "missing": {
+                                        "count": 2,
+                                        "timestamp": 500,
+                                    },
+
+                         "broken": [
+                                     {"SN": "1", "timestamp": 500},
+                                     {"SN": "2", "timestamp": 500},
+                                   ],
+
+                         "healthy":[
+                                     {"SN": "3", "timestamp": 999},
+                                     {"SN": "4", "timestamp": 999},
+                                   ]
+        }
+
+        node = {
+                  "hostname": "ThinkPad",
+                  "status": "dead",
+                  "timestamp": 100,
+                  "disk": json.dumps(disk_info),
+                  "mode": "service",
+                  "switchpoint": 123,
+        }
+
+        event = {
+                  "event": "heartbeat",
+                  "nodes": [
+                               {"hostname":"ThinkPad",
+                                "role":"MH",
+                                "status":"alive",
+                               },
+                           ]
+        }
+
+        info = self.db.add_node(**node)
+        nose.tools.ok_(info)
+
+        SwiftEventMgr.handleHeartbeat(event, "/etc/test/test.db")
+        ret = self.db.get_info("ThinkPad")
+        nose.tools.ok_(ret)
         nose.tools.ok_(ret["status"]=="alive")
 
     def test_invalidHost_event(self):
@@ -954,7 +1000,7 @@ class Test_updateNodeStatus:
                   "nodes": [
                                {"hostname":"WhatsUp",
                                 "role":"MH",
-                                "status":"alive",
+                                "status":"dead",
                                },
                            ]
         }
