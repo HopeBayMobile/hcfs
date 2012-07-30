@@ -1270,6 +1270,15 @@ def _mount(storage_url):
         po.wait()
         if po.returncode != 0:
             raise BuildGWError(output)
+        
+        # wthung, 2012/7/30
+        # create /mnt/nfssamba
+        cmd = "sudo mkdir -p /mnt/nfssamba"
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        if po.returncode != 0:
+            raise BuildGWError(output)
 
         #change the owner of nfs share to nobody:nogroup
         cmd = "sudo chown nobody:nogroup %s/nfsshare" % mountpoint
