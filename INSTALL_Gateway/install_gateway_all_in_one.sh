@@ -6,10 +6,6 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
    exit 1
 fi
 
-# install S3QL
-cd ../DCloudS3ql
-./install_s3ql_script
-
 # install gateway API
 cd ../DCloudGateway
 ./gateway_api_install_script
@@ -21,6 +17,10 @@ cd samba-3.6.6-pkg
 cd ../ubuntu1204
 ./install-u1204.sh
 cd ..
+
+# install S3QL
+cd ../DCloudS3ql
+./install_s3ql_script
 
 # install gateway GUI
 cd ../DCloudGatewayUI
