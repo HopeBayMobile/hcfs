@@ -107,6 +107,7 @@ tests/t4_fuse.py
 tests/t5_cp.py
 tests/t5_ctrl.py
 tests/t5_fsck.py
+tests/t5_fsck.py.orig
 tests/t5_full.py
 tests/t5_lock_rm.py
 util/cmdline_lexer.py
