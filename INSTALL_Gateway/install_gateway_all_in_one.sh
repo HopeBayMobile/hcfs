@@ -9,6 +9,9 @@ fi
 # install gateway API
 cd ../DCloudGateway
 ./gateway_api_install_script
+# install S3QL
+cd ../DCloudS3ql
+./install_s3ql_script
 # install samba 3.6.6
 cd ../GatewayPatches
 cd samba-3.6.6-pkg
@@ -17,10 +20,6 @@ cd samba-3.6.6-pkg
 cd ../ubuntu1204
 ./install-u1204.sh
 cd ..
-
-# install S3QL
-cd ../DCloudS3ql
-./install_s3ql_script
 
 # install gateway GUI
 cd ../DCloudGatewayUI
