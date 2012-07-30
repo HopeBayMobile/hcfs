@@ -118,16 +118,16 @@ def http_connection(hostname, port, ssl=False):
         log.info('Using proxy %s:%d', proxy_host, proxy_port)
         
         if ssl:
-            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=60)
+            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=300)
         else:
-            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=60)
+            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=300)
         conn.set_tunnel(hostname, port)
         return conn
     
     elif ssl:
-        return httplib.HTTPSConnection(hostname, port, timeout=60)
+        return httplib.HTTPSConnection(hostname, port, timeout=300)
     else:
-        return httplib.HTTPConnection(hostname, port, timeout=60)
+        return httplib.HTTPConnection(hostname, port, timeout=300)
     
 def sha256(s):
     return hashlib.sha256(s).digest()
