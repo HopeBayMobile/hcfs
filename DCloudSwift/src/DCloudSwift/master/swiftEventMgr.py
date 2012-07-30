@@ -250,9 +250,10 @@ class SwiftEventMgr(Daemon):
             logger.error("Invalid heartbeat event")
             return None
         
-        nodes = json.loads(event["nodes"])
+        nodes = event["nodes"]
         for node in nodes:
-            SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
+            newNodeStatus = SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
+            return newNodeStatus
 
     @staticmethod
     def handleEvents(notification):
