@@ -146,8 +146,9 @@ class Operations(llfuse.Operations):
     def check_args(self, args):
         '''Check and/or supplement fuse mount options'''
 
+        #Jiahong: Commented out max_write config here as new config is added to mount.py
         args.append(b'big_writes')
-        args.append('max_write=131072')
+        #args.append('max_write=131072')
         args.append('no_remote_lock')
 
     def readdir(self, id_, off):
@@ -347,6 +348,7 @@ class Operations(llfuse.Operations):
         log.debug('remove_tree(%d, %s): end', id_p0, name0)
 
 
+#Jiahong: Snapshotting begins with dirty cache flush, and only after complete flush will metadata replication starts 
     def copy_tree(self, src_id, target_id):
         '''Efficiently copy directory tree'''
 
@@ -357,10 +359,14 @@ class Operations(llfuse.Operations):
         db = self.db
 
         # First we make sure that all blocks are in the database
-#TODO: it may not be necessary for the cache to be uploaded first for snapshotting,
-#but gateway users should be warned about failed snapshots if blocks in any snapshot are corrupted
-        self.cache.commit()
-        log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
+        #Jiahong: commenting out the following. We do not need to use this function
+        #self.cache.commit()
+        #log.debug('copy_tree(%d, %d): committed cache', src_id, target_id)
+
+        #Jiahong: A monitoring code here to probe for clean cache and raise EAGAIN error if contain dirty cache
+        if self.cache.dirty_entries > 0:
+            self.cache.snapshot_upload = True #Start flushing to cloud
+            raise FUSEError(errno.EAGAIN)
 
         # Copy target attributes
         # These come from setxattr, so they may have been deleted
@@ -372,6 +378,10 @@ class Operations(llfuse.Operations):
             raise FUSEError(errno.ENOENT)
         for attr in ('atime', 'ctime', 'mtime', 'mode', 'uid', 'gid'):
             setattr(target_inode, attr, getattr(src_inode, attr))
+
+        #Jiahong: record statistics of this snapshotting (number of files, size)
+        snapshot_total_files = 0
+        snapshot_total_size = 0
 
         # We first replicate into a dummy inode, so that we
         # need to invalidate only once.
@@ -391,7 +401,6 @@ class Operations(llfuse.Operations):
             for (name_id, id_) in db.query('SELECT name_id, inode FROM contents '
                                            'WHERE parent_inode=? AND name_id > ? '
                                            'ORDER BY name_id', (src_id, off)):
-
                 if id_ not in id_cache:
                     inode = self.inodes[id_]
 
@@ -403,6 +412,10 @@ class Operations(llfuse.Operations):
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
+
+                    #Jiahong: updating statistics
+                    snapshot_total_files = snapshot_total_files + 1
+                    snapshot_total_size = snapshot_total_size + inode.size
 
                     id_new = inode_new.id
 
@@ -440,28 +453,40 @@ class Operations(llfuse.Operations):
 
                 processed += 1
 
-                if processed > gil_step:
-                    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
-                              src_inode.id, target_inode.id, src_id, target_id, name_id)
-                    queue.append((src_id, target_id, name_id))
-                    break
+#Jiahong: commented out the yielding process for now
+                #if processed > gil_step:
+                #    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
+                #              src_inode.id, target_inode.id, src_id, target_id, name_id)
+                #    queue.append((src_id, target_id, name_id))
+                #    break
 
-            if processed > gil_step:
-                dt = time.time() - stamp
-                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
-                log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
-                          src_inode.id, target_inode.id, gil_step)
-                processed = 0
-                llfuse.lock.yield_(100)
-                log.debug('copy_tree(%d, %d): re-acquired lock',
-                          src_inode.id, target_inode.id)
-                stamp = time.time()
+#Jiahong: commented out the yielding process for now
+            #if processed > gil_step:
+            #    dt = time.time() - stamp
+            #    gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+            #    log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
+            #              src_inode.id, target_inode.id, gil_step)
+            #    processed = 0
+            #    llfuse.lock.yield_(100)
+            #    log.debug('copy_tree(%d, %d): re-acquired lock',
+            #              src_inode.id, target_inode.id)
+            #    stamp = time.time()
 
         # Make replication visible
         self.db.execute('UPDATE contents SET parent_inode=? WHERE parent_inode=?',
                         (target_inode.id, tmp.id))
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
+
+        #write statistics to /root/.s3ql
+        try:
+            with open('/root/.s3ql/snapshot.log','w') as fh:
+                fh.write('total files: %d\n' % snapshot_total_files)
+                fh.write('total size: %d\n' % snapshot_total_size)
+        except:
+            log.warning('Unable to write snapshot statistics to log. Skipping logging')
+
+        self.cache.snapshot_upload = False
 
         log.debug('copy_tree(%d, %d): end', src_inode.id, target_inode.id)
 
@@ -833,7 +858,7 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = max(self.cache.dirty_entries,0)
         cache_maxsize = max(self.cache.max_size,0)
         cache_maxentries = max(self.cache.max_entries,0)
-        if (self.cache.do_upload or self.cache.forced_upload) and self.cache.dirty_size>0:
+        if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
             cache_uploading = 0
@@ -956,6 +981,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         '''
         log.debug('read(%d, %d, %d): start', fh, offset, length)
+
         buf = StringIO()
         inode = self.inodes[fh]
 
@@ -1018,7 +1044,7 @@ class Operations(llfuse.Operations):
             # If we can't read enough, add null bytes
             return buf + b"\0" * (length - len(buf))
 
-# TODO: Block write to FUSE when network connection to backend is down and dirty cache occupied all cache  
+# Jiahong: TODO: Block write to FUSE when network connection to backend is down and dirty cache occupied all cache  
     def write(self, fh, offset, buf):
         '''Handle FUSE write requests.
         

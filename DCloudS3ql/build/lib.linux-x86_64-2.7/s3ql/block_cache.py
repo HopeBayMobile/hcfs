@@ -263,10 +263,14 @@ class BlockCache(object):
         self.preload_cache = False
         self.do_upload = False
         self.forced_upload = False
+        self.snapshot_upload = False #New upload switch for snapshotting (need to flush first before snapshotting)
         #Jiahong: Adding a mechanism to monitor alive upload threads
         self.last_checked = time.time()
         self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
         self.thread_checking = False #Jiahong: New flag for knowing if the upload thread respawning check is in progress
+        self.quick_inode = -1 # Jiahong: New mechanism for caching block pointer
+        self.quick_block = -1 # Jiahong: New mechanism for caching block pointer
+        self.quick_pointer = None
 
 
         if os.access(self.path,os.F_OK):
@@ -666,6 +670,12 @@ class BlockCache(object):
             self.expire()
 
         el = None
+        if (self.quick_pointer is not None):
+            if (inode == self.quick_inode) and (blockno == self.quick_block):
+                el = self.quick_pointer
+            else:
+                self.quick_pointer = None
+
         while el is None:
             # Don't allow changing objects while they're being uploaded
             if (inode, blockno) in self.in_transit:
@@ -674,6 +684,7 @@ class BlockCache(object):
                 self.wait()
                 continue
 
+            #Jiahong: If cache blocks already exist but not in cache hash, put them in the cache hash
             try:
                 el = self.entries[(inode, blockno)]
 
@@ -794,6 +805,11 @@ class BlockCache(object):
         oldsize = el.size
         was_dirty = el.dirty
 
+        if (self.quick_pointer is None):
+            self.quick_pointer = el
+            self.quick_inode = inode
+            self.quick_block = blockno
+
         # Provide fh to caller
         try:
             #log.debug('get(inode=%d, block=%d): yield', inode, blockno)
@@ -811,67 +827,14 @@ class BlockCache(object):
             if self.dirty_entries < 0:
                 self.dirty_entries = 0
 
-#TODO: the parameter value 0.8 may be adjustable by users in the future
+#Jiahong: TODO: the parameter value 0.8 may be adjustable by users in the future
             if self.dirty_size > 0.8*self.max_size or self.dirty_entries > 0.8*self.max_entries:
                 self.forced_upload = True
 
         #log.debug('get(inode=%d, block=%d): end', inode, blockno)
 
 
-#Currently may not being used
-#This is the new expire() that only expires clean blocks. In theory, we will always have enough clean block size and entries for a replacement.
-#(assuming that the limits on dirty block size and entries are correctly implemented).
-    def expire1(self):
-        """Perform cache expiry
 
-        This method releases the global lock.
-        """
-
-        # Note that we have to make sure that the cache entry is written into
-        # the database before we remove it from the cache!
-
-        log.debug('expire: start')
-
-        did_nothing_count = 0
-        while (len(self.entries) > self.max_entries or
-               (len(self.entries) > 0  and self.size > self.max_size)):
-
-            need_size = self.size - self.max_size
-            need_entries = len(self.entries) - self.max_entries
-
-            # Try to expire entries that are not dirty
-            for el in self.entries.values_rev():
-                if el.dirty:
-                    continue
-
-                del self.entries[(el.inode, el.blockno)]
-                el.close()
-                el.unlink()
-                need_entries -= 1
-                self.size -= el.size
-                need_size -= el.size
-
-                did_nothing_count = 0
-                if need_size <= 0 and need_entries <= 0:
-                    break
-
-            if need_size <= 0 and need_entries <= 0:
-                break
-
-            did_nothing_count += 1
-            if did_nothing_count > 50:
-                log.error('Problem in expire()')
-                break
-
-            # Wait for the next entry
-            log.debug('expire: waiting for transfer threads..')
-            self.wait() # Releases global lock
-
-        log.debug('expire: end')
-
-
-
-#the original expire(), the one that also expires dirty blocks
     def expire(self):
         """Perform cache expiry
         
@@ -882,16 +845,8 @@ class BlockCache(object):
         # the database before we remove it from the cache!
 
         log.debug('expire: start')
-#Jiahong: TODO: put some mechanism here to check for network connection before
-#actually trying to expire any blocks
 
-        try:
-            with self.bucket_pool() as bucket:
-                bucket.store('cloud_gw_test_connection','nodata')
-        except:
-            log.error('Network appears to be down. Failing expire cache.')
-            raise(llfuse.FUSEError(errno.EIO))
-#Implement the rest...
+        self.quick_pointer = None  # Reset the cached block pointer
 
 
         did_nothing_count = 0
@@ -928,6 +883,14 @@ class BlockCache(object):
                 break
 
             # Try to upload just enough
+            #Jiahong: First check if swift is good
+            try:
+                with self.bucket_pool() as bucket:
+                    bucket.store('cloud_gw_test_connection','nodata')
+            except:
+                log.error('Network appears to be down. Failing expire cache.')
+                raise(llfuse.FUSEError(errno.EIO))
+
             for el in self.entries.values_rev():
                 if el.dirty and (el.inode, el.blockno) not in self.in_transit:
                     log.debug('expire: uploading %s..', el)
@@ -1054,7 +1017,7 @@ class BlockCache(object):
 
 
 
-#TODO: May rename/remove this function if we do not require dirty blocks to be uploaded before a snapshot is taken
+#Jiahong: TODO: May rename/remove this function if we do not require dirty blocks to be uploaded before a snapshot is taken
     def commit(self):
         """Initiate upload of all dirty blocks
         
