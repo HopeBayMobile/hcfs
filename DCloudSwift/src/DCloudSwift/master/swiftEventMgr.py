@@ -79,6 +79,15 @@ class SwiftEventMgr(Daemon):
     '''
     @staticmethod
     def isValidDiskEvent(event):
+        '''
+        check the format of disk event 
+
+        @type  event: dictioary
+        @param event: disk event
+        @rtype: boolean
+        @return: Return False if there's format error. 
+            Otherwise, return True.
+        '''
         logger = util.getLogger(name="SwiftEventMgr.isValidDiskEvent")
         try:
             hostname = event["hostname"]
@@ -184,6 +193,12 @@ class SwiftEventMgr(Daemon):
 
     @staticmethod
     def handleHDD(event):
+        '''
+        handle HDD event
+        
+        @type  event: dictioary
+        @param event: hdd event
+        '''
         SwiftEventMgr.updateDiskInfo(event)
 
     '''
@@ -202,6 +217,15 @@ class SwiftEventMgr(Daemon):
     '''
     @staticmethod
     def isValidHeartbeat(event):
+        '''
+        check the format of heartbeat event 
+
+        @type  event: dictioary
+        @param event: heartbeat event
+        @rtype: boolean
+        @return: Return False if there's format error. 
+            Otherwise, return True.
+        '''
         logger = util.getLogger(name="SwiftEventMgr.isValidHeartbeat")
         try:
             for node in event["nodes"]:
@@ -227,6 +251,12 @@ class SwiftEventMgr(Daemon):
     def updateNodeStatus(node, nodeInfoDbPath):
         '''
         update node status according to the heartbeat event
+        
+        @type  node: list
+        @param node: node information include node status, role, and status.
+        @rtype: string
+        @return: Return None if there's error. 
+            Otherwise, return the newly updated line
         '''
         logger = util.getLogger(name="SwiftEventMgr.updateNodeStatus")
 
@@ -244,6 +274,15 @@ class SwiftEventMgr(Daemon):
 
     @staticmethod
     def handleHeartbeat(event, nodeInfoDbPath=GlobalVar.NODE_DB):
+        '''
+        handle heartbeat event
+        
+        @type  event: dictioary
+        @param event: heartbeat event
+        @rtype: string
+        @return: Return None if there's error. 
+            Otherwise, return the newly updated line
+        '''
         logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
 
         if not SwiftEventMgr.isValidHeartbeat(event):
@@ -257,6 +296,12 @@ class SwiftEventMgr(Daemon):
 
     @staticmethod
     def handleEvents(notification):
+        '''
+        handle the received event
+        
+        @type  notification: dictioary
+        @param notification: contain an heartbeat or hdd event
+        '''
         logger = util.getLogger(name="swifteventmgr.handleEvents")
         logger.info("%s" % notification)
         event = None
