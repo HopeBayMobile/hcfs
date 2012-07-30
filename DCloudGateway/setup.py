@@ -41,7 +41,7 @@ def main():
 
         os.system("cp config/rc.local /etc")
         os.system("cp config/crontab /etc")
-        os.system("cp config/sysctl.conf /etc")
+        #os.system("cp config/sysctl.conf /etc")
         os.system("chmod 600 /etc/crontab")
 	os.system("sh ./gateway_scripts/createSmbUser.sh superuser")
 	os.system("chmod 666 %s/Gateway.ini"%CONFDIR)
