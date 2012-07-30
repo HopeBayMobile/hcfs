@@ -7,6 +7,7 @@ import pickle
 import signal
 import json
 import sqlite3
+import twisted
 from ConfigParser import ConfigParser
 from twisted.web.server import Site
 from twisted.web.resource import Resource
@@ -22,6 +23,7 @@ from util.util import GlobalVar
 from util import util
 from util.database import NodeInfoDatabaseBroker
 from util.database import MaintenanceBacklogDatabaseBroker
+
 
 class SwiftEventMgr(Daemon):
     def __init__(self, pidfile):
@@ -42,6 +44,7 @@ class SwiftEventMgr(Daemon):
         @rtype: integer
         @return: expected disk count of the queried node. Return None in case of exception.
         '''
+        logger = util.getLogger(name="SwiftEventMgr.getExpectedDiskCount")
         config = ConfigParser()
 
         try:
@@ -50,7 +53,7 @@ class SwiftEventMgr(Daemon):
 
             return int(config.get('storage', 'deviceCnt'))
         except:
-            logger.error("Failed to read deviceCnt from %s" %  GlobalVar.ORI_SWIFTCONF)
+            logger.error("Failed to read deviceCnt from %s" % GlobalVar.ORI_SWIFTCONF)
             return None
 
     '''
@@ -61,15 +64,15 @@ class SwiftEventMgr(Daemon):
         level: INFO|WARNING|ERROR,
         hostname: <hostname>
         data: [
-                  { 
+                  {
                      SN: <serial number>,
                      healthy: True|False
-                  }, 
+                  },
 
                   {
                       SN: <string: serial number>,
                       healthy: True|False
-                  }, ... 
+                  }, ...
               ],
         time: <integer>
     }
@@ -99,7 +102,6 @@ class SwiftEventMgr(Daemon):
 
         return True
 
-
     @staticmethod
     def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         '''
@@ -117,7 +119,7 @@ class SwiftEventMgr(Daemon):
                             "broken": [],
                             "healthy": [],
         }
-     
+
         nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
 
         if not SwiftEventMgr.isValidDiskEvent(event):
@@ -137,7 +139,7 @@ class SwiftEventMgr(Daemon):
             expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
 
             detectedDiskSNs = {disk["SN"] for disk in data if disk["SN"]}
-            knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"]+old_disk_info["healthy"] if disk["SN"]}
+            knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] + old_disk_info["healthy"] if disk["SN"]}
 
             if old_disk_info["timestamp"] >= event["time"]:
                 logger.warn("Old disk events are received")
@@ -147,11 +149,11 @@ class SwiftEventMgr(Daemon):
 
             # Update missing disks info
             new_disk_info["missing"]["count"] = max(expectedDiskCount - len(detectedDiskSNs), 0)
-            if len( knownDiskSNs-detectedDiskSNs) > 0 and len(detectedDiskSNs) < expectedDiskCount:
+            if len(knownDiskSNs - detectedDiskSNs) > 0 and len(detectedDiskSNs) < expectedDiskCount:
                 new_disk_info["missing"]["timestamp"] = event["time"]
             else:
                 new_disk_info["missing"]["timestamp"] = old_disk_info["missing"]["timestamp"]
-            
+
             # Update healthy disks info
             detectedHealthyDisks = [disk for disk in data if disk["healthy"]]
             new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"]} for disk in detectedHealthyDisks]
@@ -169,7 +171,7 @@ class SwiftEventMgr(Daemon):
 
         except Exception as e:
             logger.error(str(e))
-            return None 
+            return None
 
         try:
             disk = json.dumps(new_disk_info)
@@ -180,11 +182,9 @@ class SwiftEventMgr(Daemon):
 
         return new_disk_info
 
-
     @staticmethod
     def handleHDD(event):
-        logger = util.getLogger(name="swifteventmgr.handleHDD")
-        new_disk_info = SwiftEventMgr.updateDiskInfo(event)
+        SwiftEventMgr.updateDiskInfo(event)
 
     '''
     Heartbeat format
@@ -245,11 +245,11 @@ class SwiftEventMgr(Daemon):
     @staticmethod
     def handleHeartbeat(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         logger = util.getLogger(name="swifteventmgr.handleHeartbeat")
-        
+
         if not SwiftEventMgr.isValidHeartbeat(event):
             logger.error("Invalid heartbeat event")
             return None
-        
+
         nodes = event["nodes"]
         for node in nodes:
             SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
@@ -267,17 +267,17 @@ class SwiftEventMgr(Daemon):
             return 1
 
         try:
-           eventName = event["event"].lower()
+            eventName = event["event"].lower()
         except Exception as e:
-           logger.error("Failed to get event name for %s" % str(e))
-           return 1
+            logger.error("Failed to get event name for %s" % str(e))
+            return 1
 
         #Add your code here
         if eventName == "hdd":
             SwiftEventMgr.handleHDD(event)
         elif eventName == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
-            
+
     class EventsPage(Resource):
             def render_GET(self, request):
                 return '<html><body>I am the swift event manager!!</body></html>'
@@ -363,9 +363,6 @@ def initializeNodeInfo():
     '''
     Command line implementation of node info initialization.
     '''
-
-    ret = 1
-
     Usage = '''
     Usage:
         dcloud_initialize_node_info
@@ -383,7 +380,7 @@ def initializeNodeInfo():
     try:
         nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
         nodeInfoDb.initialize()
-    except sqlite3.OperationalError as e:
+    except sqlite3.OperationalError:
         print >> sys.stderr, "Node info already exists!!"
         sys.exit(1)
 
@@ -401,22 +398,20 @@ def initializeNodeInfo():
         disk = json.dumps(disk_info)
 
         mode = "service"
-        switchpoint = timestamp  
+        switchpoint = timestamp
 
-        nodeInfoDb.add_node(hostname=hostname, 
-                            status=status, 
-                            timestamp=timestamp, 
-                            disk=disk, 
-                            mode=mode, 
+        nodeInfoDb.add_node(hostname=hostname,
+                            status=status,
+                            timestamp=timestamp,
+                            disk=disk,
+                            mode=mode,
                             switchpoint=switchpoint)
+
 
 def initializeMaintenanceBacklog():
     '''
     Command line implementation of maintenance backlog initialization.
     '''
-
-    ret = 1
-
     Usage = '''
     Usage:
         dcloud_initialize_backlog
@@ -431,9 +426,10 @@ def initializeMaintenanceBacklog():
     try:
         backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
         backlog.initialize()
-    except sqlite3.OperationalError as e:
+    except sqlite3.OperationalError:
         print >> sys.stderr, "Maintenance backlog already exists!!"
         sys.exit(1)
+
 
 def clearNodeInfo():
     '''
@@ -497,14 +493,6 @@ if __name__ == "__main__":
         else:
             sys.exit(2)
     else:
-#        clearNodeInfo()
-#        clearMaintenanceBacklog()
-#        initializeMaintenanceBacklog()    
-#
-#        nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
-#        rows = nodeInfoDb.show_node_info_table()
-#        for row in rows:
-#             print row
         print "Unknown command"
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)

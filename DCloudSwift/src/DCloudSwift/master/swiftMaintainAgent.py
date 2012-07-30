@@ -7,10 +7,6 @@
 import os
 import sys
 import time
-import socket
-import random
-import pickle
-import signal
 import json
 import sqlite3
 
@@ -68,7 +64,6 @@ class SwiftMaintainAgent:
         construct SwiftMaintainAgent object.
         It will read replication_time and refreshTime from swift_master.ini
         """
-        logger = util.getLogger(name='swiftmaintainagent')
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if replicationTime is None:
             self.replicationTime = self.masterCfg.getKwparams()['maintainReplTime']
@@ -90,7 +85,6 @@ class SwiftMaintainAgent:
         """
         Check whether the maintenance_backlog is empty.
         """
-        logger = util.getLogger(name='swiftmaintainagent.checkBacklog')
         nodeList = backlog.show_maintenance_backlog_table()
 
         if len(nodeList) > 0:
@@ -105,8 +99,6 @@ class SwiftMaintainAgent:
         @param disk_info: disk information of a node in node_info table
         @return: disks should be reserved
         """
-        logger = util.getLogger(name='swiftmaintainagent.computeDisks2Reserve')
-
         disks_to_reserve = [disk["SN"] for disk in disk_info["healthy"] if disk["SN"]]
 
         for disk in disk_info["broken"]:
@@ -123,8 +115,6 @@ class SwiftMaintainAgent:
         @param disk_info: disk information of a node in node_info table
         @return: disks should be reserved
         """
-        logger = util.getLogger(name='swiftmaintainagent.computeDisks2Replace')
-
         disks_to_replace = []
 
         for disk in disk_info["broken"]:
@@ -140,7 +130,6 @@ class SwiftMaintainAgent:
         Add a waiting node to the maintenance backlog
         @return: the row added to the backlog
         """
-        logger = util.getLogger(name='swiftmaintainagent.incrementBacklog')
         nodeList = nodeInfo.query_node_info_table("mode='waiting'").fetchall()
 
         if len(nodeList) == 0:
@@ -164,7 +153,6 @@ class SwiftMaintainAgent:
         @param deadline: deadline of disk errors
         @return: return a maintenance task
         """
-        logger = util.getLogger(name='swiftmaintainagent.computeMaintenanceTask')
         disk_info = json.loads(node["disk"])
 
         ret = {
@@ -195,7 +183,6 @@ class SwiftMaintainAgent:
         update tasks in the maintenance backlog
         @return: None
         """
-        logger = util.getLogger(name='swiftmaintainagent.updateMaintenanceBacklog')
         tasks = backlog.show_maintenance_backlog_table()
 
         for task in tasks:
