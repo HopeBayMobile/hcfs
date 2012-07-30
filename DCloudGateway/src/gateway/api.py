@@ -251,7 +251,37 @@ def _check_snapshot_in_progress():
     except:
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
 
-    
+
+def _check_s3ql():
+    """
+    Check if s3ql is correctly mounted, and if /mnt/cloudgwfiles exists in mount table
+
+    @rtype: boolean
+    @return: True if s3ql is healthy.
+    """
+    try:
+        if _check_process_alive('mount.s3ql'):
+            cmd = "sudo df"
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            countdown = 30
+            while countdown > 0:
+                po.poll()
+                if po.returncode != 0:
+                    countdown = countdown - 1
+                    if countdown <= 0:
+                        po.kill()
+                        break
+                    else:
+                        time.sleep(1)
+                else:
+                    if output.find("/mnt/cloudgwfiles") != -1:
+                        return True
+                    break
+    except:
+        pass
+    return False
+
 def get_indicators():
     """
     Get gateway services' indicators by calling internal functions.
@@ -305,7 +335,7 @@ def get_indicators():
         op_SMB_srv = _check_smb_service()
         op_snapshot_in_progress = _check_snapshot_in_progress()
         op_Proxy_srv = _check_process_alive('squid3')
-        op_s3ql_ok = _check_process_alive('mount.s3ql')
+        op_s3ql_ok = _check_s3ql()
 
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
         if op_NFS_srv is False and op_s3ql_ok is True:
