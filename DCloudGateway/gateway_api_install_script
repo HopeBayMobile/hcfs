@@ -1,5 +1,5 @@
 apt-get install -y python-setuptools python-software-properties curl portmap nfs-kernel-server samba ntpdate chkconfig traceroute
-apt-get install -y python-profiler
+apt-get install -y python
 add-apt-repository -y ppa:swift-core/release
 apt-get update
 apt-get install -y swift
