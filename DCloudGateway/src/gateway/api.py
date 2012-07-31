@@ -275,7 +275,7 @@ def _check_s3ql():
                     else:
                         time.sleep(1)
                 else:
-                    if output.find("/mnt/cloudgwfiles") != -1:
+                    if output.find("/mnt/cloudgwfiles") != -1 and output.find("/mnt/nfssamba") != -1:
                         return True
                     break
     except:
