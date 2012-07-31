@@ -19,6 +19,7 @@ from util.util import GlobalVar
 from util.SwiftCfg import SwiftMasterCfg
 from util import util
 from util.database import NodeInfoDatabaseBroker
+from master.swiftMaintainAgent import SwiftMaintainAgent
 
 from common.events import HDD
 from common.events import HEARTBEAT
@@ -77,6 +78,7 @@ class SwiftMaintainSwitcher(Daemon):
         self.db = NodeInfoDatabaseBroker(self.DBFile)
         logger.info('end initiailize SwiftMaintainSwitcher')
 
+
     def checkService(self):
         """
         implement status change logic for service mode to waiting mode
@@ -105,9 +107,9 @@ class SwiftMaintainSwitcher(Daemon):
                         "the record which update status to waiting: %s"
                         % str(self.dict_from_row(record)))
                     continue
-                if (('missing' in diskInfo) or ('broken' in diskInfo)):
-                    if (diskInfo['timestamp']
-                            + self.replicationTime > self.nowtimeStamp):
+
+                deadline = self.nowtimeStamp - self.replicationTime
+                if SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
                         record = self.updateStatusWaiting(row[0])
                         logger.info(
                             "the record which update status to waiting: %s"
@@ -162,11 +164,13 @@ class SwiftMaintainSwitcher(Daemon):
             self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
             if row[1] == HEARTBEAT.status[0]:
+                logger.info("Hello")
                 diskInfo = json.loads(row[3])
-                if (('missing' not in diskInfo) or ('broken' not in diskInfo)):
+                deadline = self.nowtimeStamp - self.replicationTime
+                if not SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
                     record = self.updateStatusService(row[0])
                     logger.info(
-                        "the record which update status to waiting: %s"
+                        "the record which update status to service: %s"
                         % str(self.dict_from_row(record)))
                     continue
         logger.info("end check hostname which is in waiting mode")
@@ -209,33 +213,6 @@ def main(DBFile=None):
         sys.exit(2)
 
 if __name__ == "__main__":
-#    DBFile = '/etc/test/test.db'
-#    os.system("rm -f %s" % DBFile)
-#    db = NodeInfoDatabaseBroker(DBFile)
-#    db.initialize()
-#    timestamp = int(time.mktime(time.localtime()))
-#    diskInfo = {
-#                    'timestamp': timestamp,
-#                    'missing': {
-#                                    'count': 6,
-#                                    'timestamp': timestamp,
-#                                },
-#                    'broken': [
-#                               {
-#                                    'SN': 'aaaaa',
-#                                    'timestamp': timestamp,
-#                               },
-#                              ],
-#                    'healthy': [
-#                                {
-#                                    'SN': 'aaaaa',
-#                                    'timestamp': timestamp,
-#                                }
-#                               ],
-#                }
-#    row = db.add_node('192.168.1.20', 'dead', timestamp-100,
-#        json.dumps(diskInfo), 'service', timestamp)
-#    row = db.add_node('192.168.1.100', 'alive', timestamp-100,
-#        '{}', 'waiting', timestamp)
-    DBFile = None
-    main(DBFile)
+    pass
+    #DBFile = None
+    #main(DBFile)

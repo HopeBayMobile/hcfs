@@ -303,7 +303,7 @@
             <form action="/dashboard/snapshot/lifecycle" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
-                Snapshots will be delete after:<br />
+                Snapshots will be deleted after:<br />
                 <div class="days_div">
                     <input name="days" type="number" min="1" max="365" value="{{ default_day }}" /> days
                 </div>
