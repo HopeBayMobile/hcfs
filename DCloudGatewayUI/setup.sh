@@ -30,13 +30,13 @@ echo "Install required python packages..."
 # Install required python modules
 pip install $BASEPATH/deploy/externals/amqplib-1.0.2.tgz
 pip install $BASEPATH/deploy/externals/anyjson-0.3.1.tar.gz
+pip install $BASEPATH/deploy/externals/kombu-2.1.6.tar.gz
+pip install $BASEPATH/deploy/externals/python-dateutil-1.5.tar.gz
 pip install $BASEPATH/deploy/externals/celery-2.5.3.tar.gz
 pip install $BASEPATH/deploy/externals/Django-1.4.tar.gz
-pip install $BASEPATH/deploy/externals/django-celery-2.5.5.tar.gz
 pip install $BASEPATH/deploy/externals/django-picklefield-0.2.1.tar.gz
-pip install $BASEPATH/deploy/externals/kombu-2.1.6.tar.gz
+pip install $BASEPATH/deploy/externals/django-celery-2.5.5.tar.gz
 pip install $BASEPATH/deploy/externals/ordereddict-1.1.tar.gz
-pip install $BASEPATH/deploy/externals/python-dateutil-1.5.tar.gz
 pip install $BASEPATH/deploy/externals/SQLAlchemy-0.7.7.tar.gz
 
 # Close the debug mode of PDCM when deploy
