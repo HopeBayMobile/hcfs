@@ -61,8 +61,6 @@ class SwiftAccountMgr:
 
         self.__admin_default_name = "admin"
         self.__random_password_size = 12
-        #chars = string.letters + string.digits
-        #self.__random_password = ''.join(random.choice(chars) for x in range(8))
         self.__private_container_suffix = "_private_container"
         self.__shared_container_suffix = "_shared_container"
 
@@ -71,26 +69,26 @@ class SwiftAccountMgr:
 
     def __generate_random_password(self):
         '''
-        Generate a random password.
+        Generate a random password of length 12. The characters of the random password are alphanumeric.
 
         @rtype:  string
         @return: a random password
         '''
         logger = util.getLogger(name="__generate_random_password")
+
         chars = string.letters + string.digits
         return "".join(random.choice(chars) for x in range(self.__random_password_size))
 
     def __functionBroker(self, proxy_ip_list, retry, fn, **kwargs):
         '''
-        Repeat at most retry times:
-        1. Execute the private function fn with a randomly chosen
-        proxy node and kwargs as input.
-        2. Break if fn retrun True
+        Repeat at most retry times::
+            (1) Execute the private function fn with a randomly chosen proxy node and kwargs as input.
+            (2) Break if fn retrun True
 
         @type  proxy_ip_list: string
         @param proxy_ip_list: ip list of proxy nodes
         @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
+        @param retry: the maximum number of times to retry when fn returns False
         @type  fn: string
         @param fn: private function to call
         @param kwargs: keyword arguments to fn
@@ -107,16 +105,18 @@ class SwiftAccountMgr:
 
             try:
                 output = fn(ip, **kwargs)
+
                 if output.val == True:
                     val = True
                     msg = output.msg
                     break
                 else:
-                    errMsg = "Failed to run %s thru %s for %s" % (fn.__name__, ip, output.msg)
-                    msg = msg + '\n' + errMsg
+                    errMsg = "Failed to run %s through %s: %s\n" % (fn.__name__, ip, output.msg)
+                    msg = msg + errMsg
+
             except util.TimeoutError:
-                errMsg = "Failed to run %s thru %s in time" % (fn.__name__, ip)
-                msg = msg + '\n' + errMsg
+                errMsg = "Failed to run %s through %s in time.\n" % (fn.__name__, ip)
+                msg = msg + errMsg
 
         return (val, msg)
 
@@ -125,7 +125,7 @@ class SwiftAccountMgr:
         logger = util.getLogger(name="__add_user")
 
         url = "https://%s:8080/auth/" % proxyIp
-        msg = "Failed to add user: "
+        msg = "Failed to add user %s:%s: " % (account, user)
         val = False
 
         admin_opt = "-a " if admin else ""
@@ -569,8 +569,7 @@ class SwiftAccountMgr:
 
     def enable_user(self, account, user, retry=3):
         '''
-        Enable the user to access backend Swift by restoring the original
-        password kept in the metadata container.
+        Enable the user to access backend Swift by restoring the original password kept in the metadata container.
 
         @type  account: string
         @param account: the account of the user
@@ -590,7 +589,6 @@ class SwiftAccountMgr:
         actual_user_password = ""
         container_metadata = {}
         container = account + ":" + user
-
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -603,6 +601,17 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
+        user_existence_output = self.user_existence(account, user)
+
+        if user_existence_output.val == False:
+            val = False
+            msg = user_existence_output.msg
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            return Bool(val, msg)
+
         get_user_password_output = self.get_user_password(account, user)
 
         if get_user_password_output.val == False:
@@ -612,36 +621,22 @@ class SwiftAccountMgr:
         else:
             actual_user_password = get_user_password_output.msg
 
-        #get_admin_password_output = self.get_user_password(account, admin_user)
-        #if get_admin_password_output.val == False:
-        #    val = False
-        #    msg = get_admin_password_output.msg
-        #    return Bool(val, msg)
-        #else:
-        #    admin_password = get_admin_password_output.msg
-
-        # TODO: check whehter the container is associated with the user
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
                                            account=".super_admin", container=container, admin_user=".super_admin",\
                                            admin_password=self.__password)
 
         if val == False:
-            msg = "Failed to get the metadata of the container %s" % container + msg
             return Bool(val, msg)
         else:
             container_metadata = msg
 
         if container_metadata["Account-Enable"] == False:
             val = False
-            msg = "Failed to enable user %s: account %s does not enable" % (user, account)
+            msg = "Failed to enable user %s because account %s is disabled." % (user, account)
             return Bool(val, msg)
         elif container_metadata["User-Enable"] == True:
             val = True
-            msg = "The user %s has enabled" % user
-            return Bool(val, msg)
-        elif container_metadata["Password"] == actual_user_password:
-            val = True
-            msg = "The user %s has enabled" % user
+            msg = "User %s:%s has been enabled." % (account, user)
             return Bool(val, msg)
         else:
             ori_user_password = container_metadata["Password"]
@@ -687,10 +682,9 @@ class SwiftAccountMgr:
         logger = util.getLogger(name="disable_user")
 
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-        new_user_password = str(uuid.uuid4())
+        new_user_password = self.__generate_random_password()
         actual_user_password = ""
         container = account + ":" + user
-
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -703,6 +697,17 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1"
             return Bool(val, msg)
 
+        user_existence_output = self.user_existence(account, user)
+
+        if user_existence_output.val == False:
+            val = False
+            msg = user_existence_output.msg
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            return Bool(val, msg)
+
         get_user_password_output = self.get_user_password(account, user)
 
         if get_user_password_output.val == False:
@@ -712,37 +717,22 @@ class SwiftAccountMgr:
         else:
             actual_user_password = get_user_password_output.msg
 
-        #get_admin_password_output = self.get_user_password(account, admin_user)
-        #if get_admin_password_output.val == False:
-        #    val = False
-        #    msg = get_admin_password_output.msg
-        #    return Bool(val, msg)
-        #else:
-        #    admin_password = get_admin_password_output.msg
-
-        # TODO: check whether the container is associated with the user
-
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
                                            account=".super_admin", container=container, admin_user=".super_admin",\
                                            admin_password=self.__password)
 
         if val == False:
-            msg = "Failed to get the metadata of the container %s" % container + msg
             return Bool(val, msg)
         else:
             container_metadata = msg
 
         if container_metadata["Account-Enable"] == False:
             val = False
-            msg = "Failed to disable user %s: account %s does not enable" % (user, account)
+            msg = "Failed to disable user %s because account %s is disabled" % (user, account)
             return Bool(val, msg)
         elif container_metadata["User-Enable"] == False:
             val = True
-            msg = "The user %s has disabled" % user
-            return Bool(val, msg)
-        elif container_metadata["Password"] != actual_user_password:
-            val = True
-            msg = "The user %s has disabled" % user
+            msg = "User %s:%s has been disabled" % (account, user)
             return Bool(val, msg)
 
         change_password_output = self.change_password(account, user, new_user_password)
@@ -2145,7 +2135,7 @@ class SwiftAccountMgr:
         if account_existence_output.val == False:
             result = False
             val = False
-            msg = list_account_output.msg
+            msg = account_existence_output.msg
             return Bool(result, val, msg)
         elif account_existence_output.result == False:
             result = False
@@ -2857,7 +2847,7 @@ class SwiftAccountMgr:
             elif "Write" in line:
                 metadata_content["Write"] = line.split("ACL: ")[1]
 
-        val == True
+        val = True
         msg = metadata_content
         logger.info(msg)
 
@@ -2866,11 +2856,14 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
-    #print SA.add_account("account1")
+    #print SA.add_account("account4")
     #print SA.add_account("account3")
-    #print SA.add_user("account1","user1")
+    #print SA.add_user("account4","user1")
     #print SA.add_user("account3","user1")
-    print SA.delete_account("account1")
+    print SA.disable_user("account4","user1")
+    #print SA.disable_user("account5","user1")
+    #print SA.disable_user("account4","user2")
+    #print SA.enable_user("account4","user1")
     #print SA.add_account("account4")
     #print SA.delete_user("account3","user1")
     #print SA.delete_user("account2","user1")
