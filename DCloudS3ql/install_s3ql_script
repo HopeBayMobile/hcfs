@@ -1,17 +1,29 @@
 ./install_dep_script
 
 # install s3ql package
-dpkg -i debsrc/s3ql_1.12.0~natty1_amd64.deb
-cp -rs /usr/bin/*s3ql* /usr/local/bin/
+#dpkg -i debsrc/s3ql_1.11.1.0001-1~natty_amd64.deb
+#python setup.py build_cython
+#python setup.py build
+#python setup.py install
 
-# python setup.py build_cython
-# python setup.py build
-# python setup.py install
+#cp -rs /usr/bin/*s3ql* /usr/local/bin/
 
-# change location of DEB server
-cp /etc/apt/sources.list /etc/apt/sources.list.bak
+#
+#-- Ovid Wu <ovid.wu@delta.com.tw> Tue, 24 Jul 2012 11:16:26 +0000
+#
+# add a private of APT repository server precise distribution
+# add main & unstable components
+cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
+deb http://www.deltacloud.tw/ubuntu/ precise main
+deb-src http://www.deltacloud.tw/ubuntu precise main
 
-cat >/etc/apt/sources.list.d/delta-server.list <<EOF
-deb http://172.16.229.87/packages/ubuntu/ natty main
-deb-src http://172.16.229.87/packages/ubuntu natty main
+deb http://www.deltacloud.tw/ubuntu/ precise unstable
+deb-src http://www.deltacloud.tw/ubuntu precise unstable
 EOF
+
+sudo apt-get update
+# import public key of Delta's Ubuntu apt server
+sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B
+sudo apt-get -y --force-yes install s3ql
+# FIXME: install s3ql in /usr/local/bin in debian packaging (if it's required)
+cp -rs /usr/bin/*s3ql* /usr/local/bin/

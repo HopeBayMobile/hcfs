@@ -251,7 +251,37 @@ def _check_snapshot_in_progress():
     except:
         raise SnapshotError("Could not decide whether a snapshot is in progress.")
 
-    
+
+def _check_s3ql():
+    """
+    Check if s3ql is correctly mounted, and if /mnt/cloudgwfiles exists in mount table
+
+    @rtype: boolean
+    @return: True if s3ql is healthy.
+    """
+    try:
+        if _check_process_alive('mount.s3ql'):
+            cmd = "sudo df"
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            countdown = 30
+            while countdown > 0:
+                po.poll()
+                if po.returncode != 0:
+                    countdown = countdown - 1
+                    if countdown <= 0:
+                        po.kill()
+                        break
+                    else:
+                        time.sleep(1)
+                else:
+                    if output.find("/mnt/cloudgwfiles") != -1:
+                        return True
+                    break
+    except:
+        pass
+    return False
+
 def get_indicators():
     """
     Get gateway services' indicators by calling internal functions.
@@ -305,7 +335,7 @@ def get_indicators():
         op_SMB_srv = _check_smb_service()
         op_snapshot_in_progress = _check_snapshot_in_progress()
         op_Proxy_srv = _check_process_alive('squid3')
-        op_s3ql_ok = _check_process_alive('mount.s3ql')
+        op_s3ql_ok = _check_s3ql()
 
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
         if op_NFS_srv is False and op_s3ql_ok is True:
@@ -1302,6 +1332,15 @@ def _mount(storage_url):
         po.wait()
         if po.returncode != 0:
             raise BuildGWError(output)
+        
+        # wthung, 2012/7/30
+        # create /mnt/nfssamba
+        cmd = "sudo mkdir -p /mnt/nfssamba"
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        if po.returncode != 0:
+            raise BuildGWError(output)
 
         #change the owner of nfs share to nobody:nogroup
         cmd = "sudo chown nobody:nogroup %s/nfsshare" % mountpoint
@@ -1435,8 +1474,14 @@ def build_gateway(user_key):
         _openContainter(storage_url=url, account=account, password=password)
         _mkfs(storage_url=url, key=user_key)
         _mount(storage_url=url)
+        # restart nfs and mount /mnt/nfssamba
+        restart_service("nfs-kernel-server")
+        os.system("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
+        
         set_smb_user_list(default_user_id, default_user_pwd)
-        _restartServices()
+        restart_service("smbd")
+        restart_service("nmbd")
+        
         log.info("setting upload speed")
         os.system("sudo /etc/cron.hourly/hourly_run_this")
         # we need to manually exec background task program,
@@ -1910,7 +1955,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         
             return json.dumps(return_val)
         
-        if _setInterfaces(ip, gateway, mask, ini_path) and _setNameserver(dns1, dns2):
+        if _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path) and _setNameserver(dns1, dns2):
             try:
                 cmd = "sudo /etc/init.d/networking restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1998,7 +2043,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
     finally:
         return op_ok
 
-def _setInterfaces(ip, gateway, mask, ini_path):
+def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
     """
     Change the setting of /etc/network/interfaces.
     
@@ -2008,6 +2053,10 @@ def _setInterfaces(ip, gateway, mask, ini_path):
     @param gateway: Network gateway.
     @type mask: string
     @param mask: Network mask.
+    @type dns1: string
+    @param dns1: Primary DNS.
+    @type dns2: string
+    @param dns2: Secondary DNS.
     @type ini_path: string
     @param ini_path: Ini file to get fixed IP and network mask (used for eth0 currently).
     @rtype: boolean
@@ -2055,6 +2104,9 @@ def _setInterfaces(ip, gateway, mask, ini_path):
             f.write("\naddress %s" % ip)
             f.write("\nnetmask %s" % mask)
             f.write("\ngateway %s" % gateway)
+            # wthung, 2012/7/30
+            # fro ubuntu 12.04, move dns setting to here
+            f.write("\ndns-nameservers %s %s" % (dns1, dns2))
         os.system('sudo cp %s %s' % (interface_path_temp, interface_path))
 
         op_ok = True

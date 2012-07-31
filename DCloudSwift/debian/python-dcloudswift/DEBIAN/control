@@ -1,0 +1,30 @@
+Package: python-dcloudswift
+Source: dcloudswift
+Version: 0.2.0000-ubuntudcloud
+Architecture: all
+Maintainer: Ovid Wu <ovid.wu@delta.com.tw>
+Installed-Size: 396
+Depends: python2.7, python (>= 2.7.1-0ubuntu2), python (<< 2.8)
+Section: python
+Priority: optional
+Description: Delta Inc. CTBU Storage Gateway
+ [Description]:
+ 1. The scripts is used to deploy Swift. The development environment is listed
+    in the following.
+ 	(1) OS: Ubuntu 11.04 64 bits
+ 	(2) Language: python and bash shell
+ 	(3) Hardware: AMD 64bit
+ .
+ .
+ 2. How to use the scripts:
+ 	(1) Copy the folder 'DCloudSwift' to the master node.
+ 	(2) Change your privilege to root.
+ 	(3) Execute 'python setup.py install'
+ 	(4) Edit ./Swift.ini:
+ 	    [storage]
+             password = password of root in swift nodes
+             deviceCnt = how many disks to use in each swift node
+ 	    proxyPort = the port on which the swift-proxy should listen
+ .
+             [portal]
+             url = url of the public access portal for users
