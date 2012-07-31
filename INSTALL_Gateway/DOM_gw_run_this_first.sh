@@ -84,7 +84,7 @@ else
     
         #initialize necessary files/directories
     
-        dd if=/dev/zero of=/storage/swapfile bs=1024 count=20480000
+        dd if=/dev/zero of=/storage/swapfile bs=1024 count=512000
         mkswap /storage/swapfile
         swapon /storage/swapfile
         mkdir /storage/log
@@ -158,7 +158,7 @@ cat >/root/build_raid1.sh <<EOF
         
             #initialize necessary files/directories
         
-            dd if=/dev/zero of=/storage/swapfile bs=1024 count=20480000
+            dd if=/dev/zero of=/storage/swapfile bs=1024 count=512000
             mkswap /storage/swapfile
             swapon /storage/swapfile
             mkdir /storage/log

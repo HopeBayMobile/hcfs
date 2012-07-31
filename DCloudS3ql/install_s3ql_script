@@ -1,4 +1,4 @@
-#./install_dep_script
+./install_dep_script
 
 # install s3ql package
 #dpkg -i debsrc/s3ql_1.11.1.0001-1~natty_amd64.deb
@@ -14,16 +14,16 @@
 # add a private of APT repository server precise distribution
 # add main & unstable components
 cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
-deb http://www.deltacloud.tw/packages/ubuntu/ precise main
-deb-src http://www.deltacloud.tw/packages/ubuntu precise main
+deb http://www.deltacloud.tw/ubuntu/ precise main
+deb-src http://www.deltacloud.tw/ubuntu precise main
 
-deb http://www.deltacloud.tw/packages/ubuntu/ precise unstable
-deb-src http://www.deltacloud.tw/packages/ubuntu precise unstable
+deb http://www.deltacloud.tw/ubuntu/ precise unstable
+deb-src http://www.deltacloud.tw/ubuntu precise unstable
 EOF
 
 sudo apt-get update
 # import public key of Delta's Ubuntu apt server
 sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B
-sudo apt-get -y install s3ql
+sudo apt-get -y --force-yes install s3ql
 # FIXME: install s3ql in /usr/local/bin in debian packaging (if it's required)
 cp -rs /usr/bin/*s3ql* /usr/local/bin/
