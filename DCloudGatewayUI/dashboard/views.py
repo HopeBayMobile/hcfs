@@ -259,7 +259,7 @@ def sharefolder(request, action):
                 action_error[action] = update_return['msg']
             nfs_data['array_of_ip'] = ip_list
 
-    forms_group['Microsoft Networking Setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
+    forms_group['Microsoft Networking Access'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
 
     return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
                                                           'action_error': action_error, "nfs_data": nfs_data})
