@@ -59,23 +59,17 @@ class TryLockError(Exception):
 
 class SwiftMaintainAgent:
 
-    def __init__(self, replicationTime=None, refreshTime=None):
+    def __init__(self, replicationTime=None):
         """
         construct SwiftMaintainAgent object.
-        It will read replication_time and refreshTime from swift_master.ini
+        It will read replication_time from swift_master.ini by default
         """
         self.masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
         if replicationTime is None:
-            self.replicationTime = self.masterCfg.getKwparams()['maintainReplTime']
+            self.replicationTime = float(self.masterCfg.getKwparams()['maintainReplTime']) * 3600
         else:
             self.replicationTime = replicationTime
         self.replicationTime = int(self.replicationTime)
-
-        if refreshTime is None:
-            self.refreshTime = self.masterCfg.getKwparams()['maintainRefreshTime']
-        else:
-            self.refreshTime = refreshTime
-        self.refreshTime = int(self.refreshTime)
 
         self.backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
         self.nodeInfo = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
@@ -203,7 +197,7 @@ class SwiftMaintainAgent:
 
     @staticmethod
     @tryLock()
-    def renewMaintenanceBacklog(replicationTime=None, refreshTime=None):
+    def renewMaintenanceBacklog(replicationTime=None):
         """
         1. update tasks in the maintenance backlog
         2. add a new task to the maintance backlog if empty
@@ -215,18 +209,14 @@ class SwiftMaintainAgent:
         masterCfg = SwiftMasterCfg(GlobalVar.MASTERCONF)
 
         if replicationTime is None:
-            replicationTime = masterCfg.getKwparams()['maintainReplTime']
+            replicationTime = float(masterCfg.getKwparams()['maintainReplTime']) * 3600
         replicationTime = int(replicationTime)
-
-        if refreshTime is None:
-            refreshTime = masterCfg.getKwparams()['maintainRefreshTime']
-        refreshTime = int(refreshTime)
 
         backlog = MaintenanceBacklogDatabaseBroker(GlobalVar.MAINTENANCE_BACKLOG)
         nodeInfo = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
 
         try:
-            deadline = int(time.time() - (replicationTime) * 3600)
+            deadline = int(time.time() - replicationTime)
             SwiftMaintainAgent.updateMaintenanceBacklog(nodeInfo=nodeInfo,
                                                         backlog=backlog,
                                                         deadline=deadline)

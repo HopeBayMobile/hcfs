@@ -1,4 +1,4 @@
-apt-get install -y python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma libfuse-dev libattr1-dev python-all-dev python-sphinx build-essential python-profiler python-argparse python-setuptools fuse-utils
+apt-get install -y python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma  python-all-dev python-sphinx build-essential python-profiler python-argparse python-setuptools fuse-utils
 dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb 
 dpkg -i debsrc/cython_0.15.1-2_amd64.deb 
 dpkg -i debsrc/smartmontools_5.39.1+svn3124-2_amd64.deb

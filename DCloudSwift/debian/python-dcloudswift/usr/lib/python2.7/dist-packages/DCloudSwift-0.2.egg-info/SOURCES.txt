@@ -1,0 +1,1 @@
+../../../../share/pyshared/DCloudSwift-0.2.egg-info/SOURCES.txt

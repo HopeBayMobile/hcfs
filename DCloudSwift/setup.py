@@ -89,6 +89,11 @@ def main():
         ],
     )
 
+
+    #
+    #-- Ovid Wu <ovidwu@gmail.com> Tue, 31 Jul 2012 07:23:25 +0800
+    #
+    # TODO: move post-installation to debain packaging
     #Post-scripts
     os.system("cp ./Swift.ini  ./src/DCloudSwift/")
     os.system("chmod 755 misc/ServiceScripts/*")
