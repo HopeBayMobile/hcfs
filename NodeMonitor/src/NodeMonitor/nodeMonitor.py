@@ -139,15 +139,15 @@ class DiskChecker:
             post_data(self.receiverUrl, eventEncoding)
 
 class Heartbeat:
-    def __init__(self, receiverUrl):
-        self.receiverUrl = receiverUrl
+    def __init__(self, receiverurl):
+        self.receiverurl = receiverurl
 
     def send_heartbeat(self):
         """
         send heartbeat to the receiver 
         """
-        logger = util.getLogger(name="Heartbeat")
-        heartbeatEncoding = None
+        logger = util.getLogger(name="heartbeat")
+        heartbeatencoding = None
         try:
     
             heartbeat = {
@@ -155,33 +155,44 @@ class Heartbeat:
                 "nodes": [
                              {
                                "hostname": socket.gethostname(),
-                               "role": "MH",
+                               "role": "mh",
                                "status": "alive",
                              },
                          ]
             }
 
-            heartbeatEncoding = json.dumps(heartbeat)
-            logger.info(heartbeatEncoding)
+            heartbeatencoding = json.dumps(heartbeat)
+            logger.info(heartbeatencoding)
 
-        except Exception as e:
+        except exception as e:
             logger.error(str(e))
             event = {
-                "component_name": "Heartbeat",
+                "component_name": "heartbeat",
                 "message": str(e),
                 "time": int(time.time()),
             }
             logger.error(json.dumps(event))
 
-        if heartbeatEncoding:
-            post_data(self.receiverUrl, heartbeatEncoding)
+        if heartbeatencoding:
+            post_data(self.receiverurl, heartbeatencoding)
         
+class NtpServer:
+    def __init__(self, server):
+        self.server = server
+
+    def synchronize(self):
+        """
+        ntp update with receiver
+        """
+        return os.system("ntpdate %s" % self.server)
+
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
         self.receiverUrl = util.getReceiverUrl()
-        
+        self.ntpserver = NtpServer(self.receiverUrl.split("://")[1].split(":")[0])
         try:
+            
             self.sensorInterval = util.getSensorInterval()
             if self.sensorInterval[0] > self.sensorInterval[1]:
                 raise
@@ -199,6 +210,9 @@ class NodeMonitor(Daemon):
 
         while True:
             try:
+                if self.ntpserver.synchronize() != 0:
+                    logger.warn("Failed to synchronize time with receiver")
+
                 try: 
                     self.HB.send_heartbeat()
                 except Exception as e:
