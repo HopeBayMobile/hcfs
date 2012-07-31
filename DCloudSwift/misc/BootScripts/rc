@@ -343,9 +343,7 @@ fi
 trap - EXIT # Disable emergency handler
 
 sleep 10
-#cp -p /etc/init/tty1.conf /etc/init/ttyS0.conf
-#sed -i 's/exec \/sbin\/getty -8 38400 tty1/exec \/sbin\/getty -L ttyS0 115200 vt100/' /etc/init/ttyS0.conf
-sh /etc/DCloud/ServerRegister/autoRun.sh
+python /usr/local/bin/node-monitor restart
 python /etc/rc.py
 
 exit 0
