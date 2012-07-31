@@ -59,12 +59,14 @@ class SwiftMaintainSwitcher(Daemon):
             self.DBFile = DBFile
         if replicationTime is None:
             self.replicationTime = \
-                int(self.masterCfg.getKwparams()['maintainReplTime'])
+                float(self.masterCfg.getKwparams()['maintainReplTime']) * 3600
+            self.replicationTime = int(self.replicationTime)
         else:
             self.replicationTime = replicationTime
         if refreshTime is None:
             self.refreshTime = \
-                int(self.masterCfg.getKwparams()['maintainRefreshTime'])
+                float(self.masterCfg.getKwparams()['maintainRefreshTime']) * 60
+            self.refreshTime = int(self.refreshTime)
         else:
             self.refreshTime = refreshTime
         if daemonSleep is None:
@@ -95,8 +97,8 @@ class SwiftMaintainSwitcher(Daemon):
             if row[1] == HEARTBEAT.status[0]:
                 diskInfo = json.loads(row[3])
                 if ((self.refreshTime + row[2]) < self.nowtimeStamp):
-                    self.db.update_node_status(row[0], 
-                                               HEARTBEAT.status[2], 
+                    self.db.update_node_status(row[0],
+                                               HEARTBEAT.status[2],
                                                self.nowtimeStamp)
                     record = self.updateStatusWaiting(row[0])
                     logger.info(
