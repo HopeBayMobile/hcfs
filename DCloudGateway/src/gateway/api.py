@@ -59,9 +59,9 @@ LOGFILES = {
 # Only those with certain KEYWORDs that is defined by KEYWORD_FILTER, in log
 # content will be shown and classified into three categories error,warning,info
 KEYWORD_FILTER = {
-                  "error_log": ["\[0\]"],  # ["error", "exception"], # 0
-                  "warning_log": ["\[1\]"],  # ["warning"], # 1
-                  "info_log": ["\[2\]"],  # ["nfs", "cifs" , "."], #2
+                  "error_log": ["\[0\]"], # ["error", "exception"], # 0
+                  "warning_log": ["\[1\]"], # ["warning"], # 1
+                  "info_log": ["\[2\]"], # ["nfs", "cifs" , "."], #2
                   # the pattern . matches any log,
                   # that is if a log mismatches 0 or 1, then it will be assigned to 2
                   }
@@ -2952,9 +2952,9 @@ def read_logs(logfiles_dict, offset, num_lines):
 
             for alog in log_buf[offset : offset + nums]:
                 #print log
-                log_entry = parse_log(type, alog)
+                log_entry = parse_log(logtype, alog)
                 if not log_entry == None:  # ignore invalid log line 
-                    ret_log_cnt[type].append(log_entry)
+                    ret_log_cnt[logtype].append(log_entry)
 
         except :
             pass
@@ -3398,4 +3398,5 @@ if __name__ == '__main__':
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
     #print _traceroute_backend('aaa')
+    print read_logs(LOGFILES, 0, 10)
     pass
