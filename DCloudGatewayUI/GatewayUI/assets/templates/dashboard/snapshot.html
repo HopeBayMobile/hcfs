@@ -224,6 +224,10 @@
                 margin-top: 20px;
                 font-size: 23px;
             }
+            .last_snapshot_div {
+                text-indent: 68px;
+                font-size: 23px;
+            }
             .submit_button_div {
                 margin-left: 450px;
             }
@@ -287,6 +291,10 @@
                     {% endif %}
                 {% endfor %}
             </select> each day
+            </div>
+            <div class="last_snapshot_div">
+                Last snapshot time : {{ latest_snapshot_time }}
+            <br />
             </div>
             <div class="submit_button_div">
                 <button type="submit" value="Modify" class="submit_button" alt="Submit">
