@@ -165,6 +165,12 @@ class SwiftMaintainSwitcher(Daemon):
             self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
             if row[1] == HEARTBEAT.status[0]:
+                if ((self.refreshTime + row[2]) < self.nowtimeStamp):
+                    self.db.update_node_status(row[0],
+                                               HEARTBEAT.status[2],
+                                               self.nowtimeStamp)
+                    continue
+
                 diskInfo = json.loads(row[3])
                 deadline = self.nowtimeStamp - self.replicationTime
                 if not SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
