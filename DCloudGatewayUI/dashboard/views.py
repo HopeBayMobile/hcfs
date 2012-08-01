@@ -515,7 +515,6 @@ def get_snapshot_default_value():
             time.strftime("%a, %d %b %Y %H:%M:%S", \
                     time.gmtime(load_data.get('latest_snapshot_time')))
 
-
     return return_hash
 
 
