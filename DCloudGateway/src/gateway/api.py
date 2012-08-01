@@ -1241,6 +1241,15 @@ def _umount():
             po.wait()
             if po.returncode != 0:
                 raise UmountError(output)
+            
+            # wthung, 2012/8/1
+            # umount /mnt/nfssamba
+            cmd = "sudo umount /mnt/nfssamba"
+            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            po.wait()
+            if po.returncode != 0:
+                raise UmountError(output)
 
             cmd = "sudo /etc/init.d/nfs-kernel-server stop"
             po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
