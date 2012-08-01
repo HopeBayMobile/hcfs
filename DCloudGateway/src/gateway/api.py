@@ -338,7 +338,7 @@ def get_indicators():
         op_s3ql_ok = _check_s3ql()
 
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-        if op_NFS_srv is False and op_s3ql_ok is True:
+        if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
         if op_SMB_srv is False and op_s3ql_ok is True:
             restart_smb_service()
