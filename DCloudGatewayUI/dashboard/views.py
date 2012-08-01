@@ -601,3 +601,10 @@ def config(request, action=None):
         backup_time_str = None
 
     return render(request, 'dashboard/config.html', {'tab': 'config', 'backup_time': backup_time_str})
+
+def server_time(request):
+    """
+    return server time
+    """
+    now = datetime.datetime.now()
+    return HttpResponse(now.strftime("%Y/%m/%d %H:%M"))

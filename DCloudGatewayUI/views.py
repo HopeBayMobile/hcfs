@@ -27,8 +27,8 @@ def login(request):
             auth.login(request, user)
             return redirect('/dashboard')
         else:
-            return render(request, 'home.html', {'error_msg': 'User name or\
-                password fail'})
+            return render(request, 'home.html', {'error_msg': 'Incorrect user\
+                name or password'})
 
 
 def logout(request):
