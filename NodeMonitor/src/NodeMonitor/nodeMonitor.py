@@ -176,16 +176,6 @@ class Heartbeat:
         if heartbeatencoding:
             post_data(self.receiverurl, heartbeatencoding)
         
-#class NtpServer:
-#    def __init__(self, server):
-#        self.server = server
-#
-#    def synchronize(self):
-#        """
-#        ntp update with receiver
-#        """
-#        return os.system("ntpdate %s" % self.server)
-
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
@@ -210,9 +200,6 @@ class NodeMonitor(Daemon):
 
         while True:
             try:
-                #if self.ntpserver.synchronize() != 0:
-                #    logger.warn("Failed to synchronize time with receiver")
-
                 try: 
                     self.HB.send_heartbeat()
                 except Exception as e:
@@ -243,6 +230,5 @@ if __name__ == "__main__":
             sys.exit(2)
         sys.exit(0)
     else:
-        post_data("http://172.16.78.79:5308/events","{}")
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)
