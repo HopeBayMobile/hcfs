@@ -9,7 +9,8 @@
 			action = $(this).attr('action');
 			sure = confirm("Confirm: The server will be "+ action + ".");
 			if (sure){
-				$.post(action);
+                $.post(action);
+                window.location = "/logout"
 			}
 		});
 	</script>
