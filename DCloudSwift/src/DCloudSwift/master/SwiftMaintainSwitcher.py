@@ -109,6 +109,7 @@ class SwiftMaintainSwitcher(Daemon):
                     continue
 
                 deadline = self.nowtimeStamp - self.replicationTime
+                logger.info("deadline is %d" % deadline)
                 if SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
                         record = self.updateStatusWaiting(row[0])
                         logger.info(
@@ -164,7 +165,6 @@ class SwiftMaintainSwitcher(Daemon):
             self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
             if row[1] == HEARTBEAT.status[0]:
-                logger.info("Hello")
                 diskInfo = json.loads(row[3])
                 deadline = self.nowtimeStamp - self.replicationTime
                 if not SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
@@ -213,6 +213,5 @@ def main(DBFile=None):
         sys.exit(2)
 
 if __name__ == "__main__":
-    pass
-    #DBFile = None
-    #main(DBFile)
+    DBFile = None
+    main(DBFile)

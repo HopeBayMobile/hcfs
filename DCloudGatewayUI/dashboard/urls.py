@@ -17,4 +17,5 @@ urlpatterns = patterns("dashboard.views",
     url(r'^status/$', "status", name="status"),
     url(r'^data_update/$', "dashboard_update", name="data_update"),
     url(r'^config/(?P<action>(restore|save){0,1})$', "config", name="config"),
+    url(r'^t$', 'server_time', name="server_time"),
 )

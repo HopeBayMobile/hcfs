@@ -68,19 +68,33 @@
                                         continue;
                                     }
                                 }
+                                if (indic == "uplink_usage"){
+                                    $("#basic-bandwidth .up").text(data.uplink_usage);
+                                }
+                                if (indic == "downlink_usage"){
+                                    $("#basic-bandwidth .down").text(data.downlink_usage);
+                                }
                                 setIndicator(indic, data[indic]);
                             }
                         }
                     });
-                    $.get('/dashboard/status/', function(ctnt, stat, opts){
-                        if (stat == 'success'){
-                            var data = JSON.parse(ctnt);
-                            $("#basic-bandwidth .down").text(data.downlink_usage);
-                            $("#basic-bandwidth .up").text(data.uplink_usage);
-                        }
-                    });
                 }
                 setInterval(update_indicator, 1000);
+                
+                function updateTime(){
+                  $.ajax({
+                    type:"GET",
+                    url:"/dashboard/t",
+                    success: function(msg){
+                      $(".time_box").text(msg);
+                      setInterval(updateTime, 30000);
+                    }
+                  });
+                }
+                
+                $(function(){
+                  updateTime();
+                });
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active');
@@ -168,7 +182,7 @@
                   <!--<li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>-->
                   <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
                   <li class=""><a href="{% url dashboard:config action=None %}">Configuration</a></li>
-                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folders</a></li>
+                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Shared Folders</a></li>
                   <li class=""><a href="{% url dashboard:sync %}">Sync to Cloud</a></li>
                   <li class=""><a href="{% url dashboard:snapshot action=None %}">Snapshots</a></li>
                   <li class=""><a href="{% url dashboard:syslog %}">System Logs</a></li>

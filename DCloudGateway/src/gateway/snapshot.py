@@ -121,16 +121,12 @@ def _initialize_snapshot():
         raise SnapshotError("Could not initialize the snapshot bot.")
 
 
-# wthung, 2012/7/17
-# modify to return latest snapshot name
 def _wait_snapshot(old_len):
     """
     Wait for the new entry to appear in the database.
 
     @type old_len: integer
     @param old_len: Number of entries in database before taking snapshot
-    @rtype: string
-    @return: Last snapshot name.
     """
 
     finished = False
@@ -149,12 +145,9 @@ def _wait_snapshot(old_len):
         # we check the snapshot name is starting with 'snapshot' as well
         if new_len > old_len:
             latest_snapshot = snapshots[0]
-            if 'new_' not in latest_snapshot['name']:
-                finished = True
+            finished = True
         else:
             time.sleep(0.5)
-
-    return latest_snapshot['name']
 
 
 def take_snapshot():
@@ -490,6 +483,10 @@ def _append_samba_entry(entry):
     try:
         if os.path.exists(tmp_smb_conf1):
             os.system('sudo rm -rf %s' % tmp_smb_conf1)
+        # wthung, 2012/8/1
+        # add to remove tmp_smb_conf2
+        if os.path.exists(tmp_smb_conf2):
+            os.system('sudo rm -rf %s' % tmp_smb_conf2)
         snapshot_share_path = os.path.join(snapshot_dir, entry['name'])
 
         os.system('sudo touch %s' % tmp_smb_conf1)
@@ -504,7 +501,7 @@ def _append_samba_entry(entry):
             fh.write('read only = no\n')
             fh.write('create mask = 0755\n')
             fh.write('valid users = superuser\n\n')
-
+        
         os.system('sudo cat %s %s > %s' % (tmp_smb_conf, tmp_smb_conf1, tmp_smb_conf2))
         os.system('sudo cp %s %s' % (tmp_smb_conf2, tmp_smb_conf))
     except:
