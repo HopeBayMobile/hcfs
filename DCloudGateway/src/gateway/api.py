@@ -263,7 +263,6 @@ def _check_s3ql():
         if _check_process_alive('mount.s3ql'):
             cmd = "sudo df"
             po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
             countdown = 30
             while countdown > 0:
                 po.poll()
@@ -275,6 +274,7 @@ def _check_s3ql():
                     else:
                         time.sleep(1)
                 else:
+                    output = po.stdout.read()
                     if output.find("/mnt/cloudgwfiles") != -1 and output.find("/mnt/nfssamba") != -1:
                         return True
                     break
@@ -338,7 +338,7 @@ def get_indicators():
         op_s3ql_ok = _check_s3ql()
 
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-        if op_NFS_srv is False and op_s3ql_ok is True:
+        if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
         if op_SMB_srv is False and op_s3ql_ok is True:
             restart_smb_service()
@@ -533,6 +533,7 @@ def _check_network():
 
         section = "CloudStorageGateway"
         op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
+        full_storage_url = op_storage_url
         index = op_storage_url.find(":")
         if index != -1:
             op_storage_url = op_storage_url[0:index]
@@ -547,9 +548,8 @@ def _check_network():
                 # Jiahong: Add check to see if swift is working
                 op_user = op_config.get(section, 'backend-login')
                 op_pass = op_config.get(section, 'backend-password')
-                cmd = "sudo swift -A https://%s:8080/auth/v1.0 -U %s -K %s stat" % (op_storage_url, op_user, op_pass)
+                cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat" % (full_storage_url, op_user, op_pass)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                output = po.stdout.read()
                 countdown = 30
                 while countdown > 0:
                     po.poll()
@@ -561,6 +561,7 @@ def _check_network():
                         else:
                             time.sleep(1)
                     else:
+                        output = po.stdout.read()
                         if output.find("Bytes:") != -1:
                             op_network_ok = True
                         break
@@ -3407,5 +3408,4 @@ if __name__ == '__main__':
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
     #print _traceroute_backend('aaa')
-    print read_logs(LOGFILES, 0, 10)
     pass
