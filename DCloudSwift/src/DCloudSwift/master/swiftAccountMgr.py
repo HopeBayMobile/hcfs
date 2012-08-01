@@ -1129,7 +1129,7 @@ class SwiftAccountMgr:
         if val == False:
             return Bool(val, msg)
 
-        user_metadata_container = user + self.__private_container_suffix
+        user_metadata_container = account + ":" + user
         container_metadata = {"Password": newPassword}
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
