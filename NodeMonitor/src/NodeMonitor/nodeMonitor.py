@@ -16,6 +16,7 @@ from components.disk_info import DiskInfo
 
 timeout = 60
 socket.setdefaulttimeout(timeout)
+random.seed(os.urandom(100))
 
 '''
 Notification Data Format.
@@ -180,7 +181,6 @@ class NodeMonitor(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
         self.receiverUrl = util.getReceiverUrl()
-        self.ntpserver = NtpServer(self.receiverUrl.split("://")[1].split(":")[0])
         try:
             
             self.sensorInterval = util.getSensorInterval()
