@@ -65,6 +65,9 @@ if [ "$?" -ne "1" ]; then
    echo "Include /var/www/$BASENAME/deploy/apache/dcloud.conf" >> /etc/apache2/apache2.conf
 fi
 
+cp -f $BASEPATH/deploy/apache/ports.conf /etc/apache2/ports.conf
+cp -f $BASEPATH/deploy/apache/default /etc/apache2/sites-available/default
+
 /etc/init.d/apache2 restart
 
 #deploy Celery Task Queue

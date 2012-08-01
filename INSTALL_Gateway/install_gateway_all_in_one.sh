@@ -6,6 +6,11 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
    exit 1
 fi
 
+# update apt-get index if not to install dom
+if [ "$1" != "dom" ]; then
+   apt-get update
+fi
+
 # install gateway API
 cd ../DCloudGateway
 ./gateway_api_install_script

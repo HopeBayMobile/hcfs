@@ -263,7 +263,6 @@ def _check_s3ql():
         if _check_process_alive('mount.s3ql'):
             cmd = "sudo df"
             po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
             countdown = 30
             while countdown > 0:
                 po.poll()
@@ -275,7 +274,8 @@ def _check_s3ql():
                     else:
                         time.sleep(1)
                 else:
-                    if output.find("/mnt/cloudgwfiles") != -1:
+                    output = po.stdout.read()
+                    if output.find("/mnt/cloudgwfiles") != -1 and output.find("/mnt/nfssamba") != -1:
                         return True
                     break
     except:
@@ -306,6 +306,8 @@ def get_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
     
     #log.info("get_indicators start")
@@ -337,8 +339,11 @@ def get_indicators():
         op_Proxy_srv = _check_process_alive('squid3')
         op_s3ql_ok = _check_s3ql()
 
+        # get network statistics
+        network = get_network_speed(MONITOR_IFACE)
+
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-        if op_NFS_srv is False and op_s3ql_ok is True:
+        if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
         if op_SMB_srv is False and op_s3ql_ok is True:
             restart_smb_service()
@@ -358,7 +363,9 @@ def get_indicators():
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
               'HTTP_proxy_srv' : op_Proxy_srv,
-              'S3QL_ok': op_s3ql_ok }}
+              'S3QL_ok': op_s3ql_ok,
+              'uplink_usage' : network["uplink_usage"],
+              'downlink_usage' : network["downlink_usage"]}}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
@@ -389,6 +396,8 @@ def get_gateway_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
 
     #log.info("get_gateway_indicators start")
@@ -406,7 +415,10 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False }}
+          'S3QL_ok': False,
+          'uplink_usage' : 0,
+          'downlink_usage' : 0}}
+
 
     # test, for fast UI integration
     #return json.dumps(return_val)
@@ -533,6 +545,7 @@ def _check_network():
 
         section = "CloudStorageGateway"
         op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
+        full_storage_url = op_storage_url
         index = op_storage_url.find(":")
         if index != -1:
             op_storage_url = op_storage_url[0:index]
@@ -547,9 +560,8 @@ def _check_network():
                 # Jiahong: Add check to see if swift is working
                 op_user = op_config.get(section, 'backend-login')
                 op_pass = op_config.get(section, 'backend-password')
-                cmd = "sudo swift -A https://%s:8080/auth/v1.0 -U %s -K %s stat" % (op_storage_url, op_user, op_pass)
+                cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat" % (full_storage_url, op_user, op_pass)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                output = po.stdout.read()
                 countdown = 30
                 while countdown > 0:
                     po.poll()
@@ -561,6 +573,7 @@ def _check_network():
                         else:
                             time.sleep(1)
                     else:
+                        output = po.stdout.read()
                         if output.find("Bytes:") != -1:
                             op_network_ok = True
                         break
@@ -1235,6 +1248,15 @@ def _umount():
                 raise UmountError(output)
 
             cmd = "sudo /etc/init.d/nmbd stop"
+            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            output = po.stdout.read()
+            po.wait()
+            if po.returncode != 0:
+                raise UmountError(output)
+            
+            # wthung, 2012/8/1
+            # umount /mnt/nfssamba
+            cmd = "sudo umount /mnt/nfssamba"
             po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = po.stdout.read()
             po.wait()
@@ -3279,8 +3301,6 @@ def get_gateway_status():
             - error_log: Error log entries.
             - cloud_storage_usage: Cloud storage usage.
             - gateway_cache_usage: Gateway cache usage.
-            - uplink_usage: Network traffic going from gateway.
-            - downlink_usage: Network traffic coming to gateway.
             - uplink_backend_usage: Network traffic from gateway to backend.
             - downlink_backend_usage: Network traffic from backend to gateway.
             - network: TBD
@@ -3313,10 +3333,6 @@ def get_gateway_status():
         ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
-        # get network statistics
-        network = get_network_speed(MONITOR_IFACE)
-        ret_val["data"]["uplink_usage"] = network["uplink_usage"]
-        ret_val["data"]["downlink_usage"] = network["downlink_usage"]
     except:
         log.info("Unable to get gateway status")
 
@@ -3398,5 +3414,4 @@ if __name__ == '__main__':
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
     #print _traceroute_backend('aaa')
-    print read_logs(LOGFILES, 0, 10)
     pass
