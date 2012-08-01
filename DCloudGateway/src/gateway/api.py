@@ -306,6 +306,8 @@ def get_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
     
     #log.info("get_indicators start")
@@ -337,6 +339,9 @@ def get_indicators():
         op_Proxy_srv = _check_process_alive('squid3')
         op_s3ql_ok = _check_s3ql()
 
+        # get network statistics
+        network = get_network_speed(MONITOR_IFACE)
+
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
         if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
@@ -358,7 +363,9 @@ def get_indicators():
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
               'HTTP_proxy_srv' : op_Proxy_srv,
-              'S3QL_ok': op_s3ql_ok }}
+              'S3QL_ok': op_s3ql_ok,
+              'uplink_usage' : network["uplink_usage"],
+              'downlink_usage' : network["downlink_usage"]}}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
@@ -389,6 +396,8 @@ def get_gateway_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
 
     #log.info("get_gateway_indicators start")
@@ -406,7 +415,10 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False }}
+          'S3QL_ok': False,
+          'uplink_usage' : 0,
+          'downlink_usage' : 0}}
+
 
     # test, for fast UI integration
     #return json.dumps(return_val)
@@ -3289,8 +3301,6 @@ def get_gateway_status():
             - error_log: Error log entries.
             - cloud_storage_usage: Cloud storage usage.
             - gateway_cache_usage: Gateway cache usage.
-            - uplink_usage: Network traffic going from gateway.
-            - downlink_usage: Network traffic coming to gateway.
             - uplink_backend_usage: Network traffic from gateway to backend.
             - downlink_backend_usage: Network traffic from backend to gateway.
             - network: TBD
@@ -3323,10 +3333,6 @@ def get_gateway_status():
         ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
-        # get network statistics
-        network = get_network_speed(MONITOR_IFACE)
-        ret_val["data"]["uplink_usage"] = network["uplink_usage"]
-        ret_val["data"]["downlink_usage"] = network["downlink_usage"]
     except:
         log.info("Unable to get gateway status")
 

@@ -155,7 +155,12 @@ def get_gateway_indicators():
                                      'dirtycache_nearfull' : True,
                                      'HDD_ok' : True,
                                      'NFS_srv' : True,
-                                     'SMB_srv' : True}}
+                                     'SMB_srv' : True,
+                                     'snapshot_in_progress' : True,
+                                     'HTTP_proxy_srv' : True,
+                                     'S3QL_ok' : True,
+                                     'uplink_usage' : 100,
+                                     'downlink_usage' : 1000}}
 
     return json.dumps(return_val)
 
@@ -179,8 +184,6 @@ def get_gateway_status():
                                                         'dirty_cache_size' : 160,
                                                         'dirty_cache_entries' : 18000
                                                        },
-                                        'uplink_usage' : 100,
-                                        'downlink_usage' : 1000,
                                         'uplink_backend_usage' : 80,
                                         'downlink_backend_usage' : 600
 					  }}
