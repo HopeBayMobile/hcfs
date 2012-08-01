@@ -81,6 +81,21 @@
                     });
                 }
                 setInterval(update_indicator, 1000);
+                
+                function updateTime(){
+                  $.ajax({
+                    type:"GET",
+                    url:"/dashboard/t",
+                    success: function(msg){
+                      $(".time_box").text(msg);
+                      setInterval(updateTime, 30000);
+                    }
+                  });
+                }
+                
+                $(function(){
+                  updateTime();
+                });
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active');
