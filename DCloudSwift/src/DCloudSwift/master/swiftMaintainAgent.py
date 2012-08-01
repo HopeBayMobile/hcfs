@@ -166,6 +166,8 @@ class SwiftMaintainAgent:
         elif len(disk_info["broken"]) > 0:
             ret["target"] = "disk_broken"
             ret["disks_to_replace"] = json.dumps(SwiftMaintainAgent.computeDisks2Replace(disk_info, deadline))
+            if not json.loads(ret["disks_to_replace"]):
+                ret = None
         else:
             ret = None
 

@@ -17,6 +17,7 @@ from util import util
 PORT = 2308
 UNNECESSARYFILES = "cert* backups *.conf"
 
+random.seed(os.urandom(100))
 
 # deferSIGTERM decorator
 def deferSIGTERM(f):

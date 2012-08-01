@@ -105,5 +105,6 @@ def main():
     os.system("update-rc.d -f swift-maintain-switcher remove")
     os.system("update-rc.d swift-maintain-switcher defaults")
 
+    os.system("cp ./misc/CronScripts/timesync /etc/cron.hourly")
 if __name__ == '__main__':
     main()
