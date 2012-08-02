@@ -14,6 +14,7 @@ import pickle
 import time
 import functools
 import errno
+import traceback
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
@@ -42,6 +43,7 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
 
+FORMATTER = '%(asctime)s %(hostname)s %(name)s: <%(levelname)s> %(module)s(%(lineno)d) %(message)s'
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
@@ -335,12 +337,13 @@ def getLogger(name=None, conf=SWIFTCONF):
     try:
 
         logger = logging.getLogger(name)
+        hostname = socket.gethostname()
 
         if not hasattr(getLogger, 'handler4Logger'):
             getLogger.handler4Logger = {}
 
         if logger in getLogger.handler4Logger:
-            return logger
+            return DeltaLoggerAdapter(logger=logger, extra={'hostname': hostname}, lockFile=GlobalVar.LOGLOCK)
 
         if os.path.isfile(conf):
             kwparams = SwiftCfg(conf).getKwparams()
@@ -356,13 +359,13 @@ def getLogger(name=None, conf=SWIFTCONF):
         os.system("touch " + logDir + '/' + logName)
 
         hdlr = logging.handlers.RotatingFileHandler(logDir + '/' + logName, maxBytes=1024 * 1024, backupCount=5)
-        hdlr.setFormatter(logging.Formatter(FORMATTER))
+        hdlr.setFormatter(logging.Formatter(FORMATTER, datefmt='%Y/%m/%d %H:%M:%S'))
         logger.addHandler(hdlr)
         logger.setLevel(logLevel)
         logger.propagate = False
 
         getLogger.handler4Logger[logger] = hdlr
-        return DeltaLoggerAdapter(logger=logger, extra={}, lockFile=GlobalVar.LOGLOCK)
+        return DeltaLoggerAdapter(logger=logger, extra={'hostname': hostname}, lockFile=GlobalVar.LOGLOCK)
     finally:
         pass
 
@@ -936,7 +939,8 @@ class DeltaLoggerAdapter(logging.LoggerAdapter):
            cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
            locked = os.system(cmd)
            if locked == 0:
-               fn(msg, *args, **kwargs)
+               (mmsg, mkwargs) = self.process(msg, kwargs)
+               fn(mmsg, *args, **mkwargs)
            else:
                raise TryLockError()
         finally:
@@ -977,13 +981,17 @@ class DeltaLoggerAdapter(logging.LoggerAdapter):
     def critical(self, msg, *args, **kwargs):
         self.wrapper(self.logger.critical, msg, *args, **kwargs)
 
-    def exception(self, msg, *args):
+    def exception(self, msg, *args, **kwargs):
         try:
            os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
            cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
            locked = os.system(cmd)
            if locked == 0:
-               self.logger.exception(msg, *args)
+               (mmsg, mkwargs) = self.process(msg, kwargs)
+               traceList = traceback.format_tb(sys.exc_info()[2])
+               trace = "".join(traceList)
+               mmsg = mmsg + "\n" + trace + str(sys.exc_info()[0])
+               self.logger.error(mmsg, *args, **mkwargs)
            else:
                raise TryLockError()
         finally:
@@ -996,7 +1004,8 @@ class DeltaLoggerAdapter(logging.LoggerAdapter):
            cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
            locked = os.system(cmd)
            if locked == 0:
-               self.logger.log(level, msg, *args, **kwargs)
+               (mmsg, mkwargs) = self.process(msg, kwargs)
+               self.logger.log(level, mmsg, *args, **mkwargs)
            else:
                raise TryLockError()
         finally:
@@ -1036,4 +1045,16 @@ class TryLockError(Exception):
 
 
 if __name__ == '__main__':
+    try:
+        raise TypeError("EE")
+    except:
+        logger=getLogger(name="Tester")
+#        logger.exception("Test")
+#
+    logger = getLogger(name="Tester2")
+    logger.info("Hello")
+    logger = getLogger(name="Tester2")
+    logger.info("Hello")
+    logger = getLogger(name="Tester2")
+    logger.info("Hello")
     pass
