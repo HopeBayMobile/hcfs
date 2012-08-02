@@ -35,14 +35,14 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          ACCOUNT_DB='%s/swift_account.db' % DELTADIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
          MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
-         OBJBUILDER='object.builder')
+         OBJBUILDER='object.builder',
+         LOGLOCK = "/etc/delta/delta_log.lock",)
 
 
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
 
 lockFile = "/etc/delta/swift.lock"
-
 
 # tryLock decorator
 def tryLock(tries=11, lockLife=900):
@@ -325,7 +325,7 @@ def getLogger(name=None, conf=SWIFTCONF):
     @param name: logger name
     @type  conf: string
     @param conf: path to the swift cluster config
-    @rtype:  logging.Logger
+    @rtype:  util.DeltaLoggerAdapter
     @return: If conf is not specified or does not exist then
              return a logger which writes log to /var/log/deltaSwift with log-level=INFO.
              Otherwise, return a logger with setting specified in conf.
@@ -362,7 +362,7 @@ def getLogger(name=None, conf=SWIFTCONF):
         logger.propagate = False
 
         getLogger.handler4Logger[logger] = hdlr
-        return logger
+        return DeltaLoggerAdapter(logger=logger, extra={}, lockFile=GlobalVar.LOGLOCK)
     finally:
         pass
 
@@ -923,6 +923,87 @@ def hostname2Ip(hostname, nameserver="192.168.11.1"):
     return None
 
 
+class DeltaLoggerAdapter(logging.LoggerAdapter):
+    '''
+    A process-safe logger adaptor.
+    Precondition: each log of message should be able to be
+    accomplished in 16 seconds 
+    '''
+    
+    def wrapper(self, fn, msg, *args, **kwargs): 
+        try:
+           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
+           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
+           locked = os.system(cmd)
+           if locked == 0:
+               fn(msg, *args, **kwargs)
+           else:
+               raise TryLockError()
+        finally:
+           if locked == 0:
+               os.system("rm -f %s" % self.lockFile)
+
+    def __init__(self, logger, extra, lockFile, tries=-1):
+        '''
+        @type logger: logging.Logger
+        @param logger: an object of logging.Logger to wrap
+        @type extra: dictioary
+        @param extra: dictionary used to initialze parent
+        @type lockFile: stirng
+        @param lockFile: pathname to a lockfile for coordinating multi-processes
+        @type tries: integer
+        @param tries: times to try lock the lockfile berfore raise tryLock error
+        @rtype: None
+        @return: None
+        '''
+        logging.LoggerAdapter.__init__(self, logger=logger, extra=extra)
+        self.logger = logger
+        self.lockFile = lockFile
+        self.lockLife = 16
+        self.tries = tries
+
+    def debug(self, msg, *args, **kwargs):
+        self.wrapper(self.logger.debug, msg, *args, **kwargs)
+
+    def info(self, msg, *args, **kwargs):
+        self.wrapper(self.logger.info, msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        self.wrapper(self.logger.warning, msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        self.wrapper(self.logger.error, msg, *args, **kwargs)
+
+    def critical(self, msg, *args, **kwargs):
+        self.wrapper(self.logger.critical, msg, *args, **kwargs)
+
+    def exception(self, msg, *args):
+        try:
+           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
+           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
+           locked = os.system(cmd)
+           if locked == 0:
+               self.logger.exception(msg, *args)
+           else:
+               raise TryLockError()
+        finally:
+           if locked == 0:
+               os.system("rm -f %s" % self.lockFile)
+
+    def log(self, level, msg, *args, **kwargs):
+        try:
+           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
+           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
+           locked = os.system(cmd)
+           if locked == 0:
+               self.logger.log(level, msg, *args, **kwargs)
+           else:
+               raise TryLockError()
+        finally:
+           if locked == 0:
+               os.system("rm -f %s" % self.lockFile)
+
+
 class TimeoutError(Exception):
     def __init__(self, cmd=None, timeout=None):
         self.cmd = cmd
@@ -955,7 +1036,4 @@ class TryLockError(Exception):
 
 
 if __name__ == '__main__':
-    #createRamdiskDirs()
-    #print hostname2Ip("GDFGSDFSD")
-    #print restartSwiftProxy()
     pass
