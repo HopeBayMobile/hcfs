@@ -28,7 +28,7 @@ def enum(**enums):
     return type('Enum', (), enums)
 
 GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
-         FORMATTER='[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
+         FORMATTER = '%(asctime)s %(hostname)s %(name)s: <%(levelname)s> %(module)s(%(lineno)d) %(message)s',
          DELTADIR=DELTADIR,
          SWIFTDIR='/etc/swift',
          ORI_SWIFTCONF='%s/Swift.ini' % DELTADIR,
@@ -43,7 +43,6 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
 
-FORMATTER = '%(asctime)s %(hostname)s %(name)s: <%(levelname)s> %(module)s(%(lineno)d) %(message)s'
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
@@ -952,7 +951,7 @@ class DeltaLoggerAdapter(logging.LoggerAdapter):
         @type logger: logging.Logger
         @param logger: an object of logging.Logger to wrap
         @type extra: dictioary
-        @param extra: dictionary used to initialze parent
+        @param extra: context info
         @type lockFile: stirng
         @param lockFile: pathname to a lockfile for coordinating multi-processes
         @type tries: integer
