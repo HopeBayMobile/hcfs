@@ -28,7 +28,7 @@ def enum(**enums):
     return type('Enum', (), enums)
 
 GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
-         FORMATTER = '%(asctime)s %(hostname)s %(name)s: <%(levelname)s> %(module)s(%(lineno)d) %(message)s',
+         FORMATTER = 'deltacloud: <%(levelname)s> %(name)s %(module)s(%(lineno)d) %(message)s',
          DELTADIR=DELTADIR,
          SWIFTDIR='/etc/swift',
          ORI_SWIFTCONF='%s/Swift.ini' % DELTADIR,
@@ -42,7 +42,6 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
 
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
-
 lockFile = "/etc/delta/swift.lock"
 
 # tryLock decorator
@@ -342,7 +341,7 @@ def getLogger(name=None, conf=SWIFTCONF):
             getLogger.handler4Logger = {}
 
         if logger in getLogger.handler4Logger:
-            return DeltaLoggerAdapter(logger=logger, extra={'hostname': hostname}, lockFile=GlobalVar.LOGLOCK)
+            return logger
 
         if os.path.isfile(conf):
             kwparams = SwiftCfg(conf).getKwparams()
@@ -357,14 +356,14 @@ def getLogger(name=None, conf=SWIFTCONF):
         os.system("mkdir -p " + logDir)
         os.system("touch " + logDir + '/' + logName)
 
-        hdlr = logging.handlers.RotatingFileHandler(logDir + '/' + logName, maxBytes=1024 * 1024, backupCount=5)
+        hdlr = logging.handlers.SysLogHandler(address = '/dev/log')
         hdlr.setFormatter(logging.Formatter(FORMATTER, datefmt='%Y/%m/%d %H:%M:%S'))
         logger.addHandler(hdlr)
-        logger.setLevel(logLevel)
+        #logger.setLevel(logLevel)
         logger.propagate = False
 
         getLogger.handler4Logger[logger] = hdlr
-        return DeltaLoggerAdapter(logger=logger, extra={'hostname': hostname}, lockFile=GlobalVar.LOGLOCK)
+        return logger
     finally:
         pass
 
@@ -923,93 +922,6 @@ def hostname2Ip(hostname, nameserver="192.168.11.1"):
                 return ip
 
     return None
-
-
-class DeltaLoggerAdapter(logging.LoggerAdapter):
-    '''
-    A process-safe logger adaptor.
-    Precondition: each log of message should be able to be
-    accomplished in 16 seconds 
-    '''
-    
-    def wrapper(self, fn, msg, *args, **kwargs): 
-        try:
-           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
-           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
-           locked = os.system(cmd)
-           if locked == 0:
-               (mmsg, mkwargs) = self.process(msg, kwargs)
-               fn(mmsg, *args, **mkwargs)
-           else:
-               raise TryLockError()
-        finally:
-           if locked == 0:
-               os.system("rm -f %s" % self.lockFile)
-
-    def __init__(self, logger, extra, lockFile, tries=-1):
-        '''
-        @type logger: logging.Logger
-        @param logger: an object of logging.Logger to wrap
-        @type extra: dictioary
-        @param extra: context info
-        @type lockFile: stirng
-        @param lockFile: pathname to a lockfile for coordinating multi-processes
-        @type tries: integer
-        @param tries: times to try lock the lockfile berfore raise tryLock error
-        @rtype: None
-        @return: None
-        '''
-        logging.LoggerAdapter.__init__(self, logger=logger, extra=extra)
-        self.logger = logger
-        self.lockFile = lockFile
-        self.lockLife = 16
-        self.tries = tries
-
-    def debug(self, msg, *args, **kwargs):
-        self.wrapper(self.logger.debug, msg, *args, **kwargs)
-
-    def info(self, msg, *args, **kwargs):
-        self.wrapper(self.logger.info, msg, *args, **kwargs)
-
-    def warning(self, msg, *args, **kwargs):
-        self.wrapper(self.logger.warning, msg, *args, **kwargs)
-
-    def error(self, msg, *args, **kwargs):
-        self.wrapper(self.logger.error, msg, *args, **kwargs)
-
-    def critical(self, msg, *args, **kwargs):
-        self.wrapper(self.logger.critical, msg, *args, **kwargs)
-
-    def exception(self, msg, *args, **kwargs):
-        try:
-           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
-           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
-           locked = os.system(cmd)
-           if locked == 0:
-               (mmsg, mkwargs) = self.process(msg, kwargs)
-               traceList = traceback.format_tb(sys.exc_info()[2])
-               trace = "".join(traceList)
-               mmsg = mmsg + "\n" + trace + str(sys.exc_info()[0])
-               self.logger.error(mmsg, *args, **mkwargs)
-           else:
-               raise TryLockError()
-        finally:
-           if locked == 0:
-               os.system("rm -f %s" % self.lockFile)
-
-    def log(self, level, msg, *args, **kwargs):
-        try:
-           os.system("mkdir -p %s" % os.path.dirname(self.lockFile))
-           cmd = "lockfile -1 -r %d -l %d %s" % (self.tries, self.lockLife, self.lockFile)
-           locked = os.system(cmd)
-           if locked == 0:
-               (mmsg, mkwargs) = self.process(msg, kwargs)
-               self.logger.log(level, mmsg, *args, **mkwargs)
-           else:
-               raise TryLockError()
-        finally:
-           if locked == 0:
-               os.system("rm -f %s" % self.lockFile)
 
 
 class TimeoutError(Exception):
