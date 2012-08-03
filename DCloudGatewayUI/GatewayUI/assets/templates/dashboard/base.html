@@ -148,15 +148,17 @@
             </div>
             <div class="notify-box-group">
                 <div class="notify-box-row-NW">
-                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot in Progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
+                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot In Progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
                     </div>
                     <div id="system_check" rel="tooltip" title="System Check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                     </div>
                     <div id="network_ok" rel="tooltip" title="Network" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
                     </div>
-                    <div id="flush_inprogress" rel="tooltip" title="Flush in Progress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
+                    <div id="flush_inprogress" rel="tooltip" title="Flush In Progress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
                     </div>
                     <div id="dirtycache_nearfull" rel="tooltip" title="Data not yet protected near full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    </div>
+                    <div id="filesystem" rel="tooltip" title="Filesystem has been mounted and running" class="notify-box img-filesystem {% if result_data.S3QL_ok %}work{% endif %}">
                     </div>
                 </div>
                 <div class="notify-box-row-NE">
