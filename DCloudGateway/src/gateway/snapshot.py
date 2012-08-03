@@ -29,7 +29,7 @@ snapshot_bot = "/etc/delta/snapshot_bot"
 snapshot_schedule = "/etc/delta/snapshot_schedule"
 snapshot_db = "/root/.s3ql/snapshot_db.txt"
 snapshot_db_lock = "/root/.s3ql/.snapshot_db_lock"
-SNAPSHOT_DIR = "/mnt/cloudgwfiles/snapshots"
+snapshot_dir = "/mnt/cloudgwfiles/snapshots"
 temp_snapshot_db = "/root/.s3ql/.tempsnapshotdb"
 temp_snapshot_db1 = "/root/.s3ql/.tempsnapshotdb1"
 ss_auto_exposed_file = "/root/.s3ql/.ss_auto_exposed"
@@ -441,12 +441,12 @@ def get_snapshot_last_status():
                and the finish time of latest snapshot (return -1 if latest snapshot is failed).
     """
 
-    return_val = {'result': False,
-                  'msg': 'Latest snapshot is failed',
-                  'latest_snapshot_time': -1}
-    
+    return_msg = 'Latest snapshot is failed'
     return_result = False
     last_ss_time = -1
+    return_val = {'result': return_result,
+                  'msg': return_msg,
+                  'latest_snapshot_time': last_ss_time}
     
     try:
         db_list = _acquire_db_list()
@@ -460,7 +460,7 @@ def get_snapshot_last_status():
             return_msg = 'Latest snapshot is successfully finished.'
     
     except:
-        return_msg = '[2] Unable to get status of last snapshot.'
+        return_msg = 'Unable to get status of last snapshot.'
         last_ss_time = -1
 
     log.info(return_msg)
@@ -487,7 +487,7 @@ def _append_samba_entry(entry):
         # add to remove tmp_smb_conf2
         if os.path.exists(tmp_smb_conf2):
             os.system('sudo rm -rf %s' % tmp_smb_conf2)
-        snapshot_share_path = os.path.join(SNAPSHOT_DIR, entry['name'])
+        snapshot_share_path = os.path.join(snapshot_dir, entry['name'])
 
         os.system('sudo touch %s' % tmp_smb_conf1)
         os.system('sudo chown www-data:www-data %s' % tmp_smb_conf1)
@@ -670,7 +670,7 @@ def delete_snapshot(to_delete):
             return_msg = 'Unable to find the snapshot in the database'
         else:
             if not snapshot_list[snapshot_index]['exposed']:  # It is OK to delete
-                snapshot_path = os.path.join(SNAPSHOT_DIR, to_delete)
+                snapshot_path = os.path.join(snapshot_dir, to_delete)
                 if os.path.exists(snapshot_path):  # Invoke s3qlrm
                     os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
 
@@ -837,7 +837,7 @@ def _get_snapshot_file_info(ss_dirname):
     ret = []
     
     # get file number, including sub-directories
-    cmd = "sudo du -a %s/%s | wc -l" % (SNAPSHOT_DIR, ss_dirname) 
+    cmd = "sudo du -a %s | wc -l" % ss_dirname
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.stdout.read()
     po.wait()
@@ -848,13 +848,14 @@ def _get_snapshot_file_info(ss_dirname):
         file_num = 0
     
     # get total size, including sub-directories
-    cmd = "sudo du -s %s/%s" % (SNAPSHOT_DIR, ss_dirname) 
+    cmd = "sudo du -s %s" % ss_dirname
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.stdout.read()
     po.wait()
     
     total_size, _ = output.split('\t')
     total_size = int(total_size)
+    # for empty folder, total size calculated by "du -s" is 12
     # error handling
     if (total_size < 0):
         total_size = 0
@@ -876,11 +877,14 @@ def rebuild_snapshot_database(_ss_dir=None):
     
     listing = []
     db_string = ''
+    ss_folder = ''
     
     if _ss_dir is None:
-        listing = os.listdir(SNAPSHOT_DIR)
+        ss_folder = snapshot_dir
     else:
-        listing = os.listdir(_ss_dir)
+        ss_folder = _ss_dir
+        
+    listing = os.listdir(ss_folder)
     
     db_lock = Snapshot_Db_Lock()
     
@@ -889,11 +893,11 @@ def rebuild_snapshot_database(_ss_dir=None):
         for dirname in reversed(listing):
             ss_time = _parse_snapshot_time(dirname)
             if ss_time != -1:
-                file_num, total_size = _get_snapshot_file_info(dirname)
+                file_num, total_size = _get_snapshot_file_info("%s/%s" % (ss_folder, dirname))
                 db_string += "%s,%d,%d,%d,%d,false,false\n" % (dirname, ss_time, ss_time, file_num, total_size >> 10)
         
         # remove the last newline
-        db_string = db_string[:-1]
+        #db_string = db_string[:-1]
         
         # backup snapshot db if any
         if os.path.exists(snapshot_db):
@@ -904,6 +908,7 @@ def rebuild_snapshot_database(_ss_dir=None):
         
     except Exception as e:
         log.info('[0] Failed to rebuild snapshot database: %s' % str(e))
+        print('[0] Failed to rebuild snapshot database: %s' % str(e))
     finally:
         del db_lock
 
