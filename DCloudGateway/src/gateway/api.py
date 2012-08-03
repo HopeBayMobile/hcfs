@@ -8,6 +8,7 @@ import subprocess
 import time
 import re
 from datetime import datetime
+from gateway import snapshot
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -306,6 +307,8 @@ def get_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
     
     #log.info("get_indicators start")
@@ -337,6 +340,9 @@ def get_indicators():
         op_Proxy_srv = _check_process_alive('squid3')
         op_s3ql_ok = _check_s3ql()
 
+        # get network statistics
+        network = get_network_speed(MONITOR_IFACE)
+
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
         if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
@@ -358,7 +364,9 @@ def get_indicators():
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
               'HTTP_proxy_srv' : op_Proxy_srv,
-              'S3QL_ok': op_s3ql_ok }}
+              'S3QL_ok': op_s3ql_ok,
+              'uplink_usage' : network["uplink_usage"],
+              'downlink_usage' : network["downlink_usage"]}}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
@@ -389,6 +397,8 @@ def get_gateway_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - uplink_usage: Network traffic going from gateway.
+            - downlink_usage: Network traffic coming to gateway.
     """
 
     #log.info("get_gateway_indicators start")
@@ -406,7 +416,10 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False }}
+          'S3QL_ok': False,
+          'uplink_usage' : 0,
+          'downlink_usage' : 0}}
+
 
     # test, for fast UI integration
     #return json.dumps(return_val)
@@ -1174,10 +1187,15 @@ def _mkfs(storage_url, key):
     @param storage_url: Storage URL.
     @type key: string
     @param key: Encryption passphrase.
-    
+    @rtype: boolean
+    @return: True if a file system is existed. Otherwise, False.
     """
     
-    log.info("_mkfs start")
+    log.info("[2] _mkfs start")
+    
+    # wthung, 2012/8/3
+    # add a var to indicate an exiting filesys
+    has_existing_filesys = False
 
     try:
         cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta" % (storage_url)
@@ -1188,8 +1206,10 @@ def _mkfs(storage_url, key):
                 op_msg = "Failed to mkfs for %s" % stderr
                 raise BuildGWError(op_msg)
             else:
-                log.info("Found existing file system!")
-                log.info("Conducting forced file system check")
+                log.info("[2] Found existing file system!")
+                log.info("[2] Conducting forced file system check")
+                has_existing_filesys = True
+                
                 cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/gateway/delta" % (storage_url)
                 po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 output = po.stdout.read()
@@ -1198,10 +1218,15 @@ def _mkfs(storage_url, key):
                 if po.returncode != 0:
                     log.error("[error] Error found during fsck (%s)" % output)
                 else:
-                    log.info("fsck completed")
+                    log.info("[2] fsck completed")
+    # wthung, 2012/8/3
+    # add except
+    except Exception as e:
+        log.info('[0] _mkfs error: %s' % str(e))
 
     finally:
-        log.info("_mkfs end")
+        log.info("[2] _mkfs end")
+        return has_existing_filesys
 
 
 @common.timeout(600)
@@ -1482,8 +1507,14 @@ def build_gateway(user_key):
         password = op_config.get(section, 'backend-password')
         
         _openContainter(storage_url=url, account=account, password=password)
-        _mkfs(storage_url=url, key=user_key)
+        has_filesys = _mkfs(storage_url=url, key=user_key)
         _mount(storage_url=url)
+        
+        # wthung, 2012/8/3
+        # if a file system is existed, try to rebuild snapshot database
+        if has_filesys:
+            snapshot.rebuild_snapshot_database()
+        
         # restart nfs and mount /mnt/nfssamba
         restart_service("nfs-kernel-server")
         os.system("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
@@ -3289,8 +3320,6 @@ def get_gateway_status():
             - error_log: Error log entries.
             - cloud_storage_usage: Cloud storage usage.
             - gateway_cache_usage: Gateway cache usage.
-            - uplink_usage: Network traffic going from gateway.
-            - downlink_usage: Network traffic coming to gateway.
             - uplink_backend_usage: Network traffic from gateway to backend.
             - downlink_backend_usage: Network traffic from backend to gateway.
             - network: TBD
@@ -3323,10 +3352,6 @@ def get_gateway_status():
         ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
-        # get network statistics
-        network = get_network_speed(MONITOR_IFACE)
-        ret_val["data"]["uplink_usage"] = network["uplink_usage"]
-        ret_val["data"]["downlink_usage"] = network["downlink_usage"]
     except:
         log.info("Unable to get gateway status")
 
@@ -3408,4 +3433,5 @@ if __name__ == '__main__':
 #    print set_smb_user_list("superuser", "superuser")
 #    print get_smb_user_list()
     #print _traceroute_backend('aaa')
+    snapshot.rebuild_snapshot_database()
     pass

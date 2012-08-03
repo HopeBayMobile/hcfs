@@ -68,15 +68,14 @@
                                         continue;
                                     }
                                 }
+                                if (indic == "uplink_usage"){
+                                    $("#basic-bandwidth .up").text(data.uplink_usage);
+                                }
+                                if (indic == "downlink_usage"){
+                                    $("#basic-bandwidth .down").text(data.downlink_usage);
+                                }
                                 setIndicator(indic, data[indic]);
                             }
-                        }
-                    });
-                    $.get('/dashboard/status/', function(ctnt, stat, opts){
-                        if (stat == 'success'){
-                            var data = JSON.parse(ctnt);
-                            $("#basic-bandwidth .down").text(data.downlink_usage);
-                            $("#basic-bandwidth .up").text(data.uplink_usage);
                         }
                     });
                 }

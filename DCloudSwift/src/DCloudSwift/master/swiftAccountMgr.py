@@ -553,7 +553,9 @@ class SwiftAccountMgr:
             return Bool(val, msg)
         else:
             logger.info(list_user_output.msg)
-            user_list = list_user_output.msg
+            for field, value in list_user_output.msg.items():
+                user_list.append(field)
+            #user_list = list_user_output.msg
 
         for user in user_list:
             metadata_container = account + ":" + user
@@ -1129,7 +1131,7 @@ class SwiftAccountMgr:
         if val == False:
             return Bool(val, msg)
 
-        user_metadata_container = user + self.__private_container_suffix
+        user_metadata_container = account + ":" + user
         container_metadata = {"Password": newPassword}
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
@@ -1752,19 +1754,21 @@ class SwiftAccountMgr:
 
     def list_account(self, retry=3):
         '''
-        List all the existed accounts.
+        List all existed accounts and related information.
 
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
-        @return: a named tuple Bool(result, val, msg). If the account information is listed successfully, then Bool.val == True
-            and Bool.msg == account list. Otherwise, Bool.val == False and Bool.msg records the error message.
+        @return: a named tuple Bool(val, msg). If the account information is listed successfully, then Bool.val == True
+                and Bool.msg is a dictoinary recording all existed accounts and related information. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
         '''
         logger = util.getLogger(name="list_account")
 
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         account_info = {}
-        account_list = []
+        user_info = {}
+        account_dict = {}
         val = False
         msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1796,9 +1800,42 @@ class SwiftAccountMgr:
         for item in account_info["accounts"]:
             if ":" not in item["name"]:
             # Metadata container must be removed.
-                account_list.append(item["name"])
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
 
-        msg = account_list
+                if val == False:
+                    user_number = "Error!"
+                    logger.error(msg)
+                else:
+                    try:
+                        user_info = json.loads(msg)
+                        logger.info(msg)
+                        user_number = len(user_info["users"])
+                    except Exception as e:
+                        msg = "Failed to load the json string: %s" % str(e)
+                        logger.error(msg)
+                        user_number = "Error!"
+
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
+                                                   fn=self.__get_container_metadata, account=".super_admin",\
+                                                   container=item["name"]+":"+self.__admin_default_name, admin_user=".super_admin",\
+                                                   admin_password=self.__password)
+
+                if val == False:
+                    description = "Error!"
+                    account_enable = "Error!"
+                    logger.error(msg)
+                else:
+                    description = msg["Description"]
+                    account_enable = msg["Account-Enable"]
+
+                account_dict[item["name"]] = {
+                    "description": description,
+                    "user_number": user_number,
+                    "account_enable": account_enable,
+                }
+
+        val = True
+        msg = account_dict
 
         return Bool(val, msg)
 
@@ -1943,7 +1980,7 @@ class SwiftAccountMgr:
 
     def list_user(self, account, retry=3):
         '''
-        List all the existed user in the account.
+        List all existed users and related information in the account.
 
         @type  account: string
         @param account: the account name of the user
@@ -1951,13 +1988,14 @@ class SwiftAccountMgr:
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
         @return: a named tuple Bool(val, msg). If the user list is successfully got, then Bool.val == True and
-                Bool.msg == user list. Otherwise, Bool.val == False and Bool.msg records the error message.
+                Bool.msg is a dictionary recording all existed users and related information. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
         '''
         logger = util.getLogger(name="list_user")
 
         proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         user_info = {}
-        user_list = []
+        user_dict = {}
         val = False
         msg = ""
 
@@ -1998,9 +2036,27 @@ class SwiftAccountMgr:
                 return Bool(val, msg)
 
         for item in user_info["users"]:
-            user_list.append(item["name"])
+            #user_list.append(item["name"])
+            (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry,\
+                                               fn=self.__get_container_metadata, account=".super_admin",\
+                                               container=account+":"+item["name"], admin_user=".super_admin",\
+                                               admin_password=self.__password)
 
-        msg = user_list
+            if val == False:
+                description = "Error!"
+                user_enable = "Error!"
+                logger.error(msg)
+            else:
+                description = msg["Description"]
+                user_enable = msg["User-Enable"]
+
+            user_dict[item["name"]] = {
+                "description": description,
+                "user_enable": user_enable,
+            }
+
+        val = True
+        msg = user_dict
 
         return Bool(val, msg)
 

@@ -14,6 +14,7 @@ import pickle
 import time
 import functools
 import errno
+import traceback
 from ConfigParser import ConfigParser
 from SwiftCfg import SwiftCfg
 
@@ -27,7 +28,7 @@ def enum(**enums):
     return type('Enum', (), enums)
 
 GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
-         FORMATTER='[%(levelname)s from %(name)s on %(asctime)s] %(message)s',
+         FORMATTER = 'deltacloud: <%(levelname)s> %(name)s %(module)s(%(lineno)d) %(message)s',
          DELTADIR=DELTADIR,
          SWIFTDIR='/etc/swift',
          ORI_SWIFTCONF='%s/Swift.ini' % DELTADIR,
@@ -35,14 +36,13 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          ACCOUNT_DB='%s/swift_account.db' % DELTADIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
          MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
-         OBJBUILDER='object.builder')
+         OBJBUILDER='object.builder',
+         LOGLOCK = "/etc/delta/delta_log.lock",)
 
 
 SWIFTCONF = GlobalVar.SWIFTCONF
 FORMATTER = GlobalVar.FORMATTER
-
 lockFile = "/etc/delta/swift.lock"
-
 
 # tryLock decorator
 def tryLock(tries=11, lockLife=900):
@@ -325,11 +325,10 @@ def getLogger(name=None, conf=SWIFTCONF):
     @param name: logger name
     @type  conf: string
     @param conf: path to the swift cluster config
-    @rtype:  logging.Logger
+    @rtype:  logging.logger
     @return: If conf is not specified or does not exist then
-             return a logger which writes log to /var/log/deltaSwift with log-level=INFO.
-             Otherwise, return a logger with setting specified in conf.
-             The log rotates every 1MB and with 5 bacup.
+             return a logger which writes log to /var/log/syslog with log-level=INFO.
+             Otherwise, return a logger with log-level specified in conf.
     """
 
     try:
@@ -344,21 +343,25 @@ def getLogger(name=None, conf=SWIFTCONF):
 
         if os.path.isfile(conf):
             kwparams = SwiftCfg(conf).getKwparams()
-            logDir = kwparams.get('logDir', '/var/log/deltaSwift/')
-            logName = kwparams.get('logName', 'deltaSwift.log')
             logLevel = kwparams.get('logLevel', 'INFO')
         else:
-            logDir = '/var/log/deltaSwift/'
-            logName = 'deltaSwift.log'
             logLevel = 'INFO'
 
-        os.system("mkdir -p " + logDir)
-        os.system("touch " + logDir + '/' + logName)
-
-        hdlr = logging.handlers.RotatingFileHandler(logDir + '/' + logName, maxBytes=1024 * 1024, backupCount=5)
+        hdlr = logging.handlers.SysLogHandler(address = '/dev/log')
         hdlr.setFormatter(logging.Formatter(FORMATTER))
         logger.addHandler(hdlr)
-        logger.setLevel(logLevel)
+
+        if logLevel.lower() == "debug":
+            logger.setLevel(logging.DEBUG)
+        elif logLevel.lower() == "warning":
+            logger.setLevel(logging.WARNING)
+        elif logLevel.lower() == "error":
+            logger.setLevel(logging.ERROR)
+        elif logLevel.lower() == "critical":
+            logger.setLevel(logging.CRITICAL)
+        else:
+            logger.setLevel(logging.INFO)
+
         logger.propagate = False
 
         getLogger.handler4Logger[logger] = hdlr
@@ -955,7 +958,9 @@ class TryLockError(Exception):
 
 
 if __name__ == '__main__':
-    #createRamdiskDirs()
-    #print hostname2Ip("GDFGSDFSD")
-    #print restartSwiftProxy()
+    logger = getLogger(name="Tester")
+    logger.info("info")
+    logger.error("error")
+    logger.warn("warning")
+    logger.critical("critical")
     pass
