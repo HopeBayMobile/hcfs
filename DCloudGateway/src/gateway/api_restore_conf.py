@@ -110,11 +110,22 @@ def save_gateway_configuration():
     return_val = {'result': False,
                   'code':   '001',
                   'msg':    'config backup is fail!'}
-    fileList = ['/etc/delta/network.info',
-                '/etc/delta/gw_schedule.conf',
-                '/etc/exports',
-                '/etc/samba/smb.conf',
+    # wthung, 2012/8/3
+    # add more files to save, delete /etc/delta/network.info, 
+    #   /etc/exports and /etc/samba/smb.conf
+    SMB_PASSWD_FILE = '/var/lib/samba/passdb.tdb'
+    fileList = ['/etc/delta/gw_schedule.conf',
+                '/etc/delta/snapshot_lifespan',
+                '/etc/delta/snapshot_schedule',
+                SMB_PASSWD_FILE,
+                '/etc/hosts.allow',
                 ]
+    
+    # wthung, 2012/8/3
+    # change permission of /var/lib/samba/passdb.tdb to 0644,
+    #   so that we can successfully copy
+    os.system('sudo chmod 644 %s' % SMB_PASSWD_FILE)
+    
     swiftData = _get_Swift_credential()
     if swiftData[0] is None:
         return_val['code'] = '000'
