@@ -17,5 +17,8 @@ urlpatterns = patterns('swift_account.views',
     url(r'^user/(?P<id>\w+)/enable$', "enable_account", name="enable_account"),
     url(r'^(?P<id>\w+)/user/new$', "new_user", name="new_user"),
     url(r'^(?P<id>\w+)/user/new/confirm$', "new_user_confirm", name="confirm_user"),
-    url(r'^(?P<id>\w+)/user/new/process$', "process_user", name="process_user")
+    url(r'^(?P<id>\w+)/user/new/process$', "process_user", name="process_user"),
+    url(r'^(?P<id>\w+)/user/(?P<user_id>\w+)/edit$', "edit_user", name="edit_user"),
+    url(r'^(?P<id>\w+)/user/(?P<user_id>\w+)/update$', "update_user", name="update_user"),
+    url(r'^(?P<id>\w+)/user/(?P<user_id>\w+)/delete$', "delete_user", name="delete_user"),
 )

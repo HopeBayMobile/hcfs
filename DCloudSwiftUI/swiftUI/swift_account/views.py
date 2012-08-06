@@ -122,7 +122,29 @@ def new_user_confirm(request, id):
     return HttpResponse("new_user_confirm")
 
 @login_required
-def process_user(request):
+def process_user(request, id):
     """
     """
     return redirect("/accounts/")
+
+@login_required
+def edit_user(request, id, user_id):
+    """
+    """
+    #return HttpResponse("edit_user")
+    return render_to_response('edit_user.html',
+      {"account_id":id, 
+       "user_id":user_id,
+       "description":"Long long story......"})
+
+@login_required
+def update_user(request, id, user_id):
+    """
+    """
+    return HttpResponse("update_user")
+
+@login_required
+def delete_user(request, id, user_id):
+    """
+    """
+    return HttpResponse("delete_user")

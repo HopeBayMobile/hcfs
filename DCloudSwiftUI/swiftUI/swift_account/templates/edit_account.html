@@ -43,8 +43,8 @@
 <form action="/accounts/{{account_id}}/modify" method="post" id="form1">
     {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
-      <label for="account_id">Account ID:</label><input type="text" name="account_id" id="account_id" value="{{account_id}}" class="required" minlength="3"/>
-      <label for="description">Description:</label><textarea rows="3" name="description" id="description" value="{{description}}" class="required"></textarea>
+      Account ID: {{account_id}}
+      <label for="description">Description:</label><textarea rows="3" name="description" id="description" class="required">{{description}}</textarea>
       <label for="submit"></label>
       <input class="btn" type="submit" value="OK" /> <a class="btn" href="/accounts/{{account_id}}">Cancel</a>
     </div>
@@ -68,21 +68,21 @@
 </tr>
 <tr>
 <td>1</td>
-<td><a href="/accounts/Admin/user/edit">Admin</a></td>
+<td><a href="/accounts/{{account_id}}/user/Admin/edit">Admin</a></td>
 <td>I'm Administrator...</td>
-<td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a></td>
+<td><a class="btn" id="reset_pw$Yoo">Reset PW</a> <a class="btn" id="query_pw$Admin">Query</a></td>
 </tr>
 <tr>
 <td>2</td>
-<td><a href="/accounts/User1/user/edit">User1</a></td>
+<td><a href="/accounts/{{account_id}}/user/User1/edit">User1</a></td>
 <td>I'm ghost</td>
-<td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a> <a class="btn" href="/accounts/user/User1/enable"><i class="icon-off"></i>On</a></a></td>
+<td><a class="btn" id="reset_pw$Yoo">Reset PW</a> <a class="btn" id="query_pw$User1">Query</a> <a class="btn" href="/accounts/user/User1/enable"><i class="icon-off"></i>On</a></a></td>
 </tr>
 <tr>
 <td>1</td>
-<td><a href="/accounts/Yoo/user/edit">Yoo</a></td>
+<td><a href="/accounts/{{account_id}}/user/Yooedit">Yoo</a></td>
 <td>lala...</td>
-<td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a> <a class="btn" id="dis_user$Admin" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a></a></td>
+<td><a class="btn" id="reset_pw$Yoo">Reset PW</a> <a class="btn" id="query_pw$Yoo">Query</a> <a class="btn" id="dis_user$Yoo" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a></a></td>
 </tr>
   </table>
   </div>
@@ -98,13 +98,69 @@
     This will suspend user "[[User]]" service, are you sure?
   </div>
   <div class="modal-footer">
-    <a class="btn btn-large btn-primary" href="/accounts/user/User1/disable">Yes</a>
-    <a class="btn btn-large" href="">No</a>
+    <a class="btn btn-primary" href="/accounts/user/User1/disable">Yes</a>
+    <a class="btn" href="">No</a>
   </div>
 </div>
+
+<div class="modal hide" id="query_user_password">
+  <div class="modal-header">
+    <a class="close" data-dismiss="modal">×</a>
+    <h3>Query Password</h3>
+  </div>
+  <div class="modal-body">
+    User "[[User]]" Password is "trdgh125e555"
+  </div>
+  <div class="modal-footer">
+    <a href="#" class="btn" data-dismiss="modal">Close</a>
+  </div>
+</div>
+
+<div class="modal hide" id="reset_user_password">
+  <div class="modal-header">
+    <a class="close" data-dismiss="modal">×</a>
+    <h3>Reset Password</h3>
+  </div>
+  <div class="modal-body">
+    <label for="oldpassword">Please enter old password "trdgh125e555"</label>
+    <input type="text" name="oldpassword" id="oldpassword" class="required" minlength="3"/>
+    </div>
+  <div class="modal-footer">
+   <a class="btn" id="reset_password">OK</a> <a href="#" class="btn" data-dismiss="modal">Cancel</a>
+  </div>
+</div>
+
+<div class="modal hide" id="reset_password_successful">
+  <div class="modal-header">
+    <a class="close" data-dismiss="modal">×</a>
+    <h3>Reset Password Successful</h3>
+  </div>
+  <div class="modal-body">
+    New password is: kgdSC8056B25ef
+    </div>
+  <div class="modal-footer">
+    <a href="#" class="btn" data-dismiss="modal">Close</a>
+  </div>
+</div>
+
   <script type="text/javascript">
    $('a[id*="dis_user"]').click(function(evt){
     $('#disable_user').modal('show');
+  });
+   
+   $('a[id*="query_pw"]').click(function(evt){
+    //TODO: use ajax to query password
+    $('#query_user_password').modal('show');
+  });
+  
+  $('a[id*="reset_pw"]').click(function(evt){
+    //TODO: use ajax to query password
+    $('#reset_user_password').modal('show');
+  });
+  
+  $('#reset_password').click(function(evt){
+    $('#reset_user_password').modal('hide');
+    $('#reset_password_successful').modal('show');
   });
   </script>
 {% endblock %}
