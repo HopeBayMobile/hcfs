@@ -18,7 +18,7 @@ if [ "$BASENAME" != "DCloudGatewayUI" ]; then
 fi
 
 #Install Python Package Index
-apt-get install python-pip
+apt-get install -y --force-yes python-pip
 
 # Check if the installation package listing exist
 if [ ! -s pip.require ]; then
