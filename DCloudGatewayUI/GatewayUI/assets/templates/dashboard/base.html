@@ -84,7 +84,7 @@
                 function updateTime(){
                   $.ajax({
                     type:"GET",
-                    url:"/dashboard/t",
+                    url:"/dashboard/t?"+Math.floor((Math.random() * 100000) +1),
                     success: function(msg){
                       $(".time_box").text(msg);
                       setInterval(updateTime, 30000);
@@ -136,6 +136,8 @@
     <body>
     <style type='text/css'>
         .time_box {
+            float: left;
+            margin-top: 105px;
             margin-left: 100px;
         }
     </style>

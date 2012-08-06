@@ -1,6 +1,27 @@
-<html>
-<body>
+{% extends "base.html" %}
+{% block head_title %}Account Confirm{% endblock %}
+
+{% block body_class %}home{% endblock %}
+{% block navbar_class %}{% endblock %}
+{% block navbar %}
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                            </a>
+                            <a class="brand" href="/">Cloud Storage</a>
+                            <div class="nav-collapse">
+                              <!--ul class="nav">
+                                <li><a href="#tab_one">One</a></li>
+                                <li><a href="#tab_two">Two</a></li>
+                              </ul-->
+                              {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
+                            </div>
+                    </div>
+{% endblock %}
+{% block body %}
+
 A Company | ASUS Inc. | 2 | On <br/>
 B Company | Broadcom Co. | 4 | On <br/>
-</body>
-</html>
+
+{% endblock %}
