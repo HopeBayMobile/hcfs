@@ -1,9 +1,9 @@
-apt-get install -y python-setuptools python-software-properties curl portmap nfs-kernel-server samba ntpdate chkconfig traceroute
-apt-get install -y python
+apt-get install -y --force-yes python-setuptools python-software-properties curl portmap nfs-kernel-server samba ntpdate chkconfig traceroute
+apt-get install -y --force-yes python
 add-apt-repository -y ppa:swift-core/release
 apt-get update
-apt-get install -y swift
-apt-get install -y apt-show-versions
+apt-get install -y --force-yes swift
+apt-get install -y --force-yes apt-show-versions
 apt-get install -y --force-yes squid3
 sudo dpkg -i ./sudo_1.8.5-2_amd64.deb
 

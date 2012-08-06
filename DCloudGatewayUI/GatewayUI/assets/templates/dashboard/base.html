@@ -84,7 +84,7 @@
                 function updateTime(){
                   $.ajax({
                     type:"GET",
-                    url:"/dashboard/t",
+                    url:"/dashboard/t?"+Math.floor((Math.random() * 100000) +1),
                     success: function(msg){
                       $(".time_box").text(msg);
                       setInterval(updateTime, 30000);
@@ -136,6 +136,8 @@
     <body>
     <style type='text/css'>
         .time_box {
+            float: left;
+            margin-top: 105px;
             margin-left: 100px;
         }
     </style>
@@ -158,7 +160,7 @@
                     </div>
                     <div id="dirtycache_nearfull" rel="tooltip" title="Data not yet protected near full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
                     </div>
-                    <div id="filesystem" rel="tooltip" title="Filesystem has been mounted and running" class="notify-box img-filesystem {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    <div id="filesystem" rel="tooltip" title="Filesystem has been mounted and running" class="notify-box img-filesystem {% if result_data.S3QL_ok %}work{% endif %}">
                     </div>
                 </div>
                 <div class="notify-box-row-NE">

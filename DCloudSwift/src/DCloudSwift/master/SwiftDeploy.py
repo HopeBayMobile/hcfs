@@ -78,7 +78,6 @@ class SwiftDeploy:
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
         self.__jsonStr = json.dumps(self.__kwparams)
-        os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
         self.__setUpdateMetadataProgress()
         self.__setDeployProgress()
