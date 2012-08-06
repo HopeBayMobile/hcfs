@@ -15,6 +15,7 @@ urlpatterns = patterns('swift_account.views',
     url(r'^password/reset$', "reset_password", name="reset_password"),
     url(r'^user/(?P<id>\w+)/disable$', "disable_user", name="disable_account"),
     url(r'^user/(?P<id>\w+)/enable$', "enable_account", name="enable_account"),
-    url(r'^user/new$', "new_user", name="new_user"),
-    url(r'^user/new/confirm$', "new_user_confirm", name="confirm_user"), #del user
+    url(r'^(?P<id>\w+)/user/new$', "new_user", name="new_user"),
+    url(r'^(?P<id>\w+)/user/new/confirm$', "new_user_confirm", name="confirm_user"),
+    url(r'^(?P<id>\w+)/user/new/process$', "process_user", name="process_user")
 )

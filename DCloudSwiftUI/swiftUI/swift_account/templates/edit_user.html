@@ -39,7 +39,8 @@
       </div>
 </div>
 <div id="screen" class="span9">
-<h2>Edit Account</h2>
+<h1>Edit Account</h1>
+<h3>The user will under the "{{account_id}}" Account</h3>
 <form action="/accounts/{{account_id}}/modify" method="post" id="form1">
     {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
@@ -51,7 +52,7 @@
 </form>
   <div class="row-fluid">
     <div class="span7">
-<h3>User List under the account "{{account_id}}":</h3>
+<h3>Now under the account "{{account_id}}" User List:</h3>
     </div>
     <div class="span2">
     <a class="btn btn-primary" href="/accounts/{{account_id}}/user/new">New User</a>
@@ -68,19 +69,19 @@
 </tr>
 <tr>
 <td>1</td>
-<td><a href="/accounts/Admin/user/edit">Admin</a></td>
+<td><a href="/accounts/user/Admin/edit">Admin</a></td>
 <td>I'm Administrator...</td>
 <td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a></td>
 </tr>
 <tr>
 <td>2</td>
-<td><a href="/accounts/User1/user/edit">User1</a></td>
+<td><a href="/accounts/user/User1/edit">User1</a></td>
 <td>I'm ghost</td>
 <td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a> <a class="btn" href="/accounts/user/User1/enable"><i class="icon-off"></i>On</a></a></td>
 </tr>
 <tr>
 <td>1</td>
-<td><a href="/accounts/Yoo/user/edit">Yoo</a></td>
+<td><a href="/accounts/user/Yoo/edit">Yoo</a></td>
 <td>lala...</td>
 <td><a class="btn" href="">Reset PW</a> <a class="btn" href="">Query</a> <a class="btn" id="dis_user$Admin" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a></a></td>
 </tr>

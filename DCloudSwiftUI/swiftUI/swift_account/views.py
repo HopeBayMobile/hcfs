@@ -101,13 +101,28 @@ def enable_user(request, id):
     return HttpResponse("enable_user")
 
 @login_required
-def new_user(request):
+def new_user(request, id):
     """
     """
-    return HttpResponse("new_user")
+    #return HttpResponse("new_user")
+    return render_to_response('new_user.html', {"account_id":id})
 
 @login_required
-def new_user_confirm(request):
+def new_user_confirm(request, id):
     """
     """
+    if "user_id" in request.POST:
+        user_id = request.POST["user_id"]
+        description = request.POST["description"]
+        return render_to_response('confirm_user.html',
+          {"account_id":id,
+           "user_id":user_id,
+           "description":description,
+           "Password":"NFFG457dSC8056B"})
     return HttpResponse("new_user_confirm")
+
+@login_required
+def process_user(request):
+    """
+    """
+    return redirect("/accounts/")
