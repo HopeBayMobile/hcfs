@@ -26,7 +26,22 @@
                     </div>
 {% endblock %}
 {% block body %}
-<table>
+<!-- sidebar -->
+<div class="container-fluid">
+    <div class="row-fluid">
+    <div id="sidebar" class="span3">
+      <div class="well sidebar-nav">
+        <ul class="nav nav-list">
+          <li>Dashboard</li>
+          <li><a href="/accounts/">Account Management</a></li>
+          <li>Monitor</li>
+          <li>Maintenance</li>
+          <li>System Log</li>
+        </ul>
+      </div>
+</div>
+<div id="screen" class="span9">
+  <table>
 <tr>
 <th>Account ID</th>
 <th>Description</th>
@@ -46,7 +61,8 @@
 <td>4</td>
 <td><a id="dis_account$BCompany" href="#modal" class="btn" data-toggle="modal" data-target="#disable_account"><i class="icon-facetime-video"></i>Off</a></td>
 </tr>
-</table>
+  </table>
+</div></div>
 
 <!--div class="modal hide" id="enable_account">
   <div class="modal-header">
