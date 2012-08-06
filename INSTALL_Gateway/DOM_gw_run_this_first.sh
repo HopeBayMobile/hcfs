@@ -22,7 +22,8 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # install mdadm package
-apt-get -y install mdadm
+echo debconf postfix/main_mailer_type select No configuration | /usr/bin/debconf-set-selections
+apt-get -y --force-yes install mdadm
 
 # this token will be written if the raid is built successfuly
 SAFE_TOKEN="/storage/.init_raid_ok"
