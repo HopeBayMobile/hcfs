@@ -8,7 +8,7 @@ def index(request):
     """
     get account list
     """
-    return render_to_response('index.html', {})
+    return render_to_response('list_account.html', {})
 
 def server_time(request):
     """
