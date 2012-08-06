@@ -58,6 +58,7 @@ class SwiftAccountMgr:
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
+        self.__proxy_ip_list = ["127.0.0.1"]
 
         self.__admin_default_name = "admin"
         self.__random_password_size = 12
@@ -102,6 +103,7 @@ class SwiftAccountMgr:
 
         for t in range(retry):
             ip = random.choice(proxy_ip_list)
+            #ip = "192.168.122.217"
 
             try:
                 output = fn(ip, **kwargs)
@@ -177,7 +179,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="add_user")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -325,7 +328,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="delete_user")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -435,7 +439,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="add_account")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -520,7 +525,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="delete_account")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
         black_list = []
@@ -596,7 +602,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="enable_user")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         ori_user_password = ""
         actual_user_password = ""
         container_metadata = {}
@@ -689,7 +696,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="disable_user")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         new_user_password = self.__generate_random_password()
         actual_user_password = ""
         container = account + ":" + user
@@ -779,7 +787,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="enable_account")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_list = []
         user_metadata = {}
@@ -897,7 +906,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="diable_account")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_list = []
         user_metadata = {}
@@ -1071,7 +1081,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="change_password")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_detail = {}
         admin = False
         reseller = False
@@ -1190,8 +1201,9 @@ class SwiftAccountMgr:
                 Otherwise, Bool.val == False, and Bool.msg records the error message.
         '''
         logger = util.getLogger(name="get_account_usage")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
 
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1264,7 +1276,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="get_user_password")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_detail = {}
         user_password = ""
         password = ""
@@ -1339,7 +1352,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="is_admin")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_detail = {}
         result = False
 
@@ -1397,7 +1411,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="is_reseller")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_detail = {}
         result = False
         val = False
@@ -1457,7 +1472,9 @@ class SwiftAccountMgr:
                 Bool.msg = the standard output. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="set_account_quota")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
 
         msg = ""
@@ -1512,7 +1529,8 @@ class SwiftAccountMgr:
                 Bool.msg = the quota of the account. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="get_account_quota")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
 
         msg = ""
@@ -1575,7 +1593,8 @@ class SwiftAccountMgr:
                 Bool.msg = the standard output. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="set_user_quota")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
 
         msg = ""
@@ -1627,7 +1646,8 @@ class SwiftAccountMgr:
                 of the given user. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="get_user_quota")
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
 
         msg = ""
@@ -1713,7 +1733,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="account_existence")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         account_info = {}
         result = False
         val = False
@@ -1765,7 +1786,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="list_account")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         account_info = {}
         user_info = {}
         account_dict = {}
@@ -1894,7 +1916,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="list_container")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         val = False
         msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1993,7 +2016,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="list_user")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_dict = {}
         val = False
@@ -2077,7 +2101,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="user_existence")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         result = False
         val = False
@@ -2148,7 +2173,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="assign_read_acl")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
         msg = ""
         val = False
@@ -2231,7 +2257,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="assign_write_acl")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
         msg = ""
         val = False
@@ -2322,7 +2349,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="remove_read_acl")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         ori_read_acl = ""
         ori_write_acl = ""
         admin_password = ""
@@ -2420,7 +2448,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="remove_write_acl")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         ori_write_acl = ""
         admin_password = ""
 
@@ -2530,7 +2559,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="create_container")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
         msg = ""
         val = False
@@ -2616,7 +2646,8 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="delete_container")
 
-        proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
         admin_password = ""
         msg = ""
         val = False
@@ -2814,6 +2845,15 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
+    #print SA.add_account("accountxxx")
+    for i in range(10):
+        print "Account %d" % i
+        account = "account%d" % i
+        print SA.add_account(account)
+        for j in range(5):
+            print "User %d" % j
+            user = "user%d" % j
+            print SA.add_user(account, user)
     #print SA.add_account("account1")
     #print SA.add_user("account1", "user1")
     #print SA.disable_user("account1", "user1")
