@@ -26,7 +26,6 @@
                     </div>
 {% endblock %}
 {% block body %}
-<!-- sidebar -->
 <div class="container-fluid">
     <div class="row-fluid">
     <div id="sidebar" class="span3">
@@ -41,7 +40,7 @@
       </div>
 </div>
 <div id="screen" class="span9">
-  <table>
+  <table class="table">
 <tr>
 <th>Account ID</th>
 <th>Description</th>
@@ -53,13 +52,13 @@
 <td>Apple Inc.</td>
 <td>2</td>
 <td><!--a id="en_account" href="#modal" class="btn" data-toggle="modal" data-target="#enable_account"><i class="icon-facetime-video"></i>On</a-->
-<a href="/accounts/ACompany/enable" class="btn"><i class="icon-facetime-video"></i>On</a></td>
+<a href="/accounts/ACompany/enable" class="btn"><i class="icon-off"></i>On</a></td>
 </tr>
 <tr>
 <td><a href="/accounts/BCompany/edit">BCompany</a></td>
 <td>Broadcom Co.</td>
 <td>4</td>
-<td><a id="dis_account$BCompany" href="#modal" class="btn" data-toggle="modal" data-target="#disable_account"><i class="icon-facetime-video"></i>Off</a></td>
+<td><a id="dis_account$BCompany" href="#modal" class="btn" data-toggle="modal" data-target="#disable_account"><i class="icon-off"></i>Off</a></td>
 </tr>
   </table>
 </div></div>

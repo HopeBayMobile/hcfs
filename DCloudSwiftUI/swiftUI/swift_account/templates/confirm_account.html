@@ -20,8 +20,46 @@
                     </div>
 {% endblock %}
 {% block body %}
+<div class="container-fluid">
+    <div class="row-fluid">
+    <div id="sidebar" class="span3">
+      <div class="well sidebar-nav">
+        <ul class="nav nav-list">
+          <li>Dashboard</li>
+          <li><a href="/accounts/">Account Management</a></li>
+          <li>Monitor</li>
+          <li>Maintenance</li>
+          <li>System Log</li>
+        </ul>
+      </div>
+</div>
+<div id="screen" class="span9">
+<h1>Create Account Successful</h1>
+<table class="table">
+<tr>
+  <td>Account ID</td>
+  <td>{{account_id}}</td>
+</tr>
+<tr>
+  <td>Description</td>
+  <td>{{description}}</td>
+</tr>
+<tr>
+  <td>Identity</td>
+  <td>{{identity}}</td>
+</tr>
+<tr>
+  <td>Password</td>
+  <td>{{Password}}</td>
+</tr>
+</table>
 
-A Company | ASUS Inc. | 2 | On <br/>
-B Company | Broadcom Co. | 4 | On <br/>
-
+<h2>Would you want to create new User?</h2>
+<form action="/accounts/new/process" method="post" id="form1">
+    {% csrf_token %}
+    <div id="accountDiv" data-role="fieldcontain">
+      <input type="submit" value="OK" /> <input type="submit" value="Cancel" />
+    </div>
+  </form>
+</div>
 {% endblock %}
