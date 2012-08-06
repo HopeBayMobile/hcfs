@@ -1,4 +1,4 @@
-{% extends "banner_base.html" %}
+{% extends "base.html" %}
 
 <!--{% load i18n %}
 
@@ -6,7 +6,7 @@
 
 {% block body_class %}home{% endblock %}-->
 
-{% block extra_head %}
+{% block moreScripts %}
     <script type="text/javascript">
     function redirect(){
       self.location="/account/login/";
@@ -14,8 +14,35 @@
     </script>
 {% endblock %}
 
-<{% block banner %}
+{% block navbar_class %}{% endblock %}
+{% block navbar %}
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                            </a>
+                            <a class="brand" href="/">Cloud Storage</a>
+                            <div class="nav-collapse">
+                              <!--ul class="nav">
+                                <li><a href="#tab_one">One</a></li>
+                                <li><a href="#tab_two">Two</a></li>
+                              </ul-->
+                              {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
+                            </div>
+                    </div>
+{% endblock %}
+{% block body %}
     <h1>{% trans "Dashboard" %}</h1>
+    <div class="well pull-left">
+        <ul class="nav nav-list">
+          <li>Dashboard</li>
+          <li><a href="/accounts/">Account Management</a></li>
+          <li>Monitor</li>
+          <li>Maintenance</li>
+          <li>System Log</li>
+        </ul>
+    </div>
+    
     {% if user.is_authenticated %}
         <!--{% url what_next as what_next_url %}
         <p class="what_next">{% blocktrans %}Wondering <a href="{{ what_next_url }}" class="btn primary large">What Next</a>?{% endblocktrans %}</p-->
@@ -24,4 +51,4 @@
         {% url account_signup as signup_url %}
         <p>{% blocktrans %}You can <a href="{{ login_url }}" class="btn">Log In</a> or <a href="{{ signup_url }}" class="btn primary">Sign Up</a> to try out the site.{% endblocktrans %}</p>
     {% endif %}
-{% endblock %}>
+{% endblock %}
