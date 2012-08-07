@@ -17,7 +17,8 @@ def index(request):
         for i in accounts:
             accounts[i]["id"]=i
             account_list.append(accounts[i])
-        return render_to_response('list_account.html', {"accounts":account_list})
+        return render_to_response('list_account.html', {"accounts":account_list,
+            "request": request })
     else:
         return HttpResponse("something wrong in list_account:")
 
@@ -55,7 +56,8 @@ def enable_account(request, id):
 def new_account(request):
     """
     """
-    return render_to_response('new_account.html', {})
+    print "trackme"
+    return render_to_response('new_account.html', { "request": request })
 
 @login_required
 def new_account_confirm(request):
@@ -72,10 +74,11 @@ def new_account_confirm(request):
             admin_pw = SA.get_user_password(account=account_id,user="admin")
             if admin_pw.val!=True:
                 return HttpResponse("Can't get admin password")
-            return render_to_response('confirm_account.html', 
+            return render_to_response('confirm_account.html',
               {"account_id":account_id,
                "description":description,
                "identity":"Administrator",
+               "request": request,
                "Password":admin_pw.msg})
     else:
         return HttpResponse("new_account_confirm")
@@ -102,6 +105,7 @@ def edit_account(request, id):
         return render_to_response('edit_account.html',
           {"account_id":id, 
            "description":"Long long story......",
+           "request": request,
            "users":users_list})
     else:
         return HttpResponse("list user fail in edit_account:"+id)
@@ -129,8 +133,14 @@ def get_password(request, id, user_id):
 def reset_password(request, id, user_id):
     """
     """
-    #TODO: implement it
     SA = SwiftAccountMgr()
+    stat = SA.change_password(account=id, user=user_id)
+    if stat.val:
+        result = SA.get_user_password(account=id, user=user_id)
+        if result.val:
+            return HttpResponse(result.msg)
+        else:
+            return HttpResponse("fail to get password")
     return HttpResponse("reset_password")
 
 @login_required
@@ -160,7 +170,8 @@ def new_user(request, id):
     """
     """
     #return HttpResponse("new_user")
-    return render_to_response('new_user.html', {"account_id":id})
+    return render_to_response('new_user.html', {"account_id":id,
+        "request": request })
 
 @login_required
 def new_user_confirm(request, id):
@@ -180,6 +191,7 @@ def new_user_confirm(request, id):
               {"account_id":id,
                "user_id":user_id,
                "description":description,
+               "request": request,
                "Password":user_pw.msg})
     else:
         return HttpResponse("new_user_confirm")
@@ -198,6 +210,7 @@ def edit_user(request, id, user_id):
     return render_to_response('edit_user.html',
       {"account_id":id, 
        "user_id":user_id,
+       "request": request,
        "description":"Long long story......"})
 
 @login_required
@@ -207,8 +220,8 @@ def update_user(request, id, user_id):
     #TODO: add related api support
     return HttpResponse("update_user")
 
-@login_required
-def delete_user(request, id, user_id):
-    """
-    """
-    return HttpResponse("delete_user")
+#@login_required
+#def delete_user(request, id, user_id):
+#    """
+#    """
+#    return HttpResponse("delete_user")
