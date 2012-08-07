@@ -85,13 +85,18 @@
     Turn off the Account "<span id="modal_dis_account"></span>" will suspend all user service, are you sure?
   </div>
   <div class="modal-footer">
-    <a class="btn btn-primary" href="/accounts/BCompany/disable">OK</a>
+    <span id="modal_dis_account_link" class="btn btn-primary">OK</span>
     <a href="#" class="btn" data-dismiss="modal">Cancel</a>
   </div>
 </div>
   <script type="text/javascript">
    $('a[id*="dis_account"]').click(function(evt){
     $('#modal_dis_account').html(this.name);
+    var account_id = this.name;
+    $('#modal_dis_account_link').click(function(){
+        //$('#disable_user').modal('hide');
+    	window.location = "/accounts/"+account_id+"/disable";
+    });
     $('#disable_account').modal('show');
   });
   </script>
