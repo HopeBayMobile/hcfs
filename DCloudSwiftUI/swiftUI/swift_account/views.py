@@ -110,6 +110,7 @@ def edit_account(request, id):
 def update_account(request, id):
     """
     """
+    #TODO: add related api support
     #return HttpResponse("update_account")
     return redirect("/accounts/")
 
@@ -168,12 +169,20 @@ def new_user_confirm(request, id):
     if "user_id" in request.POST:
         user_id = request.POST["user_id"]
         description = request.POST["description"]
-        return render_to_response('confirm_user.html',
-          {"account_id":id,
-           "user_id":user_id,
-           "description":description,
-           "Password":"NFFG457dSC8056B"})
-    return HttpResponse("new_user_confirm")
+        #apply
+        SA = SwiftAccountMgr()
+        result = SA.add_user(account=id, user=user_id, description=description)
+        if result.val:
+            user_pw = SA.get_user_password(account=id,user=user_id)
+            if user_pw.val!=True:
+                return HttpResponse("Can't get "+user_id+" password from "+id)
+            return render_to_response('confirm_user.html',
+              {"account_id":id,
+               "user_id":user_id,
+               "description":description,
+               "Password":user_pw.msg})
+    else:
+        return HttpResponse("new_user_confirm")
 
 #@login_required
 #def process_user(request, id):
@@ -195,6 +204,7 @@ def edit_user(request, id, user_id):
 def update_user(request, id, user_id):
     """
     """
+    #TODO: add related api support
     return HttpResponse("update_user")
 
 @login_required
