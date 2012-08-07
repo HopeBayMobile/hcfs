@@ -27,12 +27,17 @@ if [ -f ${TARDEBFILE} ]; then
     #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
     # Note: here assume all debs are tarred in full directory path /var/cache/apt
     sudo tar zxvf ${TARDEBFILE} -C /
-    sudo dpkg-scanpackages ${APTCACHEDIR} > ${APTCACHEDIR}/Packages
-    sudo gzip ${APTCACHEDIR}/Packages
+    # assume Packages.gz is ready in ${TARDEBFILE}
+    #sudo dpkg-scanpackages ${APTCACHEDIR} > ${APTCACHEDIR}/Packages
+    #sudo gzip ${APTCACHEDIR}/Packages
 fi
 
 
-#if [ ${INTERNET} = "yes" ]; then
+# Assume no internet asscess
+if [ -f /etc/apt/sources.list ]; then
+# Backup existing sources.list
+    sudo mv /etc/apt/sources.list /etc/apt/sources.list.ORI
+fi
 
 if [ ${DVDISO} = yes ]; then
 echo "Creating dvd iso sources list"
@@ -47,19 +52,5 @@ cat > /etc/apt/sources.list.d/apt-cache.list <<EOF
 deb file:// /var/cache/apt/archives/
 EOF
 fi
-
-#else
-
-#echo "backup existing sources list"
-#cp /etc/apt/sources.list /etc/apt/sources.list.bak
-#    if [ -f /etc/apt/sources.list.d/delta-dvd-iso.list ]; then
-#        rm /etc/apt/sources.list.d/delta-dvd-iso.list
-#    fi
-#echo "Override existing sources list"
-#cat > /etc/apt/sources.list <<EOF
-#deb file:/mnt/iso precise main restricted
-#EOF
-#
-#fi
 
 sudo apt-get update
