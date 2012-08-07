@@ -129,8 +129,14 @@ def get_password(request, id, user_id):
 def reset_password(request, id, user_id):
     """
     """
-    #TODO: implement it
     SA = SwiftAccountMgr()
+    stat = SA.change_password(account=id, user=user_id)
+    if stat.val:
+        result = SA.get_user_password(account=id, user=user_id)
+        if result.val:
+            return HttpResponse(result.msg)
+        else:
+            return HttpResponse("fail to get password")
     return HttpResponse("reset_password")
 
 @login_required
@@ -207,8 +213,8 @@ def update_user(request, id, user_id):
     #TODO: add related api support
     return HttpResponse("update_user")
 
-@login_required
-def delete_user(request, id, user_id):
-    """
-    """
-    return HttpResponse("delete_user")
+#@login_required
+#def delete_user(request, id, user_id):
+#    """
+#    """
+#    return HttpResponse("delete_user")
