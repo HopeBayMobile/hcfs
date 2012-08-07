@@ -40,11 +40,17 @@ def gateway_status():
 # wthung, 2012/8/3
 def _get_snapshot_last_status():
     # get last snapshot status
-    last_ss_time = json.loads(api_snapshot.get_snapshot_last_status()).get("latest_snapshot_time")
+    ss_status = json.loads(api_snapshot.get_snapshot_last_status())
+    last_ss_time = ss_status.get("latest_snapshot_time")
     last_ss_status = ''
     if last_ss_time != -1:
+        # a snapshot is available
         last_ss_status = 'Finished at %s' % time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(last_ss_time))
+    elif ss_status.get("result"):
+        # no snapshot created
+        last_ss_status = ss_status.get('msg')
     else:
+        # fail
         last_ss_status = 'Fail'
     
     return last_ss_status
