@@ -78,7 +78,6 @@ class SwiftDeploy:
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
         self.__jsonStr = json.dumps(self.__kwparams)
-        os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
         self.__setUpdateMetadataProgress()
         self.__setDeployProgress()
@@ -234,9 +233,13 @@ class SwiftDeploy:
 
             os.system("mkdir -p %s" % swiftDir)
             os.system("touch %s/proxyList" % swiftDir)
+            os.system("touch %s/storageList" % swiftDir)
             os.system("touch %s/versBase" % swiftDir)
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(proxyList, fh)
+
+            with open("%s/storageList", swiftDir, "wb") as fh:
+                pickel.dump(storageList, fh)
 
             with open("%s/versBase" % swiftDir, "wb") as fh:
                 pickle.dump(versBase, fh)
@@ -797,59 +800,6 @@ class SwiftDeploy:
             self.__setCleanProgress(finished=True, code=1, message=[str(e)])
 
 
-def parseNodeFiles(proxyFile, storageFile):
-    proxyList = []
-    storageList = []
-
-    try:
-        #Parse proxyFile to get proxy node list
-        proxyIpSet = set()
-        with open(proxyFile) as fh:
-            for line in fh.readlines():
-                line = line.strip()
-                if len(line) > 0:
-                    try:
-                        ip = line.split()[0]
-                        socket.inet_aton(ip)
-                        proxyList.append({"ip": ip})
-                        if ip in proxyIpSet:
-                            raise Exception("%s contains duplicate ip" % proxyFile)
-                        proxyIpSet.add(ip)
-
-                    except socket.error:
-                        raise Exception("%s contains a invalid ip %s" % (proxyFile, ip))
-
-        #Parse storageFile to get storage node list
-        storageIpSet = set()
-        with open(storageFile) as fh:
-            for line in fh.readlines():
-                line = line.strip()
-                if len(line) > 0:
-                    tokens = line.split()
-                    if len(tokens) != 2:
-                        raise Exception("%s contains a invalid line %s" % (storageFile, line))
-                    try:
-                        ip = tokens[0]
-                        zid = int(tokens[1])
-                        socket.inet_aton(ip)
-
-                        if zid < 1 or zid > 9:
-                            raise Exception("zid has to be a positive integer < 10")
-                        storageList.append({"ip": ip, "zid": zid})
-                        if ip in storageIpSet:
-                            raise Exception("%s contains duplicate ip" % storageFile)
-
-                        storageIpSet.add(ip)
-                    except socket.error:
-                        raise Exception("%s contains a invalid ip %s" % (storageFile, ip))
-                    except ValueError:
-                        raise Exception("%s contains a invalid zid %s" % (storageFile, tokens[1]))
-        return (proxyList, storageList)
-    except IOError as e:
-        msg = "Failed to access input files for %s" % str(e)
-        raise Exception(msg)
-
-
 def getSection(inputFile, section):
     ret = []
     with open(inputFile) as fh:
@@ -884,27 +834,26 @@ def parseAddNodesSection(inputFile):
         for line in lines:
             line = line.strip()
             if len(line) > 0:
+                checkNodeInputFormat(section="[addNodes]", line=line)
                 tokens = line.split()
-                if len(tokens) != 2:
-                    raise Exception("[addNodes] contains an invalid line %s" % line)
                 try:
-                    ip = tokens[0]
-                    zid = int(tokens[1])
-                    socket.inet_aton(ip)
+                    node = {}
+                    for token in tokens:
+                        node.setdefault(token.split("=")[0], token.split("=")[1])
 
-                    if zid < 1 or zid > 9:
-                        raise Exception("zid has to be a positive integer < 10")
-
+                    ip = node.get("ip")
                     if ip in ipSet:
-                        raise Exception("[addNodes] contains duplicate ip")
+                        raise Exception("[deploy] A duplicate ip address %s is found!" % ip)
+
+                    zid = int(node.get("zid"))
+                    deviceCnt = int(node.get("deviceCnt"))
+                    deviceWeight = int(node.get("deviceWeight"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[addNodes] contains an invalid ip %s" % ip)
-                except ValueError:
-                    raise Exception("[addNodes] contains an invalid zid %s" % tokens[1])
         return (proxyList, storageList)
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
@@ -940,6 +889,54 @@ def parseDeleteNodesSection(inputFile):
         raise Exception(msg)
 
 
+def checkNodeInputFormat(section, line):
+    node = {}
+    tokens = line.split()
+    for token in tokens:
+        node.setdefault(token.split("=")[0], token.split("=")[1])
+
+    ip = node.get("ip", None)
+    zid = node.get("zid", None)
+    deviceCnt = node.get("deviceCnt", None)
+    deviceWeight = node.get("deviceWeight", None)
+
+    if not ip:
+        raise Exception("%s missing ip in line '%s'" % (section, line))
+    if not zid:
+        raise Exception("%s missing zid in line '%s'" % (section, line))
+    if not deviceCnt:
+        raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
+    if not deviceWeight:
+        raise Exception("%s missing deviceWeight in line '%s'" % (section, line))
+
+    try:
+        socket.inet_aton(ip)
+        
+        if not zid.isdigit():
+            raise Exception("%s line '%s' contains invalid zid" % (section, line))
+        else:
+            zid = int(zid) 
+            if zid < 1 or zid > 9:
+                raise Exception("zid has to be a positive integer < 10")
+            
+        if not deviceCnt.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceCnt" % (section, line))
+        else:
+            deviceCnt = int(deviceCnt) 
+            if deviceCnt < 1:
+                raise Exception("deviceCnt has to be a positive integer")
+
+        if not deviceWeight.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceWeight" % (section, line))
+        else:
+            deviceWeight = int(deviceWeight) 
+            if deviceWeight < 1:
+                raise Exception("deviceWeight has to be a positive integer")
+
+    except socket.error:
+        raise Exception("%s line '%s' contains an illegal ip" % (section, line))
+
+
 def parseDeploySection(inputFile):
     lines = getSection(inputFile, "deploy")
     try:
@@ -949,27 +946,26 @@ def parseDeploySection(inputFile):
         for line in lines:
             line = line.strip()
             if len(line) > 0:
+                checkNodeInputFormat(section="[deploy]", line=line)
                 tokens = line.split()
-                if len(tokens) != 2:
-                    raise Exception("[deploy] contains an invalid line %s" % line)
                 try:
-                    ip = tokens[0]
-                    zid = int(tokens[1])
-                    socket.inet_aton(ip)
+                    node = {}
+                    for token in tokens:
+                        node.setdefault(token.split("=")[0], token.split("=")[1])
 
-                    if zid < 1 or zid > 9:
-                        raise Exception("zid has to be a positive integer < 10")
-
+                    ip = node.get("ip")
                     if ip in ipSet:
-                        raise Exception("[deploy] contains duplicate ip")
+                        raise Exception("[deploy] A duplicate ip address %s is found!" % ip)
+
+                    zid = int(node.get("zid"))
+                    deviceCnt = int(node.get("deviceCnt"))
+                    deviceWeight = int(node.get("deviceWeight"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
                     ipSet.add(ip)
                 except socket.error:
-                    raise Exception("[deploy] contains an invalid ip %s" % ip)
-                except ValueError:
-                    raise Exception("[deploy] contains an invalid zid %s" % tokens[1])
+                    raise Exception("[deploy] line '%s' contains an illegal ip %s" % line)
         return (proxyList, storageList)
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
@@ -1142,18 +1138,5 @@ def deploy():
         return ret
 
 if __name__ == '__main__':
-    #print util.getNumOfReplica("/etc/swift")
-    print util.restartSwiftProxy()
-    #t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
-    #t = Thread(target=SD.spreadRingFiles, args=())
-    #t.start()
-    #progress = SD.getCleanProgress()
-    #while progress['finished'] != True:
-    #    time.sleep(10)
-    #    print progress
-    #    progress = SD.getCleanProgress()
-    #spreadProgress = SD.getSpreadProgress()
-    #util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-    #util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-    #SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
-    #SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
+    print parseDeploySection("/etc/delta/inputFile")
+    print parseAddNodesSection("/etc/delta/inputFile")
