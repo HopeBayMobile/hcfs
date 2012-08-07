@@ -6,6 +6,7 @@ import random
 import time
 import threading
 import ctypes
+import subprocess
 from ConfigParser import ConfigParser
 
 # Add gateway sources
@@ -25,6 +26,7 @@ snapshot_db = "/root/.s3ql/snapshot_db.txt"
 temp_folder = "/mnt/cloudgwfiles/tempsnapshot"
 snapshot_schedule = "/etc/delta/snapshot_schedule"
 lifespan_conf = "/etc/delta/snapshot_lifespan"
+DB_FILE_BAK = "/root/.s3ql/snapshot_db.txt.tmp"
 
 
 class SnapshotError(Exception):
@@ -216,22 +218,27 @@ class Test_takesnapshot:
         result = json.loads(result_tmp)
         nose.tools.eq_(result['data']['days_to_live'], 100)
     
+    def _backup_snapshot_DB(self):
+        # backup existing db file if any
+        if os.path.exists(snapshot_db):
+            os.system('sudo mv %s %s' % (snapshot_db, DB_FILE_BAK))
+    
+    def _restore_snapshot_DB(self):
+        # restore backup db file if any
+        if os.path.exists(DB_FILE_BAK):
+            os.system('sudo mv %s %s' % (DB_FILE_BAK, snapshot_db))
+    
     def test_get_snapshot_last_status(self):
         """
         Test get status of last snapshot.
         """
 
-        db_file = '/root/.s3ql/snapshot_db.txt'
-        db_file_bak = '/root/.s3ql/snapshot_db.txt.bak'
-        
-        # backup existing db file if any
-        if os.path.exists(db_file):
-            os.system('sudo mv %s %s' % (db_file, db_file_bak))
+        self._backup_snapshot_DB()
         
         #---------------------------------------------------------------------
         # create temp db file
-        os.system('sudo touch %s' % db_file)
-        with open(db_file, 'w') as fh:
+        os.system('sudo touch %s' % snapshot_db)
+        with open(snapshot_db, 'w') as fh:
             fh.write('snapshot_2012_7_7_7_7_7,100,-1,10,10,true,true\n')
         
         # expect false result
@@ -240,12 +247,12 @@ class Test_takesnapshot:
         nose.tools.eq_(result_val['latest_snapshot_time'], -1)
         
         # delete temp db file
-        os.system('sudo rm -rf %s' % db_file)
+        os.system('sudo rm -rf %s' % snapshot_db)
         
         #---------------------------------------------------------------------
         # create temp db file
-        os.system('sudo touch %s' % db_file)
-        with open(db_file, 'w') as fh:
+        os.system('sudo touch %s' % snapshot_db)
+        with open(snapshot_db, 'w') as fh:
             fh.write('snapshot_2012_7_7_7_7_7,100,120,10,10,true,true\n')
             
         # expect true result
@@ -254,9 +261,55 @@ class Test_takesnapshot:
         nose.tools.eq_(result_val['latest_snapshot_time'], 120)
         
         # delete temp db file
-        os.system('sudo rm -rf %s' % db_file)
+        os.system('sudo rm -rf %s' % snapshot_db)
         
         #---------------------------------------------------------------------
-        # restore backup db file if any
-        if os.path.exists(db_file_bak):
-            os.system('sudo mv %s %s' % (db_file_bak, db_file))
+        self._restore_snapshot_DB()
+    
+    def test_rebuild_snapshot_database(self):
+        """
+        Test rebuild snapshot database
+        """
+        
+        # prepare snapshot dirs
+        ss_tmp_dir = '/tmp/snapshots'
+        if not os.path.exists(ss_tmp_dir):
+            os.system('sudo mkdir %s' % ss_tmp_dir)
+            
+        tmp_dir1 = 'snapshot_2012_9_9_9_9_9'
+        tmp_dir2 = 'snapshot_2012_9_9_9_9_10'
+        
+        os.system('sudo mkdir %s/%s' % (ss_tmp_dir, tmp_dir1))
+        os.system('sudo mkdir %s/%s/sambashare' % (ss_tmp_dir, tmp_dir1))
+        os.system('sudo mkdir %s/%s/nfsshare' % (ss_tmp_dir, tmp_dir1))
+        os.system('sudo mkdir %s/%s' % (ss_tmp_dir, tmp_dir2))
+        os.system('sudo mkdir %s/%s/sambashare' % (ss_tmp_dir, tmp_dir2))
+        os.system('sudo mkdir %s/%s/nfsshare' % (ss_tmp_dir, tmp_dir2))
+        
+        # create some file into tmp dir
+        os.system("sudo dd if=/dev/zero of=%s/%s/sambashare/test.file bs=1024 count=1" % (ss_tmp_dir, tmp_dir1))
+        os.system("sudo touch %s/%s/dummy.file1" % (ss_tmp_dir, tmp_dir1))
+        os.system("sudo dd if=/dev/zero of=%s/%s/sambashare/test.file bs=1024 count=2" % (ss_tmp_dir, tmp_dir2))
+        os.system("sudo touch %s/%s/dummy.file1" % (ss_tmp_dir, tmp_dir2))
+        
+        self._backup_snapshot_DB()
+        snapshot.rebuild_snapshot_database(ss_tmp_dir)
+        
+        # get file lines of snapshot db
+        cmd = "sudo wc -l %s" % snapshot_db
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        
+        line_num = output.split(' ')
+        nose.tools.eq_(line_num[0], "2")
+        
+        # check file number
+        with open(snapshot_db, 'r') as fh:
+            for line in fh:
+                name, start_time, end_time, file_num, total_size, exposed, auto_exposed = line.split(',')
+                nose.tools.eq_(file_num, "2")
+    
+        self._restore_snapshot_DB()
+        os.system('sudo rm -rf %s' % ss_tmp_dir)
+        

@@ -37,6 +37,17 @@ def gateway_status():
         data = {}
     return data
 
+# wthung, 2012/8/3
+def _get_snapshot_last_status():
+    # get last snapshot status
+    last_ss_time = json.loads(api_snapshot.get_snapshot_last_status()).get("latest_snapshot_time")
+    last_ss_status = ''
+    if last_ss_time != -1:
+        last_ss_status = 'Finished at %s' % time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(last_ss_time))
+    else:
+        last_ss_status = 'Fail'
+    
+    return last_ss_status
 
 @login_required
 def index(request):
@@ -48,6 +59,7 @@ def index(request):
     context.update(data)
     try:
         context["available_version"] = json.loads(api_remote_upgrade.get_available_upgrade()).get("version")
+        context["last_snapshot_status"] = _get_snapshot_last_status()
     except Exception as inst:
         print inst
     return render(request, 'dashboard/dashboard.html', context)
@@ -515,7 +527,6 @@ def get_snapshot_default_value():
             time.strftime("%a, %d %b %Y %H:%M:%S", \
                     time.gmtime(load_data.get('latest_snapshot_time')))
 
-
     return return_hash
 
 
@@ -572,6 +583,9 @@ def status(request):
 def dashboard_update(request):
     data = gateway_status()
     data["version_upgrade"] = json.loads(api_remote_upgrade.get_available_upgrade())["version"]
+    # wthung, 2012/8/6
+    # add to refresh last snapshot status
+    data["last_snapshot_status"] = _get_snapshot_last_status()
     return HttpResponse(json.dumps(data))
 
 

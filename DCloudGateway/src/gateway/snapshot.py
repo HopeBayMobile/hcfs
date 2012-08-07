@@ -441,12 +441,12 @@ def get_snapshot_last_status():
                and the finish time of latest snapshot (return -1 if latest snapshot is failed).
     """
 
-    return_val = {'result': False,
-                  'msg': 'Latest snapshot is failed',
-                  'latest_snapshot_time': -1}
-    
+    return_msg = 'Latest snapshot is failed'
     return_result = False
     last_ss_time = -1
+    return_val = {'result': return_result,
+                  'msg': return_msg,
+                  'latest_snapshot_time': last_ss_time}
     
     try:
         db_list = _acquire_db_list()
@@ -460,7 +460,7 @@ def get_snapshot_last_status():
             return_msg = 'Latest snapshot is successfully finished.'
     
     except:
-        return_msg = '[2] Unable to get status of last snapshot.'
+        return_msg = 'Unable to get status of last snapshot.'
         last_ss_time = -1
 
     log.info(return_msg)
@@ -791,10 +791,130 @@ def get_snapshot_lifespan():
                   'data': {'days_to_live': days_to_live}}
     return json.dumps(return_val)
 
+# wthung, 2012/8/3
+def _parse_snapshot_time(ss_dirname):
+    """
+    Parse snapshot time from snapshot directory name.
+    
+    @type ss_dirname: String
+    @param ss_dirname: Snapshot directory name
+    @rtype: Integer
+    @return: Snapshot time since 1970
+    """
+    
+    # sample snapshot dirname: snapshot_year_month_day_hour_minute_second
+    ret = -1
+    try:
+        #(prefix, year, month, day, hour, minute, second) = ss_dirname.split('_')
+        prefix, year, month, day, hour, minute, second = ss_dirname.split('_')
+        if prefix == 'snapshot':
+            cur_struct_time = time.strptime("%s %s %s %s %s %s" % (year, 
+                                                                   month,
+                                                                   day,
+                                                                   hour,
+                                                                   minute,
+                                                                   second),
+                                            "%Y %m %d %H %M %S")
+            sec_since_epoch = time.mktime(cur_struct_time)
+            ret = int(sec_since_epoch)
+    except Exception as e:
+        log.info('[0] Error occurred when parsing snapshot directory name: %s' % str(e))
+    
+    return ret
+
+
+def _get_snapshot_file_info(ss_dirname):
+    """
+    Get file number and total size of a snapshot directory.
+    
+    @type ss_dirname: String
+    @param ss_dirname: Snapshot directory name
+    @rtype: List
+    @return: A list which file number is the first and total size is the second element,
+             where total size is in bytes
+    """
+    
+    ret = []
+    
+    # get file number, including sub-directories
+    cmd = "sudo du -a %s | wc -l" % ss_dirname
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+    
+    file_num = int(output) - 3
+    # error handling
+    if (file_num < 0):
+        file_num = 0
+    
+    # get total size, including sub-directories
+    cmd = "sudo du -s %s" % ss_dirname
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+    
+    total_size, _ = output.split('\t')
+    total_size = int(total_size)
+    # for empty folder, total size calculated by "du -s" is 12
+    # error handling
+    if (total_size < 0):
+        total_size = 0
+    
+    # append result
+    ret.append(file_num)
+    ret.append(total_size)
+    
+    return ret
+
+
+def rebuild_snapshot_database(_ss_dir=None):
+    """
+    Rebuild snapshot database.
+    
+    @type _ss_dir: String
+    @param _ss_dir: Base snapshot directory. If None is specified, use system default one
+    """
+    
+    listing = []
+    db_string = ''
+    ss_folder = ''
+    
+    if _ss_dir is None:
+        ss_folder = snapshot_dir
+    else:
+        ss_folder = _ss_dir
+        
+    listing = os.listdir(ss_folder)
+    
+    db_lock = Snapshot_Db_Lock()
+    
+    try:
+        # process most recent snapshot
+        for dirname in reversed(listing):
+            ss_time = _parse_snapshot_time(dirname)
+            if ss_time != -1:
+                file_num, total_size = _get_snapshot_file_info("%s/%s" % (ss_folder, dirname))
+                db_string += "%s,%d,%d,%d,%d,false,false\n" % (dirname, ss_time, ss_time, file_num, total_size >> 10)
+        
+        # remove the last newline
+        #db_string = db_string[:-1]
+        
+        # backup snapshot db if any
+        if os.path.exists(snapshot_db):
+            os.system('sudo mv %s %s.bak' % (snapshot_db, snapshot_db))
+        
+        with open(snapshot_db, 'w') as fh:
+            fh.write(db_string)
+        
+    except Exception as e:
+        log.info('[0] Failed to rebuild snapshot database: %s' % str(e))
+        print('[0] Failed to rebuild snapshot database: %s' % str(e))
+    finally:
+        del db_lock
+
 
 ################################################################
 
 if __name__ == '__main__':
     #print delete_snapshot('snapshot_2012_6_25_17_46_24')
-    print get_snapshot_last_status()
-    pass
+    rebuild_snapshot_database()
