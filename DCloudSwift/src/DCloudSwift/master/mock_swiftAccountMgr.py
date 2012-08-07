@@ -15,6 +15,7 @@ import string
 import sqlite3
 import uuid
 from pprint import pprint
+import random
 
 lock = threading.Lock()
 
@@ -22,26 +23,26 @@ lock = threading.Lock()
 class SwiftAccountMgr:
     def __init__(self, conf=""):
         self.__random_password_size = 12
-        self.__num_of_account = 20
-        self.__num_of_user = 20
+        self.__num_of_account = random.randrange(3, 20)
+        self.__num_of_user = random.randrange(1, 20)
         self.__account_dict = {}
         self.__user_dict = {}
 
         for i in range(self.__num_of_account):
             account = "Account%d" % i
-
+            stat = True if random.randrange(0, 2)==1 else False
             self.__account_dict[account] = {
                 "description": "This is %s" % account,
                 "user_number": self.__num_of_user,
-                "account_enable": True,
+                "account_enable": stat,
             }
 
         for j in range(self.__num_of_user):
             user = "User%d" % j
-
+            stat = True if random.randrange(0, 2)==1 else False
             self.__user_dict[user] = {
                 "description": "This is %s" % user,
-                "user_enable": True,
+                "user_enable": stat,
             }
 
     def __generate_random_password(self):

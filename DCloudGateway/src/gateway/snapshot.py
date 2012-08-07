@@ -452,12 +452,18 @@ def get_snapshot_last_status():
         db_list = _acquire_db_list()
         snapshot_list = _translate_db(db_list)
         
-        last_ss = snapshot_list[0]
-        last_ss_time = last_ss['finish_time']
-        if last_ss_time > 0:
-            # should be success
+        if not snapshot_list:
+            # no snapshot created
             return_result = True
-            return_msg = 'Latest snapshot is successfully finished.'
+            return_msg = 'No snapshot created'
+            last_snapshot_time = -1
+        else:
+            last_ss = snapshot_list[0]
+            last_ss_time = last_ss['finish_time']
+            if last_ss_time > 0:
+                # should be success
+                return_result = True
+                return_msg = 'Latest snapshot is successfully finished.'
     
     except:
         return_msg = 'Unable to get status of last snapshot.'

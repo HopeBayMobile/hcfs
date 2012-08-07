@@ -264,6 +264,19 @@ class Test_takesnapshot:
         os.system('sudo rm -rf %s' % snapshot_db)
         
         #---------------------------------------------------------------------
+        
+        # create temp db file, but no content (emulate no snapshot)
+        os.system('sudo touch %s' % snapshot_db)
+            
+        # expect true result
+        result_val = json.loads(snapshot.get_snapshot_last_status())
+        nose.tools.eq_(result_val['result'], True)
+        nose.tools.eq_(result_val['latest_snapshot_time'], -1)
+        
+        # delete temp db file
+        os.system('sudo rm -rf %s' % snapshot_db)
+        
+        #---------------------------------------------------------------------
         self._restore_snapshot_DB()
     
     def test_rebuild_snapshot_database(self):
