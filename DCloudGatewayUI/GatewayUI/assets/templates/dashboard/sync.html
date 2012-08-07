@@ -195,6 +195,14 @@
                     
                     //});
 
+                // wthung, 2012/8/7
+                // submit form when user press Enter on bandwidth field
+                $("#bandwidth_input-{{ key }}").keydown(function (e) {
+                    if (e.keyCode == 13) {
+                        document.forms["modal-for-{{ key }}"].submit();
+                    }
+                });
+
                 $("#no_upload_radio-{{ key }}").click(function() {
                         $("#bandwidth_input-{{ key }}").val("");
                 });
