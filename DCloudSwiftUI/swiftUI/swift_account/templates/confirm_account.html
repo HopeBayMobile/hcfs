@@ -53,12 +53,12 @@
   <td>{{Password}}</td>
 </tr>
 </table>
-
-<h2>Would you want to create new User?</h2>
+<hr/>
+<h3>Would you want to create new user?</h3>
 <form action="/accounts/new/process" method="post" id="form1">
     {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
-      <input class="btn" type="submit" value="OK" /> <input type="submit" value="Cancel" />
+      <input class="btn" type="submit" value="Yes" /> <a class="btn" href="/accounts/">No</a>
     </div>
   </form>
 </div>
