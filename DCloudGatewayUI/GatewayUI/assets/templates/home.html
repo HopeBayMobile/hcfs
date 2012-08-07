@@ -1,4 +1,9 @@
 {% extends "base.html" %} {% block content %}
+<script type="text/javascript">
+$(function() {
+    $('#account').focus();
+});
+</script>
 <div class="row" style="padding: 120px 0;">
 	<div style="width:560px; margin: 0 auto;">
 		<form class="well form-horizontal" method="post" action="/login">
