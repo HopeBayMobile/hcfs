@@ -221,6 +221,11 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
     if returncode != 0:
         logger.error("Failed to mount %s on %s" % (disk, mountpoint))
 
+    # prepare objects dir to fix bugs of swift rsync errors
+    if not os.path.exists("%s/objects" % mountpoint):
+        os.system("mkdir %s/objects" % mountpoint)
+        os.system("chown -R swift:swift %s/objects" % mountpoint)
+
     return returncode
 
 
