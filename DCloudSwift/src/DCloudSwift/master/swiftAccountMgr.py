@@ -150,7 +150,7 @@ class SwiftAccountMgr:
         Bool = collections.namedtuple("Bool", "val msg")
         return Bool(val, msg)
 
-    def add_user(self, account, user, password="", description="", admin=False, reseller=False, retry=3):
+    def add_user(self, account, user, password="", description="nothing", admin=False, reseller=False, retry=3):
         '''
         Add a user into an account, including the following steps::
             (1) Add a user.
@@ -415,7 +415,7 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
-    def add_account(self, account, admin_user="", admin_password="", description="", retry=3):
+    def add_account(self, account, admin_user="", admin_password="", description="nothing", retry=3):
         '''
         Add a new account, including the following steps::
             (1) Create the account and account administrator.
@@ -631,20 +631,12 @@ class SwiftAccountMgr:
             msg = "User %s:%s does not exist!" % (account, user)
             return Bool(val, msg)
 
-        get_user_password_output = self.get_user_password(account, user)
-
-        if get_user_password_output.val == False:
-            val = False
-            msg = get_user_password_output.msg
-            return Bool(val, msg)
-        else:
-            actual_user_password = get_user_password_output.msg
-
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
                                            account=".super_admin", container=container, admin_user=".super_admin",\
                                            admin_password=self.__password)
 
         if val == False:
+            logger.error(msg)
             return Bool(val, msg)
         else:
             container_metadata = msg
@@ -738,6 +730,7 @@ class SwiftAccountMgr:
                                            admin_password=self.__password)
 
         if val == False:
+            logger.error(msg)
             return Bool(val, msg)
         else:
             container_metadata = msg
@@ -773,17 +766,16 @@ class SwiftAccountMgr:
 
     def enable_account(self, account, retry=3):
         '''
-        Enable the account by changing the passwords of all users from random password to original password saved
-        in the metadata container. Note that after changing all users' passwords, the metadata must be updated.
-        (Not finished yet)
+        Enable the account by changing the passwords of all users from random passwords to original passwords saved
+        in the metadata containers.
 
         @type  account: string
-        @param account: the name of the account
+        @param account: the account to be enabled
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
         @return: a named tuple Bool(val, msg). If the account is enabled successfully, then Bool.val == True and msg == "".
-                Otherwise, Bool.val == False and Bool.msg records the error message including the black list.
+                Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
         logger = util.getLogger(name="enable_account")
 
@@ -793,9 +785,6 @@ class SwiftAccountMgr:
         user_list = []
         user_metadata = {}
         black_list = []
-        admin_user = ""  # to be defined
-        admin_password = ""
-        user_container = ""
 
         msg = ""
         val = False
@@ -809,76 +798,94 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1."
             return Bool(val, msg)
 
+        check_account_existence = self.account_existence(account)
+
+        if check_account_existence.val == False:
+            val = False
+            msg = check_account_existence.msg
+            return Bool(val, msg)
+        elif check_account_existence.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
+            return Bool(val, msg)
+
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
         if val == False:
+            logger.error(msg)
             return Bool(val, msg)
 
         try:
             user_info = json.loads(msg)
             msg = ""
-
         except Exception as e:
-            msg = "Failed to load the json string: %s" % str(e)
-            logger.error(msg)
             val = False
+            msg = "Failed to load the json string: %s" % str(e)
             return Bool(val, msg)
 
         if len(user_info["users"]) == 0:
             val = False
-            msg = "There are no users in the account %s!" % account
+            msg = "There are no users in account %s!" % account
             return Bool(val, msg)
 
         for item in user_info["users"]:
             user_list.append(item["name"])
 
-        get_admin_password_output = self.get_user_password(account, admin_user)
-        if get_admin_password_output.val == False or get_admin_password_output.msg == "":
-            val = False
-            msg = "Failed to get the password of the admin user: %s" % get_admin_password_output.msg
+        admin_metadata_container = account + ":" + self.__admin_default_name
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                           account=".super_admin", container=admin_metadata_container, admin_user=".super_admin",\
+                                           admin_password=self.__password)
+
+        if val == False:
+            logger.error(msg)
             return Bool(val, msg)
         else:
-            admin_password = get_admin_password_output.msg
+            logger.info(msg)
+            container_metadata = msg
+
+        if container_metadata["Account-Enable"] == True:
+            val = True
+            msg = "Account %s has been enabled." % account
+            return Bool(val, msg)
 
         for user in user_list:
             # TODO: use thread pool to speed up
-            user_container = ""  # to be defined
-            user_metadata = {"Account-Enable": True}
+            metadata_container = account + ":" + user
 
-            get_user_password_output = self.get_user_password(account, user)
-            if get_user_password_output.val == False or get_user_password_output.msg == "":
-                black_list.append("Failed to get the password of %s: %s" % (user, get_user_password_output.msg))
-                continue
-            else:
-                ori_password = get_user_password_output.msg
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                   account=account, container=user_container, admin_user=admin_user,\
-                                                   admin_password=admin_password)
-
-                if val == False:
-                    black_list.append("Failed to get the original password of %s: %s" % (user, msg))
-                    continue
-                elif msg["User-Enable"] == False:
-                    new_password = ori_password
-                    user_metadata["Password"] = msg["Password"]
-                else:
-                    new_password = msg["Password"]
-
-                change_password_output = self.change_password(account, user, ori_password, new_password)
-
-            if change_password_output.val == False:
-                black_list.append("Failed to change the password of %s: %s" % (user, change_password_output.msg))
-                continue
-
-            if user == admin_user:
-                admin_password = new_password
-
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
-                                               account=account, container=user_container, admin_user=admin_user,\
-                                               admin_password=admin_password, metadata_content=user_metadata)
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                               account=".super_admin", container=metadata_container, admin_user=".super_admin",\
+                                               admin_password=self.__password)
 
             if val == False:
-                black_list.append("Failed to update the metadta of %s: %s" % (user, msg))
+                logger.error(msg)
+                black_list.append(account+":"+user)
+                continue
+            else:
+                container_metadata = msg
+
+            if container_metadata["User-Enable"] == False:
+                container_metadata["Account-Enable"] = True
+            else:
+                ori_user_password = container_metadata["Password"]
+                container_metadata["Account-Enable"] = True
+
+                change_password_output = self.change_password(account, user, ori_user_password)
+
+                if change_password_output.val == False:
+                    val = False
+                    msg = change_password_output.msg
+                    black_list.append(account+":"+user)
+                    continue
+
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                               account=".super_admin", container=metadata_container, admin_user=".super_admin",\
+                                               admin_password=self.__password, metadata_content=container_metadata)
+
+            if val == False:
+                # TODO: need to rollback
+                logger.error(msg)
+                black_list.append(account+":"+user)
 
         if len(black_list) != 0:
             val = False
@@ -892,9 +899,7 @@ class SwiftAccountMgr:
     def disable_account(self, account, retry=3):
         '''
         Disable the account by changing the passwords of all users from original passwords to random passwords.
-        The original password will be stored in the metadata. Note that after changing all users' passwords,
-        the metadata must be updated.
-        (Not finished yet)
+        The original password will be stored in the metadata container.
 
         @type  account: string
         @param account: the name of the account
@@ -910,11 +915,7 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_list = []
-        user_metadata = {}
         black_list = []
-        admin_user = ""  # to be defined
-        admin_password = ""
-        user_container = ""
 
         msg = ""
         val = False
@@ -928,18 +929,30 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1."
             return Bool(val, msg)
 
+        check_account_existence = self.account_existence(account)
+
+        if check_account_existence.val == False:
+            val = False
+            msg = check_account_existence.msg
+            return Bool(val, msg)
+        elif check_account_existence.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
+            return Bool(val, msg)
+
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
         if val == False:
+            logger.error(msg)
             return Bool(val, msg)
 
         try:
             user_info = json.loads(msg)
             msg = ""
         except Exception as e:
+            val = False
             msg = "Failed to load the json string: %s" % str(e)
             logger.error(msg)
-            val = False
             return Bool(val, msg)
 
         if len(user_info["users"]) == 0:
@@ -950,59 +963,64 @@ class SwiftAccountMgr:
         for item in user_info["users"]:
             user_list.append(item["name"])
 
-        get_admin_password_output = self.get_user_password(account, admin_user)
-        if get_admin_password_output.val == False or get_admin_password_output.msg == "":
-            val = False
-            msg = "Failed to get the password of the admin user: %s" % get_admin_password_output.msg
+        admin_metadata_container = account + ":" + self.__admin_default_name
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                           account=".super_admin", container=admin_metadata_container, admin_user=".super_admin",\
+                                           admin_password=self.__password)
+
+        if val == False:
+            logger.error(msg)
             return Bool(val, msg)
         else:
-            admin_password = get_admin_password_output.msg
+            logger.info(msg)
+            container_metadata = msg
+
+        if container_metadata["Account-Enable"] == False:
+            val = True
+            msg = "Account %s has been disabled." % account
+            return Bool(val, msg)
 
         for user in user_list:
             # TODO: use thread pool to speed up
-            user_container = ""  # to be defined
-
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata, account=account,\
-                                               container=user_container, admin_user=admin_user, admin_password=admin_password)
-
-            if val == False:
-                black_list.append("Failed to get the metadata of %s: %s" % (user, msg))
-                continue
-            else:
-                ori_user_metadata = msg
-
+            metadata_container = account + ":" + user
             get_user_password_output = self.get_user_password(account, user)
-            if get_user_password_output.val == False or get_user_password_output.msg == "":
-                black_list.append("Failed to get the password of %s: %s" % (user, get_user_password_output.msg))
-                continue
+
+            if get_user_password_output.val == False:
+                val = False
+                msg = get_user_password_output.msg
+                return Bool(val, msg)
             else:
-                ori_password = get_user_password_output.msg
-                new_password = str(uuid.uuid4())
-                change_password_output = self.change_password(account, user,\
-                ori_password, new_password)
+                actual_user_password = get_user_password_output.msg
 
-            if change_password_output.val == False:
-                black_list.append("Failed to change the password of %s: %s" % (user, change_password_output.msg))
-                continue
-
-            if user == admin_user:
-                admin_password = new_password
-
-            # BUG: check whether User-Enable is False
-            if ori_user_metadata["User-Enable"] == False:
-                user_metadata = {"Account-Enable": False,
-                                 "Password": ori_user_metadata["Password"]}
-
-            else:
-                user_metadata = {"Account-Enable": False,
-                                 "Password": ori_password}
-
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata, account=account,\
-                                               container=user_container, admin_user=admin_user, admin_password=admin_password,\
-                                               metadata_content=user_metadata)
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                               account=".super_admin", container=metadata_container, admin_user=".super_admin",\
+                                               admin_password=self.__password)
 
             if val == False:
-                black_list.append("Failed to update the metadta of %s: %s" % (user, msg))
+                logger.error(msg)
+                black_list.append(account+":"+user)
+                continue
+            else:
+                container_metadata = msg
+
+            if container_metadata["User-Enable"] == True:
+                change_password_output = self.change_password(account, user)
+
+                if change_password_output.val == False:
+                    val = False
+                    msg = change_password_output.msg
+                    black_list.append(account+":"+user)
+                    continue
+
+                container_metadata = {"Account-Enable": False,
+                                      "Password": actual_user_password}
+            else:
+                container_metadata = {"Account-Enable": False}
+
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                               account=".super_admin", container=metadata_container, admin_user=".super_admin",\
+                                               admin_password=self.__password, metadata_content=container_metadata)
 
         if len(black_list) != 0:
             val = False
@@ -2846,14 +2864,30 @@ class SwiftAccountMgr:
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
     #print SA.add_account("accountxxx")
-    for i in range(10):
+    """
+    for i in range(2):
         print "Account %d" % i
         account = "account%d" % i
         print SA.add_account(account)
-        for j in range(5):
+        for j in range(3):
             print "User %d" % j
             user = "user%d" % j
             print SA.add_user(account, user)
+            #print SA.disable_user(account, user)
+    """
+    print SA.enable_account("account1")
+    #print SA.disable_account("account1")
+    print SA.enable_user("account1", "user0")
+    #print SA.disable_user("account1", "user0")
+    #print SA.enable_user("account1", "user2")
+    #print SA.disable_account("account1")
+    #print SA.disable_user("account1", "user2")
+    print SA.list_user("account1")
+    print "\n"
+    print SA.list_account()
+    #print SA.disable_account("account1")   
+    #print SA.list_user("account1")
+    #print SA.list_account()
     #print SA.add_account("account1")
     #print SA.add_user("account1", "user1")
     #print SA.disable_user("account1", "user1")

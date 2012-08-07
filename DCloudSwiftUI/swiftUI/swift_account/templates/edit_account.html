@@ -138,7 +138,7 @@
     <h3>Reset Password</h3>
   </div>
   <div class="modal-body">
-    <label for="oldpassword">Please enter old password "trdgh125e555"</label>
+    <label for="oldpassword">Please enter old password "<span id="modal_oldpw"></span>"</label>
     <input type="text" name="oldpassword" id="oldpassword" class="required" minlength="3"/>
     </div>
   <div class="modal-footer">
@@ -152,7 +152,7 @@
     <h3>Reset Password Successful</h3>
   </div>
   <div class="modal-body">
-    New password is: kgdSC8056B25ef
+    New password is: "<span id="modal_reset"></span>"
     </div>
   <div class="modal-footer">
     <a href="#" class="btn" data-dismiss="modal">Close</a>
@@ -160,20 +160,25 @@
 </div>
 
   <script type="text/javascript">
+   var user_id;
    $('a[id*="dis_user"]').click(function(evt){
     $('#modal_dis_user').html(this.name);
-    $('#modal_dis_user_link').click(function(){window.location = "/accounts/{{account_id}}/user/"+this.name+"/disable"});
+    user_id = this.name;
+    $('#modal_dis_user_link').click(function(){
+        //$('#disable_user').modal('hide');
+    	window.location = "/accounts/{{account_id}}/user/"+user_id+"/disable";
+    });
     $('#disable_user').modal('show');
-    alert("under construction");
     //$('#modal_dis_user_link').attr("href","/accounts/{{account_id}}/user/"+this.name+"/disable");
   });
    
    $('a[id*="query_pw"]').click(function(evt){
     $('#modal_pw_user').html(this.name);
+    user_id = this.name;
     //use ajax to query password
     $.ajax({
         type:"GET",
-        url:"/accounts/{{account_id}}/user/"+this.name+"/password",
+        url:"/accounts/{{account_id}}/user/"+user_id+"/password",
         success: function(msg){
           $("#modal_pw").text(msg);
           $('#query_user_password').modal('show');
@@ -182,14 +187,30 @@
   });
   
   $('a[id*="reset_pw"]').click(function(evt){
+    user_id = this.name;
+    //use ajax to query password
+    $.ajax({
+        type:"GET",
+        url:"/accounts/{{account_id}}/user/"+user_id+"/password",
+        success: function(msg){
+          $("#modal_oldpw").text(msg);
+          $('#reset_user_password').modal('show');
+        }
+    });
     $('#reset_user_password').modal('show');
-    alert("under construction");
   });
   
   $('#reset_password').click(function(evt){
     $('#reset_user_password').modal('hide');
     //TODO: check old password, query new
-    $('#reset_password_successful').modal('show');
+    $.ajax({
+        type:"GET",
+        url:"/accounts/{{account_id}}/user/"+user_id+"/password/reset",
+        success: function(msg){
+          $("#modal_reset").text(msg);
+          $('#reset_password_successful').modal('show');
+        }
+    });
   });
   </script>
 {% endblock %}
