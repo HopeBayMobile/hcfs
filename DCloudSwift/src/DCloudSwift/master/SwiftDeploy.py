@@ -238,8 +238,8 @@ class SwiftDeploy:
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(proxyList, fh)
 
-            with open("%s/storageList", swiftDir, "wb") as fh:
-                pickel.dump(storageList, fh)
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(storageList, fh)
 
             with open("%s/versBase" % swiftDir, "wb") as fh:
                 pickle.dump(versBase, fh)
@@ -283,22 +283,28 @@ class SwiftDeploy:
 
             swiftDir = "/etc/swift"
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
                 oriProxyList = pickle.load(fh)
-
             for node in proxyList:
                 if node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s already exists" % node["ip"])
-
             completeProxyList = oriProxyList + proxyList
 
+            oriStorageList = []
+            with open("%s/storageList" % swiftDir, "rb") as fh:
+                oriStorageList = pickle.load(fh)
             for node in storageList:
                 if node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s already exists" % node["ip"])
+            completeStorageList = oriStorageList + storageList
 
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(completeProxyList, fh)
+
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(completeStorageList, fh)
 
             for node in storageList:
                 for j in range(deviceCnt):
@@ -322,29 +328,34 @@ class SwiftDeploy:
             devicePrx = self.__kwparams['devicePrx']
 
             swiftDir = "/etc/swift"
-
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
                 oriProxyList = pickle.load(fh)
-
             for node in proxyList:
                 if not node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s does not exist!" % node["ip"])
 
-            completeProxyList = [node for node in oriProxyList if node not in proxyList]
-
+            oriStorageList = []
+            with open("%s/storageList" % swiftDir, "rb") as fh:
+                oriStorageList = pickle.load(fh)
             for node in storageList:
                 if not node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s does not exist!" % node["ip"])
 
             deletedIpList = [node["ip"] for node in storageList] + [node["ip"] for node in proxyList]
+            completeProxyList = [node for node in oriProxyList if node["ip"] not in deletedIpList]
+            completeStorageList = [node for node in oriStorageList if node["ip"] not in deletedIpList]
+        
             safe = self.isDeletionOfNodesSafe(deletedIpList, swiftDir)
             if safe.val == False:
                 raise UpdateMetadataError("Unsafe to delete nodes for %s" % safe.msg)
 
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(completeProxyList, fh)
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(completeStorageList, fh)
 
             for node in storageList:
                 for j in range(deviceCnt):
@@ -1028,7 +1039,6 @@ def deleteNodes():
         try:
 
                 (proxyList, storageList) = parseDeleteNodesSection(inputFile=inputFile)
-                print proxyList, storageList
 
                 SD = SwiftDeploy()
                 t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
