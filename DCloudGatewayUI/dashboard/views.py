@@ -296,6 +296,11 @@ def sync(request):
         interval_from = query.get('interval_from')
         bandwidth = query.get('bandwidth')
         no_upload = query.get('no_upload')
+        
+        # wthung, 2012/8/7
+        # ensure interval_from is smaller than interval_to
+        if int(interval_to) < int(interval_from) :
+            interval_to, interval_from = interval_from, interval_to
 
         for value in data:
             if value[0] == day:

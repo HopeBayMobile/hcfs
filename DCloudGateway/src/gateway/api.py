@@ -307,8 +307,6 @@ def get_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
-            - uplink_usage: Network traffic going from gateway.
-            - downlink_usage: Network traffic coming to gateway.
     """
     
     #log.info("get_indicators start")
@@ -340,9 +338,6 @@ def get_indicators():
         op_Proxy_srv = _check_process_alive('squid3')
         op_s3ql_ok = _check_s3ql()
 
-        # get network statistics
-        network = get_network_speed(MONITOR_IFACE)
-
         # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
         if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
             restart_nfs_service()
@@ -364,9 +359,7 @@ def get_indicators():
               'SMB_srv' : op_SMB_srv,
               'snapshot_in_progress' : op_snapshot_in_progress,
               'HTTP_proxy_srv' : op_Proxy_srv,
-              'S3QL_ok': op_s3ql_ok,
-              'uplink_usage' : network["uplink_usage"],
-              'downlink_usage' : network["downlink_usage"]}}
+              'S3QL_ok': op_s3ql_ok}}
     except Exception as Err:
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
@@ -404,6 +397,9 @@ def get_gateway_indicators():
     #log.info("get_gateway_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
+
+    # Note: indicators and net speed are acuquired from different location
+    #       don't mess them up
     return_val = {
           'result' : op_ok,
           'msg'    : op_msg,
@@ -416,9 +412,10 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False,
+          'S3QL_ok': False}}
+    return_val2 = {
           'uplink_usage' : 0,
-          'downlink_usage' : 0}}
+          'downlink_usage' : 0}
 
 
     # test, for fast UI integration
@@ -434,17 +431,23 @@ def get_gateway_indicators():
             # deserialize json object from file
             #log.info('%s is existed. Try to get indicator from it' % indic_file)
             with open(indic_file) as fh:
-                return json.dumps(json.load(fh))
+                #return json.dumps(json.load(fh))
+                return_val = json.load(fh)
         else:
             # invoke regular function calls
             log.info('No indicator file existed. Try to spend some time to get it')
             return_val = get_indicators()
-            
+
+        # below call already checks netspeed indic file
+        return_val2 = get_network_speed(MONITOR_IFACE)
+           
     except Exception as Err:
         log.info("msg: %s" % str(Err))
+        return_val['data'].update(return_val2)
         return json.dumps(return_val)
 
     #log.info("get_gateway_indicators end")
+    return_val['data'].update(return_val2)
     return json.dumps(return_val)
 
 # wthung, 2012/7/17, retire this function and replace by _check_process_alive
