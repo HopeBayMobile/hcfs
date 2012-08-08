@@ -77,7 +77,6 @@ class SwiftDeploy:
 
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
-        self.__jsonStr = json.dumps(self.__kwparams)
 
         self.__setUpdateMetadataProgress()
         self.__setDeployProgress()
@@ -377,6 +376,7 @@ class SwiftDeploy:
 
             print "Start deploying proxy node %s" % proxyIP
             pathname = "/etc/delta/master/%s" % socket.gethostname()
+            json_kwargs = json.dumps({"deviceCnt": util.getDeviceCnt(ip=proxyIP), "devicePrx": self.__kwparams["devicePrx"]})
 
             cmd = "ssh root@%s mkdir -p %s" % (proxyIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
@@ -404,7 +404,7 @@ class SwiftDeploy:
                 errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
                 raise DeployProxyError(errMsg)
 
-            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
+            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(json_kwargs))
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
             if status != 0:
                 errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
@@ -442,6 +442,7 @@ class SwiftDeploy:
         logger = util.getLogger(name="storageDeploySubtask: %s" % storageIP)
         try:
             pathname = "/etc/delta/master/%s" % socket.gethostname()
+            json_kwargs = json.dumps({"deviceCnt": util.getDeviceCnt(ip=storageIP), "devicePrx": self.__kwparams["devicePrx"]})
 
             print "Start deploying storage node %s" % storageIP
             cmd = "ssh root@%s mkdir -p %s" % (storageIP, pathname)
@@ -469,7 +470,7 @@ class SwiftDeploy:
                 errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
                 raise DeployStorageError(errMsg)
 
-            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s" % (storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
+            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s" % (storageIP, pathname, util.jsonStr2SshpassArg(json_kwargs))
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
             if status != 0:
                 errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
