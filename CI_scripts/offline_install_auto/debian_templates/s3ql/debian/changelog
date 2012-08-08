@@ -1,0 +1,118 @@
+s3ql (1.11.1.0003-precise1ubuntu1dcloudunstable) precise; urgency=low
+
+  * test build at 2012/08/08
+
+ -- Ovid Wu <ovid.wu@delta.com.tw>  Tue, 24 Jul 2012 09:35:34 +0000
+
+s3ql (1.11.1.0001-precise1ubuntu1dcloudunstable) precise; urgency=low
+
+  * rebuild for unstable
+
+ -- Ovid Wu <ovid.wu@delta.com.tw>  Tue, 24 Jul 2012 09:35:34 +0000
+
+s3ql (1.11.1.0000-precise1ubuntu1dcloud) precise; urgency=low
+
+  * rebuild for precise
+  * add build number 0000 for qa flow integration
+  * add dcloud component
+
+ -- Ovid Wu <ovidwu@gmail.com>  Mon, 16 Jul 2012 05:41:46 +0000
+
+s3ql (1.11.1-1~precise1) precise; urgency=low
+
+  * New upstream release
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Fri, 04 May 2012 11:18:45 -0400
+
+s3ql (1.11-1~precise2) precise; urgency=low
+
+  * Use same dependencies as Debian package.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 29 Apr 2012 18:13:07 -0400
+
+s3ql (1.11-1~precise1) precise; urgency=low
+
+  * Backported to precise.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 29 Apr 2012 16:07:15 -0400
+
+s3ql (1.11-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 29 Apr 2012 15:22:56 -0400
+
+s3ql (1.10-1) unstable; urgency=low
+
+  * Bumped standards to 3.9.3, no changes required.
+  * New upstream release.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Fri, 24 Feb 2012 21:51:01 -0500
+
+s3ql (1.9-1) unstable; urgency=low
+
+  * Depend on python >= 2.7 (now required by upstream). Closes: #653641.
+  * New upstream release.
+  * Dropped obsolete argparse.diff patch.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sat, 21 Jan 2012 13:38:25 -0500
+
+s3ql (1.8.1-1) unstable; urgency=low
+
+  * Add versioned depends on python-argparse. Closes: #652751.
+  * New upstream release.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Mon, 05 Dec 2011 20:36:44 -0500
+
+s3ql (1.7-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 27 Nov 2011 14:40:58 -0500
+
+s3ql (1.6-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Tue, 22 Nov 2011 11:04:35 -0500
+
+s3ql (1.5-1) unstable; urgency=low
+
+  * New upstream release.
+  * Don't crash when using Google Storage backend. Closes: #646232.
+  * Use dh_sphinxdoc.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Mon, 24 Oct 2011 19:16:12 -0400
+
+s3ql (1.4-1) unstable; urgency=low
+
+  * New upstream release.
+
+  * Depend on fuse | fusebsd. Closes: #634337.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Thu, 06 Oct 2011 11:20:25 -0400
+
+s3ql (1.2-1) unstable; urgency=low
+
+  * New upstream release.
+  * Depend on python-llfuse >= 0.36, API was changed in non-backwards
+    compatible way.
+  * Depend on Python >= 2.6.6, previous versions unusable due to
+    Python bug 6312.
+  * Don't ship our own version of underscore JavaScript library, depend
+    on libjs-underscore package instead.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Wed, 28 Sep 2011 21:00:04 -0400
+
+s3ql (1.0.1-2) unstable; urgency=low
+
+  * Install pcp as parallel-cp to avoid file name conflict with
+    pcp ("Performance Co-Pilot") package. Closes: #632473.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 03 Jul 2011 10:44:00 -0400
+
+s3ql (1.0.1-1) unstable; urgency=low
+
+  * First official debian release. Closes: #626651
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Fri, 01 Jul 2011 14:02:17 -0400

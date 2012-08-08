@@ -1,0 +1,92 @@
+Source: s3ql
+Section: misc
+Priority: optional
+X-Python-Version: >= 2.7
+Maintainer: Debian Python Apps Team <python-apps-team@lists.alioth.debian.org>
+Uploaders: Nikolaus Rath <Nikolaus@rath.org>,
+           Laszlo Boszormenyi <gcs@debian.hu>
+Build-Depends: debhelper (>= 8),
+               python-dev (>= 2.7),
+               python-dbg,
+               python-setuptools (>= 0.6.14),
+               python-apsw (>= 3.7.0),
+               libsqlite3-dev (>= 3.7.0),
+               python-sphinx (>= 1.0.7+dfsg),
+               python (>= 2.7), 
+               python-unittest2,
+               python-llfuse (>= 0.37),
+               python-pycryptopp,
+               python-lzma (>= 0.5.3),
+               texlive-latex-base,
+               texlive-latex-recommended,
+               texlive-latex-extra,
+               texlive-fonts-recommended,
+               cython (>= 0.15.1)
+Standards-Version: 3.9.3
+Homepage: http://code.google.com/p/s3ql/
+Vcs-Svn: svn://svn.debian.org/python-apps/packages/s3ql/trunk
+Vcs-Browser: http://anonscm.debian.org/viewvc/python-apps/packages/s3ql/trunk/
+
+Package: s3ql
+Architecture: any
+Depends: ${misc:Depends},
+         ${python:Depends},
+         ${shlibs:Depends},
+         ${sphinxdoc:Depends},
+         libsqlite3-0 (>= 3.7.0),
+         fuse [linux-any] | fuse4bsd [kfreebsd-any],
+         psmisc,
+         python-llfuse (>= 0.37),
+         python-apsw (>= 3.7.0),
+         python-lzma (>= 0.5.3)
+Description: Full-featured file system for online data storage
+ S3QL is a file system that stores all its data online. It supports
+ online storage services like Amazon S3 as well as arbitrary FTP or
+ SFTP servers. It effectively provides you with a hard disk of
+ infinite capacity that can be accessed from any computer with
+ internet access.
+ .
+ S3QL has been designed mainly for backup and archival purposes and
+ many of its features are especially geared towards this. However,
+ since S3QL is providing a standard UNIX file system, it can in
+ principle be used for any other application as well.
+ .
+ S3QL is designed to favor simplicity and elegance over performance
+ and feature-richness. Care has been taken to make the source code as
+ readable and serviceable as possible. Solid error detection and error
+ handling have been included from the very first line, and S3QL comes
+ with extensive automated test cases for all its components.
+
+Package: s3ql-dbg
+Architecture: any
+Section: debug
+Priority: extra
+Recommends: python-dbg,
+            python-llfuse-dbg,
+            python-apsw-dbg,
+            python-pycryptopp-dbg,
+            python-lzma-dbg
+Depends: s3ql (= ${binary:Version}),
+         ${python:Depends},
+         ${shlibs:Depends},
+         ${misc:Depends}
+Description: Full-featured file system for online data storage (debugging symbols)
+ S3QL is a file system that stores all its data online. It supports
+ online storage services like Amazon S3 as well as arbitrary FTP or
+ SFTP servers. It effectively provides you with a hard disk of
+ infinite capacity that can be accessed from any computer with
+ internet access.
+ .
+ S3QL has been designed mainly for backup and archival purposes and
+ many of its features are especially geared towards this. However,
+ since S3QL is providing a standard UNIX file system, it can in
+ principle be used for any other application as well.
+ .
+ S3QL is designed to favor simplicity and elegance over performance
+ and feature-richness. Care has been taken to make the source code as
+ readable and serviceable as possible. Solid error detection and error
+ handling have been included from the very first line, and S3QL comes
+ with extensive automated test cases for all its components.
+ .
+ This package contains the debugging symbols as well as the extension
+ built for the Python 2 debug interpreter.

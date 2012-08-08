@@ -1,0 +1,15 @@
+[Description]
+    The scripts in this folder are for packing offline installation package. 
+
+[Usage]
+First time setup
+    1. Prepare a VM or physical machine installed a clean Ubuntu 12.04 server.
+    2. ./1st_config_environment.sh
+    
+First build package
+    1. sudo ./build_gw_package.sh full <build_num>
+        Example: sudo ./build_gw_package.sh full 0093
+
+Fast rebuild (already ran full build)
+    1. sudo ./build_gw_package.sh fast <build_num>
+        Example: sudo ./build_gw_package.sh fast 0093
