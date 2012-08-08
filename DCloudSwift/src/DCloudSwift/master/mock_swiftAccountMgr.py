@@ -15,7 +15,6 @@ import string
 import sqlite3
 import uuid
 from pprint import pprint
-import random
 
 lock = threading.Lock()
 
@@ -30,7 +29,7 @@ class SwiftAccountMgr:
 
         for i in range(self.__num_of_account):
             account = "Account%d" % i
-            stat = True if random.randrange(0, 2)==1 else False
+            stat = True if random.randrange(0, 2) == 1 else False
             self.__account_dict[account] = {
                 "description": "This is %s" % account,
                 "user_number": self.__num_of_user,
@@ -39,7 +38,7 @@ class SwiftAccountMgr:
 
         for j in range(self.__num_of_user):
             user = "User%d" % j
-            stat = True if random.randrange(0, 2)==1 else False
+            stat = True if random.randrange(0, 2) == 1 else False
             self.__user_dict[user] = {
                 "description": "This is %s" % user,
                 "user_enable": stat,
@@ -335,6 +334,69 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def obtain_user_info(self, account, user, retry=3):
+        '''
+        Obtain the related information of the user in the account.
+
+        @type  account: string
+        @param account: the account name of the user
+        @type  user: string
+        @param user: the user to obtain the related information
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the information of the user is successfully got, then Bool.val == True
+                and Bool.msg is a dictionary recording the related information of the user. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
+        '''
+        val = False
+        msg = {}
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        elif user == "" or user == None:
+            msg = "User is not valid!"
+        else:
+            val = True
+
+            msg = {
+                "description": "This is user %s:%s" % (account, user),
+                "user_enable": True,
+                "account_enable": True,
+            }
+
+        return Bool(val, msg)
+
+    def modify_user_description(self, account, user, description, retry=3):
+        '''
+        Modify the description of the user in the account.
+
+        @type  account: string
+        @param account: the account name of the user
+        @type  user: string
+        @param user: the user to modify the description
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the description of the user is successfully modified, then Bool.val == True
+                and Bool.msg == "". Otherwise, Bool.val == False and Bool.msg records the error message.
+        '''
+        val = True
+        msg = ""
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        elif user == "" or user == None:
+            msg = "User is not valid!"
+        elif description == "" or description == None:
+            msg = "Description can not be empty!"
+        else:
+            val = True
+
+        return Bool(val, msg)
+
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
@@ -358,3 +420,7 @@ if __name__ == '__main__':
     pprint(SA.list_account().msg)
     print "\nlist_user"
     pprint(SA.list_user("account1").msg)
+    print "\nobtain_user_info"
+    pprint(SA.obtain_user_info("account1", "user1").msg)
+    print "\nmodify_user_description"
+    print SA.modify_user_description("account1", "user1", "This is a test!")

@@ -14,8 +14,5 @@ ip=192.168.11.13 zid=4 deviceCnt=6 deviceWeight=100
 192.168.11.10 
 
 [nodeList]
-STO1AA0110
-STO1AA0111
-STO1AA0112
-STO1AA0113
-STO1AA0114
+hostname=STO1AA0110 deviceCnt=6
+hostname=STO1AA0111 deviceCnt=6

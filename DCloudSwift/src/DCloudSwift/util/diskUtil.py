@@ -116,6 +116,19 @@ def getMountedSwiftDevices(devicePrx):
 
 
 def getUmountedSwiftDevices(deviceCnt, devicePrx):
+    '''
+    get a set of unmounted swift devices' numbers
+    @type deviceCnt: integer
+    @param deviceCnt: expected number of swift devices
+    @type devicePrx: string
+    @param  devicePrx: prefix of swift devices' mountpoints
+    @rtype: set of integers
+    @return: set of umounted swift devices' numbers
+    '''
+
+    if not deviceCnt:
+        return set()
+
     cmd = "mount"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     lines = po.stdout.readlines()
@@ -163,6 +176,9 @@ def formatNonRootDisks(deviceCnt=1):
     disks = getNonRootDisks()
     formattedDisks = []
     returncode = 0
+
+    if not deviceCnt:
+        return (returncode, formattedDisks)
 
     for disk in disks:
         if len(formattedDisks) == deviceCnt:
