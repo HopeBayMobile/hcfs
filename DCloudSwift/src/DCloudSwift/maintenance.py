@@ -52,7 +52,8 @@ def updateMetadata(confDir):
         oriVers = diskUtil.getLatestVers()
         if oriVers is None:
             util.stopAllServices()  # prevent services from occupying disks
-            diskUtil.createSwiftDevices(deviceCnt=deviceCnt, devicePrx=devicePrx)
+            if deviceCnt:
+                diskUtil.createSwiftDevices(deviceCnt=deviceCnt, devicePrx=devicePrx)
             util.restartAllServices()
         else:
             diskUtil.updateMetadataOnDisks(oriVers=oriVers)
