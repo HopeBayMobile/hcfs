@@ -12,8 +12,19 @@
 	var options = $.extend(defaults, options);
 
 	var slided = false ; //is the bar slidedown?
+        // wthung, 2012/8/8
+        // don't create bar if no error log
+        // note that this modification will cause the bar to show up lately with error logs
+        // I think this is better compared to showing up the bar and suddently disappeared
+        // anyone who don't agreen with this can modify
+        $.get('/dashboard/syslog/', function(ctnt, success, opt){
+            var msgs = JSON.parse(ctnt);
+            if (msgs != ""){
+                createBar();
+            }
+        });
 
-	createBar();
+	//createBar();
 
 	function createBar() //creates the html for the bar
 	{
