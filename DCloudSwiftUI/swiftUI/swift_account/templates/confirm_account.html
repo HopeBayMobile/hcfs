@@ -22,18 +22,10 @@
 {% block body %}
 <div class="container-fluid">
     <div class="row-fluid">
-    <div id="sidebar" class="span3">
-      <div class="well sidebar-nav">
-        <ul class="nav nav-list">
-          <li>Dashboard</li>
-          <li><a href="/accounts/">Account Management</a></li>
-          <li>Monitor</li>
-          <li>Maintenance</li>
-          <li>System Log</li>
-        </ul>
-      </div>
-</div>
-<div id="screen" class="span9">
+      <div id="sidebar" class="span3">
+      {% include "_side_bar.html" %}
+    </div>
+  <div id="screen" class="span9">
 <h1>Create Account Successful</h1>
 <table class="table">
 <tr>
