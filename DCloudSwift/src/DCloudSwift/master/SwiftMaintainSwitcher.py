@@ -193,10 +193,13 @@ class SwiftMaintainSwitcher(Daemon):
         """
         logger = util.getLogger(name='swiftmaintainswitcher.run')
         while True:
-            logger.info("daemon sleep: %s" % self.daemonSleep)
-            self.checkService()
-            self.checkWaiting()
-            time.sleep(int(self.daemonSleep))
+            try:
+                logger.info("daemon sleep: %s" % self.daemonSleep)
+                self.checkService()
+                self.checkWaiting()
+                time.sleep(int(self.daemonSleep))
+            except Exception as e:
+                logger.error("Failed to execute job due to %s" % str(e))
 
 
 def main(DBFile=None):

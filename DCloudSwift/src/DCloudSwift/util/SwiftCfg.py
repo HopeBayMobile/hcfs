@@ -27,7 +27,6 @@ class SwiftCfg:
         self.__username = "root"
 
         self.__password = config.get('storage', 'password')
-        self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
         self.__devicePrx = "sdb"
         self.__proxyPort = int(config.get('storage', 'proxyPort'))
 
@@ -38,7 +37,6 @@ class SwiftCfg:
             'username': self.__username,
             'password': self.__password,
             'devicePrx': self.__devicePrx,
-            'deviceCnt': self.__deviceCnt,
             'proxyPort': self.__proxyPort,
             'portalUrl': self.__portalUrl
         }
