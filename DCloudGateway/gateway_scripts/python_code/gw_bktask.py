@@ -112,13 +112,16 @@ def redirect_stream(system_stream, target_stream):
 
 def thread_aptget():
     """
-    Worker thread to do 'apt-get update'
+    Worker thread to do 'apt-get update' and 'apt-show-versions'
     """
 
     global g_program_exit
+
+    s3ql_version_file = '/dev/shm/s3ql_ver'
     
     while not g_program_exit:
         os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
+        os.system("sudo apt-show-versions -u s3ql > %s" % s3ql_version_file)
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(600):
