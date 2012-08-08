@@ -55,11 +55,8 @@
 </table>
 <hr/>
 <h3>Would you want to create new user?</h3>
-<form action="/accounts/new/process" method="post" id="form1">
-    {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
-      <input class="btn" type="submit" value="Yes" /> <a class="btn" href="/accounts/">No</a>
+      <a href="/accounts/new" class="btn">Yes</a> <a class="btn" href="/accounts/">No</a>
     </div>
-  </form>
 </div>
 {% endblock %}

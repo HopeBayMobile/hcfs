@@ -47,6 +47,7 @@ class SwiftEventMgr(Daemon):
         logger = util.getLogger(name="SwiftEventMgr.getExpectedDiskCount")
         config = ConfigParser()
 
+        # Todo: read from storageList
         try:
             with open(GlobalVar.ORI_SWIFTCONF, "rb") as fh:
                 config.readfp(fh)
@@ -151,7 +152,7 @@ class SwiftEventMgr(Daemon):
             knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] + old_disk_info["healthy"] if disk["SN"]}
 
             if old_disk_info["timestamp"] >= event["time"]:
-                logger.warn("Old disk events are received")
+                logger.warn("Old disk events are received from %s" % event["hostname"])
                 return None
             else:
                 new_disk_info["timestamp"] = event["time"]
@@ -380,29 +381,55 @@ def getSection(inputFile, section):
         return ret
 
 
+def checkLineFormat(section, line):
+    node = {}
+    tokens = line.split()
+    for token in tokens:
+        node.setdefault(token.split("=")[0], token.split("=")[1])
+
+    hostname = node.get("hostname", None)
+    deviceCnt = node.get("deviceCnt", None)
+
+    if not hostname:
+        raise Exception("%s missing hostname in line '%s'" % (section, line))
+    if not deviceCnt:
+        raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
+
+    if not deviceCnt.isdigit():
+        raise Exception("%s line '%s' contains invalid deviceCnt" % (section, line))
+    else:
+        deviceCnt = int(deviceCnt) 
+        if deviceCnt < 1:
+            raise Exception("deviceCnt has to be a positive integer")
+
 def parseNodeListSection(inputFile):
-    lines = getSection(inputFile, "nodeList")
     try:
-        nodeList = []
-        nameSet = set()
-        for line in lines:
-            line = line.strip()
-            if len(line) > 0:
-                tokens = line.split()
-                if len(tokens) != 1:
-                    raise Exception("[nodeList] contains an invalid line %s" % line)
-
-                name = tokens[0]
-                if name in nameSet:
-                    raise Exception("[nodeList] contains duplicate names")
-
-                nodeList.append({"hostname": name})
-                nameSet.add(name)
-
-        return nodeList
+        lines = getSection(inputFile, "nodeList")
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
         raise Exception(msg)
+
+    nodeList = []
+    nameSet = set()
+    for line in lines:
+        line = line.strip()
+        if len(line) > 0:
+            checkLineFormat(section="[nodeList]", line=line)
+            node = {}
+            tokens = line.split()
+            for token in tokens:
+                node.setdefault(token.split("=")[0], token.split("=")[1])
+
+            hostname = node.get("hostname")
+            deviceCnt = int(node.get("deviceCnt"))
+
+            if hostname in nameSet:
+                raise Exception("[nodeList] contains duplicate names")
+
+            nodeList.append({"hostname": hostname, "deviceCnt": deviceCnt})
+            nameSet.add(hostname)
+
+    return nodeList
 
 
 def initializeNodeInfo():
@@ -528,6 +555,7 @@ def clearMaintenanceBacklog():
 
 
 if __name__ == "__main__":
+    print parseNodeListSection("/etc/delta/inputFile")
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
