@@ -461,20 +461,37 @@ def generateSwiftConfig():
     os.system("chown -R swift:swift /etc/swift")
 
 
-def getDeviceCnt():
+def getDeviceCnt(ip=None):
+    """
+    get deviceCnt of the node with ip from storageList
+
+    @rtype: integer
+    @return: device count of the node record in storageList
+    """
     logger = getLogger(name="getDeviceCnt")
-
-    config = ConfigParser()
-
+    query_ip = ip
+    deviceCnt = None
+    swiftDir = GlobalVar.SWIFTDIR
+    storageList = []
     try:
-        with open(SWIFTCONF, "rb") as fh:
-            config.readfp(fh)
+        with open("%s/storageList" % swiftDir, "rb") as fh:
+            storageList = pickle.load(fh)
     except IOError:
-        logger.error("Failed to load swift.ini")
-        return None
+        logger.error("Failed to load storageList")
+        return deviceCnt
 
-    return int(config.get('storage', 'deviceCnt'))
+    if not query_ip:
+        query_ip = getIpAddress()
 
+    for node in storageList:
+        if node["ip"] == query_ip:
+            deviceCnt = node.get("deviceCnt", None)
+            break
+
+    if not deviceCnt:
+        return deviceCnt
+    else:
+        return int(deviceCnt)
 
 def getDevicePrx():
     logger = getLogger(name="getDevicePrx")
