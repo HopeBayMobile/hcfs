@@ -59,6 +59,7 @@ class SwiftAccountMgr:
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
         self.__proxy_ip_list = ["127.0.0.1"]
+        self.__auth_port = "8080"
 
         self.__admin_default_name = "admin"
         self.__random_password_size = 12
@@ -126,7 +127,7 @@ class SwiftAccountMgr:
     def __add_user(self, proxyIp, account, user, password, admin=False, reseller=False):
         logger = util.getLogger(name="__add_user")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to add user %s:%s: " % (account, user)
         val = False
 
@@ -288,7 +289,7 @@ class SwiftAccountMgr:
     def __delete_user(self, proxyIp, account, user):
         logger = util.getLogger(name="__delete_user")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to delete user %s:%s: " % (account, user)
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -395,7 +396,7 @@ class SwiftAccountMgr:
     def __add_account(self, proxyIp, account):
         logger = util.getLogger(name="__add_account")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to add account %s: " % account
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -490,7 +491,7 @@ class SwiftAccountMgr:
     def __delete_account(self, proxyIp, account):
         logger = util.getLogger(name="__delete_account")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to delete account %s: " % account
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1055,7 +1056,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__change_password")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to change the password of %s:%s: " % (account, user)
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1182,7 +1183,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_account_usage")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         password = self.get_user_password(account, user).msg
 
         cmd = "swift -A %s -U %s:%s -K %s stat" % (url, account, user, password)
@@ -1259,7 +1260,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_user_detail")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to get the detail of user %s:%s: " % (account, user)
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1717,7 +1718,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_account_info")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to get the account information: "
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1899,7 +1900,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_container_info")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         msg = "Failed to get the container information of account %s: " % account
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2000,7 +2001,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_user_info")
 
-        url = "https://%s:8080/auth/" % proxyIp
+        url = "https://%s:%s/auth/" % (proxyIp, self.__auth_port)
         msg = "Failed to get the user information in account %s: " % account
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2540,7 +2541,7 @@ class SwiftAccountMgr:
     def __create_container(self, proxyIp, account, container, admin_user, admin_password):
         logger = util.getLogger(name="__create_container")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         msg = "Fail to create container %s in account %s: " % (container, account)
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2627,7 +2628,7 @@ class SwiftAccountMgr:
     def __delete_container(self, proxyIp, account, container, admin_user, admin_password):
         logger = util.getLogger(name="__delete_container")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         msg = "Fail to delete container %s in account %s: " % (container, account)
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2753,7 +2754,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__set_container_metadata")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         msg = "Failed to set the metadata of container %s: " % container
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
@@ -2824,7 +2825,7 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="__get_container_metadata")
 
-        url = "https://%s:8080/auth/v1.0" % proxyIp
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
         msg = "Failed to get the metadata of container %s: " % container
         val = False
         metadata_content = {}
