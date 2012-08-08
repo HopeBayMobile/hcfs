@@ -37,11 +37,12 @@
 
 3. setup event manager
         (1) Add [nodeList] section to /etc/delta/inputFile in the following format:
-              hostname1
-              hostname2
+              hostname=STO1AA0110 deviceCnt=6
+              hostname=STO1AA0111 deviceCnt=6
               ...
             
-            where hostnameX are the hostname of nodes you want to monitor.
+            where deviceCnt should be a positive integer.
+
         (2) Edit /etc/delta/swift_master.ini if necessary
 	(3) Execute "dcloud_clear_node_info"
         (4) Execute "dcloud_clear_backlog"
