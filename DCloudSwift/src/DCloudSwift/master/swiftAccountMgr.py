@@ -607,7 +607,6 @@ class SwiftAccountMgr:
         #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         proxy_ip_list = self.__proxy_ip_list
         ori_user_password = ""
-        actual_user_password = ""
         container_metadata = {}
         container = account + ":" + user
         msg = ""
@@ -785,7 +784,6 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_list = []
-        user_metadata = {}
         black_list = []
 
         msg = ""
@@ -861,7 +859,7 @@ class SwiftAccountMgr:
 
             if val == False:
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
                 continue
             else:
                 container_metadata = msg
@@ -877,7 +875,7 @@ class SwiftAccountMgr:
                 if change_password_output.val == False:
                     val = False
                     msg = change_password_output.msg
-                    black_list.append(account+":"+user)
+                    black_list.append(account + ":" + user)
                     continue
 
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
@@ -887,7 +885,7 @@ class SwiftAccountMgr:
             if val == False:
                 # TODO: need to rollback
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
 
         if len(black_list) != 0:
             val = False
@@ -1001,7 +999,7 @@ class SwiftAccountMgr:
 
             if val == False:
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
                 continue
             else:
                 container_metadata = msg
@@ -1012,7 +1010,7 @@ class SwiftAccountMgr:
                 if change_password_output.val == False:
                     val = False
                     msg = change_password_output.msg
-                    black_list.append(account+":"+user)
+                    black_list.append(account + ":" + user)
                     continue
 
                 container_metadata = {"Account-Enable": False,
@@ -1106,7 +1104,6 @@ class SwiftAccountMgr:
         user_detail = {}
         admin = False
         reseller = False
-        ori_password = ""
 
         msg = ""
         val = False
@@ -1859,7 +1856,7 @@ class SwiftAccountMgr:
 
                 (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
                                                    fn=self.__get_container_metadata, account=".super_admin",\
-                                                   container=item["name"]+":"+self.__admin_default_name, admin_user=".super_admin",\
+                                                   container=item["name"] + ":" + self.__admin_default_name, admin_user=".super_admin",\
                                                    admin_password=self.__password)
 
                 if val == False:
@@ -2082,7 +2079,7 @@ class SwiftAccountMgr:
         for item in user_info["users"]:
             (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry,\
                                                fn=self.__get_container_metadata, account=".super_admin",\
-                                               container=account+":"+item["name"], admin_user=".super_admin",\
+                                               container=account + ":" + item["name"], admin_user=".super_admin",\
                                                admin_password=self.__password)
 
             if val == False:
@@ -2917,7 +2914,7 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry, fn=self.__get_container_metadata, account=".super_admin",\
-                                           container=account+":"+user, admin_user=".super_admin", admin_password=self.__password)
+                                           container=account + ":" + user, admin_user=".super_admin", admin_password=self.__password)
 
         if val == False:
             description = "Error!"
@@ -3000,7 +2997,7 @@ class SwiftAccountMgr:
         container_metadata = {"Description": description}
 
         (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry, fn=self.__set_container_metadata, account=".super_admin",\
-                                           container=account+":"+user, admin_user=".super_admin", admin_password=self.__password,\
+                                           container=account + ":" + user, admin_user=".super_admin", admin_password=self.__password,\
                                            metadata_content=container_metadata)
 
         if val == False:
