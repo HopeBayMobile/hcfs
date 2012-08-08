@@ -40,7 +40,7 @@
 </div>
 <div id="screen" class="span9">
 <h2>Edit Account</h2>
-<form action="/accounts/{{account_id}}/modify" method="post" id="form1">
+<form action="/accounts/{{account_id}}/update" method="post" id="form1">
     {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
       Account ID: {{account_id}}

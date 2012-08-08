@@ -102,6 +102,13 @@ def edit_account(request, id):
     """
     """
     SA = SwiftAccountMgr()
+    account_info = SA.obtain_user_info(id, "admin")
+    #return HttpResponse(str(account_info.val))
+    description = ""
+    if account_info.val:
+        description = account_info.msg["description"]
+    else:
+        return HttpResponse("get "+id+" account info fail in edit_account")
     result = SA.list_user(id)
     if result.val:
         users = SA.list_user(id).msg
@@ -111,7 +118,7 @@ def edit_account(request, id):
             users_list.append(users[i])
         return render_to_response('edit_account.html',
           {"account_id": id,
-           "description": "Long long story......",
+           "description": description,
            "request": request,
            "users": users_list})
     else:
@@ -122,9 +129,17 @@ def edit_account(request, id):
 def update_account(request, id):
     """
     """
-    #TODO: add related api support
-    #return HttpResponse("update_account")
-    return redirect("/accounts/")
+    if "description" in request.POST:
+        description = request.POST["description"]
+        
+        SA = SwiftAccountMgr()
+        result = SA.modify_user_description(id, "admin", description)
+        if result.val:
+            return redirect("/accounts/")
+        else:
+            return HttpResponse("fail to update description in update_account")
+    else:
+        return HttpResponse("can't get form param in update_account")
 
 
 @login_required
@@ -221,20 +236,36 @@ def new_user_confirm(request, id):
 def edit_user(request, id, user_id):
     """
     """
+    SA = SwiftAccountMgr()
+    user_info = SA.obtain_user_info(id, user_id)
+    description = ""
+    if user_info.val:
+        description = user_info.msg["description"]
+    else:
+        return HttpResponse("get "+id+" user "+user_id+" info fail in edit_user")
     #return HttpResponse("edit_user")
     return render_to_response('edit_user.html',
       {"account_id": id,
        "user_id": user_id,
        "request": request,
-       "description": "Long long story......"})
+       "description": description})
 
 
 @login_required
 def update_user(request, id, user_id):
     """
     """
-    #TODO: add related api support
-    return HttpResponse("update_user")
+    if "description" in request.POST:
+        description = request.POST["description"]
+        
+        SA = SwiftAccountMgr()
+        result = SA.modify_user_description(id, user_id, description)
+        if result.val:
+            return redirect("/accounts/"+id+"/edit")
+        else:
+            return HttpResponse("fail to update description in update_user")
+    else:
+        return HttpResponse("can't get form param in update_user")
 
 #@login_required
 #def delete_user(request, id, user_id):
