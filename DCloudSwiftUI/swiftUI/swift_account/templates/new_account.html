@@ -43,9 +43,9 @@
     {% csrf_token %}
     <div id="accountDiv" data-role="fieldcontain">
         <label for="account_id">Account ID:</label><input type="text" name="account_id" id="account_id" 
-        class="required alphanumeric nowhitespace" minLength="3"/>
+        class="required alphanumeric" minLength="3"/>
         <label for="description">Description:</label><textarea rows="3" name="description" id="description" 
-            class="required alphanumeric" maxLength="128"></textarea>
+            class="required alphanumericSpace" maxLength="128"></textarea>
       <label for="submit"></label>
       <input class="btn" type="submit" value="OK" /> <a class="btn" href="/accounts/">Cancel</a>
     </div>
