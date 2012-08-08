@@ -15,7 +15,6 @@ import string
 import sqlite3
 import uuid
 from pprint import pprint
-import random
 
 lock = threading.Lock()
 
@@ -30,7 +29,7 @@ class SwiftAccountMgr:
 
         for i in range(self.__num_of_account):
             account = "Account%d" % i
-            stat = True if random.randrange(0, 2)==1 else False
+            stat = True if random.randrange(0, 2) == 1 else False
             self.__account_dict[account] = {
                 "description": "This is %s" % account,
                 "user_number": self.__num_of_user,
@@ -39,7 +38,7 @@ class SwiftAccountMgr:
 
         for j in range(self.__num_of_user):
             user = "User%d" % j
-            stat = True if random.randrange(0, 2)==1 else False
+            stat = True if random.randrange(0, 2) == 1 else False
             self.__user_dict[user] = {
                 "description": "This is %s" % user,
                 "user_enable": stat,
