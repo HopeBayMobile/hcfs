@@ -1,0 +1,2 @@
+/usr/lib/s3ql/pcp.py /usr/bin/parallel-cp
+/usr/lib/s3ql/expire_backups.py /usr/bin/expire_backups

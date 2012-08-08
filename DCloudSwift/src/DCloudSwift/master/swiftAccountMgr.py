@@ -607,7 +607,6 @@ class SwiftAccountMgr:
         #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         proxy_ip_list = self.__proxy_ip_list
         ori_user_password = ""
-        actual_user_password = ""
         container_metadata = {}
         container = account + ":" + user
         msg = ""
@@ -785,7 +784,6 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         user_info = {}
         user_list = []
-        user_metadata = {}
         black_list = []
 
         msg = ""
@@ -861,7 +859,7 @@ class SwiftAccountMgr:
 
             if val == False:
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
                 continue
             else:
                 container_metadata = msg
@@ -877,7 +875,7 @@ class SwiftAccountMgr:
                 if change_password_output.val == False:
                     val = False
                     msg = change_password_output.msg
-                    black_list.append(account+":"+user)
+                    black_list.append(account + ":" + user)
                     continue
 
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
@@ -887,7 +885,7 @@ class SwiftAccountMgr:
             if val == False:
                 # TODO: need to rollback
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
 
         if len(black_list) != 0:
             val = False
@@ -1001,7 +999,7 @@ class SwiftAccountMgr:
 
             if val == False:
                 logger.error(msg)
-                black_list.append(account+":"+user)
+                black_list.append(account + ":" + user)
                 continue
             else:
                 container_metadata = msg
@@ -1012,7 +1010,7 @@ class SwiftAccountMgr:
                 if change_password_output.val == False:
                     val = False
                     msg = change_password_output.msg
-                    black_list.append(account+":"+user)
+                    black_list.append(account + ":" + user)
                     continue
 
                 container_metadata = {"Account-Enable": False,
@@ -1106,7 +1104,6 @@ class SwiftAccountMgr:
         user_detail = {}
         admin = False
         reseller = False
-        ori_password = ""
 
         msg = ""
         val = False
@@ -1859,7 +1856,7 @@ class SwiftAccountMgr:
 
                 (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry,\
                                                    fn=self.__get_container_metadata, account=".super_admin",\
-                                                   container=item["name"]+":"+self.__admin_default_name, admin_user=".super_admin",\
+                                                   container=item["name"] + ":" + self.__admin_default_name, admin_user=".super_admin",\
                                                    admin_password=self.__password)
 
                 if val == False:
@@ -2080,10 +2077,9 @@ class SwiftAccountMgr:
                 return Bool(val, msg)
 
         for item in user_info["users"]:
-            #user_list.append(item["name"])
             (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry,\
                                                fn=self.__get_container_metadata, account=".super_admin",\
-                                               container=account+":"+item["name"], admin_user=".super_admin",\
+                                               container=account + ":" + item["name"], admin_user=".super_admin",\
                                                admin_password=self.__password)
 
             if val == False:
@@ -2850,7 +2846,7 @@ class SwiftAccountMgr:
                 elif line.split()[2] == "False":
                     metadata_content[line.split()[1][:-1]] = False
                 else:
-                    metadata_content[line.split()[1][:-1]] = line.split()[2]
+                    metadata_content[line.split()[1][:-1]] = line.split(": ")[1]
             elif "Read" in line:
                 metadata_content["Read"] = line.split("ACL: ")[1]
             elif "Write" in line:
@@ -2862,10 +2858,157 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def obtain_user_info(self, account, user, retry=3):
+        '''
+        Obtain the related information of the user in the account.
+
+        @type  account: string
+        @param account: the account name of the user
+        @type  user: string
+        @param user: the user to obtain the related information
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the information of the user is successfully got, then Bool.val == True
+                and Bool.msg is a dictionary recording the related information of the user. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
+        '''
+        logger = util.getLogger(name="obtain_user_info")
+
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
+        user_info = {}
+        val = False
+        msg = ""
+
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found."
+            return Bool(val, msg)
+
+        if retry < 1:
+            msg = "Argument retry has to >= 1."
+            return Bool(val, msg)
+
+        account_existence_output = self.account_existence(account)
+
+        if account_existence_output.val == False:
+            val = False
+            msg = account_existence_output.msg
+            return Bool(val, msg)
+        elif account_existence_output.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
+            return Bool(val, msg)
+
+        user_existence_output = self.user_existence(account, user)
+
+        if user_existence_output.val == False:
+            val = False
+            msg = user_existence_output.msg
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry, fn=self.__get_container_metadata, account=".super_admin",\
+                                           container=account + ":" + user, admin_user=".super_admin", admin_password=self.__password)
+
+        if val == False:
+            description = "Error!"
+            user_enable = "Error!"
+            account_enable = "Error!"
+            logger.error(msg)
+        else:
+            description = msg["Description"]
+            user_enable = msg["User-Enable"]
+            account_enable = msg["Account-Enable"]
+
+        user_info = {
+            "description": description,
+            "user_enable": user_enable,
+            "account_enable": account_enable,
+        }
+
+        val = True
+        msg = user_info
+
+        return Bool(val, msg)
+
+    def modify_user_description(self, account, user, description, retry=3):
+        '''
+        Modify the description of the user in the account.
+
+        @type  account: string
+        @param account: the account name of the user
+        @type  user: string
+        @param user: the user to modify the description
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the description of the user is successfully modified, then Bool.val == True
+                and Bool.msg == "". Otherwise, Bool.val == False and Bool.msg records the error message.
+        '''
+        logger = util.getLogger(name="obtain_user_info")
+
+        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        proxy_ip_list = self.__proxy_ip_list
+        val = False
+        msg = ""
+
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found."
+            return Bool(val, msg)
+
+        if retry < 1:
+            msg = "Argument retry has to >= 1."
+            return Bool(val, msg)
+
+        if len(description.split()) == 0:
+            msg = "Description can not be an empty string."
+            return Bool(val, msg)
+
+        account_existence_output = self.account_existence(account)
+
+        if account_existence_output.val == False:
+            val = False
+            msg = account_existence_output.msg
+            return Bool(val, msg)
+        elif account_existence_output.result == False:
+            val = False
+            msg = "Account %s does not exist!" % account
+            return Bool(val, msg)
+
+        user_existence_output = self.user_existence(account, user)
+
+        if user_existence_output.val == False:
+            val = False
+            msg = user_existence_output.msg
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            return Bool(val, msg)
+
+        container_metadata = {"Description": description}
+
+        (val, msg) = self.__functionBroker(proxy_ip_list, retry=retry, fn=self.__set_container_metadata, account=".super_admin",\
+                                           container=account + ":" + user, admin_user=".super_admin", admin_password=self.__password,\
+                                           metadata_content=container_metadata)
+
+        if val == False:
+            msg = "Failed to modify the description of user %s:%s" % (account, user) + msg
+            logger.error(msg)
+
+        return Bool(val, msg)
+
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
-    #print SA.add_account("accountxxx")
     '''
     for i in range(2):
         print "Account %d" % i
@@ -2875,24 +3018,15 @@ if __name__ == '__main__':
             print "User %d" % j
             user = "user%d" % j
             print SA.add_user(account, user)
-            #print SA.disable_user(account, user)
     '''
-    print SA.delete_account("account0")
+    #print SA.delete_account("account0")
     #print SA.enable_account("account1")
     #print SA.disable_account("account1")
     #print SA.enable_user("account1", "user0")
     #print SA.disable_user("account1", "user0")
-    #print SA.enable_user("account1", "user2")
-    #print SA.disable_account("account1")
-    #print SA.disable_user("account1", "user2")
-    print SA.list_user("account1")
+    print SA.obtain_user_info("account0", "user3")
     print "\n"
-    print SA.list_account()
-    #print SA.disable_account("account1")   
+    print SA.modify_user_description("account0", "user3", "   This is very good!!!!")
     #print SA.list_user("account1")
+    #print "\n"
     #print SA.list_account()
-    #print SA.add_account("account1")
-    #print SA.add_user("account1", "user1")
-    #print SA.disable_user("account1", "user1")
-    #print SA.enable_user("account1", "user1")
-    #print SA.delete_user("account1", "user1")

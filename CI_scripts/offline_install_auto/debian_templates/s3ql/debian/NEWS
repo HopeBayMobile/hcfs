@@ -1,0 +1,38 @@
+s3ql (1.11-1) unstable; urgency=low
+
+  * The file system structure has changed, existing file systems
+    need to be upgraded using "s3qladm upgrade" before they can
+    be used.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 29 Apr 2012 15:23:20 -0400
+
+s3ql (1.9-1) unstable; urgency=low
+
+  * The file system structure has changed, existing file systems
+    need to be upgraded using "s3qladm upgrade" before they can
+    be used.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sat, 21 Jan 2012 13:49:59 -0500
+
+s3ql (1.7-1) unstable; urgency=low
+
+  * The file system structure has changed, existing file systems
+    need to be upgraded using "s3qladm upgrade" before they can 
+    be used.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Sun, 27 Nov 2011 16:43:06 -0500
+
+s3ql (1.4-1) unstable; urgency=low
+
+  Notes for upgrading from version 1.0 or earlier:
+  ------------------------------------------------
+
+  * The file system structure has changed, existing file systems
+    need to be upgraded using "s3qladm upgrade" before they can 
+    be used.
+
+  * The format and default name of the authentication file has
+    changed. The default location is now ~/.s3ql/authinfo2. 
+    Please refer to the documentation for the file format.
+
+ -- Nikolaus Rath <Nikolaus@rath.org>  Thu, 06 Oct 2011 11:25:44 -0400

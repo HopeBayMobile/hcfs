@@ -504,7 +504,7 @@ def _append_samba_entry(entry):
             fh.write('path = %s\n' % snapshot_share_path)
             fh.write('browsable = yes\n')
             fh.write('guest ok = no\n')
-            fh.write('read only = no\n')
+            fh.write('read only = yes\n')
             fh.write('create mask = 0755\n')
             fh.write('valid users = superuser\n\n')
         
