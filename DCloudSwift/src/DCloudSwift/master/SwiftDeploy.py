@@ -223,7 +223,6 @@ class SwiftDeploy:
             if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
 
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
             versBase = int(time.time()) * 100000
             swiftDir = "/etc/swift"
@@ -246,6 +245,7 @@ class SwiftDeploy:
 
             os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
@@ -278,7 +278,6 @@ class SwiftDeploy:
             if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
 
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
             swiftDir = "/etc/swift"
@@ -307,6 +306,7 @@ class SwiftDeploy:
                 pickle.dump(completeStorageList, fh)
 
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
@@ -324,7 +324,6 @@ class SwiftDeploy:
         logger = util.getLogger(name="__updateMetadata2DeleteNodes")
         try:
             self.__setUpdateMetadataProgress()
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
             swiftDir = "/etc/swift"
@@ -358,6 +357,7 @@ class SwiftDeploy:
                 pickle.dump(completeStorageList, fh)
 
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s" % (BASEDIR, node["ip"], deviceName, swiftDir)

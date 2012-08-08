@@ -529,6 +529,7 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         msg = ""
         val = False
+        user_list = []
         black_list = []
         Bool = collections.namedtuple("Bool", "val msg")
 
@@ -2864,7 +2865,7 @@ class SwiftAccountMgr:
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
     #print SA.add_account("accountxxx")
-    """
+    '''
     for i in range(2):
         print "Account %d" % i
         account = "account%d" % i
@@ -2874,10 +2875,11 @@ if __name__ == '__main__':
             user = "user%d" % j
             print SA.add_user(account, user)
             #print SA.disable_user(account, user)
-    """
-    print SA.enable_account("account1")
+    '''
+    print SA.delete_account("account0")
+    #print SA.enable_account("account1")
     #print SA.disable_account("account1")
-    print SA.enable_user("account1", "user0")
+    #print SA.enable_user("account1", "user0")
     #print SA.disable_user("account1", "user0")
     #print SA.enable_user("account1", "user2")
     #print SA.disable_account("account1")
