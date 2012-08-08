@@ -345,15 +345,12 @@ class SwiftDeploy:
             deletedIpList = [node["ip"] for node in storageList] + [node["ip"] for node in proxyList]
             completeProxyList = [node for node in oriProxyList if node["ip"] not in deletedIpList]
             completeStorageList = [node for node in oriStorageList if node["ip"] not in deletedIpList]
+            # Retrieve other fileds of nodes
+            storageList = [node for node in oriStorageList if node["ip"] in deletedIpList]
         
             safe = self.isDeletionOfNodesSafe(deletedIpList, swiftDir)
             if safe.val == False:
                 raise UpdateMetadataError("Unsafe to delete nodes for %s" % safe.msg)
-
-            with open("%s/proxyList" % swiftDir, "wb") as fh:
-                pickle.dump(completeProxyList, fh)
-            with open("%s/storageList" % swiftDir, "wb") as fh:
-                pickle.dump(completeStorageList, fh)
 
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
@@ -362,6 +359,11 @@ class SwiftDeploy:
                     cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s" % (BASEDIR, node["ip"], deviceName, swiftDir)
                     logger.info(cmd)
                     os.system(cmd)
+
+            with open("%s/proxyList" % swiftDir, "wb") as fh:
+                pickle.dump(completeProxyList, fh)
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(completeStorageList, fh)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
 
