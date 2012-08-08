@@ -353,11 +353,18 @@ class SwiftAccountMgr:
         msg = {}
         Bool = collections.namedtuple("Bool", "val msg")
 
-        msg = {
-            "description": "This is user %s:%s" % (account, user),
-            "user_enable": True,
-            "account_enable": True,
-        }
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        elif user == "" or user == None:
+            msg = "User is not valid!"
+        else:
+            val = True
+
+            msg = {
+                "description": "This is user %s:%s" % (account, user),
+                "user_enable": True,
+                "account_enable": True,
+            }
 
         return Bool(val, msg)
 
