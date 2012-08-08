@@ -97,7 +97,7 @@ else
         ln -s /storage/log /var/log
         ln -s /storage/s3ql /root/.s3ql
         # remove grub recordfail
-        sudo grub-editenv unset recordfail
+        sudo grub-editenv - unset recordfail
         sudo update-grub2
     else
         exit
@@ -171,7 +171,7 @@ cat >/root/build_raid1.sh <<EOF
             ln -s /storage/log /var/log
             ln -s /storage/s3ql /root/.s3ql
             # remove grub recordfail
-            sudo grub-editenv unset recordfail
+            sudo grub-editenv - unset recordfail
             sudo update-grub2
     fi
 EOF
