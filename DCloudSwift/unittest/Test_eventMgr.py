@@ -18,16 +18,18 @@ class Test_getExpectedDeviceCnt:
     Test the function SwiftEventMgr.getExpectedDeviceCnt
     '''
     def setup(self):
-        self.backup = GlobalVar.ORI_SWIFTCONF+".bak"
-        os.system("cp %s %s" % (GlobalVar.ORI_SWIFTCONF, self.backup))
-        os.system("cp %s/fake6.ini %s" % (WORKING_DIR, GlobalVar.ORI_SWIFTCONF))
+        if os.path.exists("/etc/test/test.db"):
+            os.system("rm /etc/test/test.db")
+        self.db = NodeInfoDatabaseBroker("/etc/test/test.db")
+        self.db.initialize()
+        self.db.add_spec(hostname="Dummy", diskcount=6)
 
     def test_value(self):
-        diskCnt = SwiftEventMgr.getExpectedDiskCount("Dummy")
+        diskCnt = SwiftEventMgr.getExpectedDiskCount("Dummy", dbfile="/etc/test/test.db")
         nose.tools.ok_(diskCnt == 6, "Function getExpectedDiskCount returned wrong value")
 
     def teardown(self):
-        os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
+        pass
 
 
 class Test_isValidDiskEvent:
@@ -36,9 +38,11 @@ class Test_isValidDiskEvent:
     '''
 
     def setup(self):
-        self.backup = GlobalVar.ORI_SWIFTCONF+".bak"
-        os.system("cp %s %s" % (GlobalVar.ORI_SWIFTCONF, self.backup))
-        os.system("cp %s/fake6.ini %s" % (WORKING_DIR, GlobalVar.ORI_SWIFTCONF))
+        if os.path.exists("/etc/test/test.db"):
+            os.system("rm /etc/test/test.db")
+        self.db = NodeInfoDatabaseBroker("/etc/test/test.db")
+        self.db.initialize()
+        self.db.add_spec(hostname="ThinkPad", diskcount=6)
         self.date = int(time.time())
 
         self.validEvent = {
@@ -161,7 +165,7 @@ class Test_isValidDiskEvent:
         nose.tools.ok_(ret is False, "Failed to detect timestamp is None")
 
     def teardown(self):
-        os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
+        pass
 
 class Test_updateDiskInfo:
     '''
@@ -170,12 +174,10 @@ class Test_updateDiskInfo:
     def setup(self):
         if os.path.exists("/etc/test/test.db"):
             os.system("rm /etc/test/test.db")
-        self.backup = GlobalVar.ORI_SWIFTCONF+".bak"
-        os.system("cp %s %s" % (GlobalVar.ORI_SWIFTCONF, self.backup))
-        os.system("cp %s/fake6.ini %s" % (WORKING_DIR, GlobalVar.ORI_SWIFTCONF))
         self.db = NodeInfoDatabaseBroker("/etc/test/test.db")
         self.db.initialize()
-        
+        self.db.add_spec(hostname="ThinkPad", diskcount=6)
+
     def test_older_event(self):
         disk_info = {
                          "timestamp": 1000,
@@ -813,7 +815,6 @@ class Test_updateDiskInfo:
         nose.tools.ok_(len(healthyDisks)==0)
 
     def teardown(self):
-        os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
         os.system("rm /etc/test/test.db")
 
 class Test_updateNodeStatus:
@@ -823,9 +824,6 @@ class Test_updateNodeStatus:
     def setup(self):
         if os.path.exists("/etc/test/test.db"):
             os.system("rm /etc/test/test.db")
-        self.backup = GlobalVar.ORI_SWIFTCONF+".bak"
-        os.system("cp %s %s" % (GlobalVar.ORI_SWIFTCONF, self.backup))
-        os.system("cp %s/fake6.ini %s" % (WORKING_DIR, GlobalVar.ORI_SWIFTCONF))
         self.db = NodeInfoDatabaseBroker("/etc/test/test.db")
         self.db.initialize()
         
@@ -1015,7 +1013,6 @@ class Test_updateNodeStatus:
         nose.tools.ok_(ret["timestamp"]==100)
 
     def teardown(self):
-        os.system("cp %s %s" % (self.backup, GlobalVar.ORI_SWIFTCONF))
         os.system("rm /etc/test/test.db")
 
 if __name__ == "__main__":

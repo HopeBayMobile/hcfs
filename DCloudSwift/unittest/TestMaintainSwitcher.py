@@ -48,12 +48,12 @@ class TestMaintainSwitcher:
         daemon.checkService()
         serviceNode = self.db.show_node_info_table()
         for row in serviceNode:
-            nose.tools.eq_(row[0], result[0])
-            nose.tools.eq_(row[1], result[1])
-            nose.tools.eq_(row[2], result[2])
-            nose.tools.eq_(row[3], result[3])
-            nose.tools.eq_(row[4], 'waiting')
-            nose.tools.ok_((row[5] >= result[5]))
+            nose.tools.eq_(row['hostname'], result['hostname'])
+            nose.tools.eq_(row['status'], result['status'])
+            nose.tools.eq_(row['timestamp'], result['timestamp'])
+            nose.tools.eq_(row['disk'], result['disk'])
+            nose.tools.eq_(row['mode'], 'waiting')
+            nose.tools.ok_((row['switchpoint'] >= result[5]))
 
     def testCheckServiceStatusAliveLargeThanRefreshTime(self):
         timestamp = int(time.mktime(time.localtime()))
@@ -83,12 +83,12 @@ class TestMaintainSwitcher:
         daemon.checkService()
         serviceNode = self.db.show_node_info_table()
         for row in serviceNode:
-            nose.tools.eq_(row[0], result[0])
-            nose.tools.eq_(row[1], result[1])
-            nose.tools.eq_(row[2], result[2])
-            nose.tools.eq_(row[3], result[3])
-            nose.tools.eq_(row[4], 'waiting')
-            nose.tools.ok_((row[5] >= result[5]))
+            nose.tools.eq_(row['hostname'], result['hostname'])
+            nose.tools.eq_(row['status'], 'dead')
+            nose.tools.ok_(row['timestamp'] > result['timestamp'])
+            nose.tools.eq_(row['disk'], result['disk'])
+            nose.tools.eq_(row['mode'], 'waiting')
+            nose.tools.ok_((row['switchpoint'] >= result['switchpoint']))
 
     def testCheckServiceStatusAliveDiskError(self):
         timestamp = int(time.mktime(time.localtime()))
@@ -96,12 +96,12 @@ class TestMaintainSwitcher:
                     'timestamp': timestamp,
                     'missing': {
                                     'count': 6,
-                                    'timestamp': timestamp,
+                                    'timestamp': timestamp-1,
                                 },
                     'broken': [
                                {
                                     'SN': 'aaaaa',
-                                    'timestamp': timestamp,
+                                    'timestamp': timestamp-1,
                                },
                               ],
                     'healthy': [
@@ -111,19 +111,19 @@ class TestMaintainSwitcher:
                                 }
                                ],
                 }
-        result = self.db.add_node('192.168.1.20', 'alive', timestamp-1,
+        result = self.db.add_node('192.168.1.20', 'alive', timestamp,
                                   json.dumps(diskInfo), 'service', timestamp)
         daemon = SwiftMaintainSwitcher('/var/run/SwiftMaintainSwitcher.pid',
                                        self.DBFile, 1, 100, 1)
         daemon.checkService()
         serviceNode = self.db.show_node_info_table()
         for row in serviceNode:
-            nose.tools.eq_(row[0], result[0])
-            nose.tools.eq_(row[1], result[1])
-            nose.tools.eq_(row[2], result[2])
-            nose.tools.eq_(row[3], result[3])
-            nose.tools.eq_(row[4], 'waiting')
-            nose.tools.ok_((row[5] >= result[5]))
+            nose.tools.eq_(row['hostname'], result['hostname'])
+            nose.tools.eq_(row['status'], result['status'])
+            nose.tools.eq_(row['timestamp'], result['timestamp'])
+            nose.tools.eq_(row['disk'], result['disk'])
+            nose.tools.eq_(row['mode'], 'waiting')
+            nose.tools.ok_((row['switchpoint'] >= result['switchpoint']))
 
     def testCheckWaitingStatusAliveNoDiskError(self):
         timestamp = int(time.mktime(time.localtime()))
@@ -146,8 +146,8 @@ class TestMaintainSwitcher:
                                 }
                                ],
                 }
-        result = self.db.add_node('192.168.1.20', 'alive', timestamp-100,
-                                  json.dumps('{}'), 'waiting', timestamp)
+        result = self.db.add_node('192.168.1.20', 'alive', timestamp-10,
+                                  json.dumps(diskInfo), 'waiting', timestamp)
         daemon = SwiftMaintainSwitcher('/var/run/SwiftMaintainSwitcher.pid',
                                        self.DBFile, 1, 100, 1)
         daemon.checkWaiting()
@@ -155,12 +155,12 @@ class TestMaintainSwitcher:
         print serviceNode
         print result
         for row in serviceNode:
-            nose.tools.eq_(row[0], result[0])
-            nose.tools.eq_(row[1], result[1])
-            nose.tools.eq_(row[2], result[2])
-            nose.tools.eq_(row[3], result[3])
-            nose.tools.eq_(row[4], 'service')
-            nose.tools.ok_((row[5] >= result[5]))
+            nose.tools.eq_(row['hostname'], result['hostname'])
+            nose.tools.eq_(row['status'], result['status'])
+            nose.tools.eq_(row['timestamp'], result['timestamp'])
+            nose.tools.eq_(row['disk'], result['disk'])
+            nose.tools.eq_(row['mode'], 'service')
+            nose.tools.ok_((row['switchpoint'] >= result['switchpoint']))
 
     def teardown(self):
         os.system("rm -f %s" % self.DBFile)

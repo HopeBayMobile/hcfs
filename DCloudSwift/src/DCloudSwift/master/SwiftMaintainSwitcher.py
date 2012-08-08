@@ -90,19 +90,19 @@ class SwiftMaintainSwitcher(Daemon):
             self.db.query_node_info_table('mode = "service"').fetchall()
 
         for row in serviceNode:
-            if row[1] == HEARTBEAT.status[2]:
-                record = self.updateStatusWaiting(row[0])
+            if row['status'] == HEARTBEAT.status[2]:
+                record = self.updateStatusWaiting(row['hostname'])
                 logger.info("the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
                 continue
 
-            if row[1] == HEARTBEAT.status[0]:
-                diskInfo = json.loads(row[3])
-                if ((self.refreshTime + row[2]) < self.nowtimeStamp):
-                    self.db.update_node_status(row[0],
+            if row['status'] == HEARTBEAT.status[0]:
+                diskInfo = json.loads(row['disk'])
+                if ((self.refreshTime + row['timestamp']) < self.nowtimeStamp):
+                    self.db.update_node_status(row['hostname'],
                                                HEARTBEAT.status[2],
                                                self.nowtimeStamp)
-                    record = self.updateStatusWaiting(row[0])
+                    record = self.updateStatusWaiting(row['hostname'])
                     logger.info(
                         "the record which update status to waiting: %s"
                         % str(self.dict_from_row(record)))
@@ -111,7 +111,7 @@ class SwiftMaintainSwitcher(Daemon):
                 deadline = self.nowtimeStamp - self.replicationTime
                 logger.info("deadline is %d" % deadline)
                 if SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
-                        record = self.updateStatusWaiting(row[0])
+                        record = self.updateStatusWaiting(row['hostname'])
                         logger.info(
                             "the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
@@ -164,17 +164,17 @@ class SwiftMaintainSwitcher(Daemon):
         waitingNode = \
             self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
-            if row[1] == HEARTBEAT.status[0]:
-                if ((self.refreshTime + row[2]) < self.nowtimeStamp):
-                    self.db.update_node_status(row[0],
+            if row['status'] == HEARTBEAT.status[0]:
+                if ((self.refreshTime + row['timestamp']) < self.nowtimeStamp):
+                    self.db.update_node_status(row['hostname'],
                                                HEARTBEAT.status[2],
                                                self.nowtimeStamp)
                     continue
 
-                diskInfo = json.loads(row[3])
+                diskInfo = json.loads(row['disk'])
                 deadline = self.nowtimeStamp - self.replicationTime
                 if not SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
-                    record = self.updateStatusService(row[0])
+                    record = self.updateStatusService(row['hostname'])
                     logger.info(
                         "the record which update status to service: %s"
                         % str(self.dict_from_row(record)))

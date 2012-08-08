@@ -35,26 +35,29 @@ class SwiftEventMgr(Daemon):
         self.page = self.masterCfg.getKwparams()["eventMgrPage"]
 
     @staticmethod
-    def getExpectedDiskCount(hostname):
+    def getExpectedDiskCount(hostname, dbfile=None):
         '''
         Get expected disk count of a node
 
         @type  hostname: string
         @param hostname: hostname of the node to query expected disk count
+        @type dbfile: string
+        @param db: pathname to the NodeInfoDatabaseBroker
         @rtype: integer
         @return: expected disk count of the queried node. Return None in case of exception.
         '''
         logger = util.getLogger(name="SwiftEventMgr.getExpectedDiskCount")
-        config = ConfigParser()
 
-        # Todo: read from storageList
         try:
-            with open(GlobalVar.ORI_SWIFTCONF, "rb") as fh:
-                config.readfp(fh)
+            if not dbfile:
+                db = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+            else:
+                db = NodeInfoDatabaseBroker(dbfile)
 
-            return int(config.get('storage', 'deviceCnt'))
-        except:
-            logger.error("Failed to read deviceCnt from %s" % GlobalVar.ORI_SWIFTCONF)
+            diskcount = db.get_spec(hostname)['diskcount']
+            return diskcount
+        except Exception as e:
+            logger.error("Failed to get diskcount from node spec for %s" % str(e))
             return None
 
     '''
@@ -106,9 +109,6 @@ class SwiftEventMgr(Daemon):
         if not isinstance(event["time"], int):
             logger.error("Wrong type of time")
             return False
-        if SwiftEventMgr.getExpectedDiskCount(event["hostname"]) is None:
-            logger.error("Failed to get expected disk count of %s" % event["hostname"])
-            return False
 
         return True
 
@@ -146,7 +146,10 @@ class SwiftEventMgr(Daemon):
         #TODO: handle invalid old_disk_info
         try:
             old_disk_info = json.loads(nodeInfoDb.get_info(hostname)["disk"])
-            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
+            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname, dbfile=nodeInfoDbPath)
+            if expectedDiskCount is None:
+                logger.error("Disk count of %s is not registerd." % hostname)
+                return None
 
             detectedDiskSNs = {disk["SN"] for disk in data if disk["SN"]}
             knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] + old_disk_info["healthy"] if disk["SN"]}
@@ -480,6 +483,8 @@ def initializeNodeInfo():
                             mode=mode,
                             switchpoint=switchpoint)
 
+        nodeInfoDb.add_spec(hostname=hostname, diskcount=node["deviceCnt"])
+
 
 def initializeMaintenanceBacklog():
     '''
@@ -524,7 +529,8 @@ def clearNodeInfo():
 
     if os.path.exists(GlobalVar.NODE_DB):
         os.system("rm %s" % GlobalVar.NODE_DB)
-        ret = 0
+
+    ret = 0
 
     return ret
 
@@ -555,7 +561,6 @@ def clearMaintenanceBacklog():
 
 
 if __name__ == "__main__":
-    print parseNodeListSection("/etc/delta/inputFile")
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
     if len(sys.argv) == 2:
         if 'start' == sys.argv[1]:
