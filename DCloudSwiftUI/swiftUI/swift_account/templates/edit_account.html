@@ -61,13 +61,18 @@
 {% for user in users %}
 <tr>
 <td>1</td>
+{% if user.user_enable %}
 <td><a href="/accounts/{{account_id}}/user/{{user.id}}/edit">{{user.id}}</a></td>
+{% else %}
+<td>{{user.id}}</td>
+{% endif %}
 <td>{{user.description}}</td>
 <td>
-<a class="btn" id="reset_pw${{user.id}}" name="{{user.id}}">Reset PW</a> <a class="btn" id="query_pw${{user.id}}" name="{{user.id}}">Query</a>
 {% if user.user_enable %}
+<a class="btn" id="reset_pw${{user.id}}" name="{{user.id}}">Reset PW</a> <a class="btn" id="query_pw${{user.id}}" name="{{user.id}}">Query</a>
 <a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a>
 {% else %}
+<a class="btn" disabled="disabled">Reset PW</a> <a class="btn" disabled="disabled">Query</a>
 <a class="btn" href="/accounts/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a>
 {% endif %}
 </td>
