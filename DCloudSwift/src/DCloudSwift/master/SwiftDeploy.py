@@ -853,7 +853,8 @@ def parseAddNodesSection(inputFile):
                 try:
                     node = {}
                     for token in tokens:
-                        node.setdefault(token.split("=")[0], token.split("=")[1])
+                        key, _, value = token.partition("=")
+                        node.setdefault(key, value)
 
                     ip = node.get("ip")
                     if ip in ipSet:
@@ -907,7 +908,8 @@ def checkNodeInputFormat(section, line):
     node = {}
     tokens = line.split()
     for token in tokens:
-        node.setdefault(token.split("=")[0], token.split("=")[1])
+        key, _, value = token.partition("=")
+        node.setdefault(key, value)
 
     ip = node.get("ip", None)
     zid = node.get("zid", None)
@@ -965,7 +967,8 @@ def parseDeploySection(inputFile):
                 try:
                     node = {}
                     for token in tokens:
-                        node.setdefault(token.split("=")[0], token.split("=")[1])
+                        key, _, value = token.partition("=")
+                        node.setdefault(key, value)
 
                     ip = node.get("ip")
                     if ip in ipSet:

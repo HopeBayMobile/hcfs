@@ -388,7 +388,8 @@ def checkLineFormat(section, line):
     node = {}
     tokens = line.split()
     for token in tokens:
-        node.setdefault(token.split("=")[0], token.split("=")[1])
+        key, _, value = token.partition("=")
+        node.setdefault(key, value)
 
     hostname = node.get("hostname", None)
     deviceCnt = node.get("deviceCnt", None)
