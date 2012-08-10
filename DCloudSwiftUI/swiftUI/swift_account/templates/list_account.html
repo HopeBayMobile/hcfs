@@ -35,12 +35,16 @@
 <tr>
 <th>Account ID</th>
 <th>Description</th>
-<th>User Number</th>
+<th>Number of Users</th>
 <th><a class="btn btn-primary" href="/accounts/new">New Account</a></th>
 </tr>
 {% for account in accounts %}
 <tr>
+{% if account.account_enable %}
 <td><a href="/accounts/{{account.id}}/edit">{{account.id}}</a></td>
+{% else %}
+<td>{{account.id}}</td>
+{% endif %}
 <td>{{account.description}}</td>
 <td>{{account.user_number}}</td>
 <td>

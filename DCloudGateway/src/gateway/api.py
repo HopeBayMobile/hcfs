@@ -263,14 +263,15 @@ def _check_s3ql():
     try:
         if _check_process_alive('mount.s3ql'):
             cmd = "sudo df"
-            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
             countdown = 30
             while countdown > 0:
                 po.poll()
                 if po.returncode != 0:
                     countdown = countdown - 1
                     if countdown <= 0:
-                        po.kill()
+                        pogid=os.getpgid(po.pid)
+                        os.system('kill -9 -%s' % pogid)
                         break
                     else:
                         time.sleep(1)
@@ -565,14 +566,15 @@ def _check_network():
                 op_user = op_config.get(section, 'backend-login')
                 op_pass = op_config.get(section, 'backend-password')
                 cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat" % (full_storage_url, op_user, op_pass)
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
                 countdown = 30
                 while countdown > 0:
                     po.poll()
                     if po.returncode != 0:
                         countdown = countdown - 1
                         if countdown <= 0:
-                            po.kill()
+                            pogid=os.getpgid(po.pid)
+                            os.system('kill -9 -%s' % pogid)
                             break
                         else:
                             time.sleep(1)

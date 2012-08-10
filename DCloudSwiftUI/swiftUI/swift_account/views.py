@@ -78,7 +78,7 @@ def new_account_confirm(request):
         if result.val:
         #    pass
             admin_pw = SA.get_user_password(account=account_id, user="admin")
-            if admin_pw.val != True:
+            if admin_pw.val == False:
                 return HttpResponse("Can't get admin password")
             return render_to_response('confirm_account.html',
               {"account_id": account_id,
@@ -86,6 +86,8 @@ def new_account_confirm(request):
                "identity": "Administrator",
                "request": request,
                "Password": admin_pw.msg})
+        else:
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("new_account_confirm")
 
@@ -211,10 +213,14 @@ def new_user_confirm(request, id):
         description = request.POST["description"]
         #apply
         SA = SwiftAccountMgr()
+        #check if already exist
+        exist = SA.obtain_user_info(id, user_id)
+        if exist.val==False:
+            return HttpResponse("user already exist")
         result = SA.add_user(account=id, user=user_id, description=description)
         if result.val:
             user_pw = SA.get_user_password(account=id, user=user_id)
-            if user_pw.val != True:
+            if user_pw.val == False:
                 return HttpResponse("Can't get " + user_id + " password from " + id)
             return render_to_response('confirm_user.html',
               {"account_id": id,
@@ -222,6 +228,8 @@ def new_user_confirm(request, id):
                "description": description,
                "request": request,
                "Password": user_pw.msg})
+        else:
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("new_user_confirm")
 
