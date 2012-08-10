@@ -889,6 +889,11 @@ def rebuild_snapshot_database(_ss_dir=None):
         ss_folder = snapshot_dir
     else:
         ss_folder = _ss_dir
+
+    # ensure snapshots folder is existed
+    if not os.path.exists(ss_folder):
+        log.info('[2] Skip rebuilding snapshot DB due to no snapshot was found')
+        return
         
     listing = os.listdir(ss_folder)
     
