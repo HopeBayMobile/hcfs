@@ -215,7 +215,7 @@ def new_user_confirm(request, id):
         SA = SwiftAccountMgr()
         #check if already exist
         exist = SA.obtain_user_info(id, user_id)
-        if exist.val==False:
+        if exist.val==True:
             return HttpResponse("user already exist")
         result = SA.add_user(account=id, user=user_id, description=description)
         if result.val:
