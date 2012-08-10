@@ -193,6 +193,10 @@ class SwiftAccountMgr:
         if password == "":
             password = self.__generate_random_password()
 
+        if len(description.split()) == 0:
+            msg = "Description can not be an empty string."
+            return Bool(val, msg)
+
         metadata_content = {
                 "Account-Enable": True,
                 "User-Enable": True,
@@ -460,6 +464,10 @@ class SwiftAccountMgr:
 
         if retry < 1:
             msg = "Argument retry has to >= 1."
+            return Bool(val, msg)
+
+        if len(description.split()) == 0:
+            msg = "Description can not be an empty string."
             return Bool(val, msg)
 
         check_account_existence = self.account_existence(account)
@@ -2922,9 +2930,9 @@ class SwiftAccountMgr:
             account_enable = "Error!"
             logger.error(msg)
         else:
-            description = msg["Description"]
-            user_enable = msg["User-Enable"]
-            account_enable = msg["Account-Enable"]
+            description = msg.get("Description")
+            user_enable = msg.get("User-Enable")
+            account_enable = msg.get("Account-Enable")
 
         user_info = {
             "description": description,

@@ -1518,6 +1518,7 @@ def build_gateway(user_key):
         # wthung, 2012/8/3
         # if a file system is existed, try to rebuild snapshot database
         if has_filesys:
+            log.info('[0] Found existing file system. Try to rebuild snapshot DB if possible')
             snapshot.rebuild_snapshot_database()
         
         # restart nfs and mount /mnt/nfssamba
