@@ -310,7 +310,6 @@ def get_indicators():
             - S3QL_ok: If S3QL service is running.
     """
     
-    #log.info("get_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
@@ -365,8 +364,7 @@ def get_indicators():
         log.info("Unable to get indicators")
         log.info("msg: %s" % str(Err))
         return return_val
-    
-    #log.info("get_indicators end successfully")
+
     return return_val
 
 # by Rice
@@ -395,7 +393,6 @@ def get_gateway_indicators():
             - downlink_usage: Network traffic coming to gateway.
     """
 
-    #log.info("get_gateway_indicators start")
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
 
@@ -418,9 +415,6 @@ def get_gateway_indicators():
           'uplink_usage' : 0,
           'downlink_usage' : 0}
 
-
-    # test, for fast UI integration
-    #return json.dumps(return_val)
     
     # indicator file
     indic_file = '/dev/shm/gw_indicator'
@@ -430,7 +424,6 @@ def get_gateway_indicators():
         if os.path.exists(indic_file):
             # read indicator file as result
             # deserialize json object from file
-            #log.info('%s is existed. Try to get indicator from it' % indic_file)
             with open(indic_file) as fh:
                 #return json.dumps(json.load(fh))
                 return_val = json.load(fh)
@@ -447,40 +440,8 @@ def get_gateway_indicators():
         return_val['data'].update(return_val2)
         return json.dumps(return_val)
 
-    #log.info("get_gateway_indicators end")
     return_val['data'].update(return_val2)
     return json.dumps(return_val)
-
-# wthung, 2012/7/17, retire this function and replace by _check_process_alive
-#def _check_http_proxy_service():
-#    """
-#    Check whether Squid3 is running.
-#    
-#    @rtype: boolean
-#    @return: True if Squid3 (HTTP proxy) is alive. Otherwise false.
-#    
-#    """
-#    
-#    op_proxy_check = False
-#    #log.info("[2] _check_http_proxy start")
-#
-#    try:
-#        cmd = "sudo ps aux | grep squid3"
-#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-#        lines = po.stdout.readlines()
-#        po.wait()
-#
-#        if po.returncode == 0:
-#            if len(lines) > 2:
-#                op_proxy_check = True
-#        else:
-#            log.info(output)
-#    except:
-#        pass
-#
-#    #log.info("[2] _check_http_proxy end")
-#    return op_proxy_check
-
 
 # Code written by Jiahong Wu (traceroute)
 def _traceroute_backend(backend_IP=None):
@@ -626,37 +587,6 @@ def _check_process_alive(process_name=None):
 
     return op
 
-# wthung, 2012/7/17, retire this function and replace by _check_process_alive
-# check fsck.s3ql daemon by Rice
-#def _check_system():
-#    """
-#    Check fsck.s3ql daemon.
-#    
-#    @rtype: boolean
-#    @return: True if fsck.s3ql is alive. Otherwise false.
-#    
-#    """
-#    
-#    op_system_check = False
-#    log.info("_check_system start")
-#
-#    try:
-#        cmd = "sudo ps aux | grep fsck.s3ql"
-#        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-#        lines = po.stdout.readlines()
-#        po.wait()
-#    
-#        if po.returncode == 0:
-#            if len(lines) > 2:
-#                op_system_check = True
-#        else:
-#            log.info(output)
-#    except:
-#        pass
-#
-#    log.info("_check_system end")
-#    return op_system_check
-
 # flush check by Rice
 def _check_flush():
     """
@@ -765,7 +695,6 @@ def _check_HDD():
     
     op_HDD_ok = False
     op_disk_num = True
-    #log.info("_check_HDD start")
 
     try:
         all_disk = common.getAllDisks()
@@ -799,7 +728,6 @@ def _check_HDD():
     except:
         pass
 
-    #log.info("_check_HDD end")
     return op_HDD_ok
 
 # check nfs daemon by Rice
@@ -813,9 +741,6 @@ def _check_nfs_service():
     """
     
     op_NFS_srv = True
-    #log.error("error_check_nfs_service start")
-    #log.warning("warning_check_nfs_service start")
-    #log.info("info_check_nfs_service start")
 
     try:
         cmd = "sudo service nfs-kernel-server status"
@@ -830,8 +755,6 @@ def _check_nfs_service():
                 op_NFS_srv = False
                 # restart_nfs_service()  # Moved this line to get_indicators()
         else:
-            #print 'Checking NFS server returns nonzero value!'
-            #log.info(output)
             pass
 
     except:
@@ -850,7 +773,6 @@ def _check_smb_service():
     """
 
     op_SMB_srv = False
-    #log.info("_check_smb_service start")    
 
     try:
         cmd = "sudo service smbd status"
@@ -885,7 +807,6 @@ def _check_smb_service():
 
     except:
         pass
-    #log.info("_check_smb_service end")
     return op_SMB_srv
 
 def get_storage_account():
@@ -1920,9 +1841,8 @@ def get_network():
             'data': network_info
         }
     
-        log.info("get_network end")
-        #log.info("[2] Gateway networking started")
-        return json.dumps(return_val)
+    log.info("[2] Gateway networking started")
+    return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
     """
@@ -2121,7 +2041,6 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
 
         fixedIp = op_config.get('network', 'fixedIp')
         fixedMask = op_config.get('network', 'fixedMask')
-        #fixedGateway = op_config.get('network', 'fixedGateway')
         op_ok = True
         log.info("Succeeded to get the fixed network information.")
 
@@ -2152,7 +2071,7 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
             f.write("\nnetmask %s" % mask)
             f.write("\ngateway %s" % gateway)
             # wthung, 2012/7/30
-            # fro ubuntu 12.04, move dns setting to here
+            # for ubuntu 12.04, move dns setting to here
             f.write("\ndns-nameservers %s %s" % (dns1, dns2))
         os.system('sudo cp %s %s' % (interface_path_temp, interface_path))
 
@@ -2293,21 +2212,15 @@ def get_smb_user_list():
             user = parser.get("cloudgwshare", "valid users")
             username = str(user).split(" ") 
         else:
-            #print "parser read fail"
             username.append(default_user_id)  # admin as the default user
 
         op_ok = True
         op_msg = 'Obtained smb account information'
         
     except ConfigParser.ParsingError:
-        #print err
         op_msg = smb_conf_file + ' is not readable.'
-        
         log.error(op_msg)
-            
         username.append(default_user_id)  # default
-        
-        #print "file is not readable"
     
     return_val = {
                   'result' : op_ok,
@@ -2429,7 +2342,6 @@ def set_smb_user_list(username, password):
     return_val['msg'] = 'Success to set smb account and passwd'
 
     log.info("set_smb_user_list end")
-
     return json.dumps(return_val)
 
 def get_nfs_access_ip_list():
@@ -2461,14 +2373,11 @@ def get_nfs_access_ip_list():
                 # skip comment lines and empty lines
                 if str(line).startswith("#") or str(line).strip() == None: 
                     continue
-            
-                #print line
 
                 # accepted format:
                 # portmap mountd nfsd statd lockd rquotad : 172.16.229.112 172.16.229.136
 
                 arr = str(line).strip().split(":")
-                #print arr
 
                 # format error
                 if len(arr) < 2:
@@ -2482,9 +2391,7 @@ def get_nfs_access_ip_list():
                 #services = str(arr[0]).strip()
                 iplist = arr[1]
                 ips = iplist.strip().split(", ")
-            
-                #print services
-                #print ips
+
                 # Jiahong: Hiding the first two ips in the list: 127.0.0.1 and 127.0.0.2
                 if len(ips) < 2:
                     log.info(str(nfs_hosts_allow_file) + " format error")
@@ -2492,21 +2399,14 @@ def get_nfs_access_ip_list():
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
 
-
                 return_val['result'] = True
                 return_val['msg'] = "Get ip list success"
                 return_val['data']["array_of_ip"] = ips[2:]
-            
-                #return json.dumps(return_val)
-            
     except :
         log.info("cannot parse " + str(nfs_hosts_allow_file))
-          
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
-        #return json.dumps(return_val)
     
     log.info("get_nfs_access_ip_list end")
-        
     return json.dumps(return_val)
     
 
@@ -2617,16 +2517,11 @@ def set_nfs_access_ip_list(array_of_ip):
                     return json.dumps(return_val)
 
             # got good format
-            # key = services allowed, val = ip lists
                 services = str(arr[0]).strip()
-                #iplist = arr[1]
-                #ips = iplist.strip().split(", ") #
 
                 iplist = arr[1]
                 ips = iplist.strip().split(", ")
 
-                #print services
-                #print ips
                 if len(ips) < 2:
                     log.info(str(nfs_hosts_allow_file) + " format error")
 
@@ -2641,7 +2536,6 @@ def set_nfs_access_ip_list(array_of_ip):
         log.info("cannot parse " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
-        #return json.dumps(return_val)
 
     # finally, updating the file
     nfs_hosts_allow_file_temp = '/etc/delta/hosts_allows_temp'
@@ -2742,7 +2636,6 @@ def stop_upload_sync():        # by Yen
     try:
         apply_scheduling_rules(schedule)
     except:
-        #print "Please check whether s3qlctrl is installed."
         return_val = {
             'result': False,
             'msg': "Turn off cache uploading has failed.",
@@ -2788,7 +2681,6 @@ def force_upload_sync(bw):        # by Yen
     try:
         apply_scheduling_rules(schedule)
     except:
-        #print "Please check whether s3qlctrl is installed."
         return_val = {
             'result': False,
             'msg': "Turn on cache uploading has failed.",
@@ -2839,16 +2731,12 @@ def classify_logs(logs, keyword_filter=KEYWORD_FILTER):
     @return: The category name of input log message.
     
     """
-    #print logs
-    for category in sorted(keyword_filter.keys()):
 
+    for category in sorted(keyword_filter.keys()):
         for keyword in keyword_filter[category]:
-            #print "in keyword = " + keyword
             if re.search(keyword, logs):
-                #print "match"
                 return category
             else:
-                #print "mismatch"
                 pass
 
     return None
@@ -2873,10 +2761,6 @@ def parse_log(type, log_cnt):
     
     """
 
-    #print "in parsing log"
-    #print type
-    #print log_cnt
-
     log_entry = {
                  "category" : "",
                  "timestamp" : "",
@@ -2887,30 +2771,17 @@ def parse_log(type, log_cnt):
 
     m = pat.match(log_cnt)
     if m == None:
-        #print "Not found"
-        return None
-
-    #print "match"
-    #print m.group()
-    #return 
+        return None 
 
     minute = int(m.group('minute'))
-    #print minute
-
     hour = int(m.group('hour'))
-    #print hour
-
     day = int(m.group('day'))
-    #print day
-
     second = int(m.group('second'))
-    #print second
 
     if len(m.group('month')) == 2:
         month = int(m.group('month'))
     else:
         month = month_number(m.group('month'))
-    #print month
 
     try:
         # syslog has't year info, try to fetch group("year") will cause exception
@@ -2920,28 +2791,16 @@ def parse_log(type, log_cnt):
         now = datetime.utcnow()
         year = now.year
 
-    #print year
-
     msg = m.group('message')
-    #print msg
 
     if msg == None:  # skip empty log
         return None
-    #now = datetime.datetime.utcnow()
 
     try:
         timestamp = datetime(year, month, day, hour, minute, second)  # timestamp
     except Exception:
-        #print "datatime error"
-        #print Exception
-        #print err
         return None
 
-    #print "timestamp = "
-    #print timestamp
-    #print "msg = "
-    #print msg
-    
     category = classify_logs(msg, KEYWORD_FILTER)
     if category == None:  # skip invalid log
         return None
@@ -2984,9 +2843,6 @@ def read_logs(logfiles_dict, offset, num_lines):
             log_buf = [line.strip() for line in open(logfiles_dict[logtype])]
             log_buf.reverse()
 
-            #print log_buf
-            #return {}
-
             # get the log file content
             #ret_log_cnt[type] = log_buf[ offset : offset + num_lines]
 
@@ -2998,7 +2854,6 @@ def read_logs(logfiles_dict, offset, num_lines):
                 nums = num_lines
 
             for alog in log_buf[offset : offset + nums]:
-                #print log
                 log_entry = parse_log(logtype, alog)
                 if not log_entry == None:  # ignore invalid log line 
                     ret_log_cnt[logtype].append(log_entry)
@@ -3069,25 +2924,11 @@ def storage_cache_usage():
 
     # Flush check & DirtyCache check
     try:
-        #print CMD_CHK_STO_CACHE_STATE
-        #proc  = subprocess.Popen("sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles", shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        #args = str(CMD_CHK_STO_CACHE_STATE).split(" ")
-        #proc = subprocess.Popen(args,
-        #                        stdout=subprocess.PIPE,
-        #                        stderr=subprocess.STDOUT)
-
-        #results = proc.stdout.read()
-        #print results
-
-        #ret_val = proc.wait() # 0 : success
-        #proc.kill()
-
         cmd = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         results = po.stdout.read()
         po.wait()
 
-        #print ret_val
         real_cloud_data = 0
 
         if po.returncode == 0:  # success
@@ -3100,26 +2941,20 @@ def storage_cache_usage():
                 if line.startswith("Total data size:"):
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
-                    #print int(float(val)/1024.0)
                     real_cloud_data = float(val)
                     ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0)  # MB -> GB 
-                    #print val
 
                 if line.startswith("After de-duplication:"):
                     tokens = line.split(":")
-                    #print tokens[1]
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
                     ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024  # MB -> GB 
-                    #print val
 
                 if line.startswith("After compression:"):
                     tokens = line.split(":")
-                    #print tokens[1]
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
                     ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024  # MB -> GB 
-                    #print val
 
                 if line.startswith("Cache size: current:"):
                     line = line.replace("," , ":")
@@ -3130,12 +2965,10 @@ def storage_cache_usage():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
-                    #print crt_val
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024  # MB -> GB 
-                    #print max_val
 
                 if line.startswith("Cache entries: current:"):
                     line = line.replace("," , ":")
@@ -3146,12 +2979,10 @@ def storage_cache_usage():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     ret_usage["gateway_cache_usage"]["used_cache_entries"] = crt_val
-                    #print crt_val
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["max_cache_entries"] = max_val
-                    #print max_val
 
                 if line.startswith("Dirty cache status: size:"):
                     line = line.replace("," , ":")
@@ -3163,18 +2994,14 @@ def storage_cache_usage():
                     crt_val = crt_tokens[0]
                     real_cloud_data = real_cloud_data - float(crt_val)
                     ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
-                    #print crt_val
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
-                    #print max_val
+
                 ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
 
     except Exception:
-        #print Exception
-        #print "exception: %s" % CMD_CHK_STO_CACHE_STATE
-
         if enable_log:
             log.info(CMD_CHK_STO_CACHE_STATE + " fail")
 
@@ -3247,9 +3074,6 @@ def get_network_speed(iface_name):  # iface_name = eth1
                "uplink_backend_usage" : 0 ,
                "downlink_backend_usage" : 0
                }
-    
-    # test
-    #return ret_val
     
     try:
         if os.path.exists(netspeed_file):
@@ -3431,13 +3255,4 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
-    #print build_gateway("1234567")
-    #print apply_user_enc_key("123456", "1234567")
-    
-    #_createS3qlConf("172.16.228.53:8080")
-#    print get_smb_user_list()
-#    print set_smb_user_list("superuser", "superuser")
-#    print get_smb_user_list()
-    #print _traceroute_backend('aaa')
-    snapshot.rebuild_snapshot_database()
     pass
