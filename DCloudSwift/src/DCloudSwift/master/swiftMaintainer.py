@@ -34,6 +34,8 @@ class SwiftMaintainer:
         f = urllib2.urlopen(req, timeout=180)
         response = f.read()
         code = f.getcode()
+        print code > 199
+        print code
         f.close
         return (code, response)
 
