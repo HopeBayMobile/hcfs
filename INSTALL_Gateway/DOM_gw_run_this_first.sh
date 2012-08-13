@@ -96,9 +96,9 @@ else
         rm -r /root/.s3ql
         ln -s /storage/log /var/log
         ln -s /storage/s3ql /root/.s3ql
-        # modify grub conf to set timeout value
-        sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
-        mv grub.tmp /boot/grub/grub.cfg
+        # remove grub recordfail
+        sudo grub-editenv - unset recordfail
+        sudo update-grub2
     else
         exit
     fi
@@ -170,9 +170,9 @@ cat >/root/build_raid1.sh <<EOF
             rm -r /root/.s3ql
             ln -s /storage/log /var/log
             ln -s /storage/s3ql /root/.s3ql
-            # modify grub conf to set timeout value
-            sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
-            mv grub.tmp /boot/grub/grub.cfg
+            # remove grub recordfail
+            sudo grub-editenv - unset recordfail
+            sudo update-grub2
     fi
 EOF
 
