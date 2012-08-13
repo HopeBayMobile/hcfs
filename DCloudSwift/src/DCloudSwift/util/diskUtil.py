@@ -240,7 +240,7 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
     # prepare objects dir to fix bugs of swift rsync errors
     if not os.path.exists("%s/objects" % mountpoint):
         os.system("mkdir %s/objects" % mountpoint)
-        os.system("chown -R swift:swift %s/objects" % mountpoint)
+        os.system("chown swift:swift %s/objects" % mountpoint)
 
     return returncode
 
@@ -350,7 +350,7 @@ def createLostSwiftDevices(lostDevices):
             continue
 
     os.system("mkdir -p /srv/node")
-    os.system("chown -R swift:swift /srv/node/")
+    os.system("chown swift:swift /srv/node/")
     logger.info("end")
     return mLostDevices
 
@@ -395,7 +395,7 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
             continue
 
     os.system("mkdir -p /srv/node")
-    os.system("chown -R swift:swift /srv/node/")
+    os.system("chown swift:swift /srv/node/")
     logger.debug("end")
     return deviceCnt - count
 
