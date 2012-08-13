@@ -1,10 +1,5 @@
 #!/bin/sh
 sleep 10
-#sh /etc/DCloud/ServerRegister/autoRun.sh
-ntpdate 192.168.11.1
-minute=$(($(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -d' ' -f1) % 60))
-task="$minute *    * * *   root    ntpdate 192.168.11.1"
-echo "$task" >> /etc/crontab
 python /etc/rc.py
 
 exit 0
