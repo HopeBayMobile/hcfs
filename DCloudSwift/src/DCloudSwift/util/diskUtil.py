@@ -351,6 +351,7 @@ def createLostSwiftDevices(lostDevices):
 
     os.system("mkdir -p /srv/node")
     os.system("chown swift:swift /srv/node/")
+    os.system("chown swift:swift /srv/node/*")
     logger.info("end")
     return mLostDevices
 
@@ -396,6 +397,7 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
 
     os.system("mkdir -p /srv/node")
     os.system("chown swift:swift /srv/node/")
+    os.system("chown swift:swift /srv/node/*")
     logger.debug("end")
     return deviceCnt - count
 
