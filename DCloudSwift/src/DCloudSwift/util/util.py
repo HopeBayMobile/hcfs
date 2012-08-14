@@ -195,8 +195,7 @@ def restartAllServices():
     if restartMemcached() != 0:
         logger.error("Failed to restart memcached")
 
-    os.system("chown swift:swift /srv/node/ ")
-    os.system("chown swift:swift /srv/node/*")
+    os.system("find /srv/node -maxdepth 1 -exec sudo chown swift:swift '{}' \;")
     restartSwiftServices()
 
 
