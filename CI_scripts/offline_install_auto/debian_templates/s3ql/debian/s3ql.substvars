@@ -1,4 +1,0 @@
-sphinxdoc:Depends=libjs-sphinxdoc (>= 1.0)
-python:Depends=python, python (>= 2.7.1-0ubuntu2), python (>= 2.7), python-apsw, python-pycryptopp, python-llfuse, python-lzma, python2.7
-shlibs:Depends=libc6 (>= 2.4), libsqlite3-0 (>= 3.5.9)
-misc:Depends=

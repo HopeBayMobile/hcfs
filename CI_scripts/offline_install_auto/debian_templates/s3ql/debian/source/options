@@ -1,8 +1,0 @@
-compression = "bzip2"
-compression-level = 9
-extend-diff-ignore = "\.pyc$"
-extend-diff-ignore = "^doc/"
-extend-diff-ignore = "^src/s3ql/_deltadump\.c$"
-extend-diff-ignore = "^contrib/.+\.1$"
-extend-diff-ignore = "^src/.+\.egg-info/"
-tar-ignore = "*.pyc"
