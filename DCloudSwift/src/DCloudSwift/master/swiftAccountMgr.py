@@ -691,21 +691,26 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="enable_user")
 
+        lock.acquire()
         #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
         proxy_ip_list = self.__proxy_ip_list
         ori_user_password = ""
         container_metadata = {}
         container = account + ":" + user
+        admin_container = account + ":" + self.__admin_default_name
+        admin_container_metadata = {}
         msg = ""
         val = False
         Bool = collections.namedtuple("Bool", "val msg")
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found."
+            lock.release()
             return Bool(val, msg)
 
         if retry < 1:
             msg = "Argument retry has to >= 1."
+            lock.release()
             return Bool(val, msg)
 
         user_existence_output = self.user_existence(account, user)
@@ -713,10 +718,12 @@ class SwiftAccountMgr:
         if user_existence_output.val == False:
             val = False
             msg = user_existence_output.msg
+            lock.release()
             return Bool(val, msg)
         elif user_existence_output.result == False:
             val = False
             msg = "User %s:%s does not exist!" % (account, user)
+            lock.release()
             return Bool(val, msg)
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
@@ -725,17 +732,36 @@ class SwiftAccountMgr:
 
         if val == False:
             logger.error(msg)
+            lock.release()
             return Bool(val, msg)
         else:
             container_metadata = msg
 
-        if container_metadata["Account-Enable"] == False:
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                           account=".super_admin", container=admin_container, admin_user=".super_admin",\
+                                           admin_password=self.__password)
+
+        if val == False:
+            logger.error(msg)
+            lock.release()
+            return Bool(val, msg)
+        else:
+            admin_container_metadata = msg
+
+        if admin_container_metadata["Account-Enable"] != container_metadata["Account-Enable"]:
             val = False
-            msg = "Failed to enable user %s because account %s is disabled." % (user, account)
+            msg = "Failed to enable user %s:%s because the failure of previous enabling/disabling account." % (account, user)
+            lock.release()
+            return Bool(val, msg)
+        elif container_metadata["Account-Enable"] == False:
+            val = False
+            msg = "Failed to enable user %s:%s because the account is disabled." % (account, user)
+            lock.release()
             return Bool(val, msg)
         elif container_metadata["User-Enable"] == True:
             val = True
             msg = "User %s:%s has been enabled." % (account, user)
+            lock.release()
             return Bool(val, msg)
         else:
             ori_user_password = container_metadata["Password"]
@@ -746,16 +772,17 @@ class SwiftAccountMgr:
         if change_password_output.val == False:
             val = False
             msg = change_password_output.msg
+            lock.release()
             return Bool(val, msg)
-
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
-                                           account=".super_admin", container=container, admin_user=".super_admin",\
-                                           admin_password=self.__password, metadata_content=container_metadata)
+        else:
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                               account=".super_admin", container=container, admin_user=".super_admin",\
+                                               admin_password=self.__password, metadata_content=container_metadata)
 
         if val == False:
-            # TODO: need to rollback
             logger.error(msg)
 
+        lock.release()
         return Bool(val, msg)
 
     def disable_user(self, account, user, retry=3):
@@ -3117,8 +3144,10 @@ if __name__ == '__main__':
     print SA.add_account("test2")
     print SA.add_user("test1", "user1")
     print SA.add_user("test2", "user1")
-    print SA.delete_account("test1")
-    print SA.delete_account("test2")
+    #print SA.disable_user("test1", "user1")
+    print SA.enable_user("test1", "user1")
+    #print SA.delete_account("test1")
+    #print SA.delete_account("test2")
     #print SA.delete_user("test1", "user1")
     #print SA.delete_user("test2", "user1")
     #print SA.delete_account("account0")
