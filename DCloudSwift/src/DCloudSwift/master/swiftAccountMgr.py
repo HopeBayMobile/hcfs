@@ -2034,16 +2034,17 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1."
             return Bool(val, msg)
 
-        account_existence_output = self.account_existence(account)
+        if account != ".super_admin":
+            account_existence_output = self.account_existence(account)
 
-        if account_existence_output.val == False:
-            val = False
-            msg = account_existence_output.msg
-            return Bool(val, msg)
-        elif account_existence_output.result == False:
-            val = False
-            msg = "Account %s does not exist!" % account
-            return Bool(val, msg)
+            if account_existence_output.val == False:
+                val = False
+                msg = account_existence_output.msg
+                return Bool(val, msg)
+            elif account_existence_output.result == False:
+                val = False
+                msg = "Account %s does not exist!" % account
+                return Bool(val, msg)
 
         if admin_user == ".super_admin":
             admin_password = self.__password
@@ -3115,6 +3116,11 @@ if __name__ == '__main__':
     print SA.add_account("test1")
     print SA.add_account("test2")
     print SA.add_user("test1", "user1")
+    print SA.add_user("test2", "user1")
+    print SA.delete_account("test1")
+    print SA.delete_account("test2")
+    #print SA.delete_user("test1", "user1")
+    #print SA.delete_user("test2", "user1")
     #print SA.delete_account("account0")
     #print SA.enable_account("account1")
     #print SA.disable_account("account1")
@@ -3122,6 +3128,7 @@ if __name__ == '__main__':
     #print SA.disable_user("account1", "user0")
     #print SA.obtain_user_info("account0", "user3")
     #print SA.modify_user_description("account0", "user3", "   This is very good!!!!")
-    #print SA.list_user("account1")
+    print SA.list_user("test1")
     #print "\n"
+    print SA.list_user("test2")
     #print SA.list_account()
