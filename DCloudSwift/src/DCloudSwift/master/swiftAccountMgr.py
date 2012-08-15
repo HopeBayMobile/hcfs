@@ -1978,8 +1978,8 @@ class SwiftAccountMgr:
                     account_enable = "Error!"
                     logger.error(msg)
                 else:
-                    description = msg["Description"]
-                    account_enable = msg["Account-Enable"]
+                    description = msg.get("Description")
+                    account_enable = msg.get("Account-Enable")
 
                 account_dict[item["name"]] = {
                     "description": description,
