@@ -1254,9 +1254,6 @@ def _mount(storage_url):
 
         os.system("sudo mkdir -p %s" % mountpoint)
 
-        if os.path.ismount(mountpoint):
-            raise BuildGWError("A filesystem is mounted on %s" % mountpoint)
-
         if _createS3qlConf(storage_url) != 0:
             raise BuildGWError("Failed to create s3ql conf")
 
@@ -1414,6 +1411,13 @@ def build_gateway(user_key):
     op_msg = 'Failed to apply storage accounts for unexpected errors.'
 
     try:
+        # wthung, 2012/8/15
+        # first to check if mount point is available to avoid build gateway twice
+        # original checking place is in _mount(). has removed it
+        config = getGatewayConfig()
+        mountpoint = config.get("mountpoint", "dir")
+        if os.path.ismount(mountpoint):
+            raise BuildGWError("A filesystem is mounted on %s" % mountpoint)
 
         if not common.isValidEncKey(user_key):
             op_msg = "Encryption Key has to be an alphanumeric string of length between 6~20"    
