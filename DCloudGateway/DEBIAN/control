@@ -3,7 +3,6 @@ Version: 1.0.9
 Section: base
 Priority: optional
 Architecture: all 
-Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, 
-samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
+Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
 Maintainer: yen.kuo@delta.com.tw 
 Description: Test package for gateway API 

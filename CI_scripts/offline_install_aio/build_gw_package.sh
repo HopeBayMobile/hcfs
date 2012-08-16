@@ -52,17 +52,6 @@ fi
     fi
 
 # Download DEB files from FTP and copy DEB files to /var/cache/apt/archives
-#~ /usr/bin/ftp -n $FTP_HOST <<END_SCRIPT
-#~ quote USER $USER
-#~ quote PASS $PASSWD
-#~ bin
-#~ passive
-#~ prompt
-#~ cd $SRC_HOME
-#~ mget $DEBFILE
-#~ mget $DEBPATCH  
-#~ quit
-#~ END_SCRIPT
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBFILE
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBPATCH
     tar -xzf $DEBFILE -C $APTCACHEDIR
@@ -72,7 +61,7 @@ fi
         exit 1
     fi
     
-# build DCloudS3ql
+# build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
     bash deb_builder.sh $S3QL_VERSION $BUILDNUM
     # Move S3QL DEB file to /var/cache/apt/
