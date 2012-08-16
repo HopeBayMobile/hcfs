@@ -31,3 +31,11 @@
     dch -v $VERSION.$BUILD -m "Modified by CDS Team @ Delta Cloud."
     # build DEB file
     dpkg-buildpackage -rfakeroot -b
+
+# build DCloudGateway (API)
+    mkdir -p /tmp/pkg_DcloudGateway/tmp
+    cp -r $INITPATH/StorageAppliance/DCloudGateway/DEBIAN /tmp/pkg_DcloudGateway
+    cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DcloudGateway/tmp
+    cd /tmp
+    dpkg --build pkg_DCloudGateway $INITPATH/
+    
