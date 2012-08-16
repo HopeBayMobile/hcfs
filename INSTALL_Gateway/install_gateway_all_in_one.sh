@@ -12,8 +12,9 @@ if [ "$1" != "dom" ]; then
 fi
 
 # install gateway API
-cd ../DCloudGateway
-./gateway_api_install_script
+#~ cd ../DCloudGateway
+#~ ./gateway_api_install_script
+apt-get install dcloudgatewayapi
 # install S3QL
 cd ../DCloudS3ql
 ./install_s3ql_script

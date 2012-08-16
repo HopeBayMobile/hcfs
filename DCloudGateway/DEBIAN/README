@@ -1,0 +1,11 @@
+This folder holds files for building a DEB package.
+Usage - 
+1. Edit "control" for version number and dependencies.
+2. Edit "preinst" for installation scripts.
+3. make a pkg_DCloudGateway folder somewhere and put this folder in it.
+   ---pkg_DCloudGateway
+      |-- DEBIAN
+      |-- tmp
+         |-- DcloudGateway  <folder of source code>
+4. go to a level above pkg_DCloudGateway and
+   dpkg --build pkg_DCloudGateway ./

@@ -22,14 +22,15 @@ fi
 # define parameters
     source build.conf
     MODE=$1
-    DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
-    DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
+    DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
+    DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     
 # remove tgz file for saving space
     rm gateway_install*.tgz
 
 # copy deb files to proper location 
     tar -xzf $DEBFILE -C $APTCACHEDIR
+    mkdir StorageAppliance/GatewayPatches/debsrc    # in case of debsrc does not exist.
     tar -xzf $DEBPATCH -C StorageAppliance/GatewayPatches/debsrc
     rm $DEBFILE
     rm $DEBPATCH
