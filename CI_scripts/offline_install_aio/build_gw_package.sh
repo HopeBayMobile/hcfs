@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "************************"
-echo "Usage: ./build_gw_package.sh <mode = full/fast> <build_num>"
+echo "Usage: ./build_gw_package.sh <mode = full/fast> <git_branch> <build_num>"
 echo "************************"
 
 # Make sure only root can run this script
@@ -9,7 +9,7 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # make sure input arguments are correct
-    if [ $# -ne 2 ] 
+    if [ $# -ne 3 ] 
     then
         echo "Need to input 2 arguments."
         exit 1
@@ -24,21 +24,28 @@ fi
     source build.conf
 
     MODE=$1
-    BUILDNUM=$2
-    DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
-    DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
+    BRANCH=$2
+    BUILDNUM=$3
+    DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
+    DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     OUTPUTFILE="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
     INITPATH=$(pwd)    
 
 # pull code from github
     if [ $MODE = "full" ];    then
         git clone https://github.com/Delta-Cloud/StorageAppliance.git
+        cd StorageAppliance
+        git stash
+        git checkout $BRANCH
+        cd ..
     else
         if [ ! -d StorageAppliance ]; then
             echo "StorageAppliance has not been downloaded, use full mode to try again."
             exit 1
         fi
         cd StorageAppliance
+        git stash
+        git checkout $BRANCH
         git reset --hard HEAD
         git pull
         cd ..
