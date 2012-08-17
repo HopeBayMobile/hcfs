@@ -75,6 +75,7 @@ def main():
                     'dcloud_clear_backlog = DCloudSwift.master.swiftEventMgr:clearMaintenanceBacklog',
                     'dcloud_print_backlog = DCloudSwift.util.MaintainReport:print_maintenance_backlog',
                     'dcloud_print_node_info = DCloudSwift.util.MaintainReport:print_node_info',
+                    'dcloud_swift_dns_setup = DCloudSwift.master.swiftLoadBalancer:setupDnsRoundRobin',
                     ]
         },
 
@@ -106,5 +107,6 @@ def main():
     os.system("update-rc.d swift-maintain-switcher defaults")
 
     os.system("cp ./misc/CronScripts/timesync /etc/cron.hourly")
+    os.system("cp ./misc/DnsScripts/db.dcloudswift /etc/bind/")
 if __name__ == '__main__':
     main()
