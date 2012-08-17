@@ -37,7 +37,8 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
          MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
          OBJBUILDER='object.builder',
-         LOGLOCK = "/etc/delta/delta_log.lock",)
+         LOGLOCK = "/etc/delta/delta_log.lock",
+         DNS_DB = "/etc/bind/db.dcloudswift",)
 
 
 SWIFTCONF = GlobalVar.SWIFTCONF

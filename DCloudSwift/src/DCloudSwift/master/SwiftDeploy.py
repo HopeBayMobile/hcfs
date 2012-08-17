@@ -1155,4 +1155,3 @@ def deploy():
 
 if __name__ == '__main__':
     print parseDeploySection("/etc/delta/inputFile")
-    print parseAddNodesSection("/etc/delta/inputFile")

@@ -131,7 +131,6 @@ def getGatewayConfig():
 
     @rtype: ConfigParser
     @return: Instance of ConfigParser.
-
     """
 
     try:
@@ -172,10 +171,9 @@ def getStorageUrl():
 
     @rtype: string
     @return: Storage URL or None if failed.
-
     """
 
-    log.info("getStorageUrl start")
+    log.debug("getStorageUrl start")
     storage_url = None
 
     try:
@@ -188,7 +186,7 @@ def getStorageUrl():
     except Exception as e:
         log.error("Failed to getStorageUrl for %s" % str(e))
     finally:
-        log.info("getStorageUrl end")
+        log.debug("getStorageUrl end")
     return storage_url
 
 
@@ -203,10 +201,9 @@ def get_compression():
         - msg: Explanation of result.
         - data: JSON object.
             - switch: True if compression is ON. Otherwise, false.
-
     """
 
-    log.info("get_compression start")
+    log.debug("get_compression start")
     op_ok = False
     op_msg = ''
     op_switch = True
@@ -232,7 +229,7 @@ def get_compression():
                       'msg': op_msg,
                       'data': {'switch': op_switch}}
 
-        log.info("get_compression end")
+        log.debug("get_compression end")
     return json.dumps(return_val)
 
 
@@ -242,7 +239,6 @@ def _check_snapshot_in_progress():
 
     @rtype: boolean
     @return: True if snapshotting is in progress. Otherwise false.
-
     """
 
     try:
@@ -361,8 +357,8 @@ def get_indicators():
               'HTTP_proxy_srv' : op_Proxy_srv,
               'S3QL_ok': op_s3ql_ok}}
     except Exception as Err:
-        log.info("Unable to get indicators")
-        log.info("msg: %s" % str(Err))
+        log.error("Unable to get indicators")
+        log.error("msg: %s" % str(Err))
         return return_val
 
     return return_val
@@ -436,7 +432,7 @@ def get_gateway_indicators():
         return_val2 = get_network_speed(MONITOR_IFACE)
            
     except Exception as Err:
-        log.info("msg: %s" % str(Err))
+        log.error("msg: %s" % str(Err))
         return_val['data'].update(return_val2)
         return json.dumps(return_val)
 
@@ -455,7 +451,7 @@ def _traceroute_backend(backend_IP=None):
     """
 
     op_msg = "Unable to obtain traceroute info to the backend"
-    log.info("_traceroute_backend start")
+    log.debug("_traceroute_backend start")
     try:
         if backend_IP == None:
             op_config = ConfigParser.ConfigParser()
@@ -488,7 +484,7 @@ def _traceroute_backend(backend_IP=None):
             log.error(str(e))
 
     finally:
-        log.info("_traceroute_backend end")
+        log.debug("_traceroute_backend end")
     return op_msg
 
 
@@ -499,11 +495,10 @@ def _check_network():
     
     @rtype: boolean
     @return: True if network is alive. Otherwise false.
-    
     """
     
     op_network_ok = False
-    log.info("_check_network start")
+    log.debug("_check_network start")
     try:
         op_config = ConfigParser.ConfigParser()
         with open('/root/.s3ql/authinfo2') as op_fh:
@@ -555,7 +550,7 @@ def _check_network():
             log.error(str(e))
 
     finally:
-        log.info("_check_network end")
+        log.debug("_check_network end")
     return op_network_ok
 
 # wthung, 2012/7/17
@@ -594,11 +589,10 @@ def _check_flush():
     
     @rtype: boolean
     @return: True if dirty cache flushing is in progress. Otherwise false.
-    
     """
     
     op_flush_inprogress = False
-    log.info("_check_flush start")
+    log.debug("_check_flush start")
     
     try:
         cmd = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
@@ -615,7 +609,7 @@ def _check_flush():
     except:
         pass
     
-    log.info("_check_flush end")
+    log.debug("_check_flush end")
     return op_flush_inprogress
 
 # dirty cache check by Rice
@@ -625,11 +619,10 @@ def _check_dirtycache():
     
     @rtype: boolean
     @return: True if dirty cache is near full. Otherwise false.
-    
     """
     
     op_dirtycache_nearfull = False
-    log.info("_check_dirtycache start")
+    log.debug("_check_dirtycache start")
 
     try:
         cmd = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
@@ -645,7 +638,7 @@ def _check_dirtycache():
     except:
         pass
 
-    log.info("_check_dirtycache end")
+    log.debug("_check_dirtycache end")
     return op_dirtycache_nearfull
 
 def _get_serial_number(disk):
@@ -677,7 +670,7 @@ def _get_serial_number(disk):
                 sn = line[index + len(target_str):]
                 break
         else:
-            log.info('[2] Some error occurred when getting serial number of %s' % disk)
+            log.error('Some error occurred when getting serial number of %s' % disk)
     except:
         pass
     
@@ -690,7 +683,6 @@ def _check_HDD():
     
     @rtype: boolean
     @return: True if all HDD are healthy. Otherwise false.
-    
     """
     
     op_HDD_ok = False
@@ -704,10 +696,10 @@ def _check_HDD():
         # wthung, 2012/7/18
         # check if hdds number is 3. If not, report the serial number of alive hdd to log
         if nu_all_disk < 3:
-            log.info('[0] Some disks were lost. Please check immediately')
+            log.error('Some disks were lost. Please check immediately')
             for disk in all_disk:
                 disk_sn = _get_serial_number(disk)
-                log.info('[0] Alive disk serial number: %s' % disk_sn)
+                log.error('Alive disk serial number: %s' % disk_sn)
             op_disk_num = False
     
         for i in all_disk:
@@ -720,7 +712,7 @@ def _check_HDD():
             if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
                 op_all_disk += 1 
             else:
-                log.info("[0] %s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
+                log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
         
         if (op_all_disk == len(all_disk)) and op_disk_num:
             op_HDD_ok = True
@@ -737,7 +729,6 @@ def _check_nfs_service():
     
     @rtype: boolean
     @return: True if NFS is alive. Otherwise false.
-    
     """
     
     op_NFS_srv = True
@@ -760,7 +751,7 @@ def _check_nfs_service():
     except:
         pass
 
-    log.info("_check_nfs_service end")
+    log.debug("_check_nfs_service end")
     return op_NFS_srv
 
 # check samba daemon by Rice
@@ -787,7 +778,7 @@ def _check_smb_service():
             #else:
                 # restart_smb_service()  # Moved to get_indicators()
         else:
-            log.info(output)
+            log.error(output)
             # restart_smb_service()  # Moved to get_indicators()
 
         # if samba service is running, go check netbios
@@ -802,7 +793,7 @@ def _check_smb_service():
                     op_SMB_srv = False
                     # restart_service("nmbd")  # Moved to get_indicators()
             else:
-                log.info(output)
+                log.error(output)
                 # restart_service("nmbd")  # Moved to get_indicators()
 
     except:
@@ -824,7 +815,7 @@ def get_storage_account():
             - account: The storage account name.
     """
     
-    log.info("get_storage_account start")
+    log.debug("get_storage_account start")
 
     op_ok = False
     op_msg = 'Storage account read failed unexpectedly.'
@@ -853,7 +844,7 @@ def get_storage_account():
              'msg' : op_msg,
              'data' : {'storage_url' : op_storage_url, 'account' : op_account}}
 
-    log.info("get_storage_account end")
+    log.debug("get_storage_account end")
     return json.dumps(return_val)
 
 def apply_storage_account(storage_url, account, password, test=True):
@@ -876,10 +867,9 @@ def apply_storage_account(storage_url, account, password, test=True):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("apply_storage_account start")
+    log.debug("apply_storage_account start")
 
     op_ok = False
     op_msg = 'Failed to apply storage accounts for unexpected errors.'
@@ -911,6 +901,10 @@ def apply_storage_account(storage_url, account, password, test=True):
     
         with open('/root/.s3ql/authinfo2', 'wb') as op_fh:
             op_config.write(op_fh)
+
+        # wthung, 2012/8/16
+        # re-create upstart s3ql.conf
+        _createS3qlConf(storage_url)
         
         op_ok = True
         op_msg = 'Succeeded to apply storage account'
@@ -925,7 +919,7 @@ def apply_storage_account(storage_url, account, password, test=True):
           'msg'    : op_msg,
           'data'   : {}}
 
-    log.info("apply_storage_account end")
+    log.debug("apply_storage_account end")
     return json.dumps(return_val)
 
 def apply_user_enc_key(old_key=None, new_key=None):
@@ -942,10 +936,9 @@ def apply_user_enc_key(old_key=None, new_key=None):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("apply_user_enc_key start")
+    log.debug("apply_user_enc_key start")
 
     op_ok = False
     op_msg = 'Failed to change encryption keys for unexpected errors.'
@@ -1005,7 +998,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
     except Exception as e:
         log.error(str(e))
     finally:
-        log.info("apply_user_enc_key end")
+        log.debug("apply_user_enc_key end")
 
         return_val = {'result' : op_ok,
               'msg'    : op_msg,
@@ -1022,10 +1015,9 @@ def _createS3qlConf(storage_url):
     @param storage_url: Storage URL.
     @rtype: integer
     @return: 0 for success. Otherwise, nonzero value.
-    
     """
     
-    log.info("_createS3qlConf start")
+    log.debug("_createS3qlConf start")
     ret = 1
     try:
         config = getGatewayConfig()
@@ -1059,7 +1051,7 @@ def _createS3qlConf(storage_url):
     except Exception as e:
         log.error("Failed to create s3ql config for %s" % str(e))
     finally:
-        log.info("_createS3qlConf end")
+        log.debug("_createS3qlConf end")
     return ret
         
 
@@ -1076,10 +1068,9 @@ def _openContainter(storage_url, account, password):
     @param account: Account name.
     @type password: string
     @param password: Account password.
-    
     """
     
-    log.info("_openContainer start")
+    log.debug("_openContainer start")
 
     try:
         os.system("sudo touch gatewayContainer.txt")
@@ -1098,7 +1089,7 @@ def _openContainter(storage_url, account, password):
             raise BuildGWError(op_msg)
         os.system("sudo rm gatewayContainer.txt")
     finally:
-        log.info("_openContainer end")
+        log.debug("_openContainer end")
 
 
 @common.timeout(180)
@@ -1117,7 +1108,7 @@ def _mkfs(storage_url, key):
     @return: True if a file system is existed. Otherwise, False.
     """
     
-    log.info("[2] _mkfs start")
+    log.debug("_mkfs start")
     
     # wthung, 2012/8/3
     # add a var to indicate an exiting filesys
@@ -1132,8 +1123,8 @@ def _mkfs(storage_url, key):
                 op_msg = "Failed to mkfs for %s" % stderr
                 raise BuildGWError(op_msg)
             else:
-                log.info("[2] Found existing file system!")
-                log.info("[2] Conducting forced file system check")
+                log.info("Found existing file system!")
+                log.info("Conducting forced file system check")
                 has_existing_filesys = True
                 
                 cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/gateway/delta" % (storage_url)
@@ -1142,16 +1133,16 @@ def _mkfs(storage_url, key):
                 po.wait()
 
                 if po.returncode != 0:
-                    log.error("[error] Error found during fsck (%s)" % output)
+                    log.error("Error found during fsck (%s)" % output)
                 else:
-                    log.info("[2] fsck completed")
+                    log.debug("fsck completed")
     # wthung, 2012/8/3
     # add except
     except Exception as e:
-        log.info('[0] _mkfs error: %s' % str(e))
+        log.error('_mkfs error: %s' % str(e))
 
     finally:
-        log.info("[2] _mkfs end")
+        log.debug("_mkfs end")
         return has_existing_filesys
 
 
@@ -1168,10 +1159,9 @@ def _umount():
     
     @rtype: boolean
     @return: True if succeed to umount file system. Otherwise, false.
-    
     """
     
-    log.info("[2] Gateway umounting")
+    log.debug("Gateway umounting")
     op_ok = False
 
     try:
@@ -1222,9 +1212,9 @@ def _umount():
     
     finally:
         if op_ok == False:
-            log.info("[0] Gateway umount error.")
+            log.error("Gateway umount error.")
         else:
-            log.info("[2] Gateway umounted")
+            log.debug("Gateway umounted")
 
 
 @common.timeout(360)
@@ -1237,10 +1227,9 @@ def _mount(storage_url):
     
     @type storage_url: string
     @param stroage_url: Storage URL.
-    
     """
     
-    log.info("[2] Gateway mounting")
+    log.debug("Gateway mounting")
     op_ok = False
     try:
         config = getGatewayConfig()
@@ -1319,9 +1308,9 @@ def _mount(storage_url):
         raise BuildGWError(op_msg)
 
         if op_ok == False:
-            log.info("[0] Gateway mount error.")
+            log.error("Gateway mount error.")
         else:
-            log.info("[2] Gateway mounted")
+            log.debug("Gateway mounted")
     
 
 @common.timeout(360)
@@ -1333,12 +1322,10 @@ def _restartServices():
         - NFS
     
     Will raise BuildGWError if failed.
-    
     """
     
-    log.info("[2] Gateway restarting")
- 
-    #log.info("_restartServices start")
+    log.debug("Gateway restarting")
+
     try:
         config = getGatewayConfig()
     
@@ -1374,9 +1361,9 @@ def _restartServices():
         log.error(str(e))
         raise BuildGWError(op_msg)
     finally:
-        log.info("_restartServices start")
+        log.debug("_restartServices start")
 
-    log.info("[2] Gateway restarted")
+    log.debug("Gateway restarted")
 
 
 def build_gateway(user_key):
@@ -1401,11 +1388,9 @@ def build_gateway(user_key):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("[2] Gateway building")
-    #log.info("build_gateway start")
+    log.debug("Gateway building")
 
     op_ok = False
     op_msg = 'Failed to apply storage accounts for unexpected errors.'
@@ -1443,7 +1428,7 @@ def build_gateway(user_key):
         # wthung, 2012/8/3
         # if a file system is existed, try to rebuild snapshot database
         if has_filesys:
-            log.info('[0] Found existing file system. Try to rebuild snapshot DB if possible')
+            log.info('Found existing file system. Try to rebuild snapshot DB if possible')
             snapshot.rebuild_snapshot_database()
         
         # restart nfs and mount /mnt/nfssamba
@@ -1454,7 +1439,7 @@ def build_gateway(user_key):
         restart_service("smbd")
         restart_service("nmbd")
         
-        log.info("setting upload speed")
+        log.debug("setting upload speed")
         os.system("sudo /etc/cron.hourly/hourly_run_this")
         # we need to manually exec background task program,
         #   because it is originally launched by upstart 
@@ -1477,15 +1462,15 @@ def build_gateway(user_key):
     finally:
         if not op_ok:
             log.error(op_msg)
-            log.info("[0] Gateway building error. " + op_msg)
+            log.error("Gateway building error. " + op_msg)
         else:
-            log.info("[2] Gateway builded")
+            log.debug("Gateway builded")
             
         return_val = {'result' : op_ok,
                       'msg'    : op_msg,
                       'data'   : {}}
 
-        log.info("build_gateway end")
+        log.debug("build_gateway end")
         return json.dumps(return_val)
 
 def restart_nfs_service():
@@ -1498,11 +1483,9 @@ def restart_nfs_service():
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("[2] NFS service restarting")
-    log.info("restart_nfs_service start")
+    log.debug("NFS service restarting")
 
     return_val = {}
     op_ok = False
@@ -1520,7 +1503,7 @@ def restart_nfs_service():
     except Exception as e:
         op_ok = False
         log.error(str(e))
-        log.info("[0] NFS service restarting error")
+        log.error("NFS service restarting error")
 
     finally:
         return_val = {
@@ -1529,9 +1512,8 @@ def restart_nfs_service():
             'data': {}
         }
     
-        log.info("restart_nfs_service end")
-        log.info("[2] NFS service restarted")
-        return json.dumps(return_val)
+    log.debug("NFS service restarted")
+    return json.dumps(return_val)
 
 def restart_smb_service():
     """
@@ -1543,11 +1525,9 @@ def restart_smb_service():
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("restart_smb_service start")
-    log.info("[2] Samba service restarting")
+    log.debug("Samba service restarting")
 
     return_val = {}
     op_ok = False
@@ -1566,12 +1546,12 @@ def restart_smb_service():
         if (po.returncode == 0) and (po1.returncode == 0):
             op_ok = True
             op_msg = "Restarting samba service succeeded."
-            log.info("[2] Samba service restarted")
+            log.debug("Samba service restarted")
 
     except Exception as e:
         op_ok = False
         log.error(str(e))
-        log.info("[0] Samba service restarting error")
+        log.error("Samba service restarting error")
 
     finally:
         return_val = {
@@ -1580,7 +1560,7 @@ def restart_smb_service():
             'data': {}
         }
     
-        log.info("restart_smb_service end")
+        log.debug("restart_smb_service end")
     return json.dumps(return_val)
 
 # wthung
@@ -1598,7 +1578,7 @@ def restart_service(svc_name):
         - data: JSON object. Always return empty.
     """
     
-    log.info("[2] %s service restarting" % svc_name)
+    log.debug("%s service restarting" % svc_name)
 
     return_val = {}
     op_ok = False
@@ -1614,13 +1594,13 @@ def restart_service(svc_name):
 
         if po.returncode == 0:
             op_ok = True
-            log.info("[2] %s service restarted successfully." % svc_name)
+            log.debug("%s service restarted successfully." % svc_name)
             op_msg = "Restarting %s service succeeded." % svc_name
 
     except Exception as e:
         op_ok = False
         log.error(str(e))
-        log.info("[0] %s service restarting error" % svc_name)
+        log.error("%s service restarting error" % svc_name)
 
     finally:
         return_val = {
@@ -1629,7 +1609,7 @@ def restart_service(svc_name):
             'data': {}
         }
     
-        log.info("[2] %s service restarted" % svc_name)
+        log.debug("%s service restarted" % svc_name)
     return json.dumps(return_val)
 
 def reset_gateway():
@@ -1642,9 +1622,8 @@ def reset_gateway():
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-        
     """
-    log.info("[2] Gateway restarting")
+    log.debug("Gateway restarting")
 
     return_val = {'result': True,
                   'msg': "Succeeded to reset the gateway.",
@@ -1657,7 +1636,7 @@ def reset_gateway():
             time.sleep(10)
             os.system("sudo reboot")
         else:
-            log.info("[2] Gateway will restart after ten seconds")
+            log.debug("Gateway will restart after ten seconds")
     except:
         pass
     
@@ -1674,9 +1653,8 @@ def shutdown_gateway():
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-        
     """
-    log.info("[2] Gateway shutdowning")
+    log.debug("Gateway shutdowning")
     
     return_val = {'result': True,
                   'msg': "Succeeded to shutdown the gateway.",
@@ -1689,7 +1667,7 @@ def shutdown_gateway():
             time.sleep(10)
             os.system("sudo poweroff")
         else:
-            log.info("[2] Gateway will shutdown after ten seconds")
+            log.debug("Gateway will shutdown after ten seconds")
     except:
         pass
     
@@ -1710,7 +1688,6 @@ def _test_storage_account(storage_url, account, password):
     @param account: Account name.
     @type password: string
     @param password: Account password.
-        
     """
     
     cmd = "sudo curl -k -v -H 'X-Storage-User: %s' -H 'X-Storage-Pass: %s' https://%s/auth/v1.0" % (account, password, storage_url)
@@ -1743,10 +1720,9 @@ def test_storage_account(storage_url, account, password):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-        
     """
     
-    log.info("test_storage_account start")
+    log.debug("test_storage_account start")
 
     op_ok = False
     op_msg = 'Test storage account failed for unexpected errors.'
@@ -1778,7 +1754,7 @@ def test_storage_account(storage_url, account, password):
                   'msg'    : op_msg,
                   'data'   : {}}
     
-    log.info("test_storage_account end")
+    log.debug("test_storage_account end")
     return json.dumps(return_val)
 
 def get_network():
@@ -1796,11 +1772,9 @@ def get_network():
             - mask: Network mask
             - dns1: Primary DNS
             - dns2: Secondary DNS
-    
     """
     
-    log.info("get_network start")
-    #log.info("[2] Gateway networking starting")
+    log.debug("get_network start")
 
     info_path = "/etc/delta/network.info"
     return_val = {}
@@ -1845,7 +1819,7 @@ def get_network():
             'data': network_info
         }
     
-    log.info("[2] Gateway networking started")
+    log.debug("Gateway networking started")
     return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -1869,11 +1843,9 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         - result: Function call result
         - msg: Explanation of result
         - data: JSON object. Always return empty.
-        
     """
     
-    log.info("apply_network start")
-    log.info("[2] Gateway networking starting")
+    log.debug("apply_network start")
 
     ini_path = "/etc/delta/Gateway.ini"
     op_ok = False
@@ -1934,15 +1906,15 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
             except:
                 op_ok = False
-                log.info("[0] Gateway networking starting error")
+                log.error("Gateway networking starting error")
             else:
                 if os.system("sudo /etc/init.d/networking restart") == 0:
                     op_ok = True
                     op_msg = "Succeeded to apply the network configuration."
-                    log.info("[2] Gateway networking started")
+                    log.debug("Gateway networking started")
                 else:
                     op_ok = False
-                    log.info("[0] Gateway networking starting error")
+                    log.debug("Gateway networking starting error")
         else:
             op_ok = False
             log.error(op_msg)
@@ -1956,7 +1928,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
     'data': {}
     }
 
-    log.info("apply_network end")
+    log.debug("apply_network end")
     return json.dumps(return_val)
 
 def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
@@ -1977,7 +1949,6 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
     @param dns2: Secondary DNS.
     @rtype: boolean
     @return: Result of storing network info to ini file.
-        
     """
     
     op_ok = False
@@ -2001,7 +1972,7 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
         os.system('sudo chown www-data:www-data %s' % info_path)
     
         op_ok = True
-        log.info("Succeeded to store the network information.")
+        log.debug("Succeeded to store the network information.")
 
     except IOError as e:
         op_ok = False
@@ -2046,7 +2017,7 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
         fixedIp = op_config.get('network', 'fixedIp')
         fixedMask = op_config.get('network', 'fixedMask')
         op_ok = True
-        log.info("Succeeded to get the fixed network information.")
+        log.debug("Succeeded to get the fixed network information.")
 
     except IOError as e:
         op_ok = False
@@ -2080,7 +2051,7 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
         os.system('sudo cp %s %s' % (interface_path_temp, interface_path))
 
         op_ok = True
-        log.info("Succeeded to set the network configuration")
+        log.debug("Succeeded to set the network configuration")
 
     except IOError as e:
         op_ok = False
@@ -2090,7 +2061,7 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
             if os.system("sudo cp -p %s %s" % (interface_path + "_backup", interface_path)) != 0:
                 log.warning("Failed to recover %s" % interface_path)
             else:
-                log.info("Succeeded to recover %s" % interface_path)
+                log.debug("Succeeded to recover %s" % interface_path)
 
     except Exception as e:
         op_ok = False
@@ -2129,7 +2100,7 @@ def _setNameserver(dns1, dns2=None):
         os.system('sudo cp %s %s' % (nameserver_path_temp, nameserver_path))
 
         op_ok = True
-        log.info("Succeeded to set the nameserver.")
+        log.debug("Succeeded to set the nameserver.")
 
     except IOError as e:
         op_ok = False
@@ -2139,7 +2110,7 @@ def _setNameserver(dns1, dns2=None):
             if os.system("sudo cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
                 log.warning("Failed to recover %s" % nameserver_path)
             else:
-                log.info("Succeeded to recover %s" % nameserver_path)
+                log.debug("Succeeded to recover %s" % nameserver_path)
 
     except Exception as e:
         op_ok = False
@@ -2158,7 +2129,6 @@ def get_scheduling_rules():        # by Yen
         - result: Function call result.
         - msg: Explanation of result.
         - data: A list to describe the scheduling rules.
-    
     """
     
     # load config file 
@@ -2185,6 +2155,7 @@ def get_scheduling_rules():        # by Yen
     'msg': "Bandwidth throttling schedule is read.",
     'data': schedule
     }
+    
     return json.dumps(return_val)
 
 def get_smb_user_list():
@@ -2198,13 +2169,11 @@ def get_smb_user_list():
         - msg: Explanation of result.
         - data: JSON object.
             - accounts: Samba user account.
-    
     """
-
+    
+    log.debug("get_smb_user_list")
+    
     username = []
-
-    log.info("get_smb_user_list")
-
     op_ok = False
     op_msg = 'Smb account read failed unexpectedly.'
 
@@ -2231,7 +2200,7 @@ def get_smb_user_list():
                   'msg' : op_msg,
                   'data' : {'accounts' : username[0]}}
 
-    log.info("get_smb_user_list end")
+    log.debug("get_smb_user_list end")
         
     return json.dumps(return_val)
 
@@ -2246,7 +2215,6 @@ def _chSmbPasswd(username, password):
     @param password: Samba user password.
     @rtype: integer
     @return: 0 for success. Otherwise, nonzero value.
-    
     """
     
     cmd = ["sudo", "sh", CMD_CH_SMB_PWD, username, password]
@@ -2258,7 +2226,7 @@ def _chSmbPasswd(username, password):
     results = proc.stdout.read()
     ret_val = proc.wait()  # 0 : success
 
-    log.info("change smb val: %d, message %s" % (ret_val, results))
+    log.debug("change smb val: %d, message %s" % (ret_val, results))
     if ret_val != 0:
         log.error("%s" % results)
 
@@ -2278,7 +2246,6 @@ def set_smb_user_list(username, password):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
     return_val = {
@@ -2286,40 +2253,13 @@ def set_smb_user_list(username, password):
                   'msg' : 'set Smb account failed unexpectedly.',
                   'data' : {} }
 
-    log.info("set_smb_user_list starts")
+    log.debug("set_smb_user_list starts")
 
     # currently, only admin can use smb
     if str(username).lower() != default_user_id:
         return_val['msg'] = 'invalid user. Only accept ' + default_user_id
         return json.dumps(return_val)
-    
-    # get current user list
-#    try:
-#        current_users = get_smb_user_list ()
-#        #load_userlist = json.loads(current_users)    
-#        #username_arr = load_userlist["data"]["accounts"]
-#        
-#        #print username_arr
-#    except:
-#        log.error("set_smb_user_list fails")
-#        return_val['msg'] = 'cannot read current user list.'
-#        return json.dumps(return_val)
-    
-    # for new user, add the new user to linux, update smb.conf, and set password
-    # TODO: impl.
-    
-    # admin must in the current user list
-    #flag = False
-#    for u in username_arr:
-#        #print u
-#        if u == default_user_id:
-#            flag = True
-    '''
-    if flag == False: # should not happen
-        log.info("set_smb_user_list fails")
-        return_val['msg'] = 'invalid user, and not in current user list.'
-        return json.dumps(return_val)
-    ''' 
+
     # ok, set the password
     # notice that only a " " is required btw tokens
      
@@ -2345,7 +2285,7 @@ def set_smb_user_list(username, password):
     return_val['result'] = True
     return_val['msg'] = 'Success to set smb account and passwd'
 
-    log.info("set_smb_user_list end")
+    log.debug("set_smb_user_list end")
     return json.dumps(return_val)
 
 def get_nfs_access_ip_list():
@@ -2361,7 +2301,6 @@ def get_nfs_access_ip_list():
         - msg: Explanation of result.
         - data: JSON object.
             - array_of_ip: Allowed IP addresses.
-    
     """
 
     return_val = {
@@ -2369,7 +2308,7 @@ def get_nfs_access_ip_list():
                   'msg' : 'get NFS access ip list failed unexpectedly.',
                   'data' : { "array_of_ip" : [] } }
 
-    log.info("get_nfs_access_ip_list starts")
+    log.debug("get_nfs_access_ip_list starts")
 
     try:
         with open(nfs_hosts_allow_file, 'r') as fh:
@@ -2385,7 +2324,7 @@ def get_nfs_access_ip_list():
 
                 # format error
                 if len(arr) < 2:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                    log.error(str(nfs_hosts_allow_file) + " format error")
           
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2398,7 +2337,7 @@ def get_nfs_access_ip_list():
 
                 # Jiahong: Hiding the first two ips in the list: 127.0.0.1 and 127.0.0.2
                 if len(ips) < 2:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                    log.error(str(nfs_hosts_allow_file) + " format error")
 
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2407,10 +2346,10 @@ def get_nfs_access_ip_list():
                 return_val['msg'] = "Get ip list success"
                 return_val['data']["array_of_ip"] = ips[2:]
     except :
-        log.info("cannot parse " + str(nfs_hosts_allow_file))
+        log.error("cannot parse " + str(nfs_hosts_allow_file))
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
     
-    log.info("get_nfs_access_ip_list end")
+    log.debug("get_nfs_access_ip_list end")
     return json.dumps(return_val)
     
 
@@ -2427,13 +2366,11 @@ def set_compression(switch):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
-    log.info("set_compression start")
+    log.debug("set_compression start")
     op_ok = False
     op_msg = ''
-    #op_switch = True
 
     try:
         config = getGatewayConfig()
@@ -2442,10 +2379,6 @@ def set_compression(switch):
             config.set("s3ql", "compress", "true")
         else:
             config.set("s3ql", "compress", "false")
-        # wthung, 2012/7/18
-        # mark below code
-#        else:
-#            raise Exception("The input argument has to be True or False")
     
         storage_url = getStorageUrl()
         if storage_url is None:
@@ -2470,12 +2403,12 @@ def set_compression(switch):
         if not op_ok:
             log.error(op_msg)
 
-        return_val = {'result' : op_ok,
+    return_val = {'result' : op_ok,
                   'msg'    : op_msg,
-                                    'data'   : {}}
+                  'data'   : {}}
     
-        log.info("set_compression end")
-        return json.dumps(return_val)
+    log.debug("set_compression end")
+    return json.dumps(return_val)
 
 def set_nfs_access_ip_list(array_of_ip):
     """
@@ -2493,7 +2426,6 @@ def set_nfs_access_ip_list(array_of_ip):
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
 
     return_val = {
@@ -2501,7 +2433,7 @@ def set_nfs_access_ip_list(array_of_ip):
                   'msg' : 'get NFS access ip list failed unexpectedly.',
                   'data' : {} }
 
-    log.info("set_nfs_access_ip_list starts")
+    log.debug("set_nfs_access_ip_list starts")
 
     try:
         # try to get services allowed
@@ -2515,19 +2447,19 @@ def set_nfs_access_ip_list(array_of_ip):
 
                 # format error
                 if len(arr) < 2:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                    log.error(str(nfs_hosts_allow_file) + " format error")
           
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
 
-            # got good format
+                # got good format
                 services = str(arr[0]).strip()
 
                 iplist = arr[1]
                 ips = iplist.strip().split(", ")
 
                 if len(ips) < 2:
-                    log.info(str(nfs_hosts_allow_file) + " format error")
+                    log.error(str(nfs_hosts_allow_file) + " format error")
 
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2537,7 +2469,7 @@ def set_nfs_access_ip_list(array_of_ip):
                 full_ip_list = fixed_ips + array_of_ip
 
     except :
-        log.info("cannot parse " + str(nfs_hosts_allow_file))
+        log.error("cannot parse " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
 
@@ -2553,7 +2485,7 @@ def set_nfs_access_ip_list(array_of_ip):
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
     except:
-        log.info("cannot write to " + str(nfs_hosts_allow_file))
+        log.error("cannot write to " + str(nfs_hosts_allow_file))
 
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
@@ -2568,7 +2500,7 @@ def set_nfs_access_ip_list(array_of_ip):
     except:
         pass
         
-    log.info("set_nfs_access_ip_list end")
+    log.debug("set_nfs_access_ip_list end")
     
     return json.dumps(return_val)
 
@@ -2587,7 +2519,6 @@ def apply_scheduling_rules(schedule):        # by Yen
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
     # write settings to gateway_throttling.cfg
@@ -2629,7 +2560,6 @@ def stop_upload_sync():        # by Yen
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
     # generate a new rule set and apply it to the gateway
@@ -2666,7 +2596,6 @@ def force_upload_sync(bw):        # by Yen
         - result: Function call result.
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
-    
     """
     
     if (bw < 256):
@@ -2710,7 +2639,6 @@ def month_number(monthabbr):
     @param monthabbr: Abbrevation of month.
     @rtype: integer
     @return: The numeric expression of the month.
-    
     """
 
     MONTHS = ['',
@@ -2733,7 +2661,6 @@ def classify_logs(logs, keyword_filter=KEYWORD_FILTER):
     @param keyword_filter: Keyword filter.
     @rtype: string
     @return: The category name of input log message.
-    
     """
 
     for category in sorted(keyword_filter.keys()):
@@ -2762,7 +2689,6 @@ def parse_log(type, log_cnt):
     @type log_cnt: Log content.
     @rtype: dictionary
     @return: A log_entry structure if successfuly parsed. Otherwise, None will be returned.
-    
     """
 
     log_entry = {
@@ -2833,7 +2759,6 @@ def read_logs(logfiles_dict, offset, num_lines):
     @param num_lines: Max number of lines to be read.
     @rtype: integer
     @return: Count of read log.
-    
     """
 
     ret_log_cnt = {}
@@ -2874,9 +2799,9 @@ def read_logs(logfiles_dict, offset, num_lines):
 
 
 ##############################    
-def storage_cache_usage():
+def _get_storage_capacity():
     """
-    Read cloud storage and gateway usage.
+    Read cloud storage and gateway usage and capacity.
     
     Format:
         - Directory entries:    601
@@ -2900,6 +2825,7 @@ def storage_cache_usage():
             - cloud_data: Cloud data usage.
             - cloud_data_dedup: Cloud data usage after deduplication.
             - cloud_data_dedup_compress: Cloud data usage after deduplication and compression.
+            - cloud_capacity: Cloud storage capacity.
         - gateway_cache_usage: JSON object
             - max_cache_size: Max cache size.
             - max_cache_entries: Max cache entries.
@@ -2907,14 +2833,16 @@ def storage_cache_usage():
             - used_cache_entries: Used cache entries.
             - dirty_cache_size: Dirty cache size.
             - dirty_cache_entries: Dirty cache entries.
-    
     """
 
     ret_usage = {
               "cloud_storage_usage" :  {
                                     "cloud_data" : 0,
                                     "cloud_data_dedup" : 0,
-                                    "cloud_data_dedup_compress" : 0
+                                    "cloud_data_dedup_compress" : 0,
+                                    # wthung, 2012/8/17
+                                    # add cloud_capacity. now set to 1TB always
+                                    "cloud_capacity": 1099511627776
                                   },
               "gateway_cache_usage"   :  {
                                     "max_cache_size" : 0,
@@ -3007,7 +2935,7 @@ def storage_cache_usage():
 
     except Exception:
         if enable_log:
-            log.info(CMD_CHK_STO_CACHE_STATE + " fail")
+            log.error(CMD_CHK_STO_CACHE_STATE + " fail")
 
     return ret_usage
 
@@ -3027,7 +2955,6 @@ def calculate_net_speed(iface_name):
         - downlink_usage: Network traffic of incoming packets.
         - uplink_backend_usage: TBD
         - downlink_backend_usage: TBD
-    
     """
     
     ret_val = {
@@ -3064,10 +2991,9 @@ def get_network_speed(iface_name):  # iface_name = eth1
         - downlink_usage: Network traffic of incoming packets.
         - uplink_backend_usage: TBD
         - downlink_backend_usage: TBD
-    
     """
     
-    #log.info('get_network_speed start')
+    log.debug('get_network_speed start')
     
     # define net speed file
     netspeed_file = '/dev/shm/gw_netspeed'
@@ -3082,12 +3008,12 @@ def get_network_speed(iface_name):  # iface_name = eth1
     try:
         if os.path.exists(netspeed_file):
             # read net speed from file
-            #log.info('Read net speed from file')
+            log.debug('Read net speed from file')
             with open(netspeed_file, 'r') as fh:
                 ret_val = json.load(fh)
         else:
             # call functions directly. will consume at least one second
-            #log.info('No net speed file existed. Consume one second to calculate')
+            log.debug('No net speed file existed. Consume one second to calculate')
             ret_val = calculate_net_speed(iface_name)
 
     except:
@@ -3109,7 +3035,6 @@ def get_network_status(iface_name):  # iface_name = eth1
     @param iface_name: NIC interface name.
     @rtype: dictionary
     @return: Network usage.
-    
     """
     
     ret_network = {}
@@ -3120,7 +3045,6 @@ def get_network_status(iface_name):  # iface_name = eth1
     _, receiveCols , transmitCols = columnLine.split("|")
     receiveCols = map(lambda a: "recv_" + a, receiveCols.split())
     transmitCols = map(lambda a: "trans_" + a, transmitCols.split())
-
     cols = receiveCols + transmitCols
 
     faces = {}
@@ -3157,7 +3081,6 @@ def get_gateway_status():
             - uplink_backend_usage: Network traffic from gateway to backend.
             - downlink_backend_usage: Network traffic from backend to gateway.
             - network: TBD
-    
     """
 
     ret_val = {"result" : True,
@@ -3174,7 +3097,7 @@ def get_gateway_status():
             }
 
     if enable_log:
-        log.info("get_gateway_status")
+        log.debug("get_gateway_status")
 
     try:
         # get logs           
@@ -3182,12 +3105,12 @@ def get_gateway_status():
         ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
         # get usage
-        usage = storage_cache_usage()
+        usage = _get_storage_capacity()
         ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
     except:
-        log.info("Unable to get gateway status")
+        log.error("Unable to get gateway status")
 
     return json.dumps(ret_val)
 
@@ -3217,7 +3140,6 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
             - error_log: Error logs.
             - warning_log: Warning logs.
             - info_log: Infomration logs.
-    
     """
 
     ret_val = {"result" : True,
