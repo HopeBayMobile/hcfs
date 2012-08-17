@@ -107,6 +107,5 @@ def main():
     os.system("update-rc.d swift-maintain-switcher defaults")
 
     os.system("cp ./misc/CronScripts/timesync /etc/cron.hourly")
-    os.system("cp ./misc/DnsScripts/db.dcloudswift /etc/bind/")
 if __name__ == '__main__':
     main()
