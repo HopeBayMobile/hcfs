@@ -126,6 +126,12 @@ def do_meta_form(data):
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
     
+    # Assign device count and deive weight to each host
+    do_meta_form.report_progress(5, True, 'Assign device count for each host...', None)
+    for host in hosts:
+        host[u'deviceCnt'] = int(data["disk_count"])
+        host[u'deviceWeight'] = 100
+
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()

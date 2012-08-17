@@ -51,6 +51,15 @@
         (7) Execute "/etc/init.d/swift-event-manager"
         (8) Execute "/etc/init.d/swift-maintain-switcher"
 
+4. setup dns round robin
+        (1) Add [balance] section to /etc/delta/inputFile in the following format:
+              ip1
+              ip2
+              ...
+            
+
+	(2) Execute "dcloud_swift_dns_setup domainName"
+
 [command lines]
 1. dcloud_print_node_info
 2. dcloud_print_backlog
