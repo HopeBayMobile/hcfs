@@ -18,7 +18,7 @@ def _get_Swift_credential():
     """
     get swift credential setting
     """
-    log.info("_get_Swift_credential start")
+    log.debug("_get_Swift_credential start")
     url = None
     login = None
     password = None
@@ -35,7 +35,7 @@ def _get_Swift_credential():
     except Exception as e:
         log.error("Failed to _get_Swift_credential for %s" % str(e))
     finally:
-        log.info("_get_Swift_credential end")
+        log.debug("_get_Swift_credential end")
     return [url, login, password]
 
 
@@ -46,7 +46,6 @@ def get_configuration_backup_info():
         2. Probe whether there is a config file in Swift.
         3. If yes, download it and get the last backup date and time
     """
-    #~ log.info("[2] get_configuration_backup_info start")
     backup_info = _get_latest_backup()
     #~ Case 1. There is no container "config"
     if backup_info is None:
@@ -67,7 +66,6 @@ def get_configuration_backup_info():
                   'code':   op_code,
                   'msg':    op_msg}
 
-    #~ log.info("[2] get_configuration_backup_info end")
     return json.dumps(return_val)
 
 
@@ -155,7 +153,7 @@ def restore_gateway_configuration():
     """
     Restore latest configuration from Cloud.
     """
-    log.info("[2] restore_gateway_configuration start")
+    log.debug("restore_gateway_configuration start")
 
     tmp_dir = "/tmp/restore_config/"
     os.system("rm -r " + tmp_dir)          # clean old temp. data
@@ -213,7 +211,7 @@ def restore_gateway_configuration():
                   'code':   op_code,
                   'msg':    op_msg}
 
-    log.info("[2] restore_gateway_configuration stop")
+    log.debug("restore_gateway_configuration stop")
     return json.dumps(return_val)
 
 

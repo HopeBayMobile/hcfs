@@ -534,7 +534,6 @@ class SwiftDeploy:
         logger = util.getLogger(name="deploySwift")
 
         try:
-            os.system("rm %s" % GlobalVar.ACCOUNT_DB)
             self.__createMetadata(proxyList, storageList, numOfReplica)
             self.__deploySwift(proxyList, storageList)
 
@@ -862,10 +861,10 @@ def parseAddNodesSection(inputFile):
 
                     zid = int(node.get("zid"))
                     deviceCnt = int(node.get("deviceCnt"))
-                    deviceWeight = int(node.get("deviceWeight"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[addNodes] contains an invalid ip %s" % ip)
@@ -914,7 +913,7 @@ def checkNodeInputFormat(section, line):
     ip = node.get("ip", None)
     zid = node.get("zid", None)
     deviceCnt = node.get("deviceCnt", None)
-    deviceWeight = node.get("deviceWeight", None)
+    deviceCapacity = node.get("deviceCapacity", None)
 
     if not ip:
         raise Exception("%s missing ip in line '%s'" % (section, line))
@@ -922,8 +921,8 @@ def checkNodeInputFormat(section, line):
         raise Exception("%s missing zid in line '%s'" % (section, line))
     if not deviceCnt:
         raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
-    if not deviceWeight:
-        raise Exception("%s missing deviceWeight in line '%s'" % (section, line))
+    if not deviceCapacity:
+        raise Exception("%s missing deviceCapacity in line '%s'" % (section, line))
 
     try:
         socket.inet_aton(ip)
@@ -942,12 +941,12 @@ def checkNodeInputFormat(section, line):
             if deviceCnt < 1:
                 raise Exception("deviceCnt has to be a positive integer")
 
-        if not deviceWeight.isdigit():
-            raise Exception("%s line '%s' contains invalid deviceWeight" % (section, line))
+        if not deviceCapacity.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceCapacity" % (section, line))
         else:
-            deviceWeight = int(deviceWeight) 
-            if deviceWeight < 1:
-                raise Exception("deviceWeight has to be a positive integer")
+            deviceCapacity = int(deviceCapacity) 
+            if deviceCapacity < 1:
+                raise Exception("deviceCapacity has to be a positive integer")
 
     except socket.error:
         raise Exception("%s line '%s' contains an illegal ip" % (section, line))
@@ -976,10 +975,10 @@ def parseDeploySection(inputFile):
 
                     zid = int(node.get("zid"))
                     deviceCnt = int(node.get("deviceCnt"))
-                    deviceWeight = int(node.get("deviceWeight"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[deploy] line '%s' contains an illegal ip %s" % line)
@@ -1144,9 +1143,9 @@ def deploy():
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, util.getIpAddress())
+            cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (password, util.getProxyPort())
             os.system(cmd)
-            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
+            os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), password))
 
     except Exception as e:
         print >> sys.stderr, str(e)
@@ -1155,4 +1154,3 @@ def deploy():
 
 if __name__ == '__main__':
     print parseDeploySection("/etc/delta/inputFile")
-    print parseAddNodesSection("/etc/delta/inputFile")

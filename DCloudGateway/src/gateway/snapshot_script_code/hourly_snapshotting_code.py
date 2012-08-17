@@ -26,7 +26,7 @@ def check_snapshot_schedule():
     """
     Check the current snapshot schedule.
     """
-    log.info('Loading snapshot schedule')
+    log.debug('Loading snapshot schedule')
 
     snapshot_time = -1
 
@@ -36,7 +36,7 @@ def check_snapshot_schedule():
                 tmp_line = fh.readline()
                 snapshot_time = int(tmp_line)
 
-        log.info('Completed loading snapshot schedule')
+        log.debug('Completed loading snapshot schedule')
 
     except:
         raise SnapshotError('Unable to load snapshot schedule')
@@ -52,7 +52,7 @@ def take_scheduled_snapshot():
         if not os.path.exists(snapshot_tag):
             try:
                 subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
-                log.info('Taking scheduled snapshot (bot started).')
+                log.debug('Taking scheduled snapshot (bot started).')
             except:
                 raise SnapshotError("Could not initialize the snapshot bot.")
 
@@ -72,5 +72,5 @@ if __name__ == '__main__':
         if current_hour == snapshot_time:
             take_scheduled_snapshot()
     except Exception as err:
-        log.info('Error in hourly snapshotting check')
-        log.info('%s' % str(err))
+        log.error('Error in hourly snapshotting check')
+        log.error('%s' % str(err))
