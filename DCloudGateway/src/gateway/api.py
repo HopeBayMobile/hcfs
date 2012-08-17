@@ -911,6 +911,10 @@ def apply_storage_account(storage_url, account, password, test=True):
     
         with open('/root/.s3ql/authinfo2', 'wb') as op_fh:
             op_config.write(op_fh)
+
+        # wthung, 2012/8/16
+        # re-create upstart s3ql.conf
+        _createS3qlConf(storage_url)
         
         op_ok = True
         op_msg = 'Succeeded to apply storage account'
@@ -2874,9 +2878,9 @@ def read_logs(logfiles_dict, offset, num_lines):
 
 
 ##############################    
-def storage_cache_usage():
+def _get_storage_capacity():
     """
-    Read cloud storage and gateway usage.
+    Read cloud storage and gateway usage and capacity.
     
     Format:
         - Directory entries:    601
@@ -2900,6 +2904,7 @@ def storage_cache_usage():
             - cloud_data: Cloud data usage.
             - cloud_data_dedup: Cloud data usage after deduplication.
             - cloud_data_dedup_compress: Cloud data usage after deduplication and compression.
+            - cloud_capacity: Cloud storage capacity.
         - gateway_cache_usage: JSON object
             - max_cache_size: Max cache size.
             - max_cache_entries: Max cache entries.
@@ -2914,7 +2919,10 @@ def storage_cache_usage():
               "cloud_storage_usage" :  {
                                     "cloud_data" : 0,
                                     "cloud_data_dedup" : 0,
-                                    "cloud_data_dedup_compress" : 0
+                                    "cloud_data_dedup_compress" : 0,
+                                    # wthung, 2012/8/17
+                                    # add cloud_capacity. now set to 1TB always
+                                    "cloud_capacity": 1099511627776
                                   },
               "gateway_cache_usage"   :  {
                                     "max_cache_size" : 0,
@@ -3182,7 +3190,7 @@ def get_gateway_status():
         ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
         # get usage
-        usage = storage_cache_usage()
+        usage = _get_storage_capacity()
         ret_val["data"]["cloud_storage_usage"] = usage["cloud_storage_usage"]
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
