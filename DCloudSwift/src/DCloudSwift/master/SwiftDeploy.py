@@ -1144,9 +1144,9 @@ def deploy():
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, util.getIpAddress())
+            cmd = "swauth-prep -K %s -A https://127.0.0.1:8080/auth/" % (password,)
             os.system(cmd)
-            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
+            os.system("swauth-add-user -A https://127.0.0.1:8080/auth -K %s -a system root testpass" % (password,))
 
     except Exception as e:
         print >> sys.stderr, str(e)
