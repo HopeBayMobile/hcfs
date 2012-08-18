@@ -1,19 +1,11 @@
 {% extends "base.html" %}
 
-<!--{% load i18n %}
-
-{% block head_title %}{% trans "Welcome" %}{% endblock %}
-
-{% block body_class %}home{% endblock %}-->
-
-{% block moreScripts %}
-    <script type="text/javascript">
-    function redirect(){
-      self.location="/account/login/";
-    }
-    </script>
+{% block moreScripts%}
 {% endblock %}
 
+{% block head_title %}New Account{% endblock %}
+
+{% block body_class %}home{% endblock %}
 {% block navbar_class %}{% endblock %}
 {% block navbar %}
                     <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
@@ -34,19 +26,13 @@
 {% block body %}
 <div class="container-fluid">
     <div class="row-fluid">
-  <div id="sidebar" class="span3">
+      <div id="sidebar" class="span3">
       {% include "_side_bar.html" %}
     </div>
   <div id="screen" class="span9">
-    <h1>{% trans "Dashboard" %}</h1>
-    
-    {% if user.is_authenticated %}
-        <!--{% url what_next as what_next_url %}
-        <p class="what_next">{% blocktrans %}Wondering <a href="{{ what_next_url }}" class="btn primary large">What Next</a>?{% endblocktrans %}</p-->
-    {% else %}
-        {% url account_login as login_url %}<script type="text/javascript">redirect();</script>
-        {% url account_signup as signup_url %}
-        <p>{% blocktrans %}You can <a href="{{ login_url }}" class="btn">Log In</a> or <a href="{{ signup_url }}" class="btn primary">Sign Up</a> to try out the site.{% endblocktrans %}</p>
-    {% endif %}
+<h1>Monitoring</h1>
+<div data-role="content">
+
+</div>
 </div></div>
 {% endblock %}

@@ -136,7 +136,11 @@ INSTALLED_APPS = [
     "metron",
     
     # project
+    "swift_dashboard",
     "swift_account",
+    "swift_monitor",
+    "swift_maintainance",
+    "systemlog",
 ]
 
 # A sample logging configuration. The only tangible logging
