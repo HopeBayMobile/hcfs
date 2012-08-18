@@ -21,6 +21,11 @@
     # prepare [debian] foler
     cp -r $INITPATH/debian_templates/s3ql/debian ./
     # build dependencies
+    #
+    #-- Ovid Wu <ovidwu@gmail.com> Sat, 18 Aug 2012 22:19:06 +0800
+    #
+    # FIXME: make sure all required dependency of s3ql is downloaded to
+    # /var/cache/apt/archive in order to build debian binary package
     sudo apt-get -y build-dep s3ql  # s3ql has to be installed before.
     # update change log
     dch -v $VERSION.$BUILD -m
