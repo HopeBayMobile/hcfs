@@ -1,5 +1,6 @@
 import os
 import subprocess
+import setuptools
 from setuptools import setup, find_packages
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -32,9 +33,6 @@ def isAllDebInstalled(debSrc):
     return True
 
 
-def usage():
-    print "usage: python setup.py install\n"
-
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -42,8 +40,6 @@ def read(fname):
 def main():
     os.system("mkdir -p %s" % DELTADIR)
 
-    #if not isAllDebInstalled("misc/deb_src"):
-    #    os.system("cd misc/deb_src; dpkg -i *.deb")
     setup(
         name="DCloudSwift",
         version="0.4",
@@ -88,6 +84,7 @@ def main():
                 "Development Status :: 3 - Alpha",
                 "Topic :: FILESYSTEM",
         ],
+        cmdclass={'prepare_image': prepare_image}
     )
 
 
@@ -107,5 +104,50 @@ def main():
     os.system("update-rc.d swift-maintain-switcher defaults")
 
     os.system("cp ./misc/CronScripts/timesync /etc/cron.hourly")
+
+class prepare_image(setuptools.Command):
+    user_options = []
+    boolean_options = []
+    description = "Copy to /usr/local/src/"
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        if os.path.exists("/usr/src/DCloudSwift"):
+            cmd = "rm -rf /usr/local/src/DCloudSwift"
+            print cmd
+            os.system(cmd)
+
+        cmd = "cp -r %s /usr/local/src/" % WORKING_DIR
+        print cmd
+        os.system(cmd)
+        
+        #replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
+        cmd = "cp misc/BootScripts/rc /etc/init.d/rc"
+        print cmd
+        os.system(cmd)
+
+        # Copy misc/BootScripts/rc.py to /etc/rc.py
+        cmd = "cp misc/BootScripts/rc.py /etc/rc.py"
+        print cmd
+        os.system(cmd)
+        
+        # Create directories
+        if not os.path.exists("/srv"):
+            cmd = "mkdir /srv"
+            print cmd
+            os.system(cmd)
+
+        if not os.path.exists("/DCloudSwift"):
+            cmd = "mkdir /DCloudSwift"
+            print cmd
+            os.system(cmd)
+
+        exit(0)
+
 if __name__ == '__main__':
     main()

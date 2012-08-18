@@ -60,6 +60,10 @@
 
 	(2) Execute "dcloud_swift_dns_setup domainName"
 
+[Build PDCM golden image]
+   (1) Copy DCloudSwift to the node for building golden image 
+   (2) Execute 'python setup.py prepare_image'
+
 [command lines]
 1. dcloud_print_node_info
 2. dcloud_print_backlog
@@ -76,8 +80,7 @@
 3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
    Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
 
-4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
-   Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py
+4. Please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
 
 5. For PDCM0.4, please create /srv and /DCloudSwift when building golden image.
 

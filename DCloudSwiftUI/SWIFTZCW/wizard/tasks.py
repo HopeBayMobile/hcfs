@@ -7,7 +7,7 @@ from threading import Thread
 from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 PASSWORD = 'deltacloud'
-SOURCE_DIR = '/usr/src/'
+SOURCE_DIR = '/usr/local/src/'
 
 def dns_lookup(hosts, nameserver="192.168.11.1"):
     '''
