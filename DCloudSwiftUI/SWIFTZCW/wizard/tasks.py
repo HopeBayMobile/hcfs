@@ -168,6 +168,6 @@ def do_meta_form(data):
     else:
         do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
     do_meta_form.report_progress(100, True, "Creating a default user...", None)
-    cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (PASSWORD, hosts[0]["ip"])
+    cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
-    os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (hosts[0]["ip"], PASSWORD))
+    os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
