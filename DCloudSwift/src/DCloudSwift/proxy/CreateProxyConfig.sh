@@ -49,7 +49,7 @@ pipeline = healthcheck cache swauth proxy-server
 
 [app:proxy-server]
 use = egg:swift#proxy
-allow_account_management = false
+allow_account_management = true
 
 [filter:swauth]
 use = egg:swauth#swauth
