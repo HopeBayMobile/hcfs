@@ -46,9 +46,9 @@ def main():
     #    os.system("cd misc/deb_src; dpkg -i *.deb")
     setup(
         name="DCloudSwift",
-        version="0.2",
-        author="Cloud Data Team, CTBU, Delta Electronic Inc.",
-        description=("Delta Inc. CTBU Storage Gateway"),
+        version="0.4",
+        author="Cloud Data Team, CTBD, Delta Electronic Inc.",
+        description=("Delta Inc. CTBD Storage Gateway"),
         license="Delta Inc.",
         keywords=['deploy', 'swift', 'cloud'],
 

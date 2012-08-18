@@ -534,7 +534,6 @@ class SwiftDeploy:
         logger = util.getLogger(name="deploySwift")
 
         try:
-            os.system("rm %s" % GlobalVar.ACCOUNT_DB)
             self.__createMetadata(proxyList, storageList, numOfReplica)
             self.__deploySwift(proxyList, storageList)
 
@@ -1144,9 +1143,9 @@ def deploy():
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://127.0.0.1:8080/auth/" % (password,)
+            cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (password, util.getProxyPort())
             os.system(cmd)
-            os.system("swauth-add-user -A https://127.0.0.1:8080/auth -K %s -a system root testpass" % (password,))
+            os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), password))
 
     except Exception as e:
         print >> sys.stderr, str(e)
