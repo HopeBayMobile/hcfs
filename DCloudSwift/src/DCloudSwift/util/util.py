@@ -690,6 +690,29 @@ def getIp2Zid(swiftDir="/etc/swift"):
 
     return ip2Zid
 
+def getStorageNodeList(swiftDir="/etc/swift"):
+    """
+    get the list of storage nodes by reading swiftDir/storageList
+
+    @type swiftDir: string
+    @param swiftDir: path to the directory containing the file proxyList
+    @rtype: list
+    @return: If swiftDir/proxyList exists and contains legal contents
+             then return the list storage nodes.
+             Otherwise, return none,
+    """
+    logger = getLogger(name="getStorageNodeList")
+
+    storageList = []
+
+    try:
+        with open("%s/storageList" % swiftDir, "rb") as fh:
+            storageList = pickle.load(fh)
+    except IOError:
+        logger.warn("Failed to load storage list from %s/storageList" % swiftDir)
+        return None
+
+    return storageList
 
 def getStorageNodeIpList(swiftDir="/etc/swift"):
     '''
