@@ -33,7 +33,6 @@ def _check_http_proxy_service():
     except:
         pass
 
-    #log.info("[2] _check_http_proxy end")
     return op_proxy_check
 
 

@@ -1,4 +1,3 @@
-import os
 import os.path
 import common
 import time
@@ -30,10 +29,10 @@ def check_lostfound_delete():
 ################################################################
 
 if __name__ == '__main__':
-    log.info('Start checking for unlinked data in lost+found')
+    log.debug('Start checking for unlinked data in lost+found')
     try:
         check_lostfound_delete()
-        log.info('Finished checking for unlinked data in lost+found')
+        log.debug('Finished checking for unlinked data in lost+found')
     except Exception as err:
-        log.info('Error in deleting unlinked data in lost+found')
-        log.info('%s' % str(err))
+        log.error('Error in deleting unlinked data in lost+found')
+        log.error('%s' % str(err))

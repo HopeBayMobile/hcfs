@@ -243,7 +243,7 @@ def execute_take_snapshot():
     """
     Main function for taking the snapshots.
     """
-    log.info('Begin snapshotting bot tasks')
+    log.debug('Begin snapshotting bot tasks')
 
     if not snapshot._check_snapshot_in_progress():
         # if we are initializing a new snapshot process
@@ -252,8 +252,8 @@ def execute_take_snapshot():
             new_database_entry()
         except snapshot.SnapshotError as Err:
             err_msg = str(Err)
-            log.info('[2] Unexpected error in snapshotting.')
-            log.info('Error message: %s' % err_msg)
+            log.error('Unexpected error in snapshotting.')
+            log.error('Error message: %s' % err_msg)
             return
     else:
         if actually_not_in_progress():
@@ -299,7 +299,7 @@ def execute_take_snapshot():
                         return
 
                     invalidate_entry()  # Cannot finish the snapshot for some reason
-                    log.info('[2] Unable to finish the current snapshotting process. Aborting.')
+                    log.error('Unable to finish the current snapshotting process. Aborting.')
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     return
             else:
@@ -307,7 +307,7 @@ def execute_take_snapshot():
 
                 if not os.path.exists(snapshot_statistics):
                     # Statistics does not exists
-                    log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                    log.warning('Unable to read snapshot statistics. Do we have the latest S3QL?')
                     invalidate_entry()  # Cannot finish the snapshot for some reason
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     return
@@ -335,7 +335,7 @@ def execute_take_snapshot():
                             return
 
                         invalidate_entry()
-                        log.info('[2] Unable to finish the current snapshotting process. Aborting.')
+                        log.error('Unable to finish the current snapshotting process. Aborting.')
                         os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                         return
                 else:
@@ -343,7 +343,7 @@ def execute_take_snapshot():
 
                     if not os.path.exists(snapshot_statistics):
                         # Statistics does not exists
-                        log.info('Unable to read snapshot statistics. Do we have the latest S3QL?')
+                        log.warning('Unable to read snapshot statistics. Do we have the latest S3QL?')
                         invalidate_entry()  # Cannot finish the snapshot for some reason
                         os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                         return
@@ -389,7 +389,7 @@ def execute_take_snapshot():
     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
     
 
-    log.info('Snapshotting finished at %s' % str(ftime_format))
+    log.debug('Snapshotting finished at %s' % str(ftime_format))
 
 ################################################################
 
@@ -397,5 +397,4 @@ if __name__ == '__main__':
     try:
         execute_take_snapshot()
     except Exception as err:
-        log.info('%s' % str(err))
-        print('%s' % str(err))
+        log.error('%s' % str(err))
