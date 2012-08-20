@@ -168,13 +168,16 @@ def do_meta_form(data):
     do_meta_form.report_progress(5, True, 'Assign device count for each host...', None)
     for host in hosts:
         host[u'deviceCnt'] = int(data["disk_count"])
-        host[u'deviceWeight'] = 100
+
+    do_meta_form.report_progress(10, True, 'Assign device capacity for each host...', None)
+    for host in hosts:
+        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
 
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
     progress = SD.getUpdateMetadataProgress()
-    do_meta_form.report_progress(10, True, 'Creating swift cluster metadata...', None)
+    do_meta_form.report_progress(15, True, 'Creating swift cluster metadata...', None)
     while progress['finished'] != True:
         time.sleep(10)
         progress = SD.getUpdateMetadataProgress()

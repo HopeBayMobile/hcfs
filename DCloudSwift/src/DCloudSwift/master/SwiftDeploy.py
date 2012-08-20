@@ -861,10 +861,10 @@ def parseAddNodesSection(inputFile):
 
                     zid = int(node.get("zid"))
                     deviceCnt = int(node.get("deviceCnt"))
-                    deviceWeight = int(node.get("deviceWeight"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[addNodes] contains an invalid ip %s" % ip)
@@ -913,7 +913,7 @@ def checkNodeInputFormat(section, line):
     ip = node.get("ip", None)
     zid = node.get("zid", None)
     deviceCnt = node.get("deviceCnt", None)
-    deviceWeight = node.get("deviceWeight", None)
+    deviceCapacity = node.get("deviceCapacity", None)
 
     if not ip:
         raise Exception("%s missing ip in line '%s'" % (section, line))
@@ -921,8 +921,8 @@ def checkNodeInputFormat(section, line):
         raise Exception("%s missing zid in line '%s'" % (section, line))
     if not deviceCnt:
         raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
-    if not deviceWeight:
-        raise Exception("%s missing deviceWeight in line '%s'" % (section, line))
+    if not deviceCapacity:
+        raise Exception("%s missing deviceCapacity in line '%s'" % (section, line))
 
     try:
         socket.inet_aton(ip)
@@ -941,12 +941,12 @@ def checkNodeInputFormat(section, line):
             if deviceCnt < 1:
                 raise Exception("deviceCnt has to be a positive integer")
 
-        if not deviceWeight.isdigit():
-            raise Exception("%s line '%s' contains invalid deviceWeight" % (section, line))
+        if not deviceCapacity.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceCapacity" % (section, line))
         else:
-            deviceWeight = int(deviceWeight) 
-            if deviceWeight < 1:
-                raise Exception("deviceWeight has to be a positive integer")
+            deviceCapacity = int(deviceCapacity) 
+            if deviceCapacity < 1:
+                raise Exception("deviceCapacity has to be a positive integer")
 
     except socket.error:
         raise Exception("%s line '%s' contains an illegal ip" % (section, line))
@@ -975,10 +975,10 @@ def parseDeploySection(inputFile):
 
                     zid = int(node.get("zid"))
                     deviceCnt = int(node.get("deviceCnt"))
-                    deviceWeight = int(node.get("deviceWeight"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceWeight": deviceWeight})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[deploy] line '%s' contains an illegal ip %s" % line)

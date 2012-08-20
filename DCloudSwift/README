@@ -20,13 +20,13 @@
             [portal]
             url = url of the public access portal for users
         (4) Add [deploy] section to /etc/delta/inputFile in the following format:
-              ip=192.168.11.10 zid=1 deviceCnt=6 deviceWeight=100
-              ip=192.168.11.11 zid=2 deviceCnt=6 deviceWeight=100
+              ip=192.168.11.10 zid=1 deviceCnt=6 deviceCapacity=100
+              ip=192.168.11.11 zid=2 deviceCnt=6 deviceCapacity=100
               ...
             
               where zid has to be a positive integer less than 10, deviceCnt should be
-              the number of disks in the node, and deviceWight should be a positive integer
-              proportional to the capacity of an individual disk in the node.
+              the number of disks in the node, and deviceCapacity should be the capacity 
+              of an individual disk in the node.
               (we assume the disks in the same node are of the same capacity.)
 
               Note that the master node to run this deploy script cannot be included 

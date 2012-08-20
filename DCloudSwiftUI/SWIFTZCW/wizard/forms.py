@@ -39,8 +39,17 @@ meta = json.loads(
         "min": 1,
         "default": 6,
         "order": 5
-        }
+        },
        
+        "disk_capacity": {
+        "description": "capacity per disk (GB)",
+        "type": "number",
+        "required": true,
+        "max": 1048576,
+        "min": 1,
+        "default": 2048,
+        "order": 6
+        }
 
 }
 """
