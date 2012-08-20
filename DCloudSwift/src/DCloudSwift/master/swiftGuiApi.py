@@ -24,7 +24,22 @@ class Dashboard:
     def __init__(self):
         self.logger = util.getLogger(name="swiftGuiApi.Dashborad")
     def get_total_capacity(self):
-        pass
+        '''
+        return the total capacity of the capacity or none if errors happen
+        '''
+        storageList = util.getStorageNodeList()
+        capacity = 0
+        try:
+            if storageList:
+                for node in storageList:
+                    capacity += node["deviceCapacity"] * node["deviceCnt"]
+            else:
+                return None
+        except Exception as e:
+             self.logger.error(str(e))
+             return None
+
+        return capacity
 
 class Monitoring:
     def __init__(self):
@@ -35,4 +50,6 @@ class Maintenance:
         self.logger = util.getLogger(name="swiftGuiApi.Maintenance")
 
 if __name__ == "__main__":
+    dboard = Dashboard()
+    print dboard.get_total_capacity()/(1024*1024*1024*1024)
     pass
