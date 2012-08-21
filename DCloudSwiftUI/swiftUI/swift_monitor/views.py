@@ -7,7 +7,7 @@ def index(request):
     """
     monitor swift nodes
     """
-    zone = {"ip":"192.168.1.104","nodes":3,"used":"21%","capacity":"12TB"}
+    zone = {"ip":"192.168.1.104","nodes":3,"used":"21","free":"79","capacity":"12TB"}
     nodes = []
     nodes.append({"ip":"172.30.11.33","hostname":"TPEIIA","status":"dead","mode":"waiting","hd_number":6,"hd_error":1,
     "hd_info":[{"serial":"SN_TP02","status":"Broken"},{"serial":"SN_TP03","status":"OK"},{"serial":"SN_TP04","status":"OK"}]
