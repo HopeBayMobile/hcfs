@@ -6,7 +6,7 @@
 <script language="javascript" type="text/javascript" src="/static/js/jqplot.pieRenderer.min.js"></script>
 <script type="text/javascript">
 $(document).ready(function(){  
-    var quota_ratio = [["Used", 3], ["Free", 7]];
+    var quota_ratio = [["Used", {{zone.used}}], ["Free", {{zone.free}}]];
     var plot7 = $.jqplot('quota_chart', [quota_ratio], {
         title:'Capacity',
         seriesColors: [ "#4bb2c5", "#c5b47f" ],
@@ -67,8 +67,27 @@ $(document).ready(function(){
           <h4>Top 5 Accounts</h4>
         </div>
     </div>
-    <div data-role="content">
-
-    </div>
+    <div class="row-fluid">
+        <div class="span9">
+          <table class="table">
+            <tr>
+				<th>IP</th>
+				<th>Nodes</th>
+				<th>Status</th>
+				<th>Error</th>
+				<th>Used</th>
+				<th>Capacity</th>
+			</tr>
+			<tr>
+			    <td>{{zone.ip}}</td>
+			    <td>{{zone.nodes}}</td>
+			    <td></td>
+			    <td></td>
+			    <td>{{zone.used}}%</td>
+			    <td>{{zone.capacity}}</td>
+			</tr>
+          </table>
+        </div>
+      </div>
 </div></div>
 {% endblock %}
