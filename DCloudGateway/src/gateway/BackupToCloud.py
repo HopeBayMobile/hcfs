@@ -38,7 +38,7 @@ class BackupToCloud():
         if self._fileList is None:
             self._fileList = ['/etc/network/interfaces',
                               '/home/hungic/.bashrc', '/tmp/aaa']
-        log.info('[3] input file list: %s' % self._fileList)
+        log.debug('input file list: %s' % self._fileList)
         #print self._fileList
         if self._cloudObject is None:
             self._cloudObject = SwiftClient()
@@ -52,13 +52,13 @@ class BackupToCloud():
         @return: a string is datetime which format is yyyyddmmHHMM
                  For example: 201206301530
         """
-        log.info('[3] start backup config')
+        log.debug('start backup config')
         self._datetime = str(int(time.mktime(time.localtime())))
         self._tarFileName = '%s_gw_conf_backup.tar.gz' % self._datetime
         self.copyFile()
-        log.info('[3] prepare tar compression file')
+        log.debug('prepare tar compression file')
         self.tarFile()
-        log.info('[3] start send to cloud')
+        log.debug('start send to cloud')
         self.sendToCloud()
         return self._datetime
 
@@ -86,7 +86,7 @@ class BackupToCloud():
                 shutil.copy2(filename, TEMP_PATH)
                 i = i + 1
             else:
-                log.warning('[1] File(%s) is not exist' % filename)
+                log.warning('File(%s) is not exist' % filename)
         #print self._metaData
         try:
             with open(''.join([TEMP_PATH, '/metadata.txt']), 'w+') as fd:

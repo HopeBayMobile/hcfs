@@ -1,17 +1,13 @@
 import ConfigParser
 import os
 import time
+import subprocess
 from threading import Thread
 
 from celery.task import task
 from delta.wizard.api import DeltaWizardTask
-from DCloudSwift.util import util
-from DCloudSwift.master import SwiftDeploy
-import DCloudSwift
-
-
-SWIFTCONF = util.GlobalVar.ORI_SWIFTCONF
 PASSWORD = 'deltacloud'
+SOURCE_DIR = '/usr/local/src/'
 
 def dns_lookup(hosts, nameserver="192.168.11.1"):
     '''
@@ -28,6 +24,7 @@ def dns_lookup(hosts, nameserver="192.168.11.1"):
         to the value of key "ip" for that host. Otherwise None is used.
     '''
 
+    from DCloudSwift.util import util
     ret = []
     for host in hosts:
         mutable_host = host.copy()
@@ -75,6 +72,9 @@ def set_portal_url(portal_url):
     @rtype: None
     @return: no return
     '''
+    from DCloudSwift.util import util
+    SWIFTCONF = util.GlobalVar.ORI_SWIFTCONF
+
     config = ConfigParser.ConfigParser()
     section = "portal"
 
@@ -96,9 +96,47 @@ def set_portal_url(portal_url):
         raise Exception("Failed to access %s" % SWIFTCONF)
 
 
+def installDCloudSwift():
+    '''
+    Install DCloudSwfit from source in SOURCE_DIR
+    '''
+    ret = os.system("python %s/DCloudSwift/setup.py install" % SOURCE_DIR)
+    if ret !=0:
+        raise Exception("Failed to install %s/DCloudSwift" % SOURCE_DIR)
+
+    import imp
+    path = getNewSysPath()
+    (fh, pathname, description) = imp.find_module("DCloudSwift", path)
+    imp.load_module("DCloudSwift", fh, pathname, description)
+
+
+def getNewSysPath():
+    '''
+    get the newest sys.path
+    '''
+    cmd = "python -c 'import sys; print \"\\n\".join(sys.path)'"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    lines = po.stdout.readlines()
+    po.wait()
+    path = []
+    if po.returncode == 0:
+        for line in lines:
+            line = line.strip()
+            if line:
+                path.append(line)
+    else:
+        raise Exception("Failed to get the newest sys.path")
+
+    return path
+
+
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
+    installDCloudSwift()
     from time import sleep
+    from DCloudSwift.util import util
+    from DCloudSwift.master import SwiftDeploy
+    import DCloudSwift
 
     #  Contruct URL of portal and write it to SWIFTCONF
     if data["portal_port"] < 1 or data["portal_port"] > 65536:
@@ -126,11 +164,20 @@ def do_meta_form(data):
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
     
+    # Assign device count and deive weight to each host
+    do_meta_form.report_progress(5, True, 'Assign device count for each host...', None)
+    for host in hosts:
+        host[u'deviceCnt'] = int(data["disk_count"])
+
+    do_meta_form.report_progress(10, True, 'Assign device capacity for each host...', None)
+    for host in hosts:
+        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
+
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
     progress = SD.getUpdateMetadataProgress()
-    do_meta_form.report_progress(10, True, 'Creating swift cluster metadata...', None)
+    do_meta_form.report_progress(15, True, 'Creating swift cluster metadata...', None)
     while progress['finished'] != True:
         time.sleep(10)
         progress = SD.getUpdateMetadataProgress()
@@ -162,6 +209,6 @@ def do_meta_form(data):
     else:
         do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
     do_meta_form.report_progress(100, True, "Creating a default user...", None)
-    cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (PASSWORD, hosts[0]["ip"])
+    cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
-    os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (hosts[0]["ip"], PASSWORD))
+    os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
