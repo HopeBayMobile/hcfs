@@ -1419,63 +1419,6 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
-    def get_user_quota(self, account, container, user, admin_user, retry=3):
-        '''
-        Get the quota of the given user by reading the metadata in the container for the user.
-        (Not finished yet)
-
-        @type  account: string
-        @param account: the account to be set quota
-        @type  container: string
-        @param container: the container for the given user
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
-        @type  retry: integer
-        @param retry: the maximum number of times to retry when fn return False
-        @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user's quota is successfully got, then Bool.val = True and Bool.msg = the quota
-                of the given user. Otherwise, Bool.val == False and Bool.msg indicates the error message.
-        '''
-        logger = util.getLogger(name="get_user_quota")
-        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-        proxy_ip_list = self.__proxy_ip_list
-        admin_password = ""
-
-        msg = ""
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-
-        #TODO: check whehter the container is associated with the given user
-
-        if proxy_ip_list is None or len(proxy_ip_list) == 0:
-            msg = "No proxy node is found."
-            return Bool(val, msg)
-
-        if retry < 1:
-            msg = "Argument retry has to >= 1."
-            return Bool(val, msg)
-
-        get_admin_password_output = self.get_user_password(account, admin_user)
-        if get_admin_password_output.val == False:
-            val = False
-            msg = get_admin_password_output.msg
-            return Bool(val, msg)
-        else:
-            admin_password = get_admin_password_output.msg
-
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata, account=account,\
-                                           container=container, admin_user=admin_user, admin_password=admin_password)
-
-        if val == False:
-            return Bool(val, msg)
-        elif msg["Quota"].isdigit():
-            msg = int(msg["Quota"])
-        else:
-            val = False
-            msg = "The value of the quota in the metadata is not a number."
-
-        return Bool(val, msg)
-
     @util.timeout(300)
     def __get_account_info(self, proxyIp):
         '''
