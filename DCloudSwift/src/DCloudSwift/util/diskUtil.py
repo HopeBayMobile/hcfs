@@ -430,12 +430,19 @@ def getLatestFingerprint():
     logger.debug("getLatestFingerprint start")
     disks = getNonRootDisks()
     latestFingerprint = None
+    hostname = socket.gethostname()
+    if not hostname:
+        logger.error("Failed to get hostname")
+        return None
 
     for disk in disks:
         (ret, fingerprint) = readFingerprint(disk)
         if ret == 0:
+            if fingerprint.get("hostname", "") != hostname:
+                continue
+
             if latestFingerprint is None or latestFingerprint["vers"] < fingerprint["vers"]:
-                latestFingerprint = fingerprint
+                    latestFingerprint = fingerprint
 
     logger.debug("getLatestFingerprint end")
     return latestFingerprint
