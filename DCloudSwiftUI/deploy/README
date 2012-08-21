@@ -1,0 +1,10 @@
+This directory contains all programs which Zone Config Wizard (ZCW) used to deploy.
+Delta Electronics, Inc. 2012
+
+In order to deploy ZCW, please follow this steps:
+1. Package what ZCW need.
+	sudo ./bundle
+2. Deploy ZCW.
+	sudo ./deploy
+3. Start ZCW Service
+	sudo zcw start

@@ -13,6 +13,7 @@ urlpatterns = patterns("",
     url(r"^$", include("swift_dashboard.urls", namespace="dashboard")),
     url(r"^admin/", include(admin.site.urls)),
     url(r"^accounts/", include("account.urls")),
+    url(r"^wizard/", include('delta.wizard.urls', namespace="DWIZARD")),
     # custom apps
     url(r"^account/", include("swift_account.urls", namespace="account")),
     url(r"^monitor/", include("swift_monitor.urls", namespace="monitor")),
