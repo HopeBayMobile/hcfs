@@ -88,6 +88,24 @@ def save_zcw_hosts(hosts):
     f.close()
     log('save hosts info into /var/zcw/hosts')
 
+def save_zcw_master(master):
+    ZCW_DIR = '/var/zcw'
+    ZCW_IP = '/var/zcw/master'
+
+    try:
+        import os
+        os.makedirs(ZCW_DIR)
+    except Exception, e:
+        if e.errno != 17:
+            err_exit('can not create /var/zcw folder for storing ip of zcw. reason: %s' % e)
+    try:
+        f = open(ZCW_IP, 'w+')
+    except Exception, e:
+        err_exit('can not open /var/zcw/ip storing ip of zcw. reason: %s' % e)
+
+    f.write(json.dumps(master))
+    f.close()
+    log('save zcw master into /var/zcw/master')
 
 def start_zcw_web_service():
     from os import system
@@ -147,17 +165,17 @@ def main():
                 send_ready(False, 'can not start zcw web service in zone "%s". resason: %s' % (zoneid, zcw_status_result.get('msg', 'unknown reason')))
     else:
         log('current node is not zcw node.')
-        hosts = data.get('hosts', [])
+        zcw_hostname = data.get('zcw_hostname', '')
 
-        if len(hosts) == 0:
-            err_exit('no host found in zone "%s"', zoneid)
-        else:
-            log('listing zone hosts ...')
-            for h in hosts:
-                log('%s - Island-%s, Rack-%s, Position-%s' % (h.get('hostname'), h.get('island', 'unknown'), h.get('rack', 'unknown'), h.get('position', 'unknown')))
+        if not zcw_hostname:
+            hosts = data.get('hosts', [])
+            if len(hosts) > 0:
+                zcw_hostname = hosts[0].get('hostname', '')
 
-            # save zcw hosts file
-            save_zcw_hosts(hosts)
+        log('zcw hostname is %s' % zcw_hostname)
+        master = {"hostname": zcw_hostname}
+        # save zcw master
+        save_zcw_master(master)
 
         send_ready(True)
 

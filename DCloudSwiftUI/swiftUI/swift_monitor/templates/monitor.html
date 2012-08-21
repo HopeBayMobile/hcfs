@@ -3,6 +3,9 @@
 {% block moreScripts%}
 {% endblock %}
 
+{% block moreStyles%}
+{% endblock %}
+
 {% block head_title %}New Account{% endblock %}
 
 {% block body_class %}home{% endblock %}
@@ -25,14 +28,75 @@
 {% endblock %}
 {% block body %}
 <div class="container-fluid">
-    <div class="row-fluid">
-      <div id="sidebar" class="span3">
+  <div class="row-fluid">
+    <div id="sidebar" class="span3">
       {% include "_side_bar.html" %}
     </div>
-  <div id="screen" class="span9">
-<h1>Monitoring</h1>
-<div data-role="content">
-
-</div>
+    <div id="screen" class="span9">
+      <div class="row-fluid">
+        <div class="span9">
+          <table class="table">
+            <tr>
+				<th>IP</th>
+				<th>Nodes</th>
+				<th>Status</th>
+				<th>Error</th>
+				<th>Used</th>
+				<th>Capacity</th>
+			</tr>
+			<tr>
+			    <td>{{zone.ip}}</td>
+			    <td>{{zone.nodes}}</td>
+			    <td></td>
+			    <td></td>
+			    <td>{{zone.used}}%</td>
+			    <td>{{zone.capacity}}</td>
+			</tr>
+          </table>
+        </div>
+      </div>
+      <div class="row-fluid">
+        <div id="sidebar" class="span9">
+          <table class="table">
+            <tr>
+                <th>Node IP</th>
+				<th></th>
+				<th>Hostname</th>
+				<th>Node Status</th>
+				<th>Mode</th>
+				<th>HD Number</th>
+				<th>HD Error</th>
+			</tr>
+			{% for node in nodes %}
+			<tr>
+			    <td>{{node.ip}}</td>
+			    <td>-</td>
+			    <td>{{node.hostname}}</td>
+			    <td>{{node.status}}</td>
+			    <td>{{node.mode}}</td>
+			    <td>{{node.hd_number}}</td>
+			    <td>{{node.hd_error}}</td>
+			</tr>
+			{% for info in node.hd_info %}
+			<tr>
+			    <td></td>
+			    <td></td>
+			    <td></td>
+			    <td></td>
+			    <td></td>
+			    <td>{{info.serial}}</td>
+			    <td>{{info.status}}</td>
+			</tr>
+			{% endfor %}
+			{% endfor %}
+			<!--tr>
+			    <td>+</td>
+			    <td>172.30.11.33</td>
+			    <td>Error</td>
+			    <td>1</td>
+			</tr-->
+          </table>
+        </div>
+      </div>
 </div></div>
 {% endblock %}
