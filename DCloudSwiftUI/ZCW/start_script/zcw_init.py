@@ -165,16 +165,17 @@ def main():
                 send_ready(False, 'can not start zcw web service in zone "%s". resason: %s' % (zoneid, zcw_status_result.get('msg', 'unknown reason')))
     else:
         log('current node is not zcw node.')
-        zcw_ip = data.get('zcw_ip', None)
+        zcw_hostname = data.get('zcw_hostname', '')
 
-        if not zcw_ip:
-            err_exit('Cannot get ip of zcw in "%s"', zoneid)
-        else:
-            log('zcw_ip is %s.' % (zcw_ip))
+        if not zcw_hostname:
+            hosts = data.get('hosts', [])
+            if len(hosts) > 0:
+                zcw_hostname = hosts[0].get('hostname', '')
 
-        master = {"ip": zcw_ip}
+        log('zcw hostname is %s' % zcw_hostname)
+        master = {"hostname": zcw_hostname}
         # save zcw master
-        save_zcw_master(zcw_master)
+        save_zcw_master(master)
 
         send_ready(True)
 
