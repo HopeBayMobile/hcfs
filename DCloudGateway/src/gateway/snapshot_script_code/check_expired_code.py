@@ -219,7 +219,7 @@ def _get_snapshot_lifespan():
                 log.info('Stored lifespan is not an integer. Resetting to default (365 days).')
                 reset_config = True
     except IOError:
-        log.info('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
+        log.warning('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
         reset_config = True
     except:
         pass
@@ -239,7 +239,7 @@ def check_expired_snapshots():
     @rtype: N/A
     @return: None
     """
-    log.info('Start checking expired snapshots')
+    log.debug('Start checking expired snapshots')
 
     try:
         finished = False
@@ -268,7 +268,7 @@ def check_expired_snapshots():
                 break
 
             # Delete expired snapshots
-            log.info('Deleting snapshot %s' % to_delete)
+            log.debug('Deleting snapshot %s' % to_delete)
             snapshot_path = os.path.join(snapshot_dir, to_delete)
             if os.path.exists(snapshot_path):  # Invoke s3qlrm
                 os.system('sudo python /usr/local/bin/s3qlrm %s' % snapshot_path)
@@ -276,7 +276,7 @@ def check_expired_snapshots():
             updated_snapshot_list = snapshot_list[:snapshot_index] + snapshot_list[snapshot_index + 1:]
             _write_snapshot_db(updated_snapshot_list)
 
-        log.info('Finished checking expired snapshots')
+        log.debug('Finished checking expired snapshots')
 
     except Exception as Err:
         raise SnapshotError(str(Err))
@@ -288,5 +288,5 @@ if __name__ == '__main__':
     try:
         check_expired_snapshots()
     except Exception as err:
-        log.info('Error in checking expired snapshots')
-        log.info('%s' % str(err))
+        log.error('Error in checking expired snapshots')
+        log.error('%s' % str(err))

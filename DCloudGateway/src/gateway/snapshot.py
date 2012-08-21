@@ -160,7 +160,7 @@ def take_snapshot():
     @rtype:    Json object
     @return:   A json object with function result and returned message.
     """
-    log.info('Started take_snapshot')
+    log.debug('Started take_snapshot')
     return_result = False
     return_msg = '[2] Unexpected error in take_snapshot'
 
@@ -174,17 +174,12 @@ def take_snapshot():
 
             _initialize_snapshot()
             _wait_snapshot(old_len)
-#            latest_ss_name = _wait_snapshot(old_len)
-#            log.info('[2] Latest snapshot name: %s' % latest_ss_name)
-#            # wthung, 2012/7/17
-#            # automatically expose this new snapshot
-#            expose_snapshot(latest_ss_name, True)
             return_result = True
             return_msg = 'Completed take_snapshot'
     except SnapshotError as Err:
         return_msg = str(Err)
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {}}
@@ -203,7 +198,7 @@ def set_snapshot_schedule(snapshot_time):
     @rtype:    Json object
     @return:   A json object with function result and returned message.
     """
-    log.info('Started set_snapshot_schedule')
+    log.debug('Started set_snapshot_schedule')
     return_result = False
     return_msg = '[2] Unexpected error in set_snapshot_schedule'
 
@@ -219,7 +214,7 @@ def set_snapshot_schedule(snapshot_time):
     except:
         return_msg = '[2] Unable to write snapshot schedule'
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {}}
@@ -241,7 +236,7 @@ def get_snapshot_schedule():
     @return:   A json object with function result, returned message,
                and the current snapshot schedule.
     """
-    log.info('Started get_snapshot_schedule')
+    log.debug('Started get_snapshot_schedule')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_schedule'
     snapshot_time = 1
@@ -261,7 +256,7 @@ def get_snapshot_schedule():
     except:
         return_msg = '[2] Unable to read snapshot schedule'
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {'snapshot_time': snapshot_time}}
@@ -375,7 +370,7 @@ def get_snapshot_list():
     @return:   A json object with function result, returned message,
                and the current snapshot database entries.
     """
-    log.info('Started get_snapshot_list')
+    log.debug('Started get_snapshot_list')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_list'
     snapshots = []
@@ -389,7 +384,7 @@ def get_snapshot_list():
     except:
         return_msg = '[2] Unable to read snapshot list'
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {'snapshots': snapshots}}
@@ -409,7 +404,7 @@ def get_snapshot_in_progress():
     @return:   A json object with function result, returned message,
                and the current snapshot in progress (if any).
     """
-    log.info('Started get_snapshot_in_progress')
+    log.debug('Started get_snapshot_in_progress')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_in_progress'
     in_progress_name = ""
@@ -469,7 +464,7 @@ def get_snapshot_last_status():
         return_msg = 'Unable to get status of last snapshot.'
         last_ss_time = -1
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'latest_snapshot_time': int(last_ss_time)}
@@ -569,7 +564,7 @@ def expose_snapshot(to_expose, expose_after_creation=False):
     @rtype:    Json object
     @return:   A json object with function result and returned message.
     """
-    log.info('Started get_snapshot_in_progress')
+    log.debug('Started get_snapshot_in_progress')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_in_progress'
 
@@ -613,7 +608,7 @@ def expose_snapshot(to_expose, expose_after_creation=False):
         os.system('sudo /etc/init.d/smbd start')
         os.system('sudo /etc/init.d/nmbd start')
 
-        log.info('Restarted samba service after snapshot exposing')
+        log.debug('Restarted samba service after snapshot exposing')
 
         # Write back snapshot database
         _write_snapshot_db(snapshot_list)
@@ -624,7 +619,7 @@ def expose_snapshot(to_expose, expose_after_creation=False):
     except:
         return_msg = '[2] Unable to expose snapshot'
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {}}
@@ -662,7 +657,7 @@ def delete_snapshot(to_delete):
     @rtype:    Json object
     @return:   A json object with function result and returned message.
     """
-    log.info('Started delete_snapshot')
+    log.debug('Started delete_snapshot')
     return_result = False
     return_msg = '[2] Unexpected error in delete_snapshot'
 
@@ -692,7 +687,7 @@ def delete_snapshot(to_delete):
     except:
         pass
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {}}
@@ -728,7 +723,7 @@ def set_snapshot_lifespan(days_to_live):
     @rtype:    Json object
     @return:   A json object with function result and returned message.
     """
-    log.info('Started set_snapshot_lifespan')
+    log.debug('Started set_snapshot_lifespan')
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
 
@@ -742,7 +737,7 @@ def set_snapshot_lifespan(days_to_live):
     except Exception as Err:
         return_msg = str(Err)
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {}}
@@ -760,7 +755,7 @@ def get_snapshot_lifespan():
     @return:   A json object with function result ,returned message, and
                the current lifespan (in days) of the snapshots.
     """
-    log.info('Started get_snapshot_lifespan')
+    log.debug('Started get_snapshot_lifespan')
     days_to_live = 365
     return_result = False
     return_msg = '[2] Unexpected error in get_snapshot_lifespan'
@@ -777,7 +772,7 @@ def get_snapshot_lifespan():
                 log.info('Stored lifespan is not an integer. Resetting to default (365 days).')
                 reset_config = True
     except IOError:
-        log.info('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
+        log.error('Unable to open config for snapshot lifespan. Resetting to default (365 days).')
         reset_config = True
     except:
         pass
@@ -791,7 +786,7 @@ def get_snapshot_lifespan():
         except SnapshotError as Err:
             return_msg = str(Err)
 
-    log.info(return_msg)
+    log.debug(return_msg)
     return_val = {'result': return_result,
                   'msg': return_msg,
                   'data': {'days_to_live': days_to_live}}
@@ -824,7 +819,7 @@ def _parse_snapshot_time(ss_dirname):
             sec_since_epoch = time.mktime(cur_struct_time)
             ret = int(sec_since_epoch)
     except Exception as e:
-        log.info('[0] Error occurred when parsing snapshot directory name: %s' % str(e))
+        log.error('Error occurred when parsing snapshot directory name: %s' % str(e))
     
     return ret
 
@@ -892,7 +887,7 @@ def rebuild_snapshot_database(_ss_dir=None):
 
     # ensure snapshots folder is existed
     if not os.path.exists(ss_folder):
-        log.info('[2] Skip rebuilding snapshot DB due to no snapshot was found')
+        log.info('Skip rebuilding snapshot DB due to no snapshot was found')
         return
         
     listing = os.listdir(ss_folder)
@@ -918,8 +913,7 @@ def rebuild_snapshot_database(_ss_dir=None):
             fh.write(db_string)
         
     except Exception as e:
-        log.info('[0] Failed to rebuild snapshot database: %s' % str(e))
-        print('[0] Failed to rebuild snapshot database: %s' % str(e))
+        log.error('Failed to rebuild snapshot database: %s' % str(e))
     finally:
         del db_lock
 

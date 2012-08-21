@@ -1,6 +1,35 @@
 {% extends "base.html" %}
 
 {% block moreScripts%}
+<script language="javascript" type="text/javascript" src="/static/js/excanvas.min.js"></script>
+<script language="javascript" type="text/javascript" src="/static/js/jquery.jqplot.min.js"></script>
+<script language="javascript" type="text/javascript" src="/static/js/jqplot.pieRenderer.min.js"></script>
+<script type="text/javascript">
+$(document).ready(function(){  
+    var quota_ratio = [["Used", 3], ["Free", 7]];
+    var plot7 = $.jqplot('quota_chart', [quota_ratio], {
+        title:'Capacity',
+        seriesColors: [ "#4bb2c5", "#c5b47f" ],
+        seriesDefaults:{
+            renderer:$.jqplot.PieRenderer,
+            rendererOptions: {
+                showDataLabels: true
+            }
+        },
+        legend:{
+            show:true,
+            rendererOptions: {
+            //    numberRows: 1
+            },
+            location: 'e'
+        }      
+    });   
+});
+</script>
+{% endblock %}
+
+{% block moreStyles%}
+<link rel="stylesheet" type="text/css" href="/static/css/jquery.jqplot.min.css" />
 {% endblock %}
 
 {% block head_title %}New Account{% endblock %}
@@ -30,9 +59,16 @@
       {% include "_side_bar.html" %}
     </div>
   <div id="screen" class="span9">
-<h1>Dashboard</h1>
-<div data-role="content">
+    <div class="row-fluid">
+        <div id="sidebar" class="span6">
+          <div id="quota_chart""></div>
+        </div>
+        <div id="sidebar" class="span3">
+          <h4>Top 5 Accounts</h4>
+        </div>
+    </div>
+    <div data-role="content">
 
-</div>
+    </div>
 </div></div>
 {% endblock %}
