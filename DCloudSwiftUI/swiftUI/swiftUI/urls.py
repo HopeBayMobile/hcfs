@@ -14,7 +14,7 @@ urlpatterns = patterns("",
     url(r"^admin/", include(admin.site.urls)),
     url(r"^accounts/", include("account.urls")),
     # custom apps
-    url(r"^account/", include("swift_account.urls", namespace="accounts")),
+    url(r"^account/", include("swift_account.urls", namespace="account")),
     url(r"^monitor/", include("swift_monitor.urls", namespace="monitor")),
     url(r"^maintainance/", include("swift_maintainance.urls", namespace="maintainance")),
     url(r"^systemlog/", include("systemlog.urls", namespace="log")),
