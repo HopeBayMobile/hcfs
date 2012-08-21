@@ -80,6 +80,7 @@ class SwiftAccountMgr:
 
         self.__admin_default_name = "admin"
         self.__random_password_size = 12
+        self.__config_container_suffix = "_gateway_config"
         self.__private_container_suffix = "_private_container"
         self.__shared_container_suffix = "_shared_container"
         self.__metadata_name = ".metadata"
@@ -200,6 +201,7 @@ class SwiftAccountMgr:
         lock.acquire()
         proxy_ip_list = self.__proxy_ip_list
         private_container = user + self.__private_container_suffix
+        config_container = user + self.__config_container_suffix
         metadata_content = {}
         msg = ""
         val = False
@@ -308,6 +310,19 @@ class SwiftAccountMgr:
                                                container=private_container, metadata_content=write_acl)
 
         if val == False:
+            msg = "Failed to create the private container: " + msg
+            logger.error(msg)
+            lock.release()
+            return Bool(val, msg)
+        elif user == self.__admin_default_name:
+            val = True
+        else:
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
+                                               account=account, admin_user=self.__admin_default_name, admin_password=admin_password,\
+                                               container=config_container, metadata_content=write_acl)
+
+        if val == False:
+            msg = "Failed to create the config container: " + msg
             logger.error(msg)
             lock.release()
             return Bool(val, msg)
@@ -372,6 +387,7 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         metadata_content = {}
         private_container = user + self.__private_container_suffix
+        config_container = user + self.__config_container_suffix
         admin_password = ""
         msg = ""
         val = False
@@ -442,7 +458,8 @@ class SwiftAccountMgr:
             msg = account_admin_container.msg
             lock.release()
             return Bool(val, msg)
-        elif private_container in account_admin_container.msg:
+
+        if private_container in account_admin_container.msg:
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_target,\
                                                account=account, target=private_container, admin_user=self.__admin_default_name,\
                                                admin_password=admin_password)
@@ -452,6 +469,20 @@ class SwiftAccountMgr:
 
         if val == False:
             msg = "Failed to delete the private container: " + msg
+            logger.error(msg)
+            lock.release()
+            return Bool(val, msg)
+            
+        if config_container in account_admin_container.msg:
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_target,\
+                                               account=account, target=config_container, admin_user=self.__admin_default_name,\
+                                               admin_password=admin_password)
+        else:
+            val = True
+            msg = ""
+
+        if val == False:
+            msg = "Failed to delete the config container: " + msg
             logger.error(msg)
             lock.release()
             return Bool(val, msg)
