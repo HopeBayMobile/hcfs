@@ -1109,74 +1109,6 @@ class SwiftAccountMgr:
         lock.release()
         return Bool(val, msg)
 
-    @util.timeout(300)
-    def __get_account_usage(self, proxyIp, account, user):
-        '''
-        Return the statement of the given user in the give account.
-        (Not finished yet)
-        '''
-        logger = util.getLogger(name="__get_account_usage")
-
-        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
-        password = self.get_user_password(account, user).msg
-
-        cmd = "swift -A %s -U %s:%s -K %s stat" % (url, account, user, password)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (stdoutData, stderrData) = po.communicate()
-
-        msg = ""
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-
-        if po.returncode != 0 or stderrData != "":
-            val = False
-            msg = stderrData
-            logger.error(msg)
-        else:
-            val = True
-            msg = stdoutData
-            logger.info(msg)
-
-        return Bool(val, msg)
-
-    def get_account_usage(self, account, user, retry=3):
-        '''
-        Get account usage from backend Swift.
-        (Not finished yet)
-
-        @type  account: string
-        @param account: the account name of the user
-        @type  user: string
-        @param user: the user to be checked
-        @type  retry: integer
-        @param retry: the maximum number of times to retry after the failure
-        @rtype:  named tuple
-        @return: a named tuple Bool(val, msg). If get the account usage successfully, then Bool.val == True, and Bool.msg == "".
-                Otherwise, Bool.val == False, and Bool.msg records the error message.
-        '''
-        logger = util.getLogger(name="get_account_usage")
-
-        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
-        proxy_ip_list = self.__proxy_ip_list
-        msg = ""
-        val = False
-        Bool = collections.namedtuple("Bool", "val msg")
-
-        if proxy_ip_list is None or len(proxy_ip_list) == 0:
-            msg = "No proxy node is found."
-            return Bool(val, msg)
-
-        if retry < 1:
-            msg = "Argument retry has to >= 1."
-            return Bool(val, msg)
-
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list,\
-                                           retry=retry,\
-                                           fn=self.__get_account_usage,\
-                                           account=account, user=user)
-
-        return Bool(val, msg)
-
     def get_user_password(self, account, user, retry=3):
         '''
         Return the user's password.
@@ -1595,12 +1527,31 @@ class SwiftAccountMgr:
             else:
                 services_content = msg
                 account_enable = True if services_content.get("disable") == None else False
-            
+
+            get_admin_password_output = self.get_user_password(item["name"], self.__admin_default_name)
+
+            if get_admin_password_output.val == False:
+                val = False
+                msg = get_admin_password_output.msg
+            else:
+                admin_password = get_admin_password_output.msg
+
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                   account=item["name"], container="  ", admin_user=self.__admin_default_name,\
+                                                   admin_password=admin_password)
+
+            if val == False:
+                usage = "Error"
+                logger.error(msg)
+            else:
+                usage = msg.get("Bytes") if msg.get("Bytes") != None else "Error"
+          
             account_dict[item["name"]] = {
                 "user_number": user_number,
                 "description": description,
                 "quota": quota,
                 "account_enable": account_enable,
+                "usage": usage,
             }
 
         val = True
@@ -2520,7 +2471,7 @@ class SwiftAccountMgr:
                 cmd = cmd + " -r \'%s\'" % value
             elif field == "Write":
                 cmd = cmd + " -w \'%s\'" % value
-            else:
+            elif field != "Bytes":
                 cmd = cmd + " -m \'%s:%s\'" % (field, value)
 
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -2597,6 +2548,8 @@ class SwiftAccountMgr:
                 metadata_content["Read"] = line.split("ACL: ")[1]
             elif "Write" in line:
                 metadata_content["Write"] = line.split("ACL: ")[1]
+            elif "Bytes" in line:
+                metadata_content["Bytes"] = int(line.split(": ")[1])
 
         val = True
         msg = metadata_content
