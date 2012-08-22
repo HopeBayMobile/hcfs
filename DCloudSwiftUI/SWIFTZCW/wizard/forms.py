@@ -5,16 +5,16 @@ from delta.forms import get_config_form
 meta = json.loads(
 """
 {
-	    "portal_domain": {
-        "description": "Portal ip or domain name",
+	"portal_domain": {
+        "description": "Portal domain or ip",
         "type": "text",
         "required": true,
-        "default": "192.168.11.10",
+        "default": "192.168.11.2",
         "order": 2
         },
 
         "portal_port": {
-        "description": "Portal service port",
+        "description": "Portal port",
         "type": "number",
         "required": true,
         "max": 65535,
@@ -24,13 +24,23 @@ meta = json.loads(
         },
 
         "replica_number": {
-        "description": "Nubmber of replica",
+        "description": "Protection Level",
         "type": "dropdown",
         "required": true,
         "value": [1, 2, 3, 4, 5],
-        "default": 3,
         "order": 4
+        },
+
+        "disk_count": {
+        "description": "disk count per node",
+        "type": "number",
+        "required": true,
+        "max": 80,
+        "min": 1,
+        "default": 6,
+        "order": 5
         }
+       
 
 }
 """

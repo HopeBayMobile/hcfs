@@ -37,7 +37,8 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
          MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
          OBJBUILDER='object.builder',
-         LOGLOCK = "/etc/delta/delta_log.lock",)
+         LOGLOCK = "/etc/delta/delta_log.lock",
+         DNS_DB = "/etc/bind/db.dcloudswift",)
 
 
 SWIFTCONF = GlobalVar.SWIFTCONF
@@ -195,8 +196,7 @@ def restartAllServices():
     if restartMemcached() != 0:
         logger.error("Failed to restart memcached")
 
-    os.system("chown swift:swift /srv/node/ ")
-    os.system("chown swift:swift /srv/node/*")
+    os.system("find /srv/node -maxdepth 1 -exec sudo chown swift:swift '{}' \;")
     restartSwiftServices()
 
 

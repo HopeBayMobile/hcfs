@@ -650,6 +650,7 @@ class CommitThread(Thread):
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
             if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
+                test_connection = 100
                 for el in self.block_cache.entries.values_rev():
                     if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
                         break;
@@ -663,13 +664,17 @@ class CommitThread(Thread):
                         continue
 
                     # Jiahong: (5/7/12) delay upload process if network is down
-                    try:
-                        with self.block_cache.bucket_pool() as bucket:
-                            bucket.store('cloud_gw_test_connection','nodata')
-                    except:
-                        log.error('Network appears to be down. Delaying cache upload.')
-                        self.stop_event.wait(60)
-                        break
+                    if test_connection >= 100:
+                        try:
+                            with self.block_cache.bucket_pool() as bucket:
+                                bucket.store('cloud_gw_test_connection','nodata')
+                            test_connection = 0
+                        except:
+                            log.error('Network appears to be down. Delaying cache upload.')
+                            self.stop_event.wait(60)
+                            break
+                    else:
+                        test_connection = test_connection + 1
 
                     # Acquire global lock to access UploadManager instance
                     with llfuse.lock:
