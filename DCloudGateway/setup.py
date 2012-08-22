@@ -64,6 +64,7 @@ def main():
         os.system("cp gateway_scripts/smbd.conf /etc/init/")
         os.system("cp gateway_scripts/delete_lostfound.conf /etc/init/")
         os.system("cp config/sudoers_delta /etc/sudoers.d/")
+        os.system("cp config/nfs-kernel-server /etc/default/nfs-kernel-server")
         #
         #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
         # the permission of sudoers_delta is required 0440
