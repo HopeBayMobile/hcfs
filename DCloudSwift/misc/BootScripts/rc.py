@@ -299,9 +299,10 @@ def main(argv):
     if not os.path.exists("/dev/shm/DCloudSwift"):
         os.system("mkdir /dev/shm/DCloudSwift")
         os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
- 
-    if loadScripts() == 0:
-        os.system("python /DCloudSwift/maintenance.py -R")
+
+    if os.path.exists("/tmp/i_am_not_zcw"):
+        if loadScripts() == 0:
+            os.system("python /DCloudSwift/maintenance.py -R")
 
 if __name__ == '__main__':
 	try:
