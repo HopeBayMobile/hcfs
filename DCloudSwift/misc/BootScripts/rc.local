@@ -1,5 +1,12 @@
 #!/bin/sh
 sleep 10
-python /etc/rc.py
-
+python /usr/local/bin/zcw_init.py
+ntpdate 192.168.11.1
+minute=$(($(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -d' ' -f1) % 60))
+task="$minute *    * * *   root    ntpdate 192.168.11.1"
+echo "$task" >> /etc/crontab
+python /usr/local/bin/node-monitor restart
+if [ ! -d "/tmp/i_am_zcw" ]; then
+    python /etc/rc.py
+fi
 exit 0

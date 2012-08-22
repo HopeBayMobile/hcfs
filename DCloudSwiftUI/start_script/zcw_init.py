@@ -132,6 +132,7 @@ def main():
 
     if not info.get('result'):
         err_exit('failed, reason: %s' % info.get('msg', 'unknown error'))
+        
     data = info.get('data')
     if not data:
         err_exit('field "data" is not found in node info.')
@@ -163,6 +164,10 @@ def main():
                 send_ready(True, zcw=zcw_status_result.get('data'))
             else:
                 send_ready(False, 'can not start zcw web service in zone "%s". resason: %s' % (zoneid, zcw_status_result.get('msg', 'unknown reason')))
+
+           # added by Ken
+           cmd = "mkdir /tmp/i_am_zcw"
+           os.system(cmd)
     else:
         log('current node is not zcw node.')
         zcw_hostname = data.get('zcw_hostname', '')
