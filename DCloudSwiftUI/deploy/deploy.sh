@@ -5,7 +5,8 @@
 ### 0. Define variables
 THISPATH=$(pwd)
 BASEPATH=${THISPATH%%/deploy}
-ZONEPATH=${BASEPATH}/ZONES
+#ZONEPATH=${BASEPATH}/ZONES
+ZONEPATH=${BASEPATH}
 
 if [ $# -ne 1 ]; then
 	echo 'Deployed Django project need to be assigned.'
