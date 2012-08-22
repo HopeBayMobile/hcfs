@@ -73,7 +73,8 @@ chmod a+x /usr/local/bin/zcw
 cd ${BASEPATH}
 cp start_script/*.py /usr/local/bin/
 
-sed -i "s/exit 0/python \/usr\/local\/bin\/zcw_init\.py \nexit 0/g" /etc/rc.local
+#not safe
+#sed -i "s/exit 0/python \/usr\/local\/bin\/zcw_init\.py \nexit 0/g" /etc/rc.local
 
 ### Finish deploying ZCW
 echo "Finish deploying ZCW"

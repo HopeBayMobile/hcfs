@@ -343,6 +343,7 @@ fi
 trap - EXIT # Disable emergency handler
 
 sleep 10
+python /usr/local/bin/zcw_init.py
 ntpdate 192.168.11.1
 minute=$(($(dd if=/dev/urandom count=1 2> /dev/null | cksum | cut -d' ' -f1) % 60))
 task="$minute *    * * *   root    ntpdate 192.168.11.1"
