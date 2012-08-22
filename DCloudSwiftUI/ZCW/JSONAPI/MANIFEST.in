@@ -1,5 +1,0 @@
-include AUTHORS CHANGES README INSTALL LICENCE
-recursive-include delta/*/static *.*
-recursive-include delta/*/templates *.*
-include docs/Makefile
-recursive-include docs/source *
