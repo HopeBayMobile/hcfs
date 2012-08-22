@@ -63,10 +63,12 @@ fi
     
 # build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
-    bash deb_builder.sh $S3QL_VERSION $BUILDNUM
+    bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM
     # Move S3QL DEB file to /var/cache/apt/
     rm $APTCACHEDIR/s3ql*   # remove old s3ql deb files
     cp StorageAppliance/s3ql*.deb $APTCACHEDIR 
+    # copy gateway api DEB file to /var/cache/apt/
+    cp dcloudgatewayapi*.deb $APTCACHEDIR 
 
 # Update "apt-get" index
     #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
@@ -89,6 +91,7 @@ fi
     rm debsrc_StorageAppliance*.tgz
     rm debpatch_StorageAppliance*.tgz
     rm StorageAppliance/s3ql*.deb
+    rm dcloudgatewayapi*.deb
     
 # Done.
     echo "~~~ DONE!"
