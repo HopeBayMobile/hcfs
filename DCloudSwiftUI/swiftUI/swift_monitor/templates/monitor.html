@@ -73,15 +73,15 @@
                 <td>-</td>
                 <td>{{node.hostname}}</td>
                 {% if node.status == "dead" %}
-                <td bgcolor="red" >
+                <td class="fail_tab">
                 {% else %}
-                <td bgcolor="green">
+                <td class="success_tab">
                 {% endif %}
                 {{node.status}}</td>
                 {% if node.mode == "waiting" %}
-                <td bgcolor="red">
+                <td class="fail_tab">
                 {% else %}
-                <td bgcolor="green">
+                <td class="success_tab">
                 {% endif %}
                 {{node.mode}}</td>
                 <td>{{node.hd_number}}</td>
@@ -96,9 +96,9 @@
                 <td></td>
                 <td>{{info.serial}}</td>
                 {% if info.status == "Broken" %}
-                <td bgcolor="red">
+                <td class="fail_tab">
                 {% else %}
-                <td>
+                <td class="success_tab">
                 {% endif %}
                 {{info.status}}</td>
             </tr>
