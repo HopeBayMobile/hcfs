@@ -3,6 +3,7 @@
 # make sure input arguments are correct
     echo "************************"
     echo "Usage: ./deb_builder.sh <gw_version> <s3ql_version> <build_num>"
+    echo "Usage: ./deb_builder.sh <version_num> <build_num>"
     echo "************************"
     if [ $# -ne 3 ] 
     then
@@ -18,15 +19,10 @@
     INITPATH=$(pwd)
 
 # build DCloudS3ql
-    cd ../../../StorageAppliance/DCloudS3ql
+    cd StorageAppliance/DCloudS3ql
     # prepare [debian] foler
     cp -r $INITPATH/debian_templates/s3ql/debian ./
-    # build dependencies
-    #
-    #-- Ovid Wu <ovidwu@gmail.com> Sat, 18 Aug 2012 22:19:06 +0800
-    #
-    # FIXME: make sure all required dependency of s3ql is downloaded to
-    # /var/cache/apt/archive in order to build debian binary package
+    # build dependencies 
     sudo apt-get -y build-dep s3ql  # s3ql has to be installed before.
     # update change log
     dch -v $S3QL_VERSION.$BUILD -m "Modified by CDS Team @ Delta Cloud."
