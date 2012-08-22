@@ -6,6 +6,7 @@
 THISPATH=$(pwd)
 BASEPATH=${THISPATH%%/deploy}
 ZONEPATH=${BASEPATH}/ZONES
+SUFFIX=zcw
 
 if [ $# -ne 1 ]; then
 	echo 'Deployed Django project need to be assigned.'
@@ -27,9 +28,16 @@ apache2ctl stop
 
 ### 4. Setup ZCW
 cd ${THISPATH}
+
+if [ -e /etc/apache2-$SUFFIX ] ; then
+	echo "/etc/apache2-$SUFFIX already exists"
+	echo "remove /etc/apache2-$SUFFIX"
+	rm -rf /etc/apache2-$SUFFIX
+fi
+
 ## 4.1 Setup Apache HTTP Server
 #Execute setup-instance command
-source /usr/share/doc/apache2/examples/setup-instance zcw
+source /usr/share/doc/apache2/examples/setup-instance ${SUFFIX}
 #Enable wsgi
 a2enmod-zcw wsgi
 #Copy Apache configurations
