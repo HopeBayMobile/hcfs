@@ -1,9 +1,52 @@
+import os
+import sys
+import time
+import socket
+import random
+import pickle
+import signal
+import json
+import sqlite3
+from ConfigParser import ConfigParser
+
+WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
+sys.path.append("%s/DCloudSwift/" % BASEDIR)
+
+from util.SwiftCfg import SwiftMasterCfg
+from util.util import GlobalVar
+from util import util
+from util.database import NodeInfoDatabaseBroker
+from util.database import MaintenanceBacklogDatabaseBroker
+
 
 class SwiftMonitorMgr:
     """
     Mockup for SwiftMonitorMgr
     """
     
+    def __init__(self):
+        self.logger = util.getLogger(name="SwiftMonitorMgr")
+
+    def get_total_capacity(self):
+        '''
+        return the total capacity of the capacity or none if errors happen
+        '''
+        storageList = util.getStorageNodeList()
+        capacity = 0
+        try:
+            if storageList:
+                for node in storageList:
+                    capacity += node["deviceCapacity"] * node["deviceCnt"]
+            else:
+                return None
+        except Exception as e:
+             self.logger.error(str(e))
+             return None
+
+        return capacity
+
+
     def get_zone_info(self):
         """
         Get zone related infomations
@@ -15,7 +58,7 @@ class SwiftMonitorMgr:
         free: zone free storage percentage
         capacity: total zone capacity
         
-        >>> SM = SwiftMonitorMgr()
+        >>> SA = SwiftMonitorMgr()
         >>> print SM.get_zone_info()
         {'ip': '192.168.1.104', 'nodes': 3, 'used': '21', 'capacity': '12TB', 'free': '79'}
         """
@@ -38,9 +81,6 @@ class SwiftMonitorMgr:
             serial: serial number
             status: operation status (OK or Broken)
         
-        >>> SM = SwiftMonitorMgr()
-        >>> print SM.list_nodes_info()
-        [{'status': 'dead', 'index': '1', 'hd_info': [{'status': 'Broken', 'serial': 'SN_TP02'}, {'status': 'OK', 'serial': 'SN_TP03'}, {'status': 'OK', 'serial': 'SN_TP04'}], 'mode': 'waiting', 'ip': '172.30.11.33', 'hostname': 'TPEIIA', 'hd_number': 6, 'hd_error': 1}, {'status': 'alive', 'index': '2', 'hd_info': [{'status': 'OK', 'serial': 'SN_TP02'}, {'status': 'OK', 'serial': 'SN_TP03'}, {'status': 'OK', 'serial': 'SN_TP04'}], 'mode': 'waiting', 'ip': '172.30.11.37', 'hostname': 'TPEIIB', 'hd_number': 6, 'hd_error': 0}, {'status': 'alive', 'index': '3', 'hd_info': [{'status': 'OK', 'serial': 'SN_TP02'}, {'status': 'OK', 'serial': 'SN_TP03'}, {'status': 'OK', 'serial': 'SN_TP04'}], 'mode': 'service', 'ip': '172.30.11.25', 'hostname': 'TPEIIC', 'hd_number': 6, 'hd_error': 0}]
         """
         nodes_info = []
         nodes_info.append({"ip":"172.30.11.33","index":"1","hostname":"TPEIIA","status":"dead","mode":"waiting","hd_number":6,"hd_error":1,
@@ -55,5 +95,5 @@ class SwiftMonitorMgr:
         return nodes_info
 
 if __name__ == '__main__':
-    SA = SwiftMonitorMgr()
+    SM = SwiftMonitorMgr()
     print SM.get_zone_info()
