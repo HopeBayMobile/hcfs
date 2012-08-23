@@ -1196,41 +1196,63 @@ class SwiftAccountMgr:
         '''
         logger = util.getLogger(name="set_account_quota")
 
-        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+        lock.acquire()
         proxy_ip_list = self.__proxy_ip_list
-        admin_password = ""
-
-        msg = ""
+        metadata_content = {}
         val = False
+        msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
-
-        #TODO: check whehter the container admin_container is associated
-        #with admin_user
-
-        #TODO: check whether the quota is a valid number
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found."
+            lock.release()
             return Bool(val, msg)
 
         if retry < 1:
             msg = "Argument retry has to >= 1."
+            lock.release()
             return Bool(val, msg)
 
-        get_admin_password_output = self.get_user_password(account, admin_user)
-        if get_admin_password_output.val == False:
+        if not str(quota).isdigit():
+            msg = "Quota must be a positive integer."
+            lock.release()
+            return Bool(val, msg)
+
+        user_existence_output = self.user_existence(account, self.__admin_default_name)
+
+        if user_existence_output.val == False:
             val = False
-            msg = get_admin_password_output.msg
+            msg = user_existence_output.msg
+            lock.release()
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            lock.release()
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
+                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                           container=account, object_name=self.__metadata_name)
+
+        if val == False:
+            msg = "Failed to get the metadata: " + msg
+            logger.error(msg)
+            lock.release()
             return Bool(val, msg)
         else:
-            admin_password = get_admin_password_output.msg
+            metadata_content = msg
+            metadata_content[self.__admin_default_name]["quota"] = quota
 
-        container_metadata = {"Quota": quota}
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
+                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                           container=account, object_name=self.__metadata_name, object_content=metadata_content)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
-                                           account=account, container=admin_container, admin_user=admin_user,\
-                                           admin_password=admin_password, metadata_content=container_metadata)
+        if val == False:
+            msg = "Failed to modify the quota of account %s" % account + msg
+            logger.error(msg)
 
+        lock.release()
         return Bool(val, msg)
 
     def set_user_quota(self, account, user, quota, retry=3):
@@ -1250,39 +1272,66 @@ class SwiftAccountMgr:
                 Bool.msg = the standard output. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="set_user_quota")
-        #proxy_ip_list = util.getProxyNodeIpList(self.__swiftDir)
+
+        lock.acquire()
         proxy_ip_list = self.__proxy_ip_list
-        admin_password = ""
-
-        msg = ""
+        metadata_content = {}
         val = False
+        msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
-
-        #TODO: check whehter the container is associated with the given user
-        #TODO: check whether the quota is a valid number
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
             msg = "No proxy node is found."
+            lock.release()
             return Bool(val, msg)
 
         if retry < 1:
             msg = "Argument retry has to >= 1."
+            lock.release()
             return Bool(val, msg)
 
-        get_admin_password_output = self.get_user_password(account, admin_user)
-        if get_admin_password_output.val == False:
+        if not str(quota).isdigit():
+            msg = "Quota must be a positive integer."
+            lock.release()
+            return Bool(val, msg)
+
+        user_existence_output = self.user_existence(account, user)
+
+        if user_existence_output.val == False:
             val = False
-            msg = get_admin_password_output.msg
+            msg = user_existence_output.msg
+            lock.release()
+            return Bool(val, msg)
+        elif user_existence_output.result == False:
+            val = False
+            msg = "User %s:%s does not exist!" % (account, user)
+            lock.release()
+            return Bool(val, msg)
+
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
+                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                           container=account, object_name=self.__metadata_name)
+
+        # TODO: to compute the remaining account quota and to decide whether the quota is valid
+
+        if val == False:
+            msg = "Failed to get the metadata: " + msg
+            logger.error(msg)
+            lock.release()
             return Bool(val, msg)
         else:
-            admin_password = get_admin_password_output.msg
+            metadata_content = msg
+            metadata_content[user]["quota"] = quota
 
-        container_metadata = {"Quota": quota}
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
+                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                           container=account, object_name=self.__metadata_name, object_content=metadata_content)
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_container_metadata,\
-                                           account=account, container=container, admin_user=admin_user,\
-                                           admin_password=admin_password, metadata_content=container_metadata)
+        if val == False:
+            msg = "Failed to modify the quota of user %s:%s" % (account, user) + msg
+            logger.error(msg)
 
+        lock.release()
         return Bool(val, msg)
 
     @util.timeout(300)
