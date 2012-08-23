@@ -95,7 +95,12 @@
                 <td></td>
                 <td></td>
                 <td>{{info.serial}}</td>
-                <td>{{info.status}}</td>
+                {% if info.status == "Broken" %}
+                <td bgcolor="red">
+                {% else %}
+                <td>
+                {% endif %}
+                {{info.status}}</td>
             </tr>
             {% endfor %}
             <script>
