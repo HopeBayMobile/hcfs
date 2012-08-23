@@ -68,8 +68,9 @@ $(document).ready(function(){
           <table class="table">
             {% for account in accounts%}
             <tr>
+                <td>{{forloop.counter}}</td>
 			    <td>{{account.id}}</td>
-			    <td>{{account.quota}}</td>
+			    <td>{{account.husage}}</td>
 			</tr>
 			{% endfor %}
           </table>
