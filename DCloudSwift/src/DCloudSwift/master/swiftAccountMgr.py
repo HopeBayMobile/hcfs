@@ -669,17 +669,24 @@ class SwiftAccountMgr:
             lock.release()
             return Bool(val, msg)
 
-        list_user_output = self.list_user(account)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
-        if list_user_output.val == False:
-            val = False
-            msg = "Failed to list all users: " + list_user_output.msg
-            lock.release()
+        if val == False:
             return Bool(val, msg)
         else:
-            logger.info(list_user_output.msg)
-            for field, value in list_user_output.msg.items():
-                user_list.append(field)
+            try:
+                user_info = json.loads(msg)
+                val = True
+                msg = ""
+            except Exception as e:
+                val = False
+                msg = "Failed to load the json string: %s" % str(e)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+
+        for item in user_info["users"]:
+            user_list.append(item["name"])
 
         for user in user_list:
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_user, account=account, user=user)
@@ -2730,29 +2737,32 @@ class SwiftAccountMgr:
         else:
             user_enable = True if msg.get("disable") == None else False
 
-        if account_enable == True:
-            get_user_password_output = self.get_user_password(account, self.__admin_default_name)
-            user_password = get_user_password_output.msg if get_user_password_output.val == True else None
+        get_user_password_output = self.get_user_password(account, self.__admin_default_name)
+        user_password = get_user_password_output.msg if get_user_password_output.val == True else None
 
-            if user != self.__admin_default_name and user_password != None:
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                   account=account, container=user + self.__private_container_suffix,\
-                                                   admin_user=self.__admin_default_name, admin_password=user_password)
+        if account_enable == True and user_password != None:
+            if user != self.__admin_default_name:
+                (val1, msg1) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                     account=account, container=user + self.__private_container_suffix,\
+                                                     admin_user=self.__admin_default_name, admin_password=user_password)
+
+                (val2, msg2) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                     account=account, container=user + self.__config_container_suffix,\
+                                                     admin_user=self.__admin_default_name, admin_password=user_password)
+
+                if val1 == False or val2 == False:
+                    usage = "Error"
+                    logger.error(msg1 + msg2)
+                elif msg1.get("Bytes") != None and msg2.get("Bytes") != None:
+                    usage = int(msg1.get("Bytes")) + int(msg2.get("Bytes"))
+                else:
+                    usage = "Error"
             else:
-                val = True
-                msg = {}
-        else:
-            val = False
-            msg = "Account %s has been disabled!" % account
-
-        if val == False:
-            usage = "Error"
-            logger.error(msg)
-        else:
-            if user == self.__admin_default_name:
                 usage = 0
-            else:
-                usage = msg.get("Bytes") if msg.get("Bytes") != None else "Error"
+        else:
+            usage = "Error"
+            msg = "Account %s has been disabled!" % account
+            logger.error(msg)
 
         user_info = {
             "description": description,
