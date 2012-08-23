@@ -3278,9 +3278,42 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
     
     return json.dumps(ret_val)
 
+# wthung
+def get_last_backup_time():
+    """
+    Get the time that all data has been flushed to cloud (no dirty cache).
+    
+    @rtype: JSON object
+    @return: Function call result and last backup time
+            - result: function call result
+            - time: last backup time
+    """
+    
+    last_backup_time_file = '/root/.s3ql/gw_last_backup_time'
+    result = False
+    last_time = 0
+    
+    if not os.path.exists(last_backup_time_file):
+        result = True
+    else:
+        try:
+            with open(last_backup_time_file, 'r') as fh:
+                time_str = fh.read()
+            
+            last_time = int(float(time_str))
+            result = True
+        except Exception as e:
+            log.error('Failed to open %s for reading last backup time: %s' % (last_backup_time_file, str(e)))
+            last_time = -1
+    
+    return_val = {'result': result,
+                  'time': last_time}
+    
+    return return_val
+
 #######################################################
 
 
 if __name__ == '__main__':
-    _check_container('172.16.78.63:443', 'cw_account:cw_user', 'deltacloud')
+    print get_last_backup_time()
     pass
