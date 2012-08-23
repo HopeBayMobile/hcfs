@@ -170,11 +170,11 @@ class SwiftAccountMgr:
 
     def add_user(self, account, user, password="", description="no description", quota=0, admin=False, reseller=False, retry=3):
         '''
-        Add a user into an account, including the following steps::
+        Add a user into the account, including the following steps::
             (1) Add a user.
-            (2) Create the user's private container.
+            (2) Create the user's private container and configuration container.
             (3) Create the user's metadata stored in super_admin account.
-            (4) Set ACL for the private container.
+            (4) Set ACL for the user's private container.
 
         @type  account: string
         @param account: the name of the account
@@ -185,7 +185,7 @@ class SwiftAccountMgr:
         @type  description: string
         @param description: the description of the user
         @type  quota: integer
-        @param quota: the quota of the user
+        @param quota: the quota of the user in the number of bytes
         @type  admin: boolean
         @param admin: admin or not
         @type  reseller: boolean
@@ -212,6 +212,7 @@ class SwiftAccountMgr:
 
         if len(description.split()) == 0:
             msg = "Description can not be an empty string."
+            lock.release()
             return Bool(val, msg)
 
         if proxy_ip_list is None or len(proxy_ip_list) == 0:
@@ -369,7 +370,7 @@ class SwiftAccountMgr:
         The deletion includes the following steps::
             (1) Delete a user.
             (2) Remove the user's metadata from super_admin account.
-            (3) Delete the user's private container.
+            (3) Delete the user's private container and configuration container.
 
         @type  account: string
         @param account: the name of the account
@@ -534,7 +535,7 @@ class SwiftAccountMgr:
         @type  description: string
         @param description: the description of the account
         @type  quota: integer
-        @param quota: the quota of the account
+        @param quota: the quota of the account in the number of bytes
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
@@ -705,15 +706,14 @@ class SwiftAccountMgr:
         Enable the user by modifying the file "<user name>" of the container "<account name>" in super_admin account.
 
         @type  account: string
-        @param account: the account of the user
+        @param account: the account having the user
         @type  user: string
         @param user: the user to be enabled
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user's password is successfully restored to the original password kept in the
-                metadata container, then Bool.val = True and Bool.msg = the standard output. Otherwise, Bool.val == False
-                and Bool.msg indicates the error message.
+        @return: a tuple Bool(val, msg). If the user is successfully enabled, then Bool.val = True and
+                Bool.msg = the standard output. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="enable_user")
 
@@ -796,9 +796,8 @@ class SwiftAccountMgr:
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
-        @return: a tuple Bool(val, msg). If the user's password is successfully changed and the original password is
-                stored in the metadata container, then Bool.val = True and Bool.msg = the standard output. Otherwise,
-                Bool.val == False and Bool.msg indicates the error message.
+        @return: a tuple Bool(val, msg). If the user is successfully disabled, then Bool.val = True and
+                Bool.msg = the standard output. Otherwise, Bool.val == False and Bool.msg indicates the error message.
         '''
         logger = util.getLogger(name="disable_user")
 
@@ -1041,7 +1040,7 @@ class SwiftAccountMgr:
         @type  account: string
         @param account: the name of the account
         @type  user: string
-        @param user: the user of the given account
+        @param user: the user to change the password
         @type  newPassword: string
         @param newPassword: the new password of the user
         @type  oldPassword: string
@@ -1114,13 +1113,13 @@ class SwiftAccountMgr:
         Return the user's password.
 
         @type  account: string
-        @param account: the account name of the user
+        @param account: the account having the user
         @type  user: string
         @param user: the user to get the password
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype: named tuple
-        @return: a named tuple Bool(val, msg). If get the user's password successfully, then Bool.val == True, and
+        @return: a named tuple Bool(val, msg). If the user's password is successfully got, then Bool.val == True, and
                 Bool.msg == password. Otherwise, Bool.val == False, and Bool.msg records the error message.
         '''
         logger = util.getLogger(name="get_user_password")
@@ -1174,20 +1173,14 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
-    def set_account_quota(self, account, admin_container, admin_user, quota, retry=3):
+    def set_account_quota(self, account, quota, retry=3):
         '''
-        Set the quota of the given account by updating the metadata
-        in the container for the admin user of the given account.
-        (Not finished yet)
+        Set the quota of the account by modifying the file ".metadata" of the contianer "<account name>" in super_admin account.
 
         @type  account: string
-        @param account: the account to be set quota
-        @type  admin_container: string
-        @param admin_container: the container for the admin user
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
+        @param account: the account to set the quota
         @type  quota: integer
-        @param quota: quota of the account (bytes)
+        @param quota: the quota of the account in number of bytes
         @type  retry: integer
         @param retry: the maximum number of times to retry when fn return False
         @rtype:  named tuple
@@ -1233,21 +1226,16 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
-    def set_user_quota(self, account, container, user, admin_user, quota, retry=3):
+    def set_user_quota(self, account, user, quota, retry=3):
         '''
-        Set the quota of the given user by updating the metadata in the container for the user.
-        (Not finished yet)
+        Set the quota of the user by modifying the file ".metadata" of the contianer "<account name>" in super_admin account.
 
         @type  account: string
-        @param account: the account of the given user
-        @type  container: string
-        @param container: the container for the given user
+        @param account: the account having the user
         @type  user: string
-        @param user: the user to be set quota
-        @type  admin_user: string
-        @param admin_user: the admin user of the account
+        @param user: the user to set the quota
         @type  quota: integer
-        @param quota: quota of the account (bytes)
+        @param quota: the quota of the user in number of bytes
         @type  retry: integer
         @param retry: the maximum number of times to retry when fn return False
         @rtype:  named tuple
@@ -1328,7 +1316,7 @@ class SwiftAccountMgr:
         Check whether the account exists.
 
         @type  account: string
-        @param account: an account name to be queried
+        @param account: the account name to be queried
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
         @rtype:  named tuple
@@ -1378,7 +1366,12 @@ class SwiftAccountMgr:
 
     def list_account(self, retry=3):
         '''
-        List all existed accounts and related information.
+        List all existed accounts and related information, including::
+            (1) the number of users
+            (2) the description of the account
+            (3) the quota of the account
+            (4) the account is enabled or not
+            (5) the usage of the account
 
         @type  retry: integer
         @param retry: the maximum number of times to retry after the failure
@@ -1486,7 +1479,7 @@ class SwiftAccountMgr:
         List all containers of the account.
 
         @type  account: string
-        @param account: the account name of the user
+        @param account: the account name to list all containers
         @type  admin_user: string
         @param admin_user: account administrator of the account
         @type  retry: integer
@@ -1553,7 +1546,7 @@ class SwiftAccountMgr:
     @util.timeout(300)
     def __get_user_info(self, proxyIp, account):
         '''
-        Return the user's information of the account. The user's information is stored in Swauth.
+        Return the user's information of the account stored in Swauth.
 
         @type  proxyIp: string
         @param proxyIp: IP of the proxy node
@@ -1587,7 +1580,11 @@ class SwiftAccountMgr:
 
     def list_user(self, account, retry=3):
         '''
-        List all existed users and related information in the account.
+        List all existed users and related information in the account, including::
+            (1) the description of the user
+            (2) the quota of the user
+            (3) the user is enabled or not
+            (4) the usage of the user
 
         @type  account: string
         @param account: the account name of the user
@@ -1683,7 +1680,7 @@ class SwiftAccountMgr:
 
     def user_existence(self, account, user, retry=3):
         '''
-        Check whether the given user exists in the account.
+        Check whether the user exists in the account.
 
         @type  account: string
         @param account: the account name to be checked
@@ -2548,7 +2545,12 @@ class SwiftAccountMgr:
 
     def obtain_account_info(self, account, retry=3):
         '''
-        Obtain the related information of the account.
+        Obtain the related information of the account, including::
+            (1) the number of users
+            (2) the description of the account
+            (3) the quota of the account
+            (4) the account is enabled or not
+            (5) the usage of the account
 
         @type  account: string
         @param account: the account to obtain the information
@@ -2659,10 +2661,14 @@ class SwiftAccountMgr:
 
     def obtain_user_info(self, account, user, account_enable=True, retry=3):
         '''
-        Obtain the related information of the user in the account.
+        Obtain the related information of the user in the account, including::
+            (1) the description of the user
+            (2) the quota of the user
+            (3) the usgae of the user
+            (4) the user is enabled or not
 
         @type  account: string
-        @param account: the account name of the user
+        @param account: the account having the user
         @type  user: string
         @param user: the user to obtain the related information
         @type  account_enable: boolean
@@ -2761,10 +2767,11 @@ class SwiftAccountMgr:
 
     def modify_user_description(self, account, user, description, retry=3):
         '''
-        Modify the description of the user's metadata stored in super_admin account.
+        Modify the description of the user by modifying the file ".metadata" of the
+        contianer "<account name>" in super_admin account.
 
         @type  account: string
-        @param account: the account name of the user
+        @param account: the account having the user
         @type  user: string
         @param user: the user to modify the description
         @type  retry: integer
@@ -2773,7 +2780,7 @@ class SwiftAccountMgr:
         @return: a named tuple Bool(val, msg). If the description of the user is successfully modified, then Bool.val == True
                 and Bool.msg == "". Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
-        logger = util.getLogger(name="obtain_user_info")
+        logger = util.getLogger(name="modify_user_description")
 
         lock.acquire()
         proxy_ip_list = self.__proxy_ip_list
