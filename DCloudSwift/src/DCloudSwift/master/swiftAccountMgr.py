@@ -668,17 +668,24 @@ class SwiftAccountMgr:
             lock.release()
             return Bool(val, msg)
 
-        list_user_output = self.list_user(account)
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
-        if list_user_output.val == False:
-            val = False
-            msg = "Failed to list all users: " + list_user_output.msg
-            lock.release()
+        if val == False:
             return Bool(val, msg)
         else:
-            logger.info(list_user_output.msg)
-            for field, value in list_user_output.msg.items():
-                user_list.append(field)
+            try:
+                user_info = json.loads(msg)
+                val = True
+                msg = ""
+            except Exception as e:
+                val = False
+                msg = "Failed to load the json string: %s" % str(e)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+
+        for item in user_info["users"]:
+            user_list.append(item["name"])
 
         for user in user_list:
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_user, account=account, user=user)
