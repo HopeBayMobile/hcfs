@@ -1,7 +1,7 @@
 The files and directories are for the purpose of building the golden image.
 
-1. rc
-Use this file to overwrite /etc/init.d/rc in the golden image
+1. rc.local
+Use this file to overwrite /etc/rc.local in the golden image
 
 2. rc.py
 Place this file in the directory /etc.
