@@ -127,7 +127,7 @@ class prepare_image(setuptools.Command):
         os.system(cmd)
         
         #replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
-        cmd = "cp misc/BootScripts/rc.local /etc/rci.local"
+        cmd = "cp misc/BootScripts/rc.local /etc/rc.local"
         print cmd
         os.system(cmd)
 
