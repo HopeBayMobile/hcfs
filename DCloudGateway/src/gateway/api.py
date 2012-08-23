@@ -2976,19 +2976,19 @@ def _get_storage_capacity():
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
                     real_cloud_data = float(val)
-                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0)  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) * 1024 ** 2)
 
                 if line.startswith("After de-duplication:"):
                     tokens = line.split(":")
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val) * 1024 ** 2) 
 
                 if line.startswith("After compression:"):
                     tokens = line.split(":")
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val) * 1024 ** 2) 
 
                 if line.startswith("Cache size: current:"):
                     line = line.replace("," , ":")
@@ -2998,11 +2998,11 @@ def _get_storage_capacity():
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
-                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val) * 1024 ** 2) 
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
-                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val) * 1024 ** 2) 
 
                 if line.startswith("Cache entries: current:"):
                     line = line.replace("," , ":")
@@ -3027,13 +3027,13 @@ def _get_storage_capacity():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     real_cloud_data = real_cloud_data - float(crt_val)
-                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val) * 1024 ** 2) 
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
 
-                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
+                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data * 1024 ** 2), 0)
 
     except Exception:
         if enable_log:

@@ -8,7 +8,8 @@ import signal
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
+#sys.path.append("%s/DCloudSwift/" % BASEDIR)
 
 from util.SwiftCfg import SwiftCfg
 from util.daemon import Daemon

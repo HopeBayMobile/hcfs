@@ -1,3 +1,4 @@
+import os
 import urllib
 import json
 from datetime import datetime
@@ -165,9 +166,10 @@ def main():
             else:
                 send_ready(False, 'can not start zcw web service in zone "%s". resason: %s' % (zoneid, zcw_status_result.get('msg', 'unknown reason')))
 
-           # added by Ken
-           cmd = "mkdir /tmp/i_am_zcw"
-           os.system(cmd)
+            # added by Ken
+            cmd = "mkdir /tmp/i_am_zcw"
+            if not os.path.exists("/tmp/i_am_zcw"):
+                os.system(cmd)
     else:
         log('current node is not zcw node.')
         zcw_hostname = data.get('zcw_hostname', '')

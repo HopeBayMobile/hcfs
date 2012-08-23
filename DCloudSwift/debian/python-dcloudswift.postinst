@@ -1,0 +1,55 @@
+#!/bin/bash
+
+#
+# Delta Cloud Data Team DCloudSwift Package post install
+# Ovid Wu <ovid.wu@delta.com.tw> Tue, 31 Jul 2012 09:13:21 +0000
+#
+
+if [ -f ./Swift.ini ]; then
+	cp ./Swift.ini  ./src/DCloudSwift/
+fi
+
+if [ -f /usr/share/doc/python-dcloudswift/Swift.ini ]; then
+	cp /usr/share/doc/python-dcloudswift/Swift.ini /etc/delta
+fi
+
+if [ -f /usr/share/doc/python-dcloudswift/inputFile.sample ]; then
+	cp /usr/share/doc/python-dcloudswift/inputFile.sample /etc/delta
+fi
+
+if [ -f /usr/share/doc/python-dcloudswift/swift_master.ini ]; then
+	cp /usr/share/doc/python-dcloudswift/swift_master.ini /etc/delta
+fi
+
+if [ ! -f swift-event-manager ]; then
+    echo "Creating /etc/init.d/swift-event-manager"
+    cp /usr/share/doc/python-dcloudswift/swift-event-manager /etc/init.d
+else
+    echo "Override /etc/init.d/swift-event-manager"
+
+fi
+
+if [ ! -f swift-maintain-switcher ]; then
+    echo "Creating /etc/init.d/swift-maintain-switcher"
+    cp /usr/share/doc/python-dcloudswift/swift-maintain-switcher /etc/init.d
+else
+    echo "Override /etc/init.d/swift-maintain-switcher"
+
+fi
+
+chmod 755 /etc/init.d/swift-event-manager
+chmod 755 /etc/init.d/swift-maintain-switcher
+
+if [ -x /etc/init.d/swift-event-manager ]; then
+    update-rc.d -f swift-event-manager remove
+    update-rc.d swift-event-manager defaults
+else
+    echo "swift-event-manager does not exist"
+fi
+
+if [ -x /etc/init.d/swift-maintain-switcher ]; then
+    update-rc.d -f swift-maintain-switcher remove
+    update-rc.d swift-maintain-switcher defaults
+else
+    echo "swift-maintain-switcher does not exist"
+fi

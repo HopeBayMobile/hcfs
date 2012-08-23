@@ -24,8 +24,11 @@ fi
 
 ### 3. Configure ZCW
 #Turn off Apache Daemon
+apache2ctl-zcw stop
 update-rc.d -f apache2 remove
-apache2ctl stop
+
+# FIXME
+sleep 5
 
 ### 4. Setup ZCW
 cd ${THISPATH}
@@ -38,6 +41,14 @@ if [ -e /etc/apache2-$SUFFIX ] ; then
         rm -rf /var/log/apache2-$SUFFIX
         rm -rf /var/www-$SUFFIX
 fi
+
+#
+if [ -e ../${PROJECTNAME}/sqlite3.db ]; then
+	rm -rf ../${PROJECTNAME}/sqlite3.db
+fi
+
+python ../${PROJECTNAME}/manage.py syncdb --noinput
+
 ## 4.1 Setup Apache HTTP Server
 #Execute setup-instance command
 source /usr/share/doc/apache2/examples/setup-instance zcw
@@ -48,11 +59,19 @@ cp -r apache2-zcw/ /etc/
 #Replace PROJECTNAME variable
 sed -i "s/PROJECTNAME/${PROJECTNAME}/g" /etc/apache2-zcw/sites-available/default
 
+#sed -i "s/\/var\/www-${SUFFIX}\/static\//\/var\/www\/${PROJECTNAME}\/${PROJECTNAME}\/static\//g" /etc/apache2-zcw/sites-available/default
+
 #Copy Django project
-mkdir /var/www-zcw
+mkdir -p /var/www-zcw
+
 cp -r ${PROJECTPATH}/ /var/www-zcw/
+#cp -rp ../${PROJECTNAME}/sqlite3.db /var/www-${SUFFIX}/${PROJECTNAME}
 #Collects the static files into STATIC_ROOT
 python /var/www-zcw/${PROJECTNAME}/manage.py collectstatic --noinput
+
+#FIXME
+#cp -r /usr/local/lib/python2.7/dist-packages/delta_wizard-0.1-py2.7.egg/delta/wizard/static/wizard/ /var/www-${SUFFIX}/${PROJECTNAME}/${PROJECTNAME}/static
+
 #change file owner and group
 chown www-data:www-data -R /var/www-zcw/
 
@@ -75,6 +94,9 @@ cp start_script/*.py /usr/local/bin/
 
 #not safe
 #sed -i "s/exit 0/python \/usr\/local\/bin\/zcw_init\.py \nexit 0/g" /etc/rc.local
+
+
+apache2ctl-zcw start
 
 ### Finish deploying ZCW
 echo "Finish deploying ZCW"
