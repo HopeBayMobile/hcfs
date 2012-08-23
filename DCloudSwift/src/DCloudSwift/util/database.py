@@ -2,6 +2,7 @@ import os
 import sqlite3
 import util
 import time
+import json
 from contextlib import contextmanager
 
 BROKER_TIMEOUT = 60
@@ -245,6 +246,49 @@ class AccountDatabaseBroker(DatabaseBroker):
 class NodeInfoDatabaseBroker(DatabaseBroker):
     """Encapsulates working with a node information database."""
 
+
+    def add_info_and_spec(self, nodeList):
+        """
+        add info and specs for nodes not in node list
+        """
+        for node in nodeList:
+            hostname = node["hostname"]
+            status = "alive"
+            timestamp = int(time.time())
+
+            disk_info = {
+                        "timestamp": timestamp,
+                        "missing": {"count": 0, "timestamp": timestamp},
+                        "broken": [],
+                        "healthy": [],
+            }
+            disk = json.dumps(disk_info)
+
+            mode = "service"
+            switchpoint = timestamp
+
+            self.add_node(hostname=hostname,
+                          status=status,
+                          timestamp=timestamp,
+                          disk=disk,
+                          mode=mode,
+                          switchpoint=switchpoint)
+
+            self.add_spec(hostname=hostname, diskcount=node["deviceCnt"], diskcapacity=node["deviceCapacity"])
+
+    def constructDb(self, nodeList=None):
+        """
+        construct db from node list
+        """
+
+        if os.path.exists(self.db_file):
+            code = os.system("rm %s" % self.db_file)
+            if code != 0:
+                raise Exception("Failed to remove %s" % self.db_file)
+
+        self.initialize()
+        self.add_info_and_spec(nodeList)
+
     def _initialize(self, conn):
         self.create_node_info_table(conn)
         self.create_node_spec_table(conn)
@@ -280,6 +324,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 hostname TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 diskcount INTEGER NOT NULL,
+                diskcapacity INTEGER NOT NULL,
                 PRIMARY KEY (hostname)
             );
         """)
@@ -336,7 +381,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
-    def add_spec(self, hostname, diskcount):
+    def add_spec(self, hostname, diskcount, diskcapacity):
         """
         add spec to node_spec
 
@@ -344,6 +389,8 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @param hostname: hostname of the node
         @type  diskcount: integer
         @param diskcount: number of disks in the node
+        @type  diskcapacity: integer
+        @param diskcapacity: capacity of each individual disk
         @rtype: row
         @return: Return None if the host already exists. 
             Otherwise return the newly added row.            
@@ -354,7 +401,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 return None
             else:
                 timestamp = int(time.time())
-                conn.execute("INSERT INTO node_spec VALUES (?,?,?)", (hostname, timestamp, diskcount))
+                conn.execute("INSERT INTO node_spec VALUES (?,?,?,?)", (hostname, timestamp, diskcount, diskcapacity))
                 conn.commit()
                 row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
                 return row
@@ -546,6 +593,29 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 timestamp = int(time.time())
                 conn.execute("UPDATE node_spec SET diskcount=?, timestamp=? WHERE hostname=?", (diskcount, timestamp, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+                return row
+
+    def update_spec_diskcapacity(self, hostname, diskcapacity):
+        """
+        update node status information to node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  diskcapacity: integer
+        @param diskcapacity: capacity of each individual disk
+        @rtype: row
+        @return: Return None if the host does not exist. 
+            Otherwise return the newly updated row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                timestamp = int(time.time())
+                conn.execute("UPDATE node_spec SET diskcapacity=?, timestamp=? WHERE hostname=?", (diskcapacity, timestamp, hostname))
                 conn.commit()
                 row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
                 return row
