@@ -72,8 +72,18 @@
                 <td><a href="#" id="display{{node.index}}">{{node.ip}}</a></td>
                 <td>-</td>
                 <td>{{node.hostname}}</td>
-                <td>{{node.status}}</td>
-                <td>{{node.mode}}</td>
+                {% if node.status == "dead" %}
+                <td bgcolor="red" >
+                {% else %}
+                <td bgcolor="green">
+                {% endif %}
+                {{node.status}}</td>
+                {% if node.mode == "waiting" %}
+                <td bgcolor="red">
+                {% else %}
+                <td bgcolor="green">
+                {% endif %}
+                {{node.mode}}</td>
                 <td>{{node.hd_number}}</td>
                 <td>{{node.hd_error}}</td>
             </tr>
@@ -85,7 +95,12 @@
                 <td></td>
                 <td></td>
                 <td>{{info.serial}}</td>
-                <td>{{info.status}}</td>
+                {% if info.status == "Broken" %}
+                <td bgcolor="red">
+                {% else %}
+                <td>
+                {% endif %}
+                {{info.status}}</td>
             </tr>
             {% endfor %}
             <script>

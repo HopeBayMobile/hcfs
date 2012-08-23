@@ -429,6 +429,7 @@ def getLatestFingerprint():
     logger = util.getLogger(name="getLatestFingerprint")
     logger.debug("getLatestFingerprint start")
     disks = getNonRootDisks()
+    latestFingerprint = None
 
     for disk in disks:
         (ret, fingerprint) = readFingerprint(disk)

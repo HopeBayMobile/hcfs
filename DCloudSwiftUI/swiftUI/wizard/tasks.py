@@ -135,6 +135,8 @@ def do_meta_form(data):
     installDCloudSwift()
     from time import sleep
     from DCloudSwift.util import util
+    from DCloudSwift.util.database import NodeInfoDatabaseBroker
+    from DCloudSwift.util.util import GlobalVar
     from DCloudSwift.master import SwiftDeploy
     import DCloudSwift
 
@@ -172,6 +174,11 @@ def do_meta_form(data):
     do_meta_form.report_progress(10, True, 'Assign device capacity for each host...', None)
     for host in hosts:
         host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
+
+    # construct node_info_db
+    do_meta_form.report_progress(12, True, 'Construct node db...', None)
+    nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+    nodeInfoDb.constructDb(nodeList=hosts)
 
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
