@@ -8,7 +8,7 @@
 $(document).ready(function(){  
     var quota_ratio = [["Used", {{zone.used}}], ["Free", {{zone.free}}]];
     var plot7 = $.jqplot('quota_chart', [quota_ratio], {
-        title:'Capacity',
+        //title:'Capacity',
         seriesColors: [ "#4bb2c5", "#c5b47f" ],
         seriesDefaults:{
             renderer:$.jqplot.PieRenderer,
@@ -61,9 +61,10 @@ $(document).ready(function(){
   <div id="screen" class="span9">
     <div class="row-fluid">
         <div id="sidebar" class="span6">
+          <h4>Capacity</h4>
           <div id="quota_chart""></div>
         </div>
-        <div id="sidebar" class="span3">
+        <div id="sidebar" class="span6">
           <h4>Top 5 Accounts</h4>
           <table class="table">
             {% for account in accounts%}
