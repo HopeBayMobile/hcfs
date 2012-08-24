@@ -1,8 +1,8 @@
 #./install_dep_script
 # install dependent packages
 apt-get install -y --force-yes python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma  python-all-dev python-sphinx build-essential python-profiler python-argparse python-setuptools fuse-utils
-dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb 
-dpkg -i debsrc/cython_0.15.1-2_amd64.deb 
+dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb
+dpkg -i debsrc/cython_0.15.1-2_amd64.deb
 dpkg -i debsrc/smartmontools_5.39.1+svn3124-2_amd64.deb
 
 # install s3ql package
@@ -31,6 +31,6 @@ EOF
 
 #sudo apt-get update
 # import public key of Delta's Ubuntu apt server
-sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B &
+# sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B &
 # FIXME: install s3ql in /usr/local/bin in debian packaging (if it's required)
 cp -rs /usr/bin/*s3ql* /usr/local/bin/

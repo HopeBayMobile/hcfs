@@ -9,9 +9,9 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # make sure input arguments are correct
-    if [ $# -ne 3 ] 
+    if [ $# -ne 3 ]
     then
-        echo "Need to input 2 arguments."
+        echo "Need to input 3 arguments."
         exit 1
     fi
     if [ $1 != "full" ] && [ $1 != "fast" ]
@@ -29,7 +29,7 @@ fi
     DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     OUTPUTFILE="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
-    INITPATH=$(pwd)    
+    INITPATH=$(pwd)
 
 # pull code from github
     if [ $MODE = "full" ];    then
@@ -60,15 +60,17 @@ fi
         echo "Error in unpackaing DEB packages."
         exit 1
     fi
-    
+
 # build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
     bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM
     # Move S3QL DEB file to /var/cache/apt/
     rm $APTCACHEDIR/s3ql*   # remove old s3ql deb files
-    cp StorageAppliance/s3ql*.deb $APTCACHEDIR 
+    cp StorageAppliance/s3ql*.deb $APTCACHEDIR
     # copy gateway api DEB file to /var/cache/apt/
-    cp dcloudgatewayapi*.deb $APTCACHEDIR 
+    cp dcloudgatewayapi*.deb $APTCACHEDIR
+    # copy dcloud-gateway meta package to /var/cache/apt/
+    cp dcloud-gateway*.deb $APTCACHEDIR
 
 # Update "apt-get" index
     #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
@@ -92,6 +94,6 @@ fi
     rm debpatch_StorageAppliance*.tgz
     rm StorageAppliance/s3ql*.deb
     rm dcloudgatewayapi*.deb
-    
+
 # Done.
     echo "~~~ DONE!"

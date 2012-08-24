@@ -12,12 +12,14 @@ if [ "$1" != "dom" ]; then
 fi
 
 # install gateway API
+apt-get install -y --force-yes dcloud-gateway
 #~ cd ../DCloudGateway
 #~ ./gateway_api_install_script
-apt-get install -y --force-yes dcloudgatewayapi
+    #~ apt-get install -y --force-yes dcloudgatewayapi
 # install S3QL
-cd ../DCloudS3ql
-./install_s3ql_script
+    #~ cd ../DCloudS3ql
+    #~ ./install_s3ql_script
+
 # install samba 3.6.6
 cd ../GatewayPatches
 ./install-samba.sh
