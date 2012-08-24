@@ -1,0 +1,5 @@
+misc/ServiceScripts/* /usr/share/doc/python-dcloudswift
+inputFile.sample /usr/share/doc/python-dcloudswift
+Swift.ini /usr/share/doc/python-dcloudswift
+swift_master.ini /usr/share/doc/python-dcloudswift
+usr/

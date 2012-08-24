@@ -1,6 +1,5 @@
 import os
 import subprocess
-import setuptools
 from setuptools import setup, find_packages
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -33,6 +32,9 @@ def isAllDebInstalled(debSrc):
     return True
 
 
+def usage():
+    print "usage: python setup.py install\n"
+
 
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
@@ -40,11 +42,13 @@ def read(fname):
 def main():
     os.system("mkdir -p %s" % DELTADIR)
 
+    #if not isAllDebInstalled("misc/deb_src"):
+    #    os.system("cd misc/deb_src; dpkg -i *.deb")
     setup(
         name="DCloudSwift",
-        version="0.4",
-        author="Cloud Data Team, CTBD, Delta Electronic Inc.",
-        description=("Delta Inc. CTBD Storage Gateway"),
+        version="0.2",
+        author="Cloud Data Team, CTBU, Delta Electronic Inc.",
+        description=("Delta Inc. CTBU Storage Gateway"),
         license="Delta Inc.",
         keywords=['deploy', 'swift', 'cloud'],
 
@@ -71,7 +75,6 @@ def main():
                     'dcloud_clear_backlog = DCloudSwift.master.swiftEventMgr:clearMaintenanceBacklog',
                     'dcloud_print_backlog = DCloudSwift.util.MaintainReport:print_maintenance_backlog',
                     'dcloud_print_node_info = DCloudSwift.util.MaintainReport:print_node_info',
-                    'dcloud_swift_dns_setup = DCloudSwift.master.swiftLoadBalancer:setupDnsRoundRobin',
                     ]
         },
 
@@ -84,7 +87,6 @@ def main():
                 "Development Status :: 3 - Alpha",
                 "Topic :: FILESYSTEM",
         ],
-        cmdclass={'prepare_image': prepare_image}
     )
 
 
@@ -102,52 +104,6 @@ def main():
 
     os.system("update-rc.d -f swift-maintain-switcher remove")
     os.system("update-rc.d swift-maintain-switcher defaults")
-
-    os.system("cp ./misc/CronScripts/timesync /etc/cron.hourly")
-
-class prepare_image(setuptools.Command):
-    user_options = []
-    boolean_options = []
-    description = "Copy to /usr/local/src/"
-
-    def initialize_options(self):
-        pass
-
-    def finalize_options(self):
-        pass
-
-    def run(self):
-        if os.path.exists("/usr/src/DCloudSwift"):
-            cmd = "rm -rf /usr/local/src/DCloudSwift"
-            print cmd
-            os.system(cmd)
-
-        cmd = "cp -r %s /usr/local/src/" % WORKING_DIR
-        print cmd
-        os.system(cmd)
-        
-        #replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
-        cmd = "cp misc/BootScripts/rc.local /etc/rc.local"
-        print cmd
-        os.system(cmd)
-
-        # Copy misc/BootScripts/rc.py to /etc/rc.py
-        cmd = "cp misc/BootScripts/rc.py /etc/rc.py"
-        print cmd
-        os.system(cmd)
-        
-        # Create directories
-        if not os.path.exists("/srv"):
-            cmd = "mkdir /srv"
-            print cmd
-            os.system(cmd)
-
-        if not os.path.exists("/DCloudSwift"):
-            cmd = "mkdir /DCloudSwift"
-            print cmd
-            os.system(cmd)
-
-        exit(0)
 
 if __name__ == '__main__':
     main()
