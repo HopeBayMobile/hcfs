@@ -13,7 +13,6 @@ fi
 
 # install gateway API
 apt-get install -y --force-yes dcloud-gateway
-apt-get -f install
 #~ cd ../DCloudGateway
 #~ ./gateway_api_install_script
     #~ apt-get install -y --force-yes dcloudgatewayapi
@@ -32,11 +31,13 @@ cd ../GatewayPatches
 ./install-u1204.sh
 
 # install gateway GUI
-apt-get -f install
+apt-get -y --force-yes -f install
 cd ../DCloudGatewayUI
 ./setup.sh
-
 update-rc.d celeryd defaults
+
+# Install COSA
+apt-get install -y --force-yes savebox
 
 sleep 3
 echo "Installation of Gateway is completed..."

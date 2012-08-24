@@ -54,6 +54,8 @@ fi
 # Download DEB files from FTP and copy DEB files to /var/cache/apt/archives
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBFILE
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBPATCH
+    wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$COSA_DEB
+    mv savebox*.deb $APTCACHEDIR
     tar -xzf $DEBFILE -C $APTCACHEDIR
     if [ $? != 0 ]   # error handling
     then
