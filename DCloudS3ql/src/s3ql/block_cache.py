@@ -410,7 +410,8 @@ class BlockCache(object):
                     with self.bucket_pool() as bucket:
                         obj_size = bucket.perform_write(do_write, 's3ql_data_%d' % obj_id).get_obj_size()
                     break
-                except:
+                except Exception as e:
+                    log.error(str(e))
                     if self.going_down:
                         raise
                     log.error('Cache upload timed out. Retrying in 10 seconds.')

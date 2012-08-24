@@ -50,7 +50,7 @@
     </div>
 </form>
   <div class="row-fluid">
-    <div class="span7">
+    <div class="span10">
 <h3>User List under the account "{{account_id}}":</h3>
     </div>
     <div class="span2">
@@ -58,7 +58,7 @@
     </div>
   </div>
   <div class="row-fluid">
-    <div class="span9">
+    <div class="span12">
   <table class="table">
 <tr>
 <th></th>
@@ -78,7 +78,7 @@
 <td>
 {% if user.user_enable %}
 <a class="btn" id="reset_pw${{user.id}}" name="{{user.id}}">Reset PW</a> <a class="btn" id="query_pw${{user.id}}" name="{{user.id}}">Query</a>
-<a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a>
+<a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a> <a class="btn" href="/account/{{account_id}}/user/{{user.id}}/delete"><i class="icon-remove"></i>Delete</a>
 {% else %}
 <a class="btn" disabled="disabled">Reset PW</a> <a class="btn" disabled="disabled">Query</a>
 <a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a>
@@ -86,25 +86,6 @@
 </td>
 </tr>
 {% endfor%}
-<!--tr>
-<td>1</td>
-<td><a href="/account/{{account_id}}/user/Admin/edit">Admin</a></td>
-<td>I'm Administrator...</td>
-<td><a class="btn" id="reset_pw$Admin">Reset PW</a> <a class="btn" id="query_pw$Admin">Query</a>
-<a class="btn" id="dis_user$Admin" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a></td>
-</tr>
-<tr>
-<td>2</td>
-<td><a href="/account/{{account_id}}/user/User1/edit">User1</a></td>
-<td>I'm ghost</td>
-<td><a class="btn" id="reset_pw$Yoo">Reset PW</a> <a class="btn" id="query_pw$User1">Query</a> <a class="btn" href="/account/user/User1/enable"><i class="icon-off"></i>On</a></a></td>
-</tr>
-<tr>
-<td>1</td>
-<td><a href="/account/{{account_id}}/user/Yooedit">Yoo</a></td>
-<td>lala...</td>
-<td><a class="btn" id="reset_pw$Yoo">Reset PW</a> <a class="btn" id="query_pw$Yoo">Query</a> <a class="btn" id="dis_user$Yoo" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a></a></td>
-</tr-->
   </table>
   </div>
   </div>

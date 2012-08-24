@@ -23,6 +23,7 @@ log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 
 # global flag to exit while safely
 g_program_exit = False
+g_prev_flushing = False
 
 ####################################################################
 '''
@@ -184,6 +185,7 @@ def get_gw_indicator():
     """
 
     indic_file = '/dev/shm/gw_indicator'
+    last_backup_time_file = '/root/.s3ql/gw_last_backup_time'
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
     return_val = {
@@ -200,15 +202,29 @@ def get_gw_indicator():
         'HTTP_proxy_srv': False,
         'S3QL_ok': False}}
 
+    global g_prev_flushing
+
     try:
         return_val = api.get_indicators()
+        
+        with open(indic_file, 'w') as fh:
+            json.dump(return_val, fh)
+
+        # if previous flushing status is True
+        if g_prev_flushing:
+            if not return_val['data']['flush_inprogress']:
+                # flushing from True -> False
+                # write current time to file
+                with open(last_backup_time_file, 'w') as fh2:
+                    fh2.write(str(time.time()))
+                
+        # change flushing status
+        g_prev_flushing = return_val['data']['flush_inprogress']
+        
 
     except Exception as err:
         log.error("Unable to get indicators")
         log.error("Error message: %s" % str(err))
-
-    with open(indic_file, 'w') as fh:
-        json.dump(return_val, fh)
 
     return return_val['result']
 

@@ -26,6 +26,7 @@ class SwiftAccountMgr:
         self.__num_of_user = random.randrange(1, 20)
         self.__account_dict = {}
         self.__user_dict = {}
+        self.__usage = {}
 
         for i in range(self.__num_of_account):
             account = "Account%d" % i
@@ -53,6 +54,19 @@ class SwiftAccountMgr:
                 "quota": user_quota,
                 "usage": user_usage,
             }
+
+        for i in range(self.__num_of_account):
+            account = "Account%d" % i
+            self.__usage[account] = {}
+
+            for j in range(self.__num_of_user):
+                #account = "Account%d" % i
+                user = "User%d" % j
+                user_usage = random.randrange(0, 1000000000)
+
+                self.__usage[account][user] = {
+                    "usage": user_usage,
+                }
 
     def __generate_random_password(self):
         '''
@@ -105,6 +119,37 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def delete_user(self, account, user, retry=3):
+        '''
+        Delete the user from backend Swift. The user's data will be destroyed.
+        The deletion includes the following steps::
+            (1) Delete a user.
+            (2) Remove the user's metadata from super_admin account.
+            (3) Delete the user's private container and configuration container.
+
+        @type  account: string
+        @param account: the name of the account
+        @type  user: string
+        @param user: the name of the user
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a tuple Bool(val, msg). If the user is successfully deleted from backend Swift, then Bool.val == True
+                and msg records the standard output. Otherwise, val == False and msg records the error message.
+        '''
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        elif user == "" or user == None:
+            msg = "User is not valid!"
+        else:
+            val = True
+
+        return Bool(val, msg)
+
     def add_account(self, account, admin_user="", admin_password="", description="no description", quota=500000000000, retry=3):
         '''
         Add a new account, including the following steps::
@@ -126,6 +171,30 @@ class SwiftAccountMgr:
         @rtype:  named tuple
         @return: a tuple Bool(val, msg). When the account is successfully created, Bool.val == True.
                 Otherwise, Bool.val == False and Bool.msg records the error message.
+        '''
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        else:
+            val = True
+
+        return Bool(val, msg)
+
+    def delete_account(self, account, retry=3):
+        '''
+        Remove all users from the account and delete the account from backend Swift.
+        All data will be destroyed.
+
+        @type  account: string
+        @param account: the name of the account
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a tuple Bool(val, msg). If the account is successfully deleted, then Bool.val ==
+                True. Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
         msg = ""
         val = False
@@ -512,13 +581,37 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def list_usage(self, retry=3):
+        '''
+        List all usages of all users in all accounts.
+
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the information is listed successfully, then Bool.val == True
+                and Bool.msg is a dictoinary recording all usages of all users in all accounts. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
+        '''
+        val = False
+        msg = ""
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        val = True
+        msg = self.__usage
+
+        return Bool(val, msg)
+
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
     print "\nadd_user"
     print SA.add_user("account1", "user1")
+    print "\ndelete_user"
+    print SA.delete_user("account1", "user1")
     print "\nadd_account"
     print SA.add_account("account1")
+    print "\ndelete_account"
+    print SA.delete_account("account1")
     print "\nenable_user"
     print SA.enable_user("account1", "user1")
     print "\ndisable_user"
@@ -545,3 +638,5 @@ if __name__ == '__main__':
     pprint(SA.obtain_user_info("account1", "user1").msg)
     print "\nmodify_user_description"
     print SA.modify_user_description("account1", "user1", "This is a test!")
+    print "\nlist_usage"
+    pprint(SA.list_usage())
