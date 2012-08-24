@@ -74,8 +74,8 @@ fi
 
 # Update "apt-get" index
     #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
-    sudo dpkg-scanpackages ${APTCACHEDIR} > ${APTCACHEDIR}/Packages
-    sudo gzip -f ${APTCACHEDIR}/Packages
+    dpkg-scanpackages ${APTCACHEDIR} > ${APTCACHEDIR}/Packages
+    gzip -f ${APTCACHEDIR}/Packages
 
 # Back up all DEB files in /var/cache/apt/archives/ with the source code
 # tar the DEB packages into a file.
