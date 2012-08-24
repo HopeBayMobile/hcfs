@@ -1671,6 +1671,7 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1."
             return Bool(val, msg)
 
+        # check the existence of the account
         account_existence_output = self.account_existence(account)
 
         if account_existence_output.val == False:
@@ -1682,6 +1683,7 @@ class SwiftAccountMgr:
             msg = "Account %s does not exist!" % account
             return Bool(val, msg)
 
+        # obtain the user list in the account
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
 
         if val == False:
@@ -1708,6 +1710,7 @@ class SwiftAccountMgr:
             metadata_content = msg
             mark = True
 
+        # check whether the account is enabled or not
         obtain_account_info_output = self.obtain_account_info(account)
 
         if obtain_account_info_output.val == True and obtain_account_info_output.msg.get("account_enable") == True:
@@ -1715,6 +1718,7 @@ class SwiftAccountMgr:
         else:
             account_enable = False
 
+        # invoke obtain_user_info() to obtain each user's info
         for item in user_info["users"]:
             obtain_user_info_output = self.obtain_user_info(account, item["name"], account_enable)
 
@@ -1730,6 +1734,25 @@ class SwiftAccountMgr:
             else:
                 user_dict[item["name"]] = obtain_user_info_output.msg
 
+        # obtain the actual usage of account administrator
+        obtain_account_info_output = self.obtain_account_info(account)
+
+        if obtain_account_info_output == False:
+            account_usage = "Error"
+        else:
+            account_usage = int(obtain_account_info_output.msg.get("usage"))
+            admin_usage = 0
+
+            for field, value in user_dict.items():
+                if str(value["usage"]).isdigit():
+                    account_usage -= int(value["usage"])
+                else:
+                    account_usage = "Error"
+                    break
+
+        user_dict[self.__admin_default_name]["usage"] = account_usage
+
+        # MUST return true to show information on GUI
         val = True
         msg = user_dict
 
@@ -2723,6 +2746,8 @@ class SwiftAccountMgr:
             (2) the quota of the user
             (3) the usgae of the user
             (4) the user is enabled or not
+
+        Note that the function can not obtain the usage of account administrator.
 
         @type  account: string
         @param account: the account having the user
