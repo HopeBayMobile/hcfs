@@ -11,7 +11,7 @@ from ConfigParser import ConfigParser
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
 
 from util.SwiftCfg import SwiftMasterCfg
 from util.util import GlobalVar
@@ -46,6 +46,79 @@ class SwiftMonitorMgr:
 
         return capacity
 
+    def get_number_of_storage_nodes(self):
+        '''
+        return the number of the nodes or none if errors happen.
+        '''
+
+        storageList = util.getStorageNodeList()
+        try:
+            # number of storage nodes must be greater than zero
+            if storageList:
+                return len(storageList)
+            else:
+                return None
+        except Exception as e:
+             self.logger.error(str(e))
+             return None
+
+    def get_used_capacity(self):
+        '''
+        return used capacity in bytes
+        '''
+        # TODO: fill in contents
+        return 4300000000
+
+    def calculate_total_capacity_in_TB(self, total):
+        '''
+        calculate used_capacity_percentage
+        @param total: total capacity in bytes
+        return total capacity in TB
+        '''
+        total_TB = None
+        try:
+            total_TB = float(total)/float(1024*1024*1024*1024)
+        except Exception as e:
+            self.logger.error(str(e))
+
+        return total_TB
+
+
+    def calculate_used_capacity_percentage(self, total, used):
+        '''
+        calculate used_capacity_percentage
+        @param total: total capacity
+        @param used: used capacity
+        return used capacity percentage
+        '''
+        percentage = None
+        try:
+            percentage = (float(used)/float(total)) * 100
+        except Exception as e:
+             self.logger.error(str(e))
+
+        return percentage
+
+
+    def calculate_free_capacity_percentage(self, total, used, unusable=0):
+        '''
+        calculate free capacity
+        @param total: total capacity
+        @param used: used capacity
+        @param unusable: unusable capacity due to broken nodes or disks 
+        '''
+        
+        percentage = None
+        try:
+            free = float(total) - float(used) - float(unusable)
+            percentage = (free/float(total))*100
+        except Exception as e:
+            self.logger.error(str(e))
+        
+        return percentage
+
+    def get_portal_url(self):
+        return util.getPortalUrl()
 
     def get_zone_info(self):
         """
@@ -57,12 +130,23 @@ class SwiftMonitorMgr:
         used: zone used storage percentage
         free: zone free storage percentage
         capacity: total zone capacity
-        
-        >>> SA = SwiftMonitorMgr()
-        >>> print SM.get_zone_info()
-        {'ip': '192.168.1.104', 'nodes': 3, 'used': '21', 'capacity': '12TB', 'free': '79'}
         """
-        zone = {"ip":"192.168.1.104","nodes":3,"used":"21","free":"79","capacity":"12TB"}
+
+        url = self.get_portal_url()
+        nodes = self.get_number_of_storage_nodes()
+        total_capacity = self.get_total_capacity()
+        used_capacity = self.get_used_capacity()
+
+        capacity = free = used = "N/A"
+
+        if total_capacity:
+            capacity = "%.0fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
+            if used_capacity:
+                used = "%.2f" % (self.calculate_used_capacity_percentage(total_capacity, used_capacity))
+                free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
+            
+        zone = {"url": url, "nodes": nodes, "used": used, "free": free, "capacity": capacity}
+        
         return zone
 
     def list_nodes_info(self):

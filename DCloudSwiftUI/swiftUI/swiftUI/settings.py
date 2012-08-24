@@ -60,7 +60,11 @@ MEDIA_URL = "/media/"
 # Don"t put anything in this directory yourself; store your static files
 # in apps" "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = os.path.join(PACKAGE_ROOT, "site_media", "static")
+#STATIC_ROOT = os.path.join(PACKAGE_ROOT, "site_media", "static")
+#
+#-- Ovid Wu <ovid.wu@delta.com.tw> Fri, 24 Aug 2012 03:45:24 +0000
+#
+STATIC_ROOT = "/var/www-zcw/static"
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -127,12 +131,12 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
+
     # theme
     "pinax_theme_bootstrap_account",
     "pinax_theme_bootstrap",
     "django_forms_bootstrap",
-    
+
     # external
     "account",
     "metron",
@@ -196,8 +200,8 @@ djcelery.setup_loader()
 # NOTE: The tasks should import after djcelery.setup_loader(),
 # otherwise, the tasks won't find celeryconfig.py
 # === Add wizard settings
-from wizard.forms import MetaForm 
-from wizard.tasks import do_meta_form 
+from wizard.forms import MetaForm
+from wizard.tasks import do_meta_form
 
 WIZARD_TITLE = 'Swift ZCW Wizard'
 WIZARD_STEP = [
