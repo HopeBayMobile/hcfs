@@ -224,6 +224,10 @@
                 margin-top: 20px;
                 font-size: 23px;
             }
+            .last_snapshot_div {
+                text-indent: 68px;
+                font-size: 23px;
+            }
             .submit_button_div {
                 margin-left: 450px;
             }
@@ -288,6 +292,10 @@
                 {% endfor %}
             </select> each day
             </div>
+            <div class="last_snapshot_div">
+                Last snapshot time : {{ latest_snapshot_time }}
+            <br />
+            </div>
             <div class="submit_button_div">
                 <button type="submit" value="Modify" class="submit_button" alt="Submit">
                     <div class="button_text">Modify</div>
@@ -303,7 +311,7 @@
             <form action="/dashboard/snapshot/lifecycle" method="POST">
             {% csrf_token %}
             <div class="schedule_sub_div">
-                Snapshots will be delete after:<br />
+                Snapshots will be deleted after:<br />
                 <div class="days_div">
                     <input name="days" type="number" min="1" max="365" value="{{ default_day }}" /> days
                 </div>

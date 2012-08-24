@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block head_title %}Account Confirm{% endblock %}
+
+{% block body_class %}home{% endblock %}
+{% block navbar_class %}{% endblock %}
+{% block navbar %}
+                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                                <span class="icon-bar"></span>
+                            </a>
+                            <a class="brand" href="/">Cloud Storage</a>
+                            <div class="nav-collapse">
+                              <!--ul class="nav">
+                                <li><a href="#tab_one">One</a></li>
+                                <li><a href="#tab_two">Two</a></li>
+                              </ul-->
+                              {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
+                            </div>
+                    </div>
+{% endblock %}
+{% block body %}
+<div class="container-fluid">
+    <div class="row-fluid">
+      <div id="sidebar" class="span3">
+      {% include "_side_bar.html" %}
+    </div>
+  <div id="screen" class="span9">
+<h1>Create Account Successful</h1>
+<table class="table">
+<tr>
+  <td>Account ID</td>
+  <td>{{account_id}}</td>
+</tr>
+<tr>
+  <td>Description</td>
+  <td>{{description}}</td>
+</tr>
+<tr>
+  <td>Identity</td>
+  <td>{{identity}}</td>
+</tr>
+<tr>
+  <td>Password</td>
+  <td>{{Password}}</td>
+</tr>
+</table>
+<hr/>
+<h3>Would you want to create new user?</h3>
+    <div id="accountDiv" data-role="fieldcontain">
+      <a href="/account/{{account_id}}/user/new" class="btn">Yes</a> <a class="btn" href="/account/">No</a>
+    </div>
+</div>
+{% endblock %}

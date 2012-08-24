@@ -2,6 +2,7 @@ import os
 import sqlite3
 import util
 import time
+import json
 from contextlib import contextmanager
 
 BROKER_TIMEOUT = 60
@@ -241,11 +242,56 @@ class AccountDatabaseBroker(DatabaseBroker):
             else:
                 return False
 
+
 class NodeInfoDatabaseBroker(DatabaseBroker):
     """Encapsulates working with a node information database."""
 
+
+    def add_info_and_spec(self, nodeList):
+        """
+        add info and specs for nodes not in node list
+        """
+        for node in nodeList:
+            hostname = node["hostname"]
+            status = "alive"
+            timestamp = int(time.time())
+
+            disk_info = {
+                        "timestamp": timestamp,
+                        "missing": {"count": 0, "timestamp": timestamp},
+                        "broken": [],
+                        "healthy": [],
+            }
+            disk = json.dumps(disk_info)
+
+            mode = "service"
+            switchpoint = timestamp
+
+            self.add_node(hostname=hostname,
+                          status=status,
+                          timestamp=timestamp,
+                          disk=disk,
+                          mode=mode,
+                          switchpoint=switchpoint)
+
+            self.add_spec(hostname=hostname, diskcount=node["deviceCnt"], diskcapacity=node["deviceCapacity"])
+
+    def constructDb(self, nodeList=None):
+        """
+        construct db from node list
+        """
+
+        if os.path.exists(self.db_file):
+            code = os.system("rm %s" % self.db_file)
+            if code != 0:
+                raise Exception("Failed to remove %s" % self.db_file)
+
+        self.initialize()
+        self.add_info_and_spec(nodeList)
+
     def _initialize(self, conn):
         self.create_node_info_table(conn)
+        self.create_node_spec_table(conn)
 
     def create_node_info_table(self, conn):
         """
@@ -266,6 +312,23 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             );
         """)
 
+    def create_node_spec_table(self, conn):
+        """
+        Create node information table which is specific to the DB.
+        
+        @type  conn: object
+        @param conn: DB connection object
+        """
+        conn.executescript("""
+            CREATE TABLE node_spec (
+                hostname TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                diskcount INTEGER NOT NULL,
+                diskcapacity INTEGER NOT NULL,
+                PRIMARY KEY (hostname)
+            );
+        """)
+
     def show_node_info_table(self):
         """
         show node_info table
@@ -275,6 +338,17 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         """
         with self.get() as conn:
             row = conn.execute("SELECT * FROM node_info").fetchall()
+            return row
+
+    def show_node_spec_table(self):
+        """
+        show node_spec table
+        
+        @rtype:  rows
+        @return: return node_info table
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec").fetchall()
             return row
 
     def add_node(self, hostname, status, timestamp, disk, mode, switchpoint):
@@ -307,6 +381,31 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+    def add_spec(self, hostname, diskcount, diskcapacity):
+        """
+        add spec to node_spec
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  diskcount: integer
+        @param diskcount: number of disks in the node
+        @type  diskcapacity: integer
+        @param diskcapacity: capacity of each individual disk
+        @rtype: row
+        @return: Return None if the host already exists. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if row:
+                return None
+            else:
+                timestamp = int(time.time())
+                conn.execute("INSERT INTO node_spec VALUES (?,?,?,?)", (hostname, timestamp, diskcount, diskcapacity))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+                return row
+
     def delete_node(self, hostname):
         """
         delete a node from node_info
@@ -326,6 +425,25 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 return None
 
+    def delete_spec(self, hostname):
+        """
+        delete a spec from node_spec
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @rtype: row
+        @return: Return None if the host does not exist. 
+            Otherwise return the deleted row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if row:
+                conn.execute("DELETE FROM node_spec WHERE hostname=?", (hostname,))
+                conn.commit()
+                return row
+            else:
+                return None
+
     def query_node_info_table(self, conditions):
         """
         query node_info according to conditions
@@ -339,6 +457,19 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             ret = conn.execute("SELECT * FROM node_info WHERE %s" % conditions)
             return ret
         
+    def query_node_spec_table(self, conditions):
+        """
+        query node_info according to conditions
+
+        @type  conditions: string
+        @param conditions: query conditions
+        @rtype: rows
+        @return: Return the result.            
+        """
+        with self.get() as conn:
+            ret = conn.execute("SELECT * FROM node_spec WHERE %s" % conditions)
+            return ret
+
     def get_info(self, hostname):
         """
         retrieve information of a node from node_info
@@ -356,6 +487,22 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 return row
  
+    def get_spec(self, hostname):
+        """
+        retrieve information of a node from node_info
+        
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @rtype: row
+        @return: Return None if the host does not exist. 
+            Otherwise return the seleted row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                return row
 
     def update_node_status(self, hostname, status, timestamp):
         """
@@ -425,6 +572,52 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 conn.execute("UPDATE node_info SET mode=?, switchpoint=? WHERE hostname=?", (mode, switchpoint, hostname))
                 conn.commit()
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+                return row
+
+    def update_spec_diskcount(self, hostname, diskcount):
+        """
+        update node status information to node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  diskcount: integer
+        @param diskcount: number of disks in the node
+        @rtype: row
+        @return: Return None if the host does not exist. 
+            Otherwise return the newly updated row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                timestamp = int(time.time())
+                conn.execute("UPDATE node_spec SET diskcount=?, timestamp=? WHERE hostname=?", (diskcount, timestamp, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+                return row
+
+    def update_spec_diskcapacity(self, hostname, diskcapacity):
+        """
+        update node status information to node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  diskcapacity: integer
+        @param diskcapacity: capacity of each individual disk
+        @rtype: row
+        @return: Return None if the host does not exist. 
+            Otherwise return the newly updated row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                timestamp = int(time.time())
+                conn.execute("UPDATE node_spec SET diskcapacity=?, timestamp=? WHERE hostname=?", (diskcapacity, timestamp, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
                 return row
 
 
@@ -540,13 +733,17 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 return row
 
 if __name__ == '__main__':
-#    os.system("rm /etc/test/test.db")
+    os.system("rm /etc/delta/swift_node.db")
     db = NodeInfoDatabaseBroker("/etc/delta/swift_node.db")
-    rows = db.show_node_info_table()
+    db.initialize()
+    db.add_spec(hostname="ddd", diskcount=3)
+    db.add_spec(hostname="dd", diskcount=3)
+    rows = db.show_node_spec_table()
     for row in rows:
         print row
-  #  db.initialize()
 #    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
-#    print db.query_node_info_table("mode=\"service\"").fetchall()
+    print db.get_spec("ddd")
+    print db.update_spec_diskcount("ddd", 5)
+    print db.delete_spec("ddd")
     #print db.add_node(hostname="system", ipaddress=None)
     pass

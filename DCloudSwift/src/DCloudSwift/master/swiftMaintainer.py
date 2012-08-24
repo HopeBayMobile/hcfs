@@ -10,7 +10,8 @@ import urllib2
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
+#sys.path.append("%s/DCloudSwift/" % BASEDIR)
 
 from util.SwiftCfg import SwiftMasterCfg
 from util.daemon import Daemon
@@ -30,12 +31,14 @@ class SwiftMaintainer:
         data = json.dumps(data)
         req = urllib2.Request(url, data, {'Content-Type': 'application/json'})
         
-        #TODO: time out mechanism
         response = None
-        f = urllib2.urlopen(req)
+        f = urllib2.urlopen(req, timeout=180)
         response = f.read()
+        code = f.getcode()
+        print code > 199
+        print code
         f.close
-        return response
+        return (code, response)
 
     def subscribe(self, event, level_name='warning', interval=None, hostname_list=[]):
         ret = {"code": 1, "message": ""}
@@ -53,7 +56,7 @@ class SwiftMaintainer:
         }
 
         try:
-            response = self.post_data(url=url, data=data)
+            (code, response) = self.post_data(url=url, data=data)
         except Exception as e:
             ret["message"] = str(e)
             return ret
@@ -65,7 +68,7 @@ class SwiftMaintainer:
             else:
                 ret["message"] = response["message"]
         except:
-            ret["message"] = "The response is not in legal format"
+            ret["message"] = "Illegal Response"
 
         return ret
 
@@ -74,14 +77,15 @@ class SwiftMaintainer:
 
 
 if __name__ == "__main__":
-    SM = SwiftMaintainer("172.16.229.220:8080")
+    SM = SwiftMaintainer("172.16.78.79:5308")
     data = {}
-    #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
-    response = SM.post_data("http://172.16.229.63:5308/events", data)
+    #response = SM.post_data("http://172.16.78.79:5308/subscribeEvent", data)
+    response = SM.post_data("http://172.16.78.79:5308/events", data)
     #SM = SwiftMaintainer("172.16.229.220:8080")
     #data = {}
     #response = SM.post_data("http://172.16.229.220:8080/subscribeEvent", data)
     #response = SM.post_data("http://172.16.229.63:5308/events", data)
-    #response = SM.subscribe(event='cpu temperature')
+    response = SM.subscribe(event='cpu temperature')
+    print response
     #print response
     #print swiftEvents.HDD.healthy.YES

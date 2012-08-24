@@ -35,7 +35,7 @@ def continue_snapshot_in_progress():
         if os.path.exists(snapshot_tag):
             try:
                 subprocess.Popen('sudo %s' % snapshot_bot, shell=True)
-                log.info('Continue snapshotting process.')
+                log.debug('Continue snapshotting process.')
             except:
                 raise SnapshotError("Could not initialize the snapshot bot.")
 
@@ -51,5 +51,5 @@ if __name__ == '__main__':
     try:
         continue_snapshot_in_progress()
     except Exception as err:
-        log.info('Error in startup gateway (snapshot)')
-        log.info('%s' % str(err))
+        log.error('Error in startup gateway (snapshot)')
+        log.error('%s' % str(err))

@@ -37,6 +37,23 @@ def gateway_status():
         data = {}
     return data
 
+# wthung, 2012/8/3
+def _get_snapshot_last_status():
+    # get last snapshot status
+    ss_status = json.loads(api_snapshot.get_snapshot_last_status())
+    last_ss_time = ss_status.get("latest_snapshot_time")
+    last_ss_status = ''
+    if last_ss_time != -1:
+        # a snapshot is available
+        last_ss_status = 'Finished at %s' % time.strftime("%Y/%m/%d %H:%M:%S", time.localtime(last_ss_time))
+    elif ss_status.get("result"):
+        # no snapshot created
+        last_ss_status = ss_status.get('msg')
+    else:
+        # fail
+        last_ss_status = 'Fail'
+    
+    return last_ss_status
 
 @login_required
 def index(request):
@@ -48,6 +65,7 @@ def index(request):
     context.update(data)
     try:
         context["available_version"] = json.loads(api_remote_upgrade.get_available_upgrade()).get("version")
+        context["last_snapshot_status"] = _get_snapshot_last_status()
     except Exception as inst:
         print inst
     return render(request, 'dashboard/dashboard.html', context)
@@ -259,7 +277,7 @@ def sharefolder(request, action):
                 action_error[action] = update_return['msg']
             nfs_data['array_of_ip'] = ip_list
 
-    forms_group['Microsoft Networking Setting'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
+    forms_group['Microsoft Networking Access'] = forms_group.get('smb_setting', SMBSetting(initial=smb_data))
 
     return render(request, 'dashboard/sharefolder.html', {'tab': 'sharefolder', 'forms_group': forms_group,
                                                           'action_error': action_error, "nfs_data": nfs_data})
@@ -278,6 +296,11 @@ def sync(request):
         interval_from = query.get('interval_from')
         bandwidth = query.get('bandwidth')
         no_upload = query.get('no_upload')
+        
+        # wthung, 2012/8/7
+        # ensure interval_from is smaller than interval_to
+        if int(interval_to) < int(interval_from) :
+            interval_to, interval_from = interval_from, interval_to
 
         for value in data:
             if value[0] == day:
@@ -413,6 +436,8 @@ def snapshot(request, action=None):
                                'the_day': return_hash.get('the_day'),
                                'default_day': return_hash.get('default_day'),
                                'snapshot_time': return_hash.get('snapshot_time'),
+                               'latest_snapshot_time': \
+                               return_hash.get('latest_snapshot_time'),
                                }
                               )
                 #return HttpResponse("Success: %s" % return_val['msg'])
@@ -429,6 +454,8 @@ def snapshot(request, action=None):
                                'the_day': return_hash.get('the_day'),
                                'default_day': return_hash.get('default_day'),
                                'snapshot_time': return_hash.get('snapshot_time'),
+                               'latest_snapshot_time': \
+                               return_hash.get('latest_snapshot_time'),
                                })
                 #return HttpResponse("Success: %s" % return_val['msg'])
             else:
@@ -479,6 +506,7 @@ def snapshot(request, action=None):
                 'the_day': return_hash.get('the_day'),
                 'default_day': return_hash.get('default_day'),
                 'snapshot_time': return_hash.get('snapshot_time'),
+                'latest_snapshot_time': return_hash.get('latest_snapshot_time'),
                 })
 
 
@@ -504,6 +532,11 @@ def get_snapshot_default_value():
     load_data = json.loads(api_snapshot.get_snapshot_schedule())
     data = load_data.get('data')
     return_hash['snapshot_time'] = data.get('snapshot_time')
+
+    load_data = json.loads(api_snapshot.get_snapshot_last_status())
+    return_hash['latest_snapshot_time'] = \
+            time.strftime("%a, %d %b %Y %H:%M:%S", \
+                    time.gmtime(load_data.get('latest_snapshot_time')))
 
     return return_hash
 
@@ -561,6 +594,9 @@ def status(request):
 def dashboard_update(request):
     data = gateway_status()
     data["version_upgrade"] = json.loads(api_remote_upgrade.get_available_upgrade())["version"]
+    # wthung, 2012/8/6
+    # add to refresh last snapshot status
+    data["last_snapshot_status"] = _get_snapshot_last_status()
     return HttpResponse(json.dumps(data))
 
 
@@ -591,3 +627,10 @@ def config(request, action=None):
         backup_time_str = None
 
     return render(request, 'dashboard/config.html', {'tab': 'config', 'backup_time': backup_time_str})
+
+def server_time(request):
+    """
+    return server time
+    """
+    now = datetime.datetime.now()
+    return HttpResponse(now.strftime("%Y/%m/%d %H:%M"))

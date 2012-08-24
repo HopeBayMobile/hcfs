@@ -22,7 +22,8 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # install mdadm package
-apt-get -y install mdadm
+echo debconf postfix/main_mailer_type select No configuration | /usr/bin/debconf-set-selections
+apt-get -y --force-yes install mdadm
 
 # this token will be written if the raid is built successfuly
 SAFE_TOKEN="/storage/.init_raid_ok"
@@ -84,7 +85,7 @@ else
     
         #initialize necessary files/directories
     
-        dd if=/dev/zero of=/storage/swapfile bs=1024 count=512000
+        dd if=/dev/zero of=/storage/swapfile bs=1024 count=20480000
         mkswap /storage/swapfile
         swapon /storage/swapfile
         mkdir /storage/log
@@ -95,9 +96,9 @@ else
         rm -r /root/.s3ql
         ln -s /storage/log /var/log
         ln -s /storage/s3ql /root/.s3ql
-        # modify grub conf to set timeout value
-        sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
-        mv grub.tmp /boot/grub/grub.cfg
+        # remove grub recordfail
+        sudo grub-editenv - unset recordfail
+        sudo update-grub2
     else
         exit
     fi
@@ -158,7 +159,7 @@ cat >/root/build_raid1.sh <<EOF
         
             #initialize necessary files/directories
         
-            dd if=/dev/zero of=/storage/swapfile bs=1024 count=512000
+            dd if=/dev/zero of=/storage/swapfile bs=1024 count=20480000
             mkswap /storage/swapfile
             swapon /storage/swapfile
             mkdir /storage/log
@@ -169,9 +170,9 @@ cat >/root/build_raid1.sh <<EOF
             rm -r /root/.s3ql
             ln -s /storage/log /var/log
             ln -s /storage/s3ql /root/.s3ql
-            # modify grub conf to set timeout value
-            sed 's/set timeout=-1/set timeout=2/' /boot/grub/grub.cfg > grub.tmp
-            mv grub.tmp /boot/grub/grub.cfg
+            # remove grub recordfail
+            sudo grub-editenv - unset recordfail
+            sudo update-grub2
     fi
 EOF
 

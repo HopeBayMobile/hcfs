@@ -12,13 +12,15 @@ import sqlite3
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
+#sys.path.append("%s/DCloudSwift/" % BASEDIR)
 
 from util.daemon import Daemon
 from util.util import GlobalVar
 from util.SwiftCfg import SwiftMasterCfg
 from util import util
 from util.database import NodeInfoDatabaseBroker
+from master.swiftMaintainAgent import SwiftMaintainAgent
 
 from common.events import HDD
 from common.events import HEARTBEAT
@@ -77,6 +79,7 @@ class SwiftMaintainSwitcher(Daemon):
         self.db = NodeInfoDatabaseBroker(self.DBFile)
         logger.info('end initiailize SwiftMaintainSwitcher')
 
+
     def checkService(self):
         """
         implement status change logic for service mode to waiting mode
@@ -88,27 +91,28 @@ class SwiftMaintainSwitcher(Daemon):
             self.db.query_node_info_table('mode = "service"').fetchall()
 
         for row in serviceNode:
-            if row[1] == HEARTBEAT.status[2]:
-                record = self.updateStatusWaiting(row[0])
+            if row['status'] == HEARTBEAT.status[2]:
+                record = self.updateStatusWaiting(row['hostname'])
                 logger.info("the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
                 continue
 
-            if row[1] == HEARTBEAT.status[0]:
-                diskInfo = json.loads(row[3])
-                if ((self.refreshTime + row[2]) < self.nowtimeStamp):
-                    self.db.update_node_status(row[0],
+            if row['status'] == HEARTBEAT.status[0]:
+                diskInfo = json.loads(row['disk'])
+                if ((self.refreshTime + row['timestamp']) < self.nowtimeStamp):
+                    self.db.update_node_status(row['hostname'],
                                                HEARTBEAT.status[2],
                                                self.nowtimeStamp)
-                    record = self.updateStatusWaiting(row[0])
+                    record = self.updateStatusWaiting(row['hostname'])
                     logger.info(
                         "the record which update status to waiting: %s"
                         % str(self.dict_from_row(record)))
                     continue
-                if (('missing' in diskInfo) or ('broken' in diskInfo)):
-                    if (diskInfo['timestamp']
-                            + self.replicationTime > self.nowtimeStamp):
-                        record = self.updateStatusWaiting(row[0])
+
+                deadline = self.nowtimeStamp - self.replicationTime
+                logger.info("deadline is %d" % deadline)
+                if SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
+                        record = self.updateStatusWaiting(row['hostname'])
                         logger.info(
                             "the record which update status to waiting: %s"
                             % str(self.dict_from_row(record)))
@@ -161,12 +165,19 @@ class SwiftMaintainSwitcher(Daemon):
         waitingNode = \
             self.db.query_node_info_table('mode = "waiting"').fetchall()
         for row in waitingNode:
-            if row[1] == HEARTBEAT.status[0]:
-                diskInfo = json.loads(row[3])
-                if (('missing' not in diskInfo) or ('broken' not in diskInfo)):
-                    record = self.updateStatusService(row[0])
+            if row['status'] == HEARTBEAT.status[0]:
+                if ((self.refreshTime + row['timestamp']) < self.nowtimeStamp):
+                    self.db.update_node_status(row['hostname'],
+                                               HEARTBEAT.status[2],
+                                               self.nowtimeStamp)
+                    continue
+
+                diskInfo = json.loads(row['disk'])
+                deadline = self.nowtimeStamp - self.replicationTime
+                if not SwiftMaintainAgent.computeMaintenanceTask(node=row, deadline=deadline):
+                    record = self.updateStatusService(row['hostname'])
                     logger.info(
-                        "the record which update status to waiting: %s"
+                        "the record which update status to service: %s"
                         % str(self.dict_from_row(record)))
                     continue
         logger.info("end check hostname which is in waiting mode")
@@ -183,10 +194,13 @@ class SwiftMaintainSwitcher(Daemon):
         """
         logger = util.getLogger(name='swiftmaintainswitcher.run')
         while True:
-            logger.info("daemon sleep: %s" % self.daemonSleep)
-            self.checkService()
-            self.checkWaiting()
-            time.sleep(int(self.daemonSleep))
+            try:
+                logger.info("daemon sleep: %s" % self.daemonSleep)
+                self.checkService()
+                self.checkWaiting()
+                time.sleep(int(self.daemonSleep))
+            except Exception as e:
+                logger.error("Failed to execute job due to %s" % str(e))
 
 
 def main(DBFile=None):
@@ -209,33 +223,5 @@ def main(DBFile=None):
         sys.exit(2)
 
 if __name__ == "__main__":
-#    DBFile = '/etc/test/test.db'
-#    os.system("rm -f %s" % DBFile)
-#    db = NodeInfoDatabaseBroker(DBFile)
-#    db.initialize()
-#    timestamp = int(time.mktime(time.localtime()))
-#    diskInfo = {
-#                    'timestamp': timestamp,
-#                    'missing': {
-#                                    'count': 6,
-#                                    'timestamp': timestamp,
-#                                },
-#                    'broken': [
-#                               {
-#                                    'SN': 'aaaaa',
-#                                    'timestamp': timestamp,
-#                               },
-#                              ],
-#                    'healthy': [
-#                                {
-#                                    'SN': 'aaaaa',
-#                                    'timestamp': timestamp,
-#                                }
-#                               ],
-#                }
-#    row = db.add_node('192.168.1.20', 'dead', timestamp-100,
-#        json.dumps(diskInfo), 'service', timestamp)
-#    row = db.add_node('192.168.1.100', 'alive', timestamp-100,
-#        '{}', 'waiting', timestamp)
     DBFile = None
     main(DBFile)

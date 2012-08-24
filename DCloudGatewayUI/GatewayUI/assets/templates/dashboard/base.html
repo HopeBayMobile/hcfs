@@ -68,19 +68,33 @@
                                         continue;
                                     }
                                 }
+                                if (indic == "uplink_usage"){
+                                    $("#basic-bandwidth .up").text(data.uplink_usage);
+                                }
+                                if (indic == "downlink_usage"){
+                                    $("#basic-bandwidth .down").text(data.downlink_usage);
+                                }
                                 setIndicator(indic, data[indic]);
                             }
                         }
                     });
-                    $.get('/dashboard/status/', function(ctnt, stat, opts){
-                        if (stat == 'success'){
-                            var data = JSON.parse(ctnt);
-                            $("#basic-bandwidth .down").text(data.downlink_usage);
-                            $("#basic-bandwidth .up").text(data.uplink_usage);
-                        }
-                    });
                 }
                 setInterval(update_indicator, 1000);
+                
+                function updateTime(){
+                  $.ajax({
+                    type:"GET",
+                    url:"/dashboard/t?"+Math.floor((Math.random() * 100000) +1),
+                    success: function(msg){
+                      $(".time_box").text(msg);
+                      setInterval(updateTime, 30000);
+                    }
+                  });
+                }
+                
+                $(function(){
+                  updateTime();
+                });
 
                 $("body").on('click', ".msg-detail", function(){
                     $(this).toggleClass('active');
@@ -103,7 +117,7 @@
                 });
 
                 var msg_template = Hogan.compile('{% templatetag openvariable %}#msgs{% templatetag closevariable %}<ul class="msg-block"><li class="msg-content error">{% templatetag openvariable %} msg {% templatetag closevariable %}<div class="msg-time">{% templatetag openvariable %} timestamp {% templatetag closevariable %}</div><div class="msg-detail"></div></li></ul>{% templatetag openvariable %}/msgs{% templatetag closevariable %}');
-
+/*
                 $.get('/dashboard/syslog/', function(ctnt, success, opt){
                     var msgs = JSON.parse(ctnt);
                     if (msgs == ""){
@@ -112,7 +126,7 @@
                         $(msg_template.render({'msgs': msgs})).appendTo('.statusbar-content');
                     }
                 });
-
+*/
                 $(".notify-box-row-NW > div").tooltip();
             });
         </script>
@@ -122,6 +136,8 @@
     <body>
     <style type='text/css'>
         .time_box {
+            float: left;
+            margin-top: 105px;
             margin-left: 100px;
         }
     </style>
@@ -130,19 +146,20 @@
             <div class="logo-box">
             </div>
             <div class="time_box">
-                time
             </div>
             <div class="notify-box-group">
                 <div class="notify-box-row-NW">
-                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot in progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
+                    <div id="snapshot_in_progress" rel="tooltip" title="Snapshot In Progress" class="notify-box img-snapshot {% if result_data.snapshot_in_progress %}work{% endif %}">
                     </div>
                     <div id="system_check" rel="tooltip" title="System Check" class="notify-box img-system {% if result_data.system_check %}work{% endif %}">
                     </div>
                     <div id="network_ok" rel="tooltip" title="Network" class="notify-box img-network {% if result_data.network_ok %}work{% endif %}">
                     </div>
-                    <div id="flush_inprogress" rel="tooltip" title="Flush in progress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
+                    <div id="flush_inprogress" rel="tooltip" title="Flush In Progress" class="notify-box img-flush {% if result_data.flush_inprogress %}work{% endif %}">
                     </div>
                     <div id="dirtycache_nearfull" rel="tooltip" title="Data not yet protected near full" class="notify-box img-dirtycache {% if result_data.dirtycache_nearfull %}work{% endif %}">
+                    </div>
+                    <div id="filesystem" rel="tooltip" title="File system mounted and running" class="notify-box img-filesystem {% if result_data.S3QL_ok %}work{% endif %}">
                     </div>
                 </div>
                 <div class="notify-box-row-NE">
@@ -168,7 +185,7 @@
                   <!--<li class=""><a href="{% url dashboard:account action=None %}">Storage Account</a></li>-->
                   <li class=""><a href="{% url dashboard:system action=None %}">System</a></li>
                   <li class=""><a href="{% url dashboard:config action=None %}">Configuration</a></li>
-                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Share Folders</a></li>
+                  <li class=""><a href="{% url dashboard:sharefolder action=None %}">Shared Folders</a></li>
                   <li class=""><a href="{% url dashboard:sync %}">Sync to Cloud</a></li>
                   <li class=""><a href="{% url dashboard:snapshot action=None %}">Snapshots</a></li>
                   <li class=""><a href="{% url dashboard:syslog %}">System Logs</a></li>

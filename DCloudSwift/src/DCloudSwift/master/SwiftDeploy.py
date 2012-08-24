@@ -18,7 +18,8 @@ from threading import Thread
 #Self defined packages
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
+#sys.path.append("%s/DCloudSwift/" % BASEDIR)
 
 from util import util
 from util import threadpool
@@ -77,8 +78,6 @@ class SwiftDeploy:
 
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
-        self.__jsonStr = json.dumps(self.__kwparams)
-        os.system("mkdir -p %s" % self.__kwparams['logDir'])
 
         self.__setUpdateMetadataProgress()
         self.__setDeployProgress()
@@ -224,7 +223,6 @@ class SwiftDeploy:
             if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
 
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
             versBase = int(time.time()) * 100000
             swiftDir = "/etc/swift"
@@ -234,15 +232,20 @@ class SwiftDeploy:
 
             os.system("mkdir -p %s" % swiftDir)
             os.system("touch %s/proxyList" % swiftDir)
+            os.system("touch %s/storageList" % swiftDir)
             os.system("touch %s/versBase" % swiftDir)
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(proxyList, fh)
+
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(storageList, fh)
 
             with open("%s/versBase" % swiftDir, "wb") as fh:
                 pickle.dump(versBase, fh)
 
             os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
@@ -275,29 +278,35 @@ class SwiftDeploy:
             if self.isMasterNodeInside(proxyList + storageList):
                 raise Exception("Master node is not allowed to be deployed!!")
 
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
             swiftDir = "/etc/swift"
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
                 oriProxyList = pickle.load(fh)
-
             for node in proxyList:
                 if node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s already exists" % node["ip"])
-
             completeProxyList = oriProxyList + proxyList
 
+            oriStorageList = []
+            with open("%s/storageList" % swiftDir, "rb") as fh:
+                oriStorageList = pickle.load(fh)
             for node in storageList:
                 if node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s already exists" % node["ip"])
+            completeStorageList = oriStorageList + storageList
 
             with open("%s/proxyList" % swiftDir, "wb") as fh:
                 pickle.dump(completeProxyList, fh)
 
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(completeStorageList, fh)
+
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
@@ -315,40 +324,47 @@ class SwiftDeploy:
         logger = util.getLogger(name="__updateMetadata2DeleteNodes")
         try:
             self.__setUpdateMetadataProgress()
-            deviceCnt = self.__kwparams['deviceCnt']
             devicePrx = self.__kwparams['devicePrx']
 
             swiftDir = "/etc/swift"
-
             oriSwiftNodeIpSet = set(util.getSwiftNodeIpList(swiftDir))
+
             oriProxyList = []
             with open("%s/proxyList" % swiftDir, "rb") as fh:
                 oriProxyList = pickle.load(fh)
-
             for node in proxyList:
                 if not node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s does not exist!" % node["ip"])
 
-            completeProxyList = [node for node in oriProxyList if node not in proxyList]
-
+            oriStorageList = []
+            with open("%s/storageList" % swiftDir, "rb") as fh:
+                oriStorageList = pickle.load(fh)
             for node in storageList:
                 if not node["ip"] in oriSwiftNodeIpSet:
                     raise UpdateMetadataError("Node %s does not exist!" % node["ip"])
 
             deletedIpList = [node["ip"] for node in storageList] + [node["ip"] for node in proxyList]
+            completeProxyList = [node for node in oriProxyList if node["ip"] not in deletedIpList]
+            completeStorageList = [node for node in oriStorageList if node["ip"] not in deletedIpList]
+            # Retrieve other fileds of nodes
+            storageList = [node for node in oriStorageList if node["ip"] in deletedIpList]
+        
             safe = self.isDeletionOfNodesSafe(deletedIpList, swiftDir)
             if safe.val == False:
                 raise UpdateMetadataError("Unsafe to delete nodes for %s" % safe.msg)
 
-            with open("%s/proxyList" % swiftDir, "wb") as fh:
-                pickle.dump(completeProxyList, fh)
-
             for node in storageList:
+                deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
                     cmd = "sh %s/DCloudSwift/proxy/DeleteRingDevice.sh %s %s %s" % (BASEDIR, node["ip"], deviceName, swiftDir)
                     logger.info(cmd)
                     os.system(cmd)
+
+            with open("%s/proxyList" % swiftDir, "wb") as fh:
+                pickle.dump(completeProxyList, fh)
+            with open("%s/storageList" % swiftDir, "wb") as fh:
+                pickle.dump(completeStorageList, fh)
 
             os.system("sh %s/DCloudSwift/proxy/Rebalance.sh %s" % (BASEDIR, swiftDir))
 
@@ -363,6 +379,7 @@ class SwiftDeploy:
 
             print "Start deploying proxy node %s" % proxyIP
             pathname = "/etc/delta/master/%s" % socket.gethostname()
+            json_kwargs = json.dumps({"deviceCnt": util.getDeviceCnt(ip=proxyIP), "devicePrx": self.__kwparams["devicePrx"]})
 
             cmd = "ssh root@%s mkdir -p %s" % (proxyIP, pathname)
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
@@ -390,7 +407,7 @@ class SwiftDeploy:
                 errMsg = "Failed to scp metadata to %s for %s" % (proxyIP, stderr)
                 raise DeployProxyError(errMsg)
 
-            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
+            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -p %s" % (proxyIP, pathname, util.jsonStr2SshpassArg(json_kwargs))
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=500)
             if status != 0:
                 errMsg = "Failed to deploy proxy %s for %s" % (proxyIP, stderr)
@@ -428,6 +445,7 @@ class SwiftDeploy:
         logger = util.getLogger(name="storageDeploySubtask: %s" % storageIP)
         try:
             pathname = "/etc/delta/master/%s" % socket.gethostname()
+            json_kwargs = json.dumps({"deviceCnt": util.getDeviceCnt(ip=storageIP), "devicePrx": self.__kwparams["devicePrx"]})
 
             print "Start deploying storage node %s" % storageIP
             cmd = "ssh root@%s mkdir -p %s" % (storageIP, pathname)
@@ -455,7 +473,7 @@ class SwiftDeploy:
                 errMsg = "Failed to scp metadata to %s for %s" % (storageIP, stderr)
                 raise DeployStorageError(errMsg)
 
-            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s" % (storageIP, pathname, util.jsonStr2SshpassArg(self.__jsonStr))
+            cmd = "ssh root@%s python %s/DCloudSwift/CmdReceiver.py -s %s" % (storageIP, pathname, util.jsonStr2SshpassArg(json_kwargs))
             (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
             if status != 0:
                 errMsg = "Failed to deploy storage %s for %s" % (storageIP, stderr)
@@ -517,7 +535,6 @@ class SwiftDeploy:
         logger = util.getLogger(name="deploySwift")
 
         try:
-            os.system("rm %s" % GlobalVar.ACCOUNT_DB)
             self.__createMetadata(proxyList, storageList, numOfReplica)
             self.__deploySwift(proxyList, storageList)
 
@@ -797,59 +814,6 @@ class SwiftDeploy:
             self.__setCleanProgress(finished=True, code=1, message=[str(e)])
 
 
-def parseNodeFiles(proxyFile, storageFile):
-    proxyList = []
-    storageList = []
-
-    try:
-        #Parse proxyFile to get proxy node list
-        proxyIpSet = set()
-        with open(proxyFile) as fh:
-            for line in fh.readlines():
-                line = line.strip()
-                if len(line) > 0:
-                    try:
-                        ip = line.split()[0]
-                        socket.inet_aton(ip)
-                        proxyList.append({"ip": ip})
-                        if ip in proxyIpSet:
-                            raise Exception("%s contains duplicate ip" % proxyFile)
-                        proxyIpSet.add(ip)
-
-                    except socket.error:
-                        raise Exception("%s contains a invalid ip %s" % (proxyFile, ip))
-
-        #Parse storageFile to get storage node list
-        storageIpSet = set()
-        with open(storageFile) as fh:
-            for line in fh.readlines():
-                line = line.strip()
-                if len(line) > 0:
-                    tokens = line.split()
-                    if len(tokens) != 2:
-                        raise Exception("%s contains a invalid line %s" % (storageFile, line))
-                    try:
-                        ip = tokens[0]
-                        zid = int(tokens[1])
-                        socket.inet_aton(ip)
-
-                        if zid < 1 or zid > 9:
-                            raise Exception("zid has to be a positive integer < 10")
-                        storageList.append({"ip": ip, "zid": zid})
-                        if ip in storageIpSet:
-                            raise Exception("%s contains duplicate ip" % storageFile)
-
-                        storageIpSet.add(ip)
-                    except socket.error:
-                        raise Exception("%s contains a invalid ip %s" % (storageFile, ip))
-                    except ValueError:
-                        raise Exception("%s contains a invalid zid %s" % (storageFile, tokens[1]))
-        return (proxyList, storageList)
-    except IOError as e:
-        msg = "Failed to access input files for %s" % str(e)
-        raise Exception(msg)
-
-
 def getSection(inputFile, section):
     ret = []
     with open(inputFile) as fh:
@@ -884,27 +848,27 @@ def parseAddNodesSection(inputFile):
         for line in lines:
             line = line.strip()
             if len(line) > 0:
+                checkNodeInputFormat(section="[addNodes]", line=line)
                 tokens = line.split()
-                if len(tokens) != 2:
-                    raise Exception("[addNodes] contains an invalid line %s" % line)
                 try:
-                    ip = tokens[0]
-                    zid = int(tokens[1])
-                    socket.inet_aton(ip)
+                    node = {}
+                    for token in tokens:
+                        key, _, value = token.partition("=")
+                        node.setdefault(key, value)
 
-                    if zid < 1 or zid > 9:
-                        raise Exception("zid has to be a positive integer < 10")
-
+                    ip = node.get("ip")
                     if ip in ipSet:
-                        raise Exception("[addNodes] contains duplicate ip")
+                        raise Exception("[deploy] A duplicate ip address %s is found!" % ip)
+
+                    zid = int(node.get("zid"))
+                    deviceCnt = int(node.get("deviceCnt"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
                     raise Exception("[addNodes] contains an invalid ip %s" % ip)
-                except ValueError:
-                    raise Exception("[addNodes] contains an invalid zid %s" % tokens[1])
         return (proxyList, storageList)
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
@@ -940,6 +904,55 @@ def parseDeleteNodesSection(inputFile):
         raise Exception(msg)
 
 
+def checkNodeInputFormat(section, line):
+    node = {}
+    tokens = line.split()
+    for token in tokens:
+        key, _, value = token.partition("=")
+        node.setdefault(key, value)
+
+    ip = node.get("ip", None)
+    zid = node.get("zid", None)
+    deviceCnt = node.get("deviceCnt", None)
+    deviceCapacity = node.get("deviceCapacity", None)
+
+    if not ip:
+        raise Exception("%s missing ip in line '%s'" % (section, line))
+    if not zid:
+        raise Exception("%s missing zid in line '%s'" % (section, line))
+    if not deviceCnt:
+        raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
+    if not deviceCapacity:
+        raise Exception("%s missing deviceCapacity in line '%s'" % (section, line))
+
+    try:
+        socket.inet_aton(ip)
+        
+        if not zid.isdigit():
+            raise Exception("%s line '%s' contains invalid zid" % (section, line))
+        else:
+            zid = int(zid) 
+            if zid < 1 or zid > 9:
+                raise Exception("zid has to be a positive integer < 10")
+            
+        if not deviceCnt.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceCnt" % (section, line))
+        else:
+            deviceCnt = int(deviceCnt) 
+            if deviceCnt < 1:
+                raise Exception("deviceCnt has to be a positive integer")
+
+        if not deviceCapacity.isdigit():
+            raise Exception("%s line '%s' contains invalid deviceCapacity" % (section, line))
+        else:
+            deviceCapacity = int(deviceCapacity) 
+            if deviceCapacity < 1:
+                raise Exception("deviceCapacity has to be a positive integer")
+
+    except socket.error:
+        raise Exception("%s line '%s' contains an illegal ip" % (section, line))
+
+
 def parseDeploySection(inputFile):
     lines = getSection(inputFile, "deploy")
     try:
@@ -949,27 +962,27 @@ def parseDeploySection(inputFile):
         for line in lines:
             line = line.strip()
             if len(line) > 0:
+                checkNodeInputFormat(section="[deploy]", line=line)
                 tokens = line.split()
-                if len(tokens) != 2:
-                    raise Exception("[deploy] contains an invalid line %s" % line)
                 try:
-                    ip = tokens[0]
-                    zid = int(tokens[1])
-                    socket.inet_aton(ip)
+                    node = {}
+                    for token in tokens:
+                        key, _, value = token.partition("=")
+                        node.setdefault(key, value)
 
-                    if zid < 1 or zid > 9:
-                        raise Exception("zid has to be a positive integer < 10")
-
+                    ip = node.get("ip")
                     if ip in ipSet:
-                        raise Exception("[deploy] contains duplicate ip")
+                        raise Exception("[deploy] A duplicate ip address %s is found!" % ip)
+
+                    zid = int(node.get("zid"))
+                    deviceCnt = int(node.get("deviceCnt"))
+                    deviceCapacity = int(node.get("deviceCapacity"))
 
                     proxyList.append({"ip": ip})
-                    storageList.append({"ip": ip, "zid": zid})
+                    storageList.append({"ip": ip, "zid": zid, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
                     ipSet.add(ip)
                 except socket.error:
-                    raise Exception("[deploy] contains an invalid ip %s" % ip)
-                except ValueError:
-                    raise Exception("[deploy] contains an invalid zid %s" % tokens[1])
+                    raise Exception("[deploy] line '%s' contains an illegal ip %s" % line)
         return (proxyList, storageList)
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
@@ -1032,7 +1045,6 @@ def deleteNodes():
         try:
 
                 (proxyList, storageList) = parseDeleteNodesSection(inputFile=inputFile)
-                print proxyList, storageList
 
                 SD = SwiftDeploy()
                 t = Thread(target=SD.deleteNodes, args=(proxyList, storageList))
@@ -1132,9 +1144,9 @@ def deploy():
             print "Swift deploy process is done!"
             #create a default account:user
             print "Create a default user..."
-            cmd = "swauth-prep -K %s -A https://%s:8080/auth/" % (password, util.getIpAddress())
+            cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (password, util.getProxyPort())
             os.system(cmd)
-            os.system("swauth-add-user -A https://%s:8080/auth -K %s -a system root testpass" % (util.getIpAddress(), password))
+            os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), password))
 
     except Exception as e:
         print >> sys.stderr, str(e)
@@ -1142,18 +1154,4 @@ def deploy():
         return ret
 
 if __name__ == '__main__':
-    #print util.getNumOfReplica("/etc/swift")
-    print util.restartSwiftProxy()
-    #t = Thread(target=SD.cleanNodes, args=(["172.16.229.132"],))
-    #t = Thread(target=SD.spreadRingFiles, args=())
-    #t.start()
-    #progress = SD.getCleanProgress()
-    #while progress['finished'] != True:
-    #    time.sleep(10)
-    #    print progress
-    #    progress = SD.getCleanProgress()
-    #spreadProgress = SD.getSpreadProgress()
-    #util.spreadPackages(password="deltacloud", nodeList=["172.16.229.122", "172.16.229.34", "172.16.229.46", "172.16.229.73"])
-    #util.spreadRC(password="deltacloud", nodeList=["172.16.229.122"])
-    #SD = SwiftDeploy([{"ip":"172.16.229.82"}], [{"ip":"172.16.229.145", "zid":1}])
-    #SD = SwiftDeploy([{"ip":"172.16.229.35"}], [{"ip":"172.16.229.146", "zid":1}, {"ip":"172.16.229.35", "zid":2}])
+    print parseDeploySection("/etc/delta/inputFile")

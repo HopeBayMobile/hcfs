@@ -12,11 +12,12 @@ ADMINS = [
 ]
 
 MANAGERS = ADMINS
+DATABASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": "dev.db",
+        "NAME": DATABASE_DIR+"/sqlite3.db",
     }
 }
 
@@ -27,7 +28,7 @@ DATABASES = {
 # timezone as the operating system.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Taipei"
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -53,7 +54,7 @@ MEDIA_ROOT = os.path.join(PACKAGE_ROOT, "site_media", "media")
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://media.lawrence.com/media/", "http://example.com/media/"
-MEDIA_URL = "/site_media/media/"
+MEDIA_URL = "/media/"
 
 # Absolute path to the directory static files should be collected to.
 # Don"t put anything in this directory yourself; store your static files
@@ -63,7 +64,7 @@ STATIC_ROOT = os.path.join(PACKAGE_ROOT, "site_media", "static")
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
-STATIC_URL = "/site_media/static/"
+STATIC_URL = "/static/"
 
 # Additional locations of static files
 STATICFILES_DIRS = [
@@ -101,9 +102,10 @@ TEMPLATE_CONTEXT_PROCESSORS = [
 
 
 MIDDLEWARE_CLASSES = [
+    "delta.wizard.middlewares.ConfigLoader",
     "django.middleware.common.CommonMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    #"django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
 ]
@@ -134,8 +136,16 @@ INSTALLED_APPS = [
     # external
     "account",
     "metron",
-    
+    'djcelery',
+    'delta.wizard',
+    'delta.forms',
+
     # project
+    "swift_dashboard",
+    "swift_account",
+    "swift_monitor",
+    "swift_maintainance",
+    "systemlog",
 ]
 
 # A sample logging configuration. The only tangible logging
@@ -169,6 +179,30 @@ LOGGING = {
 
 FIXTURE_DIRS = [
     os.path.join(PROJECT_ROOT, "fixtures"),
+]
+
+#Celery settings
+BROKER_TRANSPORT = "sqlalchemy"
+BROKER_URL = "sqlite:///" + os.path.dirname(os.path.abspath(__file__)) + "/broker.db"
+CELERY_RESULT_BACKEND = "database"
+CELERY_RESULT_DBURI = BROKER_URL
+
+import djcelery
+djcelery.setup_loader()
+
+# The following settings will use to configure the config wizard.
+# The WIZARD_STEP are the forms which you want the user to config.
+# The template names are optional.
+# NOTE: The tasks should import after djcelery.setup_loader(),
+# otherwise, the tasks won't find celeryconfig.py
+# === Add wizard settings
+from wizard.forms import MetaForm 
+from wizard.tasks import do_meta_form 
+
+WIZARD_TITLE = 'Swift ZCW Wizard'
+WIZARD_STEP = [
+    (MetaForm, do_meta_form),
+#    (ManualForm, do_manual_form),
 ]
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

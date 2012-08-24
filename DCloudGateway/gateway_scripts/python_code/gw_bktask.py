@@ -67,7 +67,6 @@ def detach_process_context():
 
     pid = os.fork()
     if pid > 0:
-        #log.info('Daemonizing, new PID is %d', pid)
         os._exit(0)
 
 
@@ -112,13 +111,16 @@ def redirect_stream(system_stream, target_stream):
 
 def thread_aptget():
     """
-    Worker thread to do 'apt-get update'
+    Worker thread to do 'apt-get update' and 'apt-show-versions'
     """
 
     global g_program_exit
+
+    s3ql_version_file = '/dev/shm/s3ql_ver'
     
     while not g_program_exit:
         os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
+        os.system("sudo apt-show-versions -u s3ql > %s" % s3ql_version_file)
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(600):
@@ -134,7 +136,6 @@ def thread_netspeed():
     """
 
     global g_program_exit
-    #log.info('Net speed thread start')
 
     # define net speed file
     netspeed_file = '/dev/shm/gw_netspeed'
@@ -149,7 +150,7 @@ def thread_netspeed():
             # todo: may need to return speed of eth0 as well
             ret_val = api.calculate_net_speed('eth1')
         except:
-            log.info('[2] Got exception from calculate_net_speed()')
+            log.error('Got exception from calculate_net_speed()')
 
         # serialize json object to file
         with open(netspeed_file, 'w') as fh:
@@ -157,8 +158,6 @@ def thread_netspeed():
 
         # wait
         time.sleep(3)
-
-    #log.info('Net speed thread end')
 
 ##############################################################################
 '''
@@ -205,8 +204,8 @@ def get_gw_indicator():
         return_val = api.get_indicators()
 
     except Exception as err:
-        log.info("[2] Unable to get indicators")
-        log.info("[2] Error message: %s" % str(err))
+        log.error("Unable to get indicators")
+        log.error("Error message: %s" % str(err))
 
     with open(indic_file, 'w') as fh:
         json.dump(return_val, fh)
@@ -225,7 +224,6 @@ def start_background_tasks(singleloop=False):
     """
 
     global g_program_exit
-    #log.info('Start gateway background task')
     # todo: check arguments
 
     # daemonize myself
@@ -250,13 +248,11 @@ def start_background_tasks(singleloop=False):
 
     while not g_program_exit:
         # get gateway indicators
-        #log.info('Start to get gateway indicator')
         ret = get_gw_indicator()
         if ret:
             pass
-            #log.info("Get indicator OK")
         else:
-            log.info("[2] Failed to get indicator")
+            log.error("Failed to get indicator")
 
         # in single loop mode, set global flag to true
         if singleloop:
@@ -268,8 +264,6 @@ def start_background_tasks(singleloop=False):
             time.sleep(1)
             if g_program_exit:
                 break
-
-    #log.info('Gateway background task program exits successfully')
 
 if __name__ == '__main__':
     start_background_tasks()

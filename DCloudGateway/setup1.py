@@ -36,6 +36,8 @@ def main():
 		],
 	)
 
+        os.system("cp gateway_scripts/python_code/* %s/"%CONFDIR)
+
 
 if __name__ == '__main__':
     main()

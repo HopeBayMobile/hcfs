@@ -6,11 +6,7 @@ WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
 os.chdir(WORKING_DIR)
 
-    #
-    #-- Ovid Wu <ovid.wu@delta.com.tw> Tue, 31 Jul 2012 10:29:38 +0000
-    #
-    # move to debian package
-#DELTADIR = "/etc/delta"
+DELTADIR = "/etc/delta"
 
 
 def isAllDebInstalled(debSrc):
@@ -44,12 +40,7 @@ def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 def main():
-
-    #
-    #-- Ovid Wu <ovid.wu@delta.com.tw> Tue, 31 Jul 2012 10:29:38 +0000
-    #
-    # move to debian package
-    #os.system("mkdir -p %s" % DELTADIR)
+    os.system("mkdir -p %s" % DELTADIR)
 
     #if not isAllDebInstalled("misc/deb_src"):
     #    os.system("cd misc/deb_src; dpkg -i *.deb")
@@ -87,12 +78,8 @@ def main():
                     ]
         },
 
-        #
-        #-- Ovid Wu <ovid.wu@delta.com.tw> Tue, 31 Jul 2012 10:35:36 +0000
-        #
-        # move to debian package
-        #data_files=[(DELTADIR, ['inputFile.sample', 'Swift.ini', 'swift_master.ini']),
-        #           ],
+        data_files=[(DELTADIR, ['inputFile.sample', 'Swift.ini', 'swift_master.ini']),
+                   ],
 
         test_suite='unittest',
         long_description=read('README'),
@@ -108,15 +95,15 @@ def main():
     #
     # TODO: move post-installation to debain packaging
     #Post-scripts
-    #os.system("cp ./Swift.ini  ./src/DCloudSwift/")
-    #os.system("chmod 755 misc/ServiceScripts/*")
-    #os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
-    #
-    #os.system("update-rc.d -f swift-event-manager remove")
-    #os.system("update-rc.d swift-event-manager defaults")
-    #
-    #os.system("update-rc.d -f swift-maintain-switcher remove")
-    #os.system("update-rc.d swift-maintain-switcher defaults")
-    #
+    os.system("cp ./Swift.ini  ./src/DCloudSwift/")
+    os.system("chmod 755 misc/ServiceScripts/*")
+    os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
+
+    os.system("update-rc.d -f swift-event-manager remove")
+    os.system("update-rc.d swift-event-manager defaults")
+
+    os.system("update-rc.d -f swift-maintain-switcher remove")
+    os.system("update-rc.d swift-maintain-switcher defaults")
+
 if __name__ == '__main__':
     main()

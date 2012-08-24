@@ -116,6 +116,19 @@ def getMountedSwiftDevices(devicePrx):
 
 
 def getUmountedSwiftDevices(deviceCnt, devicePrx):
+    '''
+    get a set of unmounted swift devices' numbers
+    @type deviceCnt: integer
+    @param deviceCnt: expected number of swift devices
+    @type devicePrx: string
+    @param  devicePrx: prefix of swift devices' mountpoints
+    @rtype: set of integers
+    @return: set of umounted swift devices' numbers
+    '''
+
+    if not deviceCnt:
+        return set()
+
     cmd = "mount"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     lines = po.stdout.readlines()
@@ -163,6 +176,9 @@ def formatNonRootDisks(deviceCnt=1):
     disks = getNonRootDisks()
     formattedDisks = []
     returncode = 0
+
+    if not deviceCnt:
+        return (returncode, formattedDisks)
 
     for disk in disks:
         if len(formattedDisks) == deviceCnt:
@@ -220,6 +236,11 @@ def mountSwiftDevice(disk, devicePrx, deviceNum):
 
     if returncode != 0:
         logger.error("Failed to mount %s on %s" % (disk, mountpoint))
+
+    # prepare objects dir to fix bugs of swift rsync errors
+    if not os.path.exists("%s/objects" % mountpoint):
+        os.system("mkdir %s/objects" % mountpoint)
+        os.system("chown swift:swift %s/objects" % mountpoint)
 
     return returncode
 
@@ -329,7 +350,7 @@ def createLostSwiftDevices(lostDevices):
             continue
 
     os.system("mkdir -p /srv/node")
-    os.system("chown -R swift:swift /srv/node/")
+    os.system("find /srv/node -maxdepth 1 -exec sudo chown swift:swift '{}' \;")
     logger.info("end")
     return mLostDevices
 
@@ -374,7 +395,8 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
             continue
 
     os.system("mkdir -p /srv/node")
-    os.system("chown -R swift:swift /srv/node/")
+    os.system("find /srv/node -maxdepth 1 -exec sudo chown swift:swift '{}' \;")
+
     logger.debug("end")
     return deviceCnt - count
 
@@ -413,7 +435,7 @@ def getLatestFingerprint():
         (ret, fingerprint) = readFingerprint(disk)
         if ret == 0:
             if latestFingerprint is None or latestFingerprint["vers"] < fingerprint["vers"]:
-                latestFingerprint = fingerprint
+                    latestFingerprint = fingerprint
 
     logger.debug("getLatestFingerprint end")
     return latestFingerprint

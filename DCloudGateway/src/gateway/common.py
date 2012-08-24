@@ -10,10 +10,16 @@ import math
 import pickle
 import time
 import re
+import urllib2
+import urllib
+import json
 
 from ConfigParser import ConfigParser
 
-#FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
+CAFEPOSTLOG = "http://127.0.0.1:80/restful/services/cafelog/post"
+CAFEGETLOG = "http://127.0.0.1:80/restful/services/cafelog/getlist"
+CAFEDELETELOG = "http://127.0.0.1:80/restful/services/cafelog/delete"
+
 FORMATTER = '[%(asctime)s] %(message)s'
 DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -161,50 +167,93 @@ def isValidEncKey(key):
 	
 	return key.isalnum()
 
+
+class CosaLogger :
+
+    def __init__(self, module, post_url, get_url, delete_url):
+        self.post_url = post_url
+        self.get_url = get_url
+        self.delete_url = delete_url
+        self.module = module
+
+    def __log(self, level,  message):
+        values = {"module": self.module, "level": level, "message": message}
+        data = json.dumps(values)
+        req = urllib2.Request(self.post_url, data, {'Content-Type': 'application/json'})
+        code = -1
+        response = None
+
+        try:
+            f = urllib2.urlopen(req)
+            code = f.getcode()
+            response = f.read()
+            f.close()
+        except urllib2.HTTPError as e:
+            code = e.code
+            response = e.read()
+        except urllib2.URLError as e:
+            response = e.reason
+        except Exception as e:
+            response = str(e)
+
+        return {"code": code, "response": response}
+
+    def get_list(self):
+        req = urllib2.Request(self.get_url)
+        code = -1
+        response = None
+
+        try:
+            f = urllib2.urlopen(req)
+            code = f.getcode()
+            response = f.read()
+            f.close()
+        except urllib2.HTTPError as e:
+            code = e.code
+            response = e.read()
+        except urllib2.URLError as e:
+            response = e.reason
+        except Exception as e:
+            response = str(e)
+
+        return {"code": code, "response": response}
+
+    def debug(self, message):
+        return self.__log(level='DEBUG', message=message)
+
+    def info(self, message):
+        return self.__log(level='INFO', message=message)
+
+    def warning(self, message):
+        return self.__log(level='warning', message=message)
+
+    def error(self, message):
+        return self.__log(level='error', message=message)
+
+    def critical(self, message):
+        return self.__log(level='critical', message=message)
+
 def getLogger(name=None, conf=None):
 	"""
 	Get a file logger using config settings.
 
 	"""
+        # TODO: read url from config
+        if name:
+            logger = CosaLogger(module=name, 
+                                post_url=CAFEPOSTLOG,
+                                get_url=CAFEGETLOG,
+                                delete_url=CAFEDELETELOG,
+                               )
+        else:
+            logger = CosaLogger(module="Gateway", 
+                                post_url=CAFEPOSTLOG,
+                                get_url=CAFEGETLOG,
+                                delete_url=CAFEDELETELOG,
+                               )
+
+        return logger
 	
-	try:
-
-		logger = logging.getLogger(name)
-
-		if not hasattr(getLogger, 'handler4Logger'):
-			getLogger.handler4Logger = {}
-
-		if logger in getLogger.handler4Logger:
-			return logger
-
-		logDir = logName = logLevel = None 
-
-		config = ConfigParser()
-		try:
-			with open(conf) as fh:
-				config.readfp(fh)
-				logDir = config.get('log', 'dir')
-				logName = config.get('log', 'name')
-				logLevel = config.get('log', 'level')
-		except Exception as e:
-			logDir = '/var/log/delta'
-			logName = 'Gateway.log'
-			logLevel = 'DEBUG'
-
-		os.system("sudo mkdir -p "+logDir)
-		os.system("sudo touch "+logDir+'/'+logName)
-                os.system("sudo chown www-data:www-data "+logDir+'/'+logName)
-
-		hdlr = logging.handlers.RotatingFileHandler(logDir+'/'+logName, maxBytes=1024*1024, backupCount=5)
-		hdlr.setFormatter(logging.Formatter(FORMATTER))
-		logger.addHandler(hdlr)
-		logger.setLevel(logLevel)
-		logger.propagate = False	
-
-		getLogger.handler4Logger[logger] = hdlr
-		return logger
-	finally:
-		pass
 
 def getIpAddress():
 	logger = getLogger(name="getIpAddress")
@@ -238,11 +287,11 @@ class TimeoutError(Exception):
 			return "TimeoutError"
 
 if __name__ == '__main__':
-	#log = getLogger("test", conf="/etc/delta/Gateway.ini")
-	#log.info("TEST")
-	@timeout(5)
-	def hello():
-		raise Exception("GG")
-
-	hello()
+        logger = CosaLogger(module="Gateway", 
+                            post_url=CAFEPOSTLOG,
+                            get_url=CAFEGETLOG,
+                            delete_url=CAFEDELETELOG,
+                           )
+        print logger.warning("hello")
+        print logger.get_list()
 	pass	

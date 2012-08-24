@@ -15,7 +15,7 @@ from twisted.internet import reactor
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
 
 from util.SwiftCfg import SwiftMasterCfg
 from util.daemon import Daemon
@@ -35,25 +35,29 @@ class SwiftEventMgr(Daemon):
         self.page = self.masterCfg.getKwparams()["eventMgrPage"]
 
     @staticmethod
-    def getExpectedDiskCount(hostname):
+    def getExpectedDiskCount(hostname, dbfile=None):
         '''
         Get expected disk count of a node
 
         @type  hostname: string
         @param hostname: hostname of the node to query expected disk count
+        @type dbfile: string
+        @param db: pathname to the NodeInfoDatabaseBroker
         @rtype: integer
         @return: expected disk count of the queried node. Return None in case of exception.
         '''
         logger = util.getLogger(name="SwiftEventMgr.getExpectedDiskCount")
-        config = ConfigParser()
 
         try:
-            with open(GlobalVar.ORI_SWIFTCONF, "rb") as fh:
-                config.readfp(fh)
+            if not dbfile:
+                db = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+            else:
+                db = NodeInfoDatabaseBroker(dbfile)
 
-            return int(config.get('storage', 'deviceCnt'))
-        except:
-            logger.error("Failed to read deviceCnt from %s" % GlobalVar.ORI_SWIFTCONF)
+            diskcount = db.get_spec(hostname)['diskcount']
+            return diskcount
+        except Exception as e:
+            logger.error("Failed to get diskcount from node spec for %s" % str(e))
             return None
 
     '''
@@ -105,9 +109,6 @@ class SwiftEventMgr(Daemon):
         if not isinstance(event["time"], int):
             logger.error("Wrong type of time")
             return False
-        if SwiftEventMgr.getExpectedDiskCount(event["hostname"]) is None:
-            logger.error("Failed to get expected disk count of %s" % event["hostname"])
-            return False
 
         return True
 
@@ -145,13 +146,16 @@ class SwiftEventMgr(Daemon):
         #TODO: handle invalid old_disk_info
         try:
             old_disk_info = json.loads(nodeInfoDb.get_info(hostname)["disk"])
-            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname)
+            expectedDiskCount = SwiftEventMgr.getExpectedDiskCount(hostname, dbfile=nodeInfoDbPath)
+            if expectedDiskCount is None:
+                logger.error("Disk count of %s is not registerd." % hostname)
+                return None
 
             detectedDiskSNs = {disk["SN"] for disk in data if disk["SN"]}
             knownDiskSNs = {disk["SN"] for disk in old_disk_info["broken"] + old_disk_info["healthy"] if disk["SN"]}
 
             if old_disk_info["timestamp"] >= event["time"]:
-                logger.warn("Old disk events are received")
+                logger.warn("Old disk events are received from %s" % event["hostname"])
                 return None
             else:
                 new_disk_info["timestamp"] = event["time"]
@@ -380,29 +384,57 @@ def getSection(inputFile, section):
         return ret
 
 
+def checkLineFormat(section, line):
+    node = {}
+    tokens = line.split()
+    for token in tokens:
+        key, _, value = token.partition("=")
+        node.setdefault(key, value)
+
+    hostname = node.get("hostname", None)
+    deviceCnt = node.get("deviceCnt", None)
+
+    if not hostname:
+        raise Exception("%s missing hostname in line '%s'" % (section, line))
+    if not deviceCnt:
+        raise Exception("%s missing deviceCnt in line '%s'" % (section, line))
+
+    if not deviceCnt.isdigit():
+        raise Exception("%s line '%s' contains invalid deviceCnt" % (section, line))
+    else:
+        deviceCnt = int(deviceCnt) 
+        if deviceCnt < 1:
+            raise Exception("deviceCnt has to be a positive integer")
+
 def parseNodeListSection(inputFile):
-    lines = getSection(inputFile, "nodeList")
     try:
-        nodeList = []
-        nameSet = set()
-        for line in lines:
-            line = line.strip()
-            if len(line) > 0:
-                tokens = line.split()
-                if len(tokens) != 1:
-                    raise Exception("[nodeList] contains an invalid line %s" % line)
-
-                name = tokens[0]
-                if name in nameSet:
-                    raise Exception("[nodeList] contains duplicate names")
-
-                nodeList.append({"hostname": name})
-                nameSet.add(name)
-
-        return nodeList
+        lines = getSection(inputFile, "nodeList")
     except IOError as e:
         msg = "Failed to access input files for %s" % str(e)
         raise Exception(msg)
+
+    nodeList = []
+    nameSet = set()
+    for line in lines:
+        line = line.strip()
+        if len(line) > 0:
+            checkLineFormat(section="[nodeList]", line=line)
+            node = {}
+            tokens = line.split()
+            for token in tokens:
+                node.setdefault(token.split("=")[0], token.split("=")[1])
+
+            hostname = node.get("hostname")
+            deviceCnt = int(node.get("deviceCnt"))
+            deviceCapacity = int(node.get("deviceCapacity"))
+
+            if hostname in nameSet:
+                raise Exception("[nodeList] contains duplicate names")
+
+            nodeList.append({"hostname": hostname, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
+            nameSet.add(hostname)
+
+    return nodeList
 
 
 def initializeNodeInfo():
@@ -430,29 +462,7 @@ def initializeNodeInfo():
         print >> sys.stderr, "Node info already exists!!"
         sys.exit(1)
 
-    for node in nodeList:
-        hostname = node["hostname"]
-        status = "alive"
-        timestamp = int(time.time())
-
-        disk_info = {
-                        "timestamp": timestamp,
-                        "missing": {"count": 0, "timestamp": timestamp},
-                        "broken": [],
-                        "healthy": [],
-        }
-        disk = json.dumps(disk_info)
-
-        mode = "service"
-        switchpoint = timestamp
-
-        nodeInfoDb.add_node(hostname=hostname,
-                            status=status,
-                            timestamp=timestamp,
-                            disk=disk,
-                            mode=mode,
-                            switchpoint=switchpoint)
-
+    nodeInfoDb.add_info_and_spec(nodeList)
 
 def initializeMaintenanceBacklog():
     '''
@@ -497,7 +507,8 @@ def clearNodeInfo():
 
     if os.path.exists(GlobalVar.NODE_DB):
         os.system("rm %s" % GlobalVar.NODE_DB)
-        ret = 0
+
+    ret = 0
 
     return ret
 

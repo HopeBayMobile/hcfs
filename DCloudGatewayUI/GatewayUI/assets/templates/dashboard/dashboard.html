@@ -15,6 +15,10 @@
 	            if (data["version_upgrade"]){
 	            	$(".control .upgrade").show();
 	            }
+
+                    var last_ss_status = data["last_snapshot_status"]
+                    $('#last_snapshot_status').find('span').text(last_ss_status);
+
 	            var cache_data = data["gateway_cache_usage"]
 	            for (key in cache_data){
 	            	$('#'+key).find('span').text(cache_data[key]);
@@ -83,13 +87,14 @@
 <div class="data-stored">
 	<p id="cloud_data">Total amount of data stored: <span>{{ cloud_storage_usage.cloud_data }}</span> GB</p>
 	<p id="cloud_data_dedup_compress">Actual amount of data stored: <span>{{ cloud_storage_usage.cloud_data_dedup_compress }}</span> GB</p>
+	<p id="last_snapshot_status">Latest snapshot status: <span>{{ last_snapshot_status }}</span></p>
 </div>
 <div class="cache-usage-bar">
 	<div class="indicator">
 		<div>
 			<img src="/static/img/dashboard/1_capacity_icon_1.png" alt="">
 			<p id="dirty_cache_size">Data not yet protected: <span>{{gateway_cache_usage.dirty_cache_size}}</span>GB</p>
-			<p id="dirty_cache_entries">File not yet protected: <span>{{gateway_cache_usage.dirty_cache_entries}}</span></p>
+			<p id="dirty_cache_entries">Files not yet protected: <span>{{gateway_cache_usage.dirty_cache_entries}}</span></p>
 		</div>
 <!--
 		<div>

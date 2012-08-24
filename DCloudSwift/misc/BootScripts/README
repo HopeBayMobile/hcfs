@@ -1,12 +1,7 @@
 The files and directories are for the purpose of building the golden image.
 
-1. rc
-Use this file to overwrite /etc/init.d/rc in the golden image
+1. rc.local
+Use this file to overwrite /etc/rc.local in the golden image
 
-2. ServerRegister
-Place this directory in the directory /etc/DCloud.
-If /etc/DCloud does not exist in the golden image, 
-please create this directory first.
-
-3. rc.py
+2. rc.py
 Place this file in the directory /etc.

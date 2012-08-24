@@ -43,8 +43,9 @@ class NodeInstaller:
         self.__logger.info("start install")
 
         fingerprint = diskUtil.getLatestFingerprint()
-        if fingerprint is None or fingerprint["vers"] < util.getSwiftConfVers():
-            diskUtil.createSwiftDevices(deviceCnt=self.__deviceCnt, devicePrx=self.__devicePrx)
+        if not fingerprint or fingerprint["vers"] < util.getSwiftConfVers():
+            if self.__deviceCnt:
+                diskUtil.createSwiftDevices(deviceCnt=self.__deviceCnt, devicePrx=self.__devicePrx)
             if BASEDIR != "/":
                 os.system("rm -rf /DCloudSwift")
                 os.system("cp -r %s/DCloudSwift /" % BASEDIR)

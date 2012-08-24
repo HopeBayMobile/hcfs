@@ -20,11 +20,15 @@
             [portal]
             url = url of the public access portal for users
         (4) Add [deploy] section to /etc/delta/inputFile in the following format:
-              ip1 zid1
-              ip2 zid2
+              ip=192.168.11.10 zid=1 deviceCnt=6 deviceCapacity=100
+              ip=192.168.11.11 zid=2 deviceCnt=6 deviceCapacity=100
               ...
             
-              where zid has to be a positive integer less than 10.
+              where zid has to be a positive integer less than 10, deviceCnt should be
+              the number of disks in the node, and deviceCapacity should be the capacity 
+              of an individual disk in the node.
+              (we assume the disks in the same node are of the same capacity.)
+
               Note that the master node to run this deploy script cannot be included 
               in this list.
               
@@ -33,11 +37,12 @@
 
 3. setup event manager
         (1) Add [nodeList] section to /etc/delta/inputFile in the following format:
-              hostname1
-              hostname2
+              hostname=STO1AA0110 deviceCnt=6
+              hostname=STO1AA0111 deviceCnt=6
               ...
             
-            where hostnameX are the hostname of nodes you want to monitor.
+            where deviceCnt should be a positive integer.
+
         (2) Edit /etc/delta/swift_master.ini if necessary
 	(3) Execute "dcloud_clear_node_info"
         (4) Execute "dcloud_clear_backlog"
@@ -45,6 +50,19 @@
         (6) Execute "dcloud_initialize_backlog"
         (7) Execute "/etc/init.d/swift-event-manager"
         (8) Execute "/etc/init.d/swift-maintain-switcher"
+
+4. setup dns round robin
+        (1) Add [balance] section to /etc/delta/inputFile in the following format:
+              ip1
+              ip2
+              ...
+            
+
+	(2) Execute "dcloud_swift_dns_setup domainName"
+
+[Build PDCM golden image]
+   (1) Copy DCloudSwift to the node for building golden image 
+   (2) Execute 'python setup.py prepare_image'
 
 [command lines]
 1. dcloud_print_node_info
@@ -56,13 +74,11 @@
    Onec PDCM is ready, we don't have to edit /etc/delta/storageNodes and /etc/delta/proxyNodes. 
    PDCM will assign the IPs of proxy and storage nodes automatically.
 
-2. The logs and error handling are not ready yet! Some logs can be found 
-   in /var/log/deltaSwift.
+2. Most messages are written to /var/log/syslog. Some logs can be found /var/log/deltaSwift.
 
-3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
-   Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
+3. For PDCM, please replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
 
-4. For PDCM, please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
-   Otherwise, please replace starage&proxy nodes' /etc/rc.py with misc/BootScripts/rc.py
+4. For PDCM,  copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
 
 5. For PDCM0.4, please create /srv and /DCloudSwift when building golden image.
+

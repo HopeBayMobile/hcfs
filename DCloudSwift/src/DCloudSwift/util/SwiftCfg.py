@@ -22,37 +22,24 @@ class SwiftCfg:
         config = ConfigParser()
         config.readfp(open(self.__configFile))
 
-        self.__logDir = config.get('log', 'dir')
-        self.__logName = config.get('log', 'name')
         self.__logLevel = config.get('log', 'level')
 
         self.__username = "root"
 
         self.__password = config.get('storage', 'password')
-        self.__deviceCnt = int(config.get('storage', 'deviceCnt'))
         self.__devicePrx = "sdb"
         self.__proxyPort = int(config.get('storage', 'proxyPort'))
 
         self.__portalUrl = config.get('portal', 'url')
 
         self.__kwparams = {
-            'logDir': self.__logDir,
             'logLevel': self.__logLevel,
-            'logName': self.__logName,
             'username': self.__username,
             'password': self.__password,
             'devicePrx': self.__devicePrx,
-            'deviceCnt': self.__deviceCnt,
             'proxyPort': self.__proxyPort,
             'portalUrl': self.__portalUrl
         }
-
-        os.system("mkdir -p " + self.__kwparams['logDir'])
-        os.system("touch " + self.__kwparams['logDir'] + "/" + self.__kwparams['logName'])
-        logging.basicConfig(level=logging.DEBUG,
-            format='[%(levelname)s on %(asctime)s] %(message)s',
-            filename=self.__kwparams['logDir'] + self.__kwparams['logName']
-        )
 
     def getKwparams(self):
         return self.__kwparams

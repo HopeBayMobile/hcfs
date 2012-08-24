@@ -9,6 +9,7 @@ import string
 import socket
 import subprocess
 import time
+import pickle
 
 # Import packages to be tested
 sys.path.append('../src/DCloudSwift/')
@@ -447,22 +448,26 @@ class Test_getDeviceCnt:
     '''
     def setup(self):
         print "Start of unit test for function getDeviceCnt() in util.py\n"
-        cmd = "cp ../Swift.ini ../src/DCloudSwift/"
+        cmd = "cp /etc/swift/storageList /etc/swift/storageList.bak"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.readlines()
         po.wait()
 
-        nose.tools.ok_(po.returncode == 0, "Failed to copy Swift.ini!")
-        self.__result = util.getDeviceCnt()
+        nose.tools.ok_(po.returncode == 0, "Failed to backup storageList!")
+        storageList =[{"ip": "192.168.11.10", "deviceCnt": 6}, {"ip": "192.168.11.12", "deviceCnt": 5}]
+        with open("/etc/swift/storageList", "wb") as fh:
+            pickle.dump(storageList, fh)
+
+        self.__result = util.getDeviceCnt("192.168.11.10")
 
     def teardown(self):
         print "End of unit test for function getDeviceCnt() in util.py\n"
-        cmd = "rm ../src/DCloudSwift/Swift.ini"
+        cmd = "mv /etc/swift/storageList.bak /etc/swift/storageList"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.readlines()
         po.wait()
 
-        nose.tools.ok_(po.returncode == 0, "Failed to remove Swift.ini!")
+        nose.tools.ok_(po.returncode == 0, "Failed to recover storageList!")
 
     def test_OutputExistence(self):
         '''
@@ -944,56 +949,6 @@ class Test_findLine:
         '''
         result = util.findLine(self.__test_file, self.__test_negative)
         nose.tools.ok_(not result, "Function findLine() does not pass the negative case!")
-
-
-class Test_getLogger:
-    '''
-    Test the function getLogger() in util.py.
-    '''
-    def setup(self):
-        print "Start of unit test for function getLogger() in util.py\n"
-        self.__random_str = ''.join(random.choice(string.letters + string.digits) for x in range(8))
-        self.__logger = util.getLogger(name="Test_getLogger")
-
-        self.__test_bank = {
-            'info': "Test_getLogger_INFO_%s" % self.__random_str,
-            'debug': "Test_getLogger_DEBUG_%s" % self.__random_str,
-            'warning': "Test_getLogger_WARNING_%s" % self.__random_str,
-            'error': "Test_getLogger_ERROR_%s" % self.__random_str,
-            'critical': "Test_getLogger_CRITICAL_%s" % self.__random_str,
-            'exception': "Test_getLogger_EXCEPTION_%s" % self.__random_str,
-        }
-
-    def teardown(self):
-        print "End of unit test for function getLogger() in util.py\n"
-
-    def test_LogOperation(self):
-        '''
-        Check the log operation executed by getLogger() is successfully done.
-        '''
-        self.__logger.info(self.__test_bank['info'])
-        self.__logger.debug(self.__test_bank['debug'])
-        self.__logger.warning(self.__test_bank['warning'])
-        self.__logger.error(self.__test_bank['error'])
-        self.__logger.critical(self.__test_bank['critical'])
-        self.__logger.exception(self.__test_bank['exception'])
-
-        cmd = "cat /var/log/deltaSwift/deltaSwift.log"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        output = po.stdout.readlines()
-        po.wait()
-
-        nose.tools.ok_(po.returncode == 0, "Failed to access the log file!")
-
-        log_count = 0
-
-        for level, content in self.__test_bank.items():
-            for line in output:
-                for item in line.split():
-                    if item == self.__test_bank[level]:
-                        log_count += 1
-
-        nose.tools.ok_(log_count == 5, "Function getLogger() can not log correctly!")
 
 
 class Test_getSwiftNodeIpList:

@@ -850,6 +850,7 @@ class BlockCache(object):
 
 
         did_nothing_count = 0
+        force_search_clean = False  # We need to search for clean entries to replace no matter what
         while (len(self.entries) > self.max_entries or
                (len(self.entries) > 0  and self.size > self.max_size)):
 
@@ -857,16 +858,28 @@ class BlockCache(object):
             need_entries = len(self.entries) - self.max_entries
 
             # Try to expire entries that are not dirty
+
+            # Jiahong: replace_all_clean indicates whether we will try to replace only clean entries
+            if self.dirty_entries < 0.8 * self.max_entries:
+                replace_all_clean = True
+                log.debug('In expire(): replace all clean= True, max entries %d, dirty entries %d' % (self.max_entries, self.dirty_entries))
+            else:
+                replace_all_clean = False
+                log.debug('In expire(): replace all clean= False, max entries %d, dirty entries %d' % (self.max_entries, self.dirty_entries))
+
+            clean_replacement_count = 0  # Count the number of clean block replacement
             for el in self.entries.values_rev():
                 if el.dirty:
-                    continue #Continue to scan clean entries
-                    #commented out the following six lines. Do not try to distinguish the two now
-                    #if (el.inode, el.blockno) in self.in_transit:
-                    #    log.debug('expire: %s is dirty, but already being uploaded', el)
-                    #    continue
-                    #else:
-                    #    log.debug('expire: %s is dirty, trying to flush', el)
-                    #    break
+                    if replace_all_clean or force_search_clean is True:
+                        continue #Continue to scan clean entries
+                    else:
+                    # Jiahong: Use the method by the original S3QL 1.10
+                        if (el.inode, el.blockno) in self.in_transit:
+                            log.debug('expire: %s is dirty, but already being uploaded', el)
+                            continue
+                        else:
+                            log.debug('expire: %s is dirty, trying to flush', el)
+                            break
 
                 del self.entries[(el.inode, el.blockno)]
                 el.close()
@@ -876,8 +889,11 @@ class BlockCache(object):
                 need_size -= el.size
 
                 did_nothing_count = 0
-                if need_size <= 0 and need_entries <= 0:
-                    break
+                
+                clean_replacement_count = clean_replacement_count + 1  # We will not stop replacing clean block immediately
+                if clean_replacement_count > 10:
+                    if need_size <= 0 and need_entries <= 0:
+                        break
 
             if need_size <= 0 and need_entries <= 0:
                 break
@@ -889,8 +905,14 @@ class BlockCache(object):
                     bucket.store('cloud_gw_test_connection','nodata')
             except:
                 log.error('Network appears to be down. Failing expire cache.')
-                raise(llfuse.FUSEError(errno.EIO))
+                if (self.max_size < self.dirty_size) or (self.max_entries < self.dirty_entries):
+                # Denial IO service if we cannot replace dirty cache now 
+                    raise(llfuse.FUSEError(errno.EIO))
+                else:
+                    force_search_clean = True
+                    continue
 
+            uploaded_count = 0  # Jiahong: Now will try to sync 4 entries at once
             for el in self.entries.values_rev():
                 if el.dirty and (el.inode, el.blockno) not in self.in_transit:
                     log.debug('expire: uploading %s..', el)
@@ -902,8 +924,12 @@ class BlockCache(object):
                     need_size -= el.size
                 need_entries -= 1
 
-                if need_size <= 0 and need_entries <= 0:
-                    break
+                if uploaded_count < 4:
+                    uploaded_count = uploaded_count + 1
+                else:
+                    uploaded_count = 0
+                    if need_size <= 0 and need_entries <= 0:
+                        break
 
             did_nothing_count += 1
             if did_nothing_count > 50:

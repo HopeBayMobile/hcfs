@@ -16,6 +16,7 @@ from components.disk_info import DiskInfo
 
 timeout = 60
 socket.setdefaulttimeout(timeout)
+random.seed(os.urandom(100))
 
 '''
 Notification Data Format.
@@ -139,15 +140,15 @@ class DiskChecker:
             post_data(self.receiverUrl, eventEncoding)
 
 class Heartbeat:
-    def __init__(self, receiverUrl):
-        self.receiverUrl = receiverUrl
+    def __init__(self, receiverurl):
+        self.receiverurl = receiverurl
 
     def send_heartbeat(self):
         """
         send heartbeat to the receiver 
         """
-        logger = util.getLogger(name="Heartbeat")
-        heartbeatEncoding = None
+        logger = util.getLogger(name="heartbeat")
+        heartbeatencoding = None
         try:
     
             heartbeat = {
@@ -155,33 +156,33 @@ class Heartbeat:
                 "nodes": [
                              {
                                "hostname": socket.gethostname(),
-                               "role": "MH",
+                               "role": "mh",
                                "status": "alive",
                              },
                          ]
             }
 
-            heartbeatEncoding = json.dumps(heartbeat)
-            logger.info(heartbeatEncoding)
+            heartbeatencoding = json.dumps(heartbeat)
+            logger.info(heartbeatencoding)
 
-        except Exception as e:
+        except exception as e:
             logger.error(str(e))
             event = {
-                "component_name": "Heartbeat",
+                "component_name": "heartbeat",
                 "message": str(e),
                 "time": int(time.time()),
             }
             logger.error(json.dumps(event))
 
-        if heartbeatEncoding:
-            post_data(self.receiverUrl, heartbeatEncoding)
+        if heartbeatencoding:
+            post_data(self.receiverurl, heartbeatencoding)
         
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
         self.receiverUrl = util.getReceiverUrl()
-        
         try:
+            
             self.sensorInterval = util.getSensorInterval()
             if self.sensorInterval[0] > self.sensorInterval[1]:
                 raise
@@ -229,6 +230,5 @@ if __name__ == "__main__":
             sys.exit(2)
         sys.exit(0)
     else:
-        post_data("http://172.16.78.79:5308/events","{}")
         print "usage: %s start|stop|restart" % sys.argv[0]
         sys.exit(2)
