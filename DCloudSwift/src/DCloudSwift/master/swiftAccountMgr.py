@@ -1278,14 +1278,40 @@ class SwiftAccountMgr:
             return Bool(val, msg)
         else:
             metadata_content = msg
-            metadata_content[self.__admin_default_name]["quota"] = quota
+            ori_quota = metadata_content[self.__admin_default_name]["quota"]
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
-                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                           container=account, object_name=self.__metadata_name, object_content=metadata_content)
+        if ori_quota == quota:
+            val = True
+            msg = ""
+        else:
+            if ori_quota > quota:
+                obtain_account_info_output = self.obtain_account_info(account)
+
+                if obtain_account_info_output.val == False:
+                    val = False
+                    msg = "Failed to modify the quota of account %s: " % account + obtain_account_info_output.msg
+                    lock.release()
+                    return Bool(val, msg)
+                else:
+                    account_usage = int(obtain_account_info_output.msg.get("usage"))
+
+                if quota < account_usage:
+                    val = False
+                    msg = "Failed to modify the quota of account %s: usage %d is larger than quota %d" % (account, account_usage, quota)
+                    logger.error(msg)
+                    lock.release()
+                    return Bool(val, msg)
+                else:
+                    metadata_content[self.__admin_default_name]["quota"] = quota
+            else:
+                metadata_content[self.__admin_default_name]["quota"] = quota
+
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
+                                               account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                               container=account, object_name=self.__metadata_name, object_content=metadata_content)
 
         if val == False:
-            msg = "Failed to modify the quota of account %s" % account + msg
+            msg = "Failed to modify the quota of account %s: " % account + msg
             logger.error(msg)
 
         lock.release()
