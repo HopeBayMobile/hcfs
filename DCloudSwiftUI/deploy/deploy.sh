@@ -25,7 +25,9 @@ fi
 ### 3. Configure ZCW
 #Turn off Apache Daemon
 update-rc.d -f apache2 remove
-apache2ctl stop
+apache2ctl-zcw stop
+# wait for apache2 to stop
+sleep 5
 
 ### 4. Setup ZCW
 cd ${THISPATH}
@@ -40,19 +42,30 @@ if [ -e /etc/apache2-$SUFFIX ] ; then
 fi
 ## 4.1 Setup Apache HTTP Server
 #Execute setup-instance command
-source /usr/share/doc/apache2/examples/setup-instance zcw
+source /usr/share/doc/apache2/examples/setup-instance ${SUFFIX}
+
 #Enable wsgi
 a2enmod-zcw wsgi
 #Copy Apache configurations
 cp -r apache2-zcw/ /etc/
+echo "PROJECTNAME=${PROJECTNAME}"
+
 #Replace PROJECTNAME variable
 sed -i "s/PROJECTNAME/${PROJECTNAME}/g" /etc/apache2-zcw/sites-available/default
+
+#Replace static alias directory
+sed -i "s/\/var\/www-${SUFFIX}\/static\//\/var\/www-${SUFFIX}\/${PROJECTNAME}\/${PROJECTNAME}\/static/g" /etc/apache2-zcw/sites-available/default
 
 #Copy Django project
 mkdir /var/www-zcw
 cp -r ${PROJECTPATH}/ /var/www-zcw/
 #Collects the static files into STATIC_ROOT
 python /var/www-zcw/${PROJECTNAME}/manage.py collectstatic --noinput
+
+
+#FIXME: 
+cp -r /usr/local/lib/python2.7/dist-packages/delta_wizard-0.1-py2.7.egg/delta/wizard/static/wizard /var/www-zcw/${PROJECTNAME}/${PROJECTNAME}/static
+
 #change file owner and group
 chown www-data:www-data -R /var/www-zcw/
 
