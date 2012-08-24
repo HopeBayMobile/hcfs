@@ -12,7 +12,7 @@ Build-Depends: debhelper (>= 8),
                python-apsw (>= 3.7.0),
                libsqlite3-dev (>= 3.7.0),
                python-sphinx (>= 1.0.7+dfsg),
-               python (>= 2.7), 
+               python (>= 2.7),
                python-unittest2,
                python-llfuse (>= 0.37),
                python-pycryptopp,
@@ -21,7 +21,20 @@ Build-Depends: debhelper (>= 8),
                texlive-latex-recommended,
                texlive-latex-extra,
                texlive-fonts-recommended,
-               cython (>= 0.15.1)
+               cython (>= 0.15.1),
+               python-pycryptopp,
+               libsqlite3-dev,
+               sqlite3,
+               python-apsw,
+               python-lzma,
+               python-all-dev,
+               python-sphinx,
+               build-essential,
+               python-profiler,
+               python-argparse,
+               python-setuptools,
+               fuse-utils,
+               smartmontools
 Standards-Version: 3.9.3
 Homepage: http://code.google.com/p/s3ql/
 Vcs-Svn: svn://svn.debian.org/python-apps/packages/s3ql/trunk
@@ -38,7 +51,20 @@ Depends: ${misc:Depends},
          psmisc,
          python-llfuse (>= 0.37),
          python-apsw (>= 3.7.0),
-         python-lzma (>= 0.5.3)
+         python-lzma (>= 0.5.3),
+        python-pycryptopp,
+        libsqlite3-dev,
+        sqlite3,
+        python-apsw,
+        python-lzma,
+        python-all-dev,
+        python-sphinx,
+        build-essential,
+        python-profiler,
+        python-argparse,
+        python-setuptools,
+        fuse-utils,
+        smartmontools
 Description: Full-featured file system for online data storage
  S3QL is a file system that stores all its data online. It supports
  online storage services like Amazon S3 as well as arbitrary FTP or

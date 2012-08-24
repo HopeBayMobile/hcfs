@@ -19,6 +19,10 @@ apt-get install -y --force-yes dcloud-gateway
 # install S3QL
     #~ cd ../DCloudS3ql
     #~ ./install_s3ql_script
+#~ FIXME
+    # 1. append apt-server domain name
+    # 2. sudo apt-key adv --recv-keys ...
+
 
 # install samba 3.6.6
 cd ../GatewayPatches
