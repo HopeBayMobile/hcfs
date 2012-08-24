@@ -3,12 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from DCloudSwift.master.swiftMonitorMgr import SwiftMonitorMgr
 #TODO: get account order from model 
+from operator import itemgetter
 from DCloudSwift.master.swiftAccountMgr import SwiftAccountMgr
 
 @login_required
 def index(request):
     """
-    dashboard
+    dashboard shows top usage accounts, monitor statics, and system error logs
     """
     SM = SwiftMonitorMgr()
     zone = SM.get_zone_info()
@@ -23,8 +24,9 @@ def index(request):
                 current_usage = int(accounts[val]["usage"])
                 account_list.append(dict(id=val,usage=current_usage))
         #sort list to get top 5
-        top_list = sorted(account_list, key=lambda k: k['usage'])[::-1][:5]
+        top_list = sorted(account_list, key=itemgetter('usage'))[::-1][:5]
         for i in top_list:
+            #make data readable
             human_int = i["usage"]/1000000
             human_float = (i["usage"] - (human_int*1000000))/10000
             if(human_float<10):
