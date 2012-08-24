@@ -251,3 +251,7 @@ def do_meta_form(data):
     cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
     os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
+
+    # reload apache to test load python module
+    cmd = "/etc/init.d/apache2-zcw reload"
+    os.system(cmd)
