@@ -9,7 +9,7 @@ $(document).ready(function(){
     var quota_ratio = [["Used", {{zone.used}}], ["Free", {{zone.free}}]];
     var plot7 = $.jqplot('quota_chart', [quota_ratio], {
         //title:'Capacity',
-        seriesColors: [ "#4bb2c5", "#c5b47f" ],
+        seriesColors: [ "#F2DEDE", "#DFF0D8" ],
         seriesDefaults:{
             renderer:$.jqplot.PieRenderer,
             rendererOptions: {
@@ -22,7 +22,13 @@ $(document).ready(function(){
             //    numberRows: 1
             },
             location: 'e'
-        }      
+        },
+        grid: {
+            background:'#ffffff',
+            borderColor: 'white',
+            shadow: false,
+            //drawBorder: false,
+            },
     });   
 });
 </script>
@@ -61,7 +67,7 @@ $(document).ready(function(){
   <div id="screen" class="span9">
     <div class="row-fluid">
         <div id="sidebar" class="span6">
-          <h4>Capacity</h4>
+          <h4>Capacity ({{zone.quota}})</h4>
           <div id="quota_chart""></div>
         </div>
         <div id="sidebar" class="span6">
