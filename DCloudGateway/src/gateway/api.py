@@ -164,6 +164,27 @@ def getGatewayConfig():
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
 
+# wthung
+def _get_storage_account():
+    """
+    Get storage account from auth file.
+    @rtype: string
+    @return: Storage account or "" if failed.
+    """
+    
+    op_account = ""
+    
+    try:
+        op_config = ConfigParser.ConfigParser()
+        with open('/root/.s3ql/authinfo2') as op_fh:
+            op_config.readfp(op_fh)
+    
+        section = "CloudStorageGateway"
+        op_account = op_config.get(section, 'backend-login')
+    except Exception as e:
+        log.error("Failed to _get_storage_account: %s" % str(e))
+    
+    return op_account
 
 def getStorageUrl():
     """
@@ -184,7 +205,7 @@ def getStorageUrl():
         section = "CloudStorageGateway"
         storage_url = config.get(section, 'storage-url').replace("swift://", "")
     except Exception as e:
-        log.error("Failed to getStorageUrl for %s" % str(e))
+        log.error("Failed to getStorageUrl: %s" % str(e))
     finally:
         log.debug("getStorageUrl end")
     return storage_url
@@ -901,10 +922,13 @@ def apply_storage_account(storage_url, account, password, test=True):
     
         with open('/root/.s3ql/authinfo2', 'wb') as op_fh:
             op_config.write(op_fh)
+            
+        # get user default container name
+        user_container = _get_user_container_name(account)
 
         # wthung, 2012/8/16
         # re-create upstart s3ql.conf
-        _createS3qlConf(storage_url)
+        _createS3qlConf(storage_url, user_container)
         
         op_ok = True
         op_msg = 'Succeeded to apply storage account'
@@ -967,11 +991,17 @@ def apply_user_enc_key(old_key=None, new_key=None):
         if key != old_key:
             op_msg = "The old_key is incorrect"
             raise Exception(op_msg)
+        # get user account
+        account = op_config.get(section, 'backend-login')
+        user_container = _get_user_container_name(account)
+        if not user_container:
+            op_msg = "Error happened when getting user container name"
+            raise Exception(op_msg)
     
         _umount()
     
         storage_url = op_config.get(section, 'storage-url')
-        cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/gateway/delta" % (storage_url)
+        cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/%s/delta" % (storage_url, user_container)
         po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         (stdout, stderr) = po.communicate(new_key)
         if po.returncode != 0:
@@ -1006,7 +1036,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
 
     return json.dumps(return_val)
 
-def _createS3qlConf(storage_url):
+def _createS3qlConf(storage_url, container):
     """
     Create S3QL configuration file and upstart script of gateway 
     by calling createS3qlconf.sh and createpregwconf.sh
@@ -1027,7 +1057,7 @@ def _createS3qlConf(storage_url):
         compress = "lzma" if config.get("s3ql", "compress") == "true" else "none"
         mountOpt = mountOpt + " --compress %s" % compress 
     
-        cmd = 'sudo sh %s/createS3qlconf.sh %s %s %s "%s"' % (DIR, iface, "swift://%s/gateway/delta" % storage_url, mountpoint, mountOpt)
+        cmd = 'sudo sh %s/createS3qlconf.sh %s %s %s "%s"' % (DIR, iface, "swift://%s/%s/delta" % (storage_url, container), mountpoint, mountOpt)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -1055,7 +1085,74 @@ def _createS3qlConf(storage_url):
     return ret
         
 
+def _get_user_container_name(account):
+    """
+    Get user default container name from input account:username pair
+    
+    @type account: string
+    @param account: The account:username pair
+    @rtype: string
+    @return: User's default container name
+    """
+    
+    # check string format
+    if not ":" in account:
+        log.error("Format error: Account name didn't contain ':'")
+        return ""
+    
+    # try to get user name from account
+    _, username = account.split(":")
+    user_container = "%s_private_container" % username
+    log.debug('container name %s for user %s' % (user_container, username))
+    
+    return user_container
+
 @common.timeout(180)
+def _check_container(storage_url, account, password):
+    """
+    Check user's default container.
+    
+    Will raise BuildGWError if failed.
+    
+    @type storage_url: string
+    @param storage_url: Storage URL.
+    @type account: string
+    @param account: Account name.
+    @type password: string
+    @param password: Account password.
+    """
+    
+    user_container = ''
+    log.debug("_check_container start")
+
+    try:
+        # get user default container name
+        user_container = _get_user_container_name(account)
+        
+        cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat %s" % (storage_url, account, password, user_container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+    
+        if po.returncode != 0:
+            op_msg = "Failed to stat container: %s" % output
+            raise BuildGWError(op_msg)
+        
+        output = output.strip()
+        if not user_container in output:
+            op_msg = "Failed to find user's container %s. Output=%s" % (user_container, output)
+            log.error(op_msg)
+            raise BuildGWError(op_msg)
+        else:
+            log.debug('Found user container %s' % user_container)
+    finally:
+        log.debug("_check_container end")
+    
+    return user_container
+
+# wthung, 2012/8/21
+# now creating container is backend's job 
+'''@common.timeout(180)
 def _openContainter(storage_url, account, password):
     """
     Open container.
@@ -1089,11 +1186,11 @@ def _openContainter(storage_url, account, password):
             raise BuildGWError(op_msg)
         os.system("sudo rm gatewayContainer.txt")
     finally:
-        log.debug("_openContainer end")
+        log.debug("_openContainer end")'''
 
 
 @common.timeout(180)
-def _mkfs(storage_url, key):
+def _mkfs(storage_url, key, container):
     """
     Create S3QL file system.
     Do file system checking if an existing one was found.
@@ -1115,7 +1212,7 @@ def _mkfs(storage_url, key):
     has_existing_filesys = False
 
     try:
-        cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/gateway/delta" % (storage_url)
+        cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/%s/delta" % (storage_url, container)
         po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = po.communicate(key)
         if po.returncode != 0:
@@ -1127,7 +1224,7 @@ def _mkfs(storage_url, key):
                 log.info("Conducting forced file system check")
                 has_existing_filesys = True
                 
-                cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/gateway/delta" % (storage_url)
+                cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/%s/delta" % (storage_url, container)
                 po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 output = po.stdout.read()
                 po.wait()
@@ -1218,7 +1315,7 @@ def _umount():
 
 
 @common.timeout(360)
-def _mount(storage_url):
+def _mount(storage_url, container):
     """
     Mount the S3QL file system.
     Will create S3QL configuration file and gateway upstart script before mounting.
@@ -1243,11 +1340,11 @@ def _mount(storage_url):
 
         os.system("sudo mkdir -p %s" % mountpoint)
 
-        if _createS3qlConf(storage_url) != 0:
+        if _createS3qlConf(storage_url, container) != 0:
             raise BuildGWError("Failed to create s3ql conf")
 
         #mount s3ql
-        cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/gateway/delta %s" % (mountOpt, authfile, storage_url, mountpoint)
+        cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/%s/delta %s" % (mountOpt, authfile, storage_url, container, mountpoint)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -1421,9 +1518,9 @@ def build_gateway(user_key):
         account = op_config.get(section, 'backend-login')
         password = op_config.get(section, 'backend-password')
         
-        _openContainter(storage_url=url, account=account, password=password)
-        has_filesys = _mkfs(storage_url=url, key=user_key)
-        _mount(storage_url=url)
+        user_container = _check_container(storage_url=url, account=account, password=password)
+        has_filesys = _mkfs(storage_url=url, key=user_key, container=user_container)
+        _mount(storage_url=url, container=user_container)
         
         # wthung, 2012/8/3
         # if a file system is existed, try to rebuild snapshot database
@@ -2383,11 +2480,16 @@ def set_compression(switch):
         storage_url = getStorageUrl()
         if storage_url is None:
             raise Exception("Failed to get storage url")
+        
+        account = _get_storage_account()
+        if not account:
+            raise Exception("Failed to get storage account")
     
         with open('/etc/delta/Gateway.ini', 'wb') as op_fh:
             config.write(op_fh)
+        
     
-        if  _createS3qlConf(storage_url) != 0:
+        if  _createS3qlConf(storage_url, account) != 0:
             raise Exception("Failed to create new s3ql config")
     
         op_ok = True
@@ -2874,19 +2976,19 @@ def _get_storage_capacity():
                     tokens = line.split(":")
                     val = tokens[1].replace("MB", "").strip()
                     real_cloud_data = float(val)
-                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) / 1024.0)  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) * 1024 ** 2)
 
                 if line.startswith("After de-duplication:"):
                     tokens = line.split(":")
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val)) / 1024  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup"] = int(float(val) * 1024 ** 2) 
 
                 if line.startswith("After compression:"):
                     tokens = line.split(":")
                     size = str(tokens[1]).strip().split(" ")
                     val = size[0]
-                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val)) / 1024  # MB -> GB 
+                    ret_usage["cloud_storage_usage"]["cloud_data_dedup_compress"] = int(float(val) * 1024 ** 2) 
 
                 if line.startswith("Cache size: current:"):
                     line = line.replace("," , ":")
@@ -2896,11 +2998,11 @@ def _get_storage_capacity():
 
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
-                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["used_cache_size"] = int(float(crt_val) * 1024 ** 2) 
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
-                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["max_cache_size"] = int(float(max_val) * 1024 ** 2) 
 
                 if line.startswith("Cache entries: current:"):
                     line = line.replace("," , ":")
@@ -2925,13 +3027,13 @@ def _get_storage_capacity():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     real_cloud_data = real_cloud_data - float(crt_val)
-                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val)) / 1024  # MB -> GB 
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val) * 1024 ** 2) 
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
 
-                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data / 1024), 0)
+                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data * 1024 ** 2), 0)
 
     except Exception:
         if enable_log:
@@ -3100,8 +3202,7 @@ def get_gateway_status():
         log.debug("get_gateway_status")
 
     try:
-        # get logs           
-        #ret_log_dict = read_logs(NUM_LOG_LINES)
+        # get logs
         ret_val["data"]["error_log"] = read_logs(LOGFILES, 0 , NUM_LOG_LINES)
 
         # get usage
@@ -3181,4 +3282,5 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
 
 
 if __name__ == '__main__':
+    _check_container('172.16.78.63:443', 'cw_account:cw_user', 'deltacloud')
     pass

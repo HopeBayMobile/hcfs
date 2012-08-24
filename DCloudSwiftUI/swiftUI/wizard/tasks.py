@@ -130,6 +130,33 @@ def getNewSysPath():
     return path
 
 
+
+def startDaemons():
+    cmd = "swift-event-manager stop"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+
+    cmd = "swift-event-manager start"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+    if po.returncode != 0:
+        raise Exception("Failed to start swift-event-manager")
+
+    cmd = "swift-maintain-switcher stop"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+
+    cmd = "swift-maintain-switcher start"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+    if po.returncode != 0:
+        raise Exception("Failed to start swift-maintain-switcher")
+
+
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
     installDCloudSwift()
@@ -167,19 +194,24 @@ def do_meta_form(data):
         raise Exception("Replica number > number of hosts!!")
     
     # Assign device count and deive weight to each host
-    do_meta_form.report_progress(5, True, 'Assign device count for each host...', None)
+    do_meta_form.report_progress(3, True, 'Assign device count for each host...', None)
     for host in hosts:
         host[u'deviceCnt'] = int(data["disk_count"])
 
-    do_meta_form.report_progress(10, True, 'Assign device capacity for each host...', None)
+    do_meta_form.report_progress(5, True, 'Assign device capacity for each host...', None)
     for host in hosts:
         host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
 
     # construct node_info_db
-    do_meta_form.report_progress(12, True, 'Construct node db...', None)
+    do_meta_form.report_progress(8, True, 'Construct node db...', None)
     nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
     nodeInfoDb.constructDb(nodeList=hosts)
 
+
+    # start daemons
+    do_meta_form.report_progress(10, True, 'Start daemons...', None)
+    startDaemons()
+    
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
