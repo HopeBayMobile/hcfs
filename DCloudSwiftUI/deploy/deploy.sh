@@ -22,23 +22,29 @@ if [ ! -d ${PROJECTPATH} ]; then
 	exit 1
 fi
 
-### 3. Configure ZCW
+### 1. Configure ZCW
 #Turn off Apache Daemon
 apache2ctl-zcw stop
 update-rc.d -f apache2 remove
 
-# FIXME
-sleep 5
-
-### 4. Setup ZCW
+### 2. Setup ZCW
 cd ${THISPATH}
 
 if [ -e /etc/apache2-$SUFFIX ] ; then
 	echo "/etc/apache2-$SUFFIX already exists"
 	echo "remove /etc/apache2-$SUFFIX"
 	rm -rf /etc/apache2-$SUFFIX
+
+        echo "remove /usr/local/sbin/*-$SUFFIX"
         rm -rf /usr/local/sbin/*-$SUFFIX
-        rm -rf /var/log/apache2-$SUFFIX
+
+        while [ -e /var/log/apache2-$SUFFIX ]; do
+           sleep 2
+           echo "remove /var/log/apache2-$SUFFIX"
+           rm -rf /var/log/apache2-$SUFFIX
+        done        
+
+        echo "remove /var/www-$SUFFIX"
         rm -rf /var/www-$SUFFIX
 fi
 
@@ -59,13 +65,10 @@ cp -r apache2-zcw/ /etc/
 #Replace PROJECTNAME variable
 sed -i "s/PROJECTNAME/${PROJECTNAME}/g" /etc/apache2-zcw/sites-available/default
 
-#sed -i "s/\/var\/www-${SUFFIX}\/static\//\/var\/www\/${PROJECTNAME}\/${PROJECTNAME}\/static\//g" /etc/apache2-zcw/sites-available/default
-
 #Copy Django project
 mkdir -p /var/www-zcw
 
 cp -r ${PROJECTPATH}/ /var/www-zcw/
-#cp -rp ../${PROJECTNAME}/sqlite3.db /var/www-${SUFFIX}/${PROJECTNAME}
 #Collects the static files into STATIC_ROOT
 python /var/www-zcw/${PROJECTNAME}/manage.py collectstatic --noinput
 
@@ -94,7 +97,6 @@ cp start_script/*.py /usr/local/bin/
 
 #not safe
 #sed -i "s/exit 0/python \/usr\/local\/bin\/zcw_init\.py \nexit 0/g" /etc/rc.local
-
 
 apache2ctl-zcw start
 
