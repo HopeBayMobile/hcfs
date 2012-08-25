@@ -7,6 +7,7 @@ import pickle
 import signal
 import json
 import sqlite3
+import pkg_resources
 from ConfigParser import ConfigParser
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -170,6 +171,18 @@ class SwiftMonitorMgr:
 
         return ip
 
+    def get_swift_version(self):
+        '''
+        return swift version
+        '''
+        version = ""
+        try:
+            version = pkg_resources.require("swift")[0].version
+        except Exception as e:
+            self.logger.error(str(e))
+       
+        return version
+ 
     def get_zone_info(self):
         """
         Get zone related infomations
@@ -186,6 +199,7 @@ class SwiftMonitorMgr:
         nodes = self.get_number_of_storage_nodes()
         total_capacity = self.get_total_capacity()
         used_capacity = self.get_used_capacity()
+        firmware = "swift_" + self.get_swift_version()
 
         capacity = free = used = "N/A"
 
@@ -195,7 +209,7 @@ class SwiftMonitorMgr:
                 used = "%.2f" % (self.calculate_used_capacity_percentage(total_capacity, used_capacity))
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
-        zone = {"ip": url, "nodes": nodes, "used": used, "free": free, "capacity": capacity}
+        zone = {"ip": url, "nodes": nodes, "used": used, "free": free, "capacity": capacity, "firmware": firmware}
         
         return zone
 
@@ -253,5 +267,5 @@ class SwiftMonitorMgr:
 
 if __name__ == '__main__':
     SM = SwiftMonitorMgr()
-    #print SM.get_zone_info()
-    print SM.list_nodes_info()
+    print SM.get_zone_info()
+    #print SM.list_nodes_info()
