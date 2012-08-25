@@ -5,7 +5,6 @@
 ### 0. Define variables
 THISPATH=$(pwd)
 BASEPATH=${THISPATH%%/deploy}
-#ZONEPATH=${BASEPATH}/ZONES
 ZONEPATH=${BASEPATH}
 SUFFIX=zcw
 
@@ -48,12 +47,27 @@ if [ -e /etc/apache2-$SUFFIX ] ; then
         rm -rf /var/www-$SUFFIX
 fi
 
-#
+## 3. Syncdb and create a superuser with username/password=admin/admin
 if [ -e ../${PROJECTNAME}/sqlite3.db ]; then
 	rm -rf ../${PROJECTNAME}/sqlite3.db
 fi
 
-python ../${PROJECTNAME}/manage.py syncdb --noinput
+echo ${PROJECTPATH}
+python <<EOF
+import pexpect
+child = pexpect.spawn('python ${PROJECTPATH}/manage.py syncdb')
+child.expect('Would you like to create one now')
+child.sendline('yes')
+child.expect("Username \(leave blank to use 'root'\):")
+child.sendline('admin')
+child.expect("E-mail address:")
+child.sendline("ctbd@delta.com.tw")
+child.expect('Password:')
+child.sendline('admin')
+child.expect('Password \(again\)')
+child.sendline('admin')
+child.expect(pexpect.EOF)
+EOF
 
 ## 4.1 Setup Apache HTTP Server
 #Execute setup-instance command
