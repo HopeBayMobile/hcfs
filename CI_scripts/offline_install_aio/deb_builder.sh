@@ -1,11 +1,22 @@
 #!/bin/bash
 # build DEB from source code
+
+# define a function
+check_ok() {
+    if [ $? -ne 0 ];
+    then
+        echo "Execution encountered an error."
+        exit 0
+    fi
+}
+#----------------------------------------------
+
 # make sure input arguments are correct
     echo "************************"
     echo "Usage: ./deb_builder.sh <gw_version> <s3ql_version> <build_num>"
     echo "Usage: ./deb_builder.sh <version_num> <build_num>"
     echo "************************"
-    if [ $# -ne 3 ] 
+    if [ $# -ne 3 ]
     then
         echo "Need to input gw_version_num s3ql_version_num and build_num."
         echo "e.g. ./deb_builder.sh 1.0.9 1.11.1 3598"
@@ -22,7 +33,7 @@
     cd StorageAppliance/DCloudS3ql
     # prepare [debian] foler
     cp -r $INITPATH/debian_templates/s3ql/debian ./
-    # build dependencies 
+    # build dependencies
     sudo apt-get -y build-dep s3ql  # s3ql has to be installed before.
     # update change log
     dch -v $S3QL_VERSION.$BUILD -m "Modified by CDS Team @ Delta Cloud."
@@ -42,7 +53,28 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
-Maintainer: ovid.wu@delta.com.tw 
-Description: Package for gateway API 
+Maintainer: ovid.wu@delta.com.tw
+Description: Package for gateway API
 EOF
     dpkg --build /tmp/pkg_DCloudGateway ./
+
+# build dcloud-gateway meta package.
+    cd $INITPATH
+cat > $INITPATH/dcloud-gateway << EOF
+# Source: <source package name; defaults to package name>
+Section: main
+Priority: optional
+# Homepage: <enter URL here; no default>
+Standards-Version: 3.9.2
+
+Package: dcloud-gateway
+Version: $GW_VERSION~build$BUILD
+Maintainer: Ovid Wu <ovid.wu@delta.com.tw>
+Pre-Depends: curl, tofrodos
+Depends: s3ql (=$S3QL_VERSION~), dcloudgatewayapi (=$GW_VERSION~), savebox
+Architecture: amd64
+# Copyright: <copyright file; defaults to GPL2>
+# Changelog: <changelog file; defaults to a generic changelog>
+Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
+EOF
+equivs-build dcloud-gateway

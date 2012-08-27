@@ -1,5 +1,16 @@
 #!/bin/bash
-# install_gateway_all_in_one.sh : will install S3ql, GUI api and GUI all in once.
+# install_gateway_all_in_one.sh : will install S3ql, GUI api and COSA all in once.
+
+# define a function
+check_ok() {
+    if [ $? -ne 0 ];
+    then
+        echo "Execution encountered an error."
+        exit 0
+    fi
+}
+#----------------------------------------------
+
 
 # Make sure only root can run this script
 if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo'" 1>&2
@@ -13,6 +24,7 @@ fi
 
 # install gateway API
 apt-get install -y --force-yes dcloud-gateway
+apt-get -y --force-yes -f install
 #~ cd ../DCloudGateway
 #~ ./gateway_api_install_script
     #~ apt-get install -y --force-yes dcloudgatewayapi
@@ -37,7 +49,8 @@ cd ../DCloudGatewayUI
 update-rc.d celeryd defaults
 
 # Install COSA
-apt-get install -y --force-yes savebox
+#~ apt-get install -y --force-yes savebox
 
+# FIXME - Clean up unsed files to free up space
 sleep 3
 echo "Installation of Gateway is completed..."

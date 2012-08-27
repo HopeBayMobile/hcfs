@@ -3,6 +3,17 @@
 # This script is for gateway offline installation.
 # It will be packed with StorageAppliance/ and apt_cache/ folders in a tar file.
 
+# define a function
+check_ok() {
+    if [ $? -ne 0 ];
+    then
+        echo "Execution encountered an error."
+        exit 0
+    fi
+}
+#----------------------------------------------
+
+
 echo "************************"
 echo "Usage: ./gw_offline_install.sh <mode = dom/vm>"
 echo "************************"

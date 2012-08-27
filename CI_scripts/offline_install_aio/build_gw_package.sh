@@ -3,6 +3,17 @@ echo "************************"
 echo "Usage: ./build_gw_package.sh <mode = full/fast> <git_branch> <build_num>"
 echo "************************"
 
+# define a function
+check_ok() {
+    if [ $? -ne 0 ];
+    then
+        echo "Execution encountered an error."
+        exit 0
+    fi
+}
+#----------------------------------------------
+
+
 # Make sure only root can run this script
 if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo'" 1>&2
    exit 1
@@ -34,6 +45,7 @@ fi
 # pull code from github
     if [ $MODE = "full" ];    then
         git clone https://github.com/Delta-Cloud/StorageAppliance.git
+        check_ok
         cd StorageAppliance
         git stash
         git checkout $BRANCH
@@ -48,24 +60,25 @@ fi
         git checkout $BRANCH
         git reset --hard HEAD
         git pull
+        check_ok
         cd ..
     fi
 
 # Download DEB files from FTP and copy DEB files to /var/cache/apt/archives
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBFILE
+    check_ok
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBPATCH
+    check_ok
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$COSA_DEB
-    mv savebox*.deb $APTCACHEDIR
+    check_ok
+    mv savebox*.deb $APTCACHEDIR    # move COSA deb
     tar -xzf $DEBFILE -C $APTCACHEDIR
-    if [ $? != 0 ]   # error handling
-    then
-        echo "Error in unpackaing DEB packages."
-        exit 1
-    fi
+    check_ok
 
 # build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
     bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM
+    check_ok
     # Move S3QL DEB file to /var/cache/apt/
     rm $APTCACHEDIR/s3ql*   # remove old s3ql deb files
     cp StorageAppliance/s3ql*.deb $APTCACHEDIR
@@ -77,6 +90,7 @@ fi
 # Update "apt-get" index
     #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
     dpkg-scanpackages ${APTCACHEDIR} > ${APTCACHEDIR}/Packages
+    check_ok
     gzip -f ${APTCACHEDIR}/Packages
 
 # Back up all DEB files in /var/cache/apt/archives/ with the source code
