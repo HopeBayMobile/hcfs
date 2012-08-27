@@ -105,6 +105,37 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def delete_user(self, account, user, retry=3):
+        '''
+        Delete the user from backend Swift. The user's data will be destroyed.
+        The deletion includes the following steps::
+            (1) Delete a user.
+            (2) Remove the user's metadata from super_admin account.
+            (3) Delete the user's private container and configuration container.
+
+        @type  account: string
+        @param account: the name of the account
+        @type  user: string
+        @param user: the name of the user
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a tuple Bool(val, msg). If the user is successfully deleted from backend Swift, then Bool.val == True
+                and msg records the standard output. Otherwise, val == False and msg records the error message.
+        '''
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        elif user == "" or user == None:
+            msg = "User is not valid!"
+        else:
+            val = True
+
+        return Bool(val, msg)
+
     def add_account(self, account, admin_user="", admin_password="", description="no description", quota=500000000000, retry=3):
         '''
         Add a new account, including the following steps::
@@ -126,6 +157,30 @@ class SwiftAccountMgr:
         @rtype:  named tuple
         @return: a tuple Bool(val, msg). When the account is successfully created, Bool.val == True.
                 Otherwise, Bool.val == False and Bool.msg records the error message.
+        '''
+        msg = ""
+        val = False
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if account == "" or account == None:
+            msg = "Account is not valid!"
+        else:
+            val = True
+
+        return Bool(val, msg)
+
+    def delete_account(self, account, retry=3):
+        '''
+        Remove all users from the account and delete the account from backend Swift.
+        All data will be destroyed.
+
+        @type  account: string
+        @param account: the name of the account
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a tuple Bool(val, msg). If the account is successfully deleted, then Bool.val ==
+                True. Otherwise, Bool.val == False and Bool.msg records the error message.
         '''
         msg = ""
         val = False
