@@ -26,6 +26,7 @@ class SwiftAccountMgr:
         self.__num_of_user = random.randrange(1, 20)
         self.__account_dict = {}
         self.__user_dict = {}
+        self.__usage = {}
 
         for i in range(self.__num_of_account):
             account = "Account%d" % i
@@ -53,6 +54,19 @@ class SwiftAccountMgr:
                 "quota": user_quota,
                 "usage": user_usage,
             }
+
+        for i in range(self.__num_of_account):
+            account = "Account%d" % i
+            self.__usage[account] = {}
+
+            for j in range(self.__num_of_user):
+                #account = "Account%d" % i
+                user = "User%d" % j
+                user_usage = random.randrange(0, 1000000000)
+
+                self.__usage[account][user] = {
+                    "usage": user_usage,
+                }
 
     def __generate_random_password(self):
         '''
@@ -567,13 +581,37 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
+    def list_usage(self, retry=3):
+        '''
+        List all usages of all users in all accounts.
+
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the information is listed successfully, then Bool.val == True
+                and Bool.msg is a dictoinary recording all usages of all users in all accounts. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
+        '''
+        val = False
+        msg = ""
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        val = True
+        msg = self.__usage
+
+        return Bool(val, msg)
+
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
     print "\nadd_user"
     print SA.add_user("account1", "user1")
+    print "\ndelete_user"
+    print SA.delete_user("account1", "user1")
     print "\nadd_account"
     print SA.add_account("account1")
+    print "\ndelete_account"
+    print SA.delete_account("account1")
     print "\nenable_user"
     print SA.enable_user("account1", "user1")
     print "\ndisable_user"
@@ -600,3 +638,5 @@ if __name__ == '__main__':
     pprint(SA.obtain_user_info("account1", "user1").msg)
     print "\nmodify_user_description"
     print SA.modify_user_description("account1", "user1", "This is a test!")
+    print "\nlist_usage"
+    pprint(SA.list_usage())
