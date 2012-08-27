@@ -537,7 +537,7 @@ class SwiftAccountMgr:
 
         return Bool(val, msg)
 
-    def add_account(self, account, admin_user="", admin_password="", description="no description", quota=500000000000, retry=3):
+    def add_account(self, account, admin_user="", admin_password="", description="no description", quota=0, retry=3):
         '''
         Add a new account, including the following steps::
             (1) Create the account and account administrator.
@@ -1389,6 +1389,7 @@ class SwiftAccountMgr:
             ori_quota = metadata_content[user]["quota"]
 
         # obtain the account quota and the sum of other users' quotas
+        '''
         total_quota = 0
         account_quota = 0
         for field, value in metadata_content.items():
@@ -1396,6 +1397,7 @@ class SwiftAccountMgr:
                 total_quota += value["quota"]
             else:
                 account_quota = value["quota"]
+        '''
 
         # must compare the new quota with the original quota to check the validity of the new quota
         if ori_quota == quota:
@@ -1409,6 +1411,7 @@ class SwiftAccountMgr:
                 if obtain_user_info_output.val == False:
                     val = False
                     msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
+                    logger.error(msg)
                     lock.release()
                     return Bool(val, msg)
                 else:
@@ -1423,6 +1426,8 @@ class SwiftAccountMgr:
                 else:
                     metadata_content[user]["quota"] = quota
             else:
+                metadata_content[user]["quota"] = quota
+                '''
                 if account_quota >= (total_quota + (quota - ori_quota)):
                     metadata_content[user]["quota"] = quota
                 else:
@@ -1431,6 +1436,7 @@ class SwiftAccountMgr:
                     logger.error(msg)
                     lock.release()
                     return Bool(val, msg)
+                '''
 
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
                                                account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
