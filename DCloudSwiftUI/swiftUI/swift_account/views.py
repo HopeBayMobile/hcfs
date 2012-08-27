@@ -40,7 +40,7 @@ def disable_account(request, id):
     SA = SwiftAccountMgr()
     result = SA.disable_account(id)
     if result.val:
-        return redirect("/accounts/")
+        return redirect("/account/")
     else:
         return HttpResponse("disable_account:" + id)
 
@@ -52,7 +52,7 @@ def enable_account(request, id):
     SA = SwiftAccountMgr()
     result = SA.enable_account(id)
     if result.val:
-        return redirect("/accounts/")
+        return redirect("/account/")
     else:
         return HttpResponse("something wrong in enable_account:" + id)
 
@@ -96,7 +96,7 @@ def new_account_confirm(request):
 #    """
 #    """
 #    #return HttpResponse("process_account")
-#    return redirect("/accounts/")
+#    return redirect("/account/")
 
 
 @login_required
@@ -137,12 +137,22 @@ def update_account(request, id):
         SA = SwiftAccountMgr()
         result = SA.modify_user_description(id, "admin", description)
         if result.val:
-            return redirect("/accounts/")
+            return redirect("/account/")
         else:
             return HttpResponse("fail to update description in update_account")
     else:
         return HttpResponse("can't get form param in update_account")
 
+@login_required
+def delete_account(request, id):
+    """
+    """
+    SA = SwiftAccountMgr()
+    result = SA.delete_account(account=id)
+    if result.val:
+        return redirect("/account/")
+    else:
+        return HttpResponse("fail to delete account in delete_account")
 
 @login_required
 def get_password(request, id, user_id):
@@ -178,7 +188,7 @@ def disable_user(request, id, user_id):
     SA = SwiftAccountMgr()
     result = SA.disable_user(id, user_id)
     if result.val:
-        return redirect("/accounts/" + id + "/edit")
+        return redirect("/account/" + id + "/edit")
     else:
         return HttpResponse("disable_user:" + user_id + " in " + id)
 
@@ -190,7 +200,7 @@ def enable_user(request, id, user_id):
     SA = SwiftAccountMgr()
     result = SA.enable_user(id, user_id)
     if result.val:
-        return redirect("/accounts/" + id + "/edit")
+        return redirect("/account/" + id + "/edit")
     else:
         return HttpResponse("enable_user:" + user_id + " in " + id)
 
@@ -237,7 +247,7 @@ def new_user_confirm(request, id):
 #def process_user(request, id):
 #    """
 #    """
-#    return redirect("/accounts/")
+#    return redirect("/account/")
 
 
 @login_required
@@ -269,14 +279,19 @@ def update_user(request, id, user_id):
         SA = SwiftAccountMgr()
         result = SA.modify_user_description(id, user_id, description)
         if result.val:
-            return redirect("/accounts/"+id+"/edit")
+            return redirect("/account/"+id+"/edit")
         else:
             return HttpResponse("fail to update description in update_user")
     else:
         return HttpResponse("can't get form param in update_user")
 
-#@login_required
-#def delete_user(request, id, user_id):
-#    """
-#    """
-#    return HttpResponse("delete_user")
+@login_required
+def delete_user(request, id, user_id):
+    """
+    """
+    SA = SwiftAccountMgr()
+    result = SA.delete_user(account=id, user=user_id)
+    if result.val:
+        return redirect("/account/")
+    else:
+        return HttpResponse("fail to delete user in delete_user")

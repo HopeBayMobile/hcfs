@@ -52,7 +52,7 @@
 {% if account.account_enable %}
     <a id="dis_account${{account.id}}" class="btn" name="{{account.id}}" href="#modal" data-toggle="modal" data-target="#disable_account"><i class="icon-off"></i>Off</a>
 {% else %}
-    <a id="en_account${{account.id}}" href="/account/{{account.id}}/enable" class="btn" name="{{account.id}}" data-loading-text="waiting..."><i class="icon-off"></i>On</a>
+    <a id="en_account${{account.id}}" href="/account/{{account.id}}/enable" class="btn" name="{{account.id}}" data-loading-text="waiting..."><i class="icon-off"></i>On</a> <a class="btn" href="/account/{{account.id}}/delete"><i class="icon-remove"></i>Delete</a>
 {% endif %}
 </td>
 </tr>
