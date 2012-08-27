@@ -1249,6 +1249,7 @@ class SwiftAccountMgr:
             lock.release()
             return Bool(val, msg)
 
+        # TODO: need to check the value of quota more precisely
         if not str(quota).isdigit():
             msg = "Quota must be a positive integer."
             lock.release()
@@ -1267,6 +1268,7 @@ class SwiftAccountMgr:
             lock.release()
             return Bool(val, msg)
 
+        # obtain the file .metadata in the container <account name> of super_admin account to get the original quota
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
                                            account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
                                            container=account, object_name=self.__metadata_name)
@@ -1280,11 +1282,13 @@ class SwiftAccountMgr:
             metadata_content = msg
             ori_quota = metadata_content[self.__admin_default_name]["quota"]
 
+        # must compare the new quota with the original quota to check the validity of the new quota
         if ori_quota == quota:
             val = True
             msg = ""
         else:
             if ori_quota > quota:
+                # TODO: the following invocation should be modified to seed up
                 obtain_account_info_output = self.obtain_account_info(account)
 
                 if obtain_account_info_output.val == False:
@@ -1352,6 +1356,7 @@ class SwiftAccountMgr:
             lock.release()
             return Bool(val, msg)
 
+        # TODO: need to check the value of quota more precisely
         if not str(quota).isdigit():
             msg = "Quota must be a positive integer."
             lock.release()
@@ -1374,8 +1379,6 @@ class SwiftAccountMgr:
                                            account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
                                            container=account, object_name=self.__metadata_name)
 
-        # TODO: to compute the remaining account quota and to decide whether the quota is valid
-
         if val == False:
             msg = "Failed to get the metadata: " + msg
             logger.error(msg)
@@ -1383,14 +1386,58 @@ class SwiftAccountMgr:
             return Bool(val, msg)
         else:
             metadata_content = msg
-            metadata_content[user]["quota"] = quota
+            ori_quota = metadata_content[user]["quota"]
 
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
-                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                           container=account, object_name=self.__metadata_name, object_content=metadata_content)
+        # obtain the account quota and the sum of other users' quotas
+        total_quota = 0
+        account_quota = 0
+        for field, value in metadata_content.items():
+            if field != self.__admin_default_name:
+                total_quota += value["quota"]
+            else:
+                account_quota = value["quota"]
+
+        # must compare the new quota with the original quota to check the validity of the new quota
+        if ori_quota == quota:
+            val = True
+            msg = ""
+        else:
+            if ori_quota > quota:
+                # TODO: the following invocation should be modified to seed up
+                obtain_user_info_output = self.obtain_user_info(account, user)
+
+                if obtain_user_info_output.val == False:
+                    val = False
+                    msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
+                    lock.release()
+                    return Bool(val, msg)
+                else:
+                    user_usage = int(obtain_user_info_output.msg.get("usage"))
+
+                if quota < user_usage:
+                    val = False
+                    msg = "Failed to modify the quota of user %s:%s: usage %d is larger than quota %d." % (account, user, user_usage, quota)
+                    logger.error(msg)
+                    lock.release()
+                    return Bool(val, msg)
+                else:
+                    metadata_content[user]["quota"] = quota
+            else:
+                if account_quota >= (total_quota + (quota - ori_quota)):
+                    metadata_content[user]["quota"] = quota
+                else:
+                    val = False
+                    msg = "Failed to modify the quota of user %s:%s: exceed the account quota." % (account, user)
+                    logger.error(msg)
+                    lock.release()
+                    return Bool(val, msg)
+
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
+                                               account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                               container=account, object_name=self.__metadata_name, object_content=metadata_content)
 
         if val == False:
-            msg = "Failed to modify the quota of user %s:%s" % (account, user) + msg
+            msg = "Failed to modify the quota of user %s:%s: " % (account, user) + msg
             logger.error(msg)
 
         lock.release()
@@ -1802,14 +1849,30 @@ class SwiftAccountMgr:
                 user_dict[item["name"]] = obtain_user_info_output.msg
 
         # obtain the actual usage of account administrator
-        obtain_account_info_output = self.obtain_account_info(account)
+        list_container_output = self.list_container(account, self.__admin_default_name)
 
-        if obtain_account_info_output == False:
+        if list_container_output.val == False:
             account_usage = "Error"
         else:
-            account_usage = int(obtain_account_info_output.msg.get("usage"))
-            admin_usage = 0
+            account_usage = 0
+            get_admin_password_output = self.get_user_password(account, self.__admin_default_name)
 
+            if get_admin_password_output.val == False:
+                account_usage = "Error"
+            else:
+                admin_password = get_admin_password_output.msg
+
+            for container in list_container_output.msg:
+                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                     account=account, container=container,\
+                                                     admin_user=self.__admin_default_name, admin_password=admin_password)
+                if val == False:
+                    account_usage = "Error"
+                    break
+                else:
+                    account_usage += msg["Bytes"]
+
+        if account_usage != "Error":
             for field, value in user_dict.items():
                 if str(value["usage"]).isdigit():
                     account_usage -= int(value["usage"])
