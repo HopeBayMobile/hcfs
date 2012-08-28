@@ -20,6 +20,7 @@ from util import util
 from util.database import NodeInfoDatabaseBroker
 from util.database import MaintenanceBacklogDatabaseBroker
 
+from swiftAccountMgr import SwiftAccountMgr
 
 class SwiftMonitorMgr:
     """
@@ -35,12 +36,21 @@ class SwiftMonitorMgr:
         '''
         storageList = util.getStorageNodeList()
         capacity = 0
+        num_of_replica = util.getNumOfReplica()
+
+        if not num_of_replica:
+            return None
+
         try:
             if storageList:
                 for node in storageList:
                     capacity += node["deviceCapacity"] * node["deviceCnt"]
             else:
                 return None
+
+            capacity = capacity/float(num_of_replica)
+            
+
         except Exception as e:
              self.logger.error(str(e))
              return None
@@ -67,8 +77,20 @@ class SwiftMonitorMgr:
         '''
         return used capacity in bytes
         '''
-        # TODO: fill in contents
-        return 4300000000
+
+        SA = SwiftAccountMgr()
+        result = SA.list_usage()
+        if not result.val:
+            return None
+
+        total_usage = 0
+        for account, users in result.msg.items():
+            for user, info in users.items():
+                usage = info.get("usage", "Error")
+                if isinstance(usage, int):
+                    total_usage += usage
+
+        return total_usage
 
     def calculate_total_capacity_in_TB(self, total):
         '''
@@ -204,8 +226,8 @@ class SwiftMonitorMgr:
         capacity = free = used = "N/A"
 
         if total_capacity:
-            capacity = "%.0fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
-            if used_capacity:
+            capacity = "%.1fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
+            if used_capacity is not None:
                 used = "%.2f" % (self.calculate_used_capacity_percentage(total_capacity, used_capacity))
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
