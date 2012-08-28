@@ -1403,41 +1403,47 @@ class SwiftAccountMgr:
         if ori_quota == quota:
             val = True
             msg = ""
-        else:
-            if ori_quota > quota:
-                # TODO: the following invocation should be modified to seed up
-                obtain_user_info_output = self.obtain_user_info(account, user)
+        elif ori_quota > quota:
+            # TODO: the following invocation should be modified to seed up
+            obtain_user_info_output = self.obtain_user_info(account, user)
 
-                if obtain_user_info_output.val == False:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                else:
-                    user_usage = int(obtain_user_info_output.msg.get("usage"))
+            if obtain_user_info_output.val == False:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+            elif str(obtain_user_info_output.msg.get("usage")).isdigit():
+                user_usage = int(obtain_user_info_output.msg.get("usage"))
+            else:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: can not obtain the usage of the user."% (account, user)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
 
-                if quota < user_usage:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: usage %d is larger than quota %d." % (account, user, user_usage, quota)
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                else:
-                    metadata_content[user]["quota"] = quota
+            if quota < user_usage:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: usage %d is larger than quota %d." % (account, user, user_usage, quota)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
             else:
                 metadata_content[user]["quota"] = quota
-                '''
-                if account_quota >= (total_quota + (quota - ori_quota)):
-                    metadata_content[user]["quota"] = quota
-                else:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: exceed the account quota." % (account, user)
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                '''
+        else:
+            metadata_content[user]["quota"] = quota
+            '''
+            if account_quota >= (total_quota + (quota - ori_quota)):
+                metadata_content[user]["quota"] = quota
+            else:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: exceed the account quota." % (account, user)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+            '''
 
+        if ori_quota != quota:
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
                                                account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
                                                container=account, object_name=self.__metadata_name, object_content=metadata_content)
@@ -1556,10 +1562,7 @@ class SwiftAccountMgr:
 
         proxy_ip_list = self.__proxy_ip_list
         account_info = {}
-        user_info = {}
         account_dict = {}
-        services_content = {}
-        metadata_content = {}
         val = False
         msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
@@ -3111,6 +3114,125 @@ class SwiftAccountMgr:
             logger.error(msg)
 
         lock.release()
+        return Bool(val, msg)
+
+    def list_usage(self, retry=3):
+        '''
+        List all usages of all users in all accounts.
+
+        @type  retry: integer
+        @param retry: the maximum number of times to retry after the failure
+        @rtype:  named tuple
+        @return: a named tuple Bool(val, msg). If the information is listed successfully, then Bool.val == True
+                and Bool.msg is a dictoinary recording all usages of all users in all accounts. Otherwise,
+                Bool.val == False and Bool.msg records the error message.
+        '''
+        logger = util.getLogger(name="list_usage")
+
+        proxy_ip_list = self.__proxy_ip_list
+        account_info = {}
+        user_info = {}
+        services_content = {}
+        usage_dict = {}
+        val = False
+        msg = ""
+        Bool = collections.namedtuple("Bool", "val msg")
+
+        if proxy_ip_list is None or len(proxy_ip_list) == 0:
+            msg = "No proxy node is found."
+            return Bool(val, msg)
+
+        if retry < 1:
+            msg = "Argument retry has to >= 1."
+            return Bool(val, msg)
+
+        # obtain the account list
+        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_account_info)
+
+        if val == False:
+            logger.error(msg)
+            return Bool(val, msg)
+        else:
+            try:
+                account_info = json.loads(msg)
+                val = True
+                msg = ""
+            except Exception as e:
+                val = False
+                msg = "Failed to load the json string: %s" % str(e)
+                logger.error(msg)
+                return Bool(val, msg)
+
+        # compute the usages of all users of each accout
+        for item in account_info["accounts"]:
+            usage_dict[item["name"]] = {}
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
+
+            if val == False:
+                return Bool(val, msg)
+            else:
+                try:
+                    user_info = json.loads(msg)
+                    val = True
+                    msg = ""
+                except Exception as e:
+                    val = False
+                    msg = "Failed to load the json string: %s" % str(e)
+                    logger.error(msg)
+                    return Bool(val, msg)
+
+            # check the file .services in the container <account> of super_admin account to
+            # verify whether the account is enabled or not
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
+                                               account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
+                                               container=item["name"], object_name=".services")
+
+            if val == False:
+                account_enable = "Error"
+                logger.error(msg)
+            else:
+                services_content = msg
+                account_enable = True if services_content.get("disable") == None else False
+
+            get_user_password_output = self.get_user_password(item["name"], self.__admin_default_name)
+            user_password = get_user_password_output.msg if get_user_password_output.val == True else None
+
+            for user in user_info["users"]: 
+                # the usage of all users can not be obtained when the account is disabled
+                if account_enable == True and user_password != None:
+                    if user["name"] != self.__admin_default_name:
+                        # the usage of the user's private container
+                        (val1, msg1) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                             account=item["name"], container=user["name"] + self.__private_container_suffix,\
+                                                             admin_user=self.__admin_default_name, admin_password=user_password)
+
+                        # the usage of the user's gateway configuration container
+                        (val2, msg2) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                             account=item["name"], container=user["name"] + self.__config_container_suffix,\
+                                                             admin_user=self.__admin_default_name, admin_password=user_password)
+
+                        if val1 == False or val2 == False:
+                            usage = "Error"
+                            logger.error(msg1 + msg2)
+                        elif msg1.get("Bytes") != None and msg2.get("Bytes") != None:
+                            usage = int(msg1.get("Bytes")) + int(msg2.get("Bytes"))
+                        else:
+                            usage = "Error"
+                    else:
+                        usage = 0
+                else:
+                    usage = "Error"
+                    msg = "Account %s has been disabled or the password of account administrator cannot be obtained." % item["name"]
+                    logger.error(msg)
+
+                usage_dict[item["name"]][user["name"]] = {
+                    "usage": usage,
+                }
+
+        # MUST return true to show information on GUI
+        val = True
+        msg = usage_dict
+
         return Bool(val, msg)
 
 

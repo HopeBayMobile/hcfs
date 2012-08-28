@@ -639,4 +639,4 @@ if __name__ == '__main__':
     print "\nmodify_user_description"
     print SA.modify_user_description("account1", "user1", "This is a test!")
     print "\nlist_usage"
-    pprint(SA.list_usage())
+    pprint(SA.list_usage().msg)
