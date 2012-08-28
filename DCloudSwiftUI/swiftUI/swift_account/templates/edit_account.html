@@ -80,7 +80,12 @@
 {% else %}
 <td>{{user.id}}</td>
 {% endif %}
-<td>20% 1G/12G</td>
+<td>
+    <div style="width:100px; background-color:#dff0d8;">
+        <div style="width:{{user.cap}}%; background-color:#f2dede;">&nbsp;</div>
+    </div>
+    {{user.usage}} / {{user.quota}}
+</td>
 <td>{{user.description}}</td>
 <td>
 {% if user.user_enable %}

@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.template import RequestContext
 import datetime
 from DCloudSwift.master.swiftAccountMgr import SwiftAccountMgr
-
+from util.helper import human_readable_capacity
 
 @login_required
 def index(request):
@@ -112,8 +112,19 @@ def edit_account(request, id):
         users_list = []
         for i in users:
             users[i]["id"] = i
+            cap = float(users[i]["usage"]) / float(users[i]["quota"])
+            cap = int( cap * 100 )
+            if cap > 100:
+                cap = 100
+            users[i]["cap"] = cap
+            users[i]["usage"] = human_readable_capacity(users[i]["usage"])
+            users[i]["quota"] = human_readable_capacity(users[i]["quota"])
             users_list.append(users[i])
-        return render_to_response('edit_account.html', {"account_id": id, "description": description, "request": request, "users": users_list})
+
+        return render_to_response('edit_account.html', {"account_id": id,
+                                                        "description": description,
+                                                        "request": request,
+                                                        "users": users_list})
     else:
         return HttpResponse("list user fail in edit_account:" + id)
 
