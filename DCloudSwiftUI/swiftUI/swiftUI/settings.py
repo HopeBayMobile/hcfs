@@ -190,12 +190,6 @@ broker_db_path = os.path.dirname(os.path.abspath(__file__)) + "/broker.db"
 BROKER_TRANSPORT = "sqlalchemy"
 BROKER_URL = "sqlite:///" + broker_db_path
 
-#Chown of broker db
-if os.path.exists(broker_db_path):
-    os.system("rm " + broker_db_path)
-os.system("touch " + broker_db_path)
-os.system("chown www-data:www-data " + broker_db_path)
-
 CELERY_RESULT_BACKEND = "database"
 CELERY_RESULT_DBURI = BROKER_URL
 
