@@ -1,6 +1,6 @@
 #!/bin/bash
 echo "************************"
-echo "Usage: ./build_gw_package.sh <mode = full/fast> <git_branch> <build_num>"
+echo "Usage: ./build_gw_package.sh <git_branch> <build_num>"
 echo "************************"
 
 # define a function
@@ -20,29 +20,29 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 # make sure input arguments are correct
-    if [ $# -ne 3 ]
+    if [ $# -ne 2 ]
     then
         echo "Need to input 3 arguments."
-        exit 1
-    fi
-    if [ $1 != "full" ] && [ $1 != "fast" ]
-    then
-        echo "mode option should be 'full' or 'fast'"
         exit 1
     fi
 
 # define parameters
     source build.conf
 
-    MODE=$1
-    BRANCH=$2
-    BUILDNUM=$3
+    BRANCH=$1
+    BUILDNUM=$2
     DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     OUTPUTFILE="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tgz"
     INITPATH=$(pwd)
 
 # pull code from github
+    if [ ! -d StorageAppliance ]; then    # if StorageAppliance is not here
+        MODE="full"
+    else
+        MODE="fast"
+    fi
+
     if [ $MODE = "full" ];    then
         git clone https://github.com/Delta-Cloud/StorageAppliance.git
         check_ok
@@ -51,10 +51,6 @@ fi
         git checkout $BRANCH
         cd ..
     else
-        if [ ! -d StorageAppliance ]; then
-            echo "StorageAppliance has not been downloaded, use full mode to try again."
-            exit 1
-        fi
         cd StorageAppliance
         git stash
         git checkout $BRANCH
@@ -63,6 +59,9 @@ fi
         check_ok
         cd ..
     fi
+
+# clean old DEB files at $APTCACHEDIR
+    rm $APTCACHEDIR/*.deb
 
 # Download DEB files from FTP and copy DEB files to /var/cache/apt/archives
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$DEBFILE
@@ -80,7 +79,6 @@ fi
     bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM
     check_ok
     # Move S3QL DEB file to /var/cache/apt/
-    rm $APTCACHEDIR/s3ql*   # remove old s3ql deb files
     cp StorageAppliance/s3ql*.deb $APTCACHEDIR
     # copy gateway api DEB file to /var/cache/apt/
     cp dcloudgatewayapi*.deb $APTCACHEDIR
@@ -110,6 +108,7 @@ fi
     rm debpatch_StorageAppliance*.tgz
     rm StorageAppliance/s3ql*.deb
     rm dcloudgatewayapi*.deb
+    rm dcloud-gateway*.deb
 
 # Done.
     echo "~~~ DONE!"

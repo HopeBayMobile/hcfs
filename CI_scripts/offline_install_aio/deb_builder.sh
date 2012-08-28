@@ -39,7 +39,8 @@ check_ok() {
     dch -v $S3QL_VERSION.$BUILD -m "Modified by CDS Team @ Delta Cloud."
     # build DEB file
     dpkg-buildpackage -rfakeroot -b
-
+    check_ok
+#~ #~
 # build DCloudGateway (API)
     cd $INITPATH
     mkdir -p /tmp/pkg_DCloudGateway/tmp
@@ -57,7 +58,8 @@ Maintainer: ovid.wu@delta.com.tw
 Description: Package for gateway API
 EOF
     dpkg --build /tmp/pkg_DCloudGateway ./
-
+    check_ok
+#~ #~
 # build dcloud-gateway meta package.
     cd $INITPATH
 cat > $INITPATH/dcloud-gateway << EOF
@@ -66,12 +68,12 @@ Section: main
 Priority: optional
 # Homepage: <enter URL here; no default>
 Standards-Version: 3.9.2
-
+#~
 Package: dcloud-gateway
-Version: $GW_VERSION~build$BUILD
-Maintainer: Ovid Wu <ovid.wu@delta.com.tw>
-Pre-Depends: curl, tofrodos
-Depends: s3ql (=$S3QL_VERSION~), dcloudgatewayapi (=$GW_VERSION~), savebox
+Version: $GW_VERSION.$BUILD
+Maintainer: CDS Team <ctbd@delta.com.tw>
+#Pre-Depends: curl, tofrodos
+Depends: curl, tofrodos, savebox, s3ql (>=$S3QL_VERSION), dcloudgatewayapi (>=$GW_VERSION)
 Architecture: amd64
 # Copyright: <copyright file; defaults to GPL2>
 # Changelog: <changelog file; defaults to a generic changelog>

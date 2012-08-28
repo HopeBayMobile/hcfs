@@ -23,16 +23,20 @@ if [ "$1" != "dom" ]; then
 fi
 
 # install gateway API
-apt-get install -y --force-yes dcloud-gateway
-apt-get -y --force-yes -f install
-#~ cd ../DCloudGateway
-#~ ./gateway_api_install_script
-    #~ apt-get install -y --force-yes dcloudgatewayapi
-# install S3QL
-    #~ cd ../DCloudS3ql
-    #~ ./install_s3ql_script
+	apt-get install -y --force-yes dcloud-gateway
+	check_ok
+	apt-get -y --force-yes -f install
+
+# 1. append apt-server domain name
+cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
+deb http://apt.delcloudia.com/ubuntu/ precise main
+deb-src http://apt.delcloudia.com/ubuntu precise main
+
+deb http://apt.delcloudia.com/ubuntu/ precise unstable
+deb-src http://apt.delcloudia.com/ubuntu precise unstable
+EOF
+
 #~ FIXME
-    # 1. append apt-server domain name
     # 2. sudo apt-key adv --recv-keys ...
 
 
@@ -47,9 +51,6 @@ apt-get -y --force-yes -f install
 cd ../DCloudGatewayUI
 ./setup.sh
 update-rc.d celeryd defaults
-
-# Install COSA
-#~ apt-get install -y --force-yes savebox
 
 # FIXME - Clean up unsed files to free up space
 sleep 3

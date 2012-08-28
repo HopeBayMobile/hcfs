@@ -35,13 +35,14 @@ fi
     MODE=$1
     DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
-
+	INITPATH=$(pwd)
+	
 # remove tgz file for saving space
     rm gateway_install*.tgz
 
 # copy deb files to proper location
     tar -xzf $DEBFILE -C $APTCACHEDIR
-    mkdir StorageAppliance/GatewayPatches/debsrc    # in case of debsrc does not exist.
+    mkdir -p StorageAppliance/GatewayPatches/debsrc    # in case of debsrc does not exist.
     tar -xzf $DEBPATCH -C StorageAppliance/GatewayPatches/debsrc
     rm $DEBFILE
     rm $DEBPATCH
@@ -57,17 +58,27 @@ EOF
 apt-get update
 
 # run gateway installation
-cd StorageAppliance/INSTALL_Gateway
-if [ $MODE = "dom" ]
-then
-    bash DOM_gw_run_this_first.sh
-    bash install_gateway_all_in_one.sh
-fi
-if [ $MODE = "vm" ]
-then
-    mkdir /storage
-    bash install_gateway_all_in_one.sh
-fi
+	cd StorageAppliance/INSTALL_Gateway
+	if [ $MODE = "dom" ]
+	then
+		mkdir -p /mnt/cloudgwfiles/COSA
+		bash DOM_gw_run_this_first.sh
+		bash install_gateway_all_in_one.sh
+	fi
+	if [ $MODE = "vm" ]
+	then
+		mkdir -p /mnt/cloudgwfiles/COSA
+		mkdir /storage
+		bash install_gateway_all_in_one.sh
+	fi
 
 ## FIXME
 # clean up temp files to free up sda space.
+	cd $INITPATH
+	rm -r StorageAppliance
+	rm gw_offline_install.sh
+	apt-get clean
+	apt-get autoclean
+	apt-get autoremove
+	rm -r /usr/share/doc
+	
