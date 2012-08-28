@@ -132,24 +132,24 @@ def getNewSysPath():
 
 
 def startDaemons():
-    cmd = "swift-event-manager stop"
+    cmd = "/usr/local/bin/swift-event-manager stop"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     po.stdout.read()
     po.wait()
 
-    cmd = "swift-event-manager start"
+    cmd = "/usr/local/bin/swift-event-manager start"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     po.stdout.read()
     po.wait()
     if po.returncode != 0:
         raise Exception("Failed to start swift-event-manager")
 
-    cmd = "swift-maintain-switcher stop"
+    cmd = "/usr/local/bin/swift-maintain-switcher stop"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     po.stdout.read()
     po.wait()
 
-    cmd = "swift-maintain-switcher start"
+    cmd = "/usr/local/bin/swift-maintain-switcher start"
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     po.stdout.read()
     po.wait()
@@ -247,10 +247,10 @@ def do_meta_form(data):
         raise Exception("Swift deploy failed for %s" % check.msg)
     else:
         do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
-    do_meta_form.report_progress(100, True, "Creating a default user...", None)
+    do_meta_form.report_progress(100, True, "Prepare swauth", None)
     cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
-    os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
+    #os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
 
     # reload apache to test load python module
     cmd = "/etc/init.d/apache2-zcw reload"
