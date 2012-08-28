@@ -50,11 +50,16 @@
     </div>
 </form>
   <div class="row-fluid">
-    <div class="span10">
+    <div class="span12">
 <h3>User List under the account "{{account_id}}":</h3>
     </div>
-    <div class="span2">
+  </div>
+  <div class="row-fluid">
+    <div class="span4">
     <a class="btn btn-primary" href="/account/{{account_id}}/user/new">New User</a>
+    </div>
+    <div class="span8">
+    <!-- pagination -->
     </div>
   </div>
   <div class="row-fluid">
@@ -63,25 +68,28 @@
 <tr>
 <th></th>
 <th>User Name</th>
+<th>Used Capacity</th>
 <th>Description</th>
-<th></th>
+<th>Action</th>
 </tr>
 {% for user in users %}
 <tr>
-<td>1</td>
+<td>{{forloop.counter}}</td>
 {% if user.user_enable %}
 <td><a href="/account/{{account_id}}/user/{{user.id}}/edit">{{user.id}}</a></td>
 {% else %}
 <td>{{user.id}}</td>
 {% endif %}
+<td>20% 1G/12G</td>
 <td>{{user.description}}</td>
 <td>
 {% if user.user_enable %}
 <a class="btn" id="reset_pw${{user.id}}" name="{{user.id}}">Reset PW</a> <a class="btn" id="query_pw${{user.id}}" name="{{user.id}}">Query</a>
-<a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a> <a class="btn" href="/account/{{account_id}}/user/{{user.id}}/delete"><i class="icon-remove"></i>Delete</a>
+<a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a> 
 {% else %}
 <a class="btn" disabled="disabled">Reset PW</a> <a class="btn" disabled="disabled">Query</a>
-<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a>
+<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a> 
+<a class="btn" id="del_user${{user.id}}" name="{{user.id}}" href="#modal" data-toggle="modal" data-target="#delete_user"><i class="icon-remove"></i>Delete</a>
 {% endif %}
 </td>
 </tr>
@@ -146,6 +154,21 @@
   </div>
 </div>
 
+<div class="modal hide" id="delete_user">
+  <div class="modal-header">
+    <a class="close" data-dismiss="modal">×</a>
+    <h3>Attention!</h3>
+  </div>
+  <div class="modal-body">
+    Delete the Account "<span id="modal_del_user"></span>" need enter old password
+    <label for="oldpassword">"<span id="modal_del_oldpw"></span>"</label>
+    <input type="text" name="del_oldpassword" id="del_oldpassword" class="required" minlength="3"/>
+    <span id="del_notmatch" class="hide label label-important">words not match</span>
+    </div>
+  <div class="modal-footer">
+   <a class="btn" id="del_user">Yes</a> <a href="#" class="btn" data-dismiss="modal">Cancel</a>
+  </div>
+</div>
   <script type="text/javascript">
    var user_id;
    var user_pw;
@@ -206,6 +229,42 @@
       //alert("words not match");
       $("#oldpassword").val("");
       $("#notmatch").removeClass("hide");
+    }
+  });
+  
+  $('a[id*="del_user"]').click(function(evt){
+    if (this.name!=""){
+      user_id = this.name;
+    }
+    console.log("delete "+user_id);
+    $("#modal_del_user").text(user_id);
+    //use ajax to query password
+    $.ajax({
+        type:"GET",
+        url:"/account/{{account_id}}/user/"+user_id+"/password",
+        success: function(msg){
+          user_pw = msg;
+          $("#modal_del_oldpw").text(msg);
+          $('#delete_user').modal('show');
+        }
+    });
+  });
+  
+  $('#del_user').click(function(evt){
+    //check old password, query new
+    //console.log($("#oldpassword").val()+":"+user_pw);
+    if(user_pw===$("#del_oldpassword").val()){
+      $.ajax({
+        type:"GET",
+        url:"/account/{{account_id}}/user/"+user_id+"/delete",
+        success: function(msg){
+          $('#delete_user').modal('hide');
+        }
+      });
+    } else {
+      //alert("words not match");
+      $("#del_oldpassword").val("");
+      $("#del_notmatch").removeClass("hide");
     }
   });
   </script>
