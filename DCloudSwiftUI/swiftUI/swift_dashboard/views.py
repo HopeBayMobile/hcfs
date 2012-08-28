@@ -35,7 +35,7 @@ def index(request):
         accounts = result.msg
         account_list = []
         for val in accounts:
-            if(accounts[val]["account_enable"] && accounts[val]["usage"]!="Error"):
+            if(accounts[val]["account_enable"] and accounts[val]["usage"]!="Error"):
                 current_usage = int(accounts[val]["usage"])
                 #current_quota = int(accounts[val]["quota"])
                 #used_capacity+=current_usage
