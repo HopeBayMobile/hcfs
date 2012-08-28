@@ -42,7 +42,7 @@ def main():
 
     setup(
         name="DCloudSwift",
-        version="0.4",
+        version="0.5",
         author="Cloud Data Team, CTBD, Delta Electronic Inc.",
         description=("Delta Inc. CTBD Storage Gateway"),
         license="Delta Inc.",
@@ -126,8 +126,8 @@ class prepare_image(setuptools.Command):
         print cmd
         os.system(cmd)
         
-        #replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
-        cmd = "cp misc/BootScripts/rc /etc/init.d/rc"
+        #replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
+        cmd = "cp misc/BootScripts/rc.local /etc/rc.local"
         print cmd
         os.system(cmd)
 

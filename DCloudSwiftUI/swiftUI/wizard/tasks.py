@@ -130,11 +130,40 @@ def getNewSysPath():
     return path
 
 
+
+def startDaemons():
+    cmd = "/usr/local/bin/swift-event-manager stop"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+
+    cmd = "/usr/local/bin/swift-event-manager start"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+    if po.returncode != 0:
+        raise Exception("Failed to start swift-event-manager")
+
+    cmd = "/usr/local/bin/swift-maintain-switcher stop"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+
+    cmd = "/usr/local/bin/swift-maintain-switcher start"
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    po.stdout.read()
+    po.wait()
+    if po.returncode != 0:
+        raise Exception("Failed to start swift-maintain-switcher")
+
+
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
     installDCloudSwift()
     from time import sleep
     from DCloudSwift.util import util
+    from DCloudSwift.util.database import NodeInfoDatabaseBroker
+    from DCloudSwift.util.util import GlobalVar
     from DCloudSwift.master import SwiftDeploy
     import DCloudSwift
 
@@ -165,14 +194,24 @@ def do_meta_form(data):
         raise Exception("Replica number > number of hosts!!")
     
     # Assign device count and deive weight to each host
-    do_meta_form.report_progress(5, True, 'Assign device count for each host...', None)
+    do_meta_form.report_progress(3, True, 'Assign device count for each host...', None)
     for host in hosts:
         host[u'deviceCnt'] = int(data["disk_count"])
 
-    do_meta_form.report_progress(10, True, 'Assign device capacity for each host...', None)
+    do_meta_form.report_progress(5, True, 'Assign device capacity for each host...', None)
     for host in hosts:
         host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
 
+    # construct node_info_db
+    do_meta_form.report_progress(8, True, 'Construct node db...', None)
+    nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
+    nodeInfoDb.constructDb(nodeList=hosts)
+
+
+    # start daemons
+    do_meta_form.report_progress(10, True, 'Start daemons...', None)
+    startDaemons()
+    
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
@@ -208,7 +247,11 @@ def do_meta_form(data):
         raise Exception("Swift deploy failed for %s" % check.msg)
     else:
         do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
-    do_meta_form.report_progress(100, True, "Creating a default user...", None)
+    do_meta_form.report_progress(100, True, "Prepare swauth", None)
     cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
-    os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
+    #os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
+
+    # reload apache to test load python module
+    cmd = "/etc/init.d/apache2-zcw reload"
+    os.system(cmd)

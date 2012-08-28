@@ -1,0 +1,15 @@
+#!/bin/bash
+
+DELTA=/etc/delta
+
+if [ ! -d ${DELTA} ]; then
+    mkdir -p ${DELTA}
+fi
+
+#echo "current directory `pwd`"
+#
+#cp ./inputFile.sample /etc/delta
+#cp ./Swift.ini /etc/delta
+#cp ./swift_master.ini /etc/delta
+#
+#cp ./misc/ServiceScripts/* /etc/init.d

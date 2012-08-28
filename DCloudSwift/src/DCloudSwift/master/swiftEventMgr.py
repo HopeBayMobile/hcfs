@@ -15,7 +15,7 @@ from twisted.internet import reactor
 
 WORKING_DIR = os.path.dirname(os.path.realpath(__file__))
 BASEDIR = os.path.dirname(os.path.dirname(WORKING_DIR))
-sys.path.append("%s/DCloudSwift/" % BASEDIR)
+sys.path.insert(0,"%s/DCloudSwift/" % BASEDIR)
 
 from util.SwiftCfg import SwiftMasterCfg
 from util.daemon import Daemon
@@ -426,11 +426,12 @@ def parseNodeListSection(inputFile):
 
             hostname = node.get("hostname")
             deviceCnt = int(node.get("deviceCnt"))
+            deviceCapacity = int(node.get("deviceCapacity"))
 
             if hostname in nameSet:
                 raise Exception("[nodeList] contains duplicate names")
 
-            nodeList.append({"hostname": hostname, "deviceCnt": deviceCnt})
+            nodeList.append({"hostname": hostname, "deviceCnt": deviceCnt, "deviceCapacity": deviceCapacity})
             nameSet.add(hostname)
 
     return nodeList
@@ -461,31 +462,7 @@ def initializeNodeInfo():
         print >> sys.stderr, "Node info already exists!!"
         sys.exit(1)
 
-    for node in nodeList:
-        hostname = node["hostname"]
-        status = "alive"
-        timestamp = int(time.time())
-
-        disk_info = {
-                        "timestamp": timestamp,
-                        "missing": {"count": 0, "timestamp": timestamp},
-                        "broken": [],
-                        "healthy": [],
-        }
-        disk = json.dumps(disk_info)
-
-        mode = "service"
-        switchpoint = timestamp
-
-        nodeInfoDb.add_node(hostname=hostname,
-                            status=status,
-                            timestamp=timestamp,
-                            disk=disk,
-                            mode=mode,
-                            switchpoint=switchpoint)
-
-        nodeInfoDb.add_spec(hostname=hostname, diskcount=node["deviceCnt"])
-
+    nodeInfoDb.add_info_and_spec(nodeList)
 
 def initializeMaintenanceBacklog():
     '''

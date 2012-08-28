@@ -74,13 +74,11 @@
    Onec PDCM is ready, we don't have to edit /etc/delta/storageNodes and /etc/delta/proxyNodes. 
    PDCM will assign the IPs of proxy and storage nodes automatically.
 
-2. The logs and error handling are not ready yet! Some logs can be found 
-   in /var/log/deltaSwift.
+2. Most messages are written to /var/log/syslog. Some logs can be found /var/log/deltaSwift.
 
-3. For PDCM, please replace /etc/init.d/rc with misc/BootScripts/rc when building golden image.
-   Otherwise, please replace starage&proxy nodes' /etc/rc.local with misc/BootScripts/rc.local
+3. For PDCM, please replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
 
-4. Please copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
+4. For PDCM,  copy misc/BootScripts/rc.py to /etc/rc.py when building golden image.
 
 5. For PDCM0.4, please create /srv and /DCloudSwift when building golden image.
 

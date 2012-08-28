@@ -111,15 +111,20 @@ class cache_tests(TestCase):
         # Flush the 2 most recently accessed ones
         commit(self.cache, inode, most_recent[-2])
         commit(self.cache, inode, most_recent[-3])
+        
+        print ('self.cache.entries length=%d' % len(self.cache.entries))
 
         # We want to expire 4 entries, 2 of which are already flushed
         self.cache.max_entries = 16
         # wthung, to work around our modification
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=3)
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=4)
         #self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
         self.cache.expire()
         self.cache.bucket_pool.verify()
-        self.assertEqual(len(self.cache.entries), 16)
+        self.assertEqual(len(self.cache.entries), 15)
+        
+        print(self.cache.entries)
+        print ('self.cache.entries length=%d' % len(self.cache.entries))
 
         for i in range(20):
             if i in most_recent:
