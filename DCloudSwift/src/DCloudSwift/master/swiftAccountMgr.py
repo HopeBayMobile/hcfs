@@ -1403,41 +1403,47 @@ class SwiftAccountMgr:
         if ori_quota == quota:
             val = True
             msg = ""
-        else:
-            if ori_quota > quota:
-                # TODO: the following invocation should be modified to seed up
-                obtain_user_info_output = self.obtain_user_info(account, user)
+        elif ori_quota > quota:
+            # TODO: the following invocation should be modified to seed up
+            obtain_user_info_output = self.obtain_user_info(account, user)
 
-                if obtain_user_info_output.val == False:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                else:
-                    user_usage = int(obtain_user_info_output.msg.get("usage"))
+            if obtain_user_info_output.val == False:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: " % (account, user) + obtain_account_info_output.msg
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+            elif str(obtain_user_info_output.msg.get("usage")).isdigit():
+                user_usage = int(obtain_user_info_output.msg.get("usage"))
+            else:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: can not obtain the usage of the user."% (account, user)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
 
-                if quota < user_usage:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: usage %d is larger than quota %d." % (account, user, user_usage, quota)
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                else:
-                    metadata_content[user]["quota"] = quota
+            if quota < user_usage:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: usage %d is larger than quota %d." % (account, user, user_usage, quota)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
             else:
                 metadata_content[user]["quota"] = quota
-                '''
-                if account_quota >= (total_quota + (quota - ori_quota)):
-                    metadata_content[user]["quota"] = quota
-                else:
-                    val = False
-                    msg = "Failed to modify the quota of user %s:%s: exceed the account quota." % (account, user)
-                    logger.error(msg)
-                    lock.release()
-                    return Bool(val, msg)
-                '''
+        else:
+            metadata_content[user]["quota"] = quota
+            '''
+            if account_quota >= (total_quota + (quota - ori_quota)):
+                metadata_content[user]["quota"] = quota
+            else:
+                val = False
+                msg = "Failed to modify the quota of user %s:%s: exceed the account quota." % (account, user)
+                logger.error(msg)
+                lock.release()
+                return Bool(val, msg)
+            '''
 
+        if ori_quota != quota:
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__set_object_content,\
                                                account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
                                                container=account, object_name=self.__metadata_name, object_content=metadata_content)
