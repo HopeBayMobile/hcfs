@@ -20,6 +20,7 @@ from util import util
 from util.database import NodeInfoDatabaseBroker
 from util.database import MaintenanceBacklogDatabaseBroker
 
+from swiftAccountMgr import SwiftAccountMgr
 
 class SwiftMonitorMgr:
     """
@@ -35,12 +36,20 @@ class SwiftMonitorMgr:
         '''
         storageList = util.getStorageNodeList()
         capacity = 0
+        num_of_replica = util.getNumOfReplica()
+
+        if not num_of_replica:
+            return None
+
         try:
             if storageList:
                 for node in storageList:
                     capacity += node["deviceCapacity"] * node["deviceCnt"]
             else:
                 return None
+
+            capacity = capacity/float(num_of_replica)
+
         except Exception as e:
              self.logger.error(str(e))
              return None
@@ -67,8 +76,17 @@ class SwiftMonitorMgr:
         '''
         return used capacity in bytes
         '''
-        # TODO: fill in contents
-        return 4300000000
+        SA = SwiftAccountMgr()
+        result = SA.list_usage()
+        if not result.val:
+            return None
+
+        total_usage = 0
+        for account, users in result.msg:
+            for user, usage in users:
+                total_usage += usage
+
+        return total_usage
 
     def calculate_total_capacity_in_TB(self, total):
         '''
