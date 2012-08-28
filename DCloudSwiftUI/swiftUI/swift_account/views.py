@@ -153,7 +153,7 @@ def delete_account(request, id):
     SA = SwiftAccountMgr()
     result = SA.delete_account(account=id)
     if result.val:
-        return redirect("/account/")
+        return HttpResponse(result.msg)
     else:
         return HttpResponse("fail to delete account in delete_account")
 
@@ -287,6 +287,6 @@ def delete_user(request, id, user_id):
     SA = SwiftAccountMgr()
     result = SA.delete_user(account=id, user=user_id)
     if result.val:
-        return redirect("/account/")
+        return HttpResponse(result.msg)
     else:
         return HttpResponse("fail to delete user in delete_user")
