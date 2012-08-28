@@ -3309,7 +3309,7 @@ def get_last_backup_time():
     return_val = {'result': result,
                   'time': last_time}
     
-    return return_val
+    return json.dumps(return_val)
 
 #######################################################
 
