@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from django.template import RequestContext
 import datetime
 from DCloudSwift.master.swiftAccountMgr import SwiftAccountMgr
-from util.helper import human_readable_capacity
+from swift_util.helper import human_readable_capacity
 
 @login_required
 def index(request):

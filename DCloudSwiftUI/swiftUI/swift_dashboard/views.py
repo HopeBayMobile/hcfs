@@ -5,7 +5,7 @@ from DCloudSwift.master.swiftMonitorMgr import SwiftMonitorMgr
 #TODO: get account order from model 
 from operator import itemgetter
 from DCloudSwift.master.swiftAccountMgr import SwiftAccountMgr
-from util.helper import human_readable_capacity
+from swift_util.helper import human_readable_capacity
 
 @login_required
 def index(request):
