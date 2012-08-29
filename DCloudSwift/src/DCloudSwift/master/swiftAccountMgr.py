@@ -605,7 +605,7 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         # create the account and account administrator
-        add_user_output = self.add_user(account=account, user=self.__admin_default_name, password="",\
+        add_user_output = self.add_user(account=account, user=self.__admin_default_name, password=admin_password,\
                                         description=description, quota=quota, admin=True)
 
         if add_user_output.val == False:
