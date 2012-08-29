@@ -21,7 +21,8 @@ def index(request):
             account_list.append(accounts[i])
         return render_to_response('list_account.html', {"accounts": account_list, "request": request})
     else:
-        return HttpResponse("something wrong in list_account:")
+        #return HttpResponse("something wrong in list_account:")
+        return HttpResponse(result.msg)
 
 
 def server_time(request):
@@ -42,7 +43,8 @@ def disable_account(request, id):
     if result.val:
         return redirect("/account/")
     else:
-        return HttpResponse("disable_account:" + id)
+        #return HttpResponse("disable_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -54,7 +56,8 @@ def enable_account(request, id):
     if result.val:
         return redirect("/account/")
     else:
-        return HttpResponse("something wrong in enable_account:" + id)
+        #return HttpResponse("something wrong in enable_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -84,7 +87,7 @@ def new_account_confirm(request):
         else:
             return HttpResponse(result.msg)
     else:
-        return HttpResponse("new_account_confirm")
+        return HttpResponse("no account id in new_account_confirm")
     
     if "user_id" in request.POST:
         user_id = request.POST["user_id"]
@@ -110,7 +113,7 @@ def new_account_confirm(request):
         else:
             return HttpResponse(result.msg)
     else:
-        return HttpResponse("new_user_confirm")
+        return HttpResponse("no user_id in new_user_confirm")
 
 #@login_required
 #def process_account(request):
@@ -153,7 +156,8 @@ def edit_account(request, id):
                                                         "request": request,
                                                         "users": users_list})
     else:
-        return HttpResponse("list user fail in edit_account:" + id)
+        #return HttpResponse("list user fail in edit_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -168,7 +172,8 @@ def update_account(request, id):
         if result.val:
             return redirect("/account/")
         else:
-            return HttpResponse("fail to update description in update_account")
+            #return HttpResponse("fail to update description in update_account")
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("can't get form param in update_account")
 
@@ -221,7 +226,8 @@ def disable_user(request, id, user_id):
     if result.val:
         return redirect("/account/" + id + "/edit")
     else:
-        return HttpResponse("disable_user:" + user_id + " in " + id)
+        #return HttpResponse("disable_user:" + user_id + " in " + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -233,7 +239,8 @@ def enable_user(request, id, user_id):
     if result.val:
         return redirect("/account/" + id + "/edit")
     else:
-        return HttpResponse("enable_user:" + user_id + " in " + id)
+        #return HttpResponse("enable_user:" + user_id + " in " + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -266,7 +273,7 @@ def new_user_confirm(request, id):
         else:
             return HttpResponse(result.msg)
     else:
-        return HttpResponse("new_user_confirm")
+        return HttpResponse("can't get form param in new_user_confirm")
 
 #@login_required
 #def process_user(request, id):
@@ -302,7 +309,8 @@ def update_user(request, id, user_id):
         if result.val:
             return redirect("/account/" + id + "/edit")
         else:
-            return HttpResponse("fail to update description in update_user")
+            #return HttpResponse("fail to update description in update_user")
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("can't get form param in update_user")
 
