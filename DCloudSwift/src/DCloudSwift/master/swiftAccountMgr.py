@@ -76,8 +76,8 @@ class SwiftAccountMgr:
         self.__SC = SwiftCfg(GlobalVar.SWIFTCONF)
         self.__kwparams = self.__SC.getKwparams()
         self.__password = self.__kwparams['password']
-        self.__proxy_ip_list = ["124.9.14.14"]
-        self.__auth_port = "443"
+        self.__proxy_ip_list = ["127.0.0.1"]
+        self.__auth_port = "8080"
 
         self.__admin_default_name = "admin"
         self.__random_password_size = 12
