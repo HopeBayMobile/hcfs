@@ -174,6 +174,12 @@ class SwiftMonitorMgr:
         for hd in disk_info.get("broken", []):
             hd_info.append({"serial": hd.get("SN", "N/A"), "status": "Broken"})
         
+        missing = disk_info.get("missing", {})
+        missing_count = missing.get("count", 0)
+
+        for i in range(missing_count):
+            hd_info.append({"serial": "N/A", "status": "Missing"})
+
         return hd_info
 
     def get_portal_url(self):
@@ -223,7 +229,8 @@ class SwiftMonitorMgr:
         used_capacity = self.get_used_capacity()
         firmware = "swift_" + self.get_swift_version()
 
-        capacity = free = used = "N/A"
+        capacity = 'N/A'
+        free = used = 0.0 
 
         if total_capacity:
             capacity = "%.1fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
@@ -248,8 +255,8 @@ class SwiftMonitorMgr:
         hd_number: node's total hard disk number
         hd_error: node's total hard disk error number
         hd_ino: dictionary of each hard disk status in this node, which include:
-            serial: serial number
-            status: operation status (OK or Broken)
+            serial: serial number or N/A
+            status: operation status (OK, Broken, or Missing)
         
         """
         nodes_info = []
@@ -290,4 +297,6 @@ class SwiftMonitorMgr:
 if __name__ == '__main__':
     SM = SwiftMonitorMgr()
     print SM.get_zone_info()
+    for i in range(0):
+        print "Hello"
     #print SM.list_nodes_info()

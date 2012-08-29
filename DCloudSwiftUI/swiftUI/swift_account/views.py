@@ -111,15 +111,16 @@ def edit_account(request, id):
         users = SA.list_user(id).msg
         users_list = []
         for i in users:
-            users[i]["id"] = i
-            cap = float(users[i]["usage"]) / float(users[i]["quota"])
-            cap = int( cap * 100 )
-            if cap > 100:
-                cap = 100
-            users[i]["cap"] = cap
-            users[i]["usage"] = human_readable_capacity(users[i]["usage"])
-            users[i]["quota"] = human_readable_capacity(users[i]["quota"])
-            users_list.append(users[i])
+            if(users[i]["id"] != "admin"):
+                users[i]["id"] = i
+                cap = float(users[i]["usage"]) / float(users[i]["quota"])
+                cap = int( cap * 100 )
+                if cap > 100:
+                    cap = 100
+                users[i]["cap"] = cap
+                users[i]["usage"] = human_readable_capacity(users[i]["usage"])
+                users[i]["quota"] = human_readable_capacity(users[i]["quota"])
+                users_list.append(users[i])
 
         return render_to_response('edit_account.html', {"account_id": id,
                                                         "description": description,

@@ -186,7 +186,7 @@ FIXTURE_DIRS = [
 ]
 
 #Celery settings
-broker_db_path = os.path.dirname(os.path.abspath(__file__)) + "/broker.db"
+broker_db_path = DATABASE_DIR + "/sqlite3.db"
 BROKER_TRANSPORT = "sqlalchemy"
 BROKER_URL = "sqlite:///" + broker_db_path
 
@@ -219,6 +219,6 @@ ACCOUNT_REQUIRED_EMAIL = False
 ACCOUNT_EMAIL_VERIFICATION = False
 ACCOUNT_EMAIL_AUTHENTICATION = False
 ACCOUNT_UNIQUE_EMAIL = EMAIL_CONFIRMATION_UNIQUE_EMAIL = False
-ACCOUNT_LOGIN_REDIRECT_URL = "home"
-ACCOUNT_LOGOUT_REDIRECT_URL = "home"
+ACCOUNT_LOGIN_REDIRECT_URL = "/"
+ACCOUNT_LOGOUT_REDIRECT_URL = "/"
 ACCOUNT_EMAIL_CONFIRMATION_EXPIRE_DAYS = 2
