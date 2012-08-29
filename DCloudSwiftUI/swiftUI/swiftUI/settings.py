@@ -186,7 +186,7 @@ FIXTURE_DIRS = [
 ]
 
 #Celery settings
-broker_db_path = os.path.dirname(os.path.abspath(__file__)) + "/broker.db"
+broker_db_path = DATABASE_DIR + "/sqlite3.db"
 BROKER_TRANSPORT = "sqlalchemy"
 BROKER_URL = "sqlite:///" + broker_db_path
 
