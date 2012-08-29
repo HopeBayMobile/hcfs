@@ -49,6 +49,7 @@ class SwiftMonitorMgr:
                 return None
 
             capacity = capacity/float(num_of_replica)
+            
 
         except Exception as e:
              self.logger.error(str(e))
@@ -76,15 +77,18 @@ class SwiftMonitorMgr:
         '''
         return used capacity in bytes
         '''
+
         SA = SwiftAccountMgr()
         result = SA.list_usage()
         if not result.val:
             return None
 
         total_usage = 0
-        for account, users in result.msg:
-            for user, usage in users:
-                total_usage += usage
+        for account, users in result.msg.items():
+            for user, info in users.items():
+                usage = info.get("usage", "Error")
+                if isinstance(usage, int):
+                    total_usage += usage
 
         return total_usage
 
@@ -222,8 +226,8 @@ class SwiftMonitorMgr:
         capacity = free = used = "N/A"
 
         if total_capacity:
-            capacity = "%.0fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
-            if used_capacity:
+            capacity = "%.1fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
+            if used_capacity is not None:
                 used = "%.2f" % (self.calculate_used_capacity_percentage(total_capacity, used_capacity))
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
