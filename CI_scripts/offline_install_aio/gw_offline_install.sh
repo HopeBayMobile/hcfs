@@ -80,5 +80,5 @@ apt-get update
 	apt-get clean
 	apt-get autoclean
 	apt-get autoremove
-	rm -r /usr/share/doc
+	rm -r /usr/share/doc /usr/src
 	
