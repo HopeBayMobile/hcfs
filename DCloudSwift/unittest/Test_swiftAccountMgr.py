@@ -410,5 +410,63 @@ class Test_disable_user:
                        "User %s:%s cannot be disabled by disable_user()." % (self.__account, self.__user))
 
 
+class Test_enable_account:
+    '''
+    Test for the function enable_account() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function enable_account() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s download %s .services -o -"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        output = stdoutData.replace("storage", "disable")
+        os.system("echo \'%s\' >> .services" % output)
+
+        cmd2 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s upload %s .services"\
+                % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd2)
+        os.system("rm .services")
+
+        self.__sa.enable_account(self.__account)
+
+    def teardown(self):
+        print "End of unit test for function enable_account() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_Enabling(self):
+        '''
+        Check whether the account is enabled or not after executing enable_account().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s list"\
+              % (auth_url, auth_port, self.__account, self.__password)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        print cmd
+        print stdoutData
+        print stderrData
+        print po.returncode
+
+        nose.tools.ok_(po.returncode == 0 and stderrData == "", "Account %s cannot be enabled by enable_account()." % self.__account)
+
+
 if __name__ == "__main__":
-    pass
+    a = Test_enable_account()
+    a.setup()
+    a.test_Enabling()
+    a.teardown()
