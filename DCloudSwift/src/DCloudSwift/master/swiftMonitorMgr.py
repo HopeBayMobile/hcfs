@@ -30,13 +30,21 @@ class SwiftMonitorMgr:
     def __init__(self):
         self.logger = util.getLogger(name="SwiftMonitorMgr")
 
-    def get_total_capacity(self):
+    def get_total_capacity(self, storageList=None, num_of_replica=None):
         '''
         return the total capacity of the capacity or none if errors happen
+        @param storageList: list of nodes to compute total capacity. 
+                            If None is given, then util.getStorageList() is used.
+        @param num_of_replica: Number of replica per object. If None is given, 
+                               then util.getNumOfReplica() is used.
+        @return: summation of disk capacities in storaga nodes divided by nume_of_replica 
         '''
-        storageList = util.getStorageNodeList()
         capacity = 0
-        num_of_replica = util.getNumOfReplica()
+
+        if not storageList:
+            storageList = util.getStorageNodeList()
+        if not num_of_replica:
+            num_of_replica = util.getNumOfReplica()
 
         if not num_of_replica:
             return None
@@ -57,12 +65,15 @@ class SwiftMonitorMgr:
 
         return capacity
 
-    def get_number_of_storage_nodes(self):
+    def get_number_of_storage_nodes(self, storageList):
         '''
+        @param storageList: list of nodes to count number of nodes. 
+                            If None is given, then util.getStorageList() is used.
         return the number of the nodes or none if errors happen.
         '''
 
-        storageList = util.getStorageNodeList()
+        if not storageList:
+            storageList = util.getStorageNodeList()
         try:
             # number of storage nodes must be greater than zero
             if storageList:
@@ -73,18 +84,35 @@ class SwiftMonitorMgr:
              self.logger.error(str(e))
              return None
 
-    def get_used_capacity(self):
+    def get_used_capacity(self, user_usage):
         '''
-        return used capacity in bytes
+        @user_usage: user storage usages of following format
+                {
+                    'Account0': {
+                        'User0': {'usage': 422116773},
+                        'User1': {'usage': 175087103}
+                    }
+                    
+                    'Account1': {
+                        'User0': {'usage': 271573000},
+                        'User1': {'usage': 593142777}
+                    }
+                }
+
+                If None is given, then SwiftAccountMgr.list_usage() is used.
+        @return: total used capacities specified in usage.
         '''
 
-        SA = SwiftAccountMgr()
-        result = SA.list_usage()
-        if not result.val:
-            return None
-
+        if not user_usage:
+            SA = SwiftAccountMgr()
+            result = SA.list_usage()
+            if not result.val:
+                return None
+            else:
+                user_usage = result.msg
+            
         total_usage = 0
-        for account, users in result.msg.items():
+        for account, users in user_usage.items():
             for user, info in users.items():
                 usage = info.get("usage", "Error")
                 if isinstance(usage, int):
@@ -174,6 +202,12 @@ class SwiftMonitorMgr:
         for hd in disk_info.get("broken", []):
             hd_info.append({"serial": hd.get("SN", "N/A"), "status": "Broken"})
         
+        missing = disk_info.get("missing", {})
+        missing_count = missing.get("count", 0)
+
+        for i in range(missing_count):
+            hd_info.append({"serial": "N/A", "status": "Missing"})
+
         return hd_info
 
     def get_portal_url(self):
@@ -223,7 +257,8 @@ class SwiftMonitorMgr:
         used_capacity = self.get_used_capacity()
         firmware = "swift_" + self.get_swift_version()
 
-        capacity = free = used = "N/A"
+        capacity = 'N/A'
+        free = used = 0.0 
 
         if total_capacity:
             capacity = "%.1fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
@@ -248,8 +283,8 @@ class SwiftMonitorMgr:
         hd_number: node's total hard disk number
         hd_error: node's total hard disk error number
         hd_ino: dictionary of each hard disk status in this node, which include:
-            serial: serial number
-            status: operation status (OK or Broken)
+            serial: serial number or N/A
+            status: operation status (OK, Broken, or Missing)
         
         """
         nodes_info = []
@@ -290,4 +325,6 @@ class SwiftMonitorMgr:
 if __name__ == '__main__':
     SM = SwiftMonitorMgr()
     print SM.get_zone_info()
+    for i in range(0):
+        print "Hello"
     #print SM.list_nodes_info()

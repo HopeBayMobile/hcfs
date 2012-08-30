@@ -21,7 +21,8 @@ def index(request):
             account_list.append(accounts[i])
         return render_to_response('list_account.html', {"accounts": account_list, "request": request})
     else:
-        return HttpResponse("something wrong in list_account:")
+        #return HttpResponse("something wrong in list_account:")
+        return HttpResponse(result.msg)
 
 
 def server_time(request):
@@ -42,7 +43,8 @@ def disable_account(request, id):
     if result.val:
         return redirect("/account/")
     else:
-        return HttpResponse("disable_account:" + id)
+        #return HttpResponse("disable_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -54,7 +56,8 @@ def enable_account(request, id):
     if result.val:
         return redirect("/account/")
     else:
-        return HttpResponse("something wrong in enable_account:" + id)
+        #return HttpResponse("something wrong in enable_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -80,11 +83,37 @@ def new_account_confirm(request):
             admin_pw = SA.get_user_password(account=account_id, user="admin")
             if not admin_pw.val:
                 return HttpResponse("Can't get admin password")
-            return render_to_response('confirm_account.html', {"account_id": account_id, "description": description, "identity": "Administrator", "request": request, "Password": admin_pw.msg})
+            #return render_to_response('confirm_account.html', {"account_id": account_id, "description": description, "identity": "Administrator", "request": request, "Password": admin_pw.msg})
         else:
             return HttpResponse(result.msg)
     else:
-        return HttpResponse("new_account_confirm")
+        return HttpResponse("no account id in new_account_confirm")
+    
+    if "user_id" in request.POST:
+        user_id = request.POST["user_id"]
+        user_description = request.POST["user_description"]
+        user_quota = request.POST["user_quota"]
+        #SA = SwiftAccountMgr()
+        #check if already exist
+        exist = SA.obtain_user_info(account_id, user_id)
+        if exist.val is True:
+            return HttpResponse("user already exist")
+        result = SA.add_user(account=account_id, user=user_id, description=user_description)
+        if result.val:
+            #user_pw = SA.get_user_password(account=account_id, user=user_id)
+            #if user_pw.val is False:
+            #    return HttpResponse("Can't get " + user_id + " password from " + account_id)
+            result = SA.set_user_quota(account=account_id, user=user_id, quota=user_quota*1024*1024*1024)
+            if result.val:
+                #return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "description": description, "request": request, "Password": user_pw.msg})
+                return render_to_response('confirm_account.html', {"account_id": account_id, "description": description, "request": request,
+                    "user_id": user_id, "user_description": user_description})
+            else:
+                return HttpResponse(result.msg)
+        else:
+            return HttpResponse(result.msg)
+    else:
+        return HttpResponse("no user_id in new_user_confirm")
 
 #@login_required
 #def process_account(request):
@@ -111,22 +140,24 @@ def edit_account(request, id):
         users = SA.list_user(id).msg
         users_list = []
         for i in users:
-            users[i]["id"] = i
-            cap = float(users[i]["usage"]) / float(users[i]["quota"])
-            cap = int( cap * 100 )
-            if cap > 100:
-                cap = 100
-            users[i]["cap"] = cap
-            users[i]["usage"] = human_readable_capacity(users[i]["usage"])
-            users[i]["quota"] = human_readable_capacity(users[i]["quota"])
-            users_list.append(users[i])
+            if(users[i]["id"] != "admin"):
+                users[i]["id"] = i
+                cap = float(users[i]["usage"]) / float(users[i]["quota"])
+                cap = int( cap * 100 )
+                if cap > 100:
+                    cap = 100
+                users[i]["cap"] = cap
+                users[i]["usage"] = human_readable_capacity(users[i]["usage"])
+                users[i]["quota"] = human_readable_capacity(users[i]["quota"])
+                users_list.append(users[i])
 
         return render_to_response('edit_account.html', {"account_id": id,
                                                         "description": description,
                                                         "request": request,
                                                         "users": users_list})
     else:
-        return HttpResponse("list user fail in edit_account:" + id)
+        #return HttpResponse("list user fail in edit_account:" + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -141,7 +172,8 @@ def update_account(request, id):
         if result.val:
             return redirect("/account/")
         else:
-            return HttpResponse("fail to update description in update_account")
+            #return HttpResponse("fail to update description in update_account")
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("can't get form param in update_account")
 
@@ -194,7 +226,8 @@ def disable_user(request, id, user_id):
     if result.val:
         return redirect("/account/" + id + "/edit")
     else:
-        return HttpResponse("disable_user:" + user_id + " in " + id)
+        #return HttpResponse("disable_user:" + user_id + " in " + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -206,7 +239,8 @@ def enable_user(request, id, user_id):
     if result.val:
         return redirect("/account/" + id + "/edit")
     else:
-        return HttpResponse("enable_user:" + user_id + " in " + id)
+        #return HttpResponse("enable_user:" + user_id + " in " + id)
+        return HttpResponse(result.msg)
 
 
 @login_required
@@ -239,7 +273,7 @@ def new_user_confirm(request, id):
         else:
             return HttpResponse(result.msg)
     else:
-        return HttpResponse("new_user_confirm")
+        return HttpResponse("can't get form param in new_user_confirm")
 
 #@login_required
 #def process_user(request, id):
@@ -275,7 +309,8 @@ def update_user(request, id, user_id):
         if result.val:
             return redirect("/account/" + id + "/edit")
         else:
-            return HttpResponse("fail to update description in update_user")
+            #return HttpResponse("fail to update description in update_user")
+            return HttpResponse(result.msg)
     else:
         return HttpResponse("can't get form param in update_user")
 
