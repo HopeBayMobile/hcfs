@@ -91,6 +91,8 @@ else
         mkdir /storage/log
         mkdir /storage/s3ql
         mkdir /storage/log/apache2
+        mkdir /storage/log/squid3
+        chown proxy:proxy /storage/log/squid3
         # add symbolic link
         rm -r /var/log 
         rm -r /root/.s3ql
@@ -165,6 +167,8 @@ cat >/root/build_raid1.sh <<EOF
             mkdir /storage/log
             mkdir /storage/s3ql
             mkdir /storage/log/apache2
+            mkdir /storage/log/squid3
+            chown proxy:proxy /storage/log/squid3
             # add symbolic link
             rm -r /var/log 
             rm -r /root/.s3ql
