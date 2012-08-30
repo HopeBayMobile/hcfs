@@ -170,7 +170,10 @@ class Test_delete_user:
         po = subprocess.Popen(cmd1, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        nose.tools.ok_(po.returncode != 0 or stderrData != "", "Container %s still exists: %s" % (private_container, stderrData))
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd1, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "", "Container %s still exists: %s" % (private_container, stderrData))
 
         cmd2 = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s list %s"\
                % (auth_url, auth_port, self.__account, self.__user, self.__password, gw_config_container)
@@ -178,7 +181,10 @@ class Test_delete_user:
         po = subprocess.Popen(cmd2, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        nose.tools.ok_(po.returncode != 0 or stderrData != "", "Container %s still exists: %s" % (gw_config_container, stderrData))
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd2, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "", "Container %s still exists: %s" % (gw_config_container, stderrData))
 
         # Check whether the metadata of the user is removed by delete_user().
         cmd = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s download %s %s -o -"\
@@ -196,7 +202,7 @@ class Test_delete_user:
             if field == self.__user:
                 mark = False
 
-        nose.tools.ok_(mark == True, "The metadat of user %s:%s does not exist." % (self.__account, self.__user))
+        nose.tools.ok_(mark == True, "The metadata of user %s:%s does not exist." % (self.__account, self.__user))
 
 
 class Test_add_account:
@@ -262,7 +268,7 @@ class Test_add_account:
             if field == "admin":
                 mark = True
 
-        nose.tools.ok_(mark == True, "The metadat of account administrator %s:admin does not exist." % self.__account)
+        nose.tools.ok_(mark == True, "The metadata of account administrator %s:admin does not exist." % self.__account)
 
 
 class Test_delete_account:
@@ -362,8 +368,10 @@ class Test_enable_user:
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        nose.tools.ok_(po.returncode == 0 and stderrData == "",\
-                       "User %s:%s cannot be enabled by enable_user()." % (self.__account, self.__user))
+        if po.returncode == 0:
+            nose.tools.ok_(stderrData == "", "User %s:%s cannot be enabled by enable_user()." % (self.__account, self.__user))
+        else:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
 
 
 class Test_disable_user:
@@ -406,8 +414,10 @@ class Test_disable_user:
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        nose.tools.ok_(po.returncode != 0 or stderrData != "",\
-                       "User %s:%s cannot be disabled by disable_user()." % (self.__account, self.__user))
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "", "User %s:%s cannot be disabled by disable_user()." % (self.__account, self.__user))
 
 
 class Test_enable_account:
@@ -457,16 +467,51 @@ class Test_enable_account:
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdoutData, stderrData) = po.communicate()
 
-        print cmd
-        print stdoutData
-        print stderrData
-        print po.returncode
+        if po.returncode == 0:
+            nose.tools.ok_(stderrData == "", "Account %s cannot be enabled by enable_account()." % self.__account)
+        else:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
 
-        nose.tools.ok_(po.returncode == 0 and stderrData == "", "Account %s cannot be enabled by enable_account()." % self.__account)
+
+class Test_disable_account:
+    '''
+    Test for the function disable_account() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function disable_account() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+
+        self.__sa.disable_account(self.__account)
+
+    def teardown(self):
+        print "End of unit test for function disable_account() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_disabling(self):
+        '''
+        Check whether the account is disabled or not after executing disable_account().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s list"\
+              % (auth_url, auth_port, self.__account, self.__password)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "", "Account %s cannot be disabled by disable_account()." % self.__account)
 
 
 if __name__ == "__main__":
-    a = Test_enable_account()
-    a.setup()
-    a.test_Enabling()
-    a.teardown()
+    pass
