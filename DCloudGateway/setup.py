@@ -39,6 +39,9 @@ def main():
 		],
 	)
 
+        # remove renamed conf
+        os.system("rm /etc/init/reorder_eth.conf")
+
         os.system("cp config/rc.local /etc")
         os.system("cp config/crontab /etc")
         #os.system("cp config/sysctl.conf /etc")
@@ -59,7 +62,7 @@ def main():
         os.system("cp gateway_scripts/check_expired %s/"%CONFDIR)
         os.system("cp gateway_scripts/post-gwstart.conf /etc/init/")
         os.system("cp gateway_scripts/check-gwstart.conf /etc/init/")
-        os.system("cp gateway_scripts/reorder_eth.conf /etc/init/")
+        os.system("cp gateway_scripts/nic.conf /etc/init/")
         os.system("cp gateway_scripts/nmbd.conf /etc/init/")
         os.system("cp gateway_scripts/smbd.conf /etc/init/")
         os.system("cp gateway_scripts/delete_lostfound.conf /etc/init/")

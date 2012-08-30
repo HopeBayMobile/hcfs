@@ -30,13 +30,21 @@ class SwiftMonitorMgr:
     def __init__(self):
         self.logger = util.getLogger(name="SwiftMonitorMgr")
 
-    def get_total_capacity(self):
+    def get_total_capacity(self, storageList=None, num_of_replica=None):
         '''
         return the total capacity of the capacity or none if errors happen
+        @param storageList: list of nodes to compute total capacity. 
+                            If None is given, then util.getStorageList() is used.
+        @param num_of_replica: Number of replica per object. If None is given, 
+                               then util.getNumOfReplica() is used.
+        @return: summation of disk capacities in storaga nodes divided by nume_of_replica 
         '''
-        storageList = util.getStorageNodeList()
         capacity = 0
-        num_of_replica = util.getNumOfReplica()
+
+        if not storageList:
+            storageList = util.getStorageNodeList()
+        if not num_of_replica:
+            num_of_replica = util.getNumOfReplica()
 
         if not num_of_replica:
             return None
@@ -57,12 +65,15 @@ class SwiftMonitorMgr:
 
         return capacity
 
-    def get_number_of_storage_nodes(self):
+    def get_number_of_storage_nodes(self, storageList):
         '''
+        @param storageList: list of nodes to count number of nodes. 
+                            If None is given, then util.getStorageList() is used.
         return the number of the nodes or none if errors happen.
         '''
 
-        storageList = util.getStorageNodeList()
+        if not storageList:
+            storageList = util.getStorageNodeList()
         try:
             # number of storage nodes must be greater than zero
             if storageList:
@@ -73,18 +84,35 @@ class SwiftMonitorMgr:
              self.logger.error(str(e))
              return None
 
-    def get_used_capacity(self):
+    def get_used_capacity(self, user_usage):
         '''
-        return used capacity in bytes
+        @user_usage: user storage usages of following format
+                {
+                    'Account0': {
+                        'User0': {'usage': 422116773},
+                        'User1': {'usage': 175087103}
+                    }
+                    
+                    'Account1': {
+                        'User0': {'usage': 271573000},
+                        'User1': {'usage': 593142777}
+                    }
+                }
+
+                If None is given, then SwiftAccountMgr.list_usage() is used.
+        @return: total used capacities specified in usage.
         '''
 
-        SA = SwiftAccountMgr()
-        result = SA.list_usage()
-        if not result.val:
-            return None
-
+        if not user_usage:
+            SA = SwiftAccountMgr()
+            result = SA.list_usage()
+            if not result.val:
+                return None
+            else:
+                user_usage = result.msg
+            
         total_usage = 0
-        for account, users in result.msg.items():
+        for account, users in user_usage.items():
             for user, info in users.items():
                 usage = info.get("usage", "Error")
                 if isinstance(usage, int):
@@ -96,11 +124,11 @@ class SwiftMonitorMgr:
         '''
         calculate used_capacity_percentage
         @param total: total capacity in bytes
-        return total capacity in TB
+        return total capacity in TB=10^12 bytes
         '''
         total_TB = None
         try:
-            total_TB = float(total)/float(1024*1024*1024*1024)
+            total_TB = float(total)/float(1000000000000)
         except Exception as e:
             self.logger.error(str(e))
 

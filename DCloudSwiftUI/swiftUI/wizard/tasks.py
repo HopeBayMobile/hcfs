@@ -40,12 +40,12 @@ def assign_swift_zid(hosts, replica_number):
     '''
     assign a swift zone id to each host in hosts.
 
-    @type  hosts: list of hosts, each host is dict containing keys "hostname", "island" and "rack"
+    @type  hosts: list of hosts, each host is dict containing keys "hostname", "position", "island" and "rack"
     @param hosts: the hosts to assign zids
     @type  replica_number: integer
     @param replica_number: number of replica
     @rtype: a list of hosts and each host is a dictinary containing an additional key "zid"
-    @return: The input list hosts is shallow copied and a new key "zid" is added to each host.
+    @return: The hosts in input list hosts is copied and a new key "zid" is added to each host.
         If replica_number < number of hosts, then None is returned.
     '''
 
@@ -56,9 +56,13 @@ def assign_swift_zid(hosts, replica_number):
     group_size = len(hosts)/zone_number
     ret = []
 
-    for i in range(len(hosts)):
+    location_awareness = lambda x: x.get("hostname")
+    sHosts = list(hosts)
+    sHosts.sort(key=location_awareness)
+
+    for i in range(len(sHosts)):
         zid = (i/group_size) + 1 if i < group_size * zone_number else (i % zone_number) + 1
-        host = hosts[i].copy()
+        host = sHosts[i].copy()
         host[u'zid'] = zid
         ret.append(host)
 
@@ -200,7 +204,7 @@ def do_meta_form(data):
 
     do_meta_form.report_progress(5, True, 'Assign device capacity for each host...', None)
     for host in hosts:
-        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
+        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1000 * 1000 * 1000)
 
     # construct node_info_db
     do_meta_form.report_progress(8, True, 'Construct node db...', None)

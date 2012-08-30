@@ -103,7 +103,7 @@ def new_account_confirm(request):
             #user_pw = SA.get_user_password(account=account_id, user=user_id)
             #if user_pw.val is False:
             #    return HttpResponse("Can't get " + user_id + " password from " + account_id)
-            result = SA.set_user_quota(account=account_id, user=user_id, quota=user_quota*1024*1024*1024)
+            result = SA.set_user_quota(account=account_id, user=user_id, quota=int(user_quota)*1024*1024*1024)
             if result.val:
                 #return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "description": description, "request": request, "Password": user_pw.msg})
                 return render_to_response('confirm_account.html', {"account_id": account_id, "description": description, "request": request,
@@ -140,8 +140,9 @@ def edit_account(request, id):
         users = SA.list_user(id).msg
         users_list = []
         for i in users:
-            if(users[i]["id"] != "admin"):
-                users[i]["id"] = i
+            if(i != "admin"):
+                if(float(users[i]["quota"])==0):
+                    HttpResponse("quota should not be zero")
                 cap = float(users[i]["usage"]) / float(users[i]["quota"])
                 cap = int( cap * 100 )
                 if cap > 100:
