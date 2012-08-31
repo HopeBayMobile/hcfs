@@ -861,7 +861,172 @@ class Test_assign_read_acl:
                            % (self.__account, self.__user, self.__container))
 
 
+class Test_assign_write_acl:
+    '''
+    Test for the function assign_write_acl() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function assign_write_acl() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__container = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+        self.__sa.add_user(self.__account, self.__user, self.__password)
+        self.__file = CreateRandomString(10).generate()
+
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s post %s"\
+              % (auth_url, auth_port, self.__account, self.__password, self.__container)
+        os.system(cmd)
+
+        os.system("touch %s" % self.__file)
+
+        self.__sa.assign_write_acl(self.__account, self.__container, self.__user, "admin")
+
+    def teardown(self):
+        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        cmd5 = "rm %s" % self.__file
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+        os.system(cmd5)
+
+    def test_CheckWriteACL(self):
+        '''
+        Check the correctness of the read ACL assigned by assign_read_acl().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
+              % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData == "",\
+                           "Failed to assign write ACL by assign_read_acl(): User %s:%s cannot write container %s."\
+                           % (self.__account, self.__user, self.__container))
+
+
+class Test_remove_read_acl:
+    '''
+    Test for the function remove_read_acl() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function remove_read_acl() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__container = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+        self.__sa.add_user(self.__account, self.__user, self.__password)
+
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s post %s -r \'%s:%s\'"\
+              % (auth_url, auth_port, self.__account, self.__password, self.__container, self.__account, self.__user)
+        os.system(cmd)
+
+        self.__sa.remove_read_acl(self.__account, self.__container, self.__user, "admin")
+
+    def teardown(self):
+        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_CheckReadACL(self):
+        '''
+        Check the correctness of the read ACL assigned by assign_read_acl().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s list %s"\
+              % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "",\
+                           "Failed to remove read ACL by remove_read_acl(): User %s:%s still can access container %s."\
+                           % (self.__account, self.__user, self.__container))
+
+
+class Test_remove_write_acl:
+    '''
+    Test for the function remove_write_acl() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function remove_write_acl() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__container = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+        self.__sa.add_user(self.__account, self.__user, self.__password)
+        self.__file = CreateRandomString(10).generate()
+
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s post %s -r \'%s:%s\' -w \'%s:%s\'"\
+              % (auth_url, auth_port, self.__account, self.__password, self.__container,\
+                 self.__account, self.__user, self.__account, self.__user)
+        os.system(cmd)
+
+        os.system("touch %s" % self.__file)
+
+        self.__sa.remove_write_acl(self.__account, self.__container, self.__user, "admin")
+
+    def teardown(self):
+        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        cmd5 = "rm %s" % self.__file
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+        os.system(cmd5)
+
+    def test_CheckReadACL(self):
+        '''
+        Check the correctness of the read ACL assigned by assign_read_acl().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
+              % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData != "",\
+                           "Failed to remove write ACL by remove_write_acl(): User %s:%s still can write container %s."\
+                           % (self.__account, self.__user, self.__container))
+
+
 if __name__ == "__main__":
     pass
-    a = Test_assign_read_acl()
-    print a.setup()
