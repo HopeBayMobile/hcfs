@@ -145,8 +145,8 @@ class Test_takesnapshot:
         # Test if the snapshot is taken correctly
         nose.tools.ok_(new_snapshot_list[0]['finish_time'] > 0)
         # wthung, 2012/7/18
-        # by auto-exposed feature, "exposed" is False and "auto_exposed" is True by default
-        nose.tools.eq_(new_snapshot_list[0]['exposed'], False)
+        # by auto-exposed feature, "exposed" and "auto_exposed" should be all True
+        nose.tools.eq_(new_snapshot_list[0]['exposed'], True)
         nose.tools.eq_(new_snapshot_list[0]['auto_exposed'], True)
         test_file_path = os.path.join(snapshot_dir, newest_snapshot)
         test_file_name = os.path.join(test_file_path,\
