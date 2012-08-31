@@ -117,11 +117,11 @@ def thread_aptget():
 
     global g_program_exit
 
-    s3ql_version_file = '/dev/shm/s3ql_ver'
+    gateway_version_file = '/dev/shm/gateway_ver'
     
     while not g_program_exit:
         os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
-        os.system("sudo apt-show-versions -u s3ql > %s" % s3ql_version_file)
+        os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(600):
