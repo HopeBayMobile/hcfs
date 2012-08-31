@@ -604,6 +604,15 @@ class Test_account_existence:
 
     def teardown(self):
         print "End of unit test for function account_existence() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
 
     def test_FalseNegative(self):
         '''
@@ -622,5 +631,138 @@ class Test_account_existence:
                        "Account %s does not exist! The result returned by account_existence() is wrong." % self.__account)
 
 
+class Test_list_account:
+    '''
+    Test for the function list_account() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function list_account() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__description = CreateRandomString(20).generate()
+        self.__sa.add_account(self.__account, "", "", self.__description, self.__quota)
+
+        self.__output = self.__sa.list_account()
+
+    def teardown(self):
+        print "End of unit test for function list_account() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_ContentIntegrity(self):
+        '''
+        Check the integrity of the contents returned by list_account().
+        '''
+        if self.__output.val == True:
+            result = self.__output.msg.get(self.__account)
+            if result == None:
+                nose.tools.ok_(False, "The result returned by list_account() is not correct.")
+            else:
+                nose.tools.ok_(result.get("quota") == self.__quota, "The value of quota is not correct.")
+                nose.tools.ok_(result.get("description") == self.__description, "The value of description is not correct.")
+                nose.tools.ok_(result.get("account_enable") == True, "The value of account_enable is not correct.")
+                nose.tools.ok_(result.get("usage") == 0, "The value of usage is not correct.")
+                nose.tools.ok_(result.get("user_number") == 1, "The value of user_number is not correct.")
+        else:
+            nose.tools.ok_(False, "Failed to execute list_account(): %s" % self.__output.msg)
+
+
+class Test_list_container:
+    '''
+    Test for the function list_container() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function list_container() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__container = CreateRandomString(12).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s post %s"\
+               % (auth_url, auth_port, self.__account, self.__password, self.__container)
+        os.system(cmd)
+
+        self.__output = self.__sa.list_container(self.__account, "admin")
+
+    def teardown(self):
+        print "End of unit test for function list_container() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_ContentCorrectness(self):
+        '''
+        Check the correctness of the containers returned by list_container().
+        '''
+        if self.__output.val == True:
+            nose.tools.ok_(self.__container in self.__output.msg, "The result returned by list_container() is not correct.")
+        else:
+            nose.tools.ok_(False, "Failed to execute list_container(): %s" % self.__output.msg)
+
+
+class Test_list_user:
+    '''
+    Test for the function list_user() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function list_user() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__description = CreateRandomString(20).generate()
+        self.__sa.add_account(self.__account)
+        self.__sa.add_user(self.__account, self.__user, "", self.__description, self.__quota)
+
+        self.__output = self.__sa.list_user(self.__account)
+
+    def teardown(self):
+        print "End of unit test for function list_user() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_ContentIntegrity(self):
+        ''' 
+        Check the integrity of the contents returned by list_user().
+        '''
+        if self.__output.val == True:
+            result = self.__output.msg.get(self.__user)
+            if result == None:
+                nose.tools.ok_(False, "The result returned by list_user() is not correct.")
+            else:
+                nose.tools.ok_(result.get("quota") == self.__quota, "The value of quota is not correct.")
+                nose.tools.ok_(result.get("description") == self.__description, "The value of description is not correct.")
+                nose.tools.ok_(result.get("user_enable") == True, "The value of user_enable is not correct.")
+                nose.tools.ok_(result.get("usage") == 0, "The value of usage is not correct.")
+        else:
+            nose.tools.ok_(False, "Failed to execute list_user(): %s" % self.__output.msg)
+
+
 if __name__ == "__main__":
     pass
+    
