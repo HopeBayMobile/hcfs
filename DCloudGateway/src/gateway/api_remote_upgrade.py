@@ -36,8 +36,7 @@ def get_gateway_version():
     Get current software version of the gateway.
     """
     try:
-        cmd = "apt-show-versions s3ql"
-        # ToDo: change to "DeltaGateway" package.
+        cmd = "apt-show-versions dcloud-gateway"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
                                 stderr=subprocess.STDOUT)
         res = po.stdout.readline()
@@ -45,6 +44,7 @@ def get_gateway_version():
         t = res.split(' ')
         ver = t[-3].replace('\n', '')
         # read current version of gateway
+        # FIXME: t[-3] only works for "dcloud-gateway/unknown uptodate 1.0.10.20120828"
         op_ok = True
         op_code = "100"
         op_msg = None
@@ -74,25 +74,26 @@ def get_available_upgrade():
     """
 
     res = ''
-    s3ql_ver_file = '/dev/shm/s3ql_ver'
+    s3ql_ver_file = '/dev/shm/gateway_ver'
+    #~ FIXME: change the file name accordingly at gw_bktask.py.
     try:
         #~ os.system("sudo apt-get update &")     # update package info.
         #~ the apt-get update action will be ran at background process
         
         # wthung, 2012/8/8
         # move apt-show-versions to gw_bktask.py to speed up
-        # the result is stored in /dev/shm/s3ql_ver
+        # the result is stored in /dev/shm/gateway_ver
         # only do apt-show-versions if file is not existed
-        if not os.path.exists(s3ql_ver_file):        
-            log.debug("%s is not existed. Spend some time to check s3ql version" % s3ql_ver_file)
-            cmd = "apt-show-versions -u s3ql"
+        if not os.path.exists(gateway_ver_file):        
+            log.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
+            cmd = "apt-show-versions -u dcloud-gateway"
             # ToDo: change to "DeltaGateway" package.
             po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
                                     stderr=subprocess.STDOUT)
             res = po.stdout.readline()
             po.wait()
         else:
-            with open(s3ql_ver_file, 'r') as fh:
+            with open(gateway_ver_file, 'r') as fh:
                 res = fh.readline()
 
         # if the result is '', it means no available update.
@@ -143,7 +144,7 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
-            cmd = "sudo apt-get install -y --force-yes s3ql 2> /tmp/log.txt"
+            cmd = "sudo apt-get install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
             # ToDo: change to "DeltaGateway" package.
             a = os.system(cmd)
             # ^^^ upgrade gateway
