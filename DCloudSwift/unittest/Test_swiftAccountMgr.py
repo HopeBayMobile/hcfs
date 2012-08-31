@@ -553,5 +553,74 @@ class Test_change_password:
             nose.tools.ok_(stderrData == "", "The new password of user %s:admin changed by change_password() is not valid." % self.__account)
 
 
+class Test_get_user_password:
+    '''
+    Test for the function get_user_password() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function get_user_password() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account)
+
+        self.__output = self.__sa.get_user_password(self.__account, "admin")
+
+    def teardown(self):
+        print "End of unit test for function get_user_password() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_Correctness(self):
+        '''
+        Check the correctness of the password returned by get_user_password().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s list"\
+              % (auth_url, auth_port, self.__account, self.__output.msg)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData == "", "The password of user %s:admin obtained by get_user_password() is not correct." % self.__account)
+
+
+class Test_account_existence:
+    '''
+    Test for the function account_existence() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function account_existence() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account)
+
+    def teardown(self):
+        print "End of unit test for function account_existence() in swiftAccountMgr.py\n"
+
+    def test_FalseNegative(self):
+        '''
+        False negative test for the valuse returned by account_existence().
+        '''
+        output = self.__sa.account_existence(self.__account)
+        nose.tools.ok_(output.result == True, "Account %s has existed! The result returned by account_existence() is wrong." % self.__account)
+
+    def test_FalsePositive(self):
+        '''
+        False positive test for the values returned by account_existence().
+        '''
+        random_account = CreateRandomString(8).generate()
+        output = self.__sa.account_existence(random_account)
+        nose.tools.ok_(output.result == False,\
+                       "Account %s does not exist! The result returned by account_existence() is wrong." % self.__account)
+
+
 if __name__ == "__main__":
     pass
