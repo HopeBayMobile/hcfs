@@ -39,6 +39,8 @@ fi
 	
 # remove tgz file for saving space
     rm gateway_install*.tgz
+# mount apt cache to ramdisk for saving space
+	mount -o bind /dev/shm $APTCACHEDIR
 
 # copy deb files to proper location
     tar -xzf $DEBFILE -C $APTCACHEDIR

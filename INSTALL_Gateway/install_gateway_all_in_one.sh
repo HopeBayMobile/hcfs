@@ -31,9 +31,6 @@ fi
 cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
 deb http://apt.delcloudia.com/ubuntu/ precise main
 deb-src http://apt.delcloudia.com/ubuntu precise main
-
-deb http://apt.delcloudia.com/ubuntu/ precise unstable
-deb-src http://apt.delcloudia.com/ubuntu precise unstable
 EOF
 
 #~ FIXME
