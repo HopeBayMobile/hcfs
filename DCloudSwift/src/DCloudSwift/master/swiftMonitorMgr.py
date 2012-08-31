@@ -20,6 +20,7 @@ from util import util
 from util.database import NodeInfoDatabaseBroker
 from util.database import MaintenanceBacklogDatabaseBroker
 
+from swiftAccountMgr import SwiftAccountMgr
 
 class SwiftMonitorMgr:
     """
@@ -35,12 +36,21 @@ class SwiftMonitorMgr:
         '''
         storageList = util.getStorageNodeList()
         capacity = 0
+        num_of_replica = util.getNumOfReplica()
+
+        if not num_of_replica:
+            return None
+
         try:
             if storageList:
                 for node in storageList:
                     capacity += node["deviceCapacity"] * node["deviceCnt"]
             else:
                 return None
+
+            capacity = capacity/float(num_of_replica)
+            
+
         except Exception as e:
              self.logger.error(str(e))
              return None
@@ -67,8 +77,20 @@ class SwiftMonitorMgr:
         '''
         return used capacity in bytes
         '''
-        # TODO: fill in contents
-        return 4300000000
+
+        SA = SwiftAccountMgr()
+        result = SA.list_usage()
+        if not result.val:
+            return None
+
+        total_usage = 0
+        for account, users in result.msg.items():
+            for user, info in users.items():
+                usage = info.get("usage", "Error")
+                if isinstance(usage, int):
+                    total_usage += usage
+
+        return total_usage
 
     def calculate_total_capacity_in_TB(self, total):
         '''
@@ -152,6 +174,12 @@ class SwiftMonitorMgr:
         for hd in disk_info.get("broken", []):
             hd_info.append({"serial": hd.get("SN", "N/A"), "status": "Broken"})
         
+        missing = disk_info.get("missing", {})
+        missing_count = missing.get("count", 0)
+
+        for i in range(missing_count):
+            hd_info.append({"serial": "N/A", "status": "Missing"})
+
         return hd_info
 
     def get_portal_url(self):
@@ -201,11 +229,12 @@ class SwiftMonitorMgr:
         used_capacity = self.get_used_capacity()
         firmware = "swift_" + self.get_swift_version()
 
-        capacity = free = used = "N/A"
+        capacity = 'N/A'
+        free = used = 0.0 
 
         if total_capacity:
-            capacity = "%.0fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
-            if used_capacity:
+            capacity = "%.1fTB" % (self.calculate_total_capacity_in_TB(total_capacity))
+            if used_capacity is not None:
                 used = "%.2f" % (self.calculate_used_capacity_percentage(total_capacity, used_capacity))
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
@@ -226,8 +255,8 @@ class SwiftMonitorMgr:
         hd_number: node's total hard disk number
         hd_error: node's total hard disk error number
         hd_ino: dictionary of each hard disk status in this node, which include:
-            serial: serial number
-            status: operation status (OK or Broken)
+            serial: serial number or N/A
+            status: operation status (OK, Broken, or Missing)
         
         """
         nodes_info = []
@@ -268,4 +297,6 @@ class SwiftMonitorMgr:
 if __name__ == '__main__':
     SM = SwiftMonitorMgr()
     print SM.get_zone_info()
+    for i in range(0):
+        print "Hello"
     #print SM.list_nodes_info()
