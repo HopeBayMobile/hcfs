@@ -41,9 +41,9 @@ def daemonize(workdir='/'):
 
     # wthung, disable redirection because after redirection,
     #   some eror occurred when calling sudo by subprocess.popen
-    #redirect_stream(sys.stdin, None)
-    #redirect_stream(sys.stdout, None)
-    #redirect_stream(sys.stderr, None)
+    redirect_stream(sys.stdin, None)
+    redirect_stream(sys.stdout, None)
+    redirect_stream(sys.stderr, None)
 
 
 def detach_process_context():
