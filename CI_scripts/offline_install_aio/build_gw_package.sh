@@ -70,7 +70,7 @@ fi
     check_ok
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$COSA_DEB
     check_ok
-    mv savebox*.deb $APTCACHEDIR    # move COSA deb
+    cp savebox*.deb $APTCACHEDIR    # move COSA deb
     tar -xzf $DEBFILE -C $APTCACHEDIR
     check_ok
 
@@ -106,9 +106,18 @@ fi
 # clean old files
     rm debsrc_StorageAppliance*.tgz
     rm debpatch_StorageAppliance*.tgz
-    rm StorageAppliance/s3ql*.deb
-    rm dcloudgatewayapi*.deb
-    rm dcloud-gateway*.deb
-
+    
+# upload DEB files to APT server
+	# FIXME - currently is saved to a directory
+	DEBSAVE="/tmp/deb_archive/"$GW_VERSION"_"$BUILDNUM
+	mkdir -p $DEBSAVE
+    mv StorageAppliance/s3ql*.deb $DEBSAVE
+    mv dcloudgatewayapi*.deb $DEBSAVE
+    mv dcloud-gateway*.deb $DEBSAVE
+	mv savebox*.deb	$DEBSAVE
+	
+# upload all_in_one installation package to the FTP
+	wput $OUTPUTFILE ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTFILE
+	
 # Done.
     echo "~~~ DONE!"
