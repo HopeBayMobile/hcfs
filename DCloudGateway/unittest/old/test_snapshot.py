@@ -147,7 +147,7 @@ class Test_takesnapshot:
         # wthung, 2012/7/18
         # by auto-exposed feature, "exposed" and "auto_exposed" should be both true
         #nose.tools.eq_(new_snapshot_list[0]['exposed'], False)
-        nose.tools.eq_(new_snapshot_list[0]['exposed'], False)
+        nose.tools.eq_(new_snapshot_list[0]['exposed'], True)
         nose.tools.eq_(new_snapshot_list[0]['auto_exposed'], True)
         test_file_path = os.path.join(snapshot_dir, newest_snapshot)
         test_file_name = os.path.join(test_file_path,\
