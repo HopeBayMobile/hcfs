@@ -19,7 +19,7 @@ from gateway import api
 from gateway.common import TimeoutError
 from gateway.common import timeout
 
-class Test_timeoutDeco:
+class Test_timeoutDeco():
 	'''
 	Test if the timeout decorator works
 	'''
