@@ -49,8 +49,106 @@ class TestMonitorMgr:
     def testGetUsedCapacity(self):
         SM = SwiftMonitorMgr()
         used_capacity = SM.get_used_capacity(self.user_usage)    
-        print used_capacity
         nose.tools.ok_(used_capacity == 240)
+
+    def testGetHdInfo(self):
+        disk_info = {"missing": { "count": 2, "timestamp": 123},
+                     "healthy": [{"SN": "a"}, {"SN": "b"}],
+                     "broken": [{"SN": "c"}, {"SN": "d"}]
+                    }
+
+        disk_info_json = json.dumps(disk_info)
+        SM = SwiftMonitorMgr()
+        hd_info = SM.get_hd_info(disk_info_json)
+
+        nose.tools.ok_(len(hd_info) == 6)
+        for disk in hd_info:
+            if disk["serial"] == "a" or disk["serial"] == "b":
+                nose.tools.ok_(disk["status"] == "OK")
+            elif disk["serial"] == "c" or disk["serial"] == "d":
+                nose.tools.ok_(disk["status"] == "Broken")
+            else:
+                nose.tools.ok_(disk["status"] == "Missing") 
+
+    def testCalculateTotalCapacityInTB(self):
+        total = 0
+        SM = SwiftMonitorMgr()
+        total_TB = SM.calculate_total_capacity_in_TB(total)
+        nose.tools.ok_(total == 0)
+
+        total = 1024
+        total_TB = SM.calculate_total_capacity_in_TB(total)
+        nose.tools.ok_(isinstance(total_TB, float) == True)
+        nose.tools.ok_(total_TB == 1/float(1024*1024*1024))
+
+
+        total = 1024*1024*1024*1024*100
+        total_TB = SM.calculate_total_capacity_in_TB(total)
+        nose.tools.ok_(isinstance(total_TB, float) == True)
+        nose.tools.ok_(total_TB == 100)
+
+
+    def testCalculateUsedCapacityPercentage(self):
+        total = 0
+        used = 2
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_used_capacity_percentage(total, used)
+        nose.tools.ok_(percentage is None)
+
+        total = 200
+        used = 0
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_used_capacity_percentage(total, used)
+        nose.tools.ok_(isinstance(percentage, float))
+        nose.tools.ok_(percentage == 0)
+
+        total = 200
+        used = 100 
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_used_capacity_percentage(total, used)
+        nose.tools.ok_(isinstance(percentage, float))
+        nose.tools.ok_(percentage == 50)
+
+    def testCalculateFreeCapacityPercentage(self):
+        total = 0
+        used = 2
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_free_capacity_percentage(total, used)
+        nose.tools.ok_(percentage is None)
+
+        total = 200
+        used = 0
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_free_capacity_percentage(total, used)
+        nose.tools.ok_(isinstance(percentage, float))
+        nose.tools.ok_(percentage == 100)
+
+        total = 200
+        used = 100
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_free_capacity_percentage(total, used)
+        nose.tools.ok_(isinstance(percentage, float))
+        nose.tools.ok_(percentage == 50)
+
+        total = 200
+        used = 100
+        unusable = 100
+        SM = SwiftMonitorMgr()
+        percentage = SM.calculate_free_capacity_percentage(total, used, unusable)
+        nose.tools.ok_(isinstance(percentage, float))
+        nose.tools.ok_(percentage == 0)
+
+    def testGetHdError(self):
+        disk_info = {"missing": { "count": 2, "timestamp": 123},
+                     "healthy": [{"SN": "a"}, {"SN": "b"}],
+                     "broken": [{"SN": "c"}, {"SN": "d"}]
+                    }
+
+        disk_info_json = json.dumps(disk_info)
+        SM = SwiftMonitorMgr()
+        errors = SM.get_hd_error(disk_info_json)
+        nose.tools.ok_(errors == 4)
+
 
     def teardown(self):
         pass

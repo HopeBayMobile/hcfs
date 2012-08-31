@@ -140,8 +140,9 @@ def edit_account(request, id):
         users = SA.list_user(id).msg
         users_list = []
         for i in users:
-            if(users[i]["id"] != "admin"):
-                users[i]["id"] = i
+            if(i != "admin"):
+                if(float(users[i]["quota"])==0):
+                    HttpResponse("quota should not be zero")
                 cap = float(users[i]["usage"]) / float(users[i]["quota"])
                 cap = int( cap * 100 )
                 if cap > 100:
