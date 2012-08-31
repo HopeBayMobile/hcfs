@@ -1113,5 +1113,97 @@ class Test_delete_container:
             nose.tools.ok_(stderrData != "", "Container %s is not deleted by delete_container()." % self.__container)
 
 
+class Test_obtain_account_info:
+    '''
+    Test for the function obtain_account_info() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function obtain_account_info() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__description = CreateRandomString(20).generate()
+        self.__sa.add_account(self.__account, "", "", self.__description, self.__quota)
+
+        self.__output = self.__sa.obtain_account_info(self.__account)
+
+    def teardown(self):
+        print "End of unit test for function obtain_account_info() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_ContentIntegrity(self):
+        '''
+        Check the integrity of the contents returned by obtain_account_info().
+        '''
+        if self.__output.val == True:
+            result = self.__output.msg
+            if result == None:
+                nose.tools.ok_(False, "The result returned by obtain_account_info() is not correct.")
+            else:
+                nose.tools.ok_(result.get("quota") == self.__quota, "The value of quota is not correct.")
+                nose.tools.ok_(result.get("description") == self.__description, "The value of description is not correct.")
+                nose.tools.ok_(result.get("account_enable") == True, "The value of account_enable is not correct.")
+                nose.tools.ok_(result.get("usage") == 0, "The value of usage is not correct.")
+                nose.tools.ok_(result.get("user_number") == 1, "The value of user_number is not correct.")
+        else:
+            nose.tools.ok_(False, "Failed to execute obtain_account_info(): %s" % self.__output.msg)
+
+
+class Test_obtain_user_info:
+    '''
+    Test for the function obtain_user_info() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function obtain_user_info() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__description = CreateRandomString(20).generate()
+        self.__sa.add_account(self.__account)
+        self.__sa.add_user(self.__account, self.__user, "", self.__description, self.__quota)
+
+        self.__output = self.__sa.obtain_user_info(self.__account, self.__user)
+
+    def teardown(self):
+        print "End of unit test for function obtain_user_info() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_ContentIntegrity(self):
+        ''' 
+        Check the integrity of the contents returned by obtain_user_info().
+        '''
+        if self.__output.val == True:
+            result = self.__output.msg
+            if result == None:
+                nose.tools.ok_(False, "The result returned by obtain_user_info() is not correct.")
+            else:
+                nose.tools.ok_(result.get("quota") == self.__quota, "The value of quota is not correct.")
+                nose.tools.ok_(result.get("description") == self.__description, "The value of description is not correct.")
+                nose.tools.ok_(result.get("user_enable") == True, "The value of user_enable is not correct.")
+                nose.tools.ok_(result.get("usage") == 0, "The value of usage is not correct.")
+        else:
+            nose.tools.ok_(False, "Failed to execute obtain_user_info(): %s" % self.__output.msg)
+
+
 if __name__ == "__main__":
     pass
