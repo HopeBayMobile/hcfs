@@ -498,7 +498,7 @@ class Test_disable_account:
         os.system(cmd2)
         os.system(cmd3)
 
-    def test_disabling(self):
+    def test_Disabling(self):
         '''
         Check whether the account is disabled or not after executing disable_account().
         '''
@@ -511,6 +511,46 @@ class Test_disable_account:
             nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
         else:
             nose.tools.ok_(stderrData != "", "Account %s cannot be disabled by disable_account()." % self.__account)
+
+
+class Test_change_password:
+    '''
+    Test for the function change_password() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function change_password() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__sa.add_account(self.__account)
+
+        self.__sa.change_password(self.__account, "admin", self.__password)
+
+    def teardown(self):
+        print "End of unit test for function change_password() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_ChangedPasswordValidation(self):
+        '''
+        Check the validation of the new password changed by change_password().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s list"\
+              % (auth_url, auth_port, self.__account, self.__password)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData == "", "The new password of user %s:admin changed by change_password() is not valid." % self.__account)
 
 
 if __name__ == "__main__":
