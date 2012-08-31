@@ -628,7 +628,7 @@ class Test_account_existence:
         random_account = CreateRandomString(8).generate()
         output = self.__sa.account_existence(random_account)
         nose.tools.ok_(output.result == False,\
-                       "Account %s does not exist! The result returned by account_existence() is wrong." % self.__account)
+                       "Account %s does not exist! The result returned by account_existence() is wrong." % random_account)
 
 
 class Test_list_account:
@@ -763,6 +763,105 @@ class Test_list_user:
             nose.tools.ok_(False, "Failed to execute list_user(): %s" % self.__output.msg)
 
 
+class Test_user_existence:
+    '''
+    Test for the function user_existence() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function user_existence() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account)
+        self.__sa.add_user(self.__account, self.__user)
+
+    def teardown(self):
+        print "End of unit test for function user_existence() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_FalseNegative(self):
+        '''
+        False negative test for the valuse returned by user_existence().
+        '''
+        output = self.__sa.user_existence(self.__account, self.__user)
+        nose.tools.ok_(output.result == True,\
+                       "User %s:%s has existed! The result returned by user_existence() is wrong." % (self.__account, self.__user))
+
+    def test_FalsePositive(self):
+        '''
+        False positive test for the values returned by user_existence().
+        '''
+        random_account = CreateRandomString(8).generate()
+        random_user = CreateRandomString(8).generate()
+        output = self.__sa.user_existence(random_account, random_user)
+        nose.tools.ok_(output.result == False,\
+                       "User %s:%s does not exist! The result returned by account_existence() is wrong." % (random_account, random_user))
+
+
+class Test_assign_read_acl:
+    '''
+    Test for the function assign_read_acl() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__password = CreateRandomString(12).generate()
+        self.__container = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account, "", self.__password)
+        self.__sa.add_user(self.__account, self.__user, self.__password)
+
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:admin -K %s post %s"\
+              % (auth_url, auth_port, self.__account, self.__password, self.__container)
+        os.system(cmd)
+
+        self.__sa.assign_read_acl(self.__account, self.__container, self.__user, "admin")
+
+    def teardown(self):
+        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_CheckReadACL(self):
+        '''
+        Check the correctness of the read ACL assigned by assign_read_acl().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s list %s"\
+              % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        else:
+            nose.tools.ok_(stderrData == "",\
+                           "Failed to assign read ACL by assign_read_acl(): User %s:%s cannot access container %s."\
+                           % (self.__account, self.__user, self.__container))
+
+
 if __name__ == "__main__":
     pass
-    
+    a = Test_assign_read_acl()
+    print a.setup()
