@@ -591,6 +591,96 @@ class Test_get_user_password:
         else:
             nose.tools.ok_(stderrData == "", "The password of user %s:admin obtained by get_user_password() is not correct." % self.__account)
 
+class Test_set_account_quota:
+    '''
+    Test for the function set_account_quota() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function set_account_quota() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account)
+
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__sa.set_account_quota(self.__account, self.__quota)
+
+    def teardown(self):
+        print "End of unit test for function set_account_quota() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+
+    def test_SettingOperation(self):
+        '''
+        Check whether the quota is successfully set by set_account_quota().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s download %s %s -o -"\
+              % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        elif stderrData != "":
+            nose.tools.ok_(False, "The metadata of account %s is not valid." % self.__account)
+        else:
+            output = json.loads(stdoutData)
+            nose.tools.ok_(output.get("admin").get("quota") == self.__quota, "The quota set by set_account_quota() is not correct!")
+
+
+class Test_set_user_quota:
+    '''
+    Test for the function set_user_quota() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function set_user_quota() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__sa.add_account(self.__account)
+        self.__sa.add_user(self.__account, self.__user)
+
+        self.__quota = random.randrange(1000000000, 1000000000000)
+        self.__sa.set_user_quota(self.__account, self.__user, self.__quota)
+
+    def teardown(self):
+        print "End of unit test for function set_user_quota() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_SettingOperation(self):
+        '''
+        Check whether the quota is successfully set by set_user_quota().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s download %s %s -o -"\
+              % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        elif stderrData != "":
+            nose.tools.ok_(False, "The metadata of account %s is not valid." % self.__account)
+        else:
+            output = json.loads(stdoutData)
+            nose.tools.ok_(output.get(self.__user).get("quota") == self.__quota, "The quota set by set_user_quota() is not correct!")
+
 
 class Test_account_existence:
     '''
