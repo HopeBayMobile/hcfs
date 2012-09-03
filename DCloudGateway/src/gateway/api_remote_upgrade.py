@@ -152,7 +152,7 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
-            cmd = "sudo apt-get install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
+            cmd = "sudo apt-get upgrade -y --force-yes 2> /tmp/log.txt"
             # ToDo: change to "DeltaGateway" package.
             a = os.system(cmd)
             # ^^^ upgrade gateway
@@ -169,7 +169,6 @@ def upgrade_gateway(enableReboot = True):
                     # ^^^ send a reboot command to os.
                     os.system("sudo service apache2 stop")
                     # ^^^ stop apache2 service 
-
             else:
                 op_ok = False
                 op_code = "002"
@@ -180,7 +179,6 @@ def upgrade_gateway(enableReboot = True):
             op_msg = "Gateway is already up to date."
             log.info("There is no new update detected when \
                         running upgrade_gateway()")
-
     except:
         op_ok = False
         op_code = "001"

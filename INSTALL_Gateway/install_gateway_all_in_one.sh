@@ -29,8 +29,8 @@ fi
 
 # 1. append apt-server domain name
 cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
-deb http://apt.delcloudia.com/ubuntu/ precise main
-deb-src http://apt.delcloudia.com/ubuntu precise main
+deb http://apt.delcloudia.com/packages/ubuntu/ precise main
+deb-src http://apt.delcloudia.com/packages/ubuntu precise main
 EOF
 
 #~ FIXME

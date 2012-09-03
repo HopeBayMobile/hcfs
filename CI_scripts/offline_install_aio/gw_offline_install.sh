@@ -58,6 +58,7 @@ cat > /etc/apt/sources.list.d/apt-cache.list <<EOF
 deb file:// $APTCACHEDIR/
 EOF
 apt-get update
+apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
 
 # run gateway installation
 	cd StorageAppliance/INSTALL_Gateway
