@@ -204,7 +204,7 @@ def do_meta_form(data):
 
     do_meta_form.report_progress(5, True, 'Assign device capacity for each host...', None)
     for host in hosts:
-        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1024 * 1024 * 1024)
+        host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1000 * 1000 * 1000)
 
     # construct node_info_db
     do_meta_form.report_progress(8, True, 'Construct node db...', None)

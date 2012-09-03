@@ -1,10 +1,10 @@
 [deploy]
-ip=192.168.11.10 zid=1 deviceCnt=6 deviceCapacity=100
-ip=192.168.11.11 zid=2 deviceCnt=6 deviceCapacity=100
+ip=192.168.11.10 zid=1 deviceCnt=6 deviceCapacity=2000000000000
+ip=192.168.11.11 zid=2 deviceCnt=6 deviceCapacity=2000000000000
 
 [addNodes]
-ip=192.168.11.12 zid=3 deviceCnt=6 deviceCapacity=100
-ip=192.168.11.13 zid=4 deviceCnt=6 deviceCapacity=100
+ip=192.168.11.12 zid=3 deviceCnt=6 deviceCapacity=2000000000000
+ip=192.168.11.13 zid=4 deviceCnt=6 deviceCapacity=2000000000000
 
 [deleteNodes]
 192.168.11.6  
@@ -14,8 +14,8 @@ ip=192.168.11.13 zid=4 deviceCnt=6 deviceCapacity=100
 192.168.11.10 
 
 [nodeList]
-hostname=STO1AA0110 deviceCnt=6 deviceCapacity=100
-hostname=STO1AA0111 deviceCnt=6 deviceCapacity=100
+hostname=STO1AA0110 deviceCnt=6 deviceCapacity=2000000000000
+hostname=STO1AA0111 deviceCnt=6 deviceCapacity=2000000000000
 
 [balance]
 192.168.11.10

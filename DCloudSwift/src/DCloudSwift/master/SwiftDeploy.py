@@ -246,9 +246,10 @@ class SwiftDeploy:
             os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
+                deviceWeight = int(node["deviceCapacity"]/float(1000 * 1000 * 1000))  # change unit from bytes to GB 
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
-                    cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
+                    cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %d %s" % (BASEDIR, node["zid"], node["ip"], deviceName, deviceWeight, swiftDir)
                     logger.info(cmd)
                     os.system(cmd)
 
@@ -307,9 +308,10 @@ class SwiftDeploy:
 
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
+                deviceWeight = int(node["deviceCapacity"]/float(1000 * 1000 * 1000))  # change unit from bytes to GB 
                 for j in range(deviceCnt):
                     deviceName = devicePrx + str(j + 1)
-                    cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %s" % (BASEDIR, node["zid"], node["ip"], deviceName, swiftDir)
+                    cmd = "sh %s/DCloudSwift/proxy/AddRingDevice.sh %d %s %s %d %s" % (BASEDIR, node["zid"], node["ip"], deviceName, deviceWeight, swiftDir)
                     logger.info(cmd)
                     os.system(cmd)
 
