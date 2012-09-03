@@ -492,11 +492,14 @@ class Test_disable_account:
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, "admin")
-        cmd3 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+        cmd3 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".services")
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account)
         os.system(cmd1)
         os.system(cmd2)
         os.system(cmd3)
+        os.system(cmd4)
 
     def test_Disabling(self):
         '''
