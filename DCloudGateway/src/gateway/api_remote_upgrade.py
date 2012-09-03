@@ -44,12 +44,12 @@ def get_gateway_version():
         res = po.stdout.readline()
         po.wait()
         if "upgradeable" in res:	# "dcloud-gateway/precise upgradeable from 1.0.10.20120830 to 1.0.10.20120831"
-			idx = -3
+            idx = -3
         elif "uptodate" in res:	#~  "dcloud-gateway/unknown uptodate 1.0.10.20120828"
-			idx = -1
-		else:
-			raise InvalidVersionString()
-		
+            idx = -1
+        else:
+            raise InvalidVersionString()
+
         t = res.split(' ')
         ver = t[idx].replace('\n', '')
 
