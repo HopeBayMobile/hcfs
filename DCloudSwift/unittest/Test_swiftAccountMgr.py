@@ -975,7 +975,7 @@ class Test_assign_write_acl:
         self.__sa.assign_write_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function assign_write_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -993,7 +993,7 @@ class Test_assign_write_acl:
 
     def test_CheckWriteACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the write ACL assigned by assign_write_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
@@ -1029,7 +1029,7 @@ class Test_remove_read_acl:
         self.__sa.remove_read_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function remove_read_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -1045,7 +1045,7 @@ class Test_remove_read_acl:
 
     def test_CheckReadACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the read ACL removed by remove_read_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s list %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container)
@@ -1085,7 +1085,7 @@ class Test_remove_write_acl:
         self.__sa.remove_write_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function remove_wirte_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -1103,7 +1103,7 @@ class Test_remove_write_acl:
 
     def test_CheckWriteACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the write ACL assigned by remove_write_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
