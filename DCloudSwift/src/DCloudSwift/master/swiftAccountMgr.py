@@ -605,7 +605,7 @@ class SwiftAccountMgr:
             return Bool(val, msg)
 
         # create the account and account administrator
-        add_user_output = self.add_user(account=account, user=self.__admin_default_name, password="",\
+        add_user_output = self.add_user(account=account, user=self.__admin_default_name, password=admin_password,\
                                         description=description, quota=quota, admin=True)
 
         if add_user_output.val == False:
@@ -2075,7 +2075,7 @@ class SwiftAccountMgr:
             msg = list_container_output.msg
             lock.release()
             return Bool(val, msg)
-        elif container not in msg:
+        elif container not in list_container_output.msg:
             val = False
             msg = "Container %s does not exist!" % container
             lock.release()
@@ -2167,7 +2167,7 @@ class SwiftAccountMgr:
             msg = list_container_output.msg
             lock.release()
             return Bool(val, msg)
-        elif container not in msg:
+        elif container not in list_container_output.msg:
             val = False
             msg = "Container %s does not exist!" % container
             lock.release()
@@ -2269,7 +2269,7 @@ class SwiftAccountMgr:
             msg = list_container_output.msg
             lock.release()
             return Bool(val, msg)
-        elif container not in msg:
+        elif container not in list_container_output.msg:
             val = False
             msg = "Container %s does not exist!" % container
             lock.release()
@@ -2372,7 +2372,7 @@ class SwiftAccountMgr:
             msg = list_container_output.msg
             lock.release()
             return Bool(val, msg)
-        elif container not in msg:
+        elif container not in list_container_output.msg:
             val = False
             msg = "Container %s does not exist!" % container
             lock.release()
