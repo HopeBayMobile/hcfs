@@ -975,7 +975,7 @@ class Test_assign_write_acl:
         self.__sa.assign_write_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function assign_write_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -993,7 +993,7 @@ class Test_assign_write_acl:
 
     def test_CheckWriteACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the write ACL assigned by assign_write_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
@@ -1029,7 +1029,7 @@ class Test_remove_read_acl:
         self.__sa.remove_read_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function remove_read_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -1045,7 +1045,7 @@ class Test_remove_read_acl:
 
     def test_CheckReadACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the read ACL removed by remove_read_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s list %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container)
@@ -1085,7 +1085,7 @@ class Test_remove_write_acl:
         self.__sa.remove_write_acl(self.__account, self.__container, self.__user, "admin")
 
     def teardown(self):
-        print "End of unit test for function assign_read_acl() in swiftAccountMgr.py\n"
+        print "End of unit test for function remove_wirte_acl() in swiftAccountMgr.py\n"
         cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
                % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
         cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
@@ -1103,7 +1103,7 @@ class Test_remove_write_acl:
 
     def test_CheckWriteACL(self):
         '''
-        Check the correctness of the read ACL assigned by assign_read_acl().
+        Check the correctness of the write ACL assigned by remove_write_acl().
         '''
         cmd = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
               % (auth_url, auth_port, self.__account, self.__user, self.__password, self.__container, self.__file)
@@ -1293,6 +1293,139 @@ class Test_obtain_user_info:
                 nose.tools.ok_(result.get("usage") == 0, "The value of usage is not correct.")
         else:
             nose.tools.ok_(False, "Failed to execute obtain_user_info(): %s" % self.__output.msg)
+
+
+class Test_modify_user_description:
+    '''
+    Test for the function modify_user_description() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function modify_user_description() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account = CreateRandomString(8).generate()
+        self.__user = CreateRandomString(8).generate()
+        self.__description = CreateRandomString(20).generate()
+        self.__sa.add_account(self.__account)
+        self.__sa.add_user(self.__account, self.__user)
+
+        self.__sa.modify_user_description(self.__account, self.__user, self.__description)
+
+    def teardown(self):
+        print "End of unit test for function modify_user_description() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, "admin")
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account, self.__user)
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account)
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+
+    def test_ModifyingOperation(self):
+        '''
+        Check whether the description is successfully modified by modify_user_description().
+        '''
+        cmd = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s download %s %s -o -"\
+              % (auth_url, auth_port, super_admin_password, self.__account, ".metadata")
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdoutData, stderrData) = po.communicate()
+
+        if po.returncode != 0:
+            nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
+        elif stderrData != "":
+            nose.tools.ok_(False, "The metadata of account %s is not valid." % self.__account)
+        else:
+            output = json.loads(stdoutData)
+            nose.tools.ok_(output.get(self.__user).get("description") == self.__description,\
+                           "The description modified by modify_user_description() is not correct!")
+
+
+class Test_list_usage:
+    '''
+    Test for the function list_usage() in swiftAccountMgr.py.
+    '''
+    def setup(self):
+        print "Start of unit test for function list_usage() in swiftAccountMgr.py\n"
+        self.__sa = SwiftAccountMgr()
+        self.__account1 = CreateRandomString(8).generate()
+        self.__user1 = CreateRandomString(8).generate()
+        self.__password1 = CreateRandomString(12).generate()
+        self.__file1 = CreateRandomString(8).generate()
+        self.__size1 = random.randrange(1000, 100000)
+        self.__sa.add_account(self.__account1)
+        self.__sa.add_user(self.__account1, self.__user1, self.__password1)
+        os.system("dd if=/dev/zero of=./%s bs=%d count=1" % (self.__file1, self.__size1))
+        self.__container1 = self.__user1 + "_private_container"
+
+        self.__account2 = CreateRandomString(8).generate()
+        self.__user2 = CreateRandomString(8).generate()
+        self.__password2 = CreateRandomString(12).generate()
+        self.__file2 = CreateRandomString(8).generate()
+        self.__size2 = random.randrange(1000, 100000)
+        self.__sa.add_account(self.__account2)
+        self.__sa.add_user(self.__account2, self.__user2, self.__password2)
+        os.system("dd if=/dev/zero of=./%s bs=%d count=1" % (self.__file2, self.__size2))
+        self.__container2 = self.__user2 + "_private_container"
+
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
+              % (auth_url, auth_port, self.__account1, self.__user1, self.__password1, self.__container1, self.__file1)
+        cmd2 = "swift -A https://%s:%s/auth/v1.0 -U %s:%s -K %s upload %s %s"\
+              % (auth_url, auth_port, self.__account2, self.__user2, self.__password2, self.__container2, self.__file2)
+
+        os.system(cmd1)
+        os.system(cmd2)
+
+        self.__output = self.__sa.list_usage()
+
+    def teardown(self):
+        print "End of unit test for function list_usage() in swiftAccountMgr.py\n"
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account1, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account1, "admin")
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account1, self.__user1)
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account1)
+
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+        os.system("rm %s" % self.__file1)
+
+        cmd1 = "swift -A https://%s:%s/auth/v1.0 -U .super_admin:.super_admin -K %s delete %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account2, ".metadata")
+        cmd2 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account2, "admin")
+        cmd3 = "swauth-delete-user -A https://%s:%s/auth -K %s %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account2, self.__user2)
+        cmd4 = "swauth-delete-account -A https://%s:%s/auth -K %s %s"\
+               % (auth_url, auth_port, super_admin_password, self.__account2)
+
+        os.system(cmd1)
+        os.system(cmd2)
+        os.system(cmd3)
+        os.system(cmd4)
+        os.system("rm %s" % self.__file2)
+
+    def test_ContentIntegrity(self):
+        '''
+        Check whether the usage returned by list_usage() is correct or not.
+        '''
+        result = self.__output
+        if result.val == False or result.msg.get(self.__account1) == None or result.msg.get(self.__account2) == None:
+            nose.tools.ok_(False, "Failed to execute list_usage().")
+        else:
+            nose.tools.ok_(result.msg.get(self.__account1).get(self.__user1).get("usage") == self.__size1,\
+                           "The usgae of user %s:%s returned by list_usage() is not correct." % (self.__account1, self.__user1))
+
+            nose.tools.ok_(result.msg.get(self.__account2).get(self.__user2).get("usage") == self.__size2,\
+                           "The usgae of user %s:%s returned by list_usage() is not correct." % (self.__account2, self.__user2))
 
 
 if __name__ == "__main__":
