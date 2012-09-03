@@ -124,11 +124,11 @@ class SwiftMonitorMgr:
         '''
         calculate used_capacity_percentage
         @param total: total capacity in bytes
-        return total capacity in TB
+        return total capacity in TB=10^12 bytes
         '''
         total_TB = None
         try:
-            total_TB = float(total)/float(1024*1024*1024*1024)
+            total_TB = float(total)/float(1000000000000)
         except Exception as e:
             self.logger.error(str(e))
 
