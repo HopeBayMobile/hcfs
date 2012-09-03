@@ -107,7 +107,7 @@ def new_account_confirm(request):
             if result.val:
                 #return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "description": description, "request": request, "Password": user_pw.msg})
                 return render_to_response('confirm_account.html', {"account_id": account_id, "description": description, "request": request,
-                    "user_id": user_id, "user_description": user_description})
+                    "user_id": user_id, "user_description": user_description, "user_quota":user_quota})
             else:
                 return HttpResponse(result.msg)
         else:
@@ -142,7 +142,7 @@ def edit_account(request, id):
         for i in users:
             if(i != "admin"):
                 if(float(users[i]["quota"])==0):
-                    HttpResponse("quota should not be zero")
+                    return HttpResponse("quota should not be zero")
                 cap = float(users[i]["usage"]) / float(users[i]["quota"])
                 cap = int( cap * 100 )
                 if cap > 100:
@@ -259,6 +259,7 @@ def new_user_confirm(request, id):
     if "user_id" in request.POST:
         user_id = request.POST["user_id"]
         description = request.POST["description"]
+        user_quota = request.POST["user_quota"]
         #apply
         SA = SwiftAccountMgr()
         #check if already exist
@@ -270,7 +271,11 @@ def new_user_confirm(request, id):
             user_pw = SA.get_user_password(account=id, user=user_id)
             if user_pw.val is False:
                 return HttpResponse("Can't get " + user_id + " password from " + id)
-            return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "description": description, "request": request, "Password": user_pw.msg})
+            result = SA.set_user_quota(account=id, user=user_id, quota=int(user_quota)*1024*1024*1024)
+            if result.val:
+                return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "user_description": description, "request": request, "user_password":user_pw.msg, "user_quota":user_quota})
+            else:
+                return HttpResponse(result.msg)
         else:
             return HttpResponse(result.msg)
     else:
