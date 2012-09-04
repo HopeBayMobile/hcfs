@@ -87,6 +87,8 @@ def main():
         os.system("chmod -R 777 /root")
         os.system("chown -R www-data:www-data %s"%CONFDIR)
         os.system("cp -rs /usr/bin/*s3ql* /usr/local/bin")
+        os.system("echo \"python /etc/delta/add_HDD_to_MD.py\" > /etc/rc.local ")
+        
 
 if __name__ == '__main__':
     main()
