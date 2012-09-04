@@ -73,7 +73,7 @@ Depends: python, python-setuptools, python-software-properties, curl, portmap, n
 Maintainer: CDS Team <ctbd@delta.com.tw>
 Description: Package for gateway API
 EOF
-    dpkg --build /tmp/pkg_DCloudGateway ./
+    dpkg --build /tmp/pkg_DCloudGateway $INITPATH
     check_ok
 
 # build dcloud-gateway meta package.
