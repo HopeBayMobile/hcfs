@@ -75,7 +75,10 @@ class SwiftClient():
                                              % (container, filename))
             if filename[0] == '/':
                 filename = filename[1:]
-            if returnData[1].strip() == filename:
+            # wthung, 2012/9/3
+            # swift upload <container> returns 403 forbidden in some swift
+            # for a word around, just find the file name in the return string
+            if filename in returnData[1].strip():
                 return True
             else:
                 log.error('swift upload fail: %s' % returnData[1])
