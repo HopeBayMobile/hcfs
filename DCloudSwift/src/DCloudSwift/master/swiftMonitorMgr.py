@@ -84,7 +84,7 @@ class SwiftMonitorMgr:
              self.logger.error(str(e))
              return None
 
-    def get_used_capacity(self, user_usage):
+    def get_used_capacity(self, user_usage=None):
         '''
         @user_usage: user storage usages of following format
                 {
@@ -267,7 +267,6 @@ class SwiftMonitorMgr:
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
         zone = {"ip": url, "nodes": nodes, "used": used, "free": free, "capacity": capacity, "firmware": firmware}
-        
         return zone
 
     def list_nodes_info(self):
