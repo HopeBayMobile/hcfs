@@ -26,8 +26,6 @@ from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
 from util.util import GlobalVar
-from util.database import AccountDatabaseBroker
-from util.database import DatabaseConnectionError
 
 
 class InconsistentDatabaseError(Exception):
