@@ -65,7 +65,7 @@ class SwiftMonitorMgr:
 
         return capacity
 
-    def get_number_of_storage_nodes(self, storageList):
+    def get_number_of_storage_nodes(self, storageList=None):
         '''
         @param storageList: list of nodes to count number of nodes. 
                             If None is given, then util.getStorageList() is used.
