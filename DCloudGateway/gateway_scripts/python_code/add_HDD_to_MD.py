@@ -109,7 +109,7 @@ def PartNewHDD(disk, debug=False):
     
     return True
 
-def Parse_NewHDD(fdisk_info):
+def Parse_NewHDD():
     #cmd = "cat /proc/mdstat"
     
     fdiskre = re.compile(".*/dev/(?P<diskname>[^:\s+]+)")
@@ -161,20 +161,10 @@ def Parse_NewHDD(fdisk_info):
                 
     return None
 
-def ParseMD_Info(info):
-    #change the owner of nfs share to nobody:nogroup
-    cmd = "cat /proc/mdstat" 
-    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
-    
-    if po.returncode != 0:
-        print "error" + output
-
 # add a new disk (must be no any partition on it) to MD
 def Add_Disk_and_Rebuild_MD():
     # find disk w/o partition
-    noPartedDisk = Parse_NewHDD(fdisk_info)
+    noPartedDisk = Parse_NewHDD()
     #print noPartedDisk
     
     # no such a disk

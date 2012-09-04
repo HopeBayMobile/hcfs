@@ -26,8 +26,6 @@ from util import util
 from util import threadpool
 from util.SwiftCfg import SwiftCfg
 from util.util import GlobalVar
-from util.database import AccountDatabaseBroker
-from util.database import DatabaseConnectionError
 
 
 class InconsistentDatabaseError(Exception):
@@ -717,8 +715,8 @@ class SwiftAccountMgr:
                 lock.release()
                 return Bool(val, msg)
 
-        # delete the metadata
-        metadata_object = account + " " + self.__metadata_name
+        # delete the metadata and the file .services
+        metadata_object = account + " " + self.__metadata_name + " " + ".services"
 
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__delete_target,\
                                            account=".super_admin", target=metadata_object, admin_user=".super_admin",\

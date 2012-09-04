@@ -35,14 +35,19 @@
 </tr>
 <tr>
   <td>Description</td>
-  <td>{{description}}</td>
+  <td>{{user_description}}</td>
 </tr>
 <tr>
   <td>Password</td>
-  <td>{{Password}}</td>
+  <td>{{user_password}}</td>
+</tr>
+<tr>
+  <td>Quota</td>
+  <td>{{user_quota}}</td>
 </tr>
 </table>
 
-<a class="btn" href="/account/{{account_id}}/user/new">Create other User</a> <a class="btn" href="/account/{{account_id}}/edit">Finish</a>
+<h3>Would you want to create more User?</h3>
+<a class="btn" href="/account/{{account_id}}/user/new">Yes</a> <a class="btn" href="/account/{{account_id}}/edit">No</a>
 </div>
 {% endblock %}

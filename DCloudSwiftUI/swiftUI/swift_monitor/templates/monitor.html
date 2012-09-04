@@ -18,7 +18,10 @@ $(document).ready(function() {
             //"bSort": false,
             "bInfo": false,
             //"bAutoWidth": false
-            "asStripeClasses": []
+            "asStripeClasses": [],
+            "aoColumnDefs": [
+            { "bSortable": false, "aTargets": [ 3, 4, 5 ] }
+            ]
             });
         $.extend( $.fn.dataTableExt.oStdClasses, {
             "sWrapper": "dataTables_wrapper form-inline"
@@ -98,16 +101,20 @@ $(document).ready(function() {
             <tr>
                 <td>{{node.hostname}}</td>
                 <td><a href="#" id="display{{node.index}}">{{node.ip}}</a></td>
+                <td>
                 {% if node.status == "dead" %}
-                <td class="fail_tab">
+                <table><td class="fail_tab">
                 {% else %}
-                <td class="success_tab">
+                <table><td class="success_tab">
                 {% endif %}
-                {{node.status}}</td>
-                <td><!-- HD Number -->
+                {{node.status}}
+                </table>
+                </td>
+                <td>
+                <!-- HD Number -->
                     {{node.hd_number}}
                     <br />
-                    <table>
+                    <table class="display{{node.index}}">
                     {% for info in node.hd_info %}
                     <tr>
                         <td>{{info.serial}}</td>
@@ -116,13 +123,15 @@ $(document).ready(function() {
                     </table>
                 </td>
                 <!-- HD Status -->
+                <td>
                 {% if node.mode == "waiting" %}
-                <td class="fail_tab">
+                <table><td class="fail_tab">
                 {% else %}
-                <td class="success_tab">
+                <table><td class="success_tab">
                 {% endif %}
                 {{node.mode}}
-                    <table>
+                </table>
+                <table class="display{{node.index}}">
                     {% for info in node.hd_info %}
                     <tr>
                     {% if info.status == "Broken" %}
@@ -138,7 +147,7 @@ $(document).ready(function() {
                 <!--Capacity-->
                 <td>
                     6.0TB
-                    <table>
+                    <table class="display{{node.index}}">
                         {% for info in node.hd_info %}
                         <tr>
                             <td>

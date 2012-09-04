@@ -65,7 +65,7 @@ class SwiftMonitorMgr:
 
         return capacity
 
-    def get_number_of_storage_nodes(self, storageList):
+    def get_number_of_storage_nodes(self, storageList=None):
         '''
         @param storageList: list of nodes to count number of nodes. 
                             If None is given, then util.getStorageList() is used.
@@ -84,7 +84,7 @@ class SwiftMonitorMgr:
              self.logger.error(str(e))
              return None
 
-    def get_used_capacity(self, user_usage):
+    def get_used_capacity(self, user_usage=None):
         '''
         @user_usage: user storage usages of following format
                 {
@@ -124,11 +124,11 @@ class SwiftMonitorMgr:
         '''
         calculate used_capacity_percentage
         @param total: total capacity in bytes
-        return total capacity in TB
+        return total capacity in TB=10^12 bytes
         '''
         total_TB = None
         try:
-            total_TB = float(total)/float(1024*1024*1024*1024)
+            total_TB = float(total)/float(1000000000000)
         except Exception as e:
             self.logger.error(str(e))
 
@@ -267,7 +267,6 @@ class SwiftMonitorMgr:
                 free = "%.2f" % (self.calculate_free_capacity_percentage(total_capacity, used_capacity))
             
         zone = {"ip": url, "nodes": nodes, "used": used, "free": free, "capacity": capacity, "firmware": firmware}
-        
         return zone
 
     def list_nodes_info(self):
