@@ -128,7 +128,6 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
     """Encapsulates working with a node information database."""
 
 
-    @lock
     def add_info_and_spec(self, nodeList):
         """
         add info and specs for nodes not in node list
