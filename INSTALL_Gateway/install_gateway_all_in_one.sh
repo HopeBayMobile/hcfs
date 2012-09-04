@@ -23,9 +23,9 @@ if [ "$1" != "dom" ]; then
 fi
 
 # install gateway API
-	apt-get install -y --force-yes dcloud-gateway
-	check_ok
-	apt-get -y --force-yes -f install
+    apt-get install -y --force-yes dcloud-gateway
+    check_ok
+    apt-get -y --force-yes -f install
 
 # 1. append apt-server domain name
 cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
@@ -36,6 +36,9 @@ EOF
 #~ FIXME
     # 2. sudo apt-key adv --recv-keys ...
 
+# FIXME - Clean up unsed files to free up space
+rm -r /usr/share/doc /usr/src
+rm -r /usr/local/MYSQL/mysql-test	## just a test, not sure whether it is safe.
 
 # install samba 3.6.6
 cd ../GatewayPatches
@@ -49,6 +52,6 @@ cd ../DCloudGatewayUI
 ./setup.sh
 update-rc.d celeryd defaults
 
-# FIXME - Clean up unsed files to free up space
+
 sleep 3
 echo "Installation of Gateway is completed..."
