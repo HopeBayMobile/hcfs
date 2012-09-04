@@ -141,6 +141,7 @@ def edit_account(request, id):
         users_list = []
         for i in users:
             if(i != "admin"):
+                users[i]["id"]=i
                 if(float(users[i]["quota"])==0):
                     return HttpResponse("quota should not be zero")
                 cap = float(users[i]["usage"]) / float(users[i]["quota"])
