@@ -3,9 +3,27 @@ import sqlite3
 import util
 import time
 import json
+import fcntl
+import functools
 from contextlib import contextmanager
 
 BROKER_TIMEOUT = 60
+
+# lock decorator
+def lock(fn):
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        handle = open(self.lockfile, 'w')
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            ret = fn(self, *args, **kwargs)
+            return ret
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+            handle.close()
+
+    return wrapper  # decorated function
+
 
 
 class DatabaseConnectionError(sqlite3.DatabaseError):
@@ -63,6 +81,11 @@ class DatabaseBroker(object):
         self.db_file = db_file
         self.db_dir = os.path.dirname(db_file)
         self.timeout = timeout
+        self.lockfile = "/etc/delta/lockfiles" + db_file
+        
+        lockfile_dir = os.path.dirname(self.lockfile)
+        if not os.path.exists(lockfile_dir):
+            util.mkdirs(lockfile_dir)
 
     def initialize(self):
         """
@@ -99,148 +122,6 @@ class DatabaseBroker(object):
         except Exception:
             conn.close()
             raise
-
-class AccountDatabaseBroker(DatabaseBroker):
-    """Encapsulates working with a Account database."""
-
-    def _initialize(self, conn):
-        self.create_user_info_table(conn)
-
-    def create_user_info_table(self, conn):
-        """
-        Create user_info table which is specific to the account DB.
-
-        :param conn: DB connection object
-        """
-        conn.executescript("""
-            CREATE TABLE user_info (
-                account TEXT NOT NULL,
-                name TEXT NOT NULL,
-                enabled BOOLEAN NOT NULL,
-                PRIMARY KEY (account, name)
-            );
-        """)
-
-    def show_user_info_table(self):
-        with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info").fetchall()
-            return row
-
-    def add_user(self, account, name):
-        """
-        add user into the db
-
-        :param account: account of the user
-        :param name: name of the user
-        :returns: return None if the user already exists. Otherwise return the newly added row
-        """
-        with self.get() as conn:
-            row_account = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
-            row_name = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-
-            if row_name:
-                return None
-            if not row_account:
-                return False
-            else:
-                conn.execute("INSERT INTO user_info VALUES (?,?,?)", (account, name, 1))
-                conn.commit()
-                row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-                return row
-
-    def delete_user(self, account, name):
-        '''
-         delete user from the db
-        :param account: account of the user
-        :param name: name of the user
-        :returns: return None if the user does not exist; otherwise return the deleted row
-        '''
-        with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-            if row:
-                conn.execute("DELETE FROM user_info WHERE account=? AND name=?", (account, name))
-                conn.commit()
-                return row
-            else:
-                return None
-
-    def add_account(self, account):
-        """
-        add account into the db
-        @author: Rice
-        @type  account: string
-        @param account: the name of account
-        @return: return None if the account already exists. Otherwise return the newly added row.
-        """
-
-        with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
-            if row:
-                return None
-            else:
-                conn.execute("INSERT INTO user_info VALUES (?,0,?)", (account, 1))
-                conn.commit()
-                row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
-                return row
-
-    def delete_account(self, account):
-        '''
-         delete user from the db
-         @author: Rice
-         @type  account: string
-         @param account: the name of account
-         @return: return None if the account does not exists. Otherwise, return the deleted row.
-        '''
-        with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info where account=?", (account,)).fetchone()
-            if row:
-                conn.execute("DELETE FROM user_info WHERE account=?", (account,))
-                conn.commit()
-                return row
-            else:
-                return None
-
-    def disable_user(self, account, name):
-        """
-        set enabled of user to False if the user exists
-
-        :param account: account of the user
-        :param name: name of the user
-        :returns: no return
-        """
-        with self.get() as conn:
-            conn.execute("UPDATE user_info SET enabled = ? where account=? AND name=?", (0, account, name))
-            conn.commit()
-
-    def enable_user(self, account, name):
-        """
-        set enabled of user to True if the user exists
-
-        :param account: account of the user
-        :param name: name of the user
-        :returns: no return
-        """
-        with self.get() as conn:
-            conn.execute("UPDATE user_info SET enabled = ? where account=? AND name=?", (1, account, name))
-            conn.commit()
-
-    def is_enabled(self, account, name):
-        """
-        check if user account:name is enabled
-
-        :param account: account of the user
-        :param name: name of the user
-        :returns: if account:name exists and is enabled then return true. Otherwise return false.
-        """
-        with self.get() as conn:
-            row = conn.execute("SELECT * FROM user_info where account=? AND name=?", (account, name)).fetchone()
-            if row:
-                if row["enabled"] == 1:
-                    return True
-                else:
-                    return False
-            else:
-                return False
 
 
 class NodeInfoDatabaseBroker(DatabaseBroker):
@@ -351,6 +232,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             row = conn.execute("SELECT * FROM node_spec").fetchall()
             return row
 
+    @lock
     def add_node(self, hostname, status, timestamp, disk, mode, switchpoint):
         """
         add node to node_info
@@ -381,6 +263,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def add_spec(self, hostname, diskcount, diskcapacity):
         """
         add spec to node_spec
@@ -406,6 +289,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def delete_node(self, hostname):
         """
         delete a node from node_info
@@ -425,6 +309,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 return None
 
+    @lock
     def delete_spec(self, hostname):
         """
         delete a spec from node_spec
@@ -504,6 +389,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             else:
                 return row
 
+    @lock
     def update_node_status(self, hostname, status, timestamp):
         """
         update node status information to node_info
@@ -528,6 +414,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def update_node_disk(self, hostname, disk):
         """
         update disk information into node_info
@@ -550,6 +437,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def update_node_mode(self, hostname, mode, switchpoint):
         """
         update disk mode information into node_info
@@ -574,6 +462,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def update_spec_diskcount(self, hostname, diskcount):
         """
         update node status information to node_info
@@ -597,6 +486,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 row = conn.execute("SELECT * FROM node_spec where hostname=?", (hostname,)).fetchone()
                 return row
 
+    @lock
     def update_spec_diskcapacity(self, hostname, diskcapacity):
         """
         update node status information to node_info
@@ -682,7 +572,6 @@ class MaintenanceBacklogDatabaseBroker(DatabaseBroker):
                 conn.commit()
                 row = conn.execute("SELECT * FROM maintenance_backlog where hostname=?", (hostname,)).fetchone()
                 return row
-
     def delete_maintenance_task(self, hostname):
         """
         delete task from maintenance_backlog
@@ -736,11 +625,11 @@ if __name__ == '__main__':
     os.system("rm /etc/delta/swift_node.db")
     db = NodeInfoDatabaseBroker("/etc/delta/swift_node.db")
     db.initialize()
-    db.add_spec(hostname="ddd", diskcount=3)
-    db.add_spec(hostname="dd", diskcount=3)
-    rows = db.show_node_spec_table()
-    for row in rows:
-        print row
+    db.add_spec(hostname="ddd", diskcount=3, diskcapacity=100)
+#    db.add_spec(hostname="dd", diskcount=3)
+#    rows = db.show_node_spec_table()
+#    for row in rows:
+#        print row
 #    db.add_node(hostname="ddd", status="alive", timestamp=123, disk="{}", mode="service", switchpoint=234)
     print db.get_spec("ddd")
     print db.update_spec_diskcount("ddd", 5)

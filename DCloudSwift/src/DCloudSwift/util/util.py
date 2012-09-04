@@ -33,7 +33,6 @@ GlobalVar = enum(SWIFTCONF='%s/DCloudSwift/Swift.ini' % BASEDIR,
          SWIFTDIR='/etc/swift',
          ORI_SWIFTCONF='%s/Swift.ini' % DELTADIR,
          MASTERCONF='%s/swift_master.ini' % DELTADIR,
-         ACCOUNT_DB='%s/swift_account.db' % DELTADIR,
          NODE_DB='%s/swift_node.db' % DELTADIR,
          MAINTENANCE_BACKLOG='%s/swift_maintenance_backlog.db' % DELTADIR,
          OBJBUILDER='object.builder',
@@ -862,36 +861,6 @@ def spreadPackages(password, nodeList=[]):
             returncode += 1
             logger.error("Failed to execute \"%s\" for %s" % (cmd, err))
             print "Failed to install swift packages on %s" % ip
-            continue
-
-    return (returncode, blackList)
-
-
-def spreadRC(password, nodeList=[]):
-    logger = getLogger(name="spreadRC")
-    blackList = []
-    returncode = 0
-    cmd = ""
-    for ip in nodeList:
-        try:
-            print "Start spreading rc.local to %s ..." % ip
-            logger.info("scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc root@%s:/etc/init.d/rc" % (ip))
-            cmd = "scp -o StrictHostKeyChecking=no /etc/lib/swift/BootScripts/rc root@%s:/etc/init.d/rc" % (ip)
-            (status, stdout, stderr) = sshpass(password, cmd, timeout=60)
-            if status != 0:
-                raise SshpassError(stderr)
-
-        except TimeoutError as err:
-            blackList.append(ip)
-            returncode += 1
-            logger.error("Failed to execute \"%s\" in time" % (cmd))
-            print "Failed to spread rc.local to %s" % ip
-            continue
-        except SshpassError as err:
-            blackList.append(ip)
-            returncode += 1
-            logger.error("Failed to execute \"%s\" for %s" % (cmd, err))
-            print "Failed to rc.local to %s" % ip
             continue
 
     return (returncode, blackList)
