@@ -1,6 +1,13 @@
 #!/bin/sh
 CACHE_DIR="/storage/http_proxy_cache/"
 CONFDIR="/etc/delta"
+PY_PATH="/usr/local/lib/python2.7/dist-packages/"
+
+### 1. setup python search path
+cat > $PY_PATH/gatewayapi.pth << EOF
+$PY_PATH/DCloudGateway
+EOF
+
 ### 2. setup config file
 mkdir -p $CACHE_DIR
 bash /tmp/gen_squid3_conf.sh

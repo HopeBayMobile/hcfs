@@ -24,6 +24,7 @@ check_ok() {
     fi
 
 # define parameters
+    echo "      ***** Building S3QL *****"
     GW_VERSION=$1
     S3QL_VERSION=$2
     BUILD=$3
@@ -41,9 +42,11 @@ check_ok() {
     # build DEB file
     dpkg-buildpackage -rfakeroot -b
     check_ok
-#~ #~
+
 # build DCloudGateway (API)
+    echo "      ***** Building dcloudgatewayapi *****"
     cd $INITPATH
+    rm -r /tmp/pkg_DCloudGateway/
     mkdir -p /tmp/pkg_DCloudGateway/tmp/
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
     cp -r $INITPATH/StorageAppliance/DCloudGateway/config /tmp/pkg_DCloudGateway/tmp/
@@ -53,8 +56,12 @@ check_ok() {
 
     mkdir -p $PY_BUILD_PATH
     # build api files
-    cd DCloudGateway
-    python setup.py build --build-base=$PY_BUILD_PATH
+    cd StorageAppliance/DCloudGateway
+    python setup.py clean
+    python setup.py build
+    python -m compileall build/lib.linux*     # compile python code
+    find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
+    cp -r build/lib.linux*/* $PY_BUILD_PATH
     # edit control file
 cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
 Package: dcloudgatewayapi
@@ -68,8 +75,9 @@ Description: Package for gateway API
 EOF
     dpkg --build /tmp/pkg_DCloudGateway ./
     check_ok
-#~ #~
+
 # build dcloud-gateway meta package.
+    echo "      ***** Building dcloud-gateway *****"
     cd $INITPATH
 cat > $INITPATH/dcloud-gateway << EOF
 # Source: <source package name; defaults to package name>
