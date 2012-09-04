@@ -18,6 +18,8 @@ def index(request):
         account_list = []
         for i in accounts:
             accounts[i]["id"] = i
+            if(accounts[i]["user_number"]>0):
+                accounts[i]["user_number"]-=1
             account_list.append(accounts[i])
         return render_to_response('list_account.html', {"accounts": account_list, "request": request})
     else:
