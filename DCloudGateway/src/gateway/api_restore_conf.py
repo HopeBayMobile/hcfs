@@ -80,7 +80,7 @@ def _get_latest_backup():
     # get uesrname to use private container
     _, username = login.split(':')
 
-    cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list %s_private_container" %\
+    cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list %s_gateway_config" %\
           (url, login, password, username)
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
                           stderr=subprocess.STDOUT)
@@ -148,7 +148,7 @@ def save_gateway_configuration():
         _, container_name = swiftData[1].split(':')
 
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
-        backuptime = backupToCloudObj.backup(container_name + "_private_container")
+        backuptime = backupToCloudObj.backup(container_name + "_gateway_config")
         return_val = {'result'  : True,
                       'code'    : '100',
                       'data'    : {'backup_time': backuptime},
@@ -189,7 +189,7 @@ def restore_gateway_configuration():
         _, username = login.split(':')
 
         cmd = "cd %s; " % (tmp_dir)
-        cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download %s_private_container %s"\
+        cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download %s_gateway_config %s"\
                 % (url, login, password, username, fname)
         os.system(cmd)
         # ^^^ 1. download last backup file.
