@@ -1,17 +1,61 @@
 """
 web deploy script
-0.2 fredlin 2011/9/4
+0.2 fredlin 2012/9/4
 
-First time usage:
+Install
+-----------------
+
+pre-requisite package:
+
+$ pip install fabric
+
+
+2 Step Usage:
+------------------
+
+1. First time usage:
 
 In linux machine, run command in console:
 
 $ fab setup
 $ fab vncserver
 
-then open another console to run
+2. then open another console to run
 
 $ fab vnc
+
+Deploy Web
+------------------
+
+edit src_path to reflect your local path.
+
+run command:
+
+$ fab deploy
+
+to update web ui.
+
+Deploy Module
+------------------
+
+edit src_path to reflect your local path.
+
+run command:
+
+$ fab deploy_module
+
+to update module.
+
+Reload Target web Server
+--------------------------
+
+(this command does not included in this tool)
+
+In target server you may need to run
+
+# /etc/init.d/apache-zcw reload
+
+to reload web.
 
 """
 from fabric.api import *
