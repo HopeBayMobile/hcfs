@@ -1006,7 +1006,7 @@ class Test_assign_write_acl:
         if po.returncode != 0:
             nose.tools.ok_(False, "Failed to execute the command %s: %s" % (cmd, stderrData))
         else:
-            nose.tools.ok_(stderrData == "",\
+            nose.tools.ok_(self.__file in stdoutData,\
                            "Failed to assign write ACL by assign_read_acl(): User %s:%s cannot write container %s."\
                            % (self.__account, self.__user, self.__container))
 
