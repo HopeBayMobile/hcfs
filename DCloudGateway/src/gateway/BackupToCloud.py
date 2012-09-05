@@ -45,7 +45,7 @@ class BackupToCloud():
         self._metaData = {}
         self.currentPath = os.path.dirname(os.path.abspath(__file__))
 
-    def backup(self):
+    def backup(self, container):
         """
         start backup file list to cloud
         @rtype: string
@@ -59,7 +59,7 @@ class BackupToCloud():
         log.debug('prepare tar compression file')
         self.tarFile()
         log.debug('start send to cloud')
-        self.sendToCloud()
+        self.sendToCloud(container)
         return self._datetime
 
     def copyFile(self):
@@ -101,12 +101,12 @@ class BackupToCloud():
         os.system('cd %s;tar -zcvf %s ./ --exclude *.tar.gz'
                   % (TEMP_PATH, self._tarFileName))
 
-    def sendToCloud(self):
+    def sendToCloud(self, container):
         """
         send tar.gz file to cloud storage
         """
         os.chdir(TEMP_PATH)
-        self._cloudObject.upload('config', self._tarFileName)
+        self._cloudObject.upload(container, self._tarFileName)
         os.chdir(self.currentPath)
 
 

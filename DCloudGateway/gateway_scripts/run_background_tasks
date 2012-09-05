@@ -1,9 +1,4 @@
 #!/bin/sh -e
 
-# wt, is a daemon, for regularly update GUI's data
 /usr/bin/python /etc/delta/gw_bktask.py
-
-# jashing, normal program, for rebuild RAID
 /usr/bin/python /etc/delta/add_HDD_to_MD.py
-
-
