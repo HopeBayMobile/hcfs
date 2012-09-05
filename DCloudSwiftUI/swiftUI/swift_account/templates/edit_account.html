@@ -5,13 +5,46 @@
 
 {% block moreScripts%}
 <script src="/static/js/bootstrap-modal.js" type="text/javascript"></script>
+<script src="/static/js/bootstrap-button.js" type="text/javascript"></script>
 <script src="/static/js/jquery.validate.min.js" type="text/javascript"></script>
 <script src="/static/js/additional-methods.min.js" type="text/javascript"></script>
+<script src="/static/js/jquery.dataTables.min.js" type="text/javascript"></script>
+<script src="/static/js/table_js.js" type="text/javascript"></script>
 <script type="text/javascript">
     $(document).ready(function() {
             $("#form1").validate();
             });
 </script>
+<script type="text/javascript">
+//http://datatables.net/release-datatables/examples/basic_init/filter_only.html
+$(document).ready(function() {
+        $('#user_list').dataTable( {
+            "sDom": "<'row'<'span6'l><'span6'f>r>t<'row'<'span6'i><'span6'p>>",
+            "sPaginationType": "bootstrap",
+            "oLanguage": {
+            "sLengthMenu": "_MENU_ records per page"
+            },
+            //"bPaginate": false,
+            "bLengthChange": false,
+            //"bFilter": true,
+            //"bSort": false,
+            "bInfo": false,
+            //"bAutoWidth": false
+            "asStripeClasses": [],
+            "aoColumnDefs": [
+            { "bSortable": false, "aTargets": [ 0, 4 ] }
+            ]
+            });
+        $.extend( $.fn.dataTableExt.oStdClasses, {
+            "sWrapper": "dataTables_wrapper form-inline"
+            });
+        });
+</script>
+{% endblock %}
+
+{% block moreStyles%}
+<link rel="stylesheet" href="/static/css/jquery.dataTables.css">
+<link rel="stylesheet" href="/static/css/table_style.css">
 {% endblock %}
 
 {% block navbar_class %}{% endblock %}
@@ -64,7 +97,8 @@
   </div>
   <div class="row-fluid">
     <div class="span12">
-  <table class="table">
+        <table class="table" id="user_list">
+            <thead>
 <tr>
 <th></th>
 <th>User Name</th>
@@ -72,6 +106,8 @@
 <th>Description</th>
 <th>Action</th>
 </tr>
+</thead>
+<tbody>
 {% for user in users %}
 <tr>
 <td>{{forloop.counter}}</td>
@@ -93,12 +129,13 @@
 <a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a> 
 {% else %}
 <a class="btn" disabled="disabled">Reset PW</a> <a class="btn" disabled="disabled">Query</a>
-<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a> 
+<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable" data-loading-text="waiting..."><i class="icon-off"></i>On</a></a> 
 <a class="btn" id="del_user${{user.id}}" name="{{user.id}}" href="#modal" data-toggle="modal" data-target="#delete_user"><i class="icon-remove"></i>Delete</a>
 {% endif %}
 </td>
 </tr>
 {% endfor%}
+</tbody>
   </table>
   </div>
   </div>
@@ -113,7 +150,7 @@
     This will suspend user "<span id="modal_dis_user"></span>" service, are you sure?
   </div>
   <div class="modal-footer">
-    <span class="btn btn-primary" id="modal_dis_user_link">Yes</span>
+    <span class="btn btn-primary" id="modal_dis_user_link" data-loading-text="waiting...">Yes</span>
     <a href="#" class="btn" data-dismiss="modal">No</a>
   </div>
 </div>
@@ -244,7 +281,7 @@
     console.log("delete "+user_id);
     $("#modal_del_user").text(user_id);
     //use ajax to query password
-    $.ajax({
+    /*$.ajax({
         type:"GET",
         url:"/account/{{account_id}}/user/"+user_id+"/password",
         success: function(msg){
@@ -252,7 +289,10 @@
           $("#modal_del_oldpw").text(msg);
           $('#delete_user').modal('show');
         }
-    });
+    });*/
+    user_pw = "ERHJUYKWE";
+    $("#modal_del_oldpw").text(user_pw);
+    $('#delete_user').modal('show');
   });
   
   $('#del_user').click(function(evt){
@@ -264,6 +304,7 @@
         url:"/account/{{account_id}}/user/"+user_id+"/delete",
         success: function(msg){
           $('#delete_user').modal('hide');
+          location.reload();
         }
       });
     } else {
