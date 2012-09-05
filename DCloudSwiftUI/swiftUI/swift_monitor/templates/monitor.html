@@ -98,10 +98,6 @@ $(document).ready(function() {
             </tr>
           </thead>
             {% for node in nodes %}
-            <style type="text/css">
-                .display{{node.index}} {
-                }
-            </style>
             <tr>
                 <td>{{node.hostname}}</td>
                 <td><a href="#" id="display{{node.index}}">{{node.ip}}</a></td>

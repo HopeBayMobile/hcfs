@@ -75,24 +75,35 @@ def _get_latest_backup():
     get the latest backup config from swift
     """
     [url, login, password] = _get_Swift_credential()
-    cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list config" %\
-          (url, login, password)
+
+    # wthung, 2012/9/3
+    # get uesrname to use private container
+    _, username = login.split(':')
+
+    cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list %s_gateway_config" %\
+          (url, login, password, username)
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
                           stderr=subprocess.STDOUT)
     res = po.stdout.readlines()
     po.wait()
 
-    #~ Case 1. There is no container "config"
+    #~ Case 1. There is private container
     if "not found" in res[0]:
         return None
     else:
         #~ Case 2. Get a list of files
         latest_dt = -999
         for fn in res:   # find latest backup
+            if "gw_conf_backup" not in fn:
+                continue
+            
             dt = fn[0:10]
             if dt > latest_dt:
                 latest_dt = dt
                 fname = fn      # fname is the file name of latest backup
+
+        if latest_dt == -999:
+            return None
 
         backup_info = {'datetime': latest_dt, 'fname': fname}
         return backup_info
@@ -131,8 +142,13 @@ def save_gateway_configuration():
         return json.dumps(return_val)
     try:
         swiftObj = SwiftClient(swiftData[0], swiftData[1], swiftData[2])
+        
+        # wthung, 2012/9/3
+        # swiftData[1] is the login pair
+        _, container_name = swiftData[1].split(':')
+
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
-        backuptime = backupToCloudObj.backup()
+        backuptime = backupToCloudObj.backup(container_name + "_gateway_config")
         return_val = {'result'  : True,
                       'code'    : '100',
                       'data'    : {'backup_time': backuptime},
@@ -167,9 +183,14 @@ def restore_gateway_configuration():
     else:
         fname = backup_info['fname']
         [url, login, password] = _get_Swift_credential()
+
+        # wthung, 2012/9/3
+        # get uesrname to use private container
+        _, username = login.split(':')
+
         cmd = "cd %s; " % (tmp_dir)
-        cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download config %s"\
-                % (url, login, password, fname)
+        cmd += "swift -A https://%s/auth/v1.0 -U %s -K %s download %s_gateway_config %s"\
+                % (url, login, password, username, fname)
         os.system(cmd)
         # ^^^ 1. download last backup file.
         cmd = "cd %s; tar zxvf %s " % (tmp_dir, fname)
@@ -217,12 +238,10 @@ def restore_gateway_configuration():
 
 #----------------------------------------------------------------------
 if __name__ == '__main__':
-    #~ res = save_gateway_configuration()
-    #~ print res
-    info = get_configuration_backup_info()
-    print info
-    #~ res = restore_gateway_configuration()
-    #~ #res = save_gateway_configuration()
-
-    #~ print res
+    #res = save_gateway_configuration()
+    #print res
+    #info = get_configuration_backup_info()
+    #print info
+    res = restore_gateway_configuration()
+    print res
     pass
