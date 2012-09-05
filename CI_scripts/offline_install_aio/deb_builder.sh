@@ -59,8 +59,10 @@ check_ok() {
     cd StorageAppliance/DCloudGateway
     python setup.py clean
     python setup.py build
-    python -m compileall build/lib.linux*     # compile python code
-    find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
+    ## suspect causing apply_network() failure vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    #~ python -m compileall build/lib.linux*     # compile python code
+    #~ find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
+    ## suspect causing apply_network() failure ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     cp -r build/lib.linux*/* $PY_BUILD_PATH
     # edit control file
 cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
