@@ -168,6 +168,22 @@ class SwiftMonitorMgr:
         
         return percentage
 
+    def calculate_node_capacity_in_TB(self, diskcount, diskcapacity, unusable=0):
+        '''
+        calculate node capacity in TB
+        @param diskcount: disk count in the node
+        @param diskcapacity: capacity per disk in bytes
+        @return: summation of disk capacities in the node
+        '''
+        
+        total = None
+        try:
+            total = (diskcount * diskcapacity) / float(1000000000000)
+        except Exception as e:
+            self.logger.error(str(e))
+        
+        return total
+
     def get_hd_error(self, disk_info_json):
         '''
         calculate ddfree capacity
@@ -308,6 +324,9 @@ class SwiftMonitorMgr:
             hd_number = spec["diskcount"] if spec else 0
             hd_error = self.get_hd_error(disk_info_json)
             hd_info = self.get_hd_info(disk_info_json)
+           
+            capacity_in_TB = self.calculate_node_capacity_in_TB(spec["diskcount"], spec["diskcapacity"]) if spec else 0
+            capacity = "%.1fTB" % capacity_in_TB if capacity_in_TB else "N/A"
 
             nodes_info.append({"hostname": hostname,
                                "index": str(index), 
@@ -317,6 +336,7 @@ class SwiftMonitorMgr:
                                "hd_number": hd_number,
                                "hd_error": hd_error,
                                "hd_info": hd_info,
+                               "capacity": capacity
                               })
 
         return nodes_info
