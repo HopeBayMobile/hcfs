@@ -47,10 +47,10 @@ cd ../GatewayPatches
 ./install-u1204.sh
 
 # install gateway GUI
-apt-get -y --force-yes -f install
-cd ../DCloudGatewayUI
-./setup.sh
-update-rc.d celeryd defaults
+#~ apt-get -y --force-yes -f install
+#~ cd ../DCloudGatewayUI
+#~ ./setup.sh
+#~ update-rc.d celeryd defaults
 
 
 sleep 3
