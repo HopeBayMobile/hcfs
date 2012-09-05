@@ -3038,8 +3038,6 @@ def _get_storage_capacity():
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
 
-                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data * 1024 ** 2), 0)
-
     except Exception:
         if enable_log:
             log.error(CMD_CHK_STO_CACHE_STATE + " fail")
@@ -3320,5 +3318,5 @@ def get_last_backup_time():
 
 
 if __name__ == '__main__':
-    print _check_network()
+    print get_gateway_status()
     pass
