@@ -30,50 +30,54 @@ echo "    Squid3 configuration has been written."
 ln -s /usr/lib/insserv/insserv /sbin/insserv
 chkconfig --level 2345 nfs-kernel-server off
 
-# install configuration files
-if [ ! -d $CONFDIR ]; then
-    cp /tmp/config/rc.local /etc
-    cp /tmp/config/crontab /etc
-    chmod 600 /etc/crontab
-    bash /tmp/gateway_scripts/createSmbUser.sh superuser
-    chmod 666 $CONFDIR/Gateway.ini
-    cp /tmp/config/interfaces /etc/network/interfaces
-    cp /tmp/config/hosts.allow /etc
-    cp /tmp/config/gw_schedule.conf $CONFDIR/
-    cp /tmp/config/smb.orig $CONFDIR
-    cp /tmp/gateway_scripts/hourly_run_this $CONFDIR
-    cp /tmp/gateway_scripts/daily_run_this /etc/cron.daily/
-    cp /tmp/gateway_scripts/update_bandwidth $CONFDIR
-    cp /tmp/gateway_scripts/python_code/* $CONFDIR
-    cp /tmp/gateway_scripts/shaping_port_8080.sh $CONFDIR
-    cp /tmp/gateway_scripts/uploadon $CONFDIR
-    cp /tmp/gateway_scripts/uploadoff $CONFDIR
-    cp /tmp/gateway_scripts/check_expired $CONFDIR
-    cp /tmp/gateway_scripts/post-gwstart.conf /etc/init/
-    cp /tmp/gateway_scripts/check-gwstart.conf /etc/init/
-    cp /tmp/gateway_scripts/reorder_eth.conf /etc/init/
-    cp /tmp/gateway_scripts/nmbd.conf /etc/init/
-    cp /tmp/gateway_scripts/smbd.conf /etc/init/
-    cp /tmp/gateway_scripts/delete_lostfound.conf /etc/init/
-    cp /tmp/config/sudoers_delta /etc/sudoers.d/
-    cp /tmp/config/nfs-kernel-server /etc/default/nfs-kernel-server
+# setup gateway api
+cd /tmp/DCloudGateway/
+python setup.py install
 
-    #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
-    # the permission of sudoers_delta is required 0440
-    chmod 0440 /etc/sudoers.d/sudoers_delta
-    cp /tmp/gateway_scripts/gw-bg-tasks.conf /etc/init/
-    #os.system("cp config/smb.conf %s/"%SMBDIR)
-    cp /tmp/gateway_scripts/snapshot_bot $CONFDIR
-    cp /tmp/gateway_scripts/snapshot_check $CONFDIR
-    cp /tmp/gateway_scripts/wait_network_up $CONFDIR
-    cp /tmp/gateway_scripts/wait_gateway_up $CONFDIR
-    cp /tmp/gateway_scripts/service_restart $CONFDIR
-    cp /tmp/gateway_scripts/hourly_snapshotting $CONFDIR
-    cp /tmp/gateway_scripts/run_background_tasks $CONFDIR
-    cp /tmp/gateway_scripts/reorder_eth.sh $CONFDIR
-    cp /tmp/gateway_scripts/delete_lostfound $CONFDIR
-    rm -rf /root/.s3ql/*
-    chmod -R 777 /root
-    chown -R www-data:www-data $CONFDIR
-    cp -rs /usr/bin/*s3ql* /usr/local/bin
-fi
+#~ # install configuration files
+#~ if [ ! -d $CONFDIR ]; then
+    #~ cp /tmp/config/rc.local /etc
+    #~ cp /tmp/config/crontab /etc
+    #~ chmod 600 /etc/crontab
+    #~ bash /tmp/gateway_scripts/createSmbUser.sh superuser
+    #~ chmod 666 $CONFDIR/Gateway.ini
+    #~ cp /tmp/config/interfaces /etc/network/interfaces
+    #~ cp /tmp/config/hosts.allow /etc
+    #~ cp /tmp/config/gw_schedule.conf $CONFDIR/
+    #~ cp /tmp/config/smb.orig $CONFDIR
+    #~ cp /tmp/gateway_scripts/hourly_run_this $CONFDIR
+    #~ cp /tmp/gateway_scripts/daily_run_this /etc/cron.daily/
+    #~ cp /tmp/gateway_scripts/update_bandwidth $CONFDIR
+    #~ cp /tmp/gateway_scripts/python_code/* $CONFDIR
+    #~ cp /tmp/gateway_scripts/shaping_port_8080.sh $CONFDIR
+    #~ cp /tmp/gateway_scripts/uploadon $CONFDIR
+    #~ cp /tmp/gateway_scripts/uploadoff $CONFDIR
+    #~ cp /tmp/gateway_scripts/check_expired $CONFDIR
+    #~ cp /tmp/gateway_scripts/post-gwstart.conf /etc/init/
+    #~ cp /tmp/gateway_scripts/check-gwstart.conf /etc/init/
+    #~ cp /tmp/gateway_scripts/reorder_eth.conf /etc/init/
+    #~ cp /tmp/gateway_scripts/nmbd.conf /etc/init/
+    #~ cp /tmp/gateway_scripts/smbd.conf /etc/init/
+    #~ cp /tmp/gateway_scripts/delete_lostfound.conf /etc/init/
+    #~ cp /tmp/config/sudoers_delta /etc/sudoers.d/
+    #~ cp /tmp/config/nfs-kernel-server /etc/default/nfs-kernel-server
+#~ 
+    #~ #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
+    #~ # the permission of sudoers_delta is required 0440
+    #~ chmod 0440 /etc/sudoers.d/sudoers_delta
+    #~ cp /tmp/gateway_scripts/gw-bg-tasks.conf /etc/init/
+    #~ #os.system("cp config/smb.conf %s/"%SMBDIR)
+    #~ cp /tmp/gateway_scripts/snapshot_bot $CONFDIR
+    #~ cp /tmp/gateway_scripts/snapshot_check $CONFDIR
+    #~ cp /tmp/gateway_scripts/wait_network_up $CONFDIR
+    #~ cp /tmp/gateway_scripts/wait_gateway_up $CONFDIR
+    #~ cp /tmp/gateway_scripts/service_restart $CONFDIR
+    #~ cp /tmp/gateway_scripts/hourly_snapshotting $CONFDIR
+    #~ cp /tmp/gateway_scripts/run_background_tasks $CONFDIR
+    #~ cp /tmp/gateway_scripts/reorder_eth.sh $CONFDIR
+    #~ cp /tmp/gateway_scripts/delete_lostfound $CONFDIR
+    #~ rm -rf /root/.s3ql/*
+    #~ chmod -R 777 /root
+    #~ chown -R www-data:www-data $CONFDIR
+    #~ cp -rs /usr/bin/*s3ql* /usr/local/bin
+#~ fi

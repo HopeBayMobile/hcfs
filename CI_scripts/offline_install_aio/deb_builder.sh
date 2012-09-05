@@ -44,26 +44,10 @@ check_ok() {
     check_ok
 
 # build DCloudGateway (API)
-    echo "      ***** Building dcloudgatewayapi *****"
     cd $INITPATH
-    rm -r /tmp/pkg_DCloudGateway/
-    mkdir -p /tmp/pkg_DCloudGateway/tmp/
+    mkdir -p /tmp/pkg_DCloudGateway/tmp
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
-    cp -r $INITPATH/StorageAppliance/DCloudGateway/config /tmp/pkg_DCloudGateway/tmp/
-    cp -r $INITPATH/StorageAppliance/DCloudGateway/gateway_scripts /tmp/pkg_DCloudGateway/tmp/
-    cp $INITPATH/StorageAppliance/DCloudGateway/src/http_proxy/gen_squid3_conf.sh /tmp/pkg_DCloudGateway/tmp/
-    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGateway/tmp
-
-    mkdir -p $PY_BUILD_PATH
-    # build api files
-    cd StorageAppliance/DCloudGateway
-    python setup.py clean
-    python setup.py build
-    ## suspect causing apply_network() failure vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-    #~ python -m compileall build/lib.linux*     # compile python code
-    #~ find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
-    ## suspect causing apply_network() failure ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    cp -r build/lib.linux*/* $PY_BUILD_PATH
+    cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGateway/tmp
     # edit control file
 cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
 Package: dcloudgatewayapi
@@ -72,11 +56,45 @@ Section: base
 Priority: optional
 Architecture: amd64
 Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
-Maintainer: CDS Team <ctbd@delta.com.tw>
+Maintainer: ovid.wu@delta.com.tw
 Description: Package for gateway API
 EOF
-    dpkg --build /tmp/pkg_DCloudGateway $INITPATH
+    dpkg --build /tmp/pkg_DCloudGateway ./
     check_ok
+
+#~ BUG in not fully achieve as setup.py install.
+#~ # build DCloudGateway (API)
+    #~ echo "      ***** Building dcloudgatewayapi *****"
+    #~ cd $INITPATH
+    #~ rm -r /tmp/pkg_DCloudGateway/
+    #~ mkdir -p /tmp/pkg_DCloudGateway/tmp/
+    #~ cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
+    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/config /tmp/pkg_DCloudGateway/tmp/
+    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/gateway_scripts /tmp/pkg_DCloudGateway/tmp/
+    #~ cp $INITPATH/StorageAppliance/DCloudGateway/src/http_proxy/gen_squid3_conf.sh /tmp/pkg_DCloudGateway/tmp/
+    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGateway/tmp
+
+    #~ mkdir -p $PY_BUILD_PATH
+    #~ # build api files
+    #~ cd StorageAppliance/DCloudGateway
+    #~ python setup.py clean
+    #~ python setup.py build
+    #~ python -m compileall build/lib.linux*     # compile python code
+    #~ find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
+    #~ cp -r build/lib.linux*/* $PY_BUILD_PATH
+    #~ # edit control file
+#~ cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
+#~ Package: dcloudgatewayapi
+#~ Version: $GW_VERSION.$BUILD
+#~ Section: base
+#~ Priority: optional
+#~ Architecture: amd64
+#~ Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
+#~ Maintainer: CDS Team <ctbd@delta.com.tw>
+#~ Description: Package for gateway API
+#~ EOF
+    #~ dpkg --build /tmp/pkg_DCloudGateway $INITPATH
+    #~ check_ok
 
 # build dcloud-gateway meta package.
     echo "      ***** Building dcloud-gateway *****"
