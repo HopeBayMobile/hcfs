@@ -111,7 +111,7 @@ Package: dcloud-gateway
 Version: $GW_VERSION.$BUILD
 Maintainer: CDS Team <ctbd@delta.com.tw>
 #Pre-Depends: curl, tofrodos
-Depends: curl, tofrodos, savebox, s3ql (>=$S3QL_VERSION), dcloudgatewayapi (>=$GW_VERSION)
+Depends: curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
 Architecture: amd64
 # Copyright: <copyright file; defaults to GPL2>
 # Changelog: <changelog file; defaults to a generic changelog>
