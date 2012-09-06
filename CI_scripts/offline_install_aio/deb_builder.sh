@@ -45,6 +45,7 @@ check_ok() {
 
 # build DCloudGateway (API)
     cd $INITPATH
+    rm -r /tmp/pkg_DCloudGateway/
     mkdir -p /tmp/pkg_DCloudGateway/tmp
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
     cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGateway/tmp
