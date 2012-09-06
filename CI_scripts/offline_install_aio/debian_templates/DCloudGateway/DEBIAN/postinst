@@ -31,9 +31,12 @@ echo "    Squid3 configuration has been written."
 ln -s /usr/lib/insserv/insserv /sbin/insserv
 chkconfig --level 2345 nfs-kernel-server off
 
+# setup gateway api
+cd /tmp/DCloudGateway/
+python setup.py install
+
 # install configuration files
-if [ ! -d $CONFDIR ]; then
-    mkdir $CONFDIR/
+if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp $SRCDIR/config/rc.local /etc
     cp $SRCDIR/config/crontab /etc
     chmod 600 /etc/crontab
@@ -79,10 +82,6 @@ if [ ! -d $CONFDIR ]; then
     chown -R www-data:www-data $CONFDIR
     cp -rs /usr/bin/*s3ql* /usr/local/bin
 fi
-
-# setup gateway api (need to be after copying config files)
-cd /tmp/DCloudGateway/
-python setup.py install
 
 # clean up temp codes
 rm -r $SRCDIR
