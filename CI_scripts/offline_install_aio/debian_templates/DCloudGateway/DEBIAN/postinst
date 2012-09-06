@@ -33,6 +33,7 @@ chkconfig --level 2345 nfs-kernel-server off
 
 # install configuration files
 if [ ! -d $CONFDIR ]; then
+    mkdir $CONFDIR/
     cp $SRCDIR/config/rc.local /etc
     cp $SRCDIR/config/crontab /etc
     chmod 600 /etc/crontab
