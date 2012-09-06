@@ -42,4 +42,4 @@ def index(request):
         #zone["quota"] = human_readable_capacity(total_capacity)
         return render_to_response('dashboard.html', {"request": request,"zone":zone,"accounts": top_list})
     else:
-        return HttpResponse("something wrong in list_account:")
+        return HttpResponse(result.msg)
