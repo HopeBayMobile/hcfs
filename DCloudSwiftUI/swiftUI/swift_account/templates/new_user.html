@@ -48,8 +48,11 @@
         class="required alphanumeric" minLength="3"/>
         <label for="description">Description:</label><textarea rows="3" name="description" id="description"
             class="required alphanumericSpace" maxLength="128"></textarea>
-         <label for="user_quota">Quota:</label><input type="text" name="user_quota" id="user_quota"
-        class="required numeric" value="1"/>
+         <label for="user_quota">Quota:</label>
+<div class="input-append">
+        <input type="text" name="user_quota" id="user_quota"
+        class="span3 required numeric" size="16" value="1"/><span class="add-on">G</span>
+        </div>
       <label for="submit"></label>
       <input class="btn" type="submit" value="OK" /> <a class="btn" href="/account/{{account_id}}/edit">Finish</a>
     </div>
