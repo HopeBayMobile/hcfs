@@ -183,6 +183,7 @@ $('#del_acnt').click(function(evt){
         url:"/account/"+account_id+"/delete",
         success: function(msg){
           $('#delete_account').modal('hide');
+          location.reload();
         }
       });
     } else {
