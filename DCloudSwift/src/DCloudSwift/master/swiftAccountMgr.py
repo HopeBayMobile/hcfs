@@ -2485,7 +2485,7 @@ class SwiftAccountMgr:
             msg = list_container_output.msg
             lock.release()
             return Bool(val, msg)
-        elif container in msg:
+        elif container in list_container_output.msg:
             val = False
             msg = "Container %s has existed!" % container
             lock.release()
