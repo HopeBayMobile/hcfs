@@ -63,6 +63,7 @@ class TestMonitorMgr:
 
         nose.tools.ok_(len(hd_info) == 6)
         for disk in hd_info:
+            nose.tools.ok_(disk["capacity"] == "N/A")
             if disk["serial"] == "a" or disk["serial"] == "b":
                 nose.tools.ok_(disk["status"] == "OK")
             elif disk["serial"] == "c" or disk["serial"] == "d":
@@ -76,13 +77,13 @@ class TestMonitorMgr:
         total_TB = SM.calculate_total_capacity_in_TB(total)
         nose.tools.ok_(total == 0)
 
-        total = 1024
+        total = 1000
         total_TB = SM.calculate_total_capacity_in_TB(total)
         nose.tools.ok_(isinstance(total_TB, float) == True)
-        nose.tools.ok_(total_TB == 1/float(1024*1024*1024))
+        nose.tools.ok_(total_TB == 1/float(1000*1000*1000))
 
 
-        total = 1024*1024*1024*1024*100
+        total = 1000*1000*1000*1000*100
         total_TB = SM.calculate_total_capacity_in_TB(total)
         nose.tools.ok_(isinstance(total_TB, float) == True)
         nose.tools.ok_(total_TB == 100)

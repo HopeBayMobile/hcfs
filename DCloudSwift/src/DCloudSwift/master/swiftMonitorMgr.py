@@ -168,6 +168,22 @@ class SwiftMonitorMgr:
         
         return percentage
 
+    def calculate_node_capacity_in_TB(self, diskcount, diskcapacity, unusable=0):
+        '''
+        calculate node capacity in TB
+        @param diskcount: disk count in the node
+        @param diskcapacity: capacity per disk in bytes
+        @return: summation of disk capacities in the node
+        '''
+        
+        total = None
+        try:
+            total = (diskcount * diskcapacity) / float(1000000000000)
+        except Exception as e:
+            self.logger.error(str(e))
+        
+        return total
+
     def get_hd_error(self, disk_info_json):
         '''
         calculate ddfree capacity
@@ -186,27 +202,28 @@ class SwiftMonitorMgr:
         
         return error
 
-    def get_hd_info(self, disk_info_json):
+    def get_hd_info(self, disk_info_json, spec=None):
         '''
-        calculate ddfree capacity
-        @param total: total capacity
-        @param used: used capacity
-        @param unusable: unusable capacity due to broken nodes or disks 
+        get hardisk info
+        @param disk_info_json: json encoding of disk info stored in disk field of node_info_table 
+        @param spec: node spec stored in node_spec_table
         '''
         disk_info = json.loads(disk_info_json)
+        capacity_in_TB = spec["diskcapacity"]/float(1000000000000) if spec else 0
+        capacity = "%.1fTB" % capacity_in_TB if capacity_in_TB else "N/A"
 
         hd_info = []
         for hd in disk_info.get("healthy", []):
-            hd_info.append({"serial": hd.get("SN", "N/A"), "status": "OK"})
+            hd_info.append({"serial": hd.get("SN", "N/A"), "status": "OK", "capacity": capacity})
 
         for hd in disk_info.get("broken", []):
-            hd_info.append({"serial": hd.get("SN", "N/A"), "status": "Broken"})
+            hd_info.append({"serial": hd.get("SN", "N/A"), "status": "Broken", "capacity": capacity})
         
         missing = disk_info.get("missing", {})
         missing_count = missing.get("count", 0)
 
         for i in range(missing_count):
-            hd_info.append({"serial": "N/A", "status": "Missing"})
+            hd_info.append({"serial": "N/A", "status": "Missing", "capacity": capacity})
 
         return hd_info
 
@@ -307,7 +324,10 @@ class SwiftMonitorMgr:
             mode = info["mode"]
             hd_number = spec["diskcount"] if spec else 0
             hd_error = self.get_hd_error(disk_info_json)
-            hd_info = self.get_hd_info(disk_info_json)
+            hd_info = self.get_hd_info(disk_info_json, spec)
+           
+            capacity_in_TB = self.calculate_node_capacity_in_TB(spec["diskcount"], spec["diskcapacity"]) if spec else 0
+            capacity = "%.1fTB" % capacity_in_TB if capacity_in_TB else "N/A"
 
             nodes_info.append({"hostname": hostname,
                                "index": str(index), 
@@ -317,13 +337,14 @@ class SwiftMonitorMgr:
                                "hd_number": hd_number,
                                "hd_error": hd_error,
                                "hd_info": hd_info,
+                               "capacity": capacity
                               })
 
         return nodes_info
 
 if __name__ == '__main__':
     SM = SwiftMonitorMgr()
-    print SM.get_zone_info()
-    for i in range(0):
-        print "Hello"
-    #print SM.list_nodes_info()
+    #print SM.get_zone_info()
+   # for i in range(0):
+   #     print "Hello"
+    print SM.list_nodes_info()
