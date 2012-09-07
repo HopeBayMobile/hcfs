@@ -1598,20 +1598,83 @@ class SwiftAccountMgr:
                 logger.error(msg)
                 return Bool(val, msg)
 
-        # invokde obtain_account_info() for each account
-        for item in account_info["accounts"]:
-            obtain_account_info_output = self.obtain_account_info(item["name"])
 
-            if obtain_account_info_output.val == False:
-                account_dict[item["name"]] = {
-                    "user_number": "Error",
-                    "description": "Error",
-                    "quota": "Error",
-                    "account_enable": "Error",
-                    "usage": "Error",
-                }
+        proxyIp = random.choice(proxy_ip_list)
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
+        super_admin_conn = client.Connection(url, ".super_admin:.super_admin", self.__password)
+
+
+        # invoke obtain_account_info() for each account
+        for item in account_info["accounts"]:
+            # obtain the user list to compute the number of users in the account
+            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
+
+            if val == False:
+                user_number = "Error"
+                logger.error(msg)
             else:
-                account_dict[item["name"]] = obtain_account_info_output.msg
+                try:
+                    user_info = json.loads(msg)
+                    user_number = len(user_info["users"])
+                except Exception as e:
+                    msg = "Failed to load the json string: %s" % str(e)
+                    logger.error(msg)
+                    user_number = "Error"
+
+            # obtain the file .metadata in the container <account> of super_admin account to
+            # get the description and quota of the account
+            try:
+                metadata_result = super_admin_conn.get_object(item["name"], ".metadata")[-1]
+                metadata_content = json.loads(metadata_result)
+
+                if metadata_content.get(self.__admin_default_name) != None:
+                    description = metadata_content.get(self.__admin_default_name).get("description")
+                    quota = metadata_content.get(self.__admin_default_name).get("quota")
+            except Exception as e:
+                logger.error("Failed to get the metadata of account %s: %s" % (item["name"], str(e)))
+                description = "Error"
+                quota = "Error"
+
+            # check the file .services in the container <account> of super_admin account to
+            # verify whether the account is enabled or not
+            try:
+                services_result = super_admin_conn.get_object(item["name"], ".services")[-1]
+                services_content = json.loads(services_result)
+                account_enable = True if services_content.get("disable") == None else False
+            except Exception as e:
+                logger.error(str(e))
+                account_enable = "Error"
+
+            # obtain the usage of the account
+            if account_enable == True:
+                get_admin_password_output = self.get_user_password(item["name"], self.__admin_default_name)
+
+                if get_admin_password_output.val == False:
+                    val = False
+                    msg = get_admin_password_output.msg
+                else:
+                    admin_password = get_admin_password_output.msg
+
+                    (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
+                                                       account=item["name"], container="  ", admin_user=self.__admin_default_name,\
+                                                       admin_password=admin_password)
+            else:
+                val = False
+                msg = "Account %s has been disabled!" % item["name"]
+
+            if val == False:
+                usage = "Error"
+                logger.error(msg)
+            else:
+                usage = msg.get("Bytes") if msg.get("Bytes") != None else "Error"
+  
+            account_dict[item["name"]] = {
+                "user_number": user_number,
+                "description": description,
+                "quota": quota,
+                "account_enable": account_enable,
+                "usage": usage,
+            }
 
         # MUST return true to show information on GUI
         val = True
