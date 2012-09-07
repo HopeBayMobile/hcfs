@@ -12,16 +12,8 @@ fi
 
 cd $1
 
-swift-ring-builder account.builder set_min_part_hours 0
-swift-ring-builder container.builder set_min_part_hours 0
-swift-ring-builder object.builder set_min_part_hours 0
-
 swift-ring-builder account.builder rebalance
 swift-ring-builder container.builder rebalance
 swift-ring-builder object.builder rebalance
-
-swift-ring-builder account.builder set_min_part_hours 1
-swift-ring-builder container.builder set_min_part_hours 1
-swift-ring-builder object.builder set_min_part_hours 1
 
 chown -R swift:swift $1

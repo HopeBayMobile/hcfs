@@ -5,6 +5,7 @@
 
 {% block moreScripts%}
 <script src="/static/js/bootstrap-modal.js" type="text/javascript"></script>
+<script src="/static/js/bootstrap-button.js" type="text/javascript"></script>
 <script src="/static/js/jquery.validate.min.js" type="text/javascript"></script>
 <script src="/static/js/additional-methods.min.js" type="text/javascript"></script>
 <script src="/static/js/jquery.dataTables.min.js" type="text/javascript"></script>
@@ -128,7 +129,7 @@ $(document).ready(function() {
 <a class="btn" id="dis_user${{user.id}}" name="{{user.id}}" href="#modal" class="btn" data-toggle="modal" data-target="#disable_user"><i class="icon-off"></i>Off</a> 
 {% else %}
 <a class="btn" disabled="disabled">Reset PW</a> <a class="btn" disabled="disabled">Query</a>
-<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable"><i class="icon-off"></i>On</a></a> 
+<a class="btn" href="/account/{{account_id}}/user/{{user.id}}/enable" data-loading-text="waiting..."><i class="icon-off"></i>On</a></a> 
 <a class="btn" id="del_user${{user.id}}" name="{{user.id}}" href="#modal" data-toggle="modal" data-target="#delete_user"><i class="icon-remove"></i>Delete</a>
 {% endif %}
 </td>
@@ -149,7 +150,7 @@ $(document).ready(function() {
     This will suspend user "<span id="modal_dis_user"></span>" service, are you sure?
   </div>
   <div class="modal-footer">
-    <span class="btn btn-primary" id="modal_dis_user_link">Yes</span>
+    <span class="btn btn-primary" id="modal_dis_user_link" data-loading-text="waiting...">Yes</span>
     <a href="#" class="btn" data-dismiss="modal">No</a>
   </div>
 </div>
@@ -280,7 +281,7 @@ $(document).ready(function() {
     console.log("delete "+user_id);
     $("#modal_del_user").text(user_id);
     //use ajax to query password
-    $.ajax({
+    /*$.ajax({
         type:"GET",
         url:"/account/{{account_id}}/user/"+user_id+"/password",
         success: function(msg){
@@ -288,7 +289,10 @@ $(document).ready(function() {
           $("#modal_del_oldpw").text(msg);
           $('#delete_user').modal('show');
         }
-    });
+    });*/
+    user_pw = "ERHJUYKWE";
+    $("#modal_del_oldpw").text(user_pw);
+    $('#delete_user').modal('show');
   });
   
   $('#del_user').click(function(evt){
@@ -300,6 +304,7 @@ $(document).ready(function() {
         url:"/account/{{account_id}}/user/"+user_id+"/delete",
         success: function(msg){
           $('#delete_user').modal('hide');
+          location.reload();
         }
       });
     } else {
