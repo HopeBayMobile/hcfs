@@ -152,9 +152,14 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
-            cmd = "sudo apt-get upgrade -y --force-yes 2> /tmp/log.txt"
-            # ToDo: change to "DeltaGateway" package.
+            cmd = "sudo apt-get -u install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
             a = os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes dcloudgatewayapi"
+            os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes s3ql"
+            os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes savebox"
+            os.system(cmd)
             # ^^^ upgrade gateway
             if a == 0:
                 op_ok = True
