@@ -1855,24 +1855,17 @@ class SwiftAccountMgr:
         get_user_password_output = self.get_user_password(account, self.__admin_default_name)
         user_password = get_user_password_output.msg if get_user_password_output.val == True else None
 
+        proxyIp = random.choice(proxy_ip_list)
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
+
+        if user_password != None and account_enable == True:
+            account_conn = client.Connection(url, account + ":" + self.__admin_default_name, user_password)
+            mark = True
+        else:
+            mark = False
+
         # invoke obtain_user_info() to obtain each user's info
         for item in user_info["users"]:
-            '''
-            obtain_user_info_output = self.obtain_user_info(account, item["name"], account_enable)
-
-            if obtain_user_info_output.val == False:
-                user_dict[item["name"]] = {
-                    "description": "Error",
-                    "quota": "Error",
-                    "user_enable": "Error",
-                    "usage": "Error",
-                }
-
-                logger.error(obtain_user_info_output.msg)
-            else:
-                user_dict[item["name"]] = obtain_user_info_output.msg
-            '''
-
             # check whether the user is enabled or not by identifying the existence of the field "disable"
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
                                                account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
@@ -1891,31 +1884,23 @@ class SwiftAccountMgr:
                 description = "Error"
                 quota = "Error"
 
-            # the usage of all users can not be obtained when the account is disabled
-            if account_enable == True and user_password != None and item["name"] != self.__admin_default_name:
-                # the usage of the user's private container
-                (val1, msg1) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                     account=account, container=item["name"] + self.__private_container_suffix,\
-                                                     admin_user=self.__admin_default_name, admin_password=user_password)
 
-                # the usage of the user's gateway configuration container
-                (val2, msg2) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                     account=account, container=item["name"] + self.__config_container_suffix,\
-                                                     admin_user=self.__admin_default_name, admin_password=user_password)
-
-                if val1 == False or val2 == False:
-                    usage = "Error"
-                    logger.error(msg1 + msg2)
-                elif msg1.get("Bytes") != None and msg2.get("Bytes") != None:
-                    usage = int(msg1.get("Bytes")) + int(msg2.get("Bytes"))
-                else:
-                    usage = "Error"
-            elif account_enable == True and user_password != None and item["name"] == self.__admin_default_name:
+            if item["name"] == self.__admin_default_name:
                 usage = 0
+            elif mark == True:
+                # the usage of the user's private container and gateway configuration container
+                try:
+                    result1 = account_conn.head_container(item["name"] + self.__private_container_suffix)
+                    result2 = account_conn.head_container(item["name"] + self.__config_container_suffix)
+                    usage = int(result1.get("x-container-bytes-used")) + int(result2.get("x-container-bytes-used"))
+                except Exception as e:
+                    logger.error("Failed to get the usage of user %s:%s: %s" % (account, item["name"], str(e)))
+                    usage = "Error"
             else:
                 usage = "Error"
                 msg = "Account %s has been disabled or the password of account administrator cannot be obtained." % account
                 logger.error(msg)
+
 
             user_dict[item["name"]] = {
                 "description": description,
@@ -1923,42 +1908,6 @@ class SwiftAccountMgr:
                 "user_enable": user_enable,
                 "usage": usage,
             }
-
-        # obtain the actual usage of account administrator
-        '''
-        list_container_output = self.list_container(account, self.__admin_default_name)
-
-        if list_container_output.val == False:
-            account_usage = "Error"
-        else:
-            account_usage = 0
-            get_admin_password_output = self.get_user_password(account, self.__admin_default_name)
-
-            if get_admin_password_output.val == False:
-                account_usage = "Error"
-            else:
-                admin_password = get_admin_password_output.msg
-
-            for container in list_container_output.msg:
-                (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                     account=account, container=container,\
-                                                     admin_user=self.__admin_default_name, admin_password=admin_password)
-                if val == False:
-                    account_usage = "Error"
-                    break
-                else:
-                    account_usage += msg["Bytes"]
-
-        if account_usage != "Error":
-            for field, value in user_dict.items():
-                if str(value["usage"]).isdigit():
-                    account_usage -= int(value["usage"])
-                else:
-                    account_usage = "Error"
-                    break
-
-        user_dict[self.__admin_default_name]["usage"] = account_usage
-        '''
 
         # MUST return true to show information on GUI
         val = True
