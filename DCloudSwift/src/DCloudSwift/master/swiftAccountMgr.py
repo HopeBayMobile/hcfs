@@ -27,6 +27,9 @@ from util import threadpool
 from util.SwiftCfg import SwiftCfg
 from util.util import GlobalVar
 
+# swift packages
+from swift.common import client
+
 
 class InconsistentDatabaseError(Exception):
     pass
@@ -1201,7 +1204,12 @@ class SwiftAccountMgr:
             return Bool(val, msg)
         else:
             user_detail = msg
-            user_password = user_detail["auth"]
+
+        # when the user is disabled, the user's password can still be obtained
+        if user_detail.get("auth") != None:
+            user_password = user_detail.get("auth")
+        else:
+            user_password = user_detail.get("disable")
 
         if user_password is None:
             val = False
@@ -3257,28 +3265,27 @@ class SwiftAccountMgr:
             get_user_password_output = self.get_user_password(item["name"], self.__admin_default_name)
             user_password = get_user_password_output.msg if get_user_password_output.val == True else None
 
+            proxyIp = random.choice(proxy_ip_list)
+            url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
+
+            if user_password != None and account_enable == True:
+                account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
+                mark = True
+            else:
+                mark = False
+
             for user in user_info["users"]: 
-                # the usage of all users can not be obtained when the account is disabled
-                if account_enable == True and user_password != None and user["name"] != self.__admin_default_name:
-                    # the usage of the user's private container
-                    (val1, msg1) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                         account=item["name"], container=user["name"] + self.__private_container_suffix,\
-                                                         admin_user=self.__admin_default_name, admin_password=user_password)
-
-                    # the usage of the user's gateway configuration container
-                    (val2, msg2) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                         account=item["name"], container=user["name"] + self.__config_container_suffix,\
-                                                         admin_user=self.__admin_default_name, admin_password=user_password)
-
-                    if val1 == False or val2 == False:
-                        usage = "Error"
-                        logger.error(msg1 + msg2)
-                    elif msg1.get("Bytes") != None and msg2.get("Bytes") != None:
-                        usage = int(msg1.get("Bytes")) + int(msg2.get("Bytes"))
-                    else:
-                        usage = "Error"
-                elif account_enable == True and user_password != None and user["name"] == self.__admin_default_name:
+                if user["name"] == self.__admin_default_name:
                     usage = 0
+                elif mark == True:
+                    # the usage of the user's private container and gateway configuration container
+                    try:
+                        result1 = account_conn.head_container(user["name"] + self.__private_container_suffix)
+                        result2 = account_conn.head_container(user["name"] + self.__config_container_suffix)
+                        usage = int(result1.get("x-container-bytes-used")) + int(result2.get("x-container-bytes-used"))
+                    except Exception as e:
+                        logger.error("Failed to get the usage of user %s:%s: %s" % (item["name"], user["name"], str(e)))
+                        usage = "Error"
                 else:
                     usage = "Error"
                     msg = "Account %s has been disabled or the password of account administrator cannot be obtained." % item["name"]
