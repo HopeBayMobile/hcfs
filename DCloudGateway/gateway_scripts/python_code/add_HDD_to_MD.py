@@ -109,11 +109,36 @@ def PartNewHDD(disk, debug=False):
     
     return True
 
-def Parse_NewHDD():
-    #cmd = "cat /proc/mdstat"
+# only size >= 200GB will be accepted
+def Filter_NewHDD():
     
+    procfile = open("/proc/partitions")
+    parts = [p.split() for p in procfile.readlines()[2:]]
+    procfile.close()
+    
+    DEVs = []
+    for p in parts:
+        devname = p[3]
+        devsize = p[2]
+
+        if devname.startswith("md"):
+            continue
+
+        # only care about sda, sdb, sdx...
+        if len(devname) == 3:
+            if devsize >= 200 * 1024 * 1024 * 1024:
+                DEVs.append(devname)
+        
+    return DEVs
+
+def Parse_NewHDD():
+    
+    AvaiDevs = Filter_NewHDD()
+    
+    #fdiskre = re.compile(".*/dev/(?P<diskname>[^:\s+]+)GB")
     fdiskre = re.compile(".*/dev/(?P<diskname>[^:\s+]+)")
-    cmd = "fdisk -l" 
+    cmd = "fdisk -l"
+     
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.stdout.read()
     po.wait()
@@ -139,11 +164,14 @@ def Parse_NewHDD():
         else:
             dn = m.group('diskname')
             #print dn
-            if dn.startswith("md") or dn.startswith("sda"):
+            if dn.startswith("md"):# or dn.startswith("sda"):
                 continue
-            diskarr.append(dn)
             
-    #print diskarr
+            for ad in AvaiDevs:
+                if dn.startswith(ad):
+                    diskarr.append(dn)
+            
+    print diskarr
     
     # find no parted disk
     for dn in diskarr:
@@ -163,9 +191,16 @@ def Parse_NewHDD():
 
 # add a new disk (must be no any partition on it) to MD
 def Add_Disk_and_Rebuild_MD():
+    
+    num_working_raid_dev = ChkMDDrive()
+    
+    if num_working_raid_dev >=2: # raid 1 is fine
+        return num_working_raid_dev
+     
     # find disk w/o partition
     noPartedDisk = Parse_NewHDD()
     #print noPartedDisk
+    #return 
     
     # no such a disk
     if noPartedDisk == None:
@@ -173,9 +208,9 @@ def Add_Disk_and_Rebuild_MD():
         return ChkMDDrive() # return num of working devs 
     
     #noPartedDisk = "sdd"
-    
     #partition the disk
     partdisk = PartNewHDD(noPartedDisk, False)
+    #partdisk = PartNewHDD(noPartedDisk, True)
     #print partdisk
     
     #newPartedDisk = "sdd" + "1"
@@ -184,6 +219,7 @@ def Add_Disk_and_Rebuild_MD():
 
     # add the new parted disk to MD    
     addMDdisk = AddMDDisk(newPartedDisk, False)
+    #addMDdisk = AddMDDisk(newPartedDisk, True)
     print addMDdisk
     
     # chk if success

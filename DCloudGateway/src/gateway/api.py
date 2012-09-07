@@ -542,7 +542,12 @@ def _check_network():
                 # Jiahong: Add check to see if swift is working
                 op_user = op_config.get(section, 'backend-login')
                 op_pass = op_config.get(section, 'backend-password')
-                cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat" % (full_storage_url, op_user, op_pass)
+
+                # wthung, 2012/9/6
+                # get user name
+                _, username = op_user.split(':')
+
+                cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat %s_private_container" % (full_storage_url, op_user, op_pass, username)
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
                 countdown = 30
                 while countdown > 0:
@@ -3033,8 +3038,6 @@ def _get_storage_capacity():
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
 
-                ret_usage["cloud_storage_usage"]["cloud_data"] = max(int(real_cloud_data * 1024 ** 2), 0)
-
     except Exception:
         if enable_log:
             log.error(CMD_CHK_STO_CACHE_STATE + " fail")
@@ -3315,5 +3318,5 @@ def get_last_backup_time():
 
 
 if __name__ == '__main__':
-    print get_last_backup_time()
+    print get_gateway_status()
     pass
