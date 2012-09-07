@@ -38,11 +38,12 @@ fi
 	INITPATH=$(pwd)
 	
 # remove tgz file for saving space
-    rm gateway_install*.tgz
+    rm gateway_install*.tar
 # mount apt cache to ramdisk for saving space
 	mount -o bind /dev/shm $APTCACHEDIR
 
 # copy deb files to proper location
+    echo "        ***** Untar DEB files *****"
     tar -xzf $DEBFILE -C $APTCACHEDIR
     mkdir -p StorageAppliance/GatewayPatches/debsrc    # in case of debsrc does not exist.
     tar -xzf $DEBPATCH -C StorageAppliance/GatewayPatches/debsrc
