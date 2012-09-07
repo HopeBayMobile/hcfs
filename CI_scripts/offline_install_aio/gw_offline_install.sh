@@ -38,7 +38,8 @@ fi
 	INITPATH=$(pwd)
 	
 # remove tgz file for saving space
-    rm gateway_install*.tar
+    #~ rm gateway_install*.tar
+    
 # mount apt cache to ramdisk for saving space
 	mount -o bind /dev/shm $APTCACHEDIR
 
