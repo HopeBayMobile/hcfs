@@ -3226,6 +3226,9 @@ class SwiftAccountMgr:
             msg = "Argument retry has to >= 1."
             return Bool(val, msg)
 
+        proxyIp = random.choice(proxy_ip_list)
+        url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
+
         # obtain the account list
         (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_account_info)
 
@@ -3243,42 +3246,50 @@ class SwiftAccountMgr:
                 logger.error(msg)
                 return Bool(val, msg)
 
+        try:
+            super_admin_conn = client.Connection(url, ".super_admin:.super_admin", self.__password)
+        except Exception as e:
+            val = False
+            msg = "Failed to create the connection: %s" % str(e)
+            logger.error(msg)
+            return Bool(val, msg)
+
         # compute the usages of all users of each accout
         for item in account_info["accounts"]:
             usage_dict[item["name"]] = {}
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
 
-            if val == False:
+            try:
+                result = super_admin_conn.get_container(item["name"])[-1]
+                user_info["users"] = result
+            except Exception as e:
+                val = False
+                msg = "Failed to get user list of account %s: %s" % (item["name"], str(e))
+                logger.error(msg)
                 return Bool(val, msg)
-            else:
-                try:
-                    user_info = json.loads(msg)
-                    val = True
-                    msg = ""
-                except Exception as e:
-                    val = False
-                    msg = "Failed to load the json string: %s" % str(e)
-                    logger.error(msg)
-                    return Bool(val, msg)
 
             # check the file .services in the container <account> of super_admin account to
             # verify whether the account is enabled or not
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
-                                               account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                               container=item["name"], object_name=".services")
-
-            if val == False:
-                account_enable = "Error"
-                logger.error(msg)
-            else:
-                services_content = msg
+            try:
+                result = super_admin_conn.get_object(item["name"], ".services")[-1]
+                services_content = json.loads(result)
                 account_enable = True if services_content.get("disable") == None else False
+            except Exception as e:
+                logger.error("Failed to get file .services of account %s: %s" % (item["name"], str(e)))
+                account_enable = "Error"
 
-            get_user_password_output = self.get_user_password(item["name"], self.__admin_default_name)
-            user_password = get_user_password_output.msg if get_user_password_output.val == True else None
+            try:
+                result = super_admin_conn.get_object(item["name"], self.__admin_default_name)[-1]
+                user_content = json.loads(result)
 
-            proxyIp = random.choice(proxy_ip_list)
-            url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
+                if user_content.get("auth") != None:
+                    user_password = user_content.get("auth")
+                else:
+                    user_password = user_content.get("disable")
+
+                user_password = user_password.split(":")[-1]
+            except Exception as e:
+                logger.error("Failed to get the password of user %s:%s: %s" % (item["name"], self.__admin_default_name, str(e)))
+                user_password = None
 
             if user_password != None and account_enable == True:
                 account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
@@ -3286,7 +3297,10 @@ class SwiftAccountMgr:
             else:
                 mark = False
 
-            for user in user_info["users"]: 
+            for user in user_info["users"]:
+                if user["name"].startswith("."):
+                    continue
+ 
                 if user["name"] == self.__admin_default_name:
                     usage = 0
                 elif mark == True:
