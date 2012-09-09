@@ -1569,6 +1569,7 @@ class SwiftAccountMgr:
         proxy_ip_list = self.__proxy_ip_list
         account_info = {}
         account_dict = {}
+        user_info = {}
         val = False
         msg = ""
         Bool = collections.namedtuple("Bool", "val msg")
@@ -1598,15 +1599,38 @@ class SwiftAccountMgr:
                 logger.error(msg)
                 return Bool(val, msg)
 
-
         proxyIp = random.choice(proxy_ip_list)
         url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
-        super_admin_conn = client.Connection(url, ".super_admin:.super_admin", self.__password)
 
+        try:
+            super_admin_conn = client.Connection(url, ".super_admin:.super_admin", self.__password)
+        except Exception as e:
+            val = False
+            msg = "Failed to create the connection: %s" % str(e)
+            logger.error(msg)
+            return Bool(val, msg)
 
         # invoke obtain_account_info() for each account
         for item in account_info["accounts"]:
             # obtain the user list to compute the number of users in the account
+
+
+            try:
+                result = super_admin_conn.get_container(item["name"])[-1]
+                user_info["users"] = result
+            except Exception as e:
+                val = False
+                msg = "Failed to get user list of account %s: %s" % (item["name"], str(e))
+                logger.error(msg)
+                user_number = "Error"
+
+            user_number = 0
+            for user in user_info["users"]:
+                if not user["name"].startswith("."):
+                    user_number += 1
+
+
+            '''
             (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
 
             if val == False:
@@ -1620,6 +1644,7 @@ class SwiftAccountMgr:
                     msg = "Failed to load the json string: %s" % str(e)
                     logger.error(msg)
                     user_number = "Error"
+            '''
 
             # obtain the file .metadata in the container <account> of super_admin account to
             # get the description and quota of the account
@@ -1646,6 +1671,47 @@ class SwiftAccountMgr:
                 account_enable = "Error"
 
             # obtain the usage of the account
+
+
+            try:
+                result = super_admin_conn.get_object(item["name"], self.__admin_default_name)[-1]
+                user_content = json.loads(result)
+
+                if user_content.get("auth") != None:
+                    user_password = user_content.get("auth")
+                else:
+                    user_password = user_content.get("disable")
+
+                user_password = user_password.split(":")[-1]
+            except Exception as e:
+                logger.error("Failed to get the password of user %s:%s: %s" % (item["name"], self.__admin_default_name, str(e)))
+                user_password = None
+
+            if user_password != None and account_enable == True:
+                try:
+                    account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
+                    mark = True
+                except Exception as e:
+                    msg = "Failed to create the connection: %s" % str(e)
+                    logger.error(msg)
+                    mark = False
+            else:
+                mark = False
+
+            if mark == True:
+                # the usage of the user's private container and gateway configuration container
+                try:
+                    result = account_conn.head_account()
+                    usage = int(result.get("x-account-bytes-used"))
+                except Exception as e:
+                    logger.error("Failed to get the usage of account %s: %s" % (item["name"], str(e)))
+                    usage = "Error"
+            else:
+                usage = "Error"
+                msg = "Failed to get the usage of account %s" % item["name"]
+                logger.error(msg)
+
+            '''
             if account_enable == True:
                 get_admin_password_output = self.get_user_password(item["name"], self.__admin_default_name)
 
@@ -1667,6 +1733,7 @@ class SwiftAccountMgr:
                 logger.error(msg)
             else:
                 usage = msg.get("Bytes") if msg.get("Bytes") != None else "Error"
+            '''
   
             account_dict[item["name"]] = {
                 "user_number": user_number,
@@ -3292,8 +3359,13 @@ class SwiftAccountMgr:
                 user_password = None
 
             if user_password != None and account_enable == True:
-                account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
-                mark = True
+                try:
+                    account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
+                    mark = True
+                except Exception as e:
+                    msg = "Failed to create the connection of account %s: %s" % (item["name"], str(e))
+                    logger.error(msg)
+                    mark = False
             else:
                 mark = False
 
@@ -3314,7 +3386,7 @@ class SwiftAccountMgr:
                         usage = "Error"
                 else:
                     usage = "Error"
-                    msg = "Account %s has been disabled or the password of account administrator cannot be obtained." % item["name"]
+                    msg = "Failed to get the usage of user %s:%s." % (item["name"], user["name"])
                     logger.error(msg)
 
                 usage_dict[item["name"]][user["name"]] = {
