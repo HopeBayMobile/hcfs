@@ -1629,23 +1629,6 @@ class SwiftAccountMgr:
                 if not user["name"].startswith("."):
                     user_number += 1
 
-
-            '''
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=item["name"])
-
-            if val == False:
-                user_number = "Error"
-                logger.error(msg)
-            else:
-                try:
-                    user_info = json.loads(msg)
-                    user_number = len(user_info["users"])
-                except Exception as e:
-                    msg = "Failed to load the json string: %s" % str(e)
-                    logger.error(msg)
-                    user_number = "Error"
-            '''
-
             # obtain the file .metadata in the container <account> of super_admin account to
             # get the description and quota of the account
             try:
@@ -1710,30 +1693,6 @@ class SwiftAccountMgr:
                 usage = "Error"
                 msg = "Failed to get the usage of account %s" % item["name"]
                 logger.error(msg)
-
-            '''
-            if account_enable == True:
-                get_admin_password_output = self.get_user_password(item["name"], self.__admin_default_name)
-
-                if get_admin_password_output.val == False:
-                    val = False
-                    msg = get_admin_password_output.msg
-                else:
-                    admin_password = get_admin_password_output.msg
-
-                    (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_container_metadata,\
-                                                       account=item["name"], container="  ", admin_user=self.__admin_default_name,\
-                                                       admin_password=admin_password)
-            else:
-                val = False
-                msg = "Account %s has been disabled!" % item["name"]
-
-            if val == False:
-                usage = "Error"
-                logger.error(msg)
-            else:
-                usage = msg.get("Bytes") if msg.get("Bytes") != None else "Error"
-            '''
   
             account_dict[item["name"]] = {
                 "user_number": user_number,
