@@ -40,20 +40,19 @@ $(document).ready(function() {
 {% block body_class %}home{% endblock %}
 {% block navbar_class %}{% endblock %}
 {% block navbar %}
-                    <a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
-                                <span class="icon-bar"></span>
-                                <span class="icon-bar"></span>
-                                <span class="icon-bar"></span>
-                            </a>
-                            <a class="brand" href="/">Cloud Storage</a>
-                            <div class="nav-collapse">
-                              <!--ul class="nav">
-                                <li><a href="#tab_one">One</a></li>
-                                <li><a href="#tab_two">Two</a></li>
-                              </ul-->
-                              {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
-                            </div>
-                    </div>
+<a class="btn btn-navbar" data-toggle="collapse" data-target=".nav-collapse">
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+    <span class="icon-bar"></span>
+</a>
+<a class="brand" href="/">Cloud Storage</a>
+<div class="nav-collapse">
+    <!--ul class="nav">
+    <li><a href="#tab_one">One</a></li>
+    <li><a href="#tab_two">Two</a></li>
+    </ul-->
+    {% block account_bar %}{% include "_account_bar.html" %}{% endblock %}
+</div>
 {% endblock %}
 {% block body %}
 <div class="container-fluid">
@@ -106,12 +105,8 @@ $(document).ready(function() {
                 </td>
                 <!-- HD Status -->
                 <td>
-                {% if node.mode == "waiting" %}
-                <table><td class="fail_tab">
-                {% else %}
-                <table><td class="success_tab">
-                {% endif %}
-                {{node.mode}}
+                <table>
+                    <td>{{ node.hd_error }} Error</td>
                 </table>
                 <table class="display{{node.index}}">
                     {% for info in node.hd_info %}
@@ -128,12 +123,12 @@ $(document).ready(function() {
                 </td>
                 <!--Capacity-->
                 <td>
-                    TBD
+                    {{ node.capacity }}
                     <table class="display{{node.index}}">
                         {% for info in node.hd_info %}
                         <tr>
                             <td>
-                               TBD
+                                {{ info.capacity }}
                             </td>
                         </tr>
                         {% endfor %}
@@ -162,5 +157,6 @@ $(document).ready(function() {
           </table>
         </div>
       </div>
-</div></div>
+</div>
+</div>
 {% endblock %}
