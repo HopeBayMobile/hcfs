@@ -1901,72 +1901,86 @@ class SwiftAccountMgr:
             msg = "Account %s does not exist!" % account
             return Bool(val, msg)
 
-        # obtain the user list in the account
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_user_info, account=account)
-
-        if val == False:
-            return Bool(val, msg)
-        else:
-            try:
-                user_info = json.loads(msg)
-                val = True
-                msg = ""
-            except Exception as e:
-                val = False
-                msg = "Failed to load the json string: %s" % str(e)
-                logger.error(msg)
-                return Bool(val, msg)
-
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
-                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                           container=account, object_name=self.__metadata_name)
-
-        if val == False:
-            logger.error(msg)
-            mark = False
-        else:
-            metadata_content = msg
-            mark = True
-
-        # check the file .services in the container <account> of super_admin account to
-        # verify whether the account is enabled or not
-        (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
-                                           account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                           container=account, object_name=".services")
-
-        if val == False:
-            account_enable = "Error"
-            logger.error(msg)
-        else:
-            services_content = msg
-            account_enable = True if services_content.get("disable") == None else False
-
-        get_user_password_output = self.get_user_password(account, self.__admin_default_name)
-        user_password = get_user_password_output.msg if get_user_password_output.val == True else None
 
         proxyIp = random.choice(proxy_ip_list)
         url = "https://%s:%s/auth/v1.0" % (proxyIp, self.__auth_port)
 
+        try:
+            super_admin_conn = client.Connection(url, ".super_admin:.super_admin", self.__password)
+        except Exception as e:
+            val = False
+            msg = "Failed to create the connection: %s" % str(e)
+            logger.error(msg)
+            return Bool(val, msg)
+
+        # obtain the user list in the account
+        try:
+            result = super_admin_conn.get_container(account)[-1]
+            user_info["users"] = result
+        except Exception as e:
+            val = False
+            msg = "Failed to get user list of account %s: %s" % (account, str(e))
+            logger.error(msg)
+            return Bool(val, msg)
+
+        # obtain the metadata of the account
+        try:
+            metadata_result = super_admin_conn.get_object(account, self.__metadata_name)[-1]
+            metadata_content = json.loads(metadata_result)
+        except Exception as e:
+            logger.error("Failed to get the metadata of account %s: %s" % (account, str(e)))
+            metadata_content = {}
+
+        # check the file .services in the container <account> of super_admin account to
+        # verify whether the account is enabled or not
+        try:
+            services_result = super_admin_conn.get_object(account, ".services")[-1]
+            services_content = json.loads(services_result)
+            account_enable = True if services_content.get("disable") == None else False
+        except Exception as e:
+            logger.error(str(e))
+            account_enable = "Error"
+
+        try:
+            result = super_admin_conn.get_object(account, self.__admin_default_name)[-1]
+            user_content = json.loads(result)
+
+            if user_content.get("auth") != None:
+                user_password = user_content.get("auth")
+            else:
+                user_password = user_content.get("disable")
+
+            user_password = user_password.split(":")[-1]
+        except Exception as e:
+            logger.error("Failed to get the password of user %s:%s: %s" % (account, self.__admin_default_name, str(e)))
+            user_password = None
+
         if user_password != None and account_enable == True:
-            account_conn = client.Connection(url, account + ":" + self.__admin_default_name, user_password)
-            mark = True
+            try:
+                account_conn = client.Connection(url, account + ":" + self.__admin_default_name, user_password)
+                mark = True
+            except Exception as e:
+                msg = "Failed to create the connection: %s" % str(e)
+                logger.error(msg)
+                mark = False
         else:
             mark = False
 
         # invoke obtain_user_info() to obtain each user's info
         for item in user_info["users"]:
+            if item["name"].startswith("."):
+                continue
             # check whether the user is enabled or not by identifying the existence of the field "disable"
-            (val, msg) = self.__functionBroker(proxy_ip_list=proxy_ip_list, retry=retry, fn=self.__get_object_content,\
-                                               account=".super_admin", admin_user=".super_admin", admin_password=self.__password,\
-                                               container=account, object_name=item["name"])
-
-            if val == False:
+            try:
+                services_result = super_admin_conn.get_object(account, item["name"])[-1]
+                services_content = json.loads(services_result)
+                user_enable = True if services_content.get("disable") == None else False
+            except Exception as e:
+                logger.error(str(e))
                 user_enable = "Error"
-                logger.error(msg)
-            else:
-                user_enable = True if msg.get("disable") == None else False
 
-            if mark == True and metadata_content.get(item["name"]) != None:
+            # obtain the description and quota of the user
+            if metadata_content.get(item["name"]) != None:
                 description = metadata_content[item["name"]].get("description")
                 quota = metadata_content[item["name"]].get("quota")
             else:
