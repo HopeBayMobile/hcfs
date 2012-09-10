@@ -47,7 +47,7 @@ meta = json.loads(
         "required": true,
         "max": 1048576,
         "min": 1,
-        "default": 2048,
+        "default": 2000,
         "order": 6
         }
 

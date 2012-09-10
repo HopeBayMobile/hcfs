@@ -243,6 +243,7 @@ class SwiftDeploy:
             with open("%s/versBase" % swiftDir, "wb") as fh:
                 pickle.dump(versBase, fh)
 
+            # TODO: error checking of creating rings
             os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
@@ -306,6 +307,7 @@ class SwiftDeploy:
             with open("%s/storageList" % swiftDir, "wb") as fh:
                 pickle.dump(completeStorageList, fh)
 
+            # TODO: error checking and rollback
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
                 deviceWeight = int(node["deviceCapacity"]/float(1000 * 1000 * 1000))  # change unit from bytes to GB 
@@ -355,6 +357,7 @@ class SwiftDeploy:
             if safe.val == False:
                 raise UpdateMetadataError("Unsafe to delete nodes for %s" % safe.msg)
 
+            # TODO: error checking and rollback
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):

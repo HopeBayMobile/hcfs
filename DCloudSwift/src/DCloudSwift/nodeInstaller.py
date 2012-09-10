@@ -14,6 +14,7 @@ BASEDIR = os.path.dirname(WORKING_DIR)
 
 from util import util
 from util import diskUtil
+from util.util import GlobalVar
 import maintenance
 
 
@@ -56,4 +57,6 @@ class NodeInstaller:
         util.generateSwiftConfig()
 
         util.restartAllServices()
+        util.mkdirs(os.path.dirname(GlobalVar.DEPLOYED))
+        os.system("touch %s" % GlobalVar.DEPLOYED)
         os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
