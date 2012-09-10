@@ -14,6 +14,7 @@ BASEDIR = os.path.dirname(WORKING_DIR)
 
 from util import util
 from util import diskUtil
+from util.util import GlobalVar
 
 
 class UpdateMetadataError(Exception):
@@ -57,9 +58,12 @@ def updateMetadata(confDir):
             util.restartAllServices()
         else:
             diskUtil.updateMetadataOnDisks(oriVers=oriVers)
-            diskUtil.mountUmountedSwiftDevices()
+            if not os.path.isfile(GlobalVar.DEPLOYED):
+                diskUtil.mountUmountedSwiftDevices()
 
         util.startAllServices()
+        util.mkdirs(os.path.dirname(GlobalVar.DEPLOYED))
+        os.system("touch %s" % GlobalVar.DEPLOYED)
         os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
     except Exception:
@@ -80,6 +84,8 @@ def resume():
     diskUtil.loadSwiftMetadata()
 
     util.restartAllServices()
+    util.mkdirs(os.path.dirname(GlobalVar.DEPLOYED))
+    os.system("touch %s" % GlobalVar.DEPLOYED)
     os.system("python /DCloudSwift/monitor/swiftMonitor.py restart")
 
     logger.info("end")
