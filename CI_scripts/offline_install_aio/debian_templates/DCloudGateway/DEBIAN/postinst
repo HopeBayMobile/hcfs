@@ -11,7 +11,7 @@ SRCDIR="/tmp/DCloudGateway"
 
 ### 2. setup config file
 mkdir -p $CACHE_DIR
-bash $SRCDIR/src/http_proxy/gen_squid3_conf.sh
+bash $SRCDIR/src/http_proxy/gen_squid3_conf.sh $CACHE_DIR
 chmod 777  $CACHE_DIR
 echo "Squid3 configuration has been written."
 
