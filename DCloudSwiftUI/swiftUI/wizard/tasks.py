@@ -219,13 +219,33 @@ def do_meta_form(data):
     hosts = do_meta_form.get_zone_hosts()
 
     # Assign public ip and dump to PUBLIC_IP_INFO
+    do_meta_form.report_progress(5, True, 'Configure Network...', None)
     hostname_to_public_ip = assign_public_ip(hosts, min_ip_value, max_ip_value)
     with open("%s" % PUBLIC_IP_INFO, "wb") as fh:
         pickle.dump(hostname_to_public_ip, fh)
 
+    SD = SwiftDeploy.SwiftDeploy()
+    t = Thread(target=SD.configureNetwork, 
+               args=(hostname_to_public_ip, 
+                     data["netmask"], 
+                     data["gateway"]))
+    t.start()
+
+    progress = SD.getConfigureNetworkProgress()
+    while progress['finished'] != True:
+        time.sleep(5)
+        progress = SD.getConfigureNetworkProgress()
+        total_progress = progress["progress"] / float(10)
+        do_meta_form.report_progress(total_progress,
+                                     True,
+                                     progress["message"],
+                                     None)
+
+    if progress['code'] != 0:
+        raise Exception("Failed to configure network for %s" % progress["message"])
 
     # Lookup ip of each host
-    do_meta_form.report_progress(5, True, 'Looking up ip for each host...', None)
+    do_meta_form.report_progress(15, True, 'Looking up ip for each host...', None)
     hosts = dns_lookup(hosts=hosts)
     for host in hosts:
         if host["ip"] is None:
@@ -236,35 +256,34 @@ def do_meta_form(data):
     hosts = [host for host in hosts if host["ip"] != master_ip]
 
     # Assign swift zone id for each host
-    do_meta_form.report_progress(0, True, 'Calculating swift zone id for each host...', None)
+    do_meta_form.report_progress(16, True, 'Calculating swift zone id for each host...', None)
     hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
     
     # Assign device count and deive weight to each host
-    do_meta_form.report_progress(3, True, 'Assign device count for each host...', None)
+    do_meta_form.report_progress(17, True, 'Assign device count for each host...', None)
     for host in hosts:
         host[u'deviceCnt'] = int(data["disk_count"])
 
-    do_meta_form.report_progress(5, True, 'Assign device capacity for each host...', None)
+    do_meta_form.report_progress(18, True, 'Assign device capacity for each host...', None)
     for host in hosts:
         host[u'deviceCapacity'] = int(data["disk_capacity"]) * (1000 * 1000 * 1000)
 
     # construct node_info_db
-    do_meta_form.report_progress(8, True, 'Construct node db...', None)
+    do_meta_form.report_progress(19, True, 'Construct node db...', None)
     nodeInfoDb = NodeInfoDatabaseBroker(GlobalVar.NODE_DB)
     nodeInfoDb.constructDb(nodeList=hosts)
 
 
     # start daemons
-    do_meta_form.report_progress(10, True, 'Start daemons...', None)
+    do_meta_form.report_progress(20, True, 'Start daemons...', None)
     startDaemons()
     
-    SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
     progress = SD.getUpdateMetadataProgress()
-    do_meta_form.report_progress(15, True, 'Creating swift cluster metadata...', None)
+    do_meta_form.report_progress(25, True, 'Creating swift cluster metadata...', None)
     while progress['finished'] != True:
         time.sleep(10)
         progress = SD.getUpdateMetadataProgress()
@@ -295,6 +314,7 @@ def do_meta_form(data):
         raise Exception("Swift deploy failed for %s" % check.msg)
     else:
         do_meta_form.report_progress(100, True, "Swift deployment is done!", None)
+
     do_meta_form.report_progress(100, True, "Prepare swauth", None)
     cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
