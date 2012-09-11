@@ -52,11 +52,11 @@ echo "        ***** Install kernel and fuse patches *****"
 ./install-u1204.sh
 
 # install gateway GUI
-echo "        ***** Install gateway GUI *****"
-apt-get -y --force-yes -f install
-cd ../DCloudGatewayUI
-./setup.sh
-update-rc.d celeryd defaults
+#~ echo "        ***** Install gateway GUI *****"
+#~ apt-get -y --force-yes -f install
+#~ cd ../DCloudGatewayUI
+#~ ./setup.sh
+#~ update-rc.d celeryd defaults
 
 sleep 1
 echo "Installation of Gateway is completed..."

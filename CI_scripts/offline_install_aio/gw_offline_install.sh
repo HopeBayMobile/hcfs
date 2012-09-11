@@ -86,4 +86,6 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
 	apt-get autoclean
 	apt-get autoremove
 	rm -r /usr/share/doc /usr/src
-	
+
+echo "....."
+echo "Installation of Gateway is completed."
