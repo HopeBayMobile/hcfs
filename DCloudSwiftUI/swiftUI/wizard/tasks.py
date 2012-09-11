@@ -2,12 +2,44 @@ import ConfigParser
 import os
 import time
 import subprocess
+import pickle
 from threading import Thread
 
 from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 PASSWORD = 'deltacloud'
 SOURCE_DIR = '/usr/local/src/'
+PUBLIC_IP_INFO = '/var/www/hostname_to_public_ip'
+
+def dottedQuadToNum(ip):
+    "convert decimal dotted quad string to long integer"
+
+    hexn = ''.join(["%02X" % long(i) for i in ip.split('.')])
+    return long(hexn, 16)
+
+def numToDottedQuad(n):
+    "convert long int to dotted quad string"
+    
+    d = 256 * 256 * 256
+    q = []
+    while d > 0:
+        m,n = divmod(n,d)
+        q.append(str(m))
+        d = d/256
+
+    return '.'.join(q)
+
+def assign_public_ip(node_list, min_ip_value, max_ip_value):
+    ip_value = min_ip_value
+
+    public_ip_dict = {}
+    for node in node_list:
+        if ip_value <= max_ip_value:
+            ip = numToDottedQuad(ip_value)
+            ip_value +=1
+            public_ip_dict[node["hostname"]] = ip
+
+    return public_ip_dict
 
 def dns_lookup(hosts, nameserver="192.168.11.1"):
     '''
@@ -171,6 +203,12 @@ def do_meta_form(data):
     from DCloudSwift.master import SwiftDeploy
     import DCloudSwift
 
+    # Check the ip range
+    min_ip_value = dottedQuadToNum(data['min_ip'])
+    max_ip_value = dottedQuadToNum(data['max_ip'])
+    if min_ip_value > max_ip_value:
+        raise Exception("min available ip has to greater than or equal to max available ip")
+
     #  Contruct URL of portal and write it to SWIFTCONF
     if data["portal_port"] < 1 or data["portal_port"] > 65536:
         raise Exception("Portal port has to be an ingeger within the range [1, 65536]")
@@ -179,6 +217,12 @@ def do_meta_form(data):
 
     # Get list of hosts
     hosts = do_meta_form.get_zone_hosts()
+
+    # Assign public ip and dump to PUBLIC_IP_INFO
+    hostname_to_public_ip = assign_public_ip(hosts, min_ip_value, max_ip_value)
+    with open("%s" % PUBLIC_IP_INFO, "wb") as fh:
+        pickle.dump(hostname_to_public_ip, fh)
+
 
     # Lookup ip of each host
     do_meta_form.report_progress(5, True, 'Looking up ip for each host...', None)
@@ -260,11 +304,4 @@ def do_meta_form(data):
     cmd = "/etc/init.d/apache2-zcw reload"
     os.system(cmd)
 
-@task(base=DeltaWizardTask)
-def do_manual_form(data):
-    from time import sleep
-    sleep(3)
-    do_meta_form.report_progress(10, True, '3secs for 10% progress', None)
-    sleep(5)
-    do_meta_form.report_progress(20, True, '5secs for 20% progress', None)
 

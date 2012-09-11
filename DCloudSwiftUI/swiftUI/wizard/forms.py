@@ -49,42 +49,41 @@ meta = json.loads(
         "min": 1,
         "default": 2000,
         "order": 6
-        }
+        },
 
+        "min_ip": {
+        "description": "min available ip",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.2",
+        "order": 7
+        },
+
+        "max_ip": {
+        "description": "max available ip",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.254",
+        "order": 8
+        },
+
+        "netmask": {
+        "description": "netmask",
+        "type": "text",
+        "required": false,
+        "default": "255.255.255.0",
+        "order": 9
+        },
+
+        "gateway": {
+        "description": "gateway",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.1",
+        "order": 10
+        }
 }
 """
 )
 
 MetaForm = get_config_form(meta)
-
-from django import forms
-from delta.forms import RenderFormMixinClass
-from delta.forms import CIDRAddressField
-from delta.forms.widgets import *
-
-
-class ManualForm(RenderFormMixinClass, forms.Form):
-    min_ip = forms.IPAddressField(label="min_ip", widget=IPAddressInput)
-    max_ip = forms.IPAddressField(label="max_ip", widget=IPAddressInput)
-    gateway = forms.IPAddressField(label="gateway", widget=IPAddressInput)
-    netmask = forms.IPAddressField(label="netmask", widget=IPAddressInput)
-
-
-    fieldset = [
-                ('Ip range ', [
-                                'min_ip',
-                                'max_ip',
-                                'netmask',
-                                'gateway'
-                                ]
-                )
-                ]
-
-    initial_dict = {
-        'min_ip': '10.1.4.2',
-        'max_ip': '10.1.4.254',
-
-        'netmask': '255.255.255.0',
-        'gateway': '192.168.11.254'
-    }
-
