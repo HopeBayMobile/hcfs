@@ -9,7 +9,7 @@ from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 PASSWORD = 'deltacloud'
 SOURCE_DIR = '/usr/local/src/'
-PUBLIC_IP_INFO = '/var/www/hostname_to_public_ip'
+NETWORK_CONFIG = '/var/www/network_config'
 
 def dottedQuadToNum(ip):
     "convert decimal dotted quad string to long integer"
@@ -221,8 +221,12 @@ def do_meta_form(data):
     # Assign public ip and dump to PUBLIC_IP_INFO
     do_meta_form.report_progress(5, True, 'Configure Network...', None)
     hostname_to_public_ip = assign_public_ip(hosts, min_ip_value, max_ip_value)
-    with open("%s" % PUBLIC_IP_INFO, "wb") as fh:
-        pickle.dump(hostname_to_public_ip, fh)
+    network_config = { "hostname_to_public_ip": hostname_to_public_ip,
+                       "netmask": data["netmask"],
+                       "gateway": data["gateway"]}
+
+    with open("%s" % NETWORK_CONFIG, "wb") as fh:
+        pickle.dump(network_config, fh)
 
     SD = SwiftDeploy.SwiftDeploy()
     t = Thread(target=SD.configureNetwork, 
