@@ -259,3 +259,12 @@ def do_meta_form(data):
     # reload apache to test load python module
     cmd = "/etc/init.d/apache2-zcw reload"
     os.system(cmd)
+
+@task(base=DeltaWizardTask)
+def do_manual_form(data):
+    from time import sleep
+    sleep(3)
+    do_meta_form.report_progress(10, True, '3secs for 10% progress', None)
+    sleep(5)
+    do_meta_form.report_progress(20, True, '5secs for 20% progress', None)
+

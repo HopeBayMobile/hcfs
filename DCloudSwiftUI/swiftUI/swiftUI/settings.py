@@ -202,13 +202,13 @@ djcelery.setup_loader()
 # NOTE: The tasks should import after djcelery.setup_loader(),
 # otherwise, the tasks won't find celeryconfig.py
 # === Add wizard settings
-from wizard.forms import MetaForm
-from wizard.tasks import do_meta_form
+from wizard.forms import MetaForm, ManualForm
+from wizard.tasks import do_meta_form, do_manual_form
 
 WIZARD_TITLE = 'Swift ZCW Wizard'
 WIZARD_STEP = [
-    (MetaForm, do_meta_form),
-#    (ManualForm, do_manual_form),
+    (MetaForm, None),
+    (ManualForm, do_manual_form),
 ]
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
