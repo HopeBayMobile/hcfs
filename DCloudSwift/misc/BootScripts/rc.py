@@ -12,6 +12,7 @@ import re
 
 FORMATTER = '[%(levelname)s from %(name)s on %(asctime)s] %(message)s'
 lockFile="/etc/delta/swift.lock"
+NETWORK_CONFIG = "network_config"
 
 class TryLockError(Exception):
 	pass
@@ -112,6 +113,59 @@ def loadScripts():
 
         logger.info("end")
         return returncode
+
+def configureNetwork():
+        logger = getLogger(name="configureNetwork")
+    
+        cmd = "wget -O /tmp/network_config http://zcw/%s" % NETWORK_CONFIG
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        if po.returncode != 0:
+            logger.error("Failed to download network config for %s" % output)
+            return 
+    
+        try:
+            with open("/tmp/network_config", "rb") as fh:
+                network_config = pickle.load(fh)
+        except IOError:
+            logger.error("Failed to load network config")
+            return
+    
+        hostname = socket.gethostname()
+        netmask = network_config.get("netmask", None)
+        gateway = network_config.get("gateway", None)
+        public_ip = network_config["hostname_to_public_ip"].get(hostname, None)
+        if not netmask:
+            logger.error("Failed to retrieve netmask")
+            return
+             
+        if not gateway:
+            logger.error("Failed to retrieve gateway")
+            return
+    
+        if not public_ip:
+            return
+    
+        cmd = "ifconfig eth0 down"
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        if po.returncode != 0:
+            logger.warn("Failed to turn off eth0 for %s" % output)
+    
+        cmd = "route delete -net 0.0.0.0 netmask 0.0.0.0 dev eth0"
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+        if po.returncode != 0:
+            logger.warn("Failed to delete default route for %s" % output)
+    
+        cmd = "ifconfig eth0 %s netmask %s" % (public_ip, netmask)
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
+
 
 def getAllDisks():
 	cmd = "fdisk -l"
@@ -300,7 +354,10 @@ def main(argv):
         os.system("mkdir /dev/shm/DCloudSwift")
         os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
 
-    if os.path.exists("/tmp/i_am_not_zcw"):
+    configureNetwork()
+
+    if not os.path.exists("/tmp/i_am_zcw"):
+        configureNetwork()
         if loadScripts() == 0:
             os.system("python /DCloudSwift/maintenance.py -R")
 
