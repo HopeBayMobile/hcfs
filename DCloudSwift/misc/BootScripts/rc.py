@@ -354,8 +354,6 @@ def main(argv):
         os.system("mkdir /dev/shm/DCloudSwift")
         os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
 
-    configureNetwork()
-
     if not os.path.exists("/tmp/i_am_zcw"):
         configureNetwork()
         if loadScripts() == 0:
