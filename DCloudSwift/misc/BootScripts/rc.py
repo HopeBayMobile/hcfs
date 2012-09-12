@@ -18,7 +18,7 @@ class TryLockError(Exception):
 	pass
 
 # tryLock decorator
-def tryLock(tries=1, lockTimeout=90000):
+def tryLock(tries=1, lockTimeout=900):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
 	
@@ -349,7 +349,7 @@ def readFingerprint(disk):
 		if lazyUmount(mountpoint)!=0:
 			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
 
-@tryLock(3000)
+@tryLock(-1)
 def main(argv):
     if not os.path.exists("/dev/shm/srv"):
         os.system("mkdir /dev/shm/srv")
@@ -361,6 +361,7 @@ def main(argv):
 
     if not os.path.exists("/tmp/i_am_zcw"):
         while configureNetwork() != 0:
+            os.system("touch %s" % lockFile)
             time.sleep(2)
 
         if loadScripts() == 0:
