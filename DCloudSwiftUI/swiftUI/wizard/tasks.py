@@ -9,7 +9,7 @@ from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 PASSWORD = 'deltacloud'
 SOURCE_DIR = '/usr/local/src/'
-NETWORK_CONFIG = '/var/www/network_config'
+NETWORK_CONFIG = '/var/www-zcw/network_config'
 
 def dottedQuadToNum(ip):
     "convert decimal dotted quad string to long integer"
@@ -224,6 +224,9 @@ def do_meta_form(data):
     network_config = { "hostname_to_public_ip": hostname_to_public_ip,
                        "netmask": data["netmask"],
                        "gateway": data["gateway"]}
+
+    if not os.path.isdir(os.path.dirname(NETWORK_CONFIG)):
+        os.makedirs(os.path.dirname(NETWORK_CONFIG))
 
     with open("%s" % NETWORK_CONFIG, "wb") as fh:
         pickle.dump(network_config, fh)
