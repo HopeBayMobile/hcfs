@@ -135,6 +135,11 @@ class prepare_image(setuptools.Command):
         cmd = "cp misc/BootScripts/rc.py /etc/rc.py"
         print cmd
         os.system(cmd)
+
+        # Copy misc/BootScripts/network_setup.py to /etc/networ_setup.py
+        cmd = "cp misc/BootScripts/network_setup.py /etc/network_setup.py"
+        print cmd
+        os.system(cmd)
         
         # Create directories
         if not os.path.exists("/srv"):

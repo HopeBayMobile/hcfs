@@ -8,5 +8,6 @@ echo "$task" >> /etc/crontab
 python /usr/local/bin/node-monitor restart
 if [ ! -d "/tmp/i_am_zcw" ]; then
     python /etc/rc.py
+    python /etc/network_setup.py
 fi
 exit 0
