@@ -18,7 +18,7 @@ class TryLockError(Exception):
 	pass
 
 # tryLock decorator
-def tryLock(tries=1, lockTimeout=900):
+def tryLock(tries=1, lockTimeout=90000):
 	def deco_tryLock(fn):
 		def wrapper(*args, **kwargs):
 	
@@ -118,7 +118,7 @@ def configureNetwork():
         logger = getLogger(name="configureNetwork")
         ret = 1 
    
-        cmd = "wget -O /tmp/network_config http://zcw/%s" % NETWORK_CONFIG
+        cmd = "wget -O /tmp/network_config http://zcw:8765/cfg/%s" % NETWORK_CONFIG
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -349,7 +349,7 @@ def readFingerprint(disk):
 		if lazyUmount(mountpoint)!=0:
 			logger.warn("Failed to umount disk %s from %s"%(disk, mountpoint))
 
-@tryLock(1)
+@tryLock(3000)
 def main(argv):
     if not os.path.exists("/dev/shm/srv"):
         os.system("mkdir /dev/shm/srv")
