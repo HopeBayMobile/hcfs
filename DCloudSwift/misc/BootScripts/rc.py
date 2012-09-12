@@ -116,21 +116,22 @@ def loadScripts():
 
 def configureNetwork():
         logger = getLogger(name="configureNetwork")
-    
+        ret = 1 
+   
         cmd = "wget -O /tmp/network_config http://zcw/%s" % NETWORK_CONFIG
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
             logger.error("Failed to download network config for %s" % output)
-            return 
+            return ret
     
         try:
             with open("/tmp/network_config", "rb") as fh:
                 network_config = pickle.load(fh)
         except IOError:
             logger.error("Failed to load network config")
-            return
+            return ret
     
         hostname = socket.gethostname()
         netmask = network_config.get("netmask", None)
@@ -138,14 +139,14 @@ def configureNetwork():
         public_ip = network_config["hostname_to_public_ip"].get(hostname, None)
         if not netmask:
             logger.error("Failed to retrieve netmask")
-            return
+            return ret
              
         if not gateway:
             logger.error("Failed to retrieve gateway")
-            return
+            return ret
     
         if not public_ip:
-            return
+            return ret
     
         cmd = "ifconfig eth0 down"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -165,6 +166,10 @@ def configureNetwork():
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
+
+        ret = 0
+
+        return ret
 
 
 def getAllDisks():
@@ -355,7 +360,9 @@ def main(argv):
         os.system("mount --bind /dev/shm/DCloudSwift /DCloudSwift")
 
     if not os.path.exists("/tmp/i_am_zcw"):
-        configureNetwork()
+        while configureNetwork() != 0:
+            time.sleep(2)
+
         if loadScripts() == 0:
             os.system("python /DCloudSwift/maintenance.py -R")
 
