@@ -82,6 +82,9 @@ sed -i "s/PROJECTNAME/${PROJECTNAME}/g" /etc/apache2-zcw/sites-available/default
 #Copy Django project
 mkdir -p /var/www-zcw
 
+#Add a directory for public network interface
+mkdir -p /var/www-zcw/cfg
+
 cp -r ${PROJECTPATH}/ /var/www-zcw/
 #Collects the static files into STATIC_ROOT
 python /var/www-zcw/${PROJECTNAME}/manage.py collectstatic --noinput
