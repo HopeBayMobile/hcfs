@@ -71,13 +71,13 @@ $(document).ready(function(){
           <div id="quota_chart""></div>
         </div>
         <div id="sidebar" class="span6">
-          <h4>Top 5 Accounts</h4>
+          <h4>Top 10 Users</h4>
           <table class="table">
-            {% for account in accounts%}
+            {% for user in users%}
             <tr>
                 <td>{{forloop.counter}}</td>
-			    <td>{{account.id}}</td>
-			    <td>{{account.husage}}</td>
+			    <td>{{user.account}}-{{user.id}}</td>
+			    <td>{{user.husage}}</td>
 			</tr>
 			{% endfor %}
           </table>
