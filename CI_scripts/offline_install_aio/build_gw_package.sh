@@ -22,7 +22,7 @@ fi
 # make sure input arguments are correct
     if [ $# -ne 2 ]
     then
-        echo "Need to input 3 arguments."
+        echo "Need to input 2 arguments."
         exit 1
     fi
 
@@ -30,7 +30,7 @@ fi
     source build.conf
 
     BRANCH=$1
-    BUILDNUM=$2
+    BUILDNUM=$3
     DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     OUTPUTFILE="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tar"
@@ -76,7 +76,7 @@ fi
 
 # build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
-    bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM
+    bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM $DEBPATCH
     check_ok
     # Move S3QL DEB file to /var/cache/apt/
     cp StorageAppliance/s3ql*.deb $APTCACHEDIR
@@ -101,7 +101,7 @@ fi
 
 # tar an all in one pack
     echo "creating gateway installation package"
-    tar -cf $OUTPUTFILE StorageAppliance/ $DEBFILE $DEBPATCH gw_offline_install.sh build.conf --exclude=StorageAppliance/.git
+    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf
 
 # clean old files
     rm debsrc_StorageAppliance*.tgz
@@ -114,7 +114,7 @@ fi
     mv StorageAppliance/s3ql*.deb $DEBSAVE
     mv dcloudgatewayapi*.deb $DEBSAVE
     mv dcloud-gateway*.deb $DEBSAVE
-	mv savebox*.deb	$DEBSAVE
+	mv savebox*.deb $DEBSAVE
 	
 # upload all_in_one installation package to the FTP
 	wput $OUTPUTFILE ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTFILE

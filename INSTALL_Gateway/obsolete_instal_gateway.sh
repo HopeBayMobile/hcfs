@@ -22,7 +22,7 @@ if [ "$1" != "dom" ]; then
    apt-get update
 fi
 
-# install gateway API
+# install all packages of gateway 
     echo "        ***** apt-get install dcloud-gateway *****"
     apt-get install -y --force-yes dcloud-gateway
     check_ok
