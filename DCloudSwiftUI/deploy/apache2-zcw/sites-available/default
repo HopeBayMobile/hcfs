@@ -15,6 +15,15 @@ WSGIPythonPath /var/www-zcw/PROJECTNAME
 	
 	Alias /static/ /var/www-zcw/static/
 
+	Alias /cfg/ /var/www-zcw/cfg/
+
+	<Directory /var/www-zcw/cfg>
+		Options FollowSymLinks MultiViews
+		AllowOverride None
+		Order allow,deny
+		allow from all
+	</Directory>
+
 	<Directory /var/www-zcw/PROJECTNAME/PROJECTNAME>
 		<Files wsgi.py>
 		Order deny,allow

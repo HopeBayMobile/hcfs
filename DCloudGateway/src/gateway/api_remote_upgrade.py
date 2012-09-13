@@ -13,6 +13,7 @@ from gateway import api
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
+class InvalidVersionString(Exception): pass
 
 #----------------------------------------------------------------------
 def _read_command_log(log_fname):
@@ -36,15 +37,22 @@ def get_gateway_version():
     Get current software version of the gateway.
     """
     try:
+        # read current version of gateway
         cmd = "apt-show-versions dcloud-gateway"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
                                 stderr=subprocess.STDOUT)
         res = po.stdout.readline()
         po.wait()
+        if "upgradeable" in res:	# "dcloud-gateway/precise upgradeable from 1.0.10.20120830 to 1.0.10.20120831"
+            idx = -3
+        elif "uptodate" in res:	#~  "dcloud-gateway/unknown uptodate 1.0.10.20120828"
+            idx = -1
+        else:
+            raise InvalidVersionString()
+
         t = res.split(' ')
-        ver = t[-3].replace('\n', '')
-        # read current version of gateway
-        # FIXME: t[-3] only works for "dcloud-gateway/unknown uptodate 1.0.10.20120828"
+        ver = t[idx].replace('\n', '')
+
         op_ok = True
         op_code = "100"
         op_msg = None
@@ -74,7 +82,7 @@ def get_available_upgrade():
     """
 
     res = ''
-    s3ql_ver_file = '/dev/shm/gateway_ver'
+    gateway_ver_file = '/dev/shm/gateway_ver'
     #~ FIXME: change the file name accordingly at gw_bktask.py.
     try:
         #~ os.system("sudo apt-get update &")     # update package info.
@@ -144,9 +152,14 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
-            cmd = "sudo apt-get install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
-            # ToDo: change to "DeltaGateway" package.
+            cmd = "sudo apt-get -u install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
             a = os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes dcloudgatewayapi"
+            os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes s3ql"
+            os.system(cmd)
+            cmd = "sudo apt-get -u install -y --force-yes savebox"
+            os.system(cmd)
             # ^^^ upgrade gateway
             if a == 0:
                 op_ok = True
@@ -161,7 +174,6 @@ def upgrade_gateway(enableReboot = True):
                     # ^^^ send a reboot command to os.
                     os.system("sudo service apache2 stop")
                     # ^^^ stop apache2 service 
-
             else:
                 op_ok = False
                 op_code = "002"
@@ -172,7 +184,6 @@ def upgrade_gateway(enableReboot = True):
             op_msg = "Gateway is already up to date."
             log.info("There is no new update detected when \
                         running upgrade_gateway()")
-
     except:
         op_ok = False
         op_code = "001"
