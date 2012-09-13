@@ -87,16 +87,21 @@ def _get_latest_backup():
     res = po.stdout.readlines()
     po.wait()
 
-    #~ Case 1. There is private container
-    if "not found" in res[0]:
+    # wthung, 2012/9/12
+    # check length of res
+    # case 1. container is exist, but no content
+    if len(res) == 0:
+        return None
+    #~ Case 2. There is no private container
+    elif "not found" in res[0]:
         return None
     else:
-        #~ Case 2. Get a list of files
+        #~ Case 3. Get a list of files
         latest_dt = -999
         for fn in res:   # find latest backup
             if "gw_conf_backup" not in fn:
                 continue
-            
+
             dt = fn[0:10]
             if dt > latest_dt:
                 latest_dt = dt
@@ -109,7 +114,6 @@ def _get_latest_backup():
         return backup_info
 
     return None
-
 
 #----------------------------------------------------------------------
 def save_gateway_configuration():
