@@ -177,51 +177,6 @@ class Heartbeat:
         if heartbeatencoding:
             post_data(self.receiverurl, heartbeatencoding)
         
-class NetworkConfigChecker:
-    def __init__(self, receiverUrl):
-        self.receiverUrl = receiverUrl
-        self.component_name = "network_conifg"
-        self.event_name = "networkconfig"
-
-    def send_networkconfig_event(self):
-        """
-        send event to the receiver 
-        """
-        logger = util.getLogger(name="NetworkConfigChecker")
-        eventEncoding = None
-        try:
-            if not self.is_network_configured():
-                event = {
-                    "hostname": socket.gethostname(),
-                    "component_name": self.component_name,
-                    "event": self.event_name,
-                    "level": "ERROR",
-                    "data": "",
-                    "time": int(time.time()),
-                }
-                eventEncoding= json.dumps(event)
-                logger.info(eventEncoding)
-
-        except Exception as e:
-            logger.error(str(e))
-            event = {
-                "component_name": self.component_name,
-                "message": str(e),
-                "time": int(time.time()),
-            }
-            logger.error(json.dumps(event))
-
-        if eventEncoding:
-            post_data(self.receiverUrl, eventEncoding)
-
-    def is_network_configured(self):
-        """
-        check if network is configured
-        """
-        if os.path.exists("/tmp/network_configured"):
-            return True
-        else:
-            return False
 
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
@@ -254,11 +209,6 @@ class NodeMonitor(Daemon):
                  
                 try:
                     self.DC.send_disk_event()
-                except Exception as e:
-                    logger.error(str(e))
-
-                try:
-                    self.NCC.send_networkconfig_event()
                 except Exception as e:
                     logger.error(str(e))
 
