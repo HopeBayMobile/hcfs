@@ -21,6 +21,23 @@ def index(request):
     #used_capacity = 0
     
     SA = SwiftAccountMgr()
+    result = SA.list_usage()
+    if result.val:
+        accounts = result.msg
+        user_list = []
+        for val in accounts:
+            for user in accounts[val]:
+                if user!="admin":
+                    current_usage = int(accounts[val][user]["usage"])
+                    user_list.append(dict(id=user,account=val,usage=current_usage))
+        #sort list to get top 10
+        top_list = sorted(user_list, key=itemgetter('usage'))[::-1][:10]
+        for i in top_list:
+            i["husage"] = human_readable_capacity(i["usage"])
+        return render_to_response('dashboard.html', {"request": request,"zone":zone,"users": top_list})
+    else:
+        return HttpResponse(result.msg)
+"""    
     result = SA.list_account()
     if result.val:
         accounts = result.msg
@@ -40,6 +57,8 @@ def index(request):
         #zone["used"] = used_ratio
         #zone["free"] = 100-used_ratio
         #zone["quota"] = human_readable_capacity(total_capacity)
+
         return render_to_response('dashboard.html', {"request": request,"zone":zone,"accounts": top_list})
     else:
         return HttpResponse(result.msg)
+"""

@@ -6,5 +6,5 @@ def human_readable_capacity(capacity):
         append_float="0"
     else:
         append_float=str(human_float/10)
-    return str(human_int) + "." + append_float +"G"
+    return str(human_int) + "." + append_float +"GB"
  

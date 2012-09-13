@@ -83,6 +83,7 @@ class SwiftDeploy:
         self.__setDeployProgress()
         self.__setSpreadProgress()
         self.__setCleanProgress()
+        self.__setConfigureNetworkProgress()
 
         if not util.findLine("/etc/ssh/ssh_config", "StrictHostKeyChecking no"):
             os.system("echo \"StrictHostKeyChecking no\" >> /etc/ssh/ssh_config")
@@ -98,6 +99,9 @@ class SwiftDeploy:
 
     def getCleanProgress(self):
         return self.__cleanProgress
+
+    def getConfigureNetworkProgress(self):
+        return self.__configureNetworkProgress
 
     def __setUpdateMetadataProgress(self, progress=0, finished=False, message=[], code=0):
         lock.acquire()
@@ -150,6 +154,22 @@ class SwiftDeploy:
         try:
 
             self.__cleanProgress = {
+                'progress': progress,
+                'doneTasks': doneTasks,
+                'finished': finished,
+                'code': code,
+                'blackList': blackList,
+                'message': message,
+            }
+
+        finally:
+            lock.release()
+
+    def __setConfigureNetworkProgress(self, progress=0, doneTasks=0, finished=False, code=0, blackList=[], message=[]):
+        lock.acquire()
+        try:
+
+            self.__configureNetworkProgress = {
                 'progress': progress,
                 'doneTasks': doneTasks,
                 'finished': finished,
@@ -214,6 +234,24 @@ class SwiftDeploy:
         finally:
             lock.release()
 
+    def __updateConfigureNetworkProgress(self, success=False, hostname="", msg=""):
+        lock.acquire()
+        try:
+            numOfTasks = len(self.__nodes2Process)
+
+            self.__configureNetworkProgress['doneTasks'] += 1
+            self.__configureNetworkProgress['progress'] = (float(self.__configureNetworkProgress['doneTasks']) / numOfTasks) * 100.0
+
+            if success == False:
+                self.__configureNetworkProgress['blackList'].append(hostname)
+                self.__configureNetworkProgress['message'].append(msg)
+                self.__configureNetworkProgress['code'] += 1
+
+            if self.__configureNetworkProgress['doneTasks'] == numOfTasks:
+                self.__configureNetworkProgress['finished'] = True
+        finally:
+            lock.release()
+
     def __createMetadata(self, proxyList, storageList, numOfReplica):
         logger = util.getLogger(name="createMetadata")
         try:
@@ -243,6 +281,7 @@ class SwiftDeploy:
             with open("%s/versBase" % swiftDir, "wb") as fh:
                 pickle.dump(versBase, fh)
 
+            # TODO: error checking of creating rings
             os.system("sh %s/DCloudSwift/proxy/CreateRings.sh %d %s" % (BASEDIR, numOfReplica, swiftDir))
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
@@ -306,6 +345,7 @@ class SwiftDeploy:
             with open("%s/storageList" % swiftDir, "wb") as fh:
                 pickle.dump(completeStorageList, fh)
 
+            # TODO: error checking and rollback
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
                 deviceWeight = int(node["deviceCapacity"]/float(1000 * 1000 * 1000))  # change unit from bytes to GB 
@@ -355,6 +395,7 @@ class SwiftDeploy:
             if safe.val == False:
                 raise UpdateMetadataError("Unsafe to delete nodes for %s" % safe.msg)
 
+            # TODO: error checking and rollback
             for node in storageList:
                 deviceCnt = int(node["deviceCnt"])
                 for j in range(deviceCnt):
@@ -618,6 +659,36 @@ class SwiftDeploy:
             logger.error(msg)
             self.__updateCleanProgress(success=False, ip=nodeIp, msg=msg)
 
+    def __configureNetworkSubtask(self, hostname, publicIp, netmask, gateway):
+        logger = util.getLogger(name="configureNetworkSubtask: %s" % hostname)
+        try:
+            pathname = "/etc/delta/master/%s" % socket.gethostname()
+
+            print "Start configure Network on node %s" % hostname
+
+            cmd = "ssh root@%s ifconfig eth0 down" % hostname
+            (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+
+            cmd = "ssh root@%s route delete -net 0.0.0.0 netmask 0.0.0.0 dev eth0" % hostname
+            (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+
+            cmd = "ssh root@%s ifconfig eth0 %s netmask %s" % (hostname, publicIp, netmask)
+            (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+
+            cmd = "ssh root@%s ifconfig eth0 up" % (hostname,)
+            (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=60)
+
+            cmd = "ssh root@%s route add -net 0.0.0.0 netmask 0.0.0.0 gw %s dev eth0" % (hostname, gateway)
+            (status, stdout, stderr) = util.sshpass(self.__kwparams['password'], cmd, timeout=360)
+
+            self.__updateConfigureNetworkProgress(success=True, hostname=hostname, msg="")
+            logger.info("Succeeded to update ring files on %s" % hostname)
+
+        except Exception as err:
+            msg = "Failed to configure network on %s for %s" % (hostname, str(err))
+            logger.error(msg)
+            self.__updateConfigureNetworkProgress(success=False, hostname=hostname, msg=msg)
+
     def isDeletionOfNodesSafe(self, ipList, swiftDir=None):
         zidSet = set()
         ip2Zid = {}
@@ -720,6 +791,23 @@ class SwiftDeploy:
             if node["ip"] == masterIp:
                 return True
         return False
+
+    def configureNetwork(self, hostname_to_public_ip, netmask, gateway):
+        self.__nodes2Process = [{"hostname": hostname} for hostname in hostname_to_public_ip]
+        self.__setConfigureNetworkProgress()
+
+        argumentList = []
+        for hostname, public_ip in hostname_to_public_ip.items():
+            argumentList.append(([hostname, public_ip, netmask, gateway], None))
+
+        pool = threadpool.ThreadPool(20)
+        requests = threadpool.makeRequests(self.__configureNetworkSubtask, argumentList)
+        for req in requests:
+            pool.putRequest(req)
+
+        pool.wait()
+        pool.dismissWorkers(20)
+        pool.joinAllDismissedWorkers()
 
     def spreadRingFiles(self):
         swiftDir = "/etc/swift"
@@ -1157,3 +1245,24 @@ def deploy():
 
 if __name__ == '__main__':
     print parseDeploySection("/etc/delta/inputFile")
+    
+    hostname_to_public_ip = {"TPE1AA0111": "10.1.4.11", "TPE1AA0112": "10.1.4.12"}
+    netmask = "255.255.255.0"
+    gateway = "10.1.4.1"
+
+    SD = SwiftDeploy()
+    t = Thread(target=SD.configureNetwork, args=(hostname_to_public_ip, netmask, gateway))
+    t.start()
+
+    print "configure network..."
+    progress = SD.getConfigureNetworkProgress()
+    while progress['finished'] != True:
+        time.sleep(5)
+        progress = SD.getConfigureNetworkProgress()
+        print progress
+
+    print progress
+    if progress['code'] != 0:
+        print "Failed to configure network for %s" % progress["message"]
+        sys.exit(1)
+

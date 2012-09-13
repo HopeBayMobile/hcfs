@@ -45,12 +45,43 @@ meta = json.loads(
         "description": "capacity per disk (GB)",
         "type": "number",
         "required": true,
-        "max": 1048576,
+        "max": 1000000,
         "min": 1,
-        "default": 2048,
+        "default": 2000,
         "order": 6
-        }
+        },
 
+        "min_ip": {
+        "description": "min available ip",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.2",
+        "order": 7
+        },
+
+        "max_ip": {
+        "description": "max available ip",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.254",
+        "order": 8
+        },
+
+        "netmask": {
+        "description": "netmask",
+        "type": "text",
+        "required": false,
+        "default": "255.255.255.0",
+        "order": 9
+        },
+
+        "gateway": {
+        "description": "gateway",
+        "type": "text",
+        "required": false,
+        "default": "10.1.4.1",
+        "order": 10
+        }
 }
 """
 )

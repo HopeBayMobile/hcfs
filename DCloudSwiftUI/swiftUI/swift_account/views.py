@@ -275,8 +275,8 @@ def new_user_confirm(request, id):
             if user_pw.val is False:
                 return HttpResponse("Can't get " + user_id + " password from " + id)
             result = SA.set_user_quota(account=id, user=user_id, quota=int(user_quota)*1024*1024*1024)
-            if result.val:
-                return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "user_description": description, "request": request, "user_password":user_pw.msg, "user_quota":user_quota})
+            if result.val: 
+                return render_to_response('confirm_user.html', {"account_id": id, "user_id": user_id, "user_description":description,  "request": request, "user_password":user_pw.msg, "user_quota":user_quota})
             else:
                 return HttpResponse(result.msg)
         else:
@@ -300,10 +300,11 @@ def edit_user(request, id, user_id):
     description = ""
     if user_info.val:
         description = user_info.msg["description"]
+        user_quota = int(user_info.msg["quota"])/(1024*1024*1024)
     else:
-        return HttpResponse("get " + id + " user " + user_id + " info fail in edit_user")
+        return HttpResponse(user_info.msg)
     #return HttpResponse("edit_user")
-    return render_to_response('edit_user.html', {"account_id": id, "user_id": user_id, "request": request, "description": description}, context_instance=RequestContext(request))
+    return render_to_response('edit_user.html', {"account_id": id, "user_id": user_id, "user_quota":user_quota, "request": request, "description": description}, context_instance=RequestContext(request))
 
 
 @login_required
@@ -312,11 +313,16 @@ def update_user(request, id, user_id):
     """
     if "description" in request.POST:
         description = request.POST["description"]
+        user_quota = request.POST["user_quota"]
 
         SA = SwiftAccountMgr()
         result = SA.modify_user_description(id, user_id, description)
         if result.val:
-            return redirect("/account/" + id + "/edit")
+            result = SA.set_user_quota(account=id, user=user_id, quota=int(user_quota)*1024*1024*1024)
+            if result.val:
+                return redirect("/account/" + id + "/edit")
+            else:
+                return HttpResponse(result.msg)
         else:
             #return HttpResponse("fail to update description in update_user")
             return HttpResponse(result.msg)

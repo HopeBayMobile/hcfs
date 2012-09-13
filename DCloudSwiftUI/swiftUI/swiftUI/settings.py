@@ -207,8 +207,7 @@ from wizard.tasks import do_meta_form
 
 WIZARD_TITLE = 'Swift ZCW Wizard'
 WIZARD_STEP = [
-    (MetaForm, do_meta_form),
-#    (ManualForm, do_manual_form),
+    (MetaForm, do_meta_form)
 ]
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

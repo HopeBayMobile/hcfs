@@ -124,11 +124,11 @@ class SwiftMonitorMgr:
         '''
         calculate used_capacity_percentage
         @param total: total capacity in bytes
-        return total capacity in TB=10^12 bytes
+        return total capacity in TB=1024^4 bytes
         '''
         total_TB = None
         try:
-            total_TB = float(total)/float(1000000000000)
+            total_TB = float(total)/float(1024*1024*1024*1024)
         except Exception as e:
             self.logger.error(str(e))
 
@@ -170,7 +170,7 @@ class SwiftMonitorMgr:
 
     def calculate_node_capacity_in_TB(self, diskcount, diskcapacity, unusable=0):
         '''
-        calculate node capacity in TB
+        calculate node capacity in TB=1000^4
         @param diskcount: disk count in the node
         @param diskcapacity: capacity per disk in bytes
         @return: summation of disk capacities in the node

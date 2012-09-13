@@ -135,7 +135,7 @@ class prepare_image(setuptools.Command):
         cmd = "cp misc/BootScripts/rc.py /etc/rc.py"
         print cmd
         os.system(cmd)
-        
+
         # Create directories
         if not os.path.exists("/srv"):
             cmd = "mkdir /srv"
