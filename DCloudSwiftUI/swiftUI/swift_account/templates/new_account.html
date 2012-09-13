@@ -5,9 +5,22 @@
 <script src="/static/js/additional-methods.min.js" type="text/javascript"></script>
 <script type="text/javascript">
     $(document).ready(function() {
-            $("#form1").validate();
+            $("#form1").validate({
+        highlight: function(label) {
+	    	$(label).closest('.control-group').addClass('error');
+	    },
+	    success: function(label) {
+	    	label
+	    		.text('OK!').addClass('valid')
+	    		.closest('.control-group').addClass('success');
+	    }
+	    });
             });
 </script>
+{% endblock %}
+
+{% block moreStyles %}
+<link href="/static/css/validation_style.css" type="text/css" rel="stylesheet" />
 {% endblock %}
 
 {% block head_title %}New Account{% endblock %}
