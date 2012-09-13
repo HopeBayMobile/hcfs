@@ -1,29 +1,36 @@
-./install_dep_script
+#./install_dep_script
+# install dependent packages
+apt-get install -y --force-yes python-pycryptopp libsqlite3-dev sqlite3 python-apsw python-lzma  python-all-dev python-sphinx build-essential python-profiler python-argparse python-setuptools fuse-utils
+dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb
+dpkg -i debsrc/cython_0.15.1-2_amd64.deb
+dpkg -i debsrc/smartmontools_5.39.1+svn3124-2_amd64.deb
 
 # install s3ql package
-dpkg -i debsrc/s3ql_1.11.1.0001-1~natty_amd64.deb
-python setup.py build_cython
-python setup.py build
-python setup.py install
-
-#cp -rs /usr/bin/*s3ql* /usr/local/bin/
+apt-get -y --force-yes install s3ql
+# FIXME: need alternative installation from internet
+#~ if [ $? != 0 ]    # if apt-get fails
+#~ then
+    #~ dpkg -i debsrc/s3ql_1.11.1.0001-1~natty_amd64.deb
+    #~ python setup.py build_cython
+    #~ python setup.py build
+    #~ python setup.py install
+#~ fi
 
 #
 #-- Ovid Wu <ovid.wu@delta.com.tw> Tue, 24 Jul 2012 11:16:26 +0000
 #
 # add a private of APT repository server precise distribution
 # add main & unstable components
-#cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
-#deb http://www.deltacloud.tw/ubuntu/ precise main
-#deb-src http://www.deltacloud.tw/ubuntu precise main
+cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
+deb http://www.deltacloud.tw/ubuntu/ precise main
+deb-src http://www.deltacloud.tw/ubuntu precise main
 
-#deb http://www.deltacloud.tw/ubuntu/ precise unstable
-#deb-src http://www.deltacloud.tw/ubuntu precise unstable
-#EOF
+deb http://www.deltacloud.tw/ubuntu/ precise unstable
+deb-src http://www.deltacloud.tw/ubuntu precise unstable
+EOF
 
 #sudo apt-get update
 # import public key of Delta's Ubuntu apt server
-#sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B
-#sudo apt-get -y --force-yes install s3ql
+# sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B &
 # FIXME: install s3ql in /usr/local/bin in debian packaging (if it's required)
 cp -rs /usr/bin/*s3ql* /usr/local/bin/
