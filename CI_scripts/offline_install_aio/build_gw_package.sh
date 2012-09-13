@@ -44,7 +44,16 @@ fi
     fi
 
     if [ $MODE = "full" ];    then
-        git clone https://github.com/Delta-Cloud/StorageAppliance.git
+        expect -c "
+        spawn git clone $GIT_SRC
+        expect \"Username for\"
+        sleep 1
+        send \"dc-cds\r\"
+        expect \"Password for\"
+        sleep 1
+        send \"delta168cloud\r\"
+        interact
+        "
         check_ok
         cd StorageAppliance
         git stash
@@ -55,7 +64,16 @@ fi
         git stash
         git checkout $BRANCH
         git reset --hard HEAD
-        git pull
+        expect -c "
+        spawn git pull
+        expect \"Username for\"
+        sleep 1
+        send \"dc-cds\r\"
+        expect \"Password for\"
+        sleep 1
+        send \"delta168cloud\r\"
+        interact
+        "
         check_ok
         cd ..
     fi
