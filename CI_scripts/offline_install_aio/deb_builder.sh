@@ -13,13 +13,12 @@ check_ok() {
 
 # make sure input arguments are correct
     echo "************************"
-    echo "Usage: ./deb_builder.sh <gw_version> <s3ql_version> <build_num>"
-    echo "Usage: ./deb_builder.sh <version_num> <build_num>"
+    echo "Usage: ./deb_builder.sh <gw_version> <s3ql_version> <build_num> <DEBPATCH_file_name>"
     echo "************************"
-    if [ $# -ne 3 ]
+    if [ $# -ne 4 ]
     then
-        echo "Need to input gw_version_num s3ql_version_num and build_num."
-        echo "e.g. ./deb_builder.sh 1.0.9 1.11.1 3598"
+        echo "Need to input gw_version_num s3ql_version_num, build_num and DEBPATCH_file_name."
+        echo "e.g. ./deb_builder.sh 1.0.9 1.11.1 3598 DEBPATCH_file_name"
         exit 1
     fi
 
@@ -74,21 +73,14 @@ EOF
     cp -r $INITPATH/StorageAppliance/GatewayPatches /tmp/pkg_DCloudGateway/tmp
     tar -xzf $DEBPATCH -C /tmp/pkg_DCloudGateway/tmp/GatewayPatches/debsrc
     # edit control file
-cat > /tmp/pkg_DCloudGatewayAPI/DEBIAN/control << EOF
-# Source: <source package name; defaults to package name>
+cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
 Section: main
 Priority: optional
-# Homepage: <enter URL here; no default>
-Standards-Version: 3.9.2
-#~
 Package: dcloud-gateway
 Version: $GW_VERSION.$BUILD
 Maintainer: CDS Team <ctbd@delta.com.tw>
-#Pre-Depends: curl, tofrodos
 Depends: curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
 Architecture: amd64
-# Copyright: <copyright file; defaults to GPL2>
-# Changelog: <changelog file; defaults to a generic changelog>
 Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
 EOF
     dpkg --build /tmp/pkg_DCloudGateway ./

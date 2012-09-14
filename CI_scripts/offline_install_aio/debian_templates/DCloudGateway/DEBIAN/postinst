@@ -1,10 +1,10 @@
 #!/bin/sh
 
-# patch Ubuntu12.04 kernel, fuse and samba 3.6.6
-cd /tmp/GatewayPatches/
-# install samba 3.6.6
-echo "        ***** Install Samba patches *****"
-./install-samba.sh
-# install kernel and fuse patches
-echo "        ***** Install kernel and fuse patches *****"
-./install-u1204.sh
+#~ # patch Ubuntu12.04 kernel, fuse and samba 3.6.6
+#~ cd /tmp/GatewayPatches/
+#~ # install samba 3.6.6
+#~ echo "        ***** Install Samba patches *****"
+#~ ./install-samba.sh
+#~ # install kernel and fuse patches
+#~ echo "        ***** Install kernel and fuse patches *****"
+#~ ./install-u1204.sh
