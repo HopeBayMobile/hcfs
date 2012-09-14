@@ -177,6 +177,7 @@ class Heartbeat:
         if heartbeatencoding:
             post_data(self.receiverurl, heartbeatencoding)
         
+
 class NodeMonitor(Daemon):
     def __init__(self, pidfile):
         Daemon.__init__(self, pidfile)
@@ -193,6 +194,7 @@ class NodeMonitor(Daemon):
 
         self.DC = DiskChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
+        self.NCC = NetworkConfigChecker(self.receiverUrl)
 
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")

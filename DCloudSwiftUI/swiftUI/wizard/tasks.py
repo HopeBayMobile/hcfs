@@ -3,6 +3,7 @@ import os
 import time
 import subprocess
 import pickle
+import socket
 from threading import Thread
 
 from celery.task import task
@@ -35,6 +36,10 @@ def assign_public_ip(node_list, min_ip_value, max_ip_value):
     public_ip_dict = {}
     for node in node_list:
         if ip_value <= max_ip_value:
+            # Don't assign public ip to zcw
+            if node["hostname"] == socket.gethostname():
+                continue
+
             ip = numToDottedQuad(ip_value)
             ip_value +=1
             public_ip_dict[node["hostname"]] = ip
@@ -244,7 +249,7 @@ def do_meta_form(data):
     while progress['finished'] != True:
         time.sleep(5)
         progress = SD.getConfigureNetworkProgress()
-        total_progress = progress["progress"] / float(10)
+        total_progress = 5 + (progress["progress"] / float(10)) #  scaling 
         do_meta_form.report_progress(total_progress,
                                      True,
                                      progress["message"],
