@@ -2,7 +2,7 @@ from django.shortcuts import render_to_response, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from DCloudSwift.master.swiftMonitorMgr import SwiftMonitorMgr
-#TODO: get account order from model 
+
 from operator import itemgetter
 from DCloudSwift.master.swiftAccountMgr import SwiftAccountMgr
 from swift_util.helper import human_readable_capacity
@@ -27,7 +27,7 @@ def index(request):
         user_list = []
         for val in accounts:
             for user in accounts[val]:
-                if user!="admin":
+                if user!="admin" and accounts[val][user]["usage"]!="Error":
                     current_usage = int(accounts[val][user]["usage"])
                     user_list.append(dict(id=user,account=val,usage=current_usage))
         #sort list to get top 10

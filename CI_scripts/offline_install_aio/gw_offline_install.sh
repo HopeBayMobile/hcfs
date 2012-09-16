@@ -76,7 +76,16 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     apt-get install -y --force-yes dcloud-gateway
     check_ok
     apt-get -y --force-yes -f install
-    
+
+# patch Ubuntu12.04 kernel, fuse and samba 3.6.6
+cd /tmp/GatewayPatches/
+# install samba 3.6.6
+echo "        ***** Install Samba patches *****"
+./install-samba.sh
+# install kernel and fuse patches
+echo "        ***** Install kernel and fuse patches *****"
+./install-u1204.sh
+
 ## FIXME
 # clean up temp files to free up sda space.
     cd $INITPATH
@@ -85,7 +94,7 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     apt-get clean
     apt-get autoclean
     apt-get autoremove
-    rm -r /usr/share/doc /usr/src
+    rm -r /usr/share/doc /usr/src /tmp/GatewayPatches/
     rm /etc/apt/sources.list.d/apt-cache.list
     
 echo "....."
