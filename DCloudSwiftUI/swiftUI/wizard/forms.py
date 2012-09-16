@@ -54,7 +54,7 @@ meta = json.loads(
         "min_ip": {
         "description": "min available ip",
         "type": "text",
-        "required": false,
+        "required": true,
         "default": "10.1.4.2",
         "order": 7
         },
@@ -62,7 +62,7 @@ meta = json.loads(
         "max_ip": {
         "description": "max available ip",
         "type": "text",
-        "required": false,
+        "required": true,
         "default": "10.1.4.254",
         "order": 8
         },
@@ -70,7 +70,7 @@ meta = json.loads(
         "netmask": {
         "description": "netmask",
         "type": "text",
-        "required": false,
+        "required": true,
         "default": "255.255.255.0",
         "order": 9
         },
@@ -78,9 +78,33 @@ meta = json.loads(
         "gateway": {
         "description": "gateway",
         "type": "text",
-        "required": false,
+        "required": true,
         "default": "10.1.4.1",
         "order": 10
+        },
+
+        "zcw_ip": {
+        "description": "zcw ip",
+        "type": "text",
+        "required": true,
+        "default": "10.2.0.168",
+        "order": 11
+        },
+
+        "zcw_netmask": {
+        "description": "zcw_netmask",
+        "type": "text",
+        "required": true,
+        "default": "255.255.255.0",
+        "order": 12
+        },
+
+        "zcw_gateway": {
+        "description": "zcw_gateway",
+        "type": "text",
+        "required": true,
+        "default": "10.2.0.254",
+        "order": 13
         }
 }
 """

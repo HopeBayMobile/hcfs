@@ -12,6 +12,28 @@ PASSWORD = 'deltacloud'
 SOURCE_DIR = '/usr/local/src/'
 NETWORK_CONFIG = '/var/www-zcw/cfg/network_config'
 
+def config_zcw_network_interface(ip, netmask, gateway, network_interface=None):
+    if not network_interface:
+        network_interface = "/etc/network/interface"    
+
+    default_config="""
+auto lo
+iface lo inet loopback
+
+auto eth1
+iface eth1 inet manual
+           up ifconfig eth1 up
+
+"""
+    with open(network_interface, "w") as fh:
+        fh.write(default_config)
+        lines = "auto eth0\n"
+        lines = lines + "iface eth0 inet static\n"
+        lines = lines + "  address %s\n" % ip
+        lines = lines + "  netmask %s\n" % netmask
+        lines = lines + "  gateway %s\n" % gateway
+        fh.write(lines)
+
 def dottedQuadToNum(ip):
     "convert decimal dotted quad string to long integer"
 
@@ -37,8 +59,8 @@ def assign_public_ip(node_list, min_ip_value, max_ip_value):
     for node in node_list:
         if ip_value <= max_ip_value:
             # Don't assign public ip to zcw
-            #if node["hostname"] == socket.gethostname():
-            #    continue
+            if node["hostname"] == socket.gethostname():
+                continue
 
             ip = numToDottedQuad(ip_value)
             ip_value +=1
@@ -223,6 +245,14 @@ def do_meta_form(data):
     # Get list of hosts
     hosts = do_meta_form.get_zone_hosts()
 
+    # Configure ZCW network on eth0
+    config_zcw_network_interface(ip=data["zcw_ip"], 
+                                 netmask=data["zcw_netmask"], 
+                                 gateway=data["zcw_gateway"])
+
+    os.system("ifconfig eth0 down; ifup eht0")
+    
+
     # Assign public ip and dump to PUBLIC_IP_INFO
     do_meta_form.report_progress(5, True, 'Configure Network...', None)
     hostname_to_public_ip = assign_public_ip(hosts, min_ip_value, max_ip_value)
@@ -332,7 +362,6 @@ def do_meta_form(data):
     do_meta_form.report_progress(100, True, "Prepare swauth", None)
     cmd = "swauth-prep -K %s -A https://127.0.0.1:%s/auth/" % (PASSWORD, util.getProxyPort())
     os.system(cmd)
-    #os.system("swauth-add-user -A https://127.0.0.1:%s/auth -K %s -a system root testpass" % (util.getProxyPort(), PASSWORD))
 
     # reload apache to test load python module
     cmd = "/etc/init.d/apache2-zcw reload"
