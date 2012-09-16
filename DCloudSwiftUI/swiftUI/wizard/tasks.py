@@ -20,7 +20,7 @@ def dottedQuadToNum(ip):
 
 def numToDottedQuad(n):
     "convert long int to dotted quad string"
-    
+
     d = 256 * 256 * 256
     q = []
     while d > 0:
@@ -37,8 +37,8 @@ def assign_public_ip(node_list, min_ip_value, max_ip_value):
     for node in node_list:
         if ip_value <= max_ip_value:
             # Don't assign public ip to zcw
-            if node["hostname"] == socket.gethostname():
-                continue
+            #if node["hostname"] == socket.gethostname():
+            #    continue
 
             ip = numToDottedQuad(ip_value)
             ip_value +=1
@@ -57,7 +57,7 @@ def dns_lookup(hosts, nameserver="192.168.11.1"):
         value is 192.168.11.1
     @rtype: a list of hosts and each host is a dictinary containing an additional key "ip"
     @return: The input list hosts is shallow copied and a new key "ip" is added to each host.
-        If the ip lookup of a host is successfully done, then the founed ip is set 
+        If the ip lookup of a host is successfully done, then the founed ip is set
         to the value of key "ip" for that host. Otherwise None is used.
     '''
 
@@ -239,9 +239,9 @@ def do_meta_form(data):
         pickle.dump(network_config, fh)
 
     SD = SwiftDeploy.SwiftDeploy()
-    t = Thread(target=SD.configureNetwork, 
-               args=(hostname_to_public_ip, 
-                     data["netmask"], 
+    t = Thread(target=SD.configureNetwork,
+               args=(hostname_to_public_ip,
+                     data["netmask"],
                      data["gateway"]))
     t.start()
 
@@ -249,7 +249,7 @@ def do_meta_form(data):
     while progress['finished'] != True:
         time.sleep(5)
         progress = SD.getConfigureNetworkProgress()
-        total_progress = 5 + (progress["progress"] / float(10)) #  scaling 
+        total_progress = progress["progress"] / float(10)
         do_meta_form.report_progress(total_progress,
                                      True,
                                      progress["message"],
@@ -274,7 +274,7 @@ def do_meta_form(data):
     hosts = assign_swift_zid(hosts=hosts, replica_number=int(data["replica_number"]))
     if hosts is None:
         raise Exception("Replica number > number of hosts!!")
-    
+
     # Assign device count and deive weight to each host
     do_meta_form.report_progress(17, True, 'Assign device count for each host...', None)
     for host in hosts:
@@ -293,7 +293,7 @@ def do_meta_form(data):
     # start daemons
     do_meta_form.report_progress(20, True, 'Start daemons...', None)
     startDaemons()
-    
+
     t = Thread(target=SD.deploySwift, args=(hosts, hosts, int(data["replica_number"])))
     t.start()
     progress = SD.getUpdateMetadataProgress()
@@ -321,8 +321,8 @@ def do_meta_form(data):
         raise Exception('Swift deployment failed for %s' % progress['message'])
 
     check = SD.isDeploymentOk(proxyList=hosts,
-                              storageList=hosts, 
-                              blackList=progress['blackList'], 
+                              storageList=hosts,
+                              blackList=progress['blackList'],
                               numOfReplica=int(data["replica_number"]))
     if not check.val:
         raise Exception("Swift deploy failed for %s" % check.msg)
@@ -337,5 +337,3 @@ def do_meta_form(data):
     # reload apache to test load python module
     cmd = "/etc/init.d/apache2-zcw reload"
     os.system(cmd)
-
-

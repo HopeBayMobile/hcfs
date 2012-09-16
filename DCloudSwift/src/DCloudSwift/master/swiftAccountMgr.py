@@ -617,6 +617,30 @@ class SwiftAccountMgr:
             val = True
             msg = ""
 
+        from swift.common import client
+        conn = client.Connection("https://127.0.0.1:8080/auth/v1.0", account+":"+self.__admin_default_name, admin_password)
+        try:
+            response = conn.get_auth()
+            portal_domain = util.getPortalUrl().replace("https://","").split(":")[0]
+            
+            storage_url = response[0].replace("127.0.0.1", portal_domain)
+            cmd = "swauth-set-account-service -K deltacloud -A https://127.0.0.1:8080/auth %s storage local %s" % (account, storage_url)
+            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            (stdoutData, stderrData) = po.communicate()
+       
+            if po.returncode != 0 or stderrData != "":
+                val = False
+                msg = msg + stderrData
+                logger.error(msg)
+            else:
+                val = True
+                msg = stdoutData
+                logger.info(msg)
+        except Exception as e:
+            val = False
+            msg = "Failed to update storage url: " + str(e)
+            logger.error(msg)
+
         lock.release()
         return Bool(val, msg)
 
@@ -3375,6 +3399,7 @@ class SwiftAccountMgr:
 
 if __name__ == '__main__':
     SA = SwiftAccountMgr()
+    SA.add_account("aabb")
     #print SA.add_account("test1")
     #print SA.add_user("test1", "user1")
     #print SA.delete_account("test1")
