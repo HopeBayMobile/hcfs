@@ -14,7 +14,7 @@ NETWORK_CONFIG = '/var/www-zcw/cfg/network_config'
 
 def config_zcw_network_interface(ip, netmask, gateway, network_interface=None):
     if not network_interface:
-        network_interface = "/etc/network/interface"    
+        network_interface = "/etc/network/interfaces"    
 
     default_config="""
 auto lo
