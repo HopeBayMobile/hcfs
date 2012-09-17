@@ -194,7 +194,6 @@ class NodeMonitor(Daemon):
 
         self.DC = DiskChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
-        self.NCC = NetworkConfigChecker(self.receiverUrl)
 
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")
