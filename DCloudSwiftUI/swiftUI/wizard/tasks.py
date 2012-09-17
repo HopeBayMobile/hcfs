@@ -279,7 +279,7 @@ def do_meta_form(data):
     while progress['finished'] != True:
         time.sleep(5)
         progress = SD.getConfigureNetworkProgress()
-        total_progress = progress["progress"] / float(10)
+        total_progress = 5 + progress["progress"] / float(10)
         do_meta_form.report_progress(total_progress,
                                      True,
                                      progress["message"],
