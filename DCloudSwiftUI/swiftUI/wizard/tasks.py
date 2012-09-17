@@ -250,7 +250,7 @@ def do_meta_form(data):
                                  netmask=data["zcw_netmask"], 
                                  gateway=data["zcw_gateway"])
 
-    os.system("ifconfig eth0 down; ifdown eth0; ifup eht0")
+    os.system("ifconfig eth0 down; ifdown eth0; ifup eth0")
     
 
     # Assign public ip and dump to PUBLIC_IP_INFO
