@@ -17,9 +17,9 @@ class SwiftMonitorMgr:
         
         >>> SM = SwiftMonitorMgr()
         >>> print SM.get_zone_info()
-        {'ip': '192.168.1.104', 'nodes': 3, 'used': '21', 'capacity': '12TB', 'free': '79'}
+        {'ip': '192.168.1.104', 'nodes': 3, 'used': '12.5', 'capacity': '12TB', 'repair':'3.5', 'free': '84'}
         """
-        zone = {"ip":"192.168.1.104","nodes":3,"used":"21","free":"79","capacity":"12TB"}
+        zone = {"ip":"192.168.1.104","nodes":3,"used":"12.5","repair":"3.5","free":"84","capacity":"12TB"}
         return zone
 
     def list_nodes_info(self):
