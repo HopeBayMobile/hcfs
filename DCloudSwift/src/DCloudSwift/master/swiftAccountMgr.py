@@ -1634,11 +1634,8 @@ class SwiftAccountMgr:
             logger.error(msg)
             return Bool(val, msg)
 
-        # invoke obtain_account_info() for each account
         for item in account_info["accounts"]:
             # obtain the user list to compute the number of users in the account
-
-
             try:
                 result = super_admin_conn.get_container(item["name"])[-1]
                 user_info["users"] = result
@@ -1673,42 +1670,23 @@ class SwiftAccountMgr:
                 services_result = super_admin_conn.get_object(item["name"], ".services")[-1]
                 services_content = json.loads(services_result)
                 account_enable = True if services_content.get("disable") == None else False
+                #auth_url = services_content.get("storage").get("local") if account_enable == True else ""
             except Exception as e:
                 logger.error(str(e))
                 account_enable = "Error"
 
+            '''
             # obtain the usage of the account
-
-
             try:
-                result = super_admin_conn.get_object(item["name"], self.__admin_default_name)[-1]
-                user_content = json.loads(result)
-
-                if user_content.get("auth") != None:
-                    user_password = user_content.get("auth")
-                else:
-                    user_password = user_content.get("disable")
-
-                user_password = user_password.split(":")[-1]
+                result = super_admin_conn.get_object(item["name"], self.__admin_default_name)[0]
+                auth_token = result.get("x-object-meta-auth-token")
             except Exception as e:
-                logger.error("Failed to get the password of user %s:%s: %s" % (item["name"], self.__admin_default_name, str(e)))
-                user_password = None
+                logger.error("Failed to get the auth token of account %s: %s" % (item["name"], str(e)))
 
-            if user_password != None and account_enable == True:
-                try:
-                    account_conn = client.Connection(url, item["name"] + ":" + self.__admin_default_name, user_password)
-                    mark = True
-                except Exception as e:
-                    msg = "Failed to create the connection: %s" % str(e)
-                    logger.error(msg)
-                    mark = False
-            else:
-                mark = False
-
-            if mark == True:
+            if account_enable == True:
                 # the usage of the user's private container and gateway configuration container
                 try:
-                    result = account_conn.head_account()
+                    result = client.head_account(auth_url, auth_token)
                     usage = int(result.get("x-account-bytes-used"))
                 except Exception as e:
                     logger.error("Failed to get the usage of account %s: %s" % (item["name"], str(e)))
@@ -1717,13 +1695,14 @@ class SwiftAccountMgr:
                 usage = "Error"
                 msg = "Failed to get the usage of account %s" % item["name"]
                 logger.error(msg)
-  
+            '''
+
             account_dict[item["name"]] = {
                 "user_number": user_number,
                 "description": description,
                 "quota": quota,
                 "account_enable": account_enable,
-                "usage": usage,
+                #"usage": usage,
             }
 
         # MUST return true to show information on GUI
@@ -3333,22 +3312,14 @@ class SwiftAccountMgr:
                 logger.error("Failed to get file .services of account %s: %s" % (item["name"], str(e)))
                 account_enable = "Error"
 
-            # get the password of account administrator and get the auth token of the account
+            # get the auth token of the account
             try:
-                output = super_admin_conn.get_object(item["name"], self.__admin_default_name)
-                result = output[-1]
-                result2 = output[0]
-                user_content = json.loads(result)
-                user_password = user_content.get("auth") if user_content.get("auth") != None else user_content.get("disable")
-                user_password = user_password.split(":")[-1]
-                auth_token = result2.get("x-object-meta-auth-token")
+                result = super_admin_conn.get_object(item["name"], self.__admin_default_name)[0]
+                auth_token = result.get("x-object-meta-auth-token")
             except Exception as e:
-                logger.error("Failed to get the password of user %s:%s: %s" % (item["name"], self.__admin_default_name, str(e)))
-                user_password = None
+                logger.error("Failed to get the auth token of account %s: %s" % (item["name"], str(e)))
 
-            mark = True if user_password != None and account_enable == True else False
-
-            if mark == True:
+            if account_enable == True:
                 # get the usage of all containers in the account
                 try:
                     result = client.get_account(auth_url, auth_token)[-1]
