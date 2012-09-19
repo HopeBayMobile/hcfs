@@ -67,7 +67,7 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     mkdir -p /mnt/cloudgwfiles/COSA
     if [ $MODE = "dom" ]
     then
-        cd /tmp/INSTALL_Gateway
+        cd $INITPATH
 	bash DOM_gw_run_this_first.sh
     fi
 
