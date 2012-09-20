@@ -39,7 +39,7 @@ check_ok() {
     # update change log
     dch -v $S3QL_VERSION.$BUILD -m "Modified by CDS Team @ Delta Cloud."
     # build DEB file
-    dpkg-buildpackage -rfakeroot -b
+    dpkg-buildpackage -rfakeroot -b -d
     check_ok
 
 # build DCloudGatewayAPI
