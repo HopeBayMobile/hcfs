@@ -42,24 +42,6 @@ class DaemonInfo:
 
         return result
 
-    def check_memory(self):
-        """
-        check memory
-
-	@rtype:
-                    {
-                       "total": total number of memory in bytes 
-                       "usage": percentage of used memory
-                    }
-  
-        @return: info of memory
-        """
-
-        mem_info = {}
-        mem_info["total"] = self.get_total()
-        mem_info["usage"] = self.get_usage()
-        return mem_info
-
 def get_module_name():
     '''
     '''

@@ -13,6 +13,7 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 from components.disk_info import DiskInfo
+from components.daemon_info import DaemonInfo
 
 timeout = 60
 socket.setdefaulttimeout(timeout)
@@ -73,6 +74,53 @@ def post_data(url, data):
     f.close
 
     return response
+
+
+class DaemonChecker:
+    def __init__(self, receiverUrl):
+        self.daemonInfo = DaemonInfo()
+        self.receiverUrl = receiverUrl
+        self.component_name = "DAEMON_INFO"
+        self.event_name = "DAEMON"
+
+    def check_daemons(self):
+        """
+        check status of daemons
+        @return: {"daemon_name1": "on", "daemon_name2": "off", ...}
+        """
+        ret = self.daemonInfo.check_daemons()
+        return ret
+
+    def send_daemon_event(self):
+        """
+        send event to the receiver 
+        """
+        logger = util.getLogger(name="DaemonChecker")
+        eventEncoding = None
+        try:
+            daemon_info = self.check_daemons()
+            event = {
+                "hostname": socket.gethostname(),
+                "component_name": self.component_name,
+                "event": self.event_name,
+                "level": "INFO",
+                "data": json.dumps(daemon_info),
+                "time": int(time.time()),
+            }
+            eventEncoding= json.dumps(event)
+            logger.info(eventEncoding)
+
+        except Exception as e:
+            logger.error(str(e))
+            event = {
+                "component_name": self.component_name,
+                "message": str(e),
+                "time": int(time.time()),
+            }
+            logger.error(json.dumps(event))
+
+        if eventEncoding:
+            post_data(self.receiverUrl, eventEncoding)
 
 
 class DiskChecker:
@@ -193,6 +241,7 @@ class NodeMonitor(Daemon):
             self.sensorInterval = (30, 60)
 
         self.DC = DiskChecker(self.receiverUrl)
+        sefl.DaemonChecker = DaemonChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
 
     def run(self):
@@ -208,6 +257,11 @@ class NodeMonitor(Daemon):
                  
                 try:
                     self.DC.send_disk_event()
+                except Exception as e:
+                    logger.error(str(e))
+
+                try:
+                    self.DaemonChecker.send_daemon_event()
                 except Exception as e:
                     logger.error(str(e))
 
