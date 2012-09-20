@@ -241,7 +241,7 @@ class NodeMonitor(Daemon):
             self.sensorInterval = (30, 60)
 
         self.DC = DiskChecker(self.receiverUrl)
-        sefl.DaemonChecker = DaemonChecker(self.receiverUrl)
+        self.DaemonChecker = DaemonChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
 
     def run(self):
