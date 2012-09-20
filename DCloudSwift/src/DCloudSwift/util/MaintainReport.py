@@ -145,6 +145,7 @@ def print_node_info():
             output += "  status: %s\n" % node["status"]
             output += "  timestamp: %d\n" % node["timestamp"]
             output += "  disk: %s\n" % node["disk"]
+            output += "  daemon: %s\n" % node["daemon"]
             output += "  mode: %s\n" % node["mode"]
             output += "  switchpoint: %s\n" % node["switchpoint"]
             output+="}\n"
@@ -161,16 +162,4 @@ def main(DBFile=None):
 
 if __name__ == '__main__':
     DBFile = None
-#    if len(sys.argv) == 2:
-#        if 'test' == sys.argv[1]:
-#            DBFile = '/etc/test/test.db'
-#            os.system("rm -f %s" % DBFile)
-#            db = MaintenanceBacklogDatabaseBroker(DBFile)
-#            db.initialize()
-#            timestamp = int(time.mktime(time.localtime()))
-#            diskReserve = \
-#                ['SN_reserve_001', 'SN_reserve_002', 'SN_reserve_003']
-#            diskReplace = ['SN_replace001', 'SN_replace002', 'SN_replace003']
-#            row = db.add_maintenance_task('node_missing', '192.168.2.30',
-#                        json.dumps(diskReserve), json.dumps(diskReplace))
     main(DBFile)

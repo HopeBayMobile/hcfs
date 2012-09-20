@@ -112,6 +112,52 @@ class SwiftEventMgr(Daemon):
 
         return True
 
+    '''
+    daemon event format
+    {
+        component_name: "daemon_info",
+        event: "DAEMON",
+        level: INFO|WARNING|ERROR,
+        hostname: <hostname>
+        data: { 
+                "daemon_name1": "on | off",
+                "daemon_name2": "on | off",
+              },
+        time: <integer>
+    }
+    '''
+
+    @staticmethod
+    def isValidDaemonEvent(event):
+        '''
+        check the format of daemon event 
+
+        @type  event: dictioary
+        @param event: daemon event
+        @rtype: boolean
+        @return: Return False if there's format error. 
+            Otherwise, return True.
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.isValidDaemonEvent")
+        try:
+            hostname = event["hostname"]
+            data = json.loads(event["data"])
+            daemon_on = [daemon_name for daemon_name in data if data[daemon_name] == "on"]
+            daemon_off = [daemon_name for daemon_name in data if data[daemon_name] == "off"]
+            timestamp = event["time"]
+        except Exception as e:
+            logger.error(str(e))
+            return False
+
+        if not isinstance(event["hostname"], str) and not isinstance(event["hostname"], unicode):
+            logger.error("Wrong type of hostname")
+            return False
+        if not isinstance(event["time"], int):
+            logger.error("Wrong type of time")
+            return False
+
+        return True
+
     @staticmethod
     def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         '''
@@ -195,6 +241,62 @@ class SwiftEventMgr(Daemon):
             return None
 
         return new_disk_info
+
+    @staticmethod
+    def updateDaemonInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
+        '''
+        update daemon info according to the daemon event
+
+        @type  event: dictioary
+        @param event: daemon event
+        @rtype: dictionary
+        @return: updated daemon info
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updatedDaemonInfo")
+        new_daemon_info = {
+                            "timestamp": 0,
+                            "on": [],
+                            "off": []
+        }
+
+        nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
+
+        if not SwiftEventMgr.isValidDaemonEvent(event):
+            logger.error("Invalid daemon event!!")
+            return None
+
+        hostname = event["hostname"]
+        data = json.loads(event["data"])
+        node = nodeInfoDb.get_info(hostname)
+        if not node:
+            logger.error("%s is not registered!!" % hostname)
+            return None
+
+        #TODO: handle invalid old_daemon_info
+        try:
+            old_daemon_info = json.loads(nodeInfoDb.get_info(hostname)["daemon"])
+            if old_daemon_info["timestamp"] >= event["time"]:
+                logger.warn("Old daemon events are received from %s" % event["hostname"])
+                return None
+            else:
+                new_daemon_info["timestamp"] = event["time"]
+
+            # Update missing disks info
+            new_daemon_info["on"] = [daemon_name for daemon_name in data if data[daemon_name] == "on"]
+            new_daemon_info["off"] = [daemon_name for daemon_name in data if data[daemon_name] == "off"]
+
+        except Exception as e:
+            logger.error(str(e))
+            return None
+
+        try:
+            daemon = json.dumps(new_daemon_info)
+            nodeInfoDb.update_node_daemon(event["hostname"], daemon)
+        except Exception as e:
+            logger.error("Failed to update database for %s" % str(e))
+            return None
+
+        return new_daemon_info
 
     @staticmethod
     def handleHDD(event):

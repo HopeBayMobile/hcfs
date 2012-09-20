@@ -145,6 +145,13 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             }
             disk = json.dumps(disk_info)
 
+            daemon_info = {
+                        "timestamp": timestamp,
+                        "on": [],
+                        "off": [],
+            }
+            daemon = json.dumps(daemon_info)
+
             mode = "service"
             switchpoint = timestamp
 
@@ -152,6 +159,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                           status=status,
                           timestamp=timestamp,
                           disk=disk,
+                          daemon=daemon,
                           mode=mode,
                           switchpoint=switchpoint)
 
@@ -187,6 +195,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 status TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
                 disk TEXT NOT NULL,
+                daemon TEXT NOT NULL,
                 mode TEXT NOT NULL,
                 switchpoint INTEGER NOT NULL,
                 PRIMARY KEY (hostname)
@@ -233,7 +242,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             return row
 
     @lock
-    def add_node(self, hostname, status, timestamp, disk, mode, switchpoint):
+    def add_node(self, hostname, status, timestamp, disk, daemon, mode, switchpoint):
         """
         add node to node_info
 
@@ -245,6 +254,8 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
         @param timestamp: time of the latest status update
         @type  disk: json string
         @param disk: disk information of the node
+        @type  daemon: json string
+        @param daemon: daemon information of the node
         @type mode: enum(service, waiting)
         @param mode: mode of the node
         @type switchpoint: integer
@@ -258,7 +269,7 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
             if row:
                 return None
             else:
-                conn.execute("INSERT INTO node_info VALUES (?,?,?,?,?,?)", (hostname, status, timestamp, disk, mode, switchpoint))
+                conn.execute("INSERT INTO node_info VALUES (?,?,?,?,?,?,?)", (hostname, status, timestamp, disk, daemon, mode, switchpoint))
                 conn.commit()
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
@@ -433,6 +444,29 @@ class NodeInfoDatabaseBroker(DatabaseBroker):
                 return None
             else:
                 conn.execute("UPDATE node_info SET disk=? WHERE hostname=?", (disk, hostname))
+                conn.commit()
+                row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+                return row
+
+    @lock
+    def update_node_daemon(self, hostname, daemon):
+        """
+        update daemon information into node_info
+
+        @type  hostname: string
+        @param hostname: hostname of the node
+        @type  daemon: encoding json string
+        @param daemon: daemon status of the node
+        @rtype: string
+        @return: Return None if the node does not exist. 
+            Otherwise return the newly added row.            
+        """
+        with self.get() as conn:
+            row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
+            if not row:
+                return None
+            else:
+                conn.execute("UPDATE node_info SET daemon=? WHERE hostname=?", (daemon, hostname))
                 conn.commit()
                 row = conn.execute("SELECT * FROM node_info where hostname=?", (hostname,)).fetchone()
                 return row
