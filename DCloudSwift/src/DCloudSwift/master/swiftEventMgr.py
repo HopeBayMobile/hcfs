@@ -308,6 +308,16 @@ class SwiftEventMgr(Daemon):
         '''
         SwiftEventMgr.updateDiskInfo(event)
 
+    @staticmethod
+    def handleDaemon(event):
+        '''
+        handle HDD event
+        
+        @type  event: dictioary
+        @param event: hdd event
+        '''
+        SwiftEventMgr.updateDaemonInfo(event)
+
     '''
     Heartbeat format
     {
@@ -430,6 +440,8 @@ class SwiftEventMgr(Daemon):
             SwiftEventMgr.handleHDD(event)
         elif eventName == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
+        elif eventName == "daemon":
+            SwiftEventMgr.handleDaemon(event)
 
     class EventsPage(Resource):
             def render_GET(self, request):
