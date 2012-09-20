@@ -94,6 +94,10 @@ fi
 
 # build DCloudS3ql and DCloudGateway (API)
     cd $INITPATH
+    echo "test start\n"
+    pwd
+    echo "test end\n"
+    echo "deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM $DEBPATCH"
     bash deb_builder.sh $GW_VERSION $S3QL_VERSION $BUILDNUM $DEBPATCH
     check_ok
     # Move S3QL DEB file to /var/cache/apt/
@@ -119,7 +123,8 @@ fi
 
 # tar an all in one pack
     echo "creating gateway installation package"
-    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf
+    cp StorageAppliance/INSTALL_Gateway/DOM_gw_run_this_first.sh ./
+    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf DOM_gw_run_this_first.sh
 
 # clean old files
     rm debsrc_StorageAppliance*.tgz
