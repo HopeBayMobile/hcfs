@@ -169,7 +169,8 @@ class SwiftEventMgr(Daemon):
 
             # Update healthy disks info
             detectedHealthyDisks = [disk for disk in data if disk["healthy"]]
-            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"]} for disk in detectedHealthyDisks]
+            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"], "usage": disk["usage"]}\
+                                       for disk in detectedHealthyDisks]
 
             # Update broken disks info
             detectedBrokenDisks = [disk for disk in data if not disk["healthy"]]
