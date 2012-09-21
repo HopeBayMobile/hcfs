@@ -149,6 +149,35 @@ def _wait_snapshot(old_len):
         else:
             time.sleep(0.5)
 
+def take_snapshot2():
+    """
+    API function for taking snapshots manually.
+    
+    Note that this function just inform that the action of taking snapshot is performing.
+    Return from this function is not equal to the finish of taking snapshot.
+
+    @rtype:    Json object
+    @return:   A json object with function result and returned message.
+    """
+    log.debug('Started take_snapshot2')
+    return_result = False
+    return_msg = '[2] Unexpected error in take_snapshot'
+
+    try:
+        if _check_snapshot_in_progress():
+            return_msg = 'Another snapshotting process is already in progress. Aborting.'
+        else:
+            _initialize_snapshot()
+            return_result = True
+            return_msg = 'Completed take_snapshot2'
+    except SnapshotError as Err:
+        return_msg = str(Err)
+
+    log.debug(return_msg)
+    return_val = {'result': return_result,
+                  'msg': return_msg,
+                  'data': {}}
+    return json.dumps(return_val)
 
 def take_snapshot():
     """
@@ -922,4 +951,4 @@ def rebuild_snapshot_database(_ss_dir=None):
 
 if __name__ == '__main__':
     #print delete_snapshot('snapshot_2012_6_25_17_46_24')
-    rebuild_snapshot_database()
+    take_snapshot2()
