@@ -58,6 +58,8 @@ class SwiftMasterCfg:
         self.__maintainReplTime = config.get('maintain', 'replication_time')
         self.__maintainRefreshTime = config.get('maintain', 'refresh_time')
         self.__maintainDaemonSleep = config.get('maintain', 'daemon_sleep')
+        self.__mongodbHost = config.get('mongodb', 'host')
+        self.__mongodbPort = config.get('mongodb', 'port')
 
         self.__kwparams = {
             'eventMgrPort': self.__eventMgrPort,
@@ -65,6 +67,8 @@ class SwiftMasterCfg:
             'maintainReplTime': self.__maintainReplTime,
             'maintainRefreshTime': self.__maintainRefreshTime,
             'maintainDaemonSleep': self.__maintainDaemonSleep,
+            'mongodbHost': self.__mongodbHost,
+            'mongodbPort': self.__mongodbPort,
         }
 
     def getKwparams(self):
