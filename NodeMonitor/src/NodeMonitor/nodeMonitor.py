@@ -13,6 +13,8 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 from components.disk_info import DiskInfo
+from components.mem_info import MemInfo
+from components.net_info import NetInfo
 from components.daemon_info import DaemonInfo
 
 timeout = 60
@@ -75,6 +77,71 @@ def post_data(url, data):
 
     return response
 
+class StatsCollector:
+    def __init__(self, receiverUrl):
+        self.MI = MemInfo()
+        self.NI = NetInfo()
+        self.receiverUrl = receiverUrl
+        self.component_name = "NODE_STATS"
+        self.event_name = "STATS"
+
+    def collect_stats(self):
+        """
+        check status of all detected disks
+
+	@rtype: {
+                    mem:{ 
+                       "total": total number of memory in bytes 
+                       "usage": percentage of used memory
+                    }
+
+                    net: {
+                           "eth0": { "receive": bits trnasmitted per second (integer),
+                                     "transmit" bits transmitted per second (interger)},
+                           "eth1": { ... },
+                       ...
+                    },
+
+        }
+  
+        @return: stats of the node
+        """
+        ret = {}
+        ret["net"] = self.NI.check_network()
+        ret["mem"] = self.MI.check_memory()
+        return ret
+
+
+    def send_stats_event(self):
+        """
+        send event to the receiver 
+        """
+        logger = util.getLogger(name="StatsCollector")
+        eventEncoding = None
+        try:
+            stats = self.collect_stats()
+            event = {
+                "hostname": socket.gethostname(),
+                "component_name": self.component_name,
+                "event": self.event_name,
+                "level": "INFO",
+                "data": json.dumps(stats),
+                "time": int(time.time()),
+            }
+            eventEncoding= json.dumps(event)
+            logger.info(eventEncoding)
+
+        except Exception as e:
+            logger.error(str(e))
+            event = {
+                "component_name": self.component_name,
+                "message": str(e),
+                "time": int(time.time()),
+            }
+            logger.error(json.dumps(event))
+
+        if eventEncoding:
+            post_data(self.receiverUrl, eventEncoding)
 
 class DaemonChecker:
     def __init__(self, receiverUrl):
@@ -243,6 +310,7 @@ class NodeMonitor(Daemon):
         self.DC = DiskChecker(self.receiverUrl)
         self.DaemonChecker = DaemonChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
+        self.StatsCollector = StatsCollector(self.receiverUrl)
 
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")
@@ -262,6 +330,11 @@ class NodeMonitor(Daemon):
 
                 try:
                     self.DaemonChecker.send_daemon_event()
+                except Exception as e:
+                    logger.error(str(e))
+
+                try:
+                    self.StatsCollector.send_stats_event()
                 except Exception as e:
                     logger.error(str(e))
 
