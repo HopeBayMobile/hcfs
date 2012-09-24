@@ -21,7 +21,7 @@ def main():
 
     setup(
         name="Node Monitor",
-        version="0.1",
+        version="0.6",
         author="Cloud Data Team, CTBD, Delta Electronic Inc.",
         description=("Delta Inc. CTBD node monitor"),
         license="Delta Inc.",

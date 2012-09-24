@@ -15,6 +15,7 @@ from util import util
 from components.disk_info import DiskInfo
 from components.mem_info import MemInfo
 from components.net_info import NetInfo
+from components.cpu_info import CpuInfo
 from components.daemon_info import DaemonInfo
 
 timeout = 60
@@ -81,6 +82,7 @@ class StatsCollector:
     def __init__(self, receiverUrl):
         self.MI = MemInfo()
         self.NI = NetInfo()
+        self.CI = CpuInfo()
         self.receiverUrl = receiverUrl
         self.component_name = "NODE_STATS"
         self.event_name = "STATS"
@@ -107,6 +109,7 @@ class StatsCollector:
         @return: stats of the node
         """
         ret = {}
+        ret["cpu"] = self.CI.check_cpu()
         ret["net"] = self.NI.check_network()
         ret["mem"] = self.MI.check_memory()
         return ret
