@@ -4,6 +4,7 @@
 # Developed by Cloud Data Team, Cloud Technology Center, Delta Electronic Inc.
 
 import os
+import pprint
 import sys
 import simplejson as json
 
@@ -18,6 +19,7 @@ from SwiftCfg import SwiftMasterCfg
 from database import MaintenanceBacklogDatabaseBroker
 from database import NodeInfoDatabaseBroker
 from master.swiftMaintainAgent import SwiftMaintainAgent
+from datetime import datetime
 
 class MaintainReport():
     """
@@ -176,10 +178,14 @@ def print_node_stats():
 
     try:
         db = get_mongodb(GlobalVar.MONITOR_MONGODB)
-        stats_collection = db.stats.find()
+        nodes = db.stats.find()
 
-        for stats in stats_collection:
-            print stats
+        for node in nodes:
+            date = datetime.fromtimestamp(node["timestamp"])
+            stats = node["stats"]
+            stats[u"date"] = str(date)
+            stats = {node["hostname"]: stats}
+            pprint.pprint(stats, indent=1)
 
     except Exception as e:
         print >> sys.stderr, str(e)
