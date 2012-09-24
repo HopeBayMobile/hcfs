@@ -13,6 +13,7 @@ sys.path.append("%s/DCloudSwift/" % BASEDIR)
 
 from daemon import Daemon
 from util import GlobalVar
+from mongodb import get_mongodb
 from SwiftCfg import SwiftMasterCfg
 from database import MaintenanceBacklogDatabaseBroker
 from database import NodeInfoDatabaseBroker
@@ -118,7 +119,7 @@ def print_maintenance_backlog():
 
 def print_node_info():
     '''
-    Command line implementation of node info initialization.
+    Command line implementation of printing node info.
     '''
 
     ret = 1
@@ -155,6 +156,34 @@ def print_node_info():
         print >> sys.stderr, str(e)
         sys.exit(1)
 
+def print_node_stats():
+    '''
+    Command line implementation of node info initialization.
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_print_node_stats
+    arguments:
+        None
+    '''
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    try:
+        db = get_mongodb(GlobalVar.MONITOR_MONGODB)
+        stats_collection = db.stats.find()
+
+        for stats in stats_collection:
+            print stats
+
+    except Exception as e:
+        print >> sys.stderr, str(e)
+        sys.exit(1)
 
 def main(DBFile=None):
     maintainReport = MaintainReport(DBFile)

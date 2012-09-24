@@ -356,11 +356,13 @@ class SwiftEventMgr(Daemon):
             return None
 
         hostname = event["hostname"]
+        timestamp = event["time"]
         stats = json.loads(event["data"])
 
         try:
             db = get_mongodb(mongodb)
-            ret = db.stats.find_and_modify({"hostname": hostname}, stats, upsert=True, new=True)
+            doc = {"hostname": hostname, "timestamp": timestamp, "stats": stats}
+            ret = db.stats.find_and_modify({"hostname": hostname}, doc, upsert=True, new=True)
         except Exception as e:
             logger.error(str(e))
             return None
@@ -389,7 +391,7 @@ class SwiftEventMgr(Daemon):
         SwiftEventMgr.updateDaemonInfo(event)
 
     @staticmethod
-    def handleStatsEvent(event, mongodb=GlobalVar.MONITOR_MONGODB):
+    def handleStats(event, mongodb=GlobalVar.MONITOR_MONGODB):
         '''
         handle stats event
         
@@ -397,7 +399,6 @@ class SwiftEventMgr(Daemon):
         @param event: data event
         '''
         SwiftEventMgr.updateStats(event)
-
 
 
     '''
@@ -737,6 +738,29 @@ def clearMaintenanceBacklog():
 
     return ret
 
+def clearNodeStats():
+    '''
+    Command line implementation of clearing node stats
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_node_stats
+    arguments:
+        None
+    '''
+    
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    db = get_mongodb(GlobalVar.MONITOR_MONGODB)
+    db.stats.remove(safe=True)
+
+    return 0
 
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')
