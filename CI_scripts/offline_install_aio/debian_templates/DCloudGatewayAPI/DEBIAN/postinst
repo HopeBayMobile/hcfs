@@ -51,6 +51,8 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     chmod 666 $CONFDIR/Gateway.ini
     cp $SRCDIR/config/interfaces /etc/network/interfaces
     cp $SRCDIR/config/hosts.allow /etc
+    cp $SRCDIR/config/hosts.deny /etc
+    cp $SRCDIR/config/exports /etc
     cp $SRCDIR/config/gw_schedule.conf $CONFDIR/
     cp $SRCDIR/config/smb.orig $CONFDIR
     cp $SRCDIR/gateway_scripts/hourly_run_this $CONFDIR
