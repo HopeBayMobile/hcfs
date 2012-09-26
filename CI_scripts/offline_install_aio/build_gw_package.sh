@@ -75,10 +75,10 @@ fi
         "
         check_ok
     fi
-    cd $INITPATH
 
 # create commit log file
     git log > $INITPATH/$COMMIT_LOG
+    cd $INITPATH
 
 # clean old DEB files at $APTCACHEDIR
     rm $APTCACHEDIR/*.deb
