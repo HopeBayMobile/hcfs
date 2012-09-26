@@ -58,7 +58,6 @@ fi
         cd StorageAppliance
         git stash
         git checkout $BRANCH
-        cd ..
     else
         cd StorageAppliance
         git stash
@@ -75,8 +74,11 @@ fi
         interact
         "
         check_ok
-        cd ..
     fi
+
+# create commit log file
+    git log > $INITPATH/$COMMIT_LOG
+    cd $INITPATH
 
 # clean old DEB files at $APTCACHEDIR
     rm $APTCACHEDIR/*.deb
@@ -124,7 +126,7 @@ fi
 # tar an all in one pack
     echo "creating gateway installation package"
     cp StorageAppliance/INSTALL_Gateway/DOM_gw_run_this_first.sh ./
-    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf DOM_gw_run_this_first.sh
+    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf DOM_gw_run_this_first.sh $COMMIT_LOG
 
 # clean old files
     rm debsrc_StorageAppliance*.tgz
