@@ -17,6 +17,7 @@ from components.mem_info import MemInfo
 from components.net_info import NetInfo
 from components.cpu_info import CpuInfo
 from components.daemon_info import DaemonInfo
+from components.os_info import OSInfo
 
 timeout = 60
 socket.setdefaulttimeout(timeout)
@@ -84,6 +85,7 @@ class RuntimeInfo:
         self.NI = NetInfo()
         self.CI = CpuInfo()
         self.DI = DaemonInfo()
+        self.OI = OSInfo()
         self.receiverUrl = receiverUrl
         self.component_name = "RUNTIME_INFO"
         self.event_name = "RUNTIME_INFO"
@@ -108,6 +110,10 @@ class RuntimeInfo:
                     },
 
                     daemon: {"daemon_name1": "on", "daemon_name2": "off", ...},
+					os: {
+					    "description": "Ubuntu12.04.1LTS"
+
+					},
 
         }
   
@@ -118,6 +124,7 @@ class RuntimeInfo:
         ret["net"] = self.NI.check_network()
         ret["mem"] = self.MI.check_memory()
         ret["daemon"] = self.DI.check_daemons()
+        ret["os"] = {"description": self.OI.get_distrib_description()}
         return ret
 
 
