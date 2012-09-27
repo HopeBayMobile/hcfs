@@ -65,6 +65,9 @@ class DiskInfo:
         output = output.lower()
         if output.find("smart overall-health self-assessment test result: passed") != -1:
             return True
+        # It is a vdisk
+        elif outpu.find("lacks SMART capability") != -1:
+            return True
         else:
             return False
 
