@@ -133,6 +133,11 @@ class prepare_image(setuptools.Command):
         print cmd
         os.system(cmd)
 
+        # Copy misc/Config/mongo.conf to /etc/mongo.conf
+        cmd = "cp misc/Config/mongodb.conf /etc/mongodb.conf"
+        print cmd
+        os.system(cmd)
+
         # Copy misc/BootScripts/rc.py to /etc/rc.py
         cmd = "cp misc/BootScripts/rc.py /etc/rc.py"
         print cmd

@@ -117,7 +117,6 @@ class DiskChecker:
         """
         disks = self.get_all_disks()
 
-        self.logger.info("Hello")
         for disk in disks:
             self.logger.info(disk)
             if not self.is_healthy(disk):
