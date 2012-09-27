@@ -6,10 +6,10 @@ meta = json.loads(
 """
 {
 	"portal_domain": {
-        "description": "Portal domain or ip",
+        "description": "Portal domain or ip (public ip)",
         "type": "text",
         "required": true,
-        "default": "192.168.11.2",
+        "default": "10.2.4.4",
         "order": 2
         },
 
@@ -40,7 +40,7 @@ meta = json.loads(
         "default": 6,
         "order": 5
         },
-       
+
         "disk_capacity": {
         "description": "capacity per disk (GB)",
         "type": "number",
@@ -55,7 +55,7 @@ meta = json.loads(
         "description": "min available ip",
         "type": "text",
         "required": true,
-        "default": "10.1.4.2",
+        "default": "10.2.4.2",
         "order": 7
         },
 
@@ -63,7 +63,7 @@ meta = json.loads(
         "description": "max available ip",
         "type": "text",
         "required": true,
-        "default": "10.1.4.254",
+        "default": "10.2.4.254",
         "order": 8
         },
 
@@ -79,7 +79,7 @@ meta = json.loads(
         "description": "gateway",
         "type": "text",
         "required": true,
-        "default": "10.1.4.1",
+        "default": "10.2.4.1",
         "order": 10
         },
 
@@ -87,7 +87,7 @@ meta = json.loads(
         "description": "zcw ip",
         "type": "text",
         "required": true,
-        "default": "10.2.0.168",
+        "default": "10.2.4.3",
         "order": 11
         },
 
@@ -103,7 +103,7 @@ meta = json.loads(
         "description": "zcw_gateway",
         "type": "text",
         "required": true,
-        "default": "10.2.0.254",
+        "default": "10.2.4.254",
         "order": 13
         }
 }
