@@ -72,7 +72,7 @@ def main():
                     'dcloud_clear_node_stats = DCloudSwift.master.swiftEventMgr:clearNodeStats',
                     'dcloud_print_backlog = DCloudSwift.util.MaintainReport:print_maintenance_backlog',
                     'dcloud_print_node_info = DCloudSwift.util.MaintainReport:print_node_info',
-                    'dcloud_print_node_stats = DCloudSwift.util.MaintainReport:print_node_stats',
+                    'dcloud_print_runtime_info = DCloudSwift.util.MaintainReport:print_runtime_info',
                     'dcloud_swift_dns_setup = DCloudSwift.master.swiftLoadBalancer:setupDnsRoundRobin',
                     ]
         },

@@ -78,24 +78,27 @@ def post_data(url, data):
 
     return response
 
-class StatsCollector:
+class RuntimeInfo:
     def __init__(self, receiverUrl):
         self.MI = MemInfo()
         self.NI = NetInfo()
         self.CI = CpuInfo()
+        self.DI = DaemonInfo()
         self.receiverUrl = receiverUrl
-        self.component_name = "NODE_STATS"
-        self.event_name = "STATS"
+        self.component_name = "RUNTIME_INFO"
+        self.event_name = "RUNTIME_INFO"
 
-    def collect_stats(self):
+    def collect_info(self):
         """
-        check status of all detected disks
+        collect runtime info
 
 	@rtype: {
+                    cpu: {"usage" <int: percentage>},
+
                     mem:{ 
                        "total": total number of memory in bytes 
                        "usage": percentage of used memory
-                    }
+                    },
 
                     net: {
                            "eth0": { "receive": bits trnasmitted per second (integer),
@@ -103,6 +106,8 @@ class StatsCollector:
                            "eth1": { ... },
                        ...
                     },
+
+                    daemon: {"daemon_name1": "on", "daemon_name2": "off", ...},
 
         }
   
@@ -112,69 +117,24 @@ class StatsCollector:
         ret["cpu"] = self.CI.check_cpu()
         ret["net"] = self.NI.check_network()
         ret["mem"] = self.MI.check_memory()
+        ret["daemon"] = self.DI.check_daemons()
         return ret
 
 
-    def send_stats_event(self):
+    def send_runtime_info_event(self):
         """
         send event to the receiver 
         """
-        logger = util.getLogger(name="StatsCollector")
+        logger = util.getLogger(name="RuntimeInfo")
         eventEncoding = None
         try:
-            stats = self.collect_stats()
+            info = self.collect_info()
             event = {
                 "hostname": socket.gethostname(),
                 "component_name": self.component_name,
                 "event": self.event_name,
                 "level": "INFO",
-                "data": json.dumps(stats),
-                "time": int(time.time()),
-            }
-            eventEncoding= json.dumps(event)
-            logger.info(eventEncoding)
-
-        except Exception as e:
-            logger.error(str(e))
-            event = {
-                "component_name": self.component_name,
-                "message": str(e),
-                "time": int(time.time()),
-            }
-            logger.error(json.dumps(event))
-
-        if eventEncoding:
-            post_data(self.receiverUrl, eventEncoding)
-
-class DaemonChecker:
-    def __init__(self, receiverUrl):
-        self.daemonInfo = DaemonInfo()
-        self.receiverUrl = receiverUrl
-        self.component_name = "DAEMON_INFO"
-        self.event_name = "DAEMON"
-
-    def check_daemons(self):
-        """
-        check status of daemons
-        @return: {"daemon_name1": "on", "daemon_name2": "off", ...}
-        """
-        ret = self.daemonInfo.check_daemons()
-        return ret
-
-    def send_daemon_event(self):
-        """
-        send event to the receiver 
-        """
-        logger = util.getLogger(name="DaemonChecker")
-        eventEncoding = None
-        try:
-            daemon_info = self.check_daemons()
-            event = {
-                "hostname": socket.gethostname(),
-                "component_name": self.component_name,
-                "event": self.event_name,
-                "level": "INFO",
-                "data": json.dumps(daemon_info),
+                "data": json.dumps(info),
                 "time": int(time.time()),
             }
             eventEncoding= json.dumps(event)
@@ -311,9 +271,8 @@ class NodeMonitor(Daemon):
             self.sensorInterval = (30, 60)
 
         self.DC = DiskChecker(self.receiverUrl)
-        self.DaemonChecker = DaemonChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
-        self.StatsCollector = StatsCollector(self.receiverUrl)
+        self.RI = RuntimeInfo(self.receiverUrl)
 
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")
@@ -332,12 +291,7 @@ class NodeMonitor(Daemon):
                     logger.error(str(e))
 
                 try:
-                    self.DaemonChecker.send_daemon_event()
-                except Exception as e:
-                    logger.error(str(e))
-
-                try:
-                    self.StatsCollector.send_stats_event()
+                    self.RI.send_runtime_info_event()
                 except Exception as e:
                     logger.error(str(e))
 

@@ -148,7 +148,6 @@ def print_node_info():
             output += "  status: %s\n" % node["status"]
             output += "  timestamp: %d\n" % node["timestamp"]
             output += "  disk: %s\n" % node["disk"]
-            output += "  daemon: %s\n" % node["daemon"]
             output += "  mode: %s\n" % node["mode"]
             output += "  switchpoint: %s\n" % node["switchpoint"]
             output+="}\n"
@@ -158,16 +157,16 @@ def print_node_info():
         print >> sys.stderr, str(e)
         sys.exit(1)
 
-def print_node_stats():
+def print_runtime_info():
     '''
-    Command line implementation of node info initialization.
+    Command line implementation of printing runtime information.
     '''
 
     ret = 1
 
     Usage = '''
     Usage:
-        dcloud_print_node_stats
+        dcloud_print_runtime_info
     arguments:
         None
     '''
@@ -178,14 +177,14 @@ def print_node_stats():
 
     try:
         db = get_mongodb(GlobalVar.MONITOR_MONGODB)
-        nodes = db.stats.find()
+        nodes = db.runtime_info.find()
 
         for node in nodes:
             date = datetime.fromtimestamp(node["timestamp"])
-            stats = node["stats"]
-            stats[u"date"] = str(date)
-            stats = {node["hostname"]: stats}
-            pprint.pprint(stats, indent=1)
+            data = node["data"]
+            data[u"date"] = str(date)
+            data = {node["hostname"]: data}
+            pprint.pprint(data, indent=1)
 
     except Exception as e:
         print >> sys.stderr, str(e)

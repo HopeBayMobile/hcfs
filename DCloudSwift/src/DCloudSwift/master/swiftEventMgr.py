@@ -170,7 +170,7 @@ class SwiftEventMgr(Daemon):
     }
     '''
     @staticmethod
-    def isValidStatsEvent(event):
+    def isValidRuntimeInfoEvent(event):
         '''
         check the format of stats event 
 
@@ -284,63 +284,7 @@ class SwiftEventMgr(Daemon):
         return new_disk_info
 
     @staticmethod
-    def updateDaemonInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
-        '''
-        update daemon info according to the daemon event
-
-        @type  event: dictioary
-        @param event: daemon event
-        @rtype: dictionary
-        @return: updated daemon info
-        '''
-        logger = util.getLogger(name="SwiftEventMgr.updatedDaemonInfo")
-        new_daemon_info = {
-                            "timestamp": 0,
-                            "on": [],
-                            "off": []
-        }
-
-        nodeInfoDb = NodeInfoDatabaseBroker(nodeInfoDbPath)
-
-        if not SwiftEventMgr.isValidDaemonEvent(event):
-            logger.error("Invalid daemon event!!")
-            return None
-
-        hostname = event["hostname"]
-        data = json.loads(event["data"])
-        node = nodeInfoDb.get_info(hostname)
-        if not node:
-            logger.error("%s is not registered!!" % hostname)
-            return None
-
-        #TODO: handle invalid old_daemon_info
-        try:
-            old_daemon_info = json.loads(nodeInfoDb.get_info(hostname)["daemon"])
-            if old_daemon_info["timestamp"] >= event["time"]:
-                logger.warn("Old daemon events are received from %s" % event["hostname"])
-                return None
-            else:
-                new_daemon_info["timestamp"] = event["time"]
-
-            # Update missing disks info
-            new_daemon_info["on"] = [daemon_name for daemon_name in data if data[daemon_name] == "on"]
-            new_daemon_info["off"] = [daemon_name for daemon_name in data if data[daemon_name] == "off"]
-
-        except Exception as e:
-            logger.error(str(e))
-            return None
-
-        try:
-            daemon = json.dumps(new_daemon_info)
-            nodeInfoDb.update_node_daemon(event["hostname"], daemon)
-        except Exception as e:
-            logger.error("Failed to update database for %s" % str(e))
-            return None
-
-        return new_daemon_info
-
-    @staticmethod
-    def updateStats(event, mongodb=GlobalVar.MONITOR_MONGODB):
+    def updateRuntimeInfo(event, mongodb=GlobalVar.MONITOR_MONGODB):
         '''
         update daemon info according to the daemon event
 
@@ -349,20 +293,20 @@ class SwiftEventMgr(Daemon):
         @rtype: dictionary
         @return: updated stats or none if failed to update
         '''
-        logger = util.getLogger(name="SwiftEventMgr.updateStats")
+        logger = util.getLogger(name="SwiftEventMgr.updateRuntimeInfo")
 
-        if not SwiftEventMgr.isValidStatsEvent(event):
-            logger.error("Invalid stats event!!")
+        if not SwiftEventMgr.isValidRuntimeInfoEvent(event):
+            logger.error("Invalid runtime_info event!!")
             return None
 
         hostname = event["hostname"]
         timestamp = event["time"]
-        stats = json.loads(event["data"])
+        data = json.loads(event["data"])
 
         try:
             db = get_mongodb(mongodb)
-            doc = {"hostname": hostname, "timestamp": timestamp, "stats": stats}
-            ret = db.stats.find_and_modify({"hostname": hostname}, doc, upsert=True, new=True)
+            doc = {"hostname": hostname, "timestamp": timestamp, "data": data}
+            ret = db.runtime_info.find_and_modify({"hostname": hostname}, doc, upsert=True, new=True)
         except Exception as e:
             logger.error(str(e))
             return None
@@ -381,24 +325,14 @@ class SwiftEventMgr(Daemon):
         SwiftEventMgr.updateDiskInfo(event)
 
     @staticmethod
-    def handleDaemon(event):
+    def handleRuntimeInfo(event, mongodb=GlobalVar.MONITOR_MONGODB):
         '''
-        handle HDD event
-        
-        @type  event: dictioary
-        @param event: hdd event
-        '''
-        SwiftEventMgr.updateDaemonInfo(event)
-
-    @staticmethod
-    def handleStats(event, mongodb=GlobalVar.MONITOR_MONGODB):
-        '''
-        handle stats event
+        handle runime_info event
         
         @type event: dictioary
         @param event: data event
         '''
-        SwiftEventMgr.updateStats(event)
+        SwiftEventMgr.updateRuntimeInfo(event)
 
 
     '''
@@ -524,10 +458,8 @@ class SwiftEventMgr(Daemon):
             SwiftEventMgr.handleHDD(event)
         elif eventName == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
-        elif eventName == "daemon":
-            SwiftEventMgr.handleDaemon(event)
-        elif eventName == "stats":
-            SwiftEventMgr.handleStats(event)
+        elif eventName == "runtime_info":
+            SwiftEventMgr.handleRuntimeInfo(event)
 
     class EventsPage(Resource):
             def render_GET(self, request):
