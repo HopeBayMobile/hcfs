@@ -31,7 +31,7 @@ mkdir -p $CACHE_DIR
 chmod 777 $CACHE_DIR
 EOF
 chmod 777 /etc/init.d/make_http_proxy_cache_dir
-cp -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
+cp -rf -rs /etc/init.d/make_http_proxy_cache_dir /etc/rc2.d/S29make_http_proxy_cache_dir
 echo "    Squid3 configuration has been written."
 
 # config nfs service
@@ -44,52 +44,52 @@ python setup.py install
 
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then
-    cp $SRCDIR/config/rc.local /etc
-    cp $SRCDIR/config/crontab /etc
+    cp -rf $SRCDIR/config/rc.local /etc
+    cp -rf $SRCDIR/config/crontab /etc
     chmod 600 /etc/crontab
     bash $SRCDIR/gateway_scripts/createSmbUser.sh superuser
     chmod 666 $CONFDIR/Gateway.ini
-    cp $SRCDIR/config/interfaces /etc/network/interfaces
-    cp $SRCDIR/config/hosts.allow /etc
-    cp $SRCDIR/config/gw_schedule.conf $CONFDIR/
-    cp $SRCDIR/config/smb.orig $CONFDIR
-    cp $SRCDIR/gateway_scripts/hourly_run_this $CONFDIR
-    cp $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
-    cp $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
-    cp $SRCDIR/gateway_scripts/python_code/* $CONFDIR
-    cp $SRCDIR/gateway_scripts/shaping_port_8080.sh $CONFDIR
-    cp $SRCDIR/gateway_scripts/uploadon $CONFDIR
-    cp $SRCDIR/gateway_scripts/uploadoff $CONFDIR
-    cp $SRCDIR/gateway_scripts/check_expired $CONFDIR
-    cp $SRCDIR/gateway_scripts/post-gwstart.conf /etc/init/
-    cp $SRCDIR/gateway_scripts/check-gwstart.conf /etc/init/
-    cp $SRCDIR/gateway_scripts/reorder_eth.conf /etc/init/
-    cp $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
-    cp $SRCDIR/gateway_scripts/smbd.conf /etc/init/
-    cp $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
-    cp $SRCDIR/config/sudoers_delta /etc/sudoers.d/
-    cp $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
+    cp -rf $SRCDIR/config/smb.conf /etc/samba
+    cp -rf $SRCDIR/config/interfaces /etc/network/interfaces
+    cp -rf $SRCDIR/config/hosts.allow /etc
+    cp -rf $SRCDIR/config/hosts.deny /etc
+    cp -rf $SRCDIR/config/exports /etc
+    cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
+    cp -rf $SRCDIR/config/smb.orig $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/hourly_run_this $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
+    cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/python_code/* $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/shaping_port_8080.sh $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/uploadon $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/uploadoff $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/check_expired $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/post-gwstart.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/check-gwstart.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/reorder_eth.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
+    cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
+    cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
 
     #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
     # the permission of sudoers_delta is required 0440
     chmod 0440 /etc/sudoers.d/sudoers_delta
-    cp $SRCDIR/gateway_scripts/gw-bg-tasks.conf /etc/init/
-    #os.system("cp config/smb.conf %s/"%SMBDIR)
-    cp $SRCDIR/gateway_scripts/snapshot_bot $CONFDIR
-    cp $SRCDIR/gateway_scripts/snapshot_check $CONFDIR
-    cp $SRCDIR/gateway_scripts/wait_network_up $CONFDIR
-    cp $SRCDIR/gateway_scripts/wait_gateway_up $CONFDIR
-    cp $SRCDIR/gateway_scripts/service_restart $CONFDIR
-    cp $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
-    cp $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
-    cp $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
-    cp $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/gw-bg-tasks.conf /etc/init/
+    #os.system("cp -rf config/smb.conf %s/"%SMBDIR)
+    cp -rf $SRCDIR/gateway_scripts/snapshot_bot $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/snapshot_check $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/wait_network_up $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/wait_gateway_up $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/service_restart $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
     rm -rf /root/.s3ql/*
     chmod -R 777 /root
     chown -R www-data:www-data $CONFDIR
     cp -rs /usr/bin/*s3ql* /usr/local/bin
 fi
 
-
-# clean up temp codes
-rm -r $SRCDIR
