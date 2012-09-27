@@ -17,4 +17,4 @@ cd ..
 # if we copy smb.conf prior to install samba-common 3.6.6, 
 #   an interactive screen will pop up to ask something
 # in order to eliminate this, we delay the copy to here
-cp -rf /tmp/DCloudGateway/config/smb.conf /etc/samba
+cp -f smb.conf /etc/samba

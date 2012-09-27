@@ -49,7 +49,6 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     chmod 600 /etc/crontab
     bash $SRCDIR/gateway_scripts/createSmbUser.sh superuser
     chmod 666 $CONFDIR/Gateway.ini
-    cp -rf $SRCDIR/config/smb.conf /etc/samba
     cp -rf $SRCDIR/config/interfaces /etc/network/interfaces
     cp -rf $SRCDIR/config/hosts.allow /etc
     cp -rf $SRCDIR/config/hosts.deny /etc
