@@ -1536,13 +1536,17 @@ def build_gateway(user_key):
         # restart nfs and mount /mnt/nfssamba
         restart_service("nfs-kernel-server")
         os.system("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
-        
+
         set_smb_user_list(default_user_id, default_user_pwd)
         restart_service("smbd")
         restart_service("nmbd")
         
         log.debug("setting upload speed")
         os.system("sudo /etc/cron.hourly/hourly_run_this")
+
+        # update bandwidth to let s3ql uploadon
+        os.system('/etc/delta/update_bandwidth')
+
         # we need to manually exec background task program,
         #   because it is originally launched by upstart 
         # launch background task program
