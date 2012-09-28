@@ -10,6 +10,7 @@ from celery.task import task
 from delta.wizard.api import DeltaWizardTask
 PASSWORD = 'deltacloud'
 SOURCE_DIR = '/usr/local/src/'
+SOURCE_DEB = '/usr/local/deb/'
 NETWORK_CONFIG = '/var/www-zcw/cfg/network_config'
 
 def config_zcw_network_interface(ip, netmask, gateway, network_interface=None):
@@ -172,6 +173,13 @@ def installDCloudSwift():
     (fh, pathname, description) = imp.find_module("DCloudSwift", path)
     imp.load_module("DCloudSwift", fh, pathname, description)
 
+def installMongodb():
+    '''
+    Install Mongodb from deb in SOURCE_DEB
+    '''
+    ret = os.system("dpkg -i %s/*.deb" % SOURCE_DEB)
+    if ret !=0:
+	raise Exception("Failed to install %s/mongodb" % SOURCE_DEB)
 
 def getNewSysPath():
     '''
@@ -222,6 +230,7 @@ def startDaemons():
 
 @task(base=DeltaWizardTask)
 def do_meta_form(data):
+    installMongodb()
     installDCloudSwift()
     from time import sleep
     from DCloudSwift.util import util
@@ -279,7 +288,7 @@ def do_meta_form(data):
     while progress['finished'] != True:
         time.sleep(5)
         progress = SD.getConfigureNetworkProgress()
-        total_progress = progress["progress"] / float(10)
+        total_progress = 5 + progress["progress"] / float(10)
         do_meta_form.report_progress(total_progress,
                                      True,
                                      progress["message"],

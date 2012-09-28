@@ -21,7 +21,7 @@ def main():
 
     setup(
         name="Node Monitor",
-        version="0.1",
+        version="0.6",
         author="Cloud Data Team, CTBD, Delta Electronic Inc.",
         description=("Delta Inc. CTBD node monitor"),
         license="Delta Inc.",
@@ -52,9 +52,9 @@ def main():
     #Post-scripts
     os.system("chmod 755 misc/ServiceScripts/*")
     os.system("cp --preserve misc/ServiceScripts/* /etc/init.d/")
-
-    os.system("update-rc.d -f node-monitor remove")
-    os.system("update-rc.d node-monitor defaults")
+    os.system("cp --preserve misc/UpstartScripts/* /etc/init/")
+    #os.system("update-rc.d -f node-monitor remove")
+    #os.system("update-rc.d node-monitor defaults")
 
 if __name__ == '__main__':
     main()
