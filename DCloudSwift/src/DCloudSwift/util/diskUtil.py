@@ -211,7 +211,7 @@ def mountDisk(disk, mountpoint):
             os.system("umount -l %s" % mountpoint)
 
         #TODO: Add timeout mechanism
-        cmd = "mount -t xfs -o noatime,nodiratime,nobarrier,logbufs=8 %s %s" % (disk, mountpoint)
+        cmd = "mount -t xfs %s %s" % (disk, mountpoint)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
