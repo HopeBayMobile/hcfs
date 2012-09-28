@@ -17,17 +17,18 @@ class NetInfo:
     def get_usages(self):
         """
         get ethernet interfaces
-	@rtype: [
+	@rtype: 
                   {
-                   "interface": name of the ethernet interface,
-                   "receive": bytes received by the interface (integer),
-                   "transmit" bytes transmitted by the interface (interger),
-                  }, ...
-                ]
+                       "eth0": { "receive": bytes received by the interface (integer),
+                                 "transmit" bytes transmitted by the interface (interger)},
+                       "eth1": { ... },
+                       ...
+                  }
+
         @return: usages of ethernet interfaces
         """
 
-        ret = []
+        ret = {}
         cmd ="sudo cat /proc/net/dev"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         lines = po.stdout.readlines()
@@ -52,12 +53,7 @@ class NetInfo:
                 #TODO: error handling
                 pass
                 
-            ret.append({
-                        "interface": name,
-                        "receive": receive,
-                        "transmit": transmit,
-                       }
-            )
+            ret[name] = { "receive": receive, "transmit": transmit}
 
         return ret
 
@@ -113,23 +109,20 @@ class NetInfo:
         get transfer rates of ethernet interfaces during an interval starting from now
         @type interval: integer
         @param interval: time interval to measure the transfer rates (in seconds)
-	@rtype: [
-                  {
-                   "interface": name of the ethernet interface,
-                   "receive_rate": bits received by the interface per second (int),
-                   "transmit_rate" bits transmitted by the interface per second (int),
-                  }, ...
-                ]
+	@rtype: {
+                   "eth0": {"receive_rate": bits received by the interface per second (int),
+                            "transmit_rate" bits transmitted by the interface per second (int)},
+                    ...
+                }
         @return: transfer rates of ethernet interfaces
         """
 
         interval = 1 if interval < 1 else interval
         usages = self.get_usages()
         time.sleep(interval)
-        ret = []
+        ret = {}
 
-	for start in usages:
-            interface = start["interface"]
+	for interface, start in usages.items():
             end = self.get_usage(interface)
             receive_rate = None
             transmit_rate = None
@@ -139,13 +132,9 @@ class NetInfo:
             if not end["transmit"] is None and not start["transmit"] is None:
                 transmit_rate = (end["transmit"] - start["transmit"]) * 8 / interval
 
-            ret.append(
-                       {
-                        "interface": interface,
-                        "receive_rate": receive_rate,
-                        "transmit_rate": transmit_rate,
-                       }
-            )
+            ret[interface] = { "receive_rate": receive_rate,
+                               "transmit_rate": transmit_rate,
+                             }
 
         return ret
 
@@ -164,7 +153,7 @@ class NetInfo:
         @return: info of ethernet interfaces
         """
    
-        ret = self.get_transfer_rates()
+        ret = self.get_transfer_rates(interval=interval)
         return ret
 
 def get_module_name():

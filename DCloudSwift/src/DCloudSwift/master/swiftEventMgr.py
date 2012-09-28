@@ -23,6 +23,7 @@ from util.util import GlobalVar
 from util import util
 from util.database import NodeInfoDatabaseBroker
 from util.database import MaintenanceBacklogDatabaseBroker
+from util.mongodb import get_mongodb
 
 
 class SwiftEventMgr(Daemon):
@@ -112,6 +113,92 @@ class SwiftEventMgr(Daemon):
 
         return True
 
+    '''
+    daemon event format
+    {
+        component_name: "daemon_info",
+        event: "DAEMON",
+        level: INFO|WARNING|ERROR,
+        hostname: <hostname>
+        data: { 
+                "daemon_name1": "on | off",
+                "daemon_name2": "on | off",
+              },
+        time: <integer>
+    }
+    '''
+    @staticmethod
+    def isValidDaemonEvent(event):
+        '''
+        check the format of daemon event 
+
+        @type  event: dictioary
+        @param event: daemon event
+        @rtype: boolean
+        @return: Return False if there's format error. 
+            Otherwise, return True.
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.isValidDaemonEvent")
+        try:
+            hostname = event["hostname"]
+            data = json.loads(event["data"])
+            daemon_on = [daemon_name for daemon_name in data if data[daemon_name] == "on"]
+            daemon_off = [daemon_name for daemon_name in data if data[daemon_name] == "off"]
+            timestamp = event["time"]
+        except Exception as e:
+            logger.error(str(e))
+            return False
+
+        if not isinstance(event["hostname"], str) and not isinstance(event["hostname"], unicode):
+            logger.error("Wrong type of hostname")
+            return False
+        if not isinstance(event["time"], int):
+            logger.error("Wrong type of time")
+            return False
+
+        return True
+
+    '''
+    stats event format
+    {
+        component_name: "NODE_STATS",
+        event: "STATS",
+        level: INFO,
+        hostname: <hostname>
+        data: {...},
+        time: <integer>
+    }
+    '''
+    @staticmethod
+    def isValidRuntimeInfoEvent(event):
+        '''
+        check the format of stats event 
+
+        @type  event: dictioary
+        @param event: stats event
+        @rtype: boolean
+        @return: Return False if there's format error. 
+            Otherwise, return True.
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.isValidStatsEvent")
+        try:
+            hostname = event["hostname"]
+            data = json.loads(event["data"])
+            timestamp = event["time"]
+        except Exception as e:
+            logger.error(str(e))
+            return False
+
+        if not isinstance(event["hostname"], str) and not isinstance(event["hostname"], unicode):
+            logger.error("Wrong type of hostname")
+            return False
+        if not isinstance(event["time"], int):
+            logger.error("Wrong type of time")
+            return False
+
+        return True
+
+
     @staticmethod
     def updateDiskInfo(event, nodeInfoDbPath=GlobalVar.NODE_DB):
         '''
@@ -169,7 +256,8 @@ class SwiftEventMgr(Daemon):
 
             # Update healthy disks info
             detectedHealthyDisks = [disk for disk in data if disk["healthy"]]
-            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"]} for disk in detectedHealthyDisks]
+            new_disk_info["healthy"] = [{"SN": disk["SN"], "timestamp": event["time"], "usage": disk["usage"]}\
+                                       for disk in detectedHealthyDisks]
 
             # Update broken disks info
             detectedBrokenDisks = [disk for disk in data if not disk["healthy"]]
@@ -196,6 +284,37 @@ class SwiftEventMgr(Daemon):
         return new_disk_info
 
     @staticmethod
+    def updateRuntimeInfo(event, mongodb=GlobalVar.MONITOR_MONGODB):
+        '''
+        update daemon info according to the daemon event
+
+        @type  event: dictioary
+        @param event: stats event
+        @rtype: dictionary
+        @return: updated stats or none if failed to update
+        '''
+        logger = util.getLogger(name="SwiftEventMgr.updateRuntimeInfo")
+
+        if not SwiftEventMgr.isValidRuntimeInfoEvent(event):
+            logger.error("Invalid runtime_info event!!")
+            return None
+
+        hostname = event["hostname"]
+        timestamp = event["time"]
+        data = json.loads(event["data"])
+
+        try:
+            db = get_mongodb(mongodb)
+            doc = {"hostname": hostname, "timestamp": timestamp, "data": data}
+            ret = db.runtime_info.find_and_modify({"hostname": hostname}, doc, upsert=True, new=True)
+        except Exception as e:
+            logger.error(str(e))
+            return None
+
+        return ret
+
+
+    @staticmethod
     def handleHDD(event):
         '''
         handle HDD event
@@ -204,6 +323,17 @@ class SwiftEventMgr(Daemon):
         @param event: hdd event
         '''
         SwiftEventMgr.updateDiskInfo(event)
+
+    @staticmethod
+    def handleRuntimeInfo(event, mongodb=GlobalVar.MONITOR_MONGODB):
+        '''
+        handle runime_info event
+        
+        @type event: dictioary
+        @param event: data event
+        '''
+        SwiftEventMgr.updateRuntimeInfo(event)
+
 
     '''
     Heartbeat format
@@ -298,6 +428,7 @@ class SwiftEventMgr(Daemon):
             newNodeStatus = SwiftEventMgr.updateNodeStatus(node, nodeInfoDbPath)
             return newNodeStatus
 
+
     @staticmethod
     def handleEvents(notification):
         '''
@@ -327,6 +458,8 @@ class SwiftEventMgr(Daemon):
             SwiftEventMgr.handleHDD(event)
         elif eventName == "heartbeat":
             SwiftEventMgr.handleHeartbeat(event)
+        elif eventName == "runtime_info":
+            SwiftEventMgr.handleRuntimeInfo(event)
 
     class EventsPage(Resource):
             def render_GET(self, request):
@@ -537,6 +670,29 @@ def clearMaintenanceBacklog():
 
     return ret
 
+def clearNodeStats():
+    '''
+    Command line implementation of clearing node stats
+    '''
+
+    ret = 1
+
+    Usage = '''
+    Usage:
+        dcloud_clear_node_stats
+    arguments:
+        None
+    '''
+    
+
+    if (len(sys.argv) != 1):
+        print >> sys.stderr, Usage
+        sys.exit(1)
+
+    db = get_mongodb(GlobalVar.MONITOR_MONGODB)
+    db.stats.remove(safe=True)
+
+    return 0
 
 if __name__ == "__main__":
     daemon = SwiftEventMgr('/var/run/SwiftEventMgr.pid')

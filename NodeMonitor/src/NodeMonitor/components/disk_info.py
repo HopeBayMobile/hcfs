@@ -8,10 +8,28 @@ import re
 
 MODULE_NAME = 'DISK_INFO'
 
+
 class DiskInfo:
 
     def __init__(self):
-        pass
+        self.device_prx = '/srv/node/sdb'
+
+    def get_mounted_disks(self):
+        '''
+        return the set of all mounted disks
+        '''
+        devices = set()
+        cmd = "sudo mount"
+        po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        lines = po.stdout.readlines()
+
+        for line in lines:
+            data = line.strip().split()
+            block_device = data[0]
+            match = re.match(r"^/dev/sd\w", block_device)
+            if match:
+                devices.add(block_device[:8])
+        return devices
 
     def get_all_disks(self):
         cmd = "sudo smartctl --scan"
@@ -32,8 +50,12 @@ class DiskInfo:
         @type  disk: string
         @param disk: name of the disk to check health
 	@rtype: bool 
-        @return: True iff the disk is healthy
+        @return: True iff the disk is healthy and mounted
         """
+
+        mounted_disks = self.get_mounted_disks()
+        if not disk in mounted_disks:
+            return False
 
         cmd ="sudo smartctl -H %s" % disk
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -42,6 +64,9 @@ class DiskInfo:
 
         output = output.lower()
         if output.find("smart overall-health self-assessment test result: passed") != -1:
+            return True
+        # It is a vdisk
+        elif output.find("lacks smart capability") != -1:
             return True
         else:
             return False

@@ -42,7 +42,7 @@ def main():
 
     setup(
         name="DCloudSwift",
-        version="0.5",
+        version="0.6",
         author="Cloud Data Team, CTBD, Delta Electronic Inc.",
         description=("Delta Inc. CTBD Storage Gateway"),
         license="Delta Inc.",
@@ -69,8 +69,10 @@ def main():
                     'dcloud_clear_node_info = DCloudSwift.master.swiftEventMgr:clearNodeInfo',
                     'dcloud_initialize_backlog = DCloudSwift.master.swiftEventMgr:initializeMaintenanceBacklog',
                     'dcloud_clear_backlog = DCloudSwift.master.swiftEventMgr:clearMaintenanceBacklog',
+                    'dcloud_clear_node_stats = DCloudSwift.master.swiftEventMgr:clearNodeStats',
                     'dcloud_print_backlog = DCloudSwift.util.MaintainReport:print_maintenance_backlog',
                     'dcloud_print_node_info = DCloudSwift.util.MaintainReport:print_node_info',
+                    'dcloud_print_runtime_info = DCloudSwift.util.MaintainReport:print_runtime_info',
                     'dcloud_swift_dns_setup = DCloudSwift.master.swiftLoadBalancer:setupDnsRoundRobin',
                     ]
         },
@@ -128,6 +130,11 @@ class prepare_image(setuptools.Command):
         
         #replace /etc/rc.local with misc/BootScripts/rc.local when building golden image.
         cmd = "cp misc/BootScripts/rc.local /etc/rc.local"
+        print cmd
+        os.system(cmd)
+
+        # Copy misc/Config/mongo.conf to /etc/mongo.conf
+        cmd = "cp misc/Config/mongodb.conf /etc/mongodb.conf"
         print cmd
         os.system(cmd)
 

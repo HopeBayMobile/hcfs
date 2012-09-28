@@ -13,6 +13,11 @@ from util.daemon import Daemon
 from util.util import GlobalVar
 from util import util
 from components.disk_info import DiskInfo
+from components.mem_info import MemInfo
+from components.net_info import NetInfo
+from components.cpu_info import CpuInfo
+from components.daemon_info import DaemonInfo
+from components.os_info import OSInfo
 
 timeout = 60
 socket.setdefaulttimeout(timeout)
@@ -73,6 +78,86 @@ def post_data(url, data):
     f.close
 
     return response
+
+class RuntimeInfo:
+    def __init__(self, receiverUrl):
+        self.MI = MemInfo()
+        self.NI = NetInfo()
+        self.CI = CpuInfo()
+        self.DI = DaemonInfo()
+        self.OI = OSInfo()
+        self.receiverUrl = receiverUrl
+        self.component_name = "RUNTIME_INFO"
+        self.event_name = "RUNTIME_INFO"
+
+    def collect_info(self):
+        """
+        collect runtime info
+
+	@rtype: {
+                    cpu: {"usage" <int: percentage>},
+
+                    mem:{ 
+                       "total": total number of memory in bytes 
+                       "usage": percentage of used memory
+                    },
+
+                    net: {
+                           "eth0": { "receive": bits trnasmitted per second (integer),
+                                     "transmit" bits transmitted per second (interger)},
+                           "eth1": { ... },
+                       ...
+                    },
+
+                    daemon: {"daemon_name1": "on", "daemon_name2": "off", ...},
+					os: {
+					    "description": "Ubuntu12.04.1LTS"
+
+					},
+
+        }
+  
+        @return: stats of the node
+        """
+        ret = {}
+        ret["cpu"] = self.CI.check_cpu()
+        ret["net"] = self.NI.check_network()
+        ret["mem"] = self.MI.check_memory()
+        ret["daemon"] = self.DI.check_daemons()
+        ret["os"] = {"description": self.OI.get_distrib_description()}
+        return ret
+
+
+    def send_runtime_info_event(self):
+        """
+        send event to the receiver 
+        """
+        logger = util.getLogger(name="RuntimeInfo")
+        eventEncoding = None
+        try:
+            info = self.collect_info()
+            event = {
+                "hostname": socket.gethostname(),
+                "component_name": self.component_name,
+                "event": self.event_name,
+                "level": "INFO",
+                "data": json.dumps(info),
+                "time": int(time.time()),
+            }
+            eventEncoding= json.dumps(event)
+            logger.info(eventEncoding)
+
+        except Exception as e:
+            logger.error(str(e))
+            event = {
+                "component_name": self.component_name,
+                "message": str(e),
+                "time": int(time.time()),
+            }
+            logger.error(json.dumps(event))
+
+        if eventEncoding:
+            post_data(self.receiverUrl, eventEncoding)
 
 
 class DiskChecker:
@@ -194,7 +279,7 @@ class NodeMonitor(Daemon):
 
         self.DC = DiskChecker(self.receiverUrl)
         self.HB = Heartbeat(self.receiverUrl)
-        self.NCC = NetworkConfigChecker(self.receiverUrl)
+        self.RI = RuntimeInfo(self.receiverUrl)
 
     def run(self):
         logger = util.getLogger(name="NodeMonitor.run")
@@ -209,6 +294,11 @@ class NodeMonitor(Daemon):
                  
                 try:
                     self.DC.send_disk_event()
+                except Exception as e:
+                    logger.error(str(e))
+
+                try:
+                    self.RI.send_runtime_info_event()
                 except Exception as e:
                     logger.error(str(e))
 
