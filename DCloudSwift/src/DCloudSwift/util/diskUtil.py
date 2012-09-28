@@ -153,7 +153,7 @@ def formatDisks(diskList):
     formattedDisks = []
 
     for disk in diskList:
-        cmd = "mkfs.ext4 -F %s" % (disk)
+        cmd = "mkfs.xfs -f -i size=1024 %s" % (disk)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -184,7 +184,7 @@ def formatNonRootDisks(deviceCnt=1):
         if len(formattedDisks) == deviceCnt:
             break
 
-        cmd = "mkfs.ext4 -F %s" % (disk)
+        cmd = "mkfs.xfs -f -i size=1024 %s" % (disk)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -211,7 +211,7 @@ def mountDisk(disk, mountpoint):
             os.system("umount -l %s" % mountpoint)
 
         #TODO: Add timeout mechanism
-        cmd = "mount -o user_xattr %s %s" % (disk, mountpoint)
+        cmd = "mount -t xfs -o noatime,nodiratime,nobarrier,logbufs=8 %s %s" % (disk, mountpoint)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -376,7 +376,6 @@ def createSwiftDevices(deviceCnt=3, devicePrx="sdb"):
                 os.system("umount -l %s" % mountpoint)
 
             print "%s\n" % mountpoint
-            #line = "%s %s xfs noatime,nodiratime,nobarrier,logbufs=8 0 0"%(disk, mountpoint)
 
             if writeMetadata(disk=disk, vers=vers, deviceCnt=deviceCnt, devicePrx=devicePrx, deviceNum=count) != 0:
                 raise WriteMetadataError("Failed to write fingerprint into %s" % disk)
