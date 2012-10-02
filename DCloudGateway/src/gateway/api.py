@@ -1003,7 +1003,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
             op_msg = "Error happened when getting user container name"
             raise Exception(op_msg)
     
-        _umount()
+        _umount(True)
     
         storage_url = op_config.get(section, 'storage-url')
         cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/%s/delta" % (storage_url, user_container)
@@ -1249,7 +1249,7 @@ def _mkfs(storage_url, key, container):
 
 
 @common.timeout(600)
-def _umount():
+def _umount(is_lazy=False):
     """
     Umount S3QL file system.
     
@@ -1301,7 +1301,10 @@ def _umount():
             if po.returncode != 0:
                 raise UmountError(output)
 
-            cmd = "sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint)
+            if is_lazy:
+                cmd = "sudo python /usr/local/bin/umount.s3ql --lazy %s" % (mountpoint)
+            else:
+                cmd = "sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint)
             po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             output = po.stdout.read()
             po.wait()
