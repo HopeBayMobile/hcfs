@@ -23,9 +23,6 @@ from util.database import MaintenanceBacklogDatabaseBroker
 from swiftAccountMgr import SwiftAccountMgr
 
 class SwiftMonitorMgr:
-    """
-    Mockup for SwiftMonitorMgr
-    """
     
     def __init__(self):
         self.logger = util.getLogger(name="SwiftMonitorMgr")

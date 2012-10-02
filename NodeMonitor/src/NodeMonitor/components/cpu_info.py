@@ -37,56 +37,45 @@ class CpuInfo:
         """
         check cpu
 
-	@rtype:[
-                    {
-                       "id": cpu id (integer)
-                       "usage": cpu usage in percentage (integer)
-                    }, ...
-        ]
+	@rtype:{
+                   usage: <int: percentage>
+        }
   
-        @return: usage of all CPUs 
+        @return: average usage of all CPUs during the past 1 second
         """
 
-        cmd = "sudo mpstat -P ALL"
+        cmd = "sudo mpstat 1 1"
         po  = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         lines = po.stdout.readlines()
         po.wait()
 
-        if po.returncode !=0 or len(lines) < 4:
-            return []
+        if po.returncode !=0:
+            return {}
 
-        #skip the first 4 lines
-        lines = lines[4:]
-
-        cpu_info = []
-        cpu_id = 0
+        cpu_info = {}
         try:
             for line in lines:
-                tokens = line.split()
-                if len(tokens) < 12:
-                    return []
+                if line.startswith("Average"):
+                    tokens = line.split()
+                else:
+                    continue
 
-                if cpu_id != int(tokens[2]):
-                    return []
+                if len(tokens) < 11:
+                    return {}
 
-                usage = int(100.0 - float(tokens[11]))
-                cpu_info.append({"id": cpu_id, "usage": usage})
-                cpu_id += 1
-
-            return cpu_info
-        except Exception:
-            return []
+                usage = int(100.0 - float(tokens[10]))
+                cpu_info["usage"] = usage
+                return cpu_info
+        except Exception as e:
+            return {}
 
     def check_cpu(self):
         """
         check cpu
 
-	@rtype:[
-                    {
-                       "id": cpu id (integer)
-                       "usage": cpu usage in percentage (integer)
-                    }, ...
-        ]
+	@rtype:{
+                 "usage": cpu usage in percentage (integer)
+        }
   
         @return: info of CPUs
         """

@@ -20,7 +20,7 @@ from util import util
 PORT = 2308
 UNNECESSARYFILES = "cert* backups *.conf"
 
-random.seed(os.urandom(100))
+random.seed(os.urandom(180))
 
 # deferSIGTERM decorator
 def deferSIGTERM(f):
@@ -105,6 +105,9 @@ class DiskChecker:
         output = output.lower()
         if output.find("smart overall-health self-assessment test result: passed") != -1:
             return True
+        # It is a vdisk
+        elif output.find("lacks smart capability") != -1:
+            return True
         else:
             return False
 
@@ -117,7 +120,6 @@ class DiskChecker:
         """
         disks = self.get_all_disks()
 
-        self.logger.info("Hello")
         for disk in disks:
             self.logger.info(disk)
             if not self.is_healthy(disk):
