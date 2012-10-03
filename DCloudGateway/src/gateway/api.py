@@ -721,7 +721,8 @@ def _check_HDD():
         
         # wthung, 2012/7/18
         # check if hdds number is 3. If not, report the serial number of alive hdd to log
-        if nu_all_disk < 3:
+        # wthung, 2012/10/3, now we only have 2 hdds
+        if nu_all_disk < 2:
             log.error('Some disks were lost. Please check immediately')
             for disk in all_disk:
                 disk_sn = _get_serial_number(disk)
