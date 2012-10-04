@@ -1,10 +1,31 @@
-#!/bin/sh
+#!/bin/bash
 
-#~ # patch Ubuntu12.04 kernel, fuse and samba 3.6.6
-#~ cd /tmp/GatewayPatches/
-#~ # install samba 3.6.6
-#~ echo "        ***** Install Samba patches *****"
-#~ ./install-samba.sh
-#~ # install kernel and fuse patches
-#~ echo "        ***** Install kernel and fuse patches *****"
-#~ ./install-u1204.sh
+# make mount point if not exist
+    if [ ! -e "/storage" ]; then
+         # make mount point
+         mkdir /storage
+    fi
+
+
+if [ ! -e "/storage/s3ql" ]; then    # check whether 
+# make swap
+    dd if=/dev/zero of=/storage/swapfile bs=1024 count=16000000
+    mkswap /storage/swapfile
+    swapon /storage/swapfile
+
+#initialize necessary files/directories
+    mkdir -p /storage/log
+    mkdir -p /storage/s3ql
+    mkdir -p /storage/log/apache2
+    mkdir -p /storage/log/squid3
+    chown proxy:proxy /storage/log/squid3
+    # add symbolic link
+    rm -rf /var/log 
+    rm -rf /root/.s3ql  
+    # ^^^ cannot put at dcloud-gateway package because it cannot do update
+    ln -s /storage/log /var/log
+    ln -s /storage/s3ql /root/.s3ql
+    # remove grub recordfail
+    sudo grub-editenv - unset recordfail
+    sudo update-grub2
+fi
