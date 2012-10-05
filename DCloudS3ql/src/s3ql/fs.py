@@ -882,28 +882,33 @@ class Operations(llfuse.Operations):
         if size is None:
             size = 0
 
-        # file system block size,
-        # It would be more appropriate to switch f_bsize and f_frsize,
-        # but since df and stat ignore f_frsize, this way we can
-        # export more information  
-        stat_.f_bsize = int(size // blocks) if blocks != 0 else self.max_obj_size
-        stat_.f_frsize = self.max_obj_size
+        # file system block size, i.e. the minimum amount of space that can
+        # be allocated. This doesn't make much sense for S3QL, so we just
+        # return the average size of stored blocks.
+        stat_.f_frsize = size // blocks if blocks != 0 else 4096
 
-        # size of fs in f_frsize units 
-        # (since backend is supposed to be unlimited, always return a half-full filesystem,
-        # but at least 50 GB)
-        total_blocks = int(max(2 * blocks, 50 * 1024 ** 3 // stat_.f_frsize))
+        # This should actually be the "preferred block size for doing IO.  However, `df` incorrectly
+        # interprets f_blocks, f_bfree and f_bavail in terms of f_bsize rather than f_frsize as it
+        # should (according to statvfs(3)), so the only way to return correct values *and* have df
+        # print something sensible is to set f_bsize and f_frsize to the same value. (cf.
+        # http://bugs.debian.org/671490)
+        stat_.f_bsize = stat_.f_frsize
 
-        stat_.f_blocks = total_blocks
-        stat_.f_bfree = total_blocks - blocks
-        stat_.f_bavail = total_blocks - blocks # free for non-root
+        # size of fs in f_frsize units. Since backend is supposed to be unlimited,
+        # always return a half-full filesystem, but at least 1 TB)
+        fs_size = max(2 * size, 1024 ** 4)
 
-        total_inodes = max(2 * inodes, 50000)
+        stat_.f_blocks = fs_size // stat_.f_frsize
+        stat_.f_bfree = (fs_size - size) // stat_.f_frsize
+        stat_.f_bavail = stat_.f_bfree # free for non-root
+
+        total_inodes = max(2 * inodes, 1000000)
         stat_.f_files = total_inodes
         stat_.f_ffree = total_inodes - inodes
         stat_.f_favail = total_inodes - inodes # free for non-root
 
         return stat_
+
 
     def open(self, id_, flags):
         log.debug('open(%d): start', id_)
