@@ -54,7 +54,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/hosts.deny /etc
     cp -rf $SRCDIR/config/exports /etc
     cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
-    cp -rf $SRCDIR/config/smb.orig $CONFDIR
+    #cp -rf $SRCDIR/config/smb.orig $CONFDIR
     cp -rf $SRCDIR/gateway_scripts/hourly_run_this $CONFDIR
     cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
     cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
