@@ -23,13 +23,6 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
    exit 1
 fi
 
-# make sure input arguments are correct
-    if [ $# -ne 1 ]
-    then
-        echo "Please give dom or vm as input argument"
-        exit 1
-    fi
-
 # define parameters
     source build.conf
     MODE=$1
@@ -41,16 +34,12 @@ fi
     #~ rm gateway_install*.tar
     
 # mount apt cache to ramdisk for saving space
-    mount -o bind /dev/shm $APTCACHEDIR
+    #~ mount -o bind /dev/shm $APTCACHEDIR
 
 # copy deb files to proper location
     echo "        ***** Untar DEB files *****"
     tar -xzf $DEBFILE -C $APTCACHEDIR
-    # FIXME - use dcloudgateway-patch DEB install instead
-    #~ mkdir -p StorageAppliance/GatewayPatches/debsrc    # in case of debsrc does not exist.
-    #~ tar -xzf $DEBPATCH -C StorageAppliance/GatewayPatches/debsrc
     rm $DEBFILE
-    #~ rm $DEBPATCH
 
 # remove /etc/apt/sources.list
     mv /etc/apt/sources.list  /etc/apt/sources.list.bak
@@ -64,12 +53,10 @@ apt-get update
 apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
 
 # run gateway installation
-    mkdir -p /mnt/cloudgwfiles/COSA
-    if [ $MODE = "dom" ]
-    then
-        cd $INITPATH
-	bash DOM_gw_run_this_first.sh
-    fi
+    # *********************************************
+    # Test whether COSA does not need it
+    #~ mkdir -p /mnt/cloudgwfiles/COSA
+    # *********************************************
 
 # install all packages of gateway 
     echo "        ***** apt-get install dcloud-gateway *****"
@@ -87,6 +74,8 @@ echo "        ***** Install kernel and fuse patches *****"
 ./install-u1204.sh
 
 ## FIXME
+## FIXME
+
 # clean up temp files to free up sda space.
     cd $INITPATH
     #~ rm -r StorageAppliance
@@ -96,6 +85,10 @@ echo "        ***** Install kernel and fuse patches *****"
     apt-get autoremove
     rm -r /usr/share/doc /usr/src /tmp/GatewayPatches/
     rm /etc/apt/sources.list.d/apt-cache.list
+    sed -i 's/cd \/root\/;bash gw_offline_install.sh vm/#/' /etc/rc.local   # clean up first time install
     
 echo "....."
 echo "Installation of Gateway is completed."
+echo "The system will be powered off in 5 seconds."
+sleep 5
+poweroff
