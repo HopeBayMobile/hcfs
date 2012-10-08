@@ -1,14 +1,16 @@
 #!/bin/bash
 
-seed_file="delta.seed"
-#seed_file="delta_gw_iii.seed"
-#seed_file="delta_gw_fix.seed"
+#seed_name="delta.seed"
+#seed_name="delta_test.seed"
+seed_name="delta_only_os.seed"
+seed_dir="seed"
 dest_dir="dest_ubuntu/source_ubuntu"
 txt_file="$dest_dir/isolinux/txt.cfg"
 isolinux_file="$dest_dir/isolinux/isolinux.cfg"
 iso_file="delta_gateway_install.iso"
-gateway_package="gateway_package/gateway_install_pkg*.tar"
-gateway_version="1.0.16_20121003a"
+gateway_dir="gateway_package"
+gateway_name="gateway_install_pkg*.tar"
+iso_version="only_os"
 script_dir="script"
 
 # Make sure only root can run this script
@@ -17,27 +19,45 @@ if [ "$(id -u)" -ne "0" ]; then echo "This script must be run as root, use 'sudo
 fi
 
 if [ -n "$1" ]; then
-    date_str=$1
-    iso_file="delta_gateway_install_$1.iso"
-else
-    iso_file="delta_gateway_install_$gateway_version.iso"
+    iso_version="$1";
+    gateway_name=`ls $gateway_dir | grep "$1"`
+    if [ -z gateway_name ]; then
+        echo "gateway package is not exist!!"
+	exit 0
+    fi
+    gateway_package="$gateway_dir/$gateway_name"
+    cp $gateway_package  $dest_dir/preseed/
+    seed_name="delta.seed"   
 fi
+iso_file="delta_gateway_install_$iso_version.iso"
+
+mkdir -p $seed_dir
+mkdir -p $gateway_dir
+mkdir -p $script_dir
 
 # generate README file
+if [ $iso_version = "only_os" ]; then
 cat<<EOF > README
 This iso will install ubuntu server 12.04 automatically, and will setup and install the following item and package.
-1. DCloudGateway version $gateway_version
+1. No DCloudGateway
 2. set /etc/grub.d/00header timeout=-1 to timeout=2
 3. have raid1 auto rebuild script
 EOF
+else
+cat<<EOF > README
+This iso will install ubuntu server 12.04 automatically, and will setup and install the following item and package.
+1. DCloudGateway version $iso_version
+2. set /etc/grub.d/00header timeout=-1 to timeout=2
+3. have raid1 auto rebuild script
+EOF
+fi
 
-
+seed_file="$seed_dir/$seed_name"
 cp README $dest_dir/
 cp $seed_file $dest_dir/preseed/
-cp $gateway_package $dest_dir/preseed/
 cp $script_dir/* $dest_dir/preseed/
 preseed_md5sum=`md5sum $seed_file | cut -d " " -f 1`
-sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_file preseed/file/checksum=$preseed_md5sum auto=true priority=critical initrd=/install/initrd.gz ramdisk_size=16384 root=/dev/ram rw quiet --" $txt_file
+sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_name preseed/file/checksum=$preseed_md5sum auto=true priority=critical initrd=/install/initrd.gz ramdisk_size=16384 root=/dev/ram rw quiet --" $txt_file
 sed -i "5c timeout 10" $isolinux_file
 chmod -R 777 $dest_dir
 
