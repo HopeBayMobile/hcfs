@@ -3,6 +3,7 @@
 #seed_name="delta.seed"
 #seed_name="delta_test.seed"
 seed_name="delta_only_os.seed"
+#seed_name="delta_only_os_swap.seed"
 seed_dir="seed"
 dest_dir="dest_ubuntu/source_ubuntu"
 txt_file="$dest_dir/isolinux/txt.cfg"
