@@ -9,6 +9,7 @@ import time
 import re
 from datetime import datetime
 from gateway import snapshot
+import api_restore_conf
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -2596,12 +2597,15 @@ def set_nfs_access_ip_list(array_of_ip):
         ofile.write(output)
         ofile.close()
         os.system('sudo cp %s %s' % (nfs_hosts_allow_file_temp, nfs_hosts_allow_file))
+        # yen, 2012/10/09. Remove outdated config files
+        # save config to cloud
+        api_restore_conf.save_gateway_configuration()
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
+
     except:
         log.error("cannot write to " + str(nfs_hosts_allow_file))
-
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
     try:
@@ -2653,6 +2657,9 @@ def apply_scheduling_rules(schedule):        # by Yen
             'msg': "Rules of bandwidth schedule are saved.",
             'data': {}
         }
+        # yen, 2012/10/09. Remove outdated config files
+        # save config to cloud
+        api_restore_conf.save_gateway_configuration()
 
     except:
         return_val = {

@@ -115,6 +115,56 @@ def _get_latest_backup():
 
     return None
 
+
+#----------------------------------------------------------------------
+def _delete_oldest_backup(n):    ## n is the number of copies for retain
+    """
+    This function will delete an oldest backup.
+    n = the number of copies for retain
+    """
+    [url, login, password] = _get_Swift_credential()
+
+    # wthung, 2012/9/3
+    # get uesrname to use private container
+    _, username = login.split(':')
+
+    cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s list %s_gateway_config" %\
+          (url, login, password, username)
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
+                          stderr=subprocess.STDOUT)
+    res = po.stdout.readlines()
+    po.wait()
+
+    # wthung, 2012/9/12
+    # check length of res
+    # case 1. container is exist, but no content
+    if len(res) == 0:
+        return None
+    #~ Case 2. There is no private container
+    elif "not found" in res[0]:
+        return None
+    else:
+        #~ Case 3. Get a list of files
+        oldest_dt = 'ZZZZZZZZZZZZZZZZZZZZZZZ'
+        c = 0
+        for fn in res:   # find latest backup
+            c += 1
+            if "gw_conf_backup" not in fn:
+                continue
+
+            dt = fn[0:10]
+            if dt < oldest_dt:
+                oldest_dt = dt
+                fname = fn      # fname is the file name of latest backup
+
+        if c > n:   # there are many copies of backup
+            cmd = "swift -A https://%s/auth/v1.0 -U %s -K %s delete %s_gateway_config %s"\
+                    % (url, login, password, username, fname)
+            os.system(cmd)
+            return None
+
+    return None
+
 #----------------------------------------------------------------------
 def save_gateway_configuration():
     """
@@ -123,21 +173,8 @@ def save_gateway_configuration():
     return_val = {'result': False,
                   'code':   '001',
                   'msg':    'config backup is fail!'}
-    # wthung, 2012/8/3
-    # add more files to save, delete /etc/delta/network.info, 
-    #   /etc/exports and /etc/samba/smb.conf
-    SMB_PASSWD_FILE = '/var/lib/samba/passdb.tdb'
-    fileList = ['/etc/delta/gw_schedule.conf',
-                '/etc/delta/snapshot_lifespan',
-                '/etc/delta/snapshot_schedule',
-                SMB_PASSWD_FILE,
-                '/etc/hosts.allow',
-                ]
-    
-    # wthung, 2012/8/3
-    # change permission of /var/lib/samba/passdb.tdb to 0644,
-    #   so that we can successfully copy
-    os.system('sudo chmod 644 %s' % SMB_PASSWD_FILE)
+    # yen, 2012/10/09. Remove outdated config files
+    fileList = ['/etc/delta/gw_schedule.conf']
     
     swiftData = _get_Swift_credential()
     if swiftData[0] is None:
@@ -153,6 +190,11 @@ def save_gateway_configuration():
 
         backupToCloudObj = BackupToCloud(fileList, swiftObj)
         backuptime = backupToCloudObj.backup(container_name + "_gateway_config")
+        
+        # yen, 2012/10/09.
+        # Delete oldest config file
+        _delete_oldest_backup(5)    ## 5 is the number of copies for retain
+        
         return_val = {'result'  : True,
                       'code'    : '100',
                       'data'    : {'backup_time': backuptime},
