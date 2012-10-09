@@ -55,7 +55,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/exports /etc
     cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
     #cp -rf $SRCDIR/config/smb.orig $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/hourly_run_this $CONFDIR
+    cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/
     cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
     cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
     cp -rf $SRCDIR/gateway_scripts/python_code/* $CONFDIR
@@ -65,7 +65,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/gateway_scripts/check_expired $CONFDIR
     cp -rf $SRCDIR/gateway_scripts/post-gwstart.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/check-gwstart.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/reorder_eth.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh /etc/init/
     cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
