@@ -1537,6 +1537,9 @@ def build_gateway(user_key):
         if has_filesys:
             log.info('Found existing file system. Try to rebuild snapshot DB if possible')
             snapshot.rebuild_snapshot_database()
+            # yen, 2012/10/09.
+            # restore configuration from cloud
+            api_restore_conf.restore_gateway_configuration()
         
         # restart nfs and mount /mnt/nfssamba
         restart_service("nfs-kernel-server")
@@ -2657,7 +2660,7 @@ def apply_scheduling_rules(schedule):        # by Yen
             'msg': "Rules of bandwidth schedule are saved.",
             'data': {}
         }
-        # yen, 2012/10/09. Remove outdated config files
+        # yen, 2012/10/09.
         # save config to cloud
         api_restore_conf.save_gateway_configuration()
 
