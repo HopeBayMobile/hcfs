@@ -15,7 +15,7 @@ check_ok() {
 
 
 echo "************************"
-echo "Usage: ./gw_offline_install.sh <mode = dom/vm>"
+echo "Usage: ./gw_offline_install.sh"
 echo "************************"
 
 # Make sure only root can run this script
