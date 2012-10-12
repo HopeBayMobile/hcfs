@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ubuntu_iso="ubuntu-12.04-server-amd64.iso"
+ubuntu_iso="ISO/*.iso"   # this iso file name is controlled by build.conf
 source_dir="source_ubuntu"
 dest_dir="dest_ubuntu"
 rm -rf $source_dir

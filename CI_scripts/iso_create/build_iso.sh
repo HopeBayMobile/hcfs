@@ -8,7 +8,7 @@ seed_dir="seed"
 dest_dir="dest_ubuntu/source_ubuntu"
 txt_file="$dest_dir/isolinux/txt.cfg"
 isolinux_file="$dest_dir/isolinux/isolinux.cfg"
-iso_file="delta_gateway_install.iso"
+iso_file="gateway_install.iso"
 gateway_dir="gateway_package"
 gateway_name="gateway_install_pkg*.tar"
 iso_version="only_os"
@@ -30,7 +30,7 @@ if [ -n "$1" ]; then
     cp $gateway_package  $dest_dir/preseed/
     seed_name="delta.seed"   
 fi
-iso_file="delta_gateway_install_$iso_version.iso"
+iso_file="gateway_install_$iso_version.iso"
 
 mkdir -p $seed_dir
 mkdir -p $gateway_dir

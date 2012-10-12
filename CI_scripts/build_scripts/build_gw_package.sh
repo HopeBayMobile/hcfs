@@ -33,7 +33,8 @@ fi
     BUILDNUM=$2
     DEBFILE="debsrc_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
     DEBPATCH="debpatch_StorageAppliance_"$GW_VERSION"_"$OS_CODE_NAME"_"$COMPONENT"_"$ARCH".tgz"
-    OUTPUTFILE="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tar"
+    OUTPUTTAR="gateway_install_pkg_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".tar"
+    OUTPUTISO="gateway_install_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".iso"
     INITPATH=$(pwd)
 
 # pull code from github
@@ -90,8 +91,13 @@ fi
     check_ok
     wget ftp://anonymous@$FTP_HOST/$SRC_HOME/$COSA_DEB
     check_ok
+    # download clean OS ISO from FTP
+    wget ftp://anonymous@$FTP_HOST/$ISO_HOME/$UBUNTU_ISO
+    check_ok
     cp savebox*.deb $APTCACHEDIR    # move COSA deb
     tar -xzf $DEBFILE -C $APTCACHEDIR
+    mkdir -p $INITPATH/StorageAppliance/CI_scripts/iso_create/ISO
+    mv $UBUNTU_ISO $INITPATH/StorageAppliance/CI_scripts/iso_create/ISO
     check_ok
 
 # build DCloudS3ql and DCloudGateway (API)
@@ -125,7 +131,7 @@ fi
 
 # tar an all in one pack
     echo "creating gateway installation package"
-    tar -cf $OUTPUTFILE $DEBFILE gw_offline_install.sh build.conf $COMMIT_LOG
+    tar -cf $OUTPUTTAR $DEBFILE gw_offline_install.sh build.conf $COMMIT_LOG
 
 # clean old files
     rm debsrc_StorageAppliance*.tgz
@@ -140,8 +146,15 @@ fi
     mv dcloud-gateway*.deb $DEBSAVE
 	mv savebox*.deb $DEBSAVE
 	
+# Build an ISO with auto-install OS
+    mkdir -p $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package
+    mv $OUTPUTTAR $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package
+    cd $INITPATH/StorageAppliance/CI_scripts/iso_create/
+    bash cp_iso_source.sh
+    bash build_iso.sh $GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH
+
 # upload all_in_one installation package to the FTP
-	wput $OUTPUTFILE ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTFILE
-	
+	wput $OUTPUTISO ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTISO
+
 # Done.
     echo "~~~ DONE!"
