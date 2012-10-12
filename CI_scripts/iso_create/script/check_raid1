@@ -1,32 +1,36 @@
 #!/bin/bash
 
 
-sda=`cat /proc/mdstat | grep sda`
-sdb=`cat /proc/mdstat | grep sdb`
+echo "===start check raid1!"
+echo "===check which disk is new!"
+sda=`mdadm --detail /dev/md0 | grep sda`
+sdb=`mdadm --detail /dev/md0 | grep sdb`
 new_disk=""
 
 if [ -z "$sda" ] && [ -n "$sdb" ]; then
-    echo "sda is a new disk!"
-    sfdisk -d /dev/sdb > /tmp/partition
-    sfdisk /dev/sda < /tmp/partition
-    unlink /tmp/partition
+    echo "===sda is a new disk!"
     new_disk="/dev/sda"
+    old_disk="/dev/sdb"
 elif [ -n "$sda" ] && [ -z "$sdb" ]; then
-    echo "sdb is a new disk!"
-    sfdisk -d /dev/sda > /tmp/partition
-    sfdisk /dev/sdb < /tmp/partition
-    unlink /tmp/partition
+    echo "===sdb is a new disk!"
     new_disk="/dev/sdb"
+    old_disk="/dev/sda"
 else
-    echo "No new disk!"
+    echo "===No new disk!"
     exit 0
 fi
 
-echo "new disk name is $new_disk!"
-
+echo "===new disk name is $new_disk!"
+echo "===do sfdisk partition rebuild!"
+sfdisk -d "$old_disk" > /tmp/partition
+sfdisk --force --no-reread "$new_disk" < /tmp/partition
+echo "===write partprobe!"
+partprobe
+echo "unlink partition info file"
+unlink /tmp/partition
+echo "===do zero superblock to $new_disk!"
 mdadm --zero-superblock $new_disk"1"
 mdadm --zero-superblock $new_disk"2"
-partprobe
+echo "add $new_disk to md0 and md1"
 mdadm --add /dev/md0 $new_disk"1" 
 mdadm --add /dev/md1 $new_disk"2" 
-
