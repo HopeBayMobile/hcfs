@@ -4,7 +4,10 @@
         scripts to setup an apt server from clean OS.
     Folder <offline_install_manual>: 
         scripts for importing a manually generated deb.tar.package on a clean OS for gateway offline installation.
-    Folder <offline_install_auto>: 
-        scripts for setup a tar package maker from a clean OS; build all in one instllation package.
+    Folder <build_scripts>: 
+        scripts for build a tar package maker from a clean OS; build all in one instllation package.
+    Folder <super_build>: 
+        scripts for building gateway of all branches, e.g. gw_savebox and gw_dmc. It will (1) checkout to branche (2) pull latest code 
+        (3) copy CI_scripts/build_scripts and (4) run the build scripts
 
 

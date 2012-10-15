@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # This script is for gateway offline installation.
 # It will be packed with StorageAppliance/ and apt_cache/ folders in a tar file.
@@ -15,7 +15,7 @@ check_ok() {
 
 
 echo "************************"
-echo "Usage: ./gw_offline_install.sh <mode = dom/vm>"
+echo "Usage: ./gw_offline_install.sh"
 echo "************************"
 
 # Make sure only root can run this script
@@ -72,9 +72,10 @@ echo "        ***** Install Samba patches *****"
 # install kernel and fuse patches
 echo "        ***** Install kernel and fuse patches *****"
 ./install-u1204.sh
-
-## FIXME
-## FIXME
+# install ldap and ldap-samba for SaveBox
+echo "        ***** ldap and ldap-samba patches *****"
+cd /tmp/GatewayPatches/install_ldap
+./Install_ldap_samba.sh
 
 # clean up temp files to free up sda space.
     cd $INITPATH

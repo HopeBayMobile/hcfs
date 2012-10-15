@@ -9,6 +9,7 @@ import time
 import re
 from datetime import datetime
 from gateway import snapshot
+import api_restore_conf
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -1197,7 +1198,7 @@ def _openContainter(storage_url, account, password):
         log.debug("_openContainer end")'''
 
 
-@common.timeout(180)
+@common.timeout(18000)
 def _mkfs(storage_url, key, container):
     """
     Create S3QL file system.
@@ -1591,6 +1592,9 @@ def build_gateway(user_key):
         if has_filesys:
             log.info('Found existing file system. Try to rebuild snapshot DB if possible')
             snapshot.rebuild_snapshot_database()
+            # yen, 2012/10/09.
+            # restore configuration from cloud
+            api_restore_conf.restore_gateway_configuration()
         
         # restart nfs and mount /mnt/nfssamba
         restart_service("nfs-kernel-server")
@@ -2203,7 +2207,8 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
     try:
         with open(interface_path_temp, "w") as f:
             f.write("auto lo\niface lo inet loopback\n")
-            f.write("\nauto eth0\niface eth0 inet static")
+            f.write("\nauto eth0\niface eth0 inet dhcp\n")
+            f.write("\nauto eth0:1\niface eth0:1 inet static")
             f.write("\naddress %s" % fixedIp)
             f.write("\nnetmask %s\n" % fixedMask)
             f.write("\nauto eth1\niface eth1 inet static")
@@ -2653,12 +2658,15 @@ def set_nfs_access_ip_list(array_of_ip):
         ofile.write(output)
         ofile.close()
         os.system('sudo cp %s %s' % (nfs_hosts_allow_file_temp, nfs_hosts_allow_file))
+        # yen, 2012/10/09. Remove outdated config files
+        # save config to cloud
+        api_restore_conf.save_gateway_configuration()
 
         return_val['result'] = True
         return_val['msg'] = "Update ip list successfully"
+
     except:
         log.error("cannot write to " + str(nfs_hosts_allow_file))
-
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
     try:
@@ -2710,6 +2718,9 @@ def apply_scheduling_rules(schedule):        # by Yen
             'msg': "Rules of bandwidth schedule are saved.",
             'data': {}
         }
+        # yen, 2012/10/09.
+        # save config to cloud
+        api_restore_conf.save_gateway_configuration()
 
     except:
         return_val = {

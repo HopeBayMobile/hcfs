@@ -296,7 +296,11 @@ d-i partman-auto/expert_recipe string \
                  $lvmignore{ }                             \
                  $primary{ } method{ raid }                \
               .                                            \
-              500 52 1000000000 raid                       \
+              4096 51 4096 raid                            \
+	         $lvmignore{ }                             \
+                 $primary{ } method{ raid }                \
+              .                                            \
+	      500 52 1000000000 raid                       \
                  $lvmignore{ }                             \
                  $primary{ } method{ raid }                \
               .
@@ -388,7 +392,7 @@ d-i passwd/username string dclouduser
 #d-i passwd/user-password-again password yourpassword
 # or encrypted using an MD5 hash.
 #d-i passwd/user-password-crypted password [MD5 hash]
-d-i passwd/user-password-crypted password $1$UN4Ym7WC$.3Ca44VJ0VH2iXw.eDQLa/
+d-i passwd/user-password-crypted password $1$OPlsUILO$IrwUBMsXYZGXPk0KKS5j61
 # Create the first user with the specified UID instead of the default.
 #d-i passwd/user-uid string 1010
 # The installer will warn about weak passwords. If you are sure you know
@@ -605,20 +609,24 @@ d-i partman/early_command string \
      for d in `list-devices disk`; do for u in `list-devices usb-partition`; do echo "$u" | grep "$d" > /dev/null 2>&1 || NU="$NU $d" && break; done; done; \
      else for d in `list-devices disk`; do NU="$NU $d"; done; \
      fi; \
-     P1RAID="replace1#replace1"; P2RAID="replace2#replace2"; TMP=`echo "$NU" | tr " " "\n"`; \
+     P1RAID="replace1#replace1"; P2RAID="replace2#replace2"; P3RAID="replace3#replace3"; TMP=`echo "$NU" | tr " " "\n"`; \
      for p in $TMP; do \
      q=`echo "$p" | sed 's/\//\\\\\//g'`; P1RAID=`echo "$P1RAID" | sed "s/replace/$q/"`; P2RAID=`echo "$P2RAID" | sed "s/replace/$q/"`;  \
+     P3RAID=`echo "$P3RAID" | sed "s/replace/$q/"`; \
      done; \
+     echo "$P1RAID"; \
+     echo "$P2RAID"; \
+     echo "$P3RAID"; \
      debconf-set partman-auto/disk "$NU"; \
-     debconf-set partman-auto-raid/recipe "1 2 0 ext4 / $P1RAID . 1 2 0 ext4 /storage $P2RAID .";
+     debconf-set partman-auto-raid/recipe "1 2 0 ext4 / $P1RAID . 1 2 0 swap - $P2RAID . 1 2 0 ext4 /storage $P3RAID .";
 #     it does not work!
 #     debconf-set grub-installer/bootdev "$NU";
 # partman-auto/disk and grub-installer/bootdev need to be preseed
 
 d-i preseed/late_command string \
-    cp -af /cdrom/preseed/gateway_install_pkg*.tar /target/root/; \
-    cd /target/root/; tar -xf gateway_install_pkg*.tar; \
-    sed 's/^exit 0/cd \/root\/;bash gw_offline_install.sh vm;\nexit 0/' /target/etc/rc.local; \
+#    cp -af /cdrom/preseed/gateway_install_pkg*.tar /target/root/; \
+#    cd /target/root/; tar -xf gateway_install_pkg*.tar; \
+#    sed -i 's/^exit 0/cd \/root\/;bash gw_offline_install.sh vm;\nexit 0/' /target/etc/rc.local; \
     cp -af /cdrom/preseed/check_raid1 /target/etc/init.d/; \
-    cp -frs /target/etc/init.d/check_raid1 /target/etc/rc2.d/S10check_raid1; \
+    cp -af /cdrom/preseed/check_raid1 /target/etc/rc2.d/S10check_raid1; \
     sed -i 's/set timeout=-1/set timeout=2/' /target/etc/grub.d/00_header;
