@@ -62,7 +62,8 @@ sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_name preseed/file/checksu
 sed -i "5c timeout 10" $isolinux_file
 chmod -R 777 $dest_dir
 
-mkisofs -r -V "$iso_version" \
+ISO_ID="${iso_version:0:10}"
+mkisofs -r -V "$ISO_ID" \
             -cache-inodes \
             -J -l -b isolinux/isolinux.bin \
             -c isolinux/boot.cat -no-emul-boot \
