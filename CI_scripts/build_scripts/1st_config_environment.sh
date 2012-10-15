@@ -7,7 +7,7 @@ echo "***************************"
 echo "Acquire::http { Proxy \"http://172.16.78.253:80\"; };" > /etc/apt/apt.conf.d/09proxy
 
 apt-get update
-apt-get install -y git dpkg-dev wput expect
+apt-get install -y git dpkg-dev wput expect mkisofs
 apt-get -y install python-software-properties devscripts
 
 # to set up proxy for git

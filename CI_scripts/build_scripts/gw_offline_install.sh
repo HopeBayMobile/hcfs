@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 # This script is for gateway offline installation.
 # It will be packed with StorageAppliance/ and apt_cache/ folders in a tar file.

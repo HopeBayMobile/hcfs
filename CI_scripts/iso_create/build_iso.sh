@@ -62,7 +62,7 @@ sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_name preseed/file/checksu
 sed -i "5c timeout 10" $isolinux_file
 chmod -R 777 $dest_dir
 
-mkisofs -r -V "Delta Install CD" \
+mkisofs -r -V "$iso_version" \
             -cache-inodes \
             -J -l -b isolinux/isolinux.bin \
             -c isolinux/boot.cat -no-emul-boot \

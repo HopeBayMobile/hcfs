@@ -7,6 +7,7 @@
     Folder <build_scripts>: 
         scripts for build a tar package maker from a clean OS; build all in one instllation package.
     Folder <super_build>: 
-        We will
+        scripts for building gateway of all branches, e.g. gw_savebox and gw_dmc. It will (1) checkout to branche (2) pull latest code 
+        (3) copy CI_scripts/build_scripts and (4) run the build scripts
 
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 echo "************************"
 echo "Usage: ./build_gw_package.sh <git_branch> <build_num>"
 echo "************************"
@@ -133,6 +133,9 @@ fi
     echo "creating gateway installation package"
     tar -cf $OUTPUTTAR $DEBFILE gw_offline_install.sh build.conf $COMMIT_LOG
 
+# upload all_in_one installation package to the FTP
+    wput $OUTPUTTAR ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTTAR
+
 # clean old files
     rm debsrc_StorageAppliance*.tgz
     rm debpatch_StorageAppliance*.tgz
@@ -147,11 +150,12 @@ fi
 	mv savebox*.deb $DEBSAVE
 	
 # Build an ISO with auto-install OS
+    rm -r $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package  # delete old file
     mkdir -p $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package
     mv $OUTPUTTAR $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package
     cd $INITPATH/StorageAppliance/CI_scripts/iso_create/
-    bash cp_iso_source.sh
-    bash build_iso.sh $GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH
+    bash -x cp_iso_source.sh
+    bash -x build_iso.sh $GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH
 
 # upload all_in_one installation package to the FTP
 	wput $OUTPUTISO ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTISO
