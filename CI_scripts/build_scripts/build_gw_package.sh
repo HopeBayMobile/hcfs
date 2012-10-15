@@ -134,7 +134,7 @@ fi
     tar -cf $OUTPUTTAR $DEBFILE gw_offline_install.sh build.conf $COMMIT_LOG
 
 # upload all_in_one installation package to the FTP
-    wput $OUTPUTTAR ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTTAR
+    wput $OUTPUTTAR ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTTAR & # upload in background
 
 # clean old files
     rm debsrc_StorageAppliance*.tgz
