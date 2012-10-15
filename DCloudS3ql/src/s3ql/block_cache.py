@@ -256,7 +256,7 @@ class BlockCache(object):
         self.in_transit = set()
         self.removed_in_transit = set()
         self.to_upload = Distributor()
-        self.to_remove = Queue(250)
+        self.to_remove = Queue(0) # Jiahong: 10/12/12: Drop limitation of to_remove queue size
         self.upload_threads = []
         self.removal_threads = []
         self.transfer_completed = SimpleEvent()

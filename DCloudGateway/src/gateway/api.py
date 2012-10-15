@@ -1196,7 +1196,7 @@ def _openContainter(storage_url, account, password):
         log.debug("_openContainer end")'''
 
 
-@common.timeout(180)
+@common.timeout(18000)
 def _mkfs(storage_url, key, container):
     """
     Create S3QL file system.
