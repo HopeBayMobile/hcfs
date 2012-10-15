@@ -2152,7 +2152,8 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
     try:
         with open(interface_path_temp, "w") as f:
             f.write("auto lo\niface lo inet loopback\n")
-            f.write("\nauto eth0\niface eth0 inet static")
+            f.write("\nauto eth0\niface eth0 inet dhcp\n")
+            f.write("\nauto eth0:1\niface eth0:1 inet static")
             f.write("\naddress %s" % fixedIp)
             f.write("\nnetmask %s\n" % fixedMask)
             f.write("\nauto eth1\niface eth1 inet static")
