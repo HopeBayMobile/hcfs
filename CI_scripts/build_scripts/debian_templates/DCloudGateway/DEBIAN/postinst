@@ -23,3 +23,10 @@ if [ ! -e "/storage/s3ql" ]; then    # check whether
     sudo grub-editenv - unset recordfail
     sudo update-grub2
 fi
+
+# reduce default dhclient.conf timeout
+#~ sed -i 's/#timeout 60;/timeout 10;/#/' /etc/dhcp/dhclient.conf
+#~ sed -i 's/#retry 60;/retry 2;/#/' /etc/dhcp/dhclient.conf
+echo "timeout 10;" >> /etc/dhcp/dhclient.conf
+echo "retry 2;" >> /etc/dhcp/dhclient.conf
+
