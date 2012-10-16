@@ -37,48 +37,8 @@ fi
     OUTPUTISO="gateway_install_"$GW_VERSION"_"$BUILDNUM"_"$OS_CODE_NAME"_"$BRANCH"_"$ARCH".iso"
     INITPATH=$(pwd)
 
-# pull code from github
-    if [ ! -d StorageAppliance ]; then    # if StorageAppliance is not here
-        MODE="full"
-    else
-        MODE="fast"
-    fi
-
-    if [ $MODE = "full" ];    then
-        expect -c "
-        spawn git clone $GIT_SRC
-        expect \"Username for\"
-        sleep 1
-        send \"dc-cds\r\"
-        expect \"Password for\"
-        sleep 1
-        send \"delta168cloud\r\"
-        interact
-        "
-        check_ok
-        cd StorageAppliance
-        git stash
-        git checkout $BRANCH
-    else
-        cd StorageAppliance
-        git stash
-        git checkout $BRANCH
-        git reset --hard HEAD
-        expect -c "
-        spawn git pull
-        expect \"Username for\"
-        sleep 1
-        send \"dc-cds\r\"
-        expect \"Password for\"
-        sleep 1
-        send \"delta168cloud\r\"
-        interact
-        "
-        check_ok
-    fi
-
 # create commit log file
-    git log > $INITPATH/$COMMIT_LOG
+    git log -1 --format="%H" > $INITPATH/$COMMIT_LOG
     cd $INITPATH
 
 # clean old DEB files at $APTCACHEDIR
