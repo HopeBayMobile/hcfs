@@ -48,6 +48,10 @@ def parse_args(args):
                           parents=[pparser])
     subparsers.add_parser('uploadoff', help='stop upload dirty file system cache',
                           parents=[pparser])
+    subparsers.add_parser('writeon', help='allow write operation to file system',
+                          parents=[pparser])
+    subparsers.add_parser('writeoff', help='disallow write operation to file system',
+                          parents=[pparser])
 
 
 
@@ -113,6 +117,12 @@ def main(args=None):
 
     if options.action == 'uploadoff':
         llfuse.setxattr(ctrlfile, 'uploadoff', 'dummy')
+        
+    if options.action == 'writeon':
+        llfuse.setxattr(ctrlfile, 'writeon', 'dummy')
+
+    if options.action == 'writeoff':
+        llfuse.setxattr(ctrlfile, 'writeoff', 'dummy')
 
 
 

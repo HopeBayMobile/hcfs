@@ -68,7 +68,7 @@ def main(args=None):
 
     # Added by Jiahong Wu: read cache information
     buf = llfuse.getxattr(ctrlfile, b's3qlcache', size_guess=256)
-    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading)= struct.unpack('QQQQQQQ', buf)
+    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write)= struct.unpack('QQQQQQQQ', buf)
     p_dedup = dedup_size * 100 / fs_size if fs_size else 0
     p_compr_1 = compr_size * 100 / fs_size if fs_size else 0
     p_compr_2 = compr_size * 100 / dedup_size if dedup_size else 0
@@ -90,12 +90,17 @@ def main(args=None):
     if cache_uploading == 1:
         print('Cache uploading: On\n')
     else:
-        print('Cache uploading: Off\n')
+        print('Cache uploading: Off\n')    
 
     if (cache_dirtysize > (0.8 * cache_maxsize)) or (cache_dirtyentries > (0.8 * cache_maxentries)):
-        print('Dirty cache near full: True\n')
+        print('Dirty cache near full: True')
     else:
-        print('Dirty cache near full: False\n')
+        print('Dirty cache near full: False')
+    
+    if filesys_write == 1:
+        print('File system writing: On\n')
+    else:
+        print('File system writing: Off\n')
 
 
 if __name__ == '__main__':
