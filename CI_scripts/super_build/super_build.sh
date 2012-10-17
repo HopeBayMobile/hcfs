@@ -74,7 +74,7 @@ fi
     fi
 
 # re-arrange folders for build
-    rm -r build_scripts
+    rm -r $INITPATH/build_scripts
     cp -r $INITPATH/StorageAppliance/CI_scripts/build_scripts $INITPATH
     cp -rf $INITPATH/StorageAppliance $INITPATH/build_scripts/
     cd $INITPATH/build_scripts
