@@ -1005,7 +1005,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
             op_msg = "Error happened when getting user container name"
             raise Exception(op_msg)
     
-        _umount(True)
+        _umount()
     
         storage_url = op_config.get(section, 'storage-url')
         cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/%s/delta" % (storage_url, user_container)
@@ -1013,7 +1013,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
         (stdout, stderr) = po.communicate(new_key)
         if po.returncode != 0:
             if stdout.find("Wrong bucket passphrase") != -1:
-                op_msg = "The key stored in /root/.s3ql/authoinfo2 is incorrect!"
+                op_msg = "The old key stored in /root/.s3ql/authoinfo2 is incorrect!"
             else:
                 op_msg = "Failed to change enc_key for %s" % stdout
             raise Exception(op_msg)
@@ -1029,7 +1029,9 @@ def apply_user_enc_key(old_key=None, new_key=None):
         op_msg = 'Failed to access /root/.s3ql/authinfo2'
         log.error(str(e))
     except UmountError as e:
-        op_msg = "Failed to umount s3ql for %s" % str(e)
+        op_msg = "Failed to umount s3ql: %s" % str(e)
+        # undo the umount process
+        _undo_umount()
     except common.TimeoutError as e:
         op_msg = "Failed to umount s3ql in 10 minutes."
     except Exception as e:
@@ -1249,9 +1251,70 @@ def _mkfs(storage_url, key, container):
         log.debug("_mkfs end")
         return has_existing_filesys
 
+# wthung, 2012/10/16
+def _run_subprocess(cmd):
+    """
+    Utility function to run a command by subprocess.Popen
+    
+    @type cmd: string
+    @param cmd: Command to run
+    @rtype: tuple
+    @return: Command return code and output string in a tuple
+    """
+    po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+    
+    return (po.returncode, output)
+
+# wthung, 2012/10/16
+@common.timeout(600)
+def _undo_umount():
+    """
+    Undo the umount process
+    
+    Note:
+        - Mount COSA related folders
+        - Start NFS
+        - Mount /mnt/nfssamba
+        - Start NetBIOS
+        - Start Samba
+    """
+    log.debug('Undo gateway umount process')
+    
+    # mount cosa related folders if necessary
+    # note: we can't use os.path.ismount to check a binded folder
+    ret_code, output = _run_subprocess("sudo mount | grep /COSASTORAGE/ALFRESCO")
+    if ret_code:
+        bind_path = '/storage/COSA/ALFRESCO /COSASTORAGE/ALFRESCO'
+        ret_code, output = _run_subprocess("sudo mount -o bind %s" % bind_path)
+        if ret_code:
+            log.error('Unable to bind %s: %s' % (bind_path, output))
+    
+    # start nfs service
+    ret_code, output = _run_subprocess("sudo /etc/init.d/nfs-kernel-server restart")
+    if ret_code:
+        log.error('Unable to start NFS service: %s' % output)
+    
+    # mount nfs mount point if necessary
+    if not os.path.ismount('/mnt/nfssamba'):
+        ret_code, output = _run_subprocess("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
+        if ret_code:
+            log.error('Unable to mount /mnt/nfssamba: %s' % output)
+    
+    # start nmbd
+    ret_code, output = _run_subprocess("sudo /etc/init.d/nmbd restart")
+    if ret_code:
+        log.error('Unable to start nmbd service: %s' % output)
+    
+    # start smbd
+    ret_code, output = _run_subprocess("sudo /etc/init.d/smbd restart")
+    if ret_code:
+        log.error('Unable to start smbd service: %s' % output)
+    
 
 @common.timeout(600)
-def _umount(is_lazy=False):
+def _umount():
     """
     Umount S3QL file system.
     
@@ -1264,7 +1327,6 @@ def _umount(is_lazy=False):
     @rtype: boolean
     @return: True if succeed to umount file system. Otherwise, false.
     """
-    
     log.debug("Gateway umounting")
     op_ok = False
 
@@ -1273,44 +1335,37 @@ def _umount(is_lazy=False):
         mountpoint = config.get("mountpoint", "dir")
     
         if os.path.ismount(mountpoint):
-            cmd = "sudo /etc/init.d/smbd stop"
-            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
-            if po.returncode != 0:
+            # umount cosa related folders
+            ret_code, output = _run_subprocess("sudo mount | grep /COSASTORAGE/ALFRESCO")
+            if not ret_code:
+                ret_code, output = _run_subprocess("sudo umount -l /COSASTORAGE/ALFRESCO")
+                if ret_code:
+                    raise UmountError(output)
+            
+            # stop smbd
+            ret_code, output = _run_subprocess("sudo /etc/init.d/smbd stop")
+            if ret_code:
                 raise UmountError(output)
 
-            cmd = "sudo /etc/init.d/nmbd stop"
-            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
-            if po.returncode != 0:
+            # stop nmbd
+            ret_code, output = _run_subprocess("sudo /etc/init.d/nmbd stop")
+            if ret_code:
                 raise UmountError(output)
             
             # wthung, 2012/8/1
-            # umount /mnt/nfssamba
-            cmd = "sudo umount /mnt/nfssamba"
-            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
-            if po.returncode != 0:
+            # umount /mnt/nfssamba            
+            ret_code, output = _run_subprocess("sudo umount /mnt/nfssamba")
+            if ret_code:
+                raise UmountError(output)
+            
+            # stop nfs
+            ret_code, output = _run_subprocess("sudo /etc/init.d/nfs-kernel-server stop")
+            if ret_code:
                 raise UmountError(output)
 
-            cmd = "sudo /etc/init.d/nfs-kernel-server stop"
-            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
-            if po.returncode != 0:
-                raise UmountError(output)
-
-            if is_lazy:
-                cmd = "sudo python /usr/local/bin/umount.s3ql --lazy %s" % (mountpoint)
-            else:
-                cmd = "sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint)
-            po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            output = po.stdout.read()
-            po.wait()
-            if po.returncode != 0:
+            # umount s3ql mount point
+            ret_code, output = _run_subprocess("sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint))
+            if ret_code:
                 raise UmountError(output)
             
             op_ok = True
@@ -2012,7 +2067,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
         
             return json.dumps(return_val)
         
-        if _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path) and _setNameserver(dns1, dns2):
+        if _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
             try:
                 cmd = "sudo /etc/init.d/networking restart"
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -2185,54 +2240,56 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
     finally:
         return op_ok
 
-def _setNameserver(dns1, dns2=None):
-    """
-    Set the domain name server.
-    
-    @type dns1: string
-    @param dns1: Primiary DNS.
-    @type dns2: string
-    @param dns2: Secondary DNS.
-    @rtype: boolean
-    @return: True if successfully applied the DNS. Otherwise, false.
-    """
-    
-    nameserver_path = "/etc/resolv.conf"
-    nameserver_path_temp = "/etc/delta/temp_resolv.conf"
-    op_ok = False
-
-    if os.system("sudo cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
-        os.system("sudo touch %s" % nameserver_path)
-        log.warning("File does not exist: %s" % nameserver_path)
-
-    try:
-        with open(nameserver_path_temp, "w") as f:
-            f.write("nameserver %s\n" % dns1)
-    
-            if dns2 != None:
-                f.write("nameserver %s\n" % dns2)
-
-        os.system('sudo cp %s %s' % (nameserver_path_temp, nameserver_path))
-
-        op_ok = True
-        log.debug("Succeeded to set the nameserver.")
-
-    except IOError as e:
-        op_ok = False
-        log.error("Failed to access %s." % nameserver_path)
-
-        if os.path.exists(nameserver_path + "_backup"):
-            if os.system("sudo cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
-                log.warning("Failed to recover %s" % nameserver_path)
-            else:
-                log.debug("Succeeded to recover %s" % nameserver_path)
-
-    except Exception as e:
-        op_ok = False
-        log.error(str(e))
-
-    finally:
-        return op_ok
+# wthung, 2012/10/16
+# content of resolv.conf is auto-generated. no need to modify it
+#def _setNameserver(dns1, dns2=None):
+#    """
+#    Set the domain name server.
+#    
+#    @type dns1: string
+#    @param dns1: Primiary DNS.
+#    @type dns2: string
+#    @param dns2: Secondary DNS.
+#    @rtype: boolean
+#    @return: True if successfully applied the DNS. Otherwise, false.
+#    """
+#    
+#    nameserver_path = "/etc/resolv.conf"
+#    nameserver_path_temp = "/etc/delta/temp_resolv.conf"
+#    op_ok = False
+#
+#    if os.system("sudo cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
+#        os.system("sudo touch %s" % nameserver_path)
+#        log.warning("File does not exist: %s" % nameserver_path)
+#
+#    try:
+#        with open(nameserver_path_temp, "w") as f:
+#            f.write("nameserver %s\n" % dns1)
+#    
+#            if dns2 != None:
+#                f.write("nameserver %s\n" % dns2)
+#
+#        os.system('sudo cp %s %s' % (nameserver_path_temp, nameserver_path))
+#
+#        op_ok = True
+#        log.debug("Succeeded to set the nameserver.")
+#
+#    except IOError as e:
+#        op_ok = False
+#        log.error("Failed to access %s." % nameserver_path)
+#
+#        if os.path.exists(nameserver_path + "_backup"):
+#            if os.system("sudo cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
+#                log.warning("Failed to recover %s" % nameserver_path)
+#            else:
+#                log.debug("Succeeded to recover %s" % nameserver_path)
+#
+#    except Exception as e:
+#        op_ok = False
+#        log.error(str(e))
+#
+#    finally:
+#        return op_ok
 
 def get_scheduling_rules():        # by Yen
     """
@@ -3337,5 +3394,5 @@ def get_last_backup_time():
 
 
 if __name__ == '__main__':
-    print get_gateway_status()
+    print apply_user_enc_key('123456', '111111')
     pass
