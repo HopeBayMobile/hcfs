@@ -76,6 +76,6 @@ fi
 # re-arrange folders for build
     rm -r build_scripts
     cp -r $INITPATH/StorageAppliance/CI_scripts/build_scripts $INITPATH
-    cp -f $INITPATH/StorageAppliance $INITPATH/build_scripts/
+    cp -rf $INITPATH/StorageAppliance $INITPATH/build_scripts/
     cd $INITPATH/build_scripts
     bash build_gw_package.sh $1 $2

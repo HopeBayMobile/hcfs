@@ -49,17 +49,18 @@ check_ok() {
     cp -r $INITPATH/debian_templates/DCloudGatewayAPI/DEBIAN /tmp/pkg_DCloudGatewayAPI
     cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGatewayAPI/tmp
     # edit control file
+# 2012/10/17, take out nfs-kernel-server and samba for fixing prompt screen. (Yen)
 cat > /tmp/pkg_DCloudGatewayAPI/DEBIAN/control << EOF
 Package: dcloudgatewayapi
 Version: $GW_VERSION.$BUILD
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
+Depends: python, python-setuptools, python-software-properties, curl, portmap, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
 Maintainer: CDS Team <ctbd@delta.com.tw>
 Description: Package for gateway API
 EOF
-    dpkg --build /tmp/pkg_DCloudGatewayAPI ./
+    dpkg --build /tmp/pkg_DCloudGatewayAPI .
     check_ok
 
 
@@ -83,7 +84,7 @@ Depends: curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3Q
 Architecture: amd64
 Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
 EOF
-    dpkg --build /tmp/pkg_DCloudGateway ./
+    dpkg --build /tmp/pkg_DCloudGateway .
     check_ok
 
 

@@ -38,6 +38,7 @@ fi
     INITPATH=$(pwd)
 
 # create commit log file
+    cd $INITPATH/StorageAppliance
     git log -1 --format="%H" > $INITPATH/$COMMIT_LOG
     cd $INITPATH
 
