@@ -120,6 +120,8 @@ fi
 
 # upload all_in_one installation package to the FTP
 	wput $OUTPUTISO ftp://anonymous@$FTP_HOST/$BUILD_PATH/$OUTPUTISO
-
+    # clear old ISO
+    rm $INITPATH/StorageAppliance/CI_scripts/iso_create/$OUTPUTISO
+    
 # Done.
     echo "~~~ DONE!"
