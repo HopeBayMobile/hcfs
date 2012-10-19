@@ -1,7 +1,7 @@
 import os
 import os.path
-import common
 import time
+from gateway import common
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 

@@ -6,9 +6,9 @@ This script checks for unfinished snapshotting at system start
 and initiate continuation of the process if one exits.
 """
 import os.path
-import common
 import subprocess
 from datetime import datetime
+from gateway import common
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))

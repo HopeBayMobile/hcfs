@@ -35,6 +35,7 @@ DUMP_SPEC = [
                                ('size', INTEGER),
                                ('rdev', INTEGER),
                                ('locked', INTEGER),
+                               ('plocked', INTEGER),
                                ('refcount', INTEGER))),
 
              ('inode_blocks', 'inode, blockno',
@@ -137,7 +138,8 @@ def create_tables(conn):
         refcount  INT NOT NULL,
         size      INT NOT NULL DEFAULT 0,
         rdev      INT NOT NULL DEFAULT 0,
-        locked    BOOLEAN NOT NULL DEFAULT 0
+        locked    BOOLEAN NOT NULL DEFAULT 0,
+        plocked   BOOLEAN NOT NULL DEFAULT 0
     )""")
 
     # Further Blocks used by inode (blockno >= 1)

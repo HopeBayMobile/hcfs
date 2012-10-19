@@ -5,10 +5,10 @@ Developed by CTBU, Delta Electronics Inc., 2012
 This script checks for and deletes expired snapshots.
 """
 import os.path
-import common
 import time
 from datetime import datetime
 from gateway import snapshot
+from gateway import common
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))

@@ -5,9 +5,9 @@ Developed by CTBU, Delta Electronics Inc., 2012
 This script initiates scheduled snapshotting.
 """
 import os.path
-import common
 import subprocess
 import time
+from gateway import common
 from datetime import datetime
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")

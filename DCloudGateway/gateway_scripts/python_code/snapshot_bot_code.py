@@ -5,13 +5,13 @@ Developed by CTBU, Delta Electronics Inc., 2012
 This is the main bot script for taking snapshots.
 """
 import os.path
-import common
 import subprocess
 import time
 import urllib2
 import json
 from datetime import datetime
 from gateway import snapshot
+from gateway import common
 
 log = common.getLogger(name="Snapshot_Bot", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))

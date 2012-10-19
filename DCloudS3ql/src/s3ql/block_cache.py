@@ -262,6 +262,7 @@ class BlockCache(object):
         self.transfer_completed = SimpleEvent()
         self.preload_cache = False
         self.do_upload = False
+        self.do_write = True # flag to allow/disallow the write to s3ql file system
         self.forced_upload = False
         self.snapshot_upload = False #New upload switch for snapshotting (need to flush first before snapshotting)
         #Jiahong: Adding a mechanism to monitor alive upload threads

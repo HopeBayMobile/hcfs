@@ -210,6 +210,10 @@ class Operations(llfuse.Operations):
                 self.cache.do_upload = True
             elif name == 'uploadoff':
                 self.cache.do_upload = False
+            elif name == 'writeon':
+                self.cache.do_write = True
+            elif name == 'writeoff':
+                self.cache.do_write = False
             elif name == 'copy':
                 self.copy_tree(*pickle.loads(value))
             elif name == 'upload-meta':
@@ -219,6 +223,12 @@ class Operations(llfuse.Operations):
                     raise llfuse.FUSEError(errno.ENOTTY)
             elif name == 'lock':
                 self.lock_tree(*pickle.loads(value))
+            elif name == 'unlock':
+                self.unlock_tree(*pickle.loads(value))
+            elif name == 'plock':
+                self.plock_tree(*pickle.loads(value))
+            elif name == 'punlock':
+                self.punlock_tree(*pickle.loads(value))
             elif name == 'rmtree':
                 self.remove_tree(*pickle.loads(value))
             elif name == 'logging':
@@ -228,7 +238,10 @@ class Operations(llfuse.Operations):
             else:
                 raise llfuse.FUSEError(errno.EINVAL)
         else:
-            if self.inodes[id_].locked:
+            if not self.cache.do_write:
+                raise FUSEError(errno.ENOSPC)
+            
+            if self.inodes[id_].locked or self.inodes[id_].plocked:
                 raise FUSEError(errno.EPERM)
 
             if len(value) > deltadump.MAX_BLOB_SIZE:
@@ -241,7 +254,10 @@ class Operations(llfuse.Operations):
     def removexattr(self, id_, name):
         log.debug('removexattr(%d, %r): start', id_, name)
 
-        if self.inodes[id_].locked:
+        if not self.cache.do_write:
+            raise FUSEError(errno.ENOSPC)
+            
+        if self.inodes[id_].locked or self.inodes[id_].plocked:
             raise FUSEError(errno.EPERM)
 
         try:
@@ -289,6 +305,109 @@ class Operations(llfuse.Operations):
                 stamp = time.time()
 
         log.debug('lock_tree(%d): end', id0)
+        
+    def plock_tree(self, id0):
+        '''Partial lock directory tree'''
+
+        log.debug('plock_tree(%d): start', id0)
+        queue = [ id0 ]
+        self.inodes[id0].plocked = True
+        processed = 0 # Number of steps since last GIL release
+        stamp = time.time() # Time of last GIL release
+        gil_step = 250 # Approx. number of steps between GIL releases
+        while True:
+            id_p = queue.pop()
+            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+                                        (id_p,)):
+                self.inodes[id_].plocked = True
+                processed += 1
+
+                if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
+                    queue.append(id_)
+
+            if not queue:
+                break
+
+            if processed > gil_step:
+                dt = time.time() - stamp
+                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+                log.debug('plock_tree(%d): Adjusting gil_step to %d',
+                          id0, gil_step)
+                processed = 0
+                llfuse.lock.yield_(100)
+                log.debug('plock_tree(%d): re-acquired lock', id0)
+                stamp = time.time()
+
+        log.debug('plock_tree(%d): end', id0)
+    
+    # wthung, add unlock
+    def unlock_tree(self, id0):
+        '''Lock directory tree'''
+
+        log.debug('unlock_tree(%d): start', id0)
+        queue = [ id0 ]
+        self.inodes[id0].locked = False
+        processed = 0 # Number of steps since last GIL release
+        stamp = time.time() # Time of last GIL release
+        gil_step = 250 # Approx. number of steps between GIL releases
+        while True:
+            id_p = queue.pop()
+            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+                                        (id_p,)):
+                self.inodes[id_].locked = False
+                processed += 1
+
+                if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
+                    queue.append(id_)
+
+            if not queue:
+                break
+
+            if processed > gil_step:
+                dt = time.time() - stamp
+                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+                log.debug('unlock_tree(%d): Adjusting gil_step to %d',
+                          id0, gil_step)
+                processed = 0
+                llfuse.lock.yield_(100)
+                log.debug('unlock_tree(%d): re-acquired lock', id0)
+                stamp = time.time()
+
+        log.debug('unlock_tree(%d): end', id0)
+    
+    def punlock_tree(self, id0):
+        '''Partial lock directory tree'''
+
+        log.debug('punlock_tree(%d): start', id0)
+        queue = [ id0 ]
+        self.inodes[id0].plocked = False
+        processed = 0 # Number of steps since last GIL release
+        stamp = time.time() # Time of last GIL release
+        gil_step = 250 # Approx. number of steps between GIL releases
+        while True:
+            id_p = queue.pop()
+            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+                                        (id_p,)):
+                self.inodes[id_].plocked = False
+                processed += 1
+
+                if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
+                    queue.append(id_)
+
+            if not queue:
+                break
+
+            if processed > gil_step:
+                dt = time.time() - stamp
+                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+                log.debug('punlock_tree(%d): Adjusting gil_step to %d',
+                          id0, gil_step)
+                processed = 0
+                llfuse.lock.yield_(100)
+                log.debug('punlock_tree(%d): re-acquired lock', id0)
+                stamp = time.time()
+
+        log.debug('punlock_tree(%d): end', id0)
 
     def remove_tree(self, id_p0, name0):
         '''Remove directory tree'''
@@ -726,7 +845,10 @@ class Operations(llfuse.Operations):
                      new_name, new_id_p)
             raise FUSEError(errno.EINVAL)
 
-        if inode_p.locked:
+        if not self.cache.do_write:
+            raise FUSEError(errno.ENOSPC)
+            
+        if inode_p.locked or inode_p.plocked:
             raise FUSEError(errno.EPERM)
 
         inode_p.ctime = timestamp
@@ -751,7 +873,10 @@ class Operations(llfuse.Operations):
         inode = self.inodes[id_]
         timestamp = time.time()
 
-        if inode.locked:
+        if not self.cache.do_write:
+            raise FUSEError(errno.ENOSPC)
+        
+        if inode.locked or inode.plocked:
             raise FUSEError(errno.EPERM)
 
         if attr.st_size is not None:
@@ -862,12 +987,17 @@ class Operations(llfuse.Operations):
             cache_uploading = 1
         else:
             cache_uploading = 0
+        
+        # wthung, 2012/10/15
+        # pack a value to show do_write flag
+        # this is not a perfect location
+        if (self.cache.do_write):
+            filesys_write = 1
+        else:
+            filesys_write = 0
 
-        return struct.pack('QQQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading)
-
-
-
+        return struct.pack('QQQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write)
 
     def statfs(self):
         log.debug('statfs(): start')
@@ -909,11 +1039,11 @@ class Operations(llfuse.Operations):
 
         return stat_
 
-
     def open(self, id_, flags):
-        log.debug('open(%d): start', id_)
+        log.debug('open(%d): start', id_)        
+        
         if ((flags & os.O_RDWR or flags & os.O_WRONLY)
-            and self.inodes[id_].locked):
+            and (self.inodes[id_].locked or self.inodes[id_].plocked)):
             raise FUSEError(errno.EPERM)
 
         return id_
@@ -954,7 +1084,10 @@ class Operations(llfuse.Operations):
         timestamp = time.time()
         inode_p = self.inodes[id_p]
 
-        if inode_p.locked:
+        if not self.cache.do_write:
+            raise FUSEError(errno.ENOSPC)
+            
+        if inode_p.locked or inode_p.plocked:
             raise FUSEError(errno.EPERM)
 
         if inode_p.refcount == 0:
@@ -1057,7 +1190,10 @@ class Operations(llfuse.Operations):
         '''
         log.debug('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
 
-        if self.inodes[fh].locked:
+        if not self.cache.do_write:
+            raise FUSEError(errno.ENOSPC)
+
+        if self.inodes[fh].locked or self.inodes[fh].plocked:
             raise FUSEError(errno.EPERM)
 
         total = len(buf)
