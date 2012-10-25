@@ -273,7 +273,15 @@ class BlockCache(object):
         self.quick_inode = -1 # Jiahong: New mechanism for caching block pointer
         self.quick_block = -1 # Jiahong: New mechanism for caching block pointer
         self.quick_pointer = None
-
+        # wthung, add value cache. need to retrieve it in initialization of block cache
+        self.value_cache = {"entries": max(self.db.get_val("SELECT COUNT(rowid) FROM contents"), 0),
+                            "blocks": max(self.db.get_val("SELECT COUNT(id) FROM objects"), 0),
+                            "inodes": max(self.db.get_val("SELECT COUNT(id) FROM inodes"), 0),
+                            "fs_size": max(self.db.get_val('SELECT SUM(size) FROM inodes') or 0, 0),
+                            "dedup_size": max(self.db.get_val('SELECT SUM(size) FROM blocks') or 0, 0),
+                            "compr_size": max(self.db.get_val('SELECT SUM(size) FROM objects') or 0, 0)}
+        # counter to refresh value cache
+        self.refresh_count = 0
 
         if os.access(self.path,os.F_OK):
             pass
@@ -446,8 +454,14 @@ class BlockCache(object):
                         if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
                             self.forced_upload = False
                 else:
-                    self.db.execute('UPDATE objects SET size=? WHERE id=?',
+                    affect_rows = self.db.execute('UPDATE objects SET size=? WHERE id=?',
                                 (obj_size, obj_id))
+                    while affect_rows > 0:
+                        # wthung, 2012/10/24
+                        # update value cache
+                        self.value_cache["compr_size"] += obj_size
+                        affect_rows -= 1
+                        
                     os.fchmod(el.fh.fileno(), stat.S_IRUSR)
                     #  Jiahong: Update dirty cache size/entries and stop forced uploading if dirty cache size/entries drop below some limit
                     if el.dirty:
@@ -522,9 +536,15 @@ class BlockCache(object):
             # No block with same hash
             except NoSuchRowError:
                 obj_id = self.db.rowid('INSERT INTO objects (refcount, size) VALUES(1, -1)')
+                # wthung, 2012/10/24
+                # update value cache
+                self.value_cache["blocks"] += 1
                 log.debug('upload(%s): created new object %d', el, obj_id)
                 block_id = self.db.rowid('INSERT INTO blocks (refcount, obj_id, hash, size) '
                                          'VALUES(?,?,?,?)', (1, obj_id, hash_, el.size))
+                # wthung, 2012/10/24
+                # update value cache
+                self.value_cache["dedup_size"] += el.size
                 log.debug('upload(%s): created new block %d', el, block_id)
                 log.debug('upload(%s): adding to upload queue', el)
 
@@ -594,6 +614,11 @@ class BlockCache(object):
         log.debug('upload(%s): removing prev. block %d', el, old_block_id)
         old_obj_id = self.db.get_val('SELECT obj_id FROM blocks WHERE id=?', (old_block_id,))
         self.db.execute('DELETE FROM blocks WHERE id=?', (old_block_id,))
+        
+        # wthung, 2012/10/24
+        # update value cache
+        self.value_cache["dedup_size"] -= el.size
+        
         refcount = self.db.get_val('SELECT refcount FROM objects WHERE id=?', (old_obj_id,))
         if refcount > 1:
             log.debug('upload(%s):  decreased refcount for prev. obj: %d', el, old_obj_id)
@@ -602,7 +627,13 @@ class BlockCache(object):
             return el.size
 
         log.debug('upload(%s): removing object %d', el, old_obj_id)
-        self.db.execute('DELETE FROM objects WHERE id=?', (old_obj_id,))
+        affect_rows = self.db.execute('DELETE FROM objects WHERE id=?', (old_obj_id,))
+        while affect_rows > 0:
+            # wthung, 2012/10/24
+            # update value cache
+            self.value_cache["blocks"] -= 1
+            self.value_cache["compr_size"] -= el.size
+            affect_rows -= 1
 
         while old_obj_id in self.in_transit:
             log.debug('upload(%s): waiting for transfer of old object %d to complete',
@@ -1005,7 +1036,6 @@ class BlockCache(object):
                     if self.dirty_entries < 0:
                         self.dirty_entries = 0
 
-
                 el.unlink()
 
             try:
@@ -1033,6 +1063,9 @@ class BlockCache(object):
                       inode, blockno, block_id)
             obj_id = self.db.get_val('SELECT obj_id FROM blocks WHERE id=?', (block_id,))
             self.db.execute('DELETE FROM blocks WHERE id=?', (block_id,))
+            # wthung, 2012/10/24
+            # update value cache
+            self.value_cache["dedup_size"] -= el.size
 
             # Decrease object refcount
             refcount = self.db.get_val('SELECT refcount FROM objects WHERE id=?', (obj_id,))
@@ -1049,7 +1082,13 @@ class BlockCache(object):
                 # Move blocking of object removal of in_transit objects to _do_removal
                 log.debug('remove(inode=%d, blockno=%d): deleting object %d',
                           inode, blockno, obj_id)
-                self.db.execute('DELETE FROM objects WHERE id=?', (obj_id,))
+                affect_rows = self.db.execute('DELETE FROM objects WHERE id=?', (obj_id,))
+                while affect_rows > 0:
+                    # wthung, 2012/10/24
+                    # update value cache
+                    self.value_cache["blocks"] -= 1
+                    self.value_cache["compr_size"] -= el.size
+                    affect_rows -= 1
                 with lock_released:
                     if not self.removal_threads:
                         log.warn("remove(): no removal threads, removing synchronously")
