@@ -54,7 +54,7 @@ class _Inode(object):
         # We want our blocksize for IO as large as possible to get large
         # write requests
         elif key == 'st_blksize':
-            return 128 * 1024
+            return 2048 * 1024  # Jiahong (10/23/12): Enlarge requested block size to 2MB
 
         elif key.startswith('st_'):
             return getattr(self, key[3:])

@@ -1005,7 +1005,7 @@ class Operations(llfuse.Operations):
         stat_ = llfuse.StatvfsData
 
         # Get number of blocks & inodes
-        blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
+        blocks = self.db.get_val("SELECT COUNT(id) FROM blocks")  # Jiahong: Changes the number of blocks to directly counting from blocks table
         inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
         size = self.db.get_val('SELECT SUM(size) FROM blocks')
 
@@ -1016,6 +1016,8 @@ class Operations(llfuse.Operations):
         # be allocated. This doesn't make much sense for S3QL, so we just
         # return the average size of stored blocks.
         stat_.f_frsize = size // blocks if blocks != 0 else 4096
+        if stat_.f_frsize == 0:  # Jiahong: Extra error handling for ensuring that the f_frsize var won't be zero
+            stat_.f_frsize = 4096
 
         # This should actually be the "preferred block size for doing IO.  However, `df` incorrectly
         # interprets f_blocks, f_bfree and f_bavail in terms of f_bsize rather than f_frsize as it

@@ -126,7 +126,7 @@ class CacheEntry(object):
     """
 
     __slots__ = [ 'dirty', 'inode', 'blockno', 'last_upload',
-                  'size', 'pos', 'fh' ]
+                  'size', 'pos', 'fh', 'to_delete' ]
 
 #Jiahong: modified this function and allow the creation of cache entry from existing cache file
     def __init__(self, inode, blockno, filename, newfile=True):
@@ -154,6 +154,7 @@ class CacheEntry(object):
         self.blockno = blockno
         self.last_upload = time.time()
         self.pos = 0
+        self.to_delete = False
         self.size = os.fstat(self.fh.fileno()).st_size
 
     def read(self, size=None):
@@ -256,7 +257,7 @@ class BlockCache(object):
         self.in_transit = set()
         self.removed_in_transit = set()
         self.to_upload = Distributor()
-        self.to_remove = Queue(0) # Jiahong: 10/12/12: Drop limitation of to_remove queue size
+        self.to_remove = Queue(0) # Jiahong on 10/12/12: Disable limit on object deletion queue
         self.upload_threads = []
         self.removal_threads = []
         self.transfer_completed = SimpleEvent()
@@ -437,24 +438,33 @@ class BlockCache(object):
                           obj_id, el.size, time_, rate)
 
             with lock:
-                self.db.execute('UPDATE objects SET size=? WHERE id=?',
+                try:
+                    tmp_obj_id = self.db.get_val('SELECT size FROM objects WHERE id=?',(obj_id,))
+                except NoSuchRowError:  #  Jiahong: (10/19/2012)Object already is scheduled for deletion
+                    #  Do not update dirty cache info. This is already done in remove()
+                    if el.dirty:
+                        if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
+                            self.forced_upload = False
+                else:
+                    self.db.execute('UPDATE objects SET size=? WHERE id=?',
                                 (obj_size, obj_id))
-                os.fchmod(el.fh.fileno(), stat.S_IRUSR)
-                #Update dirty cache size/entries and stop forced uploading if dirty cache size/entries drop below some limit
-                if el.dirty:
-                    self.dirty_size -= el.size
-                    self.dirty_entries -= 1
-                    if self.dirty_size < 0:
-                        self.dirty_size = 0 
-                    if self.dirty_entries < 0:
-                        self.dirty_entries = 0
-                    if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
-                        self.forced_upload = False
-                el.dirty = False
-                el.last_upload = time.time()
-                self.in_transit.remove(obj_id)
-                self.in_transit.remove((el.inode, el.blockno))
-                self.transfer_completed.notify_all()
+                    os.fchmod(el.fh.fileno(), stat.S_IRUSR)
+                    #  Jiahong: Update dirty cache size/entries and stop forced uploading if dirty cache size/entries drop below some limit
+                    if el.dirty:
+                        self.dirty_size -= el.size
+                        self.dirty_entries -= 1
+                        if self.dirty_size < 0:
+                            self.dirty_size = 0
+                        if self.dirty_entries < 0:
+                            self.dirty_entries = 0
+                        if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
+                            self.forced_upload = False
+                    el.dirty = False
+                    el.last_upload = time.time()
+                finally:
+                    self.in_transit.remove(obj_id)
+                    self.in_transit.remove((el.inode, el.blockno))
+                    self.transfer_completed.notify_all()
 
         except Exception as exc:
             with lock:
@@ -632,6 +642,11 @@ class BlockCache(object):
 #Jiahong: adding exception handling.....
         while True:
             try:
+                while obj_id in self.in_transit:
+                    log.debug('remove(inode=%d, blockno=%d): waiting for transfer of '
+                              'object %d to complete', inode, blockno, obj_id)
+                    self.wait()
+
                 with self.bucket_pool() as bucket:
                     bucket.delete('s3ql_data_%d' % obj_id)
                 break
@@ -916,7 +931,7 @@ class BlockCache(object):
 
             uploaded_count = 0  # Jiahong: Now will try to sync 4 entries at once
             for el in self.entries.values_rev():
-                if el.dirty and (el.inode, el.blockno) not in self.in_transit:
+                if el.dirty and (el.inode, el.blockno) not in self.in_transit and not el.to_delete:
                     log.debug('expire: uploading %s..', el)
                     freed = self.upload(el) # Releases global lock
                     need_size -= freed
@@ -964,6 +979,12 @@ class BlockCache(object):
         if end_no is None:
             end_no = start_no + 1
 
+        for blockno in range(start_no, end_no):
+            # Adding this to prevent deletion from being blocked due to continuous block upload
+            if (inode, blockno) in self.entries:
+                el = self.entries[(inode, blockno)]
+                el.to_delete = True
+        
         for blockno in range(start_no, end_no):
             # We can't use self.mlock here to prevent simultaneous retrieval
             # of the block with get(), because this could deadlock
@@ -1021,10 +1042,11 @@ class BlockCache(object):
                 self.db.execute('UPDATE objects SET refcount=refcount-1 WHERE id=?',
                                 (obj_id,))
             else:
-                while obj_id in self.in_transit:
-                    log.debug('remove(inode=%d, blockno=%d): waiting for transfer of '
-                              'object %d to complete', inode, blockno, obj_id)
-                    self.wait()
+                #while obj_id in self.in_transit:
+                #    log.debug('remove(inode=%d, blockno=%d): waiting for transfer of '
+                #              'object %d to complete', inode, blockno, obj_id)
+                #    self.wait()
+                # Move blocking of object removal of in_transit objects to _do_removal
                 log.debug('remove(inode=%d, blockno=%d): deleting object %d',
                           inode, blockno, obj_id)
                 self.db.execute('DELETE FROM objects WHERE id=?', (obj_id,))
@@ -1057,7 +1079,7 @@ class BlockCache(object):
         """
 
         for el in self.entries.itervalues():
-            if not (el.dirty and (el.inode, el.blockno) not in self.in_transit):
+            if not (el.dirty and (el.inode, el.blockno) not in self.in_transit and not el.to_delete):
                 continue
 
             self.upload(el) # Releases global lock

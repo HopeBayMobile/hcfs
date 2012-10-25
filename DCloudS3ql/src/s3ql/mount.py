@@ -548,40 +548,45 @@ class MetadataUploadThread(Thread):
                 fh = tempfile.TemporaryFile()
                 dump_metadata(self.db, fh)
 
-
-            with self.bucket_pool() as bucket:
-                #New mod by Jiahong on 5/7/12: check if can successfully get the seq no from the backend before proceeding
-                try:
-                    seq_no = get_seq_no(bucket)
-                except:
-                    log.error('Cannot connect to backend. Skipping metadata upload for now.')
-                    fh.close()
-                    continue
-
-                if seq_no != self.param['seq_no']:
-                    log.error('Remote metadata is newer than local (%d vs %d), '
-                              'refusing to overwrite!', seq_no, self.param['seq_no'])
-                    fh.close()
-                    continue
-
-                cycle_metadata(bucket)
-                fh.seek(0)
-                self.param['last-modified'] = time.time()
-
-                # Temporarily decrease sequence no, this is not the final upload
-                self.param['seq_no'] -= 1
-                def do_write(obj_fh):
-                    fh.seek(0)
-                    stream_write_bz2(fh, obj_fh)
-                    return obj_fh
-                log.info("Compressing and uploading metadata...")
-                obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=self.param,
-                                              is_compressed=True)
-                log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
-                self.param['seq_no'] += 1
-
+            #New mod by Jiahong on 5/7/12 and mod again on 10/24/12: check if can successfully get the seq no from the backend before proceeding
+            try:
+                seq_no = get_seq_no(bucket)
+            except:
+                log.error('Cannot connect to backend. Skipping metadata upload for now.')
                 fh.close()
-                self.db_mtime = new_mtime
+                continue
+            
+            #  Jiahong (10/24/12): To handle disconnection during meta backup
+            try:
+                with self.bucket_pool() as bucket:
+                    if seq_no != self.param['seq_no']:
+                        log.error('Remote metadata is newer than local (%d vs %d), '
+                                  'refusing to overwrite!', seq_no, self.param['seq_no'])
+                        fh.close()
+                        continue
+
+                    cycle_metadata(bucket)
+                    fh.seek(0)
+                    self.param['last-modified'] = time.time()
+
+                    # Temporarily decrease sequence no, this is not the final upload
+                    self.param['seq_no'] -= 1
+                    def do_write(obj_fh):
+                        fh.seek(0)
+                        stream_write_bz2(fh, obj_fh)
+                        return obj_fh
+                    log.info("Compressing and uploading metadata...")
+                    obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=self.param,
+                                                  is_compressed=True)
+                    log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
+                    self.param['seq_no'] += 1
+
+                    fh.close()
+                    self.db_mtime = new_mtime
+            except:
+                log.error('Cannot connect to backend. Skipping metadata upload for now.')
+                fh.close()
+                continue
 
         log.debug('MetadataUploadThread: end')
 
@@ -654,7 +659,7 @@ class CommitThread(Thread):
                 for el in self.block_cache.entries.values_rev():
                     if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
                         break;
-                    if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
+                    if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit and not el.to_delete):
                         continue
                     #Modified by Jiahong Wu
                     # Wait for one minute since last uploading the block to do it again
