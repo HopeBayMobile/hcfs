@@ -51,15 +51,15 @@ def get_configuration_backup_info():
     if backup_info is None:
         op_ok = False
         op_data = {'backup_time': None}
-        op_code = "000"
-        op_msg = "There is no [config] container at Swift."
+        op_code = 0x00000051
+        op_msg = "There is no configuration container. "
     else:
         backup_time = backup_info['datetime']
         #~ print backup_time
         op_ok = True
         op_data = {'backup_time': backup_time}
-        op_code = "100"
-        op_msg = None
+        op_code = 0x00000052
+        op_msg = "Getting configuration information was successful."
 
     return_val = {'result': op_ok,
                   'data':   op_data,
@@ -171,15 +171,15 @@ def save_gateway_configuration():
     Save current configuration to Cloud.
     """
     return_val = {'result': False,
-                  'code':   '001',
-                  'msg':    'config backup is fail!'}
+                  'code': 0x000000E1,
+                  'msg': 'Configuration backup failed.'}
     # yen, 2012/10/09. Remove outdated config files
     fileList = ['/etc/delta/gw_schedule.conf']
     
     swiftData = _get_Swift_credential()
     if swiftData[0] is None:
-        return_val['code'] = '000'
-        return_val['msg'] = 'There is no [config] container at Swift.'
+        return_val['code'] = 0x000000E2
+        return_val['msg'] = 'There is no configuration container.'
         return json.dumps(return_val)
     try:
         swiftObj = SwiftClient(swiftData[0], swiftData[1], swiftData[2])
@@ -196,15 +196,11 @@ def save_gateway_configuration():
         _delete_oldest_backup(5)    ## 5 is the number of copies for retain
         
         return_val = {'result'  : True,
-                      'code'    : '100',
+                      'code'    : 0x000000E3,
                       'data'    : {'backup_time': backuptime},
-                      'msg'     : 'config backup success'}
+                      'msg'     : 'Configuration backup was successful.'}
         return json.dumps(return_val)
     except BackupError as e:
-        return_val = {'result'  : False,
-                      'code'    : e.code,
-                      'data'    : None,
-                      'msg'     : e.msg}
         return json.dumps(return_val)
     except Exception as e:
         log.error('unexception error: %s' % e)
@@ -224,8 +220,8 @@ def restore_gateway_configuration():
 
     if backup_info is None:
         op_ok = False
-        op_code = "000"
-        op_msg = "There is no [config] container at Swift."
+        op_code = 0x000000D1
+        op_msg = "There is no configuration container."
     else:
         fname = backup_info['fname']
         [url, login, password] = _get_Swift_credential()
@@ -264,12 +260,12 @@ def restore_gateway_configuration():
             api.restart_smb_service()
 
             op_ok = True
-            op_code = "100"
-            op_msg = None
+            op_code = 0x000000D3
+            op_msg = "Restoring configuration files was successful."
         # ^^^ 3. parse metadata. (where should config files be put to)
         except:
             op_ok = False
-            op_code = "001"
+            op_code = 0x000000D2
             op_msg = "Errors occurred when restoring configuration files."
 
     #~ end of if-else
