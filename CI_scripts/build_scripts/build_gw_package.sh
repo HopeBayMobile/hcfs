@@ -103,7 +103,7 @@ fi
     
 # upload DEB files to APT server
 	# FIXME - currently is saved to a directory
-	DEBSAVE="/tmp/deb_archive/"$GW_VERSION"_"$BUILDNUM
+	DEBSAVE="/root/deb_archive/"$GW_VERSION"_"$BUILDNUM
 	mkdir -p $DEBSAVE
     mv StorageAppliance/s3ql*.deb $DEBSAVE
     mv dcloudgatewayapi*.deb $DEBSAVE
