@@ -1286,7 +1286,7 @@ def _undo_umount():
     # note: we can't use os.path.ismount to check a binded folder
     ret_code, output = _run_subprocess("sudo mount | grep /COSASTORAGE/ALFRESCO")
     if ret_code:
-        bind_path = '/storage/COSA/ALFRESCO /COSASTORAGE/ALFRESCO'
+        bind_path = '/mnt/cloudgwfiles/COSA /COSASTORAGE/ALFRESCO'
         ret_code, output = _run_subprocess("sudo mount -o bind %s" % bind_path)
         if ret_code:
             log.error('Unable to bind %s: %s' % (bind_path, output))
