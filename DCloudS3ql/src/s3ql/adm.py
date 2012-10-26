@@ -345,9 +345,21 @@ def upgrade(bucket, cachepath):
         return obj_fh
 
     log.info("Compressing and uploading metadata...")
-    bucket.store('s3ql_seq_no_%d' % param['seq_no'], 'Empty')
-    obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=param,
+    # Jiahong Wu (10/24/12): Added network fail mechanism
+    try:
+        bucket.store('s3ql_seq_no_%d' % param['seq_no'], 'Empty')
+        obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=param,
                                   is_compressed=True)
+    except Exception as e:
+        log,error(str(e))
+        param['needs_fsck'] = True
+        pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
+
+        db.execute('ANALYZE')
+        db.execute('VACUUM')
+
+        raise QuietError('Cannot connect to the backend. Metadata is only saved to local.')
+    
     log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
     pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
 

@@ -1314,8 +1314,21 @@ def main(args=None):
         return obj_fh
 
     log.info("Compressing and uploading metadata...")
-    obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=param,
+    # Jiahong Wu (10/24/12): Added aborting mechanism
+    try:
+        obj_fh = bucket.perform_write(do_write, "s3ql_metadata", metadata=param,
                                   is_compressed=True)
+    except Exception as e:
+        log,error(str(e))
+        param['needs_fsck'] = True
+        pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
+
+        db.execute('ANALYZE')
+        db.execute('VACUUM')
+        db.close()
+
+        raise QuietError('Cannot connect to the backend. Metadata is only saved to local.')
+    
     log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
     pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
 

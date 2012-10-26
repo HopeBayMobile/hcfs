@@ -1,8 +1,16 @@
-#!/bin/bash
+#!/bin/bash -x
 
 
 echo "===start check raid1!"
 echo "===check which disk is new!"
+
+sda=`dmesg | grep sda`
+sdb=`dmesg | grep sdb`
+if [ -z "$sda" ] || [ -z "$sdb" ]; then
+    echo "===No new disk!"
+    exit 0
+fi
+
 sda=`mdadm --detail /dev/md0 | grep sda`
 sdb=`mdadm --detail /dev/md0 | grep sdb`
 new_disk=""
@@ -22,15 +30,20 @@ fi
 
 echo "===new disk name is $new_disk!"
 echo "===do sfdisk partition rebuild!"
-sfdisk -d "$old_disk" > /tmp/partition
-sfdisk --force --no-reread "$new_disk" < /tmp/partition
+sfdisk -d "$old_disk" | sfdisk --force "$new_disk"
+echo "===dd MBR to $new_disk!"
+dd if=$old_disk of=$new_disk bs=2048 count=1
 echo "===write partprobe!"
 partprobe
-echo "unlink partition info file"
-unlink /tmp/partition
 echo "===do zero superblock to $new_disk!"
 mdadm --zero-superblock $new_disk"1"
 mdadm --zero-superblock $new_disk"2"
 echo "add $new_disk to md0 and md1"
 mdadm --add /dev/md0 $new_disk"1" 
-mdadm --add /dev/md1 $new_disk"2" 
+mdadm --add /dev/md1 $new_disk"2"
+echo "grub update"
+update-grub
+echo "grub install to $new_disk"
+grub-install --modules='biosdisk raid' --recheck "$new_disk"
+grub-install --modules='biosdisk raid' --recheck "$old_disk"
+echo 60000 > /proc/sys/dev/raid/speed_limit_min

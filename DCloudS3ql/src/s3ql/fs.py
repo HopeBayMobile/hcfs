@@ -31,6 +31,7 @@ log = logging.getLogger("fs")
 
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
+REFRESH_COUNT = 1080
 
 class Operations(llfuse.Operations):
     """A full-featured file system for online data storage
@@ -528,6 +529,10 @@ class Operations(llfuse.Operations):
                                                uid=inode.uid, gid=inode.gid,
                                                mtime=inode.mtime, atime=inode.atime,
                                                ctime=inode.ctime, rdev=inode.rdev)
+                        # wthung, 2012/10/24
+                        # update value cache
+                        self.cache.value_cache["inodes"] += 1
+                        self.cache.value_cache["fs_size"] += inode.size
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
@@ -555,6 +560,7 @@ class Operations(llfuse.Operations):
                     processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
+                    # wthung todo: need to investigate what the following sql command affects
                     db.execute('REPLACE INTO blocks (id, hash, refcount, size, obj_id) '
                                'SELECT id, hash, refcount+COUNT(id), size, obj_id '
                                'FROM inode_blocks JOIN blocks ON block_id = id '
@@ -568,6 +574,9 @@ class Operations(llfuse.Operations):
 
                 db.execute('INSERT INTO contents (name_id, inode, parent_inode) VALUES(?, ?, ?)',
                            (name_id, id_new, target_id))
+                # wthung, 2012/10/24
+                # update value cache
+                self.cache.value_cache["entries"] += 1
                 db.execute('UPDATE names SET refcount=refcount+1 WHERE id=?', (name_id,))
 
                 processed += 1
@@ -659,6 +668,12 @@ class Operations(llfuse.Operations):
         name_id = self._del_name(name)
         self.db.execute("DELETE FROM contents WHERE name_id=? AND parent_inode=?",
                         (name_id, id_p))
+        
+        # wthung, 2012/10/24
+        # update value cache
+        self.cache.value_cache["entries"] -= 1
+        self.cache.value_cache["fs_size"] -= self.inodes[id_].size
+        log.debug("fs size -%d" % self.inodes[id_].size)
 
         inode = self.inodes[id_]
         inode.refcount -= 1
@@ -682,6 +697,10 @@ class Operations(llfuse.Operations):
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
             del self.inodes[id_]
+            
+            # wthung, 2012/10/24
+            # update value cache
+            self.cache.value_cache["inodes"] -= 1
 
         log.debug('_remove(%d, %s): start', id_p, name)
 
@@ -802,6 +821,10 @@ class Operations(llfuse.Operations):
         name_id_old = self._del_name(name_old)
         self.db.execute('DELETE FROM contents WHERE name_id=? AND parent_inode=?',
                         (name_id_old, id_p_old))
+        
+        # wthung, 2012/10/24
+        # update value cache
+        self.cache.value_cache["entries"] -= 1
 
         inode_new = self.inodes[id_new]
         inode_new.refcount -= 1
@@ -827,6 +850,10 @@ class Operations(llfuse.Operations):
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_new,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_new,))
             del self.inodes[id_new]
+            
+            # wthung, 2012/10/24
+            # update value cache
+            self.cache.value_cache["inodes"] -= 1
 
 
     def link(self, id_, new_id_p, new_name):
@@ -856,6 +883,12 @@ class Operations(llfuse.Operations):
 
         self.db.execute("INSERT INTO contents (name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(new_name), id_, new_id_p))
+        # wthung, 2012/10/24
+        # update value cache
+        self.cache.value_cache["entries"] += 1
+        self.cache.value_cache["fs_size"] += self.inodes[id_].size
+        log.debug('link, fs size +%d' % self.inodes[id_].size)
+        
         inode = self.inodes[id_]
         inode.refcount += 1
         inode.ctime = timestamp
@@ -953,12 +986,33 @@ class Operations(llfuse.Operations):
         # Flush inode cache to get better estimate of total fs size
         self.inodes.flush()
 
-        entries = self.db.get_val("SELECT COUNT(rowid) FROM contents")
-        blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
-        inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
-        fs_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
-        dedup_size = self.db.get_val('SELECT SUM(size) FROM blocks') or 0
-        compr_size = self.db.get_val('SELECT SUM(size) FROM objects') or 0
+        # wthung, 2012/10/24
+        # Use refresh count to control the source of data
+        self.cache.refresh_count += 1
+        if self.cache.refresh_count > REFRESH_COUNT:
+            entries = self.db.get_val("SELECT COUNT(rowid) FROM contents")
+            blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
+            inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
+            fs_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
+            dedup_size = self.db.get_val('SELECT SUM(size) FROM blocks') or 0
+            compr_size = self.db.get_val('SELECT SUM(size) FROM objects') or 0
+
+            # update to value cache
+            self.cache.value_cache["entries"] = entries
+            self.cache.value_cache["blocks"] = blocks
+            self.cache.value_cache["inodes"] = inodes
+            self.cache.value_cache["fs_size"] = fs_size
+            self.cache.value_cache["dedup_size"] = dedup_size
+            self.cache.value_cache["compr_size"] = compr_size
+
+            self.cache.refresh_count = 0
+        else:
+            entries = self.cache.value_cache["entries"]
+            blocks = self.cache.value_cache["blocks"]
+            inodes = self.cache.value_cache["inodes"]
+            fs_size = self.cache.value_cache["fs_size"]
+            dedup_size = self.cache.value_cache["dedup_size"]
+            compr_size = self.cache.value_cache["compr_size"]
         
         entries = max(entries,0)
         blocks = max(blocks,0)
@@ -1005,9 +1059,24 @@ class Operations(llfuse.Operations):
         stat_ = llfuse.StatvfsData
 
         # Get number of blocks & inodes
-        blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
-        inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
-        size = self.db.get_val('SELECT SUM(size) FROM blocks')
+        # wthung, 2012/10/24
+        # Use refresh count to control the source of data
+        self.cache.refresh_count += 1
+        if self.cache.refresh_count > REFRESH_COUNT:
+            blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
+            inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
+            size = self.db.get_val('SELECT SUM(size) FROM blocks')
+
+            # update value cache
+            self.cache.value_cache["blocks"] = blocks
+            self.cache.value_cache["inodes"] = inodes
+            self.cache.value_cache["dedup_size"] = size
+
+            self.cache.refresh_count = 0
+        else:
+            blocks = self.cache.value_cache["blocks"]
+            inodes = self.cache.value_cache["inodes"]
+            size = self.cache.value_cache["dedup_size"]
 
         if size is None:
             size = 0
@@ -1016,6 +1085,8 @@ class Operations(llfuse.Operations):
         # be allocated. This doesn't make much sense for S3QL, so we just
         # return the average size of stored blocks.
         stat_.f_frsize = size // blocks if blocks != 0 else 4096
+        if stat_.f_frsize == 0:  # Jiahong: Extra error handling for ensuring that the f_frsize var won't be zero
+            stat_.f_frsize = 4096
 
         # This should actually be the "preferred block size for doing IO.  However, `df` incorrectly
         # interprets f_blocks, f_bfree and f_bavail in terms of f_bsize rather than f_frsize as it
@@ -1101,12 +1172,20 @@ class Operations(llfuse.Operations):
             inode = self.inodes.create_inode(mtime=timestamp, ctime=timestamp, atime=timestamp,
                                              uid=ctx.uid, gid=ctx.gid, mode=mode, refcount=1,
                                              rdev=rdev, size=size)
+            # wthung, 2012/10/24
+            # update value cache
+            self.cache.value_cache["inodes"] += 1
+            self.cache.value_cache["fs_size"] += size
+            log.debug("fs size +%d" % size)
         except OutOfInodesError:
             log.warn('Could not find a free inode')
             raise FUSEError(errno.ENOSPC)
 
         self.db.execute("INSERT INTO contents(name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(name), inode.id, id_p))
+        # wthung, 2012/10/24
+        # update value cache
+        self.cache.value_cache["entries"] += 1
 
         return inode
 
@@ -1200,6 +1279,9 @@ class Operations(llfuse.Operations):
         minsize = offset + total
         while buf:
             written = self._write(fh, offset, buf)
+            # wthung, 2012/10/24
+            # update value cache
+            self.cache.value_cache["fs_size"] += written
             offset += written
             buf = buf[written:]
 
@@ -1281,6 +1363,10 @@ class Operations(llfuse.Operations):
                     self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
                     self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
                     del self.inodes[id_]
+                    
+                    # wthung, 2012/10/24
+                    # update value cache
+                    self.cache.value_cache["inodes"] -= 1
 
 
     def fsyncdir(self, fh, datasync):

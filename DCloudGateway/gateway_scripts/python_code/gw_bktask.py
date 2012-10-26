@@ -93,22 +93,28 @@ def redirect_stream(system_stream, target_stream):
     Worker threads.
 '''
 
-#def thread_get_snapshot_status():
-#   # create a message queue to receive events
-#   mq = posix_ipc.MessageQueue('/bktask_mq', posix_ipc.O_CREAT)
-#   while not g_program_exit:
-#       try:
-#           # receive message by one second timeout
-#           (msg, priority) = mq.receive(1)
-#           if 'snapshot' in msg:
-#               os.system('touch /dev/shm/123')
-#       except:
-#           pass
-#
-#   # cleanup
-#   mq.close()
-#   mq.unlink()
-#   print 'snapshot thread exited'
+def thread_term_dhclient():
+    """
+    Worker thread to terminate dhclient process to avoid it to change our static IP
+    """
+    global g_program_exit
+    
+    while not g_program_exit:
+        ret_code, _ = api._run_subprocess('sudo ps aux | grep dhclient')
+        if not ret_code:
+            print 'detected dhclient'
+            # dhclient exists, terminate it
+            ret_code, _ = api._run_subprocess('sudo pkill -9 dhclient')
+            if not ret_code:
+                print('dhclient process has been terminated')
+            else:
+                print('Detected a dhclient process is running, but terminating it is failed')
+        
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(30):
+            time.sleep(1)
+            if g_program_exit:
+                break
 
 def thread_aptget():
     """
@@ -259,8 +265,9 @@ def start_background_tasks(singleloop=False):
     t2 = Thread(target=thread_aptget)
     t2.start()
 
-#    t2 = Thread(target=thread_get_snapshot_status)
-#    t2.start()
+    # create a thread to do terminate dhclient
+    t3 = Thread(target=thread_term_dhclient)
+    t3.start()
 
     while not g_program_exit:
         # get gateway indicators
