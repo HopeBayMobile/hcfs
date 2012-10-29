@@ -52,7 +52,8 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/interfaces /etc/network/interfaces
     cp -rf $SRCDIR/config/hosts.allow /etc
     cp -rf $SRCDIR/config/hosts.deny /etc
-    cp -rf $SRCDIR/config/exports /etc
+    #~ cp -rf $SRCDIR/config/exports /etc	#~ take out this for avoiding asking "keep local version"
+    cp -rf $SRCDIR/config/sysctl.conf /etc
     cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
     #cp -rf $SRCDIR/config/smb.orig $CONFDIR
     cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/

@@ -39,7 +39,7 @@ DscOverride: ../override/override.precise
 
 EOF
 
-mkdir -p
+mkdir -p /var/packages/ubuntu/override/
 touch /var/packages/ubuntu/override/override.natty
 touch /var/packages/ubuntu/override/override.precise
 
