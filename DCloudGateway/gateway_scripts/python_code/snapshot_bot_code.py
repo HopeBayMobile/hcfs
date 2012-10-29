@@ -340,7 +340,7 @@ def execute_take_snapshot():
             
             # check if src folder does exist
             if not os.path.exists(src_folder):
-                err_msg = "Snapshot: source folder doesn't exist"
+                err_msg = "Source folder for snapshot does not exist."
                 ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, 0, 0, 0, 0, False, err_msg)
                 response = json.loads(ret_val["response"])
                 if ret_val["code"] != 200 or response["statuscode"] != 200:
@@ -350,7 +350,7 @@ def execute_take_snapshot():
             
             # check if dest folder does not exist
             if os.path.exists(dest_folder):
-                err_msg = "Snapshot: destination folder does exist"
+                err_msg = "Destination folder for snapshot does not exist."
                 ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, 0, 0, 0, 0, False, err_msg)
                 response = json.loads(ret_val["response"])
                 if ret_val["code"] != 200 or response["statuscode"] != 200:
@@ -373,7 +373,7 @@ def execute_take_snapshot():
                     time.sleep(60)  # Wait one minute before retrying
                 else:
                     # s3qlcp failed
-                    err_msg = 'Unable to finish the current snapshotting process. Aborting.'
+                    err_msg = 'Unexpected errors occurred when taking snapshots. Aborting...'
                     log.error(err_msg)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     
@@ -389,7 +389,7 @@ def execute_take_snapshot():
                 # Record statistics for samba share
                 if not os.path.exists(snapshot_statistics):
                     # Statistics does not exists
-                    err_msg = 'Unable to read snapshot statistics. Do we have the latest S3QL?'
+                    err_msg = 'Reading snapshot statistics failed. Please make sure the latest S3QL version was installed.'
                     log.warning(err_msg)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     

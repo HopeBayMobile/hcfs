@@ -54,13 +54,13 @@ def get_gateway_version():
         ver = t[idx].replace('\n', '')
 
         op_ok = True
-        op_code = "100"
-        op_msg = None
+        op_code = 0xB
+        op_msg = "Getting software version was successful."
         version = ver
     except:
         op_ok = False
-        op_code = "000"
-        op_msg = "Cannot get software version."
+        op_code = 0x8015
+        op_msg = "Getting software version failed."
         version = ''
 
     return_val = {'result':  op_ok,
@@ -76,9 +76,9 @@ def get_available_upgrade():
     """
     Get the info. of latest upgrade/update.
     op_code defintion:
-        100:    Success and there is an update.
-        110:    Success and there is NO new update.
-        000:    Fail.
+        0x6:    Success and there is an update.
+        0x5:    Success and there is NO new update.
+        0x8012:    Fail.
     """
 
     res = ''
@@ -106,21 +106,21 @@ def get_available_upgrade():
 
         # if the result is '', it means no available update.
         if len(res) == 0:
-            op_code = "110"
-            op_msg = "There is no update."
+            op_code = 0x5
+            op_msg = "There is no newer update."
             version = None
             description = ''
         else:
             t = res.split(' ')
             ver = t[-1].replace('\n', '')
-            op_code = "100"
-            op_msg = None
+            op_code = 0x6
+            op_msg = "A newer update is available."
             version = ver
             description = ''
         # query for new updates
     except:
-        op_code = "000"
-        op_msg = "Failed to query new updates."
+        op_code = 0x8012
+        op_msg = "Querying new update failed."
         version = None
         description = None
 
@@ -139,10 +139,9 @@ def upgrade_gateway(enableReboot = True):
     """
     Upgrade gateway to the latest software version.
     op_code defintion:
-        100:    Success
-        001:    Fail, cannot run apt-get install.
-        002:    Fail, apt-get install occurs error.
-        003:    Fail, there is no new update.
+        0x16:    Success
+        0x8022:    Fail, cannot run apt-get install.
+        0x15:    Fail, there is no new update.
     """
     log.debug("Try to upgrade gateway")
     try:
@@ -163,8 +162,8 @@ def upgrade_gateway(enableReboot = True):
             # ^^^ upgrade gateway
             if a == 0:
                 op_ok = True
-                op_code = "100"
-                op_msg = None
+                op_code = 0x16
+                op_msg = "Updating to the latest gateway version was successful."
                 # ^^^ assign return value
                 log.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
@@ -176,18 +175,18 @@ def upgrade_gateway(enableReboot = True):
                     # ^^^ stop apache2 service 
             else:
                 op_ok = False
-                op_code = "002"
-                op_msg = _read_command_log("/tmp/log.txt")
+                op_code = 0x8022
+                op_msg = "Updating to the latest gateway version failed."
         else:
             op_ok = False
-            op_code = "003"
-            op_msg = "Gateway is already up to date."
+            op_code = 0x15
+            op_msg = "Gateway is already using the latest version."
             log.info("There is no new update detected when \
                         running upgrade_gateway()")
     except:
         op_ok = False
-        op_code = "001"
-        op_msg = "Failed to upgrade software."
+        op_code = 0x00000403
+        op_msg = "Updating to the latest gateway version failed."
 
     # do something here ...
 
