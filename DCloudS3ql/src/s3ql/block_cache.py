@@ -1019,6 +1019,10 @@ class BlockCache(object):
         for blockno in range(start_no, end_no):
             # We can't use self.mlock here to prevent simultaneous retrieval
             # of the block with get(), because this could deadlock
+            
+            # wthung, 2012/10/29, add a var to store el size
+            el_size = 0
+            
             if (inode, blockno) in self.entries:
                 log.debug('remove(inode=%d, blockno=%d): removing from cache',
                           inode, blockno)
@@ -1026,6 +1030,7 @@ class BlockCache(object):
                 # Type inference fails here
                 #pylint: disable-msg=E1103
                 el = self.entries.pop((inode, blockno))
+                el_size = el.size
 
                 self.size -= el.size
                 if el.dirty:
@@ -1041,6 +1046,8 @@ class BlockCache(object):
             try:
                 block_id = self.db.get_val('SELECT block_id FROM inode_blocks '
                                            'WHERE inode=? AND blockno=?', (inode, blockno))
+                if not el_size:
+                    el_size = self.db.get_val('SELECT size FROM blocks WHERE id=?', (block_id,))
             except NoSuchRowError:
                 log.debug('remove(inode=%d, blockno=%d): block not in db', inode, blockno)
                 continue
@@ -1065,7 +1072,7 @@ class BlockCache(object):
             self.db.execute('DELETE FROM blocks WHERE id=?', (block_id,))
             # wthung, 2012/10/24
             # update value cache
-            self.value_cache["dedup_size"] -= el.size
+            self.value_cache["dedup_size"] -= el_size
 
             # Decrease object refcount
             refcount = self.db.get_val('SELECT refcount FROM objects WHERE id=?', (obj_id,))
@@ -1087,7 +1094,7 @@ class BlockCache(object):
                     # wthung, 2012/10/24
                     # update value cache
                     self.value_cache["blocks"] -= 1
-                    self.value_cache["compr_size"] -= el.size
+                    self.value_cache["compr_size"] -= el_size
                     affect_rows -= 1
                 with lock_released:
                     if not self.removal_threads:
