@@ -161,17 +161,17 @@ def take_snapshot2():
     """
     log.debug('Started take_snapshot2')
     return_result = False
-    return_code = 0x00000101
+    return_code = 0x801B
     return_msg = 'Unexpected errors occurred when taking snapshots.'
 
     try:
         if _check_snapshot_in_progress():
-            return_code = 0x00000102
+            return_code = 0x801A
             return_msg = 'Another snapshot process is already in progress. Aborting...'
         else:
             _initialize_snapshot()
             return_result = True
-            return_code = 0x00000103
+            return_code = 0x12
             return_msg = 'Snapshot taking was completed.'
     except SnapshotError as Err:
         return_msg = str(Err)

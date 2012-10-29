@@ -329,7 +329,7 @@ def get_indicators():
     """
     
     op_ok = False
-    op_code = 0x00000061
+    op_code = 0x8014
     op_msg = 'Reading gateway indicators failed due to unexpected errors.'
     return_val = {
           'result' : op_ok,
@@ -365,7 +365,7 @@ def get_indicators():
             restart_smb_service()
 
         op_ok = True
-        op_code = 0x00000062
+        op_code = 0x8
         op_msg = "Reading gateway indicators was successful."
     
         return_val = {
@@ -416,7 +416,7 @@ def get_gateway_indicators():
     """
 
     op_ok = False
-    op_code = 0x00000061
+    op_code = 0x8014
     op_msg = 'Reading gateway indicators failed due to unexpected errors.'
 
     # Note: indicators and net speed are acuquired from different location
@@ -852,7 +852,7 @@ def get_storage_account():
     log.debug("get_storage_account start")
 
     op_ok = False
-    op_code = 0x000000B1
+    op_code = 0x8016
     op_msg = 'Reading storage account failed due to unexpected errors.'
     op_storage_url = ''
     op_account = ''
@@ -866,15 +866,15 @@ def get_storage_account():
         op_storage_url = op_config.get(section, 'storage-url').replace("swift://", "")
         op_account = op_config.get(section, 'backend-login')
         op_ok = True
-        op_code = 0x000000B2
+        op_code = 0xD
         op_msg = 'Obtaining storage account information was successful.'
 
     except IOError as e:
-        op_code = 0x000000B3
+        op_code = 0x8003
         op_msg = 'File access failed.'
         log.error(str(e))
     except Exception as e:
-        op_code = 0x000000B4
+        op_code = 0x8017
         op_msg = 'Obtaining storage url or login info failed.' 
         log.error(str(e))
 
@@ -911,7 +911,7 @@ def apply_storage_account(storage_url, account, password, test=True):
     log.debug("apply_storage_account start")
 
     op_ok = False
-    op_code = 0x00000011
+    op_code = 0x8002
     op_msg = 'Applying storage account failed due to unexpected errors.'
 
     if test:
@@ -950,11 +950,11 @@ def apply_storage_account(storage_url, account, password, test=True):
         _createS3qlConf(storage_url, user_container)
         
         op_ok = True
-        op_code = 0x00000012
+        op_code = 0x2
         op_msg = 'Applying storage account was successful.'
 
     except IOError as e:
-        op_code = 0x00000013
+        op_code = 0x8003
         op_msg = 'File access failed.'
         log.error(str(e))
     except Exception as e:
@@ -987,19 +987,19 @@ def apply_user_enc_key(old_key=None, new_key=None):
     log.debug("apply_user_enc_key start")
 
     op_ok = False
-    op_code = 0x00000021
+    op_code = 0x800B
     op_msg = 'Changing encryption key failed due to unexpected errors.'
 
     try:
         #Check if the new key is of valid format
         if not common.isValidEncKey(new_key):
-            op_code = 0x00000022
+            op_code = 0x8004
             op_msg = "The encryption key must be an alphanumeric string of length between 6 and 20."
             raise Exception(op_msg)
     
         op_config = ConfigParser.ConfigParser()
         if not os.path.exists('/root/.s3ql/authinfo2'):
-            op_code = 0x00000023
+            op_code = 0x8005
             op_msg = "File finding failed."
             raise Exception(op_msg)
 
@@ -1008,21 +1008,21 @@ def apply_user_enc_key(old_key=None, new_key=None):
 
         section = "CloudStorageGateway"
         if not op_config.has_section(section):
-            op_code = 0x00000024
+            op_code = 0x8006
             op_msg = "Section could not be found."
             raise Exception(op_msg)
     
         #TODO: deal with the case where the key stored in /root/.s3ql/authoinfo2 is Wrong
         key = op_config.get(section, 'bucket-passphrase')
         if key != old_key:
-            op_code = 0x00000025
+            op_code = 0x8007
             op_msg = "The old key is not correct."
             raise Exception(op_msg)
         # get user account
         account = op_config.get(section, 'backend-login')
         user_container = _get_user_container_name(account)
         if not user_container:
-            op_code = 0x00000026
+            op_code = 0x8008
             op_msg = "Errors occurred when getting user container name."
             raise Exception(op_msg)
     
@@ -1034,10 +1034,10 @@ def apply_user_enc_key(old_key=None, new_key=None):
         (stdout, stderr) = po.communicate(new_key)
         if po.returncode != 0:
             if stdout.find("Wrong bucket passphrase") != -1:
-                op_code = 0x00000027
+                op_code = 0x8009
                 op_msg = "The old key stored in the authentication file is not correct."
             else:
-                op_code = 0x00000028
+                op_code = 0x800A
                 op_msg = "Changing encryption key failed."
                 log.error(stdout)
             raise Exception(op_msg)
@@ -1047,21 +1047,21 @@ def apply_user_enc_key(old_key=None, new_key=None):
             op_config.write(op_fh)
         
         op_ok = True
-        op_code = 0x00000029
+        op_code = 0x3
         op_msg = 'Applying new user encryption key was successful.'
 
     except IOError as e:
-        op_code = 0x0000002A
+        op_code = 0x800C
         op_msg = 'Authentication file access failed.'
         log.error(str(e))
     except UmountError as e:
-        op_code = 0x0000002B
+        op_code = 0x800D
         op_msg = "Unmounting failed."
         log.error(str(e))
         # undo the umount process
         _undo_umount()
     except common.TimeoutError as e:
-        op_code = 0x0000002C
+        op_code = 0x800E
         op_msg = "Unmounting failed due to time out."
     except Exception as e:
         log.error(str(e))
@@ -1585,7 +1585,7 @@ def build_gateway(user_key):
     log.debug("Gateway building")
 
     op_ok = False
-    op_code = 0x00000031
+    op_code = 0x8011
     op_msg = 'Applying storage accounts failed due to unexpected errors.'
 
     try:
@@ -1595,11 +1595,11 @@ def build_gateway(user_key):
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
         if os.path.ismount(mountpoint):
-            op_code = 0x00000032
+            op_code = 0x800F
             raise BuildGWError("A file system was already mounted.")
 
         if not common.isValidEncKey(user_key):
-            op_code = 0x00000033
+            op_code = 0x8004
             op_msg = "The encryption key must be an alphanumeric string of length between 6 and 20."
             raise BuildGWError(op_msg)
 
@@ -1649,14 +1649,14 @@ def build_gateway(user_key):
         os.system("/usr/bin/python /etc/delta/gw_bktask.py")
      
         op_ok = True
-        op_code = 0x00000036
+        op_code = 0x4
         op_msg = 'Building gateway was successful.'
 
     except common.TimeoutError:
-        op_code = 0x00000034
+        op_code = 0x8010
         op_msg = "Building gateway failed due to time out." 
     except IOError as e:
-        op_code = 0x00000035
+        op_code = 0x8003
         op_msg = 'File access failed.'
     except EncKeyError as e:
         op_msg = str(e)
@@ -1833,7 +1833,7 @@ def reset_gateway():
 
     return_val = {'result': True,
                   'msg': "Restarting the gateway was successful.",
-                  'code': 0x000000C1,
+                  'code': 0xE,
                   'data': {}}
     
     try:
@@ -1865,7 +1865,7 @@ def shutdown_gateway():
     
     return_val = {'result': True,
                   'msg': "Shutting down the gateway was successful.",
-                  'code': 0x000000F1,
+                  'code': 0x11,
                   'data': {}}
 
     try:
@@ -1933,17 +1933,17 @@ def test_storage_account(storage_url, account, password):
     log.debug("test_storage_account start")
 
     op_ok = False
-    op_code = 0x00000301
+    op_code = 0x8020
     op_msg = 'Testing storage account failed due to unexpected errors.'
 
     try:
         _test_storage_account(storage_url=storage_url, account=account, password=password)
         op_ok = True
-        op_code = 0x00000302
+        op_code = 0x14
         op_msg = 'Testing storage account was successful.'
         
     except common.TimeoutError:
-        op_code = 0x00000303
+        op_code = 0x8021
         op_msg = "Testing storage account failed due to time out." 
         log.error(op_msg)
     except TestStorageError as e:
@@ -2359,7 +2359,7 @@ def get_scheduling_rules():        # by Yen
         return_val = {
             'result': False,
             'msg': "Opening or writing failed.",
-            'code': 0x000000A1,
+            'code': 0x8001,
             'data': []
         }
         return json.dumps(return_val)
@@ -2367,7 +2367,7 @@ def get_scheduling_rules():        # by Yen
     return_val = {
     'result': True,
     'msg': "Bandwidth throttling schedule was read successfully.",
-    'code': 0x000000A2,
+    'code': 0xC,
     'data': schedule
     }
     
@@ -2759,7 +2759,7 @@ def apply_scheduling_rules(schedule):        # by Yen
         return_val = {
             'result': True,
             'msg': "Rules of bandwidth schedule were saved successfully.",
-            'code': 0x00000001,
+            'code': 0x1,
             'data': {}
         }
         # yen, 2012/10/09.
@@ -2770,7 +2770,7 @@ def apply_scheduling_rules(schedule):        # by Yen
         return_val = {
             'result': False,
             'msg': "Opening or writing failed.",
-            'code': 0x00000002,
+            'code': 0x8001,
             'data': []
         }
         return json.dumps(return_val)
@@ -3311,7 +3311,7 @@ def get_gateway_status():
 
     ret_val = {"result" : True,
                "msg" : "Getting gateway log and status was successful.",
-               'code': 0x00000071,
+               'code': 0x9,
                "data" : { "error_log" : [],
                        "cloud_storage_usage" : 0,
                        "gateway_cache_usage" : 0,
@@ -3370,7 +3370,7 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
 
     ret_val = {"result" : True,
                "msg": "Getting gateway system log was successful.",
-               "code": 0x00000081,
+               "code": 0xA,
                "data": {"error_log": [],
                          "warning_log": [],
                          "info_log": []
