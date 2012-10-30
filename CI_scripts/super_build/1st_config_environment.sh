@@ -16,5 +16,11 @@ echo "configure git to use proxy. E.g."
 echo "sudo git config --global http.proxy http://<delta-user>:<delta-pass>@172.16.64.60:8080"
 echo "***************************"
 
+# manually install s3ql
+echo "***************************"
+echo "You have to manually install s3ql first."
+echo "You can use a recent build gw_xxx.tar on our FTP."
+echo "***************************"
+
 
 
