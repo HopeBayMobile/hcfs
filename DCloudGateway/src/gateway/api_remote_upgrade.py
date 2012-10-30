@@ -151,6 +151,23 @@ def upgrade_gateway(enableReboot = True):
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
+			#~ download DEB files to cache
+            cmd = "sudo apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox"
+            a = os.system(cmd)
+			apt_cache_dir = "/var/cache/apt/archives"
+            cmd = "mv *.deb %s" % (apt_cache_dir)
+            a = os.system(cmd)            
+			#~ Update "apt-get" index   #-- Ovid Wu <ovid.wu@delta.com.tw> Mon, 06 Aug 2012 06:18:03 +0000
+			cmd = "dpkg-scanpackages %s > %s/Packages" % (apt_cache_dir, apt_cache_dir)
+            a = os.system(cmd)
+			cmd = "gzip -f %s/Packages" % (apt_cache_dir)
+            a = os.system(cmd)
+			cmd = "apt-get update"
+            a = os.system(cmd)			
+			#~ write start upgrade flag; this should be after local cache is downloaded
+			cmd = "echo 'upgrading' > /root/upgrading.flag"
+			a = os.system(cmd)
+			#~ upgrade gateway
             cmd = "sudo apt-get -u install -y --force-yes dcloud-gateway 2> /tmp/log.txt"
             a = os.system(cmd)
             cmd = "sudo apt-get -u install -y --force-yes dcloudgatewayapi"
@@ -159,7 +176,7 @@ def upgrade_gateway(enableReboot = True):
             os.system(cmd)
             cmd = "sudo apt-get -u install -y --force-yes savebox"
             os.system(cmd)
-            # ^^^ upgrade gateway
+            #~ check result
             if a == 0:
                 op_ok = True
                 op_code = 0x16
@@ -167,6 +184,9 @@ def upgrade_gateway(enableReboot = True):
                 # ^^^ assign return value
                 log.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
+				cmd = "rm /root/upgrading.flag"		# clear upgrade flag
+				a = os.system(cmd)
+				#~ if reboot is allowed
                 if enableReboot == True:
                     #~ api.reset_gateway()
                     os.system("sudo sync;  sudo shutdown -r now")
@@ -177,6 +197,7 @@ def upgrade_gateway(enableReboot = True):
                 op_ok = False
                 op_code = 0x8022
                 op_msg = "Updating to the latest gateway version failed."
+                log.info("Updating to the latest gateway version %s failed." % (new_ver) )
         else:
             op_ok = False
             op_code = 0x15
@@ -186,7 +207,7 @@ def upgrade_gateway(enableReboot = True):
     except:
         op_ok = False
         op_code = 0x00000403
-        op_msg = "Updating to the latest gateway version failed."
+        log.info("Updating to the latest gateway version %s failed." % (new_ver) )
 
     # do something here ...
 

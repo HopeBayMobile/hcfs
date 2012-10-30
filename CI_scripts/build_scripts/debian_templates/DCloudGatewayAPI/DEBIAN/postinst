@@ -71,6 +71,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
+    cp -rf $SRCDIR/gateway_scripts/upgrade_failover.conf /etc/init/  # Yen added at 2012/10/29
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
 
