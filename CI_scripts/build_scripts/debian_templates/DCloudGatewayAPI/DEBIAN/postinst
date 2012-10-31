@@ -14,7 +14,7 @@ echo "        ***** append APT-server to /etc/apt/sources.list.d/ *****"
 cat >/etc/apt/sources.list.d/delta-server-precise.list <<EOF
 deb http://apt.delcloudia.com/packages/ubuntu/ precise main
 deb-src http://apt.delcloudia.com/packages/ubuntu precise main
-deb file:// /var/cache/apt/archives
+deb file:// /var/cache/apt/archives/
 EOF
 
 ### 2. setup config file
@@ -72,7 +72,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
     cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/upgrade_failover.conf /etc/init/  # Yen added at 2012/10/29
+    cp -rf $SRCDIR/gateway_scripts/S05upgrade_failover /etc/rc2.d/  # Yen added at 2012/10/29
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
 
