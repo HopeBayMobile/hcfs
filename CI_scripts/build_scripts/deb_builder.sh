@@ -82,7 +82,7 @@ Priority: optional
 Package: dcloud-gateway
 Version: $GW_VERSION.$BUILD
 Maintainer: CDS Team <ctbd@delta.com.tw>
-Depends: curl, tofrodos, savebox, nfs-kernel-server, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
+Depends: nfs-kernel-server, curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
 Architecture: amd64
 Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
 EOF
