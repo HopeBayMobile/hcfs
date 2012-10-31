@@ -1,10 +1,10 @@
 #!/bin/sh -e
 
 /etc/delta/update_bandwidth
-#/etc/init.d/smbd restart
-#/etc/init.d/nmbd restart
+/etc/init.d/smbd restart
+/etc/init.d/nmbd restart
 /etc/init.d/nfs-kernel-server start
 #/etc/init.d/apache2 restart
 #/etc/init.d/celeryd restart
 /etc/delta/snapshot_check
-mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba/
+#mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba/
