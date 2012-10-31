@@ -989,6 +989,25 @@ def apply_user_enc_key(old_key=None, new_key=None):
     op_ok = False
     op_code = 0x800B
     op_msg = 'Changing encryption key failed due to unexpected errors.'
+    
+    def do_change_passphrase():
+        storage_url = op_config.get(section, 'storage-url')
+        cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/%s/delta" % (storage_url, user_container)
+        po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        (stdout, stderr) = po.communicate(new_key)
+        if po.returncode != 0:
+            if stdout.find("Wrong bucket passphrase") != -1:
+                op_code = 0x8009
+                op_msg = "The old key stored in the authentication file is not correct."
+            else:
+                op_code = 0x800A
+                op_msg = "Changing encryption key failed."
+                log.error(stdout)
+            raise Exception(op_msg)
+        
+        op_config.set(section, 'bucket-passphrase', new_key)
+        with open('/root/.s3ql/authinfo2', 'wb') as op_fh:
+            op_config.write(op_fh)
 
     try:
         #Check if the new key is of valid format
@@ -1027,24 +1046,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
             raise Exception(op_msg)
     
         _umount()
-    
-        storage_url = op_config.get(section, 'storage-url')
-        cmd = "sudo python /usr/local/bin/s3qladm --cachedir /root/.s3ql passphrase %s/%s/delta" % (storage_url, user_container)
-        po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        (stdout, stderr) = po.communicate(new_key)
-        if po.returncode != 0:
-            if stdout.find("Wrong bucket passphrase") != -1:
-                op_code = 0x8009
-                op_msg = "The old key stored in the authentication file is not correct."
-            else:
-                op_code = 0x800A
-                op_msg = "Changing encryption key failed."
-                log.error(stdout)
-            raise Exception(op_msg)
-        
-        op_config.set(section, 'bucket-passphrase', new_key)
-        with open('/root/.s3ql/authinfo2', 'wb') as op_fh:
-            op_config.write(op_fh)
+        do_change_passphrase()
         
         op_ok = True
         op_code = 0x3
@@ -1063,6 +1065,10 @@ def apply_user_enc_key(old_key=None, new_key=None):
     except common.TimeoutError as e:
         op_code = 0x800E
         op_msg = "Unmounting failed due to time out."
+        # force to kill umount process
+        _run_subprocess('pkill -9 umount.s3ql')
+        # change passphrase
+        do_change_passphrase()
     except Exception as e:
         log.error(str(e))
     finally:
