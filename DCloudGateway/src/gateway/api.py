@@ -295,7 +295,7 @@ def _check_s3ql():
                         time.sleep(1)
                 else:
                     output = po.stdout.read()
-                    if output.find("/mnt/cloudgwfiles") != -1 and output.find("/mnt/nfssamba") != -1:
+                    if output.find("/mnt/cloudgwfiles") != -1:
                         return True
                     break
     except:
@@ -1312,7 +1312,6 @@ def _undo_umount():
     Note:
         - Mount COSA related folders
         - Start NFS
-        - Mount /mnt/nfssamba
         - Start NetBIOS
         - Start Samba
     """
@@ -1331,12 +1330,6 @@ def _undo_umount():
     ret_code, output = _run_subprocess("sudo /etc/init.d/nfs-kernel-server restart")
     if ret_code:
         log.error('Unable to start NFS service: %s' % output)
-    
-    # mount nfs mount point if necessary
-    if not os.path.ismount('/mnt/nfssamba'):
-        ret_code, output = _run_subprocess("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
-        if ret_code:
-            log.error('Unable to mount /mnt/nfssamba: %s' % output)
     
     # start nmbd
     ret_code, output = _run_subprocess("sudo /etc/init.d/nmbd restart")
@@ -1385,12 +1378,6 @@ def _umount():
 
             # stop nmbd
             ret_code, output = _run_subprocess("sudo /etc/init.d/nmbd stop")
-            if ret_code:
-                raise UmountError(output)
-            
-            # wthung, 2012/8/1
-            # umount /mnt/nfssamba            
-            ret_code, output = _run_subprocess("sudo umount /mnt/nfssamba")
             if ret_code:
                 raise UmountError(output)
             
@@ -1472,15 +1459,6 @@ def _mount(storage_url, container):
 
         #mkdir in the mountpoint for nfs share
         cmd = "sudo mkdir -p %s/nfsshare" % mountpoint
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-        if po.returncode != 0:
-            raise BuildGWError(output)
-        
-        # wthung, 2012/7/30
-        # create /mnt/nfssamba
-        cmd = "sudo mkdir -p /mnt/nfssamba"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = po.stdout.read()
         po.wait()
@@ -1635,9 +1613,8 @@ def build_gateway(user_key):
             # restore configuration from cloud
             api_restore_conf.restore_gateway_configuration()
         
-        # restart nfs and mount /mnt/nfssamba
+        # restart nfs
         restart_service("nfs-kernel-server")
-        os.system("sudo mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba")
 
         set_smb_user_list(default_user_id, default_user_pwd)
         restart_service("smbd")
