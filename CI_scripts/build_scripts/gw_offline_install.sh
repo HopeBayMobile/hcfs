@@ -62,18 +62,19 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     echo "        ***** apt-get install dcloud-gateway *****"
     apt-get install -y --force-yes dcloud-gateway
     check_ok
-    apt-get -y --force-yes -f install
 
 # patch Ubuntu12.04 kernel, fuse and samba 3.6.6
 cd /tmp/GatewayPatches/
 # install samba 3.6.6
 echo "        ***** Install Samba patches *****"
+apt-get -y --force-yes -f install
 ./install-samba.sh
 # install kernel and fuse patches
-echo "        ***** Install kernel and fuse patches *****"
-./install-u1204.sh
+#~ echo "        ***** Install kernel and fuse patches *****"
+#~ ./install-u1204.sh
 # install ldap and ldap-samba for SaveBox
 echo "        ***** ldap and ldap-samba patches *****"
+apt-get -y --force-yes -f install
 cd /tmp/GatewayPatches/install_ldap
 ./Install_ldap_samba.sh
 
@@ -81,8 +82,8 @@ cd /tmp/GatewayPatches/install_ldap
     cd $INITPATH
     #~ rm -r StorageAppliance
     rm gw_offline_install.sh
-    apt-get clean
-    apt-get autoclean
+    #~ apt-get clean
+    #~ apt-get autoclean
     apt-get autoremove
     rm -r /usr/share/doc /usr/src /tmp/GatewayPatches/
     rm /etc/apt/sources.list.d/apt-cache.list
