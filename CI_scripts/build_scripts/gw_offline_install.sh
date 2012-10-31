@@ -69,12 +69,17 @@ cd /tmp/GatewayPatches/
 echo "        ***** Install Samba patches *****"
 apt-get -y --force-yes -f install
 ./install-samba.sh
+
 # install kernel and fuse patches
 #~ echo "        ***** Install kernel and fuse patches *****"
 #~ ./install-u1204.sh
+
 # install ldap and ldap-samba for SaveBox
 echo "        ***** ldap and ldap-samba patches *****"
-apt-get -y --force-yes -f install
+## FIX ME - why dependency error here?
+rm /etc/init/nmbd.conf /etc/init/smbd.conf  # avoid system asking keep local version
+apt-get -y --force-yes -f install   
+## FIX ME - why dependency error here?
 cd /tmp/GatewayPatches/install_ldap
 ./Install_ldap_samba.sh
 
