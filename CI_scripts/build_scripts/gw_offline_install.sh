@@ -77,11 +77,17 @@ apt-get -y --force-yes -f install
 # install ldap and ldap-samba for SaveBox
 echo "        ***** ldap and ldap-samba patches *****"
 ## FIX ME - why dependency error here?
-rm /etc/init/nmbd.conf /etc/init/smbd.conf  # avoid system asking keep local version
+# avoid system asking keep local version
+mv /etc/init/nmbd.conf /tmp/
+mv /etc/init/smbd.conf /tmp/
 apt-get -y --force-yes -f install   
 ## FIX ME - why dependency error here?
 cd /tmp/GatewayPatches/install_ldap
 ./Install_ldap_samba.sh
+## FIX ME - move back config files
+mv /tmp/nmbd.conf /etc/init/
+mv /tmp/smbd.conf /etc/init/
+## FIX ME - move back config files
 
 # clean up temp files to free up sda space.
     cd $INITPATH
