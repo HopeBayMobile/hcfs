@@ -29,7 +29,7 @@ def main():
 
         data_files=[ (CONFDIR, ['Gateway.ini']),
                              (ETCDIR, ['config/hosts.deny']),
-                             (ETCDIR, ['config/exports'])
+                             (ETCDIR, ['config/hosts.deny'])
                            ],
 
         test_suite='unittest',

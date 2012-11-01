@@ -350,13 +350,8 @@ def execute_take_snapshot():
             
             # check if dest folder does not exist
             if os.path.exists(dest_folder):
-                err_msg = "Destination folder for snapshot does not exist."
-                ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, 0, 0, 0, 0, False, err_msg)
-                response = json.loads(ret_val["response"])
-                if ret_val["code"] != 200 or response["statuscode"] != 200:
-                    log.error('Failed to report snapshot task status (id: %s)' % (sid))
-                time.sleep(3)
-                continue
+                # remove dest folder
+                os.system('sudo rm -rf %s' % dest_folder)
                     
             start_time = time.time()
 
