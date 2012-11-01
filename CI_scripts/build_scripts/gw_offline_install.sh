@@ -62,27 +62,39 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     echo "        ***** apt-get install dcloud-gateway *****"
     apt-get install -y --force-yes dcloud-gateway
     check_ok
-    apt-get -y --force-yes -f install
 
 # patch Ubuntu12.04 kernel, fuse and samba 3.6.6
 cd /tmp/GatewayPatches/
 # install samba 3.6.6
 echo "        ***** Install Samba patches *****"
+apt-get -y --force-yes -f install
 ./install-samba.sh
+
 # install kernel and fuse patches
-echo "        ***** Install kernel and fuse patches *****"
-./install-u1204.sh
+#~ echo "        ***** Install kernel and fuse patches *****"
+#~ ./install-u1204.sh
+
 # install ldap and ldap-samba for SaveBox
 echo "        ***** ldap and ldap-samba patches *****"
+## FIX ME - why dependency error here?
+# avoid system asking keep local version
+mv /etc/init/nmbd.conf /tmp/
+mv /etc/init/smbd.conf /tmp/
+apt-get -y --force-yes -f install   
+## FIX ME - why dependency error here?
 cd /tmp/GatewayPatches/install_ldap
 ./Install_ldap_samba.sh
+## FIX ME - move back config files
+mv /tmp/nmbd.conf /etc/init/
+mv /tmp/smbd.conf /etc/init/
+## FIX ME - move back config files
 
 # clean up temp files to free up sda space.
     cd $INITPATH
     #~ rm -r StorageAppliance
     rm gw_offline_install.sh
-    apt-get clean
-    apt-get autoclean
+    #~ apt-get clean
+    #~ apt-get autoclean
     apt-get autoremove
     rm -r /usr/share/doc /usr/src /tmp/GatewayPatches/
     rm /etc/apt/sources.list.d/apt-cache.list

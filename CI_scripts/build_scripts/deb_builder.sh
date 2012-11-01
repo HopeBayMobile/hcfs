@@ -51,13 +51,14 @@ check_ok() {
     # edit control file
 # 2012/10/17, take out nfs-kernel-server and samba for fixing prompt screen. (Yen)
 # 2012/10/19, WeiTang says nfs-kernel-server is not installed, thus install it back (Yen)
+# 2012/10/31, move the dependency of nfs-kernel-server to dcloud-gateway package (Yen)
 cat > /tmp/pkg_DCloudGatewayAPI/DEBIAN/control << EOF
 Package: dcloudgatewayapi
 Version: $GW_VERSION.$BUILD
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: python, python-setuptools, python-software-properties, nfs-kernel-server, curl, portmap, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
+Depends: python, python-setuptools, python-software-properties, curl, portmap, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
 Maintainer: CDS Team <ctbd@delta.com.tw>
 Description: Package for gateway API
 EOF
@@ -81,7 +82,7 @@ Priority: optional
 Package: dcloud-gateway
 Version: $GW_VERSION.$BUILD
 Maintainer: CDS Team <ctbd@delta.com.tw>
-Depends: curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
+Depends: nfs-kernel-server, curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
 Architecture: amd64
 Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
 EOF
