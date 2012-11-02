@@ -24,6 +24,8 @@ log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 # global flag to exit while safely
 g_program_exit = False
 g_prev_flushing = False
+g_prev_cache_full_log = False
+g_prev_entries_full_log = False
 
 ####################################################################
 '''
@@ -92,6 +94,47 @@ def redirect_stream(system_stream, target_stream):
 '''
     Worker threads.
 '''
+
+def thread_cache_usage():
+    """
+    Worker thread to monitor cache size/entries usage
+    """
+    global g_program_exit
+    global g_prev_cache_full_log
+    global g_prev_entries_full_log
+    
+    criteria_high = 99.9
+    criteria_low = 80.0
+    
+    while not g_program_exit:
+        usage = api._get_storage_capacity()
+        max_cache_size = usage['gateway_cache_usage']['max_cache_size']
+        max_entries = usage['gateway_cache_usage']['max_cache_entries']
+        cur_dirty_cache_size = usage['gateway_cache_usage']['dirty_cache_size']
+        cur_dirty_cache_entries = usage['gateway_cache_usage']['dirty_cache_entries']
+        
+        cache_percent = (float(cur_dirty_cache_size) / float(max_cache_size)) * 100
+        entries_percent = (float(cur_dirty_cache_entries) / float(max_entries)) * 100
+        
+        # check cache size
+        if cache_percent <= criteria_low:
+            g_prev_cache_full_log = False
+        elif cache_percent >= criteria_high and not g_prev_cache_full_log:
+            log.info('Full cache')
+            g_prev_cache_full_log = True
+
+        # check cache entries number
+        if entries_percent <= criteria_low:
+            g_prev_entries_full_log = False
+        elif entries_percent >= criteria_high and not g_prev_entries_full_log:
+            log.info('Full cache entries')
+            g_prev_entries_full_log = True
+    
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(20):
+            time.sleep(1)
+            if g_program_exit:
+                break
 
 def thread_term_dhclient():
     """
@@ -268,6 +311,10 @@ def start_background_tasks(singleloop=False):
     # create a thread to do terminate dhclient
     t3 = Thread(target=thread_term_dhclient)
     t3.start()
+    
+    # create a thread to do monitor dirty cache/entries usage
+    t4 = Thread(target=thread_cache_usage)
+    t4.start()
 
     while not g_program_exit:
         # get gateway indicators
