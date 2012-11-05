@@ -125,7 +125,7 @@ class CacheEntry(object):
     :pos: current position in file
     """
 
-    __slots__ = [ 'dirty', 'inode', 'blockno', 'last_upload',
+    __slots__ = [ 'dirty', 'inode', 'blockno', 'last_access',
                   'size', 'pos', 'fh', 'to_delete' ]
 
 #Jiahong: modified this function and allow the creation of cache entry from existing cache file
@@ -152,7 +152,7 @@ class CacheEntry(object):
 
         self.inode = inode
         self.blockno = blockno
-        self.last_upload = time.time()
+        self.last_access = time.time()
         self.pos = 0
         self.to_delete = False
         self.size = os.fstat(self.fh.fileno()).st_size
@@ -474,7 +474,7 @@ class BlockCache(object):
                         if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
                             self.forced_upload = False
                     el.dirty = False
-                    el.last_upload = time.time()
+                    #el.last_upload = time.time()
                 finally:
                     self.in_transit.remove(obj_id)
                     self.in_transit.remove((el.inode, el.blockno))
@@ -575,7 +575,7 @@ class BlockCache(object):
                         if self.dirty_entries < 0:
                             self.dirty_entries = 0
                     el.dirty = False
-                    el.last_upload = time.time()
+                    #el.last_upload = time.time()
                     self.in_transit.remove((el.inode, el.blockno))
                     return el.size
 
@@ -594,7 +594,7 @@ class BlockCache(object):
                         self.dirty_entries = 0
 
                 el.dirty = False
-                el.last_upload = time.time()
+                #el.last_upload = time.time()
                 self.in_transit.remove((el.inode, el.blockno))
         except:
             self.in_transit.remove((el.inode, el.blockno))
@@ -849,7 +849,7 @@ class BlockCache(object):
                 #log.debug('get(inode=%d, block=%d): in cache', inode, blockno)
                 self.entries.to_head((inode, blockno))
 
-        #el.last_access = time.time()
+        el.last_access = time.time()
         oldsize = el.size
         was_dirty = el.dirty
 

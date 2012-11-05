@@ -665,7 +665,8 @@ class CommitThread(Thread):
                     # Wait for one minute since last uploading the block to do it again
                     # TODO: consider new policy on when to upload the block. May need to delay doing
                     # TODO: so if the block or the file is being accessed (either read or write)
-                    if stamp - el.last_upload < 60:
+					# Jiahong (10/25/12): Change back to last_access, but now wait for 60 seconds
+                    if stamp - el.last_access < 60:
                         continue
 
                     # Jiahong: (5/7/12) delay upload process if network is down
