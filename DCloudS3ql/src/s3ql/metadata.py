@@ -35,7 +35,6 @@ DUMP_SPEC = [
                                ('size', INTEGER),
                                ('rdev', INTEGER),
                                ('locked', INTEGER),
-                               ('plocked', INTEGER),
                                ('refcount', INTEGER))),
 
              ('inode_blocks', 'inode, blockno',
@@ -138,8 +137,7 @@ def create_tables(conn):
         refcount  INT NOT NULL,
         size      INT NOT NULL DEFAULT 0,
         rdev      INT NOT NULL DEFAULT 0,
-        locked    BOOLEAN NOT NULL DEFAULT 0,
-        plocked   BOOLEAN NOT NULL DEFAULT 0
+        locked    BOOLEAN NOT NULL DEFAULT 0
     )""")
 
     # Further Blocks used by inode (blockno >= 1)
@@ -198,3 +196,13 @@ def create_tables(conn):
     CREATE VIEW ext_attributes_v AS
     SELECT * FROM ext_attributes JOIN names ON names.id = name_id
     """)
+    
+    # create indices for speeding up queries (2012/11/06 added by Yen)
+    conn.execute("""CREATE INDEX inodes_idx ON inodes (id)""")
+    conn.execute("""CREATE INDEX blocks_idx ON blocks (id, hash)""")
+    conn.execute("""CREATE INDEX objects_idx ON objects (id)""")
+    conn.execute("""CREATE INDEX contents_idx ON contents (inode, parent_inode)""")
+    conn.execute("""CREATE INDEX symlink_targets_idx ON symlink_targets (inode)""")
+    conn.execute("""CREATE INDEX ext_attributes_idx ON ext_attributes (inode)""")
+    conn.execute("""CREATE INDEX names_idx ON names (id, name)""")
+    conn.execute("""CREATE INDEX inode_blocks_idx ON inode_blocks (inode, blockno)""")

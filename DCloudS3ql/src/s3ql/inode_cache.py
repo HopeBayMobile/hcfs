@@ -16,10 +16,10 @@ log = logging.getLogger('inode_cache')
 
 CACHE_SIZE = 100
 ATTRIBUTES = ('mode', 'refcount', 'uid', 'gid', 'size', 'locked',
-              'rdev', 'atime', 'mtime', 'ctime', 'id', 'plocked')
+              'rdev', 'atime', 'mtime', 'ctime', 'id')
 ATTRIBUTE_STR = ', '.join(ATTRIBUTES)
 UPDATE_ATTRS = ('mode', 'refcount', 'uid', 'gid', 'size', 'locked',
-              'rdev', 'atime', 'mtime', 'ctime', 'plocked')
+              'rdev', 'atime', 'mtime', 'ctime')
 UPDATE_STR = ', '.join('%s=?' % x for x in UPDATE_ATTRS)
 
 MAX_INODE = 2 ** 32 - 1
