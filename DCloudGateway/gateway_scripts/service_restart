@@ -6,5 +6,5 @@
 /etc/init.d/nfs-kernel-server start
 #/etc/init.d/apache2 restart
 #/etc/init.d/celeryd restart
-/etc/delta/snapshot_check
+#/etc/delta/snapshot_check
 #mount -t nfs 127.0.0.1:/mnt/cloudgwfiles/sambashare/ /mnt/nfssamba/
