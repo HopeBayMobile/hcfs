@@ -180,7 +180,7 @@ def upgrade_gateway(enableReboot = True):
             if a == 0:
                 op_ok = True
                 op_code = 0x16
-                op_msg = "Updating to the latest gateway version was successful."
+                op_msg = "Updating to the latest SAVEBOX version was successful."
                 # ^^^ assign return value
                 log.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
@@ -196,12 +196,12 @@ def upgrade_gateway(enableReboot = True):
             else:
                 op_ok = False
                 op_code = 0x8022
-                op_msg = "Updating to the latest gateway version failed."
+                op_msg = "Updating to the latest SAVEBOX version failed."
                 log.info("Updating to the latest gateway version %s failed." % (new_ver) )
         else:
             op_ok = False
             op_code = 0x15
-            op_msg = "Gateway is already using the latest version."
+            op_msg = "SAVEBOX is already using the latest version."
             log.info("There is no new update detected when \
                         running upgrade_gateway()")
     except:

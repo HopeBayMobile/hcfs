@@ -330,7 +330,7 @@ def get_indicators():
     
     op_ok = False
     op_code = 0x8014
-    op_msg = 'Reading gateway indicators failed due to unexpected errors.'
+    op_msg = 'Reading SAVEBOX indicators failed due to unexpected errors.'
     return_val = {
           'result' : op_ok,
           'msg'    : op_msg,
@@ -366,7 +366,7 @@ def get_indicators():
 
         op_ok = True
         op_code = 0x8
-        op_msg = "Reading gateway indicators was successful."
+        op_msg = "Reading SAVEBOX indicators was successful."
     
         return_val = {
               'result' : op_ok,
@@ -417,7 +417,7 @@ def get_gateway_indicators():
 
     op_ok = False
     op_code = 0x8014
-    op_msg = 'Reading gateway indicators failed due to unexpected errors.'
+    op_msg = 'Reading SAVEBOX indicators failed due to unexpected errors.'
 
     # Note: indicators and net speed are acuquired from different location
     #       don't mess them up
@@ -1633,11 +1633,11 @@ def build_gateway(user_key):
      
         op_ok = True
         op_code = 0x4
-        op_msg = 'Building gateway was successful.'
+        op_msg = 'Building SAVEBOX was successful.'
 
     except common.TimeoutError:
         op_code = 0x8010
-        op_msg = "Building gateway failed due to time out." 
+        op_msg = "Building SAVEBOX failed due to time out."
     except IOError as e:
         op_code = 0x8003
         op_msg = 'File access failed.'
@@ -1815,7 +1815,7 @@ def reset_gateway():
     log.debug("Gateway restarting")
 
     return_val = {'result': True,
-                  'msg': "Restarting the gateway was successful.",
+                  'msg': "Restarting SAVEBOX was successful.",
                   'code': 0xE,
                   'data': {}}
     
@@ -1847,7 +1847,7 @@ def shutdown_gateway():
     log.debug("Gateway shutdowning")
     
     return_val = {'result': True,
-                  'msg': "Shutting down the gateway was successful.",
+                  'msg': "Shutting down SAVEBOX was successful.",
                   'code': 0x11,
                   'data': {}}
 
@@ -3293,7 +3293,7 @@ def get_gateway_status():
     """
 
     ret_val = {"result" : True,
-               "msg" : "Getting gateway log and status was successful.",
+               "msg" : "Getting SAVEBOX log and status was successful.",
                'code': 0x9,
                "data" : { "error_log" : [],
                        "cloud_storage_usage" : 0,
@@ -3352,7 +3352,7 @@ def get_gateway_system_log(log_level, number_of_msg, category_mask):
     """
 
     ret_val = {"result" : True,
-               "msg": "Getting gateway system log was successful.",
+               "msg": "Getting SAVEBOX system log was successful.",
                "code": 0xA,
                "data": {"error_log": [],
                          "warning_log": [],
