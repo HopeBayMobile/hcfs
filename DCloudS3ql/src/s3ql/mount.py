@@ -550,7 +550,8 @@ class MetadataUploadThread(Thread):
 
             #New mod by Jiahong on 5/7/12 and mod again on 10/24/12: check if can successfully get the seq no from the backend before proceeding
             try:
-                seq_no = get_seq_no(bucket)
+                with self.bucket_pool() as bucket:
+                    seq_no = get_seq_no(bucket)
             except:
                 log.error('Cannot connect to backend. Skipping metadata upload for now.')
                 fh.close()
