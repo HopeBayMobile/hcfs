@@ -225,13 +225,13 @@ class CosaLogger :
         return self.__log(level='INFO', message=message)
 
     def warning(self, message):
-        return self.__log(level='warning', message=message)
+        return self.__log(level='WARNING', message=message)
 
     def error(self, message):
-        return self.__log(level='error', message=message)
+        return self.__log(level='ERROR', message=message)
 
     def critical(self, message):
-        return self.__log(level='critical', message=message)
+        return self.__log(level='CRITICAL', message=message)
 
 def getLogger(name=None, conf=None):
 	"""
