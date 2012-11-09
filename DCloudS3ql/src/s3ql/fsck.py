@@ -930,6 +930,9 @@ class Fsck(object):
                         self.log_error("Deleted spurious object %d", obj_id)
                 except NoSuchObject:
                     pass
+                # Yuxun, handle timeout error
+                except TimeoutError:
+                    pass
 
             self.conn.execute('CREATE TEMPORARY TABLE missing AS '
                               'SELECT id FROM objects EXCEPT SELECT id FROM obj_ids')

@@ -43,6 +43,58 @@ log = logging.getLogger("backend")
 HMAC_SIZE = 32
 
 RETRY_TIMEOUT = 60 * 60 * 24
+
+# Yuxun: add timeout decorator and TimeoutError class
+class TimeoutError(Exception):
+    def __init__(self, cmd=None, timeout=None):
+        self.cmd = cmd
+        self.timeout = timeout
+        if self.timeout is not None:
+            self.timeout= str(self.timeout)
+    def __str__(self):
+        if self.cmd is not None and self.timeout is not None:
+            return "Failed to complete \"%s\" in %s secondssss"%(self.cmd, self.timeout)
+        elif self.cmd is not None:
+            return "Failed to complete in \"%s\" seconds"%self.cmd
+        elif self.timeout is not None:
+            return "Failed to finish in %s seconds"%(self.timeout)
+        else:
+            return "TimeoutError"
+
+#timeout decorator
+def timeout(timeout_time):
+    def timeoutDeco(f):
+        def wrapper(*args,**kwargs):
+            class InterruptableThread(threading.Thread):
+                def __init__(self,f, *args, **kwargs):
+                    threading.Thread.__init__(self)
+                    self.f = f
+                    self.args =args
+                    self.kwargs = kwargs
+                    self.result = None
+                def run(self):
+                    try:
+                        self.result = (0,self.f(*(self.args), **(self.kwargs)))			
+                    except Exception as e:
+                        self.result = (1, e, sys.exc_info()[2])
+
+            timeout=timeout_time
+            if timeout <=0:
+                timeout = 86400*7 #one week
+            it = InterruptableThread(f, *args, **kwargs)
+            it.daemon =True
+            it.start()
+            it.join(timeout)
+            if it.isAlive():
+               raise TimeoutError(timeout)
+            elif it.result[0] == 0:
+               return it.result[1]
+            else:
+               raise it.result[1], None, it.result[2]
+
+        return wrapper
+    return timeoutDeco
+
 def retry(fn):
     '''Decorator for retrying a method on some exceptions
     
@@ -564,6 +616,8 @@ class BetterBucket(AbstractBucket):
         '''Check if `key` is in bucket'''
         return self.bucket.contains(key)
 
+    # Yuxun, add timeout decorator
+    @timeout(180)
     def delete(self, key, force=False):
         """Delete object stored under `key`
 
