@@ -270,9 +270,6 @@ class BlockCache(object):
         self.last_checked = time.time()
         self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
         self.thread_checking = False #Jiahong: New flag for knowing if the upload thread respawning check is in progress
-        self.quick_inode = -1 # Jiahong: New mechanism for caching block pointer
-        self.quick_block = -1 # Jiahong: New mechanism for caching block pointer
-        self.quick_pointer = None
         # wthung, add value cache. need to retrieve it in initialization of block cache
         self.value_cache = {"entries": max(self.db.get_val("SELECT COUNT(rowid) FROM contents"), 0),
                             "blocks": max(self.db.get_val("SELECT COUNT(id) FROM objects"), 0),
@@ -312,6 +309,10 @@ class BlockCache(object):
 
                 with self.get(tmp_inode,tmp_block) as fh:
                     pass
+                yield_count += 1
+                if yield_count > 10:
+                    llfuse.lock.yield_(100)
+                    yield_count = 0 
 
 
     def init(self, threads=1):
@@ -718,12 +719,7 @@ class BlockCache(object):
             self.expire()
 
         el = None
-        if (self.quick_pointer is not None):
-            if (inode == self.quick_inode) and (blockno == self.quick_block):
-                el = self.quick_pointer
-            else:
-                self.quick_pointer = None
-
+        
         while el is None:
             # Don't allow changing objects while they're being uploaded
             if (inode, blockno) in self.in_transit:
@@ -741,8 +737,7 @@ class BlockCache(object):
                 filename = os.path.join(self.path, '%d-%d' % (inode, blockno))
 
                 if os.access(filename,os.F_OK): # If cache file already in cache directory, use that
-                    with lock_released:
-                        el = CacheEntry(inode, blockno, filename, False)
+                    el = CacheEntry(inode, blockno, filename, False)
                     self.entries[(inode, blockno)] = el
                     self.size += el.size
                     if el.dirty:
@@ -853,10 +848,6 @@ class BlockCache(object):
         oldsize = el.size
         was_dirty = el.dirty
 
-        if (self.quick_pointer is None):
-            self.quick_pointer = el
-            self.quick_inode = inode
-            self.quick_block = blockno
 
         # Provide fh to caller
         try:
@@ -893,8 +884,6 @@ class BlockCache(object):
         # the database before we remove it from the cache!
 
         log.debug('expire: start')
-
-        self.quick_pointer = None  # Reset the cached block pointer
 
 
         did_nothing_count = 0

@@ -504,6 +504,8 @@ class Fsck(object):
                         size_old = size_a[0]
                     except ValueError:
                         self.log_error("inode %d not in table but in cache... skipping",inode_id)
+                        prefix_files = os.path.join(self.cachedir, "%d" % inode_id)
+                        os.system('rm -rf %s-*' % prefix_files)
                         continue
                 if size_old < cached_max_size and size < cached_max_size:
                     self.found_errors = True
