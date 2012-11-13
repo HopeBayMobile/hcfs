@@ -4,8 +4,9 @@ FLAG_FILE="/root/upgrading.flag"
 if [ -f $FLAG_FILE ]
 then
         echo "Upgrade Failover."
-        apt-get remove -y --force-yes dcloud-gateway dcloudgatewayapi s3ql savebox
+        apt-get remove -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
         apt-get update
-        apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql savebox
+        apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
+        apt-get install --reinstall -y --force-yes savebox
         rm $FLAG_FILE
 fi
