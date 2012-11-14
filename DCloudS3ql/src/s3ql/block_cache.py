@@ -298,6 +298,8 @@ class BlockCache(object):
         if os.access(self.path,os.F_OK) and self.preload_cache == False:
             self.preload_cache = True
             initial_cache_list=os.listdir(self.path)
+            yield_count = 0
+
             for cache_files in initial_cache_list:
 
                 match = re.match('^(\\d+)-(\\d+)$', cache_files)
