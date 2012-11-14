@@ -113,22 +113,25 @@ def thread_cache_usage():
         cur_dirty_cache_size = usage['gateway_cache_usage']['dirty_cache_size']
         cur_dirty_cache_entries = usage['gateway_cache_usage']['dirty_cache_entries']
         
-        cache_percent = (float(cur_dirty_cache_size) / float(max_cache_size)) * 100
-        entries_percent = (float(cur_dirty_cache_entries) / float(max_entries)) * 100
-        
-        # check cache size
-        if cache_percent <= criteria_low:
-            g_prev_cache_full_log = False
-        elif cache_percent >= criteria_high and not g_prev_cache_full_log:
-            log.info('Full cache')
-            g_prev_cache_full_log = True
+        if max_cache_size > 0 and max_entries > 0:
+            cache_percent = (float(cur_dirty_cache_size) / float(max_cache_size)) * 100
+            entries_percent = (float(cur_dirty_cache_entries) / float(max_entries)) * 100
+            
+            # check cache size
+            if cache_percent <= criteria_low:
+                g_prev_cache_full_log = False
+            elif cache_percent >= criteria_high and not g_prev_cache_full_log:
+                log.info('Full cache')
+                g_prev_cache_full_log = True
 
-        # check cache entries number
-        if entries_percent <= criteria_low:
-            g_prev_entries_full_log = False
-        elif entries_percent >= criteria_high and not g_prev_entries_full_log:
-            log.info('Full cache entries')
-            g_prev_entries_full_log = True
+            # check cache entries number
+            if entries_percent <= criteria_low:
+                g_prev_entries_full_log = False
+            elif entries_percent >= criteria_high and not g_prev_entries_full_log:
+                log.info('Full cache entries')
+                g_prev_entries_full_log = True
+        else:
+            log.error('Get negative max cache size or max entries')
     
         # sleep for some time by a for loop in order to break at any time
         for _ in range(20):
@@ -276,7 +279,158 @@ def get_gw_indicator():
         log.error("Error message: %s" % str(err))
 
     return return_val['result']
+    
+    
+def enableSMART(disk):
+    """
+    enable the SMART control opinions
+    @type disk: string
+    @param disk: HDD device name. e.g., /dev/sda
+    @rtype: boolean
+    @return: True if enable successed, false if not
+    """
+    
+    target_str = 'SMART Enabled.'
+    enable_ok = False
+    
+    try:
+        cmd = "sudo smartctl --smart=on %s" % disk
+        ret_code, output = api._run_subprocess(cmd)
 
+        if ret_code == 0:
+            # grep the serial number
+            for line in output:
+                if target_str in line:
+                    enable_ok = True
+                    break                              
+        else:
+            #log.error('Some error occurred when enable the SMART control of %s' % disk)
+            pass
+
+    except:
+        pass    
+        
+    return enable_ok
+
+    
+def check_RAID_rebuild(disk):
+    """
+    Check if disk is rebuilding RAID by mdadm utility
+           
+    @type disk: string
+    @param disk: HDD device name. e.g., /dev/sda
+    @rtype: boolean
+    @return: True if disk is rebuilding RAID, false if not.
+    """
+    
+    target_str = 'rebuilding'
+    dev_no = ''
+    is_rebuilding = False
+    
+    try:
+        for i in range(2):            
+            cmd = "sudo mdadm --detail /dev/md%d" % i
+            ret_code, output = api._run_subprocess(cmd)
+    
+            if ret_code == 0:
+                # grep the serial number
+                for line in output.split('\n'):
+                    if target_str not in line:
+                        continue
+                    else:
+                        dev_no = line.split()[6][:8]
+                        if dev_no == disk:
+                            is_rebuilding = True
+                            break
+            else:
+                log.error('Some error occurred when getting serial number of %s' % disk)
+    except Exception:
+        pass
+            
+    return is_rebuilding
+     
+     
+def get_HDD_status():
+    """
+    For each disk, enable the SMART control optinos, get the serial number and check the status.
+    Finally, compare with status collected before to find if some disk is missing.
+    The status would be encoded to json object and written to /dev/shm/gw_HDD_status.    
+    """
+    
+    global g_program_exit
+    
+    op_ok = True
+    
+    _data = [] # serial and status of disks
+    pre_all_disks = set() 
+    all_disks = set() 
+           
+    return_val = {
+        'result': '',
+        'msg': '',
+        'msg_code': '',
+        'data': '',
+        }
+    
+    while not g_program_exit:
+        
+        try:
+            all_disk = common.getAllDisks()
+            _data = []
+
+            for i in all_disk:
+        
+                enable_ok = enableSMART(i)
+                if not enable_ok:
+                    op_ok = False
+                                          
+                serial_num = api._get_serial_number(i)            
+                all_disks.add(serial_num)
+            
+                cmd = "sudo smartctl -H %s" % i
+                ret_code, output = api._run_subprocess(cmd)                
+
+                if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
+                    if not check_RAID_rebuild(i):
+                        single_hdd = {'serial': serial_num, 'status': 0} # HDD is normal
+                    else:                         
+                        single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
+                else:
+                    #log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
+                    single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
+                
+                _data.append(single_hdd)        
+        
+        except Exception as e:
+            op_ok = False
+                
+        # first read gw_HDD_status file to check if there are missing disks
+        if os.path.exists('/root/gw_HDD_status'):
+            with open('/root/gw_HDD_status', 'r') as fh:
+                previous_status = json.loads(fh.read())
+                for sn in previous_status['data']:
+                    pre_all_disks.add(sn['serial'])
+            
+                if (len(all_disks) < len(pre_all_disks)):
+                    missing_disk = (all_disks^pre_all_disks)
+                    for missing in missing_disk:
+                        single_hdd = {'serial': missing, 'status': 3} # HDD is not installed or empty slot
+                        _data.append(single_hdd)     
+            
+        return_val['result'] = True
+        return_val['data'] = _data    
+    
+        # update gw_HDD_status file
+        with open('/root/gw_HDD_status', 'w') as fh:
+            json.dump(return_val, fh)
+            
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(30):
+            time.sleep(1)
+            if g_program_exit:
+                break
+             
+               
 ##############################################################################
 '''
     Main.
@@ -295,12 +449,12 @@ def start_background_tasks(singleloop=False):
     daemonize()
 
     # register handler
-    #atexit.register(handler_sigterm)
+    atexit.register(handler_sigterm)
     # normal exit when killed
     signal(SIGTERM, signal_handler)
     signal(SIGINT, signal_handler)
 
-    # create a thread to calculate net speed
+    #~ # create a thread to calculate net speed
     t = Thread(target=thread_netspeed)
     t.start()
     
@@ -315,6 +469,10 @@ def start_background_tasks(singleloop=False):
     # create a thread to do monitor dirty cache/entries usage
     t4 = Thread(target=thread_cache_usage)
     t4.start()
+    #~ 
+    #~ # create a thread to get HDD status
+    t5 = Thread(target=get_HDD_status)
+    t5.start()
 
     while not g_program_exit:
         # get gateway indicators

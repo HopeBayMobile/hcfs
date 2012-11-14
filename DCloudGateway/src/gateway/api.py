@@ -834,6 +834,42 @@ def _check_smb_service():
         pass
     return op_SMB_srv
 
+def get_HDD_status():
+    """
+    Get HDD_status.
+    
+    @rtype: JSON object
+    @return: Result of getting HDD status .
+    
+        
+        -result : whether this return is correct or not.
+        -msg : It is supposed only be used by Delta.
+        -msg_code : It is an optional field for mapping message code to i18n strings.
+        -data : data contain an HDD object array
+                [   
+                {
+                        "serial": "string",
+                        "status": 0 // normal, 1 // rebuiling RAID, 2 // failed, 3 // not installed 
+                },
+                ...
+                ]
+    """
+    return_val = {
+        'result': False,
+        'msg': '',
+        'msg_code': '',
+        'data': '',
+        }
+            
+    try:
+        with open("/root/gw_HDD_status","r") as fh:
+            return_val = json.loads(fh.read())
+            
+    except:
+        pass
+        
+    return json.dumps(return_val)
+
 def get_storage_account():
     """
     Get storage account.
