@@ -601,7 +601,8 @@ class Operations(llfuse.Operations):
         # update value cache
         self.cache.value_cache["entries"] -= 1
         self.cache.value_cache["fs_size"] -= self.inodes[id_].size
-        log.debug("fs size -%d" % self.inodes[id_].size)
+        self.cache.value_cache["entries"] = max(self.cache.value_cache["entries"], 0)
+        self.cache.value_cache["fs_size"] = max(self.cache.value_cache["fs_size"], 0)
 
         inode = self.inodes[id_]
         inode.refcount -= 1
@@ -629,6 +630,7 @@ class Operations(llfuse.Operations):
             # wthung, 2012/10/24
             # update value cache
             self.cache.value_cache["inodes"] -= 1
+            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
 
         log.debug('_remove(%d, %s): start', id_p, name)
 
@@ -753,6 +755,7 @@ class Operations(llfuse.Operations):
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] -= 1
+        self.cache.value_cache["entries"] = max(self.cache.value_cache["entries"], 0)
 
         inode_new = self.inodes[id_new]
         inode_new.refcount -= 1
@@ -782,6 +785,7 @@ class Operations(llfuse.Operations):
             # wthung, 2012/10/24
             # update value cache
             self.cache.value_cache["inodes"] -= 1
+            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
 
 
     def link(self, id_, new_id_p, new_name):
@@ -1008,6 +1012,19 @@ class Operations(llfuse.Operations):
 
         if size is None:
             size = 0
+
+        # wthung, 2012/11/12, retrieve db value in negative value
+        if blocks < 0:
+            blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
+            self.cache.value_cache["blocks"] = blocks
+
+        if inodes < 0:
+            inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
+            self.cache.value_cache["inodes"] = inodes
+
+        if size < 0:
+            size = self.db.get_val('SELECT SUM(size) FROM blocks')
+            self.cache.value_cache["dedup_size"] = size
 
         # file system block size, i.e. the minimum amount of space that can
         # be allocated. This doesn't make much sense for S3QL, so we just

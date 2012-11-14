@@ -298,6 +298,8 @@ class BlockCache(object):
         if os.access(self.path,os.F_OK) and self.preload_cache == False:
             self.preload_cache = True
             initial_cache_list=os.listdir(self.path)
+            yield_count = 0
+
             for cache_files in initial_cache_list:
 
                 match = re.match('^(\\d+)-(\\d+)$', cache_files)
@@ -619,6 +621,7 @@ class BlockCache(object):
         # wthung, 2012/10/24
         # update value cache
         self.value_cache["dedup_size"] -= el.size
+        self.value_cache["dedup_size"] = max(self.value_cache["dedup_size"], 0)
         
         refcount = self.db.get_val('SELECT refcount FROM objects WHERE id=?', (old_obj_id,))
         if refcount > 1:
@@ -634,6 +637,8 @@ class BlockCache(object):
             # update value cache
             self.value_cache["blocks"] -= 1
             self.value_cache["compr_size"] -= el.size
+            self.value_cache["blocks"] = max(self.value_cache["blocks"], 0)
+            self.value_cache["compr_size"] = max(self.value_cache["compr_size"], 0)
             affect_rows -= 1
 
         while old_obj_id in self.in_transit:
@@ -1062,6 +1067,7 @@ class BlockCache(object):
             # wthung, 2012/10/24
             # update value cache
             self.value_cache["dedup_size"] -= el_size
+            self.value_cache["dedup_size"] = max(self.value_cache["dedup_size"], 0)
 
             # Decrease object refcount
             refcount = self.db.get_val('SELECT refcount FROM objects WHERE id=?', (obj_id,))
@@ -1084,6 +1090,8 @@ class BlockCache(object):
                     # update value cache
                     self.value_cache["blocks"] -= 1
                     self.value_cache["compr_size"] -= el_size
+                    self.value_cache["blocks"] = max(self.value_cache["blocks"], 0)
+                    self.value_cache["compr_size"] = max(self.value_cache["compr_size"], 0)
                     affect_rows -= 1
                 with lock_released:
                     if not self.removal_threads:
