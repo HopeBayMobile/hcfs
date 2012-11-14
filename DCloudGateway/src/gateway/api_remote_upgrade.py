@@ -135,7 +135,7 @@ def get_available_upgrade():
 
 
 #----------------------------------------------------------------------
-def upgrade_gateway(enableReboot = True):
+def upgrade_gateway():
     """
     Upgrade gateway to the latest software version.
     op_code defintion:
@@ -185,19 +185,12 @@ def upgrade_gateway(enableReboot = True):
                 log.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
                 cmd = "rm /root/upgrading.flag"		# clear upgrade flag
-                a = os.system(cmd)
-                #~ if reboot is allowed
-                if enableReboot == True:
-                    #~ api.reset_gateway()
-                    os.system("sudo sync;  sudo shutdown -r now")
-                    # ^^^ send a reboot command to os.
-                    os.system("sudo service apache2 stop")
-                    # ^^^ stop apache2 service 
+                a = os.system(cmd)                
             else:
                 op_ok = False
                 op_code = 0x8022
                 op_msg = "Updating to the latest SAVEBOX version failed."
-                log.info("Updating to the latest gateway version %s failed." % (new_ver) )
+                log.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
         else:
             op_ok = False
             op_code = 0x15
@@ -207,13 +200,20 @@ def upgrade_gateway(enableReboot = True):
     except:
         op_ok = False
         op_code = 0x00000403
-        log.info("Updating to the latest gateway version %s failed." % (new_ver) )
+        log.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
 
     # do something here ...
 
     return_val = {'result': op_ok,
                   'code':   op_code,
                   'msg':    op_msg}
+    
+    # wthung, 2012/11/14
+    # in the upgrade, savebox services have been stopped.
+    # they cannot get return code from api.
+    # we must dump the result to a file for communication.
+    with open('/dev/shm/upgrade_result', 'w') as fh:        
+        json.dump(return_val, fh)
 
     return json.dumps(return_val)
 
