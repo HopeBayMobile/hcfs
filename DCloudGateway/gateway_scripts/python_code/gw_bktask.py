@@ -449,7 +449,6 @@ def start_background_tasks(singleloop=False):
     daemonize()
 
     # register handler
-    atexit.register(handler_sigterm)
     # normal exit when killed
     signal(SIGTERM, signal_handler)
     signal(SIGINT, signal_handler)
