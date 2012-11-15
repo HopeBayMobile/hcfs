@@ -298,15 +298,14 @@ def enableSMART(disk):
         ret_code, output = api._run_subprocess(cmd)
 
         if ret_code == 0:
-            # grep the serial number
-            for line in output:
+            # check if enable successed
+            for line in output.split('\n'):
                 if target_str in line:
                     enable_ok = True
                     break                              
         else:
-            #log.error('Some error occurred when enable the SMART control of %s' % disk)
-            pass
-
+            log.error('Some error occurred when enable the SMART control of %s' % disk)
+            
     except:
         pass    
         
@@ -320,12 +319,14 @@ def check_RAID_rebuild(disk):
     @type disk: string
     @param disk: HDD device name. e.g., /dev/sda
     @rtype: boolean
-    @return: True if disk is rebuilding RAID, false if not.
+    @return: op_ok: return whether the mdadm utility run successed 
+             is-rebuilding: True if disk is rebuilding RAID, false if not.
     """
     
     target_str = 'rebuilding'
     dev_no = ''
     is_rebuilding = False
+    op_ok = False
     
     try:
         for i in range(2):            
@@ -333,7 +334,8 @@ def check_RAID_rebuild(disk):
             ret_code, output = api._run_subprocess(cmd)
     
             if ret_code == 0:
-                # grep the serial number
+                # ckeck RAID status
+                op_ok = True
                 for line in output.split('\n'):
                     if target_str not in line:
                         continue
@@ -343,11 +345,11 @@ def check_RAID_rebuild(disk):
                             is_rebuilding = True
                             break
             else:
-                log.error('Some error occurred when getting serial number of %s' % disk)
+                log.error('Some error occurred when checking whether %s is rebuilding RAID' % disk)
     except Exception:
         pass
             
-    return is_rebuilding
+    return (op_ok, is_rebuilding)
      
      
 def get_HDD_status():
@@ -360,11 +362,8 @@ def get_HDD_status():
     global g_program_exit
     
     op_ok = True
-    
     _data = [] # serial and status of disks
-    pre_all_disks = set() 
-    all_disks = set() 
-           
+               
     return_val = {
         'result': '',
         'msg': '',
@@ -375,55 +374,58 @@ def get_HDD_status():
     while not g_program_exit:
         
         try:
+            op_ok = True
             all_disk = common.getAllDisks()
             _data = []
-
+            all_disks = set() # save the dev name for all scaned disks. e.g. {"dev/sda", "/dev/sdb"}
+                        
             for i in all_disk:
         
-                enable_ok = enableSMART(i)
-                if not enable_ok:
-                    op_ok = False
-                                          
+                op_ok = enableSMART(i)
+                
                 serial_num = api._get_serial_number(i)            
-                all_disks.add(serial_num)
+                all_disks.add(i)
             
                 cmd = "sudo smartctl -H %s" % i
                 ret_code, output = api._run_subprocess(cmd)                
 
                 if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
-                    if not check_RAID_rebuild(i):
-                        single_hdd = {'serial': serial_num, 'status': 0} # HDD is normal
+                    op_ok, is_rebuilding = check_RAID_rebuild(i)
+                    
+                    if not is_rebuilding:
+                        single_hdd = {'serial': serial_num, 'status': 0, 'dev': i} # HDD is normal
                     else:                         
-                        single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
+                        single_hdd = {'serial': serial_num, 'status': 2, 'dev': i} # HDD is rebuilding RAID            
                 else:
-                    #log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
-                    single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
+                    log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
+                    single_hdd = {'serial': serial_num, 'status': 1, 'dev': i} # HDD is failed  
                 
                 _data.append(single_hdd)        
         
+            # first read gw_HDD_status file to check if there are missing disks
+            if os.path.exists('/root/gw_HDD_status'):
+                with open('/root/gw_HDD_status', 'r') as fh:
+                    previous_status = json.loads(fh.read())
+                    if (len(all_disks) < len(previous_status['data'])):
+                        for disk in previous_status['data']:
+                            if disk['dev'] not in all_disks:
+                                single_hdd = {'serial': disk['serial'], 'status': 3, 'dev': disk['dev']} # HDD is not installed or empty slot
+                                _data.append(single_hdd)
+                    
         except Exception as e:
             op_ok = False
-                
-        # first read gw_HDD_status file to check if there are missing disks
-        if os.path.exists('/root/gw_HDD_status'):
-            with open('/root/gw_HDD_status', 'r') as fh:
-                previous_status = json.loads(fh.read())
-                for sn in previous_status['data']:
-                    pre_all_disks.add(sn['serial'])
+        
+        try:
+            return_val['result'] = op_ok
+            return_val['data'] = _data    
             
-                if (len(all_disks) < len(pre_all_disks)):
-                    missing_disk = (all_disks^pre_all_disks)
-                    for missing in missing_disk:
-                        single_hdd = {'serial': missing, 'status': 3} # HDD is not installed or empty slot
-                        _data.append(single_hdd)     
-            
-        return_val['result'] = True
-        return_val['data'] = _data    
-    
-        # update gw_HDD_status file
-        with open('/root/gw_HDD_status', 'w') as fh:
-            json.dump(return_val, fh)
-            
+            # update gw_HDD_status file
+            with open('/root/gw_HDD_status', 'w') as fh:
+                json.dump(return_val, fh)
+       
+        except:
+            pass
+                    
         # sleep for some time by a for loop in order to break at any time
         for _ in range(30):
             time.sleep(1)
@@ -449,12 +451,12 @@ def start_background_tasks(singleloop=False):
     daemonize()
 
     # register handler
-    atexit.register(handler_sigterm)
+    #atexit.register(handler_sigterm)
     # normal exit when killed
     signal(SIGTERM, signal_handler)
     signal(SIGINT, signal_handler)
 
-    #~ # create a thread to calculate net speed
+    # create a thread to calculate net speed
     t = Thread(target=thread_netspeed)
     t.start()
     
@@ -469,8 +471,8 @@ def start_background_tasks(singleloop=False):
     # create a thread to do monitor dirty cache/entries usage
     t4 = Thread(target=thread_cache_usage)
     t4.start()
-    #~ 
-    #~ # create a thread to get HDD status
+    
+    # create a thread to get HDD status
     t5 = Thread(target=get_HDD_status)
     t5.start()
 

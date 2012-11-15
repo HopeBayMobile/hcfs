@@ -849,7 +849,7 @@ def get_HDD_status():
                 [   
                 {
                         "serial": "string",
-                        "status": 0 // normal, 1 // rebuiling RAID, 2 // failed, 3 // not installed 
+                        "status": 0 // normal, 1 // failed, 2 // rebuiling RAID, 3 // not installed 
                 },
                 ...
                 ]
@@ -864,7 +864,9 @@ def get_HDD_status():
     try:
         with open("/root/gw_HDD_status","r") as fh:
             return_val = json.loads(fh.read())
-            
+            for disk in return_val['data']:
+                del disk['dev']
+
     except:
         pass
         
