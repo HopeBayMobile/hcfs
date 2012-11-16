@@ -76,6 +76,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf -rs /etc/init.d/upgrade_failover /etc/rc2.d/S05upgrade_failover  # Yen added at 2012/10/31
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
+    cp -rf $SRCDIR/gateway_scripts/showlog /usr/bin/  # Yen added at 2012/11/16
 
     #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
     # the permission of sudoers_delta is required 0440

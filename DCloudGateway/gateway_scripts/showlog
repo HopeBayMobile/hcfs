@@ -1,0 +1,24 @@
+#!/usr/bin/python
+"""
+    Simply print log time and log content from COSA MongoDB.
+"""
+
+from pymongo import Connection
+import string
+
+try:
+    # get connection from localhost, port 27017
+    connection = Connection('localhost', 27017)
+    # use Log db
+    db = connection.Log
+    # get SystemLog collections
+    logs = db.SystemLog
+
+    # iterate all logs
+    for log in logs.find():
+        print log['time'] + ' - ' + log['advence']
+
+    # disconnect
+    connection.close()
+except Exception as e:
+    print(str(e))
