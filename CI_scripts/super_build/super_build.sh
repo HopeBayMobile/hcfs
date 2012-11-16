@@ -27,6 +27,14 @@ fi
         exit 1
     fi
 
+# make sure internet is connectable
+    wget www.google.com
+    if [ $? -ne 0 ]
+    then
+        echo "Cannot connect to internet. Please check proxy's settings."
+        exit 1
+    fi
+
 # define parameters
     BRANCH=$1
     BUILDNUM=$2
