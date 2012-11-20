@@ -1306,16 +1306,27 @@ def _mkfs(storage_url, key, container):
                 log.info("Found existing file system!")
                 log.info("Conducting forced file system check")
                 has_existing_filesys = True
-                
+                # Yuxun: Using po.poll() to implement 30 second timeout
                 cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/%s/delta" % (storage_url, container)
-                po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                output = po.stdout.read()
-                po.wait()
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+                countdown = 30
+                while countdown > 0:
+                    po.poll()
+                    if po.returncode != 0:
+                        countdown = countdown - 1
+                        if countdown <= 0:
+                            output = po.stdout.read()
+                            log.error("Error found during fsck (%s)" % output)
+                            pogid=os.getpgid(po.pid) 
+                            os.system('kill -9 -%s' % pogid)
+                            break
+                        else:
+                            time.sleep(1)
+                    else:
+                        log.error("fsck completed")                
+                        break
 
-                if po.returncode != 0:
-                    log.error("Error found during fsck (%s)" % output)
-                else:
-                    log.debug("fsck completed")
+                    
     # wthung, 2012/8/3
     # add except
     except Exception as e:
