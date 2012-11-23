@@ -1272,7 +1272,6 @@ def _openContainter(storage_url, account, password):
         log.debug("_openContainer end")'''
 
 
-@common.timeout(18000)
 def _mkfs(storage_url, key, container):
     """
     Create S3QL file system.
@@ -1287,9 +1286,9 @@ def _mkfs(storage_url, key, container):
     @rtype: boolean
     @return: True if a file system is existed. Otherwise, False.
     """
-    
+
     log.debug("_mkfs start")
-    
+
     # wthung, 2012/8/3
     # add a var to indicate an exiting filesys
     has_existing_filesys = False
@@ -1306,24 +1305,20 @@ def _mkfs(storage_url, key, container):
                 log.info("Found existing file system!")
                 log.info("Conducting forced file system check")
                 has_existing_filesys = True
-                # Yuxun: Using po.poll() to implement 30 second timeout
+
                 cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/%s/delta" % (storage_url, container)
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
-                countdown = 30
+                po = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+                countdown = 86400
                 while countdown > 0:
                     po.poll()
                     if po.returncode != 0:
                         countdown = countdown - 1
                         if countdown <= 0:
-                            output = po.stdout.read()
-                            log.error("Error found during fsck (%s)" % output)
-                            pogid=os.getpgid(po.pid) 
-                            os.system('kill -9 -%s' % pogid)
-                            break
+                            log.error("Timed out during fsck")
+                            raise RuntimeError
                         else:
                             time.sleep(1)
                     else:
-                        log.error("fsck completed")                
                         break
 
                     
