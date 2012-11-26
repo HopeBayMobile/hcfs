@@ -9,15 +9,13 @@ import os
 import sys
 import json
 import time
+import ConfigParser
 from signal import signal, SIGTERM, SIGINT
 from threading import Thread
 
 # delta specified API
 from gateway import common
 from gateway import api
-
-# 3rd party modules
-#import posix_ipc
 
 log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 
@@ -38,11 +36,8 @@ def daemonize(workdir='/'):
     '''Daemonize the process'''
 
     os.chdir(workdir)
-
     detach_process_context()
 
-    # wthung, disable redirection because after redirection,
-    #   some eror occurred when calling sudo by subprocess.popen
     redirect_stream(sys.stdin, None)
     redirect_stream(sys.stdout, None)
     redirect_stream(sys.stderr, None)
@@ -95,6 +90,12 @@ def redirect_stream(system_stream, target_stream):
     Worker threads.
 '''
 
+def thread_upload_gw_usage(data_size):
+    """
+    Worker thread to upload gateway usage to swift
+    """
+    _upload_usage_data(data_size)
+
 def thread_cache_usage():
     """
     Worker thread to monitor cache size/entries usage
@@ -105,6 +106,7 @@ def thread_cache_usage():
     
     criteria_high = 99.9
     criteria_low = 80.0
+    prev_data_size = -1
     
     while not g_program_exit:
         usage = api._get_storage_capacity()
@@ -112,6 +114,16 @@ def thread_cache_usage():
         max_entries = usage['gateway_cache_usage']['max_cache_entries']
         cur_dirty_cache_size = usage['gateway_cache_usage']['dirty_cache_size']
         cur_dirty_cache_entries = usage['gateway_cache_usage']['dirty_cache_entries']
+        data_size = usage['cloud_storage_usage']['cloud_data']
+        
+        # ensure value is not negative
+        data_size = max(data_size, 0)
+        
+        if prev_data_size != data_size:
+            # start a thread to upload data size to swift
+            # the_thread = Thread(target=thread_upload_gw_usage, args=(data_size,))
+            # the_thread.start()
+            prev_data_size = data_size
         
         if max_cache_size > 0 and max_entries > 0:
             cache_percent = (float(cur_dirty_cache_size) / float(max_cache_size)) * 100
@@ -148,13 +160,8 @@ def thread_term_dhclient():
     while not g_program_exit:
         ret_code, _ = api._run_subprocess('sudo ps aux | grep dhclient')
         if not ret_code:
-            print 'detected dhclient'
             # dhclient exists, terminate it
             ret_code, _ = api._run_subprocess('sudo pkill -9 dhclient')
-            if not ret_code:
-                print('dhclient process has been terminated')
-            else:
-                print('Detected a dhclient process is running, but terminating it is failed')
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(30):
@@ -240,19 +247,7 @@ def get_gw_indicator():
     last_backup_time_file = '/root/.s3ql/gw_last_backup_time'
     op_ok = False
     op_msg = 'Gateway indicators read failed unexpectedly.'
-    return_val = {
-        'result': op_ok,
-        'msg': op_msg,
-        'data': {'network_ok': False,
-        'system_check': False,
-        'flush_inprogress': False,
-        'dirtycache_nearfull': False,
-        'HDD_ok': False,
-        'NFS_srv': False,
-        'SMB_srv': False,
-        'snapshot_in_progress': False,
-        'HTTP_proxy_srv': False,
-        'S3QL_ok': False}}
+    return_val = {}
 
     global g_prev_flushing
 
@@ -272,14 +267,124 @@ def get_gw_indicator():
                 
         # change flushing status
         g_prev_flushing = return_val['data']['flush_inprogress']
-        
 
     except Exception as err:
         log.error("Unable to get indicators")
         log.error("Error message: %s" % str(err))
 
-    return return_val['result']
+    if 'result' in return_val:
+        return return_val['result']
+    return False
+
+def _get_storage_info():
+    """
+    Get storage URL and user name from /root/.s3ql/authinfo2.
+
+    @rtype: tuple
+    @return: Storage URL and user name or None if failed.
+    """
+    storage_url = None
+    account = None
+    password = None
+
+    try:
+        config = ConfigParser.ConfigParser()
+        with open('/root/.s3ql/authinfo2') as op_fh:
+            config.readfp(op_fh)
+
+        section = "CloudStorageGateway"
+        storage_url = config.get(section, 'storage-url').replace("swift://", "")
+        account = config.get(section, 'backend-login')
+        password = config.get(section, 'backend-password')
+
+    except Exception as e:
+        log.error("Failed to get storage info: %s" % str(e))
+    finally:
+        pass
+    return (storage_url, account, password)
     
+def _upload_usage_data(usage):
+    """
+    Upload gateway usage to swift
+    
+    @type usage: integer
+    @param usage: Gateway usage
+    """
+    # temp file to store usage. 
+    # ***file name of this file must be fixed because backend needs to parse it***
+    target_file = 'gw_total_usage'
+    # echo usage to a temp file
+    os.system('sudo echo %d > %s' % (usage, target_file))
+    
+    # get storage info
+    storage_url, account, password = _get_storage_info()
+    
+    # process if all required data are available
+    if storage_url and account and password:
+        _, username = account.split(':')
+        _, output = api._run_subprocess('sudo swift -A https://%s/auth/v1.0 -U %s -K %s upload %s_private_container %s' 
+                                           % (storage_url, account, password, username, target_file), 15)
+        if target_file in output:
+            log.info('Uploaded gateway total usage to swift (%d)' % usage)
+        else:
+            log.error('Failed to upload gateway total usage to swift. %s' % output)
+    
+    # remove the temp file
+    os.system('sudo rm %s' % target_file)
+    
+def _get_gateway_quota():
+    """
+    Get gateway quota by swift command
+    
+    @rtype: integer
+    @return: -1 if fail. A integer larger than 0 if success. (Unit: byte)
+    """
+    # get storage info
+    storage_url, account, password = _get_storage_info()
+    if storage_url and account and password:
+        _, username = account.split(':')
+        ret_code, output = api._run_subprocess('sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat %s_private_container' 
+                                           % (storage_url, account, password, username), 20)
+        
+        if not ret_code:
+            lines = output.split('\n')
+            for line in lines:
+                # find a fixed string
+                if 'Meta Quota' in line:
+                    _, meta_quota = line.split(':')
+                    meta_quota = int(meta_quota)
+                    return meta_quota 
+        else:
+            log.error('Failed to get gateway quota by swift: %s' % output)
+    
+    # return -1 if quota cannot be retrieved
+    return -1
+
+def thread_retrieve_quota():
+    """
+    Worker thread to retrieve gateway quota from swift
+    """
+    global g_program_exit
+    prev_quota = -1
+    
+    while not g_program_exit:
+        quota = _get_gateway_quota()
+        if quota <= 0:
+            log.error("Cannot retrieve SAVEBOX quota. Set default 1T.")
+            # assign default quota 1T
+            quota = 1024 ** 4
+        
+        # update quota to s3ql if different quota arrival
+        if prev_quota != quota:
+            # set quota to s3ql
+            api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
+            prev_quota = quota
+        
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(60):
+            time.sleep(1)
+            if g_program_exit:
+                break
     
 def enableSMART(disk):
     """
@@ -474,6 +579,10 @@ def start_background_tasks(singleloop=False):
     # create a thread to get HDD status
     t5 = Thread(target=get_HDD_status)
     t5.start()
+    
+    # create a thread to retrieve gateway quota from swift
+    # t6 = Thread(target=thread_retrieve_quota)
+    # t6.start()
 
     while not g_program_exit:
         # get gateway indicators

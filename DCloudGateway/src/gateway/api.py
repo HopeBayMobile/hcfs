@@ -7,6 +7,7 @@ import common
 import subprocess
 import time
 import re
+import signal
 from datetime import datetime
 from gateway import snapshot
 import api_restore_conf
@@ -276,7 +277,7 @@ def _check_s3ql():
     Check if s3ql is correctly mounted, and if /mnt/cloudgwfiles exists in mount table
 
     @rtype: boolean
-    @return: True if s3ql is healthy.
+    @return: True if S3QL is healthy.
     """
     try:
         if _check_process_alive('mount.s3ql'):
@@ -302,6 +303,18 @@ def _check_s3ql():
         pass
     return False
 
+def _check_s3ql_writing(stat):
+    """
+    Check if S3QL is allowed to write.
+    
+    @rtype: boolean
+    @return: True if S3QL can be written.
+    """
+    if stat.find('File system writing: On') != -1:
+        return True
+    return False
+    
+    
 def get_indicators():
     """
     Get gateway services' indicators by calling internal functions.
@@ -326,6 +339,7 @@ def get_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - S3QL_writing: If S3QL is allowed to write.
     """
     
     op_ok = False
@@ -344,44 +358,51 @@ def get_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False }}
+          'S3QL_ok': False,
+          'S3QL_writing': True}}
 
     try:
-        op_network_ok = _check_network()
-        op_system_check = _check_process_alive('fsck.s3ql')
-        op_flush_inprogress = _check_flush()
-        op_dirtycache_nearfull = _check_dirtycache()
-        op_HDD_ok = _check_HDD()
-        op_NFS_srv = _check_nfs_service()
-        op_SMB_srv = _check_smb_service()
-        op_snapshot_in_progress = _check_snapshot_in_progress()
-        op_Proxy_srv = _check_process_alive('squid3')
-        op_s3ql_ok = _check_s3ql()
+        # get s3ql statistics by s3qlstat
+        ret_code, output = _run_subprocess('sudo s3qlstat /mnt/cloudgwfiles', 15)
+        # s3qlstat return 0 in success, 1 in failure
+        if ret_code == 0:
+            op_network_ok = _check_network()
+            op_system_check = _check_process_alive('fsck.s3ql')
+            op_flush_inprogress = _check_flush(output)
+            op_dirtycache_nearfull = _check_dirtycache(output)
+            op_HDD_ok = _check_HDD()
+            op_NFS_srv = _check_nfs_service()
+            op_SMB_srv = _check_smb_service()
+            op_snapshot_in_progress = _check_snapshot_in_progress()
+            op_Proxy_srv = _check_process_alive('squid3')
+            op_s3ql_ok = _check_s3ql()
+            op_s3ql_writing = _check_s3ql_writing(output)
 
-        # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-        if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
-            restart_nfs_service()
-        if op_SMB_srv is False and op_s3ql_ok is True:
-            restart_smb_service()
+            # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
+            if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
+                restart_nfs_service()
+            if op_SMB_srv is False and op_s3ql_ok is True:
+                restart_smb_service()
 
-        op_ok = True
-        op_code = 0x8
-        op_msg = "Reading SAVEBOX indicators was successful."
-    
-        return_val = {
-              'result' : op_ok,
-              'msg'    : op_msg,
-              'code'   : op_code,
-              'data'   : {'network_ok' : op_network_ok,
-              'system_check' : op_system_check,
-              'flush_inprogress' : op_flush_inprogress,
-              'dirtycache_nearfull' : op_dirtycache_nearfull,
-              'HDD_ok' : op_HDD_ok,
-              'NFS_srv' : op_NFS_srv,
-              'SMB_srv' : op_SMB_srv,
-              'snapshot_in_progress' : op_snapshot_in_progress,
-              'HTTP_proxy_srv' : op_Proxy_srv,
-              'S3QL_ok': op_s3ql_ok}}
+            op_ok = True
+            op_code = 0x8
+            op_msg = "Reading SAVEBOX indicators was successful."
+        
+            return_val = {
+                  'result' : op_ok,
+                  'msg'    : op_msg,
+                  'code'   : op_code,
+                  'data'   : {'network_ok' : op_network_ok,
+                  'system_check' : op_system_check,
+                  'flush_inprogress' : op_flush_inprogress,
+                  'dirtycache_nearfull' : op_dirtycache_nearfull,
+                  'HDD_ok' : op_HDD_ok,
+                  'NFS_srv' : op_NFS_srv,
+                  'SMB_srv' : op_SMB_srv,
+                  'snapshot_in_progress' : op_snapshot_in_progress,
+                  'HTTP_proxy_srv' : op_Proxy_srv,
+                  'S3QL_ok': op_s3ql_ok,
+                  'S3QL_writing': op_s3ql_writing}}
     except Exception as Err:
         log.error("Unable to get indicators")
         log.error("msg: %s" % str(Err))
@@ -390,7 +411,7 @@ def get_indicators():
     return return_val
 
 # by Rice
-# modified by wthung, 2012/6/25
+# modified by wthung, 2012/11/26
 def get_gateway_indicators():
     """
     Get gateway services' indicators by reading file or by the result of calling get_indicators().
@@ -411,6 +432,7 @@ def get_gateway_indicators():
             - snapshot_in_progress: If S3QL snapshotting is in progress.
             - HTTP_proxy_srv: If HTTP proxy server is alive.
             - S3QL_ok: If S3QL service is running.
+            - S3QL_writing: If S3QL is allowed to write.
             - uplink_usage: Network traffic going from gateway.
             - downlink_usage: Network traffic coming to gateway.
     """
@@ -434,7 +456,8 @@ def get_gateway_indicators():
           'SMB_srv' : False,
           'snapshot_in_progress' : False,
           'HTTP_proxy_srv' : False,
-          'S3QL_ok': False}}
+          'S3QL_ok': False,
+          'S3QL_writing': True}}
     return_val2 = {
           'uplink_usage' : 0,
           'downlink_usage' : 0}
@@ -526,7 +549,6 @@ def _check_network():
     """
     
     op_network_ok = False
-    log.debug("_check_network start")
     try:
         op_config = ConfigParser.ConfigParser()
         with open('/root/.s3ql/authinfo2') as op_fh:
@@ -555,23 +577,27 @@ def _check_network():
                 _, username = op_user.split(':')
 
                 cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat %s_private_container" % (full_storage_url, op_user, op_pass, username)
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
-                countdown = 30
-                while countdown > 0:
-                    po.poll()
-                    if po.returncode != 0:
-                        countdown = countdown - 1
-                        if countdown <= 0:
-                            pogid=os.getpgid(po.pid)
-                            os.system('kill -9 -%s' % pogid)
-                            break
-                        else:
-                            time.sleep(1)
-                    else:
-                        output = po.stdout.read()
-                        if output.find("Bytes:") != -1:
-                            op_network_ok = True
-                        break
+                ret_code, output = _run_subprocess(cmd, 30)
+                if ret_code == 0:
+                    if output.find("Bytes:") != -1:
+                        op_network_ok = True
+                # po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
+                # countdown = 30
+                # while countdown > 0:
+                    # po.poll()
+                    # if po.returncode != 0:
+                        # countdown = countdown - 1
+                        # if countdown <= 0:
+                            # pogid=os.getpgid(po.pid)
+                            # os.system('kill -9 -%s' % pogid)
+                            # break
+                        # else:
+                            # time.sleep(1)
+                    # else:
+                        # output = po.stdout.read()
+                        # if output.find("Bytes:") != -1:
+                            # op_network_ok = True
+                        # break
         else:
             log.info(output)
 
@@ -581,9 +607,9 @@ def _check_network():
     except Exception as e:
             log.error('Unable to obtain storage url or login info.')
             log.error(str(e))
-
     finally:
-        log.debug("_check_network end")
+        pass
+    
     return op_network_ok
 
 # wthung, 2012/7/17
@@ -616,63 +642,28 @@ def _check_process_alive(process_name=None):
     return op
 
 # flush check by Rice
-def _check_flush():
+def _check_flush(stat):
     """
     Check if S3QL dirty cache flushing is in progress.
     
     @rtype: boolean
     @return: True if dirty cache flushing is in progress. Otherwise false.
     """
-    
-    op_flush_inprogress = False
-    log.debug("_check_flush start")
-    
-    try:
-        cmd = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-    
-        if po.returncode == 0:
-            if output.find("Cache uploading: On") != -1:
-                op_flush_inprogress = True
-    
-        else:
-            log.info(output)
-    except:
-        pass
-    
-    log.debug("_check_flush end")
-    return op_flush_inprogress
+    if stat.find("Cache uploading: On") != -1:
+        return True
+    return False
 
 # dirty cache check by Rice
-def _check_dirtycache():
+def _check_dirtycache(stat):
     """
     Check if S3QL dirty cache is near full.
     
     @rtype: boolean
     @return: True if dirty cache is near full. Otherwise false.
     """
-    
-    op_dirtycache_nearfull = False
-    log.debug("_check_dirtycache start")
-
-    try:
-        cmd = "sudo python /usr/local/bin/s3qlstat /mnt/cloudgwfiles"
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-    
-        if po.returncode == 0:
-            if output.find("Dirty cache near full: True") != -1:
-                            op_dirtycache_nearfull = True
-        else:
-            log.info(output)
-    except:
-        pass
-
-    log.debug("_check_dirtycache end")
-    return op_dirtycache_nearfull
+    if stat.find("Dirty cache near full: True") != -1:
+        return True
+    return False
 
 def _get_serial_number(disk):
     """
@@ -778,7 +769,6 @@ def _check_nfs_service():
         if po.returncode == 3:
             if output.find("not running") >= 0:
                 op_NFS_srv = False
-                # restart_nfs_service()  # Moved this line to get_indicators()
         else:
             pass
 
@@ -809,11 +799,8 @@ def _check_smb_service():
         if po.returncode == 0:
             if output.find("running") != -1:
                 op_SMB_srv = True
-            #else:
-                # restart_smb_service()  # Moved to get_indicators()
         else:
             log.error(output)
-            # restart_smb_service()  # Moved to get_indicators()
 
         # if samba service is running, go check netbios
         if op_SMB_srv:
@@ -825,10 +812,8 @@ def _check_smb_service():
             if po2.returncode == 0:
                 if output2.find("running") == -1:
                     op_SMB_srv = False
-                    # restart_service("nmbd")  # Moved to get_indicators()
             else:
                 log.error(output)
-                # restart_service("nmbd")  # Moved to get_indicators()
 
     except:
         pass
@@ -849,7 +834,7 @@ def get_HDD_status():
                 [   
                 {
                         "serial": "string",
-                        "status": 0 // normal, 1 // failed, 2 // rebuiling RAID, 3 // not installed 
+                        "status": 0 // normal, 1 // rebuiling RAID, 2 // failed, 3 // not installed 
                 },
                 ...
                 ]
@@ -864,9 +849,7 @@ def get_HDD_status():
     try:
         with open("/root/gw_HDD_status","r") as fh:
             return_val = json.loads(fh.read())
-            for disk in return_val['data']:
-                del disk['dev']
-
+            
     except:
         pass
         
@@ -1272,6 +1255,7 @@ def _openContainter(storage_url, account, password):
         log.debug("_openContainer end")'''
 
 
+
 def _mkfs(storage_url, key, container):
     """
     Create S3QL file system.
@@ -1320,8 +1304,6 @@ def _mkfs(storage_url, key, container):
                             time.sleep(1)
                     else:
                         break
-
-                    
     # wthung, 2012/8/3
     # add except
     except Exception as e:
@@ -1331,19 +1313,80 @@ def _mkfs(storage_url, key, container):
         log.debug("_mkfs end")
         return has_existing_filesys
 
-# wthung, 2012/10/16
-def _run_subprocess(cmd):
+# wthung, 2012/11/26
+def _findChildPids(pid, pslist, cpid_list):
     """
-    Utility function to run a command by subprocess.Popen
+    Find all children/grandchildren of input pid.
+    This function is stictly based on result of command 'ps eo pid,pgid,ppid'.
+    
+    @type pid: integer
+    @param pid: Target process ID
+    @type pslist: list
+    @param pslist: Process list
+    @type cpid_list: list
+    @param cpid_list: List of all children/grandchildren processes
+    """
+    for ps in pslist:
+        if ps[2] == pid:
+            cpid_list.append(ps[0])
+            _findChildPids(ps[0], pslist, cpid_list)
+    
+    return cpid_list
+    
+# wthung, 2012/11/26
+def _killChildrenProcess(pid):
+    """
+    Kill process of pid and all its children/grandchildren
+    
+    @type pid: integer
+    @param pid: Target process ID
+    """
+    # get the pid, pgid, ppid of our current processes:
+    command = "ps axo pid,pgid,ppid"
+    psraw = os.popen(command).readlines()
+    psList = []
+    killList = []
+    
+    for ps in psraw[1:]: # 1: gets rid of header
+        psList.append(map(int,ps.split()))
+    
+    killList.append(pid)
+    _findChildPids(pid, psList, killList)
+    
+    for id in killList:
+        os.system('sudo kill -9 %d' % id)
+    
+    return
+    
+# wthung, 2012/11/26
+def _run_subprocess(cmd, timeout=86400):
+    """
+    Utility function to run a command by subprocess.Popen. 
+    Kill the subprocess after input timeout.
     
     @type cmd: string
     @param cmd: Command to run
     @rtype: tuple
     @return: Command return code and output string in a tuple
     """
+    output = ""
     po = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
-    po.wait()
+    
+    while True:
+        # check if process stops
+        po.poll()
+        
+        if po.returncode is None:
+            # not yet stop
+            timeout = timeout - 1
+            if timeout <= 0:
+                _killChildrenProcess(po.pid)
+                break
+            else:
+                time.sleep(1)
+        else:
+            output = po.stdout.read()
+            break
     
     return (po.returncode, output)
 
@@ -3467,5 +3510,5 @@ def get_last_backup_time():
 
 
 if __name__ == '__main__':
-    print apply_user_enc_key('123456', '111111')
+    print get_indicators()
     pass
