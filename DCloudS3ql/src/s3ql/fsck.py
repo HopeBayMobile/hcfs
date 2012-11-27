@@ -28,6 +28,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import subprocess
 
 
 log = logging.getLogger("fsck")
@@ -1144,6 +1145,20 @@ def parse_args(args):
 
     return options
 
+def repair_db(path):
+    """Repair and check database """
+    log.info('Repairing broken database.')
+
+    os.system("sqlite3 "  + path + ".db .dump | sed -e '$,$s/ROLLBACK/COMMIT/' | sqlite3 " + path + ".db.fixed")
+    os.rename(path + '.db.fixed', path + '.db')
+
+    cmd = 'sqlite3 ' + path + '.db "PRAGMA integrity_check(20)"'
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+
+    return output
+
 def main(args=None):
 
     if args is None:
@@ -1187,7 +1202,26 @@ def main(args=None):
             param = bucket.lookup('s3ql_metadata')
         else:
             log.info('Using cached metadata.')
-            db = Connection(cachepath + '.db')
+            #Chenming: check and repair database
+            try:
+                db = Connection(cachepath + '.db')
+            except apsw.CorruptError: 
+                cmd = 'sqlite3 ' + cachepath + '.db "PRAGMA integrity_check(20)"'
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+
+		if output.split("\n")[0] == "ok":
+		    db = Connection(cachepath + '.db')
+		else:
+                    output = repair_db(cachepath)
+	            if output.split("\n")[0] == "ok":
+ 	                db = Connection(cachepath + '.db')
+	            else:
+	                raise QuietError('Repaire failed: Local metadata is corrupted. Remove or repair the following '
+	   		                 'files manually and re-run fsck:\n'
+			                 + cachepath + '.db (corrupted)\n'
+			                 + cachepath + '.param (intact)')
             #Since we do not clear cachepath, it most likely will exist
             #assert not param['needs_fsck']
             #assert not os.path.exists(cachepath + '-cache') or param['needs_fsck']
@@ -1251,10 +1285,15 @@ def main(args=None):
                 log.error('\n'.join(x[0] for x in res))
                 raise apsw.CorruptError()
         except apsw.CorruptError:
-            raise QuietError('Local metadata is corrupted. Remove or repair the following '
-                             'files manually and re-run fsck:\n'
-                             + cachepath + '.db (corrupted)\n'
-                             + cachepath + '.param (intact)')
+            #Chenming: repair and check database
+            output = repair_db(cachepath)
+
+            if output.split("\n")[0] != "ok":
+                log.error('\n'.join(x[0] for x in res))
+                raise QuietError('Local metadata is corrupted. Remove or repair the following '
+                                     'files manually and re-run fsck:\n'
+                                     + cachepath + '.db (corrupted)\n'
+                                     + cachepath + '.param (intact)')
     else:
         def do_read(fh):
             tmpfh = tempfile.TemporaryFile()
