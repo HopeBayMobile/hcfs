@@ -1218,10 +1218,7 @@ def main(args=None):
 	            if output.split("\n")[0] == "ok":
  	                db = Connection(cachepath + '.db')
 	            else:
-	                raise QuietError('Repaire failed: Local metadata is corrupted. Remove or repair the following '
-	   		                 'files manually and re-run fsck:\n'
-			                 + cachepath + '.db (corrupted)\n'
-			                 + cachepath + '.param (intact)')
+	                log.error('Local metadata is corrupted.')
             #Since we do not clear cachepath, it most likely will exist
             #assert not param['needs_fsck']
             #assert not os.path.exists(cachepath + '-cache') or param['needs_fsck']
