@@ -384,7 +384,7 @@ def get_HDD_status():
                 op_ok = enableSMART(i)
                 
                 serial_num = api._get_serial_number(i)            
-                all_disks.add(i)
+                all_disks.add(serial_num)
             
                 cmd = "sudo smartctl -H %s" % i
                 ret_code, output = api._run_subprocess(cmd)                
@@ -393,12 +393,12 @@ def get_HDD_status():
                     op_ok, is_rebuilding = check_RAID_rebuild(i)
                     
                     if not is_rebuilding:
-                        single_hdd = {'serial': serial_num, 'status': 0, 'dev': i} # HDD is normal
+                        single_hdd = {'serial': serial_num, 'status': 0} # HDD is normal
                     else:                         
-                        single_hdd = {'serial': serial_num, 'status': 2, 'dev': i} # HDD is rebuilding RAID            
+                        single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
                 else:
                     log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
-                    single_hdd = {'serial': serial_num, 'status': 1, 'dev': i} # HDD is failed  
+                    single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
                 
                 _data.append(single_hdd)        
         
@@ -408,8 +408,8 @@ def get_HDD_status():
                     previous_status = json.loads(fh.read())
                     if (len(all_disks) < len(previous_status['data'])):
                         for disk in previous_status['data']:
-                            if disk['dev'] not in all_disks:
-                                single_hdd = {'serial': disk['serial'], 'status': 3, 'dev': disk['dev']} # HDD is not installed or empty slot
+                            if disk['serial'] not in all_disks:
+                                single_hdd = {'serial': disk['serial'], 'status': 3} # HDD is not installed or empty slot
                                 _data.append(single_hdd)
                     
         except Exception as e:

@@ -864,9 +864,7 @@ def get_HDD_status():
     try:
         with open("/root/gw_HDD_status","r") as fh:
             return_val = json.loads(fh.read())
-            for disk in return_val['data']:
-                del disk['dev']
-
+          
     except:
         pass
         
