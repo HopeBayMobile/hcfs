@@ -1161,7 +1161,6 @@ def download_metadata(bucket, cachepath):
     restore_metadata(tmpfh, db)
     db.close()
     os.rename(cachepath + '.db.tmp', cachepath + '.db')
-    return db 
 
 def repair_db(path):
     """Repair and check database """
