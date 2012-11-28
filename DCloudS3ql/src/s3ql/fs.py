@@ -31,6 +31,8 @@ log = logging.getLogger("fs")
 
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
+# refresh count for value cache
+# interval is 20s for getting indicator, thus below setting is equal to 6 hours
 REFRESH_COUNT = 1080
 
 class Operations(llfuse.Operations):
@@ -236,7 +238,7 @@ class Operations(llfuse.Operations):
                 raise llfuse.FUSEError(errno.EINVAL)
         else:
             if not self.cache.do_write:
-                raise FUSEError(errno.ENOSPC)
+                raise FUSEError(errno.EDQUOT)
             
             if self.inodes[id_].locked:
                 raise FUSEError(errno.EPERM)
@@ -252,7 +254,7 @@ class Operations(llfuse.Operations):
         log.debug('removexattr(%d, %r): start', id_, name)
 
         if not self.cache.do_write:
-            raise FUSEError(errno.ENOSPC)
+            raise FUSEError(errno.EDQUOT)
             
         if self.inodes[id_].locked:
             raise FUSEError(errno.EPERM)
@@ -805,7 +807,7 @@ class Operations(llfuse.Operations):
             raise FUSEError(errno.EINVAL)
 
         if not self.cache.do_write:
-            raise FUSEError(errno.ENOSPC)
+            raise FUSEError(errno.EDQUOT)
             
         if inode_p.locked:
             raise FUSEError(errno.EPERM)
@@ -839,7 +841,7 @@ class Operations(llfuse.Operations):
         timestamp = time.time()
 
         if not self.cache.do_write:
-            raise FUSEError(errno.ENOSPC)
+            raise FUSEError(errno.EDQUOT)
         
         if inode.locked:
             raise FUSEError(errno.EPERM)
@@ -1101,7 +1103,7 @@ class Operations(llfuse.Operations):
         inode_p = self.inodes[id_p]
 
         if not self.cache.do_write:
-            raise FUSEError(errno.ENOSPC)
+            raise FUSEError(errno.EDQUOT)
             
         if inode_p.locked:
             raise FUSEError(errno.EPERM)
@@ -1215,7 +1217,7 @@ class Operations(llfuse.Operations):
         log.debug('write(%d, %d, datalen=%d): start', fh, offset, len(buf))
 
         if not self.cache.do_write:
-            raise FUSEError(errno.ENOSPC)
+            raise FUSEError(errno.EDQUOT)
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
