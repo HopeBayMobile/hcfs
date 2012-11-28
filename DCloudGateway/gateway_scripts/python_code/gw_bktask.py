@@ -370,15 +370,13 @@ def thread_retrieve_quota():
     while not g_program_exit:
         quota = _get_gateway_quota()
         if quota <= 0:
-            log.error("Cannot retrieve SAVEBOX quota. Set default 1T.")
-            # assign default quota 1T
-            quota = 1024 ** 4
-        
-        # update quota to s3ql if different quota arrival
-        if prev_quota != quota:
-            # set quota to s3ql
-            api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
-            prev_quota = quota
+            log.debug("Cannot retrieve SAVEBOX quota.")
+        else:
+            # update quota to s3ql if different quota arrival
+            if prev_quota != quota:
+                # set quota to s3ql
+                api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
+                prev_quota = quota
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(60):
