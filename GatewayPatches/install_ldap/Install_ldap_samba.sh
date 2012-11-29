@@ -106,6 +106,10 @@ create_admin_user(){
     sudo smbldap-useradd -a -P admin 0wen1sMyL0rd
 }
 
+copy_squid3_config(){
+    sudo cp $LDAP_PACKAGE/squid.conf /etc/squid3
+}
+
 
 #main
 remove_samba_config
@@ -128,3 +132,4 @@ install_nscd_nslcd_package
 restart_nssldap_service
 copy_exports_file
 create_admin_user
+copy_squid3_config
