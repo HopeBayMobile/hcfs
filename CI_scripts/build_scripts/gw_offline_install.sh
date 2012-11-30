@@ -44,6 +44,18 @@ fi
 # remove /etc/apt/sources.list
     mv /etc/apt/sources.list  /etc/apt/sources.list.bak
 
+# modify /etc/network/interfaces
+mv /etc/network/interfaces /root/interfaces.bak
+cat > /etc/network/interfaces <<EOF
+auto lo
+iface lo inet loopback
+
+auto eth0
+iface eth0 inet static
+address 192.168.1.10
+netmask 255.255.255.0
+EOF
+
 #~ # update apt index
 # add deb files to search source
 cat > /etc/apt/sources.list.d/apt-cache.list <<EOF
