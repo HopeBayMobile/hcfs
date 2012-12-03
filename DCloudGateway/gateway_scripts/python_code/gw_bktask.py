@@ -461,7 +461,7 @@ def get_HDD_status():
     """
     For each disk, enable the SMART control optinos, get the serial number and check the status.
     Finally, compare with status collected before to find if some disk is missing.
-    The status would be encoded to json object and written to /dev/shm/gw_HDD_status.    
+    The status would be encoded to json object and written to /root/gw_HDD_status.    
     """
     
     global g_program_exit
