@@ -3,10 +3,10 @@ echo "Set bandwidth limit of port 8080 = " $2
 # clean tc rules
 tc qdisc del dev $1 root  # clean tc settings
 # flush iptables settings
-iptables -F
-iptables -X
-iptables -t nat -F
-iptables -t nat -X
+#iptables -F
+#iptables -X
+#iptables -t nat -F
+#iptables -t nat -X
 iptables -t mangle -F
 iptables -t mangle -X
 iptables -P INPUT ACCEPT
