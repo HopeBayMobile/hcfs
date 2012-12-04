@@ -189,6 +189,12 @@ def main(args=None):
 
     # Terminate threads
     finally:
+        # wthung, 2012/11/28
+        # ensure dirty cache and to_remove is empty before terminating work threads
+        # this is a block function
+        log.debug("Waiting for dirty cache to be cleaned and remove queue to become empty...")
+        do_cleanup(block_cache)
+        
         log.debug("Waiting for background threads...")
         for (op, with_lock) in ((metadata_upload_thread.stop, False),
                                 (commit_thread.stop, False),
@@ -272,6 +278,82 @@ def main(args=None):
         p.print_stats(50)
         fh.close()
 
+def do_cleanup(block_cache):
+    '''
+    Ensure dirty cache is completely flushed to cloud storage and
+    remove queue is empty. A statistic file will be dumped.
+    '''
+    data_file = '/dev/shm/cleanup_data'
+    if os.path.exists(data_file):
+        os.system('sudo rm -f %s' % data_file)
+    
+    # if backend is disconnected, quit
+    if not block_cache.network_ok:
+        log.debug("Network is down before doing cleanup jobs.")
+        return
+    
+    orig_dirty_size = block_cache.dirty_size
+    orig_remove_qsize = block_cache.to_remove.qsize()
+    cur_dirty_size = orig_dirty_size
+    cur_remove_qsize = orig_remove_qsize
+    prev_completeness = -1
+    stops = 0
+    
+    if cur_dirty_size == 0:
+        completeness1 = 100
+    else:
+        completeness1 = 0
+    if cur_remove_qsize == 0:
+        completeness2 = 100
+    else:
+        completeness2 = 0
+    
+    while cur_dirty_size > 0 or cur_remove_qsize > 0:
+        # ensure s3ql is able to upload
+        block_cache.do_upload = True
+        
+        time.sleep(1)
+        cur_dirty_size = block_cache.dirty_size
+        cur_remove_qsize = block_cache.to_remove.qsize()
+        
+        if cur_dirty_size > 0:
+            completeness1 = ((orig_dirty_size - cur_dirty_size) / orig_dirty_size) * 100
+        if cur_remove_qsize > 0:
+            completeness2 = ((orig_remove_qsize - cur_remove_qsize) / orig_remove_qsize) * 100
+        
+        completeness = min(completeness1, completeness2)
+        if prev_completeness != completeness:
+            prev_completeness = completeness
+            stops = 0
+        else:
+            # value of completeness isn't changed. increase counter
+            stops = stops + 1
+        
+        # echo statistics to a file
+        os.system("echo '%d' > %s" % (completeness, data_file))
+        
+        # if value of completeness isn't changed for 1 min
+        if stops > 60:
+            log.debug("Cleanup progress isn't changed for 1 min.")
+            # check what's happened
+            # backend is connected?
+            if block_cache.network_ok:
+                log.debug("Network is OK. Wait for another 1 min.")
+                # wait for more 5 mins. if problem remains, quit
+                if stops > 120:
+                    log.debug("Cleanup progress isn't changed for a long while. Quit.")
+                    break
+            else:
+                # wait for 30 secs to check network again
+                time.sleep(30)
+                if not block_cache.network_ok:
+                    # network is still not ok, quit
+                    log.debug("Network is down when doing cleanup jobs. Quit.")
+                    break
+            
+    # 100% completed when exiting while loop
+    os.system("echo '100' > %s" % data_file)
+        
 def determine_threads(options):
     '''Return optimum number of upload threads'''
 
@@ -676,9 +758,11 @@ class CommitThread(Thread):
                             with self.block_cache.bucket_pool() as bucket:
                                 bucket.store('cloud_gw_test_connection','nodata')
                             test_connection = 0
+                            self.block_cache.network_ok = True
                         except:
                             log.error('Network appears to be down. Delaying cache upload.')
                             self.stop_event.wait(60)
+                            self.block_cache.network_ok = False
                             break
                     else:
                         test_connection = test_connection + 1

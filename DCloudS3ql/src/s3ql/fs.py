@@ -32,8 +32,8 @@ log = logging.getLogger("fs")
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
 # refresh count for value cache
-# interval is 20s for getting indicator, thus below setting is equal to 6 hours
-REFRESH_COUNT = 1080
+# interval is 20s for getting indicator, thus below setting is equal to half hour
+REFRESH_COUNT = 90
 
 class Operations(llfuse.Operations):
     """A full-featured file system for online data storage
@@ -234,6 +234,10 @@ class Operations(llfuse.Operations):
                 update_logging(*pickle.loads(value))
             elif name == 'cachesize':
                 self.cache.max_size = pickle.loads(value)
+            elif name == 'quotasize':
+                self.cache.quota_size = pickle.loads(value)
+                # check quota
+                self.cache.check_quota()
             else:
                 raise llfuse.FUSEError(errno.EINVAL)
         else:
@@ -463,6 +467,8 @@ class Operations(llfuse.Operations):
                         # update value cache
                         self.cache.value_cache["inodes"] += 1
                         self.cache.value_cache["fs_size"] += inode.size
+                        # check quota
+                        self.cache.check_quota()
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
@@ -605,6 +611,8 @@ class Operations(llfuse.Operations):
         self.cache.value_cache["fs_size"] -= self.inodes[id_].size
         self.cache.value_cache["entries"] = max(self.cache.value_cache["entries"], 0)
         self.cache.value_cache["fs_size"] = max(self.cache.value_cache["fs_size"], 0)
+        # check quota
+        self.cache.check_quota()
 
         inode = self.inodes[id_]
         inode.refcount -= 1
@@ -823,6 +831,9 @@ class Operations(llfuse.Operations):
         self.cache.value_cache["fs_size"] += self.inodes[id_].size
         log.debug('link, fs size +%d' % self.inodes[id_].size)
         
+        # check quota
+        self.cache.check_quota()
+        
         inode = self.inodes[id_]
         inode.refcount += 1
         inode.ctime = timestamp
@@ -938,6 +949,9 @@ class Operations(llfuse.Operations):
             self.cache.value_cache["fs_size"] = fs_size
             self.cache.value_cache["dedup_size"] = dedup_size
             self.cache.value_cache["compr_size"] = compr_size
+            
+            # check quota
+            self.cache.check_quota()
 
             self.cache.refresh_count = 0
         else:
@@ -971,6 +985,9 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = max(self.cache.dirty_entries,0)
         cache_maxsize = max(self.cache.max_size,0)
         cache_maxentries = max(self.cache.max_entries,0)
+        # wthung, 2012/11/21, report quota size
+        quota_size = max(self.cache.quota_size, 0)
+        
         if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
@@ -984,8 +1001,8 @@ class Operations(llfuse.Operations):
         else:
             filesys_write = 0
 
-        return struct.pack('QQQQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write)
+        return struct.pack('QQQQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write, quota_size)
 
     def statfs(self):
         log.debug('statfs(): start')
@@ -999,21 +1016,18 @@ class Operations(llfuse.Operations):
         if self.cache.refresh_count > REFRESH_COUNT:
             blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
-            size = self.db.get_val('SELECT SUM(size) FROM blocks')
+            data_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
 
             # update value cache
             self.cache.value_cache["blocks"] = blocks
             self.cache.value_cache["inodes"] = inodes
-            self.cache.value_cache["dedup_size"] = size
+            self.cache.value_cache["fs_size"] = data_size
 
             self.cache.refresh_count = 0
         else:
             blocks = self.cache.value_cache["blocks"]
             inodes = self.cache.value_cache["inodes"]
-            size = self.cache.value_cache["dedup_size"]
-
-        if size is None:
-            size = 0
+            data_size = self.cache.value_cache["fs_size"]
 
         # wthung, 2012/11/12, retrieve db value in negative value
         if blocks < 0:
@@ -1024,14 +1038,13 @@ class Operations(llfuse.Operations):
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
             self.cache.value_cache["inodes"] = inodes
 
-        if size < 0:
-            size = self.db.get_val('SELECT SUM(size) FROM blocks')
-            self.cache.value_cache["dedup_size"] = size
-
         # file system block size, i.e. the minimum amount of space that can
         # be allocated. This doesn't make much sense for S3QL, so we just
         # return the average size of stored blocks.
-        stat_.f_frsize = size // blocks if blocks != 0 else 4096
+        
+        # wthung, 2012/12/4
+        # Used size in df will be data size before dedup
+        stat_.f_frsize = data_size // blocks if blocks != 0 else 4096
         if stat_.f_frsize == 0:  # Jiahong: Extra error handling for ensuring that the f_frsize var won't be zero
             stat_.f_frsize = 4096
 
@@ -1044,10 +1057,13 @@ class Operations(llfuse.Operations):
 
         # size of fs in f_frsize units. Since backend is supposed to be unlimited,
         # always return a half-full filesystem, but at least 1 TB)
-        fs_size = max(2 * size, 1024 ** 4)
+        #fs_size = max(2 * size, 1024 ** 4)
+        # wthung, 2012/12/4
+        # max gateway disk space is equal to quota
+        fs_size = self.cache.quota_size
 
         stat_.f_blocks = fs_size // stat_.f_frsize
-        stat_.f_bfree = (fs_size - size) // stat_.f_frsize
+        stat_.f_bfree = (fs_size - data_size) // stat_.f_frsize
         stat_.f_bavail = stat_.f_bfree # free for non-root
 
         total_inodes = max(2 * inodes, 1000000)
@@ -1124,6 +1140,9 @@ class Operations(llfuse.Operations):
             self.cache.value_cache["inodes"] += 1
             self.cache.value_cache["fs_size"] += size
             log.debug("fs size +%d" % size)
+            
+            # check quota
+            self.cache.check_quota()
         except OutOfInodesError:
             log.warn('Could not find a free inode')
             raise FUSEError(errno.ENOSPC)
@@ -1221,6 +1240,12 @@ class Operations(llfuse.Operations):
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
+            
+        # wthung, 2012/11/28
+        # if backend is disconnected and dirty cache occupies all cache, raise ENOBUFS
+        if not self.cache.network_ok and self.cache.dirty_size > self.cache.max_size:
+            log.warn('Network appears to be down and dirty cache is full.')
+            raise FUSEError(errno.ENOBUFS)
 
         total = len(buf)
         minsize = offset + total
@@ -1231,6 +1256,9 @@ class Operations(llfuse.Operations):
             self.cache.value_cache["fs_size"] += written
             offset += written
             buf = buf[written:]
+            
+        # check quota
+        self.cache.check_quota()
 
         # Update file size if changed
         # Fuse does not ensure that we do not get concurrent write requests,

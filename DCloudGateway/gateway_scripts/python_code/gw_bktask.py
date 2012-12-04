@@ -121,8 +121,8 @@ def thread_cache_usage():
         
         if prev_data_size != data_size:
             # start a thread to upload data size to swift
-            # the_thread = Thread(target=thread_upload_gw_usage, args=(data_size,))
-            # the_thread.start()
+            the_thread = Thread(target=thread_upload_gw_usage, args=(data_size,))
+            the_thread.start()
             prev_data_size = data_size
         
         if max_cache_size > 0 and max_entries > 0:
@@ -369,9 +369,7 @@ def thread_retrieve_quota():
     
     while not g_program_exit:
         quota = _get_gateway_quota()
-        if quota <= 0:
-            log.debug("Cannot retrieve SAVEBOX quota.")
-        else:
+        if quota > 0:
             # update quota to s3ql if different quota arrival
             if prev_quota != quota:
                 # set quota to s3ql
@@ -579,8 +577,8 @@ def start_background_tasks(singleloop=False):
     t5.start()
     
     # create a thread to retrieve gateway quota from swift
-    # t6 = Thread(target=thread_retrieve_quota)
-    # t6.start()
+    t6 = Thread(target=thread_retrieve_quota)
+    t6.start()
 
     while not g_program_exit:
         # get gateway indicators

@@ -254,6 +254,9 @@ class BlockCache(object):
         self.dirty_size = 0
         self.dirty_entries = 0
         self.max_size = max_size
+        self.quota_size = 1024 ** 4 # wthung, 2012/11/21, default quota size is 1T
+        self.size_gap = 1024 ** 3 # wthung, 2012/11/28, size gap between full/normal upload speed
+        self.fullspeed_factor = 0.8 # wthung, 2012/11/28, factor to control full speed
         self.in_transit = set()
         self.removed_in_transit = set()
         self.to_upload = Distributor()
@@ -279,15 +282,25 @@ class BlockCache(object):
                             "compr_size": max(self.db.get_val('SELECT SUM(size) FROM objects') or 0, 0)}
         # counter to refresh value cache
         self.refresh_count = 0
+        # flag to indicate network is ok
+        self.network_ok = True
 
         if os.access(self.path,os.F_OK):
             pass
         else:
             os.mkdir(self.path)
-
+    
     def __len__(self):
         '''Get number of objects in cache'''
         return len(self.entries)
+        
+    # wthung, 2012/11/21
+    def check_quota(self):
+        '''Check quota. If quota is reached, disable writing.'''
+        if self.value_cache["fs_size"] > self.quota_size:
+            self.do_write = False
+        else:
+            self.do_write = True
 
     def read_cachefiles(self):
         '''Read cache files as initial cache entries'''
@@ -416,12 +429,22 @@ class BlockCache(object):
         try:
             if log.isEnabledFor(logging.DEBUG):
                 time_ = time.time()
+                
+            # wthung, 2012/11/28
+            # check if dirty cache is below predefined threshold.
+            # not using full speed to upload if so
+            if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                and self.dirty_entries < self.fullspeed_factor * self.max_entries:
+                self.forced_upload = False
+                # yuxun todo: set user configured upload speed
+                log.info('Set user configured upload speed.')
             
             #Jiahong Wu (5/8/12): Added retry mechanism for cache upload. Will retry until system umount.
             while True:
                 try:
                     with self.bucket_pool() as bucket:
                         obj_size = bucket.perform_write(do_write, 's3ql_data_%d' % obj_id).get_obj_size()
+                    self.network_ok = True
                     break
                 except Exception as e:
                     log.error(str(e))
@@ -434,8 +457,10 @@ class BlockCache(object):
                             with self.bucket_pool() as bucket:
                                 bucket.bucket.conn.close()
                                 bucket.bucket.conn = bucket.bucket._get_conn()
+                            self.network_ok = True
                             break
                         except:
+                            self.network_ok = False
                             if self.going_down:
                                 raise
                             log.error('Network may be disconnected. Retrying in 10 seconds.')
@@ -454,8 +479,11 @@ class BlockCache(object):
                 except NoSuchRowError:  #  Jiahong: (10/19/2012)Object already is scheduled for deletion
                     #  Do not update dirty cache info. This is already done in remove()
                     if el.dirty:
-                        if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
+                        if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                            and self.dirty_entries < self.fullspeed_factor * self.max_entries:
                             self.forced_upload = False
+                            # yuxun todo: set user configured upload speed
+                            log.info('Set user configured upload speed.')
                 else:
                     affect_rows = self.db.execute('UPDATE objects SET size=? WHERE id=?',
                                 (obj_size, obj_id))
@@ -474,8 +502,11 @@ class BlockCache(object):
                             self.dirty_size = 0
                         if self.dirty_entries < 0:
                             self.dirty_entries = 0
-                        if self.dirty_size < 0.5*self.max_size and self.dirty_entries < 0.5*self.max_entries:
+                        if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                            and self.dirty_entries < self.fullspeed_factor * self.max_entries:
                             self.forced_upload = False
+                            # yuxun todo: set user configured upload speed
+                            log.info('Set user configured upload speed.')
                     el.dirty = False
                     #el.last_upload = time.time()
                 finally:
@@ -718,7 +749,7 @@ class BlockCache(object):
         passed to `remove` for deletion will not be deleted.
         """
 
-        #log.debug('get(inode=%d, block=%d): start', inode, blockno)
+        log.debug('get(inode=%d, block=%d): start', inode, blockno)
 
         if self.size > self.max_size or len(self.entries) > self.max_entries:
             self.expire()
@@ -798,11 +829,13 @@ class BlockCache(object):
                                 try:
                                     with self.bucket_pool() as bucket:
                                         el = bucket.perform_read(do_read, 's3ql_data_%d' % obj_id)
+                                    self.network_ok = True
                                     break
                                 except Exception as exc:
                                     if no_attempts >= 9:
                                         log.error('Read cache block error timed out....')
-                                        raise(llfuse.FUSEError(errno.EIO))
+                                        # block in backend, but cannot download it, raise EACCES
+                                        raise(llfuse.FUSEError(errno.EACCES))
                                     log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
                                     if el is not None:
@@ -812,8 +845,10 @@ class BlockCache(object):
                                         with self.bucket_pool() as bucket:
                                             bucket.bucket.conn.close()
                                             bucket.bucket.conn = bucket.bucket._get_conn()
+                                        self.network_ok = True
                                     except:
                                         log.error('Network may be down.')
+                                        self.network_ok = False
                                         raise(llfuse.FUSEError(errno.EIO))
                                     
 
@@ -871,9 +906,12 @@ class BlockCache(object):
             if self.dirty_entries < 0:
                 self.dirty_entries = 0
 
-#Jiahong: TODO: the parameter value 0.8 may be adjustable by users in the future
-            if self.dirty_size > 0.8*self.max_size or self.dirty_entries > 0.8*self.max_entries:
+#Jiahong: TODO: the parameter value 'fullspeed_factor' may be adjustable by users in the future
+            if self.dirty_size > self.fullspeed_factor * self.max_size \
+                or self.dirty_entries > self.fullspeed_factor * self.max_entries:
                 self.forced_upload = True
+                # yuxun todo: set full upload speed
+                log.info('Set full speed to upload.')
 
         #log.debug('get(inode=%d, block=%d): end', inode, blockno)
 
@@ -945,11 +983,13 @@ class BlockCache(object):
             try:
                 with self.bucket_pool() as bucket:
                     bucket.store('cloud_gw_test_connection','nodata')
+                self.network_ok = True
             except:
                 log.error('Network appears to be down. Failing expire cache.')
+                self.network_ok = False
                 if (self.max_size < self.dirty_size) or (self.max_entries < self.dirty_entries):
                 # Denial IO service if we cannot replace dirty cache now 
-                    raise(llfuse.FUSEError(errno.EIO))
+                    raise(llfuse.FUSEError(errno.ENOBUFS))
                 else:
                     force_search_clean = True
                     continue
