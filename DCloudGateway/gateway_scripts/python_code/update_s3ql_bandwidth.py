@@ -36,6 +36,10 @@ def get_scheduled_bandwidth(weekday, hour, schedule):
 
 def main():
 
+    # s3ql start to forced upload, discard the bandwidth scheduling
+    if os.path.exists('/dev/shm/forced_upload'):
+        return 
+
     retry_max = 10;
     while (not os.path.exists('/mnt/cloudgwfiles/nfsshare')) and (retry_max>0):
         time.sleep(1)

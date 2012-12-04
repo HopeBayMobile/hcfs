@@ -24,6 +24,7 @@ import time
 import stat
 import re
 from .backends.common import NoSuchObject
+from gateway import update_s3ql_bandwidth as bw
 
 # standard logger for this module
 log = logging.getLogger("BlockCache")
@@ -437,7 +438,16 @@ class BlockCache(object):
                 and self.dirty_entries < self.fullspeed_factor * self.max_entries:
                 self.forced_upload = False
                 # yuxun todo: set user configured upload speed
-                log.info('Set user configured upload speed.')
+                if os.path.exists('/dev/shm/forced_upload'):
+                    cmd = "rm /dev/shm/forced_upload"
+                    os.system(cmd)
+                                        
+                    cmd = "/etc/delta/update_bandwidth"
+                    os.system(cmd)
+                    log.info('Set user configured upload speed.')
+                else:
+                    log.info("already set user configured upload speed")
+                #log.info('Set user configured upload speed.')
             
             #Jiahong Wu (5/8/12): Added retry mechanism for cache upload. Will retry until system umount.
             while True:
@@ -483,7 +493,16 @@ class BlockCache(object):
                             and self.dirty_entries < self.fullspeed_factor * self.max_entries:
                             self.forced_upload = False
                             # yuxun todo: set user configured upload speed
-                            log.info('Set user configured upload speed.')
+                            if os.path.exists('/dev/shm/forced_upload'):
+                                cmd = "rm /dev/shm/forced_upload"
+                                os.system(cmd)
+                                        
+                                cmd = "/etc/delta/update_bandwidth"
+                                os.system(cmd)
+                                log.info('Set user configured upload speed.')
+                            else:
+                                log.info("already set user configured upload speed")
+                            #log.info('Set user configured upload speed.')
                 else:
                     affect_rows = self.db.execute('UPDATE objects SET size=? WHERE id=?',
                                 (obj_size, obj_id))
@@ -506,7 +525,16 @@ class BlockCache(object):
                             and self.dirty_entries < self.fullspeed_factor * self.max_entries:
                             self.forced_upload = False
                             # yuxun todo: set user configured upload speed
-                            log.info('Set user configured upload speed.')
+                            if os.path.exists('/dev/shm/forced_upload'):
+                                cmd = "rm /dev/shm/forced_upload"
+                                os.system(cmd)
+                                        
+                                cmd = "/etc/delta/update_bandwidth"
+                                os.system(cmd)
+                                log.info('Set user configured upload speed.')
+                            else:
+                                log.info("already set user configured upload speed")
+                            #log.info('Set user configured upload speed.')
                     el.dirty = False
                     #el.last_upload = time.time()
                 finally:
@@ -911,8 +939,24 @@ class BlockCache(object):
                 or self.dirty_entries > self.fullspeed_factor * self.max_entries:
                 self.forced_upload = True
                 # yuxun todo: set full upload speed
-                log.info('Set full speed to upload.')
-
+                if os.path.exists('/dev/shm/forced_upload'):
+                    # already in full upload speed
+                    log.info("already in full upload speed")
+                else:
+                    #first create the forced_upload file, then set the maximum bandwidth 
+                    cmd = "touch /dev/shm/forced_upload"
+                    os.system(cmd)
+                    
+                    new_bw = 1024 * 1024
+                    try:
+                        bw.set_bandwidth(new_bw)
+                        cmd = "/etc/delta/uploadon"
+                        os.system(cmd)
+                        
+                        log.info('Set full speed to upload.')
+                    except:
+                        log.info("Some error occur when set full upload speed")
+                    
         #log.debug('get(inode=%d, block=%d): end', inode, blockno)
 
 
