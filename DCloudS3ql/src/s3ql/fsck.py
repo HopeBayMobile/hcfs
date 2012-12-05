@@ -1182,8 +1182,7 @@ def main(args=None):
         args = sys.argv[1:]
 
     options = parse_args(args)
-    stdout_log_handler = gitsetup_logging(options)
-    
+    stdout_log_handler = setup_logging(options)
     if stdout_log_handler:
         logging.getLogger().removeHandler(stdout_log_handler)
 
