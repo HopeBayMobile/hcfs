@@ -1182,7 +1182,10 @@ def main(args=None):
         args = sys.argv[1:]
 
     options = parse_args(args)
-    setup_logging(options)
+    stdout_log_handler = gitsetup_logging(options)
+    
+    if stdout_log_handler:
+        logging.getLogger().removeHandler(stdout_log_handler)
 
     # Check if fs is mounted on this computer
     # This is not foolproof but should prevent common mistakes
