@@ -657,16 +657,29 @@ class CommitThread(Thread):
             if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
                 test_connection = 100
+
+                # Jiahong (12/7/12): Adding code to monitor and fix inconsistent number of dirty cache entries reported
+
+                most_recent_access = 0
+                have_dirty_cache = False
+                total_cache_size = 0
+
                 for el in self.block_cache.entries.values_rev():
+                    if (most_recent_access < el.last_access):
+                        most_recent_access = el.last_access
+                    if el.dirty and have_dirty_cache is False:
+                        have_dirty_cache = True
+                    total_cache_size += el.size
+
                     if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
-                        break;
+                        continue
                     if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit and not el.to_delete):
                         continue
                     #Modified by Jiahong Wu
                     # Wait for one minute since last uploading the block to do it again
                     # TODO: consider new policy on when to upload the block. May need to delay doing
                     # TODO: so if the block or the file is being accessed (either read or write)
-					# Jiahong (10/25/12): Change back to last_access, but now wait for 60 seconds
+                    # Jiahong (10/25/12): Change back to last_access, but now wait for 60 seconds
                     if stamp - el.last_access < 60:
                         continue
 
@@ -695,6 +708,40 @@ class CommitThread(Thread):
 
                     if self.stop_event.is_set():
                         break
+            else:  # Added by Jiahong on 12/7/12 to handle inconsisteny number of dirty cache entries 
+                most_recent_access = 0
+                have_dirty_cache = False
+                total_cache_size = 0
+
+                for el in self.block_cache.entries.values_rev():
+                    if (most_recent_access < el.last_access):
+                        most_recent_access = el.last_access
+                    if el.dirty and have_dirty_cache is False:
+                        have_dirty_cache = True
+                    total_cache_size += el.size
+
+            if have_dirty_cache:
+                log.debug('Computed cache status in committhread: Most_recent_access %d, Have dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
+            else:
+                log.debug('Computed cache status in committhread: Most_recent_access %d, No dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
+
+            if time.time() - most_recent_access > 60 and have_dirty_cache is False and total_cache_size != self.block_cache.size and self.block_cache.dirty_entries > 0:
+                log.info('Potential cache size inconsistency detected. Conducting sweeping.')
+                with llfuse.lock:
+                    real_total_cache_size = 0
+                    real_dirty_cache_size = 0
+                    real_dirty_entries = 0
+                    for el in self.block_cache.entries.values_rev():
+                        real_total_cache_size += el.size
+                        if el.dirty:
+                            real_dirty_cache_size += el.size
+                            real_dirty_entries += 1
+                    log.debug('Computed value after sweeping: %d, %d, %d' % (real_total_cache_size, real_dirty_cache_size, real_dirty_entries))
+                    if real_total_cache_size != self.block_cache.size or real_dirty_cache_size != self.block_cache.dirty_size or real_dirty_entries != self.block_cache.dirty_entries:
+                        log.error('Inconsistency in cache size detected, correcting to actual value.')
+                        self.block_cache.size = real_total_cache_size
+                        self.block_cache.dirty_size = real_dirty_cache_size
+                        self.block_cache.dirty_entries = real_dirty_entries
 
             if not did_sth:
                 self.stop_event.wait(5)
