@@ -370,15 +370,13 @@ def thread_retrieve_quota():
     while not g_program_exit:
         quota = _get_gateway_quota()
         if quota <= 0:
-            log.error("Cannot retrieve SAVEBOX quota. Set default 1T.")
-            # assign default quota 1T
-            quota = 1024 ** 4
-        
-        # update quota to s3ql if different quota arrival
-        if prev_quota != quota:
-            # set quota to s3ql
-            api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
-            prev_quota = quota
+            log.debug("Cannot retrieve SAVEBOX quota.")
+        else:
+            # update quota to s3ql if different quota arrival
+            if prev_quota != quota:
+                # set quota to s3ql
+                api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
+                prev_quota = quota
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(60):
@@ -461,7 +459,7 @@ def get_HDD_status():
     """
     For each disk, enable the SMART control optinos, get the serial number and check the status.
     Finally, compare with status collected before to find if some disk is missing.
-    The status would be encoded to json object and written to /dev/shm/gw_HDD_status.    
+    The status would be encoded to json object and written to /root/gw_HDD_status.    
     """
     
     global g_program_exit
@@ -489,7 +487,7 @@ def get_HDD_status():
                 op_ok = enableSMART(i)
                 
                 serial_num = api._get_serial_number(i)            
-                all_disks.add(i)
+                all_disks.add(serial_num)
             
                 cmd = "sudo smartctl -H %s" % i
                 ret_code, output = api._run_subprocess(cmd)                
@@ -498,12 +496,12 @@ def get_HDD_status():
                     op_ok, is_rebuilding = check_RAID_rebuild(i)
                     
                     if not is_rebuilding:
-                        single_hdd = {'serial': serial_num, 'status': 0, 'dev': i} # HDD is normal
+                        single_hdd = {'serial': serial_num, 'status': 0} # HDD is normal
                     else:                         
-                        single_hdd = {'serial': serial_num, 'status': 2, 'dev': i} # HDD is rebuilding RAID            
+                        single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
                 else:
                     log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
-                    single_hdd = {'serial': serial_num, 'status': 1, 'dev': i} # HDD is failed  
+                    single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
                 
                 _data.append(single_hdd)        
         
@@ -513,8 +511,8 @@ def get_HDD_status():
                     previous_status = json.loads(fh.read())
                     if (len(all_disks) < len(previous_status['data'])):
                         for disk in previous_status['data']:
-                            if disk['dev'] not in all_disks:
-                                single_hdd = {'serial': disk['serial'], 'status': 3, 'dev': disk['dev']} # HDD is not installed or empty slot
+                            if disk['serial'] not in all_disks:
+                                single_hdd = {'serial': disk['serial'], 'status': 3} # HDD is not installed or empty slot
                                 _data.append(single_hdd)
                     
         except Exception as e:

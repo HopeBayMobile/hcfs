@@ -43,7 +43,6 @@ fi
 
 # remove /etc/apt/sources.list
     mv /etc/apt/sources.list  /etc/apt/sources.list.bak
-
 #~ # update apt index
 # add deb files to search source
 cat > /etc/apt/sources.list.d/apt-cache.list <<EOF

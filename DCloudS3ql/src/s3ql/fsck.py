@@ -10,7 +10,7 @@ Jia-Hong edited this file for checking cached files without uploading them first
 
 from __future__ import division, print_function, absolute_import
 from . import CURRENT_FS_REV
-from .backends.common import NoSuchObject, get_bucket, NoSuchBucket
+from .backends.common import NoSuchObject, get_bucket, NoSuchBucket, TimeoutError
 from .common import (ROOT_INODE, inode_for_path, sha256_fh, get_path, BUFSIZE, get_bucket_cachedir, 
     setup_logging, QuietError, get_seq_no, stream_write_bz2, stream_read_bz2, CTRL_INODE)
 from .database import NoSuchRowError, Connection
@@ -28,6 +28,7 @@ import sys
 import tempfile
 import textwrap
 import time
+import subprocess
 
 
 log = logging.getLogger("fsck")
@@ -1144,13 +1145,46 @@ def parse_args(args):
 
     return options
 
+def download_metadata(bucket, cachepath):
+    """ Downloading and decompressing metadata from swift"""
+    def do_read(fh):
+        tmpfh = tempfile.TemporaryFile()
+        stream_read_bz2(fh, tmpfh)
+        return tmpfh
+    log.info('Downloading and decompressing metadata...')
+    tmpfh = bucket.perform_read(do_read, "s3ql_metadata")
+    os.close(os.open(cachepath + '.db.tmp', os.O_RDWR | os.O_CREAT | os.O_TRUNC,
+                     stat.S_IRUSR | stat.S_IWUSR))
+    db = Connection(cachepath + '.db.tmp', fast_mode=True)
+    log.info("Reading metadata...")
+    tmpfh.seek(0)
+    restore_metadata(tmpfh, db)
+    db.close()
+    os.rename(cachepath + '.db.tmp', cachepath + '.db')
+
+def repair_db(path):
+    """Repair and check database """
+    log.info('Repairing broken database.')
+
+    os.system("sqlite3 "  + path + ".db .dump | sed -e '$,$s/ROLLBACK/COMMIT/' | sqlite3 " + path + ".db.fixed")
+    os.rename(path + '.db.fixed', path + '.db')
+
+    cmd = 'sqlite3 ' + path + '.db "PRAGMA integrity_check(20)"'
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+
+    return output
+
 def main(args=None):
 
     if args is None:
         args = sys.argv[1:]
 
     options = parse_args(args)
-    setup_logging(options)
+    stdout_log_handler = setup_logging(options)
+    if stdout_log_handler:
+        logging.getLogger().removeHandler(stdout_log_handler)
 
     # Check if fs is mounted on this computer
     # This is not foolproof but should prevent common mistakes
@@ -1187,7 +1221,24 @@ def main(args=None):
             param = bucket.lookup('s3ql_metadata')
         else:
             log.info('Using cached metadata.')
-            db = Connection(cachepath + '.db')
+            #Chenming: check and repair database
+            try:
+                db = Connection(cachepath + '.db')
+            except apsw.CorruptError:  
+                cmd = 'sqlite3 ' + cachepath + '.db "PRAGMA integrity_check(20)"'
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                output = po.stdout.read()
+                po.wait()
+		
+		if output.split("\n")[0] == "ok":
+		    db = Connection(cachepath + '.db')
+		else:
+                    output = repair_db(cachepath)
+                    
+	            if output.split("\n")[0] == "ok":
+ 	                db = Connection(cachepath + '.db')
+	            else:
+	                log.error('Local metadata is corrupted.')
             #Since we do not clear cachepath, it most likely will exist
             #assert not param['needs_fsck']
             #assert not os.path.exists(cachepath + '-cache') or param['needs_fsck']
@@ -1251,26 +1302,18 @@ def main(args=None):
                 log.error('\n'.join(x[0] for x in res))
                 raise apsw.CorruptError()
         except apsw.CorruptError:
-            raise QuietError('Local metadata is corrupted. Remove or repair the following '
-                             'files manually and re-run fsck:\n'
-                             + cachepath + '.db (corrupted)\n'
-                             + cachepath + '.param (intact)')
+            #Chenming: repair and check database
+            db.close()
+            output = repair_db(cachepath)
+
+	    if output.split("\n")[0] != "ok":
+                log.error('\n'.join(x[0] for x in res))
+                log.error('Local metadata is corrupted after connect db.')
+                download_metadata(bucket, cachepath)
+            db = Connection(cachepath + '.db')            
     else:
-        def do_read(fh):
-            tmpfh = tempfile.TemporaryFile()
-            stream_read_bz2(fh, tmpfh)
-            return tmpfh
-        log.info('Downloading and decompressing metadata...')
-        tmpfh = bucket.perform_read(do_read, "s3ql_metadata")
-        os.close(os.open(cachepath + '.db.tmp', os.O_RDWR | os.O_CREAT | os.O_TRUNC,
-                         stat.S_IRUSR | stat.S_IWUSR))
-        db = Connection(cachepath + '.db.tmp', fast_mode=True)
-        log.info("Reading metadata...")
-        tmpfh.seek(0)
-        restore_metadata(tmpfh, db)
-        db.close()
-        os.rename(cachepath + '.db.tmp', cachepath + '.db')
-        db = Connection(cachepath + '.db')
+        download_metadata(bucket, cachepath)
+        db = Connection(cachepath + '.db')            
 
     # Increase metadata sequence no 
     param['seq_no'] += 1
