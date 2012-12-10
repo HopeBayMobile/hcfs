@@ -166,6 +166,33 @@ def getGatewayConfig():
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
 
+# wthung, 2012/12/10
+def getSaveboxConfig():
+    """
+    Get SAVEBOX configuration from /etc/delta/savebox.ini.
+
+    Will raise GatewayConfError if some error ocurred.
+
+    @rtype: ConfigParser
+    @return: Instance of ConfigParser.
+    """
+    config_name = '/etc/delta/savebox.ini'
+
+    try:
+        config = ConfigParser.ConfigParser()
+        with open(config_name, 'rb') as fh:
+            config.readfp(fh)
+
+        if not config.has_section("squid3"):
+            raise GatewayConfError("Failed to find section [squid3] in the config file")
+        if not config.has_option("squid3", "start_on_boot"):
+            raise GatewayConfError("Failed to find option 'start_on_boot'  in section [squid3] in the config file")
+
+        return config
+    except IOError:
+        op_msg = 'Failed to access %s' % config_name
+        raise GatewayConfError(op_msg)
+        
 # wthung
 def _get_storage_account():
     """
@@ -1704,6 +1731,16 @@ def build_gateway(user_key):
             # yen, 2012/10/09.
             # restore configuration from cloud
             api_restore_conf.restore_gateway_configuration()
+            
+            # wthung, 2012/12/10
+            # read savebox.ini and set proxy status
+            sb_config = getSaveboxConfig()
+            proxy_status = sb_config('squid3', 'start_on_boot')
+            if proxy_status == 'on':
+                # turn proxy on
+                os.system('service squid3 start')
+            else:
+                os.system('service squid3 stop')
         
         # restart nfs
         restart_service("nfs-kernel-server")

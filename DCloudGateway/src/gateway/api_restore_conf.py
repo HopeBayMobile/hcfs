@@ -174,7 +174,8 @@ def save_gateway_configuration():
                   'code': 0x8019,
                   'msg': 'Configuration backup failed.'}
     # yen, 2012/10/09. Remove outdated config files
-    fileList = ['/etc/delta/gw_schedule.conf']
+    fileList = ['/etc/delta/gw_schedule.conf',
+                '/etc/delta/savebox.ini']
     
     swiftData = _get_Swift_credential()
     if swiftData[0] is None:
@@ -255,10 +256,6 @@ def restore_gateway_configuration():
                 os.system(cmd)
                 # ^^^ 3.2. put config files back to their destination folder.
 
-            # ^^^ 3.3. restart gateway services
-            api.restart_nfs_service()
-            api.restart_smb_service()
-
             op_ok = True
             op_code = 0xF
             op_msg = "Restoring configuration files was successful."
@@ -280,10 +277,8 @@ def restore_gateway_configuration():
 
 #----------------------------------------------------------------------
 if __name__ == '__main__':
-    #res = save_gateway_configuration()
-    #print res
     #info = get_configuration_backup_info()
     #print info
-    res = restore_gateway_configuration()
-    print res
+    #print save_gateway_configuration()
+    print restore_gateway_configuration()
     pass

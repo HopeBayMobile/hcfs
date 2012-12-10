@@ -581,6 +581,9 @@ def start_background_tasks(singleloop=False):
     # create a thread to retrieve gateway quota from swift
     # t6 = Thread(target=thread_retrieve_quota)
     # t6.start()
+    
+    # set proxy
+    os.system('sudo python /etc/delta/set_proxy.py')
 
     while not g_program_exit:
         # get gateway indicators

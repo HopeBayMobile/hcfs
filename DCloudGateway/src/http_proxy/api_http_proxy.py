@@ -44,6 +44,16 @@ def set_http_proxy(setting):
     if po.returncode == 0:
         op_ok = True
         op_code = '100'
+        # wthung, 2012/12/10
+        # write to savebox.ini
+        sb_ini = '/etc/delta/savebox.ini'
+        try:
+            sb_config = api.getSaveboxConfig()
+            sb_config.set('squid3', 'start_on_boot', setting)
+            with open(sb_ini, 'wb') as op_fh:
+                sb_config.write(op_fh)
+        except Exception as e:
+            print('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
     elif po.returncode == 1:
         if setting == "off":
             # maybe squid3 has been stopped
@@ -60,3 +70,6 @@ def set_http_proxy(setting):
                   'msg':    op_msg}
 
     return json.dumps(return_val)
+
+if __name__ == '__main__':
+    print set_http_proxy('on')
