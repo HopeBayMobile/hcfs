@@ -1276,6 +1276,7 @@ def _mkfs(storage_url, key, container):
     # wthung, 2012/8/3
     # add a var to indicate an exiting filesys
     has_existing_filesys = False
+    result = True
 
     try:
         cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/%s/delta" % (storage_url, container)
@@ -1295,23 +1296,26 @@ def _mkfs(storage_url, key, container):
                 countdown = 86400
                 while countdown > 0:
                     po.poll()
-                    if po.returncode != 0:
+                    if po.returncode is None:
+                        # fsck not finished
                         countdown = countdown - 1
                         if countdown <= 0:
-                            log.error("Timed out during fsck")
+                            log.error("Timed out during fsck.")
                             raise RuntimeError
                         else:
                             time.sleep(1)
                     else:
+                        # fsck terminated, check return code again
+                        if po.returncode != 0:
+                            raise RuntimeError
                         break
-    # wthung, 2012/8/3
-    # add except
     except Exception as e:
+        result = False
         log.error('_mkfs error: %s' % str(e))
 
     finally:
         log.debug("_mkfs end")
-        return has_existing_filesys
+        return (result, has_existing_filesys)
 
 # wthung, 2012/11/26
 def _findChildPids(pid, pslist, cpid_list):
@@ -1688,7 +1692,9 @@ def build_gateway(user_key):
         password = op_config.get(section, 'backend-password')
         
         user_container = _check_container(storage_url=url, account=account, password=password)
-        has_filesys = _mkfs(storage_url=url, key=user_key, container=user_container)
+        mkfs_result, has_filesys = _mkfs(storage_url=url, key=user_key, container=user_container)
+        if not mkfs_result:
+            raise BuildGWError('Error occurred during mkfs.')
         _mount(storage_url=url, container=user_container)
         
         # wthung, 2012/8/3
