@@ -7,7 +7,10 @@
 import os
 import json
 import subprocess
+from gateway import api
+from gateway import common
 
+log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
 def set_http_proxy(setting):
     """
@@ -52,8 +55,10 @@ def set_http_proxy(setting):
             sb_config.set('squid3', 'start_on_boot', setting)
             with open(sb_ini, 'wb') as op_fh:
                 sb_config.write(op_fh)
+            # save conf. To avoid UI hang, use an external process
+            api._run_subprocess('sudo python /etc/delta/save_conf.py', 180)
         except Exception as e:
-            print('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
+            log.error('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
     elif po.returncode == 1:
         if setting == "off":
             # maybe squid3 has been stopped
