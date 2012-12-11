@@ -56,7 +56,8 @@ def set_http_proxy(setting):
             with open(sb_ini, 'wb') as op_fh:
                 sb_config.write(op_fh)
             # save conf. To avoid UI hang, use an external process
-            api._run_subprocess('sudo python /etc/delta/save_conf.py', 180)
+            cmd = 'sudo python /etc/delta/save_conf.py'
+            subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except Exception as e:
             log.error('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
     elif po.returncode == 1:
