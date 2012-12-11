@@ -1734,13 +1734,16 @@ def build_gateway(user_key):
             
             # wthung, 2012/12/10
             # read savebox.ini and set proxy status
-            sb_config = getSaveboxConfig()
-            proxy_status = sb_config('squid3', 'start_on_boot')
-            if proxy_status == 'on':
-                # turn proxy on
-                os.system('service squid3 start')
-            else:
-                os.system('service squid3 stop')
+            try:
+                sb_config = getSaveboxConfig()
+                proxy_status = sb_config('squid3', 'start_on_boot')
+                if proxy_status == 'on':
+                    # turn proxy on
+                    os.system('service squid3 start')
+                else:
+                    os.system('service squid3 stop')
+            except Exception as e:
+                log.error(str(e))
         
         # restart nfs
         restart_service("nfs-kernel-server")

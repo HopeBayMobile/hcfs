@@ -582,9 +582,6 @@ def start_background_tasks(singleloop=False):
     # t6 = Thread(target=thread_retrieve_quota)
     # t6.start()
     
-    # set proxy
-    os.system('sudo python /etc/delta/set_proxy.py')
-
     while not g_program_exit:
         # get gateway indicators
         ret = get_gw_indicator()
