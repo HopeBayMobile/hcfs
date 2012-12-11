@@ -33,18 +33,23 @@ def set_http_proxy(setting):
                   'msg': op_msg}
 
     if setting == "on":
-        cmd = "sudo service squid3 restart"
+        cmd = "sudo service squid3 start"
     elif setting == "off":
         cmd = "sudo service squid3 stop"
     else:
         op_msg = 'Invalid argument. Must be "on" or "off"'
+        return_val['msg'] = op_msg
         return json.dumps(return_val)
 
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    output = po.stdout.read()
     po.wait()
 
-    if po.returncode == 0:
+    # check proxy status is really set
+    proxy_status = "off"
+    if api._check_process_alive('squid3'):
+        proxy_status = "on"
+        
+    if setting == proxy_status:            
         op_ok = True
         op_code = '100'
         # wthung, 2012/12/10
@@ -60,16 +65,11 @@ def set_http_proxy(setting):
             subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except Exception as e:
             log.error('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
-    elif po.returncode == 1:
-        if setting == "off":
-            # maybe squid3 has been stopped
-            op_ok = True
-            op_code = '100'
-            op_msg = 'http proxy has already been stopped.'
-        else:
-            op_ok = False
-            op_code = '000'
-            op_msg = 'Failed to turn %s http proxy.' % setting
+    else:
+        # current proxy status is not the same as api set
+        op_ok = False
+        op_code = '000'
+        op_msg = 'Failed to turn %s http proxy.' % setting
 
     return_val = {'result': op_ok,
                   'code':   op_code,
