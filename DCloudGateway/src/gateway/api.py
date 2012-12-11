@@ -2077,6 +2077,7 @@ def test_storage_account(storage_url, account, password):
             log.error('Error in traceroute:\n' + str(e))
 
     return_val = {'result' : op_ok,
+                  'code'   : op_code,
                   'msg'    : op_msg,
                   'data'   : {}}
     
