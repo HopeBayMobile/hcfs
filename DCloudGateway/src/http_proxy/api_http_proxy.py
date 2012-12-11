@@ -12,31 +12,6 @@ from gateway import common
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
-# wthung, 2012/12/11
-def check_http_proxy_alive():
-    """
-    Query squid3 service status.
-    Will try to parse status from savebox.ini.
-    If that file can't be accessed, try to get status from process list
-    
-    @rtype: boolean
-    @return: True if squid3 service is running. Otherwise, False.
-    """
-    squid3_status = False
-    
-    try:
-        sb_config = api.getSaveboxConfig()
-        setting = sb_config.get('squid3', 'start_on_boot')
-        if setting == 'on':
-            squid3_status = True
-        else:
-            squid3_status = False
-    except:
-        # try to get status from process list
-        squid3_status = api._check_process_alive('squid3')
-    
-    return squid3_status
-
 def set_http_proxy(setting):
     """
     Toggle squid service to be on or off.

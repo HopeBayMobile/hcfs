@@ -499,8 +499,9 @@ def get_gateway_indicators():
             # read indicator file as result
             # deserialize json object from file
             with open(indic_file) as fh:
-                #return json.dumps(json.load(fh))
                 return_val = json.load(fh)
+                # update proxy status
+                return_val['data']['HTTP_proxy_srv'] = _check_process_alive('squid3')
         else:
             # invoke regular function calls
             log.info('No indicator file existed. Try to spend some time to get it')
