@@ -211,7 +211,7 @@ def _get_storage_account():
         section = "CloudStorageGateway"
         op_account = op_config.get(section, 'backend-login')
     except Exception as e:
-        log.error("Failed to _get_storage_account: %s" % str(e))
+        log.debug("Failed to _get_storage_account: %s" % str(e))
     
     return op_account
 
@@ -234,7 +234,7 @@ def getStorageUrl():
         section = "CloudStorageGateway"
         storage_url = config.get(section, 'storage-url').replace("swift://", "")
     except Exception as e:
-        log.error("Failed to getStorageUrl: %s" % str(e))
+        log.debug("Failed to getStorageUrl: %s" % str(e))
     finally:
         log.debug("getStorageUrl end")
     return storage_url
@@ -920,7 +920,7 @@ def get_storage_account():
     except IOError as e:
         op_code = 0x8003
         op_msg = 'File access failed.'
-        log.error(str(e))
+        log.debug(str(e))
     except Exception as e:
         op_code = 0x8017
         op_msg = 'Obtaining storage url or login info failed.' 
