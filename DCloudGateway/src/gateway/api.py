@@ -1736,7 +1736,7 @@ def build_gateway(user_key):
             # read savebox.ini and set proxy status
             try:
                 sb_config = getSaveboxConfig()
-                proxy_status = sb_config('squid3', 'start_on_boot')
+                proxy_status = sb_config.get('squid3', 'start_on_boot')
                 if proxy_status == 'on':
                     # turn proxy on
                     os.system('service squid3 start')
