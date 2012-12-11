@@ -534,7 +534,13 @@ def get_HDD_status():
             time.sleep(1)
             if g_program_exit:
                 break
-             
+
+def delete_lostfound():
+    """
+    clean the lost+found folder
+    """
+    return os.system("/etc/delta/delete_lostfound")
+                 
                
 ##############################################################################
 '''
@@ -582,6 +588,15 @@ def start_background_tasks(singleloop=False):
     # t6 = Thread(target=thread_retrieve_quota)
     # t6.start()
     
+    # create a thread to update s3ql upload bandwidth
+    #t7 = Thread(target=update_bandwidth)
+    #t7.start()
+    
+    # create a thread to delete lost+found files(only do once)
+    t8 = Thread(target=delete_lostfound)
+    t8.start()
+   
+         
     while not g_program_exit:
         # get gateway indicators
         ret = get_gw_indicator()
