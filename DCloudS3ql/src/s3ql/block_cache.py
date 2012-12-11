@@ -862,8 +862,8 @@ class BlockCache(object):
                                 except Exception as exc:
                                     if no_attempts >= 9:
                                         log.error('Read cache block error timed out....')
-                                        # block in backend, but cannot download it, raise EACCES
-                                        raise(llfuse.FUSEError(errno.EACCES))
+                                        # block in backend, but cannot download it, raise EAGAIN
+                                        raise(llfuse.FUSEError(errno.EAGAIN))
                                     log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
                                     if el is not None:
@@ -877,7 +877,7 @@ class BlockCache(object):
                                     except:
                                         log.error('Network may be down.')
                                         self.network_ok = False
-                                        raise(llfuse.FUSEError(errno.EIO))
+                                        raise(llfuse.FUSEError(errno.EAGAIN))
                                     
 
                         # Note: We need to do this *before* releasing the global
