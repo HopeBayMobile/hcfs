@@ -533,7 +533,43 @@ def get_HDD_status():
             if g_program_exit:
                 break
              
-               
+    
+def update_bandwidth():
+    """
+    Check the forced_upload file in /dev/shm to see if need to update the s3ql bandwidth. 
+    If forced_file exists, set the full bandwidth to upload.
+    If not, set the confiured bandwidth back.       
+    """
+
+    global g_program_exit
+
+    now_bw = 1 # 0 full bandwidth / 1 configured bandwidth
+    full_bw = 1024 * 1024
+
+    while not g_program_exit:
+        if os.path.exists('/dev/shm/forced_upload'):
+            if now_bw == 0:
+                pass
+            else:
+                bw.set_bandwidth(full_bw)
+                cmd = "/etc/delta/uploadon"
+                os.system(cmd)
+                now_bw = 0
+
+        else:
+            if now_bw == 0:
+                cmd = "/etc/delta/update_bandwidth"
+                os.system(cmd)
+                now_bw = 1
+            else:
+                pass
+
+        for _ in range(10):
+            time.sleep(1)
+            if g_program_exit:
+                break
+
+           
 ##############################################################################
 '''
     Main.
@@ -579,6 +615,10 @@ def start_background_tasks(singleloop=False):
     # create a thread to retrieve gateway quota from swift
     t6 = Thread(target=thread_retrieve_quota)
     t6.start()
+
+    # create a thread to update s3ql upload bandwidth
+    t7 = Thread(target=update_bandwidth)
+    t7.start()
 
     while not g_program_exit:
         # get gateway indicators
