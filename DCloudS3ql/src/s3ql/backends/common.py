@@ -169,17 +169,18 @@ def http_connection(hostname, port, ssl=False):
         proxy_host = hit.group(2)
         log.info('Using proxy %s:%d', proxy_host, proxy_port)
         
+        # wthung, 2012/12/12, change timeout to 60s
         if ssl:
-            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=300)
+            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=60)
         else:
-            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=300)
+            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=60)
         conn.set_tunnel(hostname, port)
         return conn
     
     elif ssl:
-        return httplib.HTTPSConnection(hostname, port, timeout=300)
+        return httplib.HTTPSConnection(hostname, port, timeout=60)
     else:
-        return httplib.HTTPConnection(hostname, port, timeout=300)
+        return httplib.HTTPConnection(hostname, port, timeout=60)
     
 def sha256(s):
     return hashlib.sha256(s).digest()
