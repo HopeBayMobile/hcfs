@@ -780,42 +780,44 @@ class BlockCache(object):
                         continue
 
                     # We need to download
+                    self.in_transit.add((inode,blockno))  # Jiahong (12/12/12): added to resolve data inconsistency when multi-threading
                     self.in_transit.add(obj_id)
                     log.debug('get(inode=%d, block=%d): downloading object %d..',
                               inode, blockno, obj_id)
                     def do_read(fh):
-                        el = CacheEntry(inode, blockno, filename)
+                        new_block = CacheEntry(inode, blockno, filename)
                         #Jiahong: At the start of the download, mark the group read bit to specify that this block is being downloaded
-                        el.download_set()
-                        shutil.copyfileobj(fh, el, BUFSIZE)
-                        return el
+                        new_block.download_set()
+                        shutil.copyfileobj(fh, new_block, BUFSIZE)
+                        return new_block
                     try:
                         #Jiahong: added retry mechanism to perform_read
 #Jiahong (5/4/12): Implemented a mechanism for labeling partially downloaded block objects. Such objects are removed during fsck
-                        with lock_released:
-                            no_attempts=0
-                            while no_attempts < 10:
-                                try:
+                        # Jiahong (12/12/12): Rewriting lock_release scope to deal with data inconsistency problem
+                        no_attempts=0
+                        while no_attempts < 10:
+                            try:
+                                with lock_released:
                                     with self.bucket_pool() as bucket:
                                         el = bucket.perform_read(do_read, 's3ql_data_%d' % obj_id)
-                                    break
-                                except Exception as exc:
-                                    if no_attempts >= 9:
-                                        log.error('Read cache block error timed out....')
-                                        raise(llfuse.FUSEError(errno.EIO))
-                                    log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
-                                    no_attempts += 1
-                                    if el is not None:
-                                        el.unlink()
-                                    time.sleep(5)
-                                    try:
-                                        with self.bucket_pool() as bucket:
-                                            bucket.bucket.conn.close()
-                                            bucket.bucket.conn = bucket.bucket._get_conn()
-                                    except:
-                                        log.error('Network may be down.')
-                                        raise(llfuse.FUSEError(errno.EIO))
-                                    
+                                break
+                            except Exception as exc:
+                                if no_attempts >= 9:
+                                    log.error('Read cache block error timed out....')
+                                    raise(llfuse.FUSEError(errno.EIO))
+                                log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
+                                no_attempts += 1
+                                if el is not None:
+                                    el.unlink()
+                                time.sleep(5)
+                                try:
+                                    with self.bucket_pool() as bucket:
+                                        bucket.bucket.conn.close()
+                                        bucket.bucket.conn = bucket.bucket._get_conn()
+                                except:
+                                    log.error('Network may be down.')
+                                    raise(llfuse.FUSEError(errno.EIO))
+                                
 
                         # Note: We need to do this *before* releasing the global
                         # lock to notify other threads
@@ -826,9 +828,6 @@ class BlockCache(object):
                         el.dirty = False
 
                         self.size += el.size
-                        if el.dirty:
-                            self.dirty_size += el.size
-                            self.dirty_entries += 1
 
                     except NoSuchObject:
                         raise QuietError('Backend claims that object %d does not exist, data '
@@ -841,6 +840,7 @@ class BlockCache(object):
                         raise
                     finally:
                         self.in_transit.remove(obj_id)
+                        self.in_transit.remove((inode,blockno))
                         with lock_released:
                             self.transfer_completed.notify_all()
 
