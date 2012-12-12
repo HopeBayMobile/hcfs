@@ -663,12 +663,14 @@ class CommitThread(Thread):
                 most_recent_access = 0
                 have_dirty_cache = False
                 total_cache_size = 0
+                dirty_cache_size = 0
 
                 for el in self.block_cache.entries.values_rev():
                     if (most_recent_access < el.last_access):
                         most_recent_access = el.last_access
-                    if el.dirty and have_dirty_cache is False:
+                    if el.dirty:
                         have_dirty_cache = True
+                        dirty_cache_size += el.size
                     total_cache_size += el.size
 
                     if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
@@ -712,12 +714,15 @@ class CommitThread(Thread):
                 most_recent_access = 0
                 have_dirty_cache = False
                 total_cache_size = 0
+                dirty_cache_size = 0
 
                 for el in self.block_cache.entries.values_rev():
                     if (most_recent_access < el.last_access):
                         most_recent_access = el.last_access
-                    if el.dirty and have_dirty_cache is False:
+                    if el.dirty:
                         have_dirty_cache = True
+                        dirty_cache_size += el.size
+
                     total_cache_size += el.size
 
             if have_dirty_cache:
@@ -725,7 +730,7 @@ class CommitThread(Thread):
             else:
                 log.debug('Computed cache status in committhread: Most_recent_access %d, No dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
 
-            if time.time() - most_recent_access > 60 and have_dirty_cache is False and total_cache_size != self.block_cache.size and self.block_cache.dirty_entries > 0:
+            if time.time() - most_recent_access > 60 and ((have_dirty_cache is False and self.block_cache.dirty_entries > 0) or total_cache_size != self.block_cache.size or dirty_cache_size != self.block_cache.dirty_size):
                 log.info('Potential cache size inconsistency detected. Conducting sweeping.')
                 with llfuse.lock:
                     real_total_cache_size = 0
