@@ -794,29 +794,29 @@ class BlockCache(object):
                         #Jiahong: added retry mechanism to perform_read
 #Jiahong (5/4/12): Implemented a mechanism for labeling partially downloaded block objects. Such objects are removed during fsck
                         # Jiahong (12/12/12): Rewriting lock_release scope to deal with data inconsistency problem
-                        no_attempts=0
-                        while no_attempts < 10:
-                            try:
-                                with lock_released:
-                                    with self.bucket_pool() as bucket:
-                                        el = bucket.perform_read(do_read, 's3ql_data_%d' % obj_id)
-                                break
-                            except Exception as exc:
-                                if no_attempts >= 9:
-                                    log.error('Read cache block error timed out....')
-                                    raise(llfuse.FUSEError(errno.EIO))
-                                log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
-                                no_attempts += 1
-                                if el is not None:
-                                    el.unlink()
-                                time.sleep(5)
+                        with lock_released:
+                            no_attempts=0
+                            while no_attempts < 10:
                                 try:
                                     with self.bucket_pool() as bucket:
-                                        bucket.bucket.conn.close()
-                                        bucket.bucket.conn = bucket.bucket._get_conn()
-                                except:
-                                    log.error('Network may be down.')
-                                    raise(llfuse.FUSEError(errno.EIO))
+                                        el = bucket.perform_read(do_read, 's3ql_data_%d' % obj_id)
+                                    break
+                                except Exception as exc:
+                                    if no_attempts >= 9:
+                                        log.error('Read cache block error timed out....')
+                                        raise(llfuse.FUSEError(errno.EIO))
+                                    log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
+                                    no_attempts += 1
+                                    if el is not None:
+                                        el.unlink()
+                                    time.sleep(5)
+                                    try:
+                                        with self.bucket_pool() as bucket:
+                                            bucket.bucket.conn.close()
+                                            bucket.bucket.conn = bucket.bucket._get_conn()
+                                    except:
+                                        log.error('Network may be down.')
+                                        raise(llfuse.FUSEError(errno.EIO))
                                 
 
                         # Note: We need to do this *before* releasing the global
