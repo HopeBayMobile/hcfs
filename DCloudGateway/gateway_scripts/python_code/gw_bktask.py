@@ -107,6 +107,7 @@ def thread_cache_usage():
     criteria_high = 99.9
     criteria_low = 80.0
     prev_data_size = -1
+    report_time = 0
     
     while not g_program_exit:
         usage = api._get_storage_capacity()
@@ -120,9 +121,13 @@ def thread_cache_usage():
         data_size = max(data_size, 0)
         
         if prev_data_size != data_size:
-            # start a thread to upload data size to swift
-            the_thread = Thread(target=thread_upload_gw_usage, args=(data_size,))
-            the_thread.start()
+            report_time += 1
+            # report usage by 60s
+            if report_time % 3 == 0:
+                # start a thread to upload data size to swift
+                the_thread = Thread(target=thread_upload_gw_usage, args=(data_size,))
+                the_thread.start()
+                report_time = 0
             prev_data_size = data_size
         
         if max_cache_size > 0 and max_entries > 0:
