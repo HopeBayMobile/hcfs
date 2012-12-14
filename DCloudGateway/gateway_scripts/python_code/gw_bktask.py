@@ -16,6 +16,7 @@ from threading import Thread
 # delta specified API
 from gateway import common
 from gateway import api
+from gateway import update_s3ql_bandwidth as bw
 
 log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 
