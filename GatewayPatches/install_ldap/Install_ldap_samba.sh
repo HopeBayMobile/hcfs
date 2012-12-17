@@ -110,6 +110,14 @@ copy_squid3_config(){
     sudo cp $LDAP_PACKAGE/squid.conf /etc/squid3
 }
 
+install_winbind(){
+    sudo echo "krb5-config krb5-config/add_servers_realm string COSA.LOCAL" | debconf-set-selections
+    sudo echo "krb5-config krb5-config/default_realm string COSA.LOCAL" | debconf-set-selections
+    apt-get install -y --force-yes expect ntp krb5-user
+}
+
+
+
 
 #main
 remove_samba_config
@@ -133,3 +141,4 @@ restart_nssldap_service
 copy_exports_file
 create_admin_user
 copy_squid3_config
+install_winbind
