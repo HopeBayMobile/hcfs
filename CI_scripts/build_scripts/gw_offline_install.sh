@@ -88,6 +88,9 @@ mv /tmp/nmbd.conf /etc/init/
 mv /tmp/smbd.conf /etc/init/
 ## FIX ME - move back config files
 
+# append a line in sshd_config to only allow dclouduser to login by ssh
+echo "AllowUsers dclouduser" >> /etc/ssh/sshd_config
+
 # clean up temp files to free up sda space.
     cd $INITPATH
     #~ rm -r StorageAppliance
