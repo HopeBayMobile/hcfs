@@ -24,7 +24,6 @@ import time
 import stat
 import re
 from .backends.common import NoSuchObject
-from gateway import update_s3ql_bandwidth as bw
 
 # standard logger for this module
 log = logging.getLogger("BlockCache")
