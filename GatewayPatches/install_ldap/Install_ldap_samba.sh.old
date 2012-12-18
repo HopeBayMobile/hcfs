@@ -25,8 +25,6 @@ create_nssldap_config(){
     sudo echo "ldap-auth-config ldap-auth-config/rootbindpw password cosa123!" | debconf-set-selections
     sudo echo "nslcd   nslcd/ldap-base string  dc=cosa,dc=com" | debconf-set-selections
     sudo echo "nslcd   nslcd/ldap-uris string  ldapi:///" | debconf-set-selections
-    sudo echo "krb5-config krb5-config/add_servers_realm string COSA.LOCAL" | debconf-set-selections
-    sudo echo "krb5-config krb5-config/default_realm string COSA.LOCAL" | debconf-set-selections
 }
 
 modify_hosts_file(){
@@ -42,7 +40,7 @@ install_ldap_package(){
 }
 
 install_samba_package(){
-    sudo apt-get install -y --force-yes samba samba-doc smbldap-tools expect ntp krb5-user winbind
+    sudo apt-get install -y --force-yes samba samba-doc smbldap-tools
 }
 
 replace_smbldap_tools(){
