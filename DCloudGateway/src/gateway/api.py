@@ -610,23 +610,6 @@ def _check_network():
                 if ret_code == 0:
                     if output.find("Bytes:") != -1:
                         op_network_ok = True
-                # po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, preexec_fn=os.setsid)
-                # countdown = 30
-                # while countdown > 0:
-                    # po.poll()
-                    # if po.returncode != 0:
-                        # countdown = countdown - 1
-                        # if countdown <= 0:
-                            # pogid=os.getpgid(po.pid)
-                            # os.system('kill -9 -%s' % pogid)
-                            # break
-                        # else:
-                            # time.sleep(1)
-                    # else:
-                        # output = po.stdout.read()
-                        # if output.find("Bytes:") != -1:
-                            # op_network_ok = True
-                        # break
         else:
             log.info(output)
 
@@ -2021,11 +2004,11 @@ def _test_storage_account(storage_url, account, password):
     po.wait()
 
     if po.returncode != 0:
-        op_msg = "Test storage account failed for %s" % output
+        op_msg = "Testing storage account failed for %s." % output
         raise TestStorageError(op_msg)
 
     if not common.isHttp200(output):
-        op_msg = "Test storage account failed"
+        op_msg = "Testing storage account failed."
         raise TestStorageError(op_msg)
 
 def test_storage_account(storage_url, account, password):
@@ -2064,6 +2047,7 @@ def test_storage_account(storage_url, account, password):
         op_msg = "Testing storage account failed due to time out." 
         log.error(op_msg)
     except TestStorageError as e:
+        op_code = 0x8023
         op_msg = str(e)
         log.error(op_msg)
     except Exception as e:
@@ -2072,7 +2056,8 @@ def test_storage_account(storage_url, account, password):
     #Jiahong: Insert traceroute info in the case of a failed test
     if op_ok is False:
         try:
-            traceroute_info = _traceroute_backend(storage_url)
+            url, _ = storage_url.split(':')
+            traceroute_info = _traceroute_backend(url)
             log.error(traceroute_info)
             op_msg = op_msg + '\n' + traceroute_info
         except Exception as e:
