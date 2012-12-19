@@ -358,13 +358,13 @@ class AbstractBucket(object):
 
         self.perform_write(lambda fh: fh.write(val), key, metadata)
         
-    def store_noretry(self, key, val, metadata=None):
+    def store_noretry(self, key, val, countdown, metadata=None):
         """
         Original store() but without retry decorator.
         The retry times can be adjusted by the changing the value of countdown.
         """
 
-        self.perform_write_noretry(lambda fh: fh.write(val), key, metadata)
+        self.perform_write_noretry(lambda fh: fh.write(val), key, countdown, metadata)
 
     @abstractmethod
     def is_temp_failure(self, exc):
