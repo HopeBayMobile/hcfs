@@ -1060,7 +1060,7 @@ class Operations(llfuse.Operations):
         #fs_size = max(2 * size, 1024 ** 4)
         # wthung, 2012/12/4
         # max gateway disk space is equal to quota
-        fs_size = self.cache.quota_size
+        fs_size = max(self.cache.quota_size, data_size)
 
         stat_.f_blocks = fs_size // stat_.f_frsize
         stat_.f_bfree = (fs_size - data_size) // stat_.f_frsize

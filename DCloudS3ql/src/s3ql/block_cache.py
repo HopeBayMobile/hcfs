@@ -843,12 +843,8 @@ class BlockCache(object):
                             while no_attempts < 10:
                                 try:
                                     with self.bucket_pool() as bucket:
-                                        bucket.bucket.net_ts = time.time()
-                                        el = bucket.perform_read(do_read, 's3ql_data_%d' % obj_id)
+                                        el = bucket.perform_read_noretry(do_read, 's3ql_data_%d' % obj_id, 2)
                                     self.network_ok = True
-                                    # reset net timestamp in bucket
-                                    with self.bucket_pool() as bucket:
-                                        bucket.bucket.net_ts = 0
                                     break
                                 except Exception as exc:
                                     if no_attempts >= 9:
@@ -862,13 +858,9 @@ class BlockCache(object):
                                     time.sleep(5)
                                     try:
                                         with self.bucket_pool() as bucket:
-                                            bucket.bucket.net_ts = time.time()
                                             bucket.bucket.conn.close()
                                             bucket.bucket.conn = bucket.bucket._get_conn()
-                                        self.network_ok = True
-                                        # reset net timestamp in bucket
-                                        with self.bucket_pool() as bucket:
-                                            bucket.bucket.net_ts = 0
+                                        self.network_ok = True                                        
                                     except:
                                         log.error('Network may be down.')
                                         self.network_ok = False
@@ -1008,23 +1000,15 @@ class BlockCache(object):
             #Jiahong: First check if swift is good
             try:
                 with self.bucket_pool() as bucket:
-                    if (self.max_size < self.dirty_size) or (self.max_entries < self.dirty_entries):
-                        bucket.bucket.net_ts = time.time()
-                    bucket.store('cloud_gw_test_connection','nodata')
+                    bucket.store_noretry('cloud_gw_test_connection','nodata', 2)
                 self.network_ok = True
-                # reset net timestamp in bucket
-                with self.bucket_pool() as bucket:
-                    bucket.bucket.net_ts = 0
             except:
                 log.error('Network appears to be down. Failing expire cache.')
                 self.network_ok = False
-                if (self.max_size < self.dirty_size) or (self.max_entries < self.dirty_entries):
+                if (self.max_size <= self.dirty_size) or (self.max_entries <= self.dirty_entries):
                     # return no buffers available if we cannot replace dirty cache now 
                     raise(llfuse.FUSEError(errno.ENOBUFS))
                 else:
-                    # reset net timestamp in bucket
-                    with self.bucket_pool() as bucket:
-                        bucket.bucket.net_ts = 0
                     force_search_clean = True
                     continue
 
