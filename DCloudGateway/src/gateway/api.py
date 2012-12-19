@@ -406,10 +406,11 @@ def get_indicators():
             op_s3ql_writing = _check_s3ql_writing(output)
 
             # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-            if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
-                restart_nfs_service()
-            if op_SMB_srv is False and op_s3ql_ok is True:
-                restart_smb_service()
+            # wthung, 2012/12/19, don't restart smb and nfs by cosa's request
+            #if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
+            #    restart_nfs_service()
+            #if op_SMB_srv is False and op_s3ql_ok is True:
+            #    restart_smb_service()
 
             op_ok = True
             op_code = 0x8
