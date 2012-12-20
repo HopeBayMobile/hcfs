@@ -66,7 +66,7 @@ fi
     # make a tag on Git server
     cd $INITPATH/StorageAppliance/CI_scripts/build_scripts
     source build.conf
-    VER=$GW_VERSION.$BUILDNUM
+    VER="v$GW_VERSION.$BUILDNUM"
     git tag -a $VER -m "build of $VER"
 
 # re-arrange folders for build
