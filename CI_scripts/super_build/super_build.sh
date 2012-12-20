@@ -51,11 +51,11 @@ fi
     if [ $MODE = "full" ];    then
         git clone $GIT_SRC
         check_ok
-        cd StorageAppliance
+        cd $INITPATH/StorageAppliance
         git stash
         git checkout $BRANCH
     else
-        cd StorageAppliance
+        cd $INITPATH/StorageAppliance
         git stash
         git checkout $BRANCH
         git reset --hard HEAD
@@ -63,14 +63,15 @@ fi
         check_ok
     fi
 
+    # make a tag on Git server
+    cd $INITPATH/StorageAppliance/CI_scripts/build_scripts
+    source build.conf
+    VER=$GW_VERSION.$BUILDNUM
+    git tag -a $VER -m "build of $VER"
+
 # re-arrange folders for build
     rm -r $INITPATH/build_scripts
     cp -r $INITPATH/StorageAppliance/CI_scripts/build_scripts $INITPATH
     cp -rf $INITPATH/StorageAppliance $INITPATH/build_scripts/
-    # make a tag on Git server
-    cd $INITPATH/build_scripts
-    source build.conf
-    VER=$GW_VERSION.$BUILDNUM
-    git tag -a $VER -m "build of $VER"
     # run build script
     bash build_gw_package.sh $1 $2
