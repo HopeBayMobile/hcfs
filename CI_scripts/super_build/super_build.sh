@@ -27,18 +27,18 @@ fi
         exit 1
     fi
 
-# make sure internet is connectable
-    wget www.google.com
-    if [ $? -ne 0 ]
-    then
-        echo "Cannot connect to internet. Please check proxy's settings."
-        exit 1
-    fi
+## make sure internet is connectable
+    #~ wget www.google.com
+    #~ if [ $? -ne 0 ]
+    #~ then
+        #~ echo "Cannot connect to internet. Please check proxy's settings."
+        #~ exit 1
+    #~ fi
 
 # define parameters
     BRANCH=$1
     BUILDNUM=$2
-    GIT_SRC="https://github.com/Delta-Cloud/StorageAppliance.git"
+    GIT_SRC="ssh://weitang.hung@172.16.78.207/git/StorageAppliance.git"
     INITPATH=$(pwd)
     
 # pull code from github
@@ -49,16 +49,7 @@ fi
     fi
 
     if [ $MODE = "full" ];    then
-        expect -c "
-        spawn git clone $GIT_SRC
-        expect \"Username for\"
-        sleep 1
-        send \"dc-cds\r\"
-        expect \"Password for\"
-        sleep 1
-        send \"delta168cloud\r\"
-        interact
-        "
+        git clone $GIT_SRC
         check_ok
         cd StorageAppliance
         git stash
@@ -68,16 +59,7 @@ fi
         git stash
         git checkout $BRANCH
         git reset --hard HEAD
-        expect -c "
-        spawn git pull
-        expect \"Username for\"
-        sleep 1
-        send \"dc-cds\r\"
-        expect \"Password for\"
-        sleep 1
-        send \"delta168cloud\r\"
-        interact
-        "
+        git pull
         check_ok
     fi
 
@@ -85,5 +67,10 @@ fi
     rm -r $INITPATH/build_scripts
     cp -r $INITPATH/StorageAppliance/CI_scripts/build_scripts $INITPATH
     cp -rf $INITPATH/StorageAppliance $INITPATH/build_scripts/
+    # make a tag on Git server
     cd $INITPATH/build_scripts
+    source build.conf
+    VER=$GW_VERSION.$BUILDNUM
+    git tag -a $VER -m "build of $VER"
+    # run build script
     bash build_gw_package.sh $1 $2
