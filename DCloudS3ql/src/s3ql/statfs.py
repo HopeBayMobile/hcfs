@@ -70,7 +70,7 @@ def main(args=None):
     buf = llfuse.getxattr(ctrlfile, b's3qlcache', size_guess=256)
     (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, 
         cache_maxsize, cache_maxentries, cache_uploading, filesys_write, 
-        quota_size) = struct.unpack('QQQQQQQQQ', buf)
+        quota_size, cache_openedentries) = struct.unpack('QQQQQQQQQQ', buf)
     p_dedup = dedup_size * 100 / fs_size if fs_size else 0
     p_compr_1 = compr_size * 100 / fs_size if fs_size else 0
     p_compr_2 = compr_size * 100 / dedup_size if dedup_size else 0
@@ -88,6 +88,7 @@ def main(args=None):
            'Cache size: current: %.2f MB, max: %.2f MB' % ((cache_size / mb),(cache_maxsize / mb)),
            'Cache entries: current: %d, max: %d' % (cache_entries,cache_maxentries),
            'Dirty cache status: size: %.2f MB, entries: %d' % ((cache_dirtysize / mb),cache_dirtyentries),
+           'Opened cache entries: %d' % cache_openedentries,
            sep='\n')
     if cache_uploading == 1:
         print('Cache uploading: On\n')

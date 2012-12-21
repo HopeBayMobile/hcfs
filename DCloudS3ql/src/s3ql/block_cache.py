@@ -108,6 +108,7 @@ class SimpleEvent(object):
 
 
 # Modified by Jia-Hong on 4/16/2012: If the cache file access mode is RW, then it is dirty. If R-only, then clean.
+# Modified by Jiahong on 9/29/2012: Allow cache files to be closed and then reopened during use.
 class CacheEntry(object):
     """An element in the block cache
     
@@ -126,28 +127,34 @@ class CacheEntry(object):
     """
 
     __slots__ = [ 'dirty', 'inode', 'blockno', 'last_access',
-                  'size', 'pos', 'fh', 'to_delete' ]
+                  'size', 'pos', 'fh', 'to_delete', 'isopen' ]
 
 #Jiahong: modified this function and allow the creation of cache entry from existing cache file
-    def __init__(self, inode, blockno, filename, newfile=True):
+    def __init__(self, inode, blockno, filename, newfile=True, to_open=True):
         super(CacheEntry, self).__init__()
         # Writing 100MB in 128k chunks takes 90ms unbuffered and
         # 116ms with 1 MB buffer. Reading time does not depend on
         # buffer size.
+        self.isopen = to_open
         if newfile:
-            self.fh = open(filename, "w+b", 0)
+            if to_open is True:
+                self.fh = open(filename, "w+b", 0)
+            else:
+                os.system('touch %s' % filename)
             self.dirty = False
         else:
             mode_bits=stat.S_IMODE(os.stat(filename).st_mode)
             if mode_bits & 128:
-                self.fh = open(filename, "r+b", 0)
-                self.fh.seek(0)
-                os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
+                if to_open is True:
+                    self.fh = open(filename, "r+b", 0)
+                    self.fh.seek(0)
+                    os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
                 self.dirty = True
             else:
-                self.fh = open(filename, "r+b", 0)
-                self.fh.seek(0)
-                os.fchmod(self.fh.fileno(), stat.S_IRUSR)
+                if to_open is True:
+                    self.fh = open(filename, "r+b", 0)
+                    self.fh.seek(0)
+                    os.fchmod(self.fh.fileno(), stat.S_IRUSR)
                 self.dirty = False
 
         self.inode = inode
@@ -155,7 +162,11 @@ class CacheEntry(object):
         self.last_access = time.time()
         self.pos = 0
         self.to_delete = False
-        self.size = os.fstat(self.fh.fileno()).st_size
+        if to_open is True:
+            self.size = os.fstat(self.fh.fileno()).st_size
+        else:
+            self.size = os.stat(filename).st_size
+
 
     def read(self, size=None):
         buf = self.fh.read(size)
@@ -192,11 +203,43 @@ class CacheEntry(object):
         self.pos += len(buf)
         self.size = max(self.pos, self.size)
 
+    # Mod by Jiahong on 9/29/12: Will change the cache status to file closed
     def close(self):
-        self.fh.close()
+        try:
+            if self.isopen is True:
+                if self.fh is not None:
+                    self.fh.close()
+        except:
+            log.debug('Unable to close cache entry')
+            pass
+        self.isopen = False
 
-    def unlink(self):
-        os.unlink(self.fh.name)
+    # New function by Jiahong on 9/29/12: Function to reopen cache files
+    # Refined on 11/5/12
+    def reopen(self, path):
+        filename = os.path.join(path, 'subdir_%d' % ((self.inode+self.blockno) % 100), '%d-%d' % (self.inode, self.blockno)) 
+        mode_bits=stat.S_IMODE(os.stat(filename).st_mode)
+        if mode_bits & 128:
+            self.fh = open(filename, "r+b", 0)
+            self.fh.seek(0)
+            os.fchmod(self.fh.fileno(), stat.S_IRUSR | stat.S_IWUSR)
+            self.dirty = True
+        else:
+            self.fh = open(filename, "r+b", 0)
+            self.fh.seek(0)
+            os.fchmod(self.fh.fileno(), stat.S_IRUSR)
+            self.dirty = False
+
+        self.isopen = True
+
+
+    def unlink(self, path):
+        if self.isopen is True:
+            os.unlink(self.fh.name)
+        else:
+            filename = os.path.join(path, 'subdir_%d' % ((self.inode+self.blockno) % 100), '%d-%d' % (self.inode, self.blockno))
+            os.unlink(filename)
+
 
     #Jiahong:New function for checking if the cache blocks are partially downloaded
     #Jiahong:If the group read bit of the cache files is on, then it is still being downloaded
@@ -254,13 +297,13 @@ class BlockCache(object):
         self.dirty_size = 0
         self.dirty_entries = 0
         self.max_size = max_size
-        self.quota_size = 1024 ** 4 # wthung, 2012/11/21, default quota size is 1T
+        self.quota_size = 10 * (1024 ** 4)  #Jiahong: Will we be able to set quota_size now? If not, it might be better to set this to 10T on the repository?
         self.size_gap = 1024 ** 3 # wthung, 2012/11/28, size gap between full/normal upload speed
         self.fullspeed_factor = 0.8 # wthung, 2012/11/28, factor to control full speed
         self.in_transit = set()
         self.removed_in_transit = set()
         self.to_upload = Distributor()
-        self.to_remove = Queue(0) # Jiahong on 10/12/12: Disable limit on object deletion queue
+        self.to_remove = Queue(0)  # Jiahong on 10/12/12: Disable limit on object deletion queue
         self.upload_threads = []
         self.removal_threads = []
         self.transfer_completed = SimpleEvent()
@@ -268,11 +311,11 @@ class BlockCache(object):
         self.do_upload = False
         self.do_write = True # flag to allow/disallow the write to s3ql file system
         self.forced_upload = False
-        self.snapshot_upload = False #New upload switch for snapshotting (need to flush first before snapshotting)
+        self.snapshot_upload = False  #New upload switch for snapshotting (need to flush first before snapshotting)
         #Jiahong: Adding a mechanism to monitor alive upload threads
         self.last_checked = time.time()
-        self.going_down = False #Jiahong: New switch on knowing when the cache will be destroyed
-        self.thread_checking = False #Jiahong: New flag for knowing if the upload thread respawning check is in progress
+        self.going_down = False  #Jiahong: New switch on knowing when the cache will be destroyed
+        self.thread_checking = False  #Jiahong: New flag for knowing if the upload thread respawning check is in progress
         # wthung, add value cache. need to retrieve it in initialization of block cache
         self.value_cache = {"entries": max(self.db.get_val("SELECT COUNT(rowid) FROM contents"), 0),
                             "blocks": max(self.db.get_val("SELECT COUNT(id) FROM objects"), 0),
@@ -284,12 +327,24 @@ class BlockCache(object):
         self.refresh_count = 0
         # flag to indicate network is ok
         self.network_ok = True
+        self.temp_opened = set()  # Jiahong: Maintain temp opened entries
+        self.opened_entries = OrderedDict() # New dict for maintaining opened cache files
+        self.max_opened_entries = 250000
+        self.cache_to_close = set()  # Jiahong (11/27/12): Set for maintaining cache files to be closed due to file closing
 
         if os.access(self.path,os.F_OK):
             pass
         else:
             os.mkdir(self.path)
-    
+
+        # Jiahong (12/4/12): Divide the cache entries into 100 subfolders
+        for i in range(100):
+            subdir = os.path.join(self.path,'subdir_%d' % i)
+            if os.access(subdir, os.F_OK):
+                pass
+            else:
+                os.mkdir(subdir)
+
     def __len__(self):
         '''Get number of objects in cache'''
         return len(self.entries)
@@ -310,24 +365,28 @@ class BlockCache(object):
 
         if os.access(self.path,os.F_OK) and self.preload_cache == False:
             self.preload_cache = True
-            initial_cache_list=os.listdir(self.path)
-            yield_count = 0
 
-            for cache_files in initial_cache_list:
+            # Jiahong (12/4/12): Divide the cache entries into 100 subfolders
+            for i in range(100):
+                subdir = os.path.join(self.path,'subdir_%d' % i)
+                initial_cache_list=os.listdir(subdir)
+                yield_count = 0
 
-                match = re.match('^(\\d+)-(\\d+)$', cache_files)
-                if match:
-                    tmp_inode = int(match.group(1))
-                    tmp_block = int(match.group(2))
-                else:
-                    raise RuntimeError('Strange file in cache directory: %s' % cache_files)
+                for cache_files in initial_cache_list:
 
-                with self.get(tmp_inode,tmp_block) as fh:
-                    pass
-                yield_count += 1
-                if yield_count > 10:
-                    llfuse.lock.yield_(100)
-                    yield_count = 0 
+                    match = re.match('^(\\d+)-(\\d+)$', cache_files)
+                    if match:
+                        tmp_inode = int(match.group(1))
+                        tmp_block = int(match.group(2))
+                    else:
+                        raise RuntimeError('Strange file in cache directory: %s' % cache_files)
+
+                    with self.get(tmp_inode,tmp_block, to_open=False) as fh:
+                        pass
+                    yield_count += 1
+                    if yield_count > 10:
+                        llfuse.lock.yield_(100)
+                        yield_count = 0 
 
 
     def init(self, threads=1):
@@ -348,6 +407,7 @@ class BlockCache(object):
     def check_alive_threads(self):
         '''Monitor if the upload threads are alive. Restart them if necessary'''
 
+        log.debug('Start checking alive threads')
         self.thread_checking = True
         finished = False
         self.last_checked = time.time()
@@ -367,11 +427,13 @@ class BlockCache(object):
                     break
 
         self.thread_checking = False
+        log.debug('Stop checking alive threads')
 
 
     def destroy(self):
         '''Clean up and stop worker threads'''
 
+        log.debug('Start thread destroy')
         self.going_down = True
 
         time.sleep(2) #Checking if thread spawning check is in progress
@@ -400,6 +462,7 @@ class BlockCache(object):
         log.debug('destroy(): close opened cache...')
         self.close_cache()
 
+        log.debug('Completed thread destroy')
         #Jiahong: Commented out the following line (we always want the cache directory)
         #os.rmdir(self.path) 
 
@@ -525,12 +588,25 @@ class BlockCache(object):
                     el.dirty = False
                     #el.last_upload = time.time()
                 finally:
+                    #  Jiahong (11/5/12): If we have temp reopened it, close it.
+                    if (el.inode, el.blockno) in self.temp_opened:
+                        if (el.inode, el.blockno) not in self.opened_entries:
+                            el.close()
+                        self.temp_opened.remove((el.inode, el.blockno))
+
                     self.in_transit.remove(obj_id)
                     self.in_transit.remove((el.inode, el.blockno))
                     self.transfer_completed.notify_all()
 
         except Exception as exc:
+            log.error('Error in cache uploading. Message type %s (%s).' % (type(exc).__name__, exc))
             with lock:
+                #  Jiahong (11/5/12): If we have temp reopened it, close it.
+                if (el.inode, el.blockno) in self.temp_opened:
+                    if (el.inode, el.blockno) not in self.opened_entries:
+                        el.close()
+                    self.temp_opened.remove((el.inode, el.blockno))
+
                 self.in_transit.remove(obj_id)
                 self.in_transit.remove((el.inode, el.blockno))
                 self.transfer_completed.notify_all()
@@ -569,6 +645,11 @@ class BlockCache(object):
         self.in_transit.add((el.inode, el.blockno))
 
         try:
+            #Jiahong (11/5/12): Check if the cache file is open. If not, open it.
+            if el.isopen is False:
+                el.reopen(self.path)
+                self.temp_opened.add((el.inode, el.blockno))
+
             el.seek(0)
             hash_ = sha256_fh(el)
 
@@ -625,6 +706,11 @@ class BlockCache(object):
                             self.dirty_entries = 0
                     el.dirty = False
                     #el.last_upload = time.time()
+                    #  Jiahong (11/5/12): If we have temp reopened it, close it.
+                    if (el.inode, el.blockno) in self.temp_opened:
+                        el.close()
+                        self.temp_opened.remove((el.inode, el.blockno))
+
                     self.in_transit.remove((el.inode, el.blockno))
                     return el.size
 
@@ -641,11 +727,21 @@ class BlockCache(object):
                         self.dirty_size = 0
                     if self.dirty_entries < 0:
                         self.dirty_entries = 0
+                #  Jiahong (11/5/12): If we have temp reopened it, close it.
+                if (el.inode, el.blockno) in self.temp_opened:
+                    el.close()
+                    self.temp_opened.remove((el.inode, el.blockno))
 
                 el.dirty = False
                 #el.last_upload = time.time()
                 self.in_transit.remove((el.inode, el.blockno))
         except:
+            #  Jiahong (11/5/12): If we have temp reopened it, close it.
+            if (el.inode, el.blockno) in self.temp_opened:
+                if (el.inode, el.blockno) not in self.opened_entries:
+                    el.close()
+                self.temp_opened.remove((el.inode, el.blockno))
+
             self.in_transit.remove((el.inode, el.blockno))
             raise
 
@@ -751,9 +847,9 @@ class BlockCache(object):
                         time.sleep(10)
 
 
-
+    # Jiahong on 9/30/12: Changed this function so that the accessed block will be added to the opened_entries
     @contextmanager
-    def get(self, inode, blockno):
+    def get(self, inode, blockno, to_open=True):
         """Get file handle for block `blockno` of `inode`
         
         This method releases the global lock, and the managed block
@@ -765,6 +861,10 @@ class BlockCache(object):
         """
 
         log.debug('get(inode=%d, block=%d): start', inode, blockno)
+
+        # Jiahong on 9/30/12: Call this new function whenever we have too many opened cache entries
+        if len(self.opened_entries) > self.max_opened_entries:
+            self.expire_opened()
 
         if self.size > self.max_size or len(self.entries) > self.max_entries:
             self.expire()
@@ -779,29 +879,27 @@ class BlockCache(object):
                 self.wait()
                 continue
 
+            not_in_cache = False
             #Jiahong: If cache blocks already exist but not in cache hash, put them in the cache hash
             try:
                 el = self.entries[(inode, blockno)]
 
             # Not in cache
             except KeyError:
-                filename = os.path.join(self.path, '%d-%d' % (inode, blockno))
+                not_in_cache = True
+                filename = os.path.join(self.path, 'subdir_%d' % ((inode+blockno) % 100), '%d-%d' % (inode, blockno))
 
                 if os.access(filename,os.F_OK): # If cache file already in cache directory, use that
-                    el = CacheEntry(inode, blockno, filename, False)
+                    el = CacheEntry(inode, blockno, filename, False, to_open)
                     self.entries[(inode, blockno)] = el
                     self.size += el.size
                     if el.dirty:
                         self.dirty_size += el.size
                         self.dirty_entries += 1
+                    not_in_cache = False
 
-
-            try:
-                el = self.entries[(inode, blockno)]
-
-            # Not in cache
-            except KeyError:
-                filename = os.path.join(self.path, '%d-%d' % (inode, blockno))
+            if not_in_cache is True:
+                filename = os.path.join(self.path, 'subdir_%d' % ((inode+blockno) % 100),'%d-%d' % (inode, blockno))
 
                 try:
                     
@@ -810,13 +908,13 @@ class BlockCache(object):
 
                 # No corresponding object
                 except NoSuchRowError:
-                    #log.debug('get(inode=%d, block=%d): creating new block', inode, blockno)
+                    log.debug('get(inode=%d, block=%d): creating new block', inode, blockno)
                     el = CacheEntry(inode, blockno, filename)
                     self.entries[(inode, blockno)] = el
 
                 # Need to download corresponding object
                 else:
-                    #log.debug('get(inode=%d, block=%d): downloading block', inode, blockno)
+                    log.debug('get(inode=%d, block=%d): downloading block', inode, blockno)
                     obj_id = self.db.get_val('SELECT obj_id FROM blocks WHERE id=?', (block_id,))
 
                     if obj_id in self.in_transit:
@@ -826,18 +924,20 @@ class BlockCache(object):
                         continue
 
                     # We need to download
+                    self.in_transit.add((inode,blockno))  # Jiahong (12/12/12): added to resolve data inconsistency when multi-threading
                     self.in_transit.add(obj_id)
                     log.debug('get(inode=%d, block=%d): downloading object %d..',
                               inode, blockno, obj_id)
                     def do_read(fh):
-                        el = CacheEntry(inode, blockno, filename)
+                        new_block = CacheEntry(inode, blockno, filename)
                         #Jiahong: At the start of the download, mark the group read bit to specify that this block is being downloaded
-                        el.download_set()
-                        shutil.copyfileobj(fh, el, BUFSIZE)
-                        return el
+                        new_block.download_set()
+                        shutil.copyfileobj(fh, new_block, BUFSIZE)
+                        return new_block
                     try:
                         #Jiahong: added retry mechanism to perform_read
 #Jiahong (5/4/12): Implemented a mechanism for labeling partially downloaded block objects. Such objects are removed during fsck
+                        # Jiahong (12/12/12): Rewriting lock_release scope to deal with data inconsistency problem
                         with lock_released:
                             no_attempts=0
                             while no_attempts < 10:
@@ -854,13 +954,13 @@ class BlockCache(object):
                                     log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
                                     if el is not None:
-                                        el.unlink()
+                                        el.unlink(self.path)
                                     time.sleep(5)
                                     try:
                                         with self.bucket_pool() as bucket:
                                             bucket.bucket.conn.close()
                                             bucket.bucket.conn = bucket.bucket._get_conn()
-                                        self.network_ok = True                                        
+                                        self.network_ok = True
                                     except:
                                         log.error('Network may be down.')
                                         self.network_ok = False
@@ -876,9 +976,6 @@ class BlockCache(object):
                         el.dirty = False
 
                         self.size += el.size
-                        if el.dirty:
-                            self.dirty_size += el.size
-                            self.dirty_entries += 1
 
                     except NoSuchObject:
                         raise QuietError('Backend claims that object %d does not exist, data '
@@ -887,26 +984,37 @@ class BlockCache(object):
                     # wthung, 2012/12/12, throw exception out
                     except Exception as e:
                         if el is not None:
-                            el.unlink()
+                            el.unlink(self.path)
                         raise e
                     finally:
                         self.in_transit.remove(obj_id)
+                        self.in_transit.remove((inode,blockno))
                         with lock_released:
                             self.transfer_completed.notify_all()
 
             # In Cache
             else:
-                #log.debug('get(inode=%d, block=%d): in cache', inode, blockno)
+                log.debug('get(inode=%d, block=%d): in cache', inode, blockno)
                 self.entries.to_head((inode, blockno))
+                # Added by Jiahong on 9/30/12: check if the entry is opened. If not, open it.
+                if el.isopen is False and to_open is True:
+                    el.reopen(self.path)
 
         el.last_access = time.time()
         oldsize = el.size
         was_dirty = el.dirty
 
+        # Added by Jiahong on 9/30/12: Check if the entry is in opened_entries, if not, add it.
+        if to_open is True:
+            try:
+                (opened_inode, opened_blockno) = self.opened_entries[(inode, blockno)]
+            except KeyError:
+                self.opened_entries[(inode, blockno)] = (inode, blockno)
+            self.opened_entries.to_head((inode, blockno))
 
         # Provide fh to caller
         try:
-            #log.debug('get(inode=%d, block=%d): yield', inode, blockno)
+            log.debug('get(inode=%d, block=%d): yield', inode, blockno)
             yield el
         finally:
             # Update cachesize 
@@ -934,6 +1042,26 @@ class BlockCache(object):
                     cmd = "touch /dev/shm/forced_upload"
                     os.system(cmd)
                     log.info("Set full upload speed.")
+
+        log.debug('get(inode=%d, block=%d): end', inode, blockno)
+
+
+    # Jiahong on 9/30/12: New function for expiring opened cache files by closing it (but not deleting)
+    def expire_opened(self):
+        log.debug('expire_opened start')
+        total_close_count = 0
+
+        for (inode, blockno) in self.opened_entries.values_rev():
+            if (inode, blockno) in self.in_transit:
+                log.debug('expire_opened: (%d,%d) is being uploaded now, skipping closing process', inode, blockno)
+                continue
+ 
+            self.entries[(inode, blockno)].close()
+            del self.opened_entries[(inode, blockno)]
+            total_close_count += 1
+            if total_close_count > 100:
+                break;
+
 
     def expire(self):
         """Perform cache expiry
@@ -980,8 +1108,14 @@ class BlockCache(object):
                             break
 
                 del self.entries[(el.inode, el.blockno)]
+                # Jiahong on 9/30/12: Delete entry in opened_entries if any
+                try:
+                    del self.opened_entries[(el.inode, el.blockno)]
+                except:
+                    pass
+
                 el.close()
-                el.unlink()
+                el.unlink(self.path)
                 need_entries -= 1
                 self.size -= el.size
                 need_size -= el.size
@@ -1074,7 +1208,7 @@ class BlockCache(object):
             
             # wthung, 2012/10/29, add a var to store el size
             el_size = 0
-            
+
             if (inode, blockno) in self.entries:
                 log.debug('remove(inode=%d, blockno=%d): removing from cache',
                           inode, blockno)
@@ -1083,6 +1217,11 @@ class BlockCache(object):
                 #pylint: disable-msg=E1103
                 el = self.entries.pop((inode, blockno))
                 el_size = el.size
+                # Jiahong on 9/30/12: Delete entry in opened_entries if any
+                try:
+                    del self.opened_entries[(el.inode, el.blockno)]
+                except:
+                    pass
 
                 self.size -= el.size
                 if el.dirty:
@@ -1093,7 +1232,7 @@ class BlockCache(object):
                     if self.dirty_entries < 0:
                         self.dirty_entries = 0
 
-                el.unlink()
+                el.unlink(self.path)
 
             try:
                 block_id = self.db.get_val('SELECT block_id FROM inode_blocks '
@@ -1204,8 +1343,9 @@ class BlockCache(object):
 #New function to close all opened cache files
     def close_cache(self):
 
-        for el in self.entries.values_rev():
-            el.close()
+        for (inode, blockno) in self.opened_entries.values_rev():  # Modified by Jiahong on 11/11/12: deal with opened_entries instead
+            self.entries[(inode, blockno)].close()
+
 
     def __del__(self):
         if len(self.entries) > 0:

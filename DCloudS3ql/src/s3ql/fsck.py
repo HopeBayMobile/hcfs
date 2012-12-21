@@ -29,6 +29,7 @@ import tempfile
 import textwrap
 import time
 import subprocess
+import resource
 
 
 log = logging.getLogger("fsck")
@@ -150,9 +151,14 @@ class Fsck(object):
                                               % sql_objs):
                     self.found_errors = True
                     sql_objs['val'] = val
+                    # Jiahong (12/5/12): Since there does not appear to be an actual deletion here, changing the description
+                    # Also, commenting out the report a bug phrase. This is confusing.
                     self.log_error('%(src_table)s.%(src_col)s refers to non-existing key %(val)s '
-                                   'in %(dst_table)s.%(dst_col)s, deleting.', sql_objs)
-                    log.error('This should not happen, please report a bug.')
+                                   'in %(dst_table)s.%(dst_col)s. Trying to fix in the next pass.', sql_objs)
+
+#                    self.log_error('%(src_table)s.%(src_col)s refers to non-existing key %(val)s '
+#                                   'in %(dst_table)s.%(dst_col)s, deleting.', sql_objs)
+#                    log.error('This should not happen, please report a bug.')
                     self.uncorrectable_errors = True
 
     #Jiahong (4/27/12): New function for listing the cached inode-blockno pairs
@@ -163,34 +169,41 @@ class Fsck(object):
         if not os.path.exists(self.cachedir):
             return
 
-        for filename in os.listdir(self.cachedir):
+        # Jiahong (12/4/12): Divide the cache entries into 100 subfolders
+        for i in range(100):
+            subdir = os.path.join(self.cachedir,'subdir_%d' % i)
 
-            full_filename = os.path.join(self.cachedir, filename)
-
-            #Jiahong (5/4/12): Check if the cached file was still being downloaded but stopped due to crash. If so, delete.
-            mode_bits=stat.S_IMODE(os.stat(full_filename).st_mode)
-            if mode_bits & 32:
-                os.unlink(full_filename)
-                log.info('Deleting partially downloaded block object %s' % filename)
+            if not os.access(subdir,os.F_OK):
                 continue
 
-            match = re.match('^(\\d+)-(\\d+)$', filename)
-            if match:
-                inode = int(match.group(1))
-                blockno = int(match.group(2))
-            else:
-                raise RuntimeError('Strange file in cache directory: %s' % filename)
+            for filename in os.listdir(subdir):
 
-            block_size=os.stat(full_filename).st_size
+                full_filename = os.path.join(subdir, filename)
 
-            log.debug("Adding cached data (%d, %d)" % (inode, blockno))
-            self.cached_blocks.add((inode, blockno))
+                #Jiahong (5/4/12): Check if the cached file was still being downloaded but stopped due to crash. If so, delete.
+                mode_bits=stat.S_IMODE(os.stat(full_filename).st_mode)
+                if mode_bits & 32:
+                    os.unlink(full_filename)
+                    log.info('Deleting partially downloaded block object %s' % filename)
+                    continue
+
+                match = re.match('^(\\d+)-(\\d+)$', filename)
+                if match:
+                    inode = int(match.group(1))
+                    blockno = int(match.group(2))
+                else:
+                    raise RuntimeError('Strange file in cache directory: %s' % filename)
+
+                block_size=os.stat(full_filename).st_size
+
+                log.debug("Adding cached data (%d, %d)" % (inode, blockno))
+                self.cached_blocks.add((inode, blockno))
         
-            try:
-                if self.inode_size_cache[inode] < (blockno * self.max_obj_size + block_size):
+                try:
+                    if self.inode_size_cache[inode] < (blockno * self.max_obj_size + block_size):
+                        self.inode_size_cache[inode] = (blockno * self.max_obj_size + block_size)
+                except KeyError:
                     self.inode_size_cache[inode] = (blockno * self.max_obj_size + block_size)
-            except KeyError:
-                self.inode_size_cache[inode] = (blockno * self.max_obj_size + block_size)
 
 
 
@@ -504,9 +517,10 @@ class Fsck(object):
                         size = 0
                         size_old = size_a[0]
                     except ValueError:
-                        self.log_error("inode %d not in table but in cache... skipping",inode_id)
-                        prefix_files = os.path.join(self.cachedir, "%d" % inode_id)
-                        os.system('rm -rf %s-*' % prefix_files)
+                        self.log_error("inode %d not in table but in cache... deleting corresponding cache blocks",inode_id)
+                        for i in range(100):
+                            prefix_files = os.path.join(self.cachedir, 'subdir_%d' % i, "%d" % inode_id)
+                            os.system('rm -rf %s-*' % prefix_files)
                         continue
                 if size_old < cached_max_size and size < cached_max_size:
                     self.found_errors = True
@@ -837,6 +851,10 @@ class Fsck(object):
                 self.log_error('Inode %d (%s) is not a directory but has child entries. '
                                'This is probably going to confuse your system!',
                                inode, get_path(inode, self.conn))
+                tmp_path = get_path(inode, self.conn)
+                if tmp_path[0:12] == "/lost+found/":
+                    self.conn.execute("DELETE FROM inodes WHERE id=?", (inode,))
+                    self.log_error('Removing inode from /lost+found')
 
             if (not stat.S_ISREG(mode) and
                 self.conn.has_val('SELECT 1 FROM inode_blocks WHERE inode=?', (inode,))):
@@ -1181,12 +1199,12 @@ def main(args=None):
     if args is None:
         args = sys.argv[1:]
 
+    resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))
     options = parse_args(args)
     stdout_log_handler = setup_logging(options)
-    
     if stdout_log_handler:
-            logging.getLogger().removeHandler(stdout_log_handler)
-            
+        logging.getLogger().removeHandler(stdout_log_handler)
+
     # Check if fs is mounted on this computer
     # This is not foolproof but should prevent common mistakes
     match = options.storage_url + ' /'

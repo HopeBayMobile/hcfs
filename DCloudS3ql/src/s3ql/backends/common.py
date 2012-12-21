@@ -22,7 +22,7 @@ import bz2
 import cPickle as pickle
 import hashlib
 import hmac
-import httplib
+from eventlet.green import httplib
 import logging
 import lzma
 import os
@@ -276,18 +276,18 @@ class AbstractBucket(object):
         '''
         with self.open_read(key) as fh:
             return fn(fh)
-            
+
     def perform_read_noretry(self, fn, key, countdown):
-        '''
+        '''  
         Original perform_read() but without retry decorator.
         The retry times can be adjusted by the changing the value of countdown.
         '''
         countdown = countdown
-        
+     
         if countdown <= 0:
             countdown = 1
-            
-        while countdown > 0:
+     
+        while countdown > 0: 
             countdown = countdown - 1
             try:
                 with self.open_read(key) as fh:
@@ -296,7 +296,7 @@ class AbstractBucket(object):
                 if countdown <= 0:
                     raise
                 else:
-                    continue 
+                    continue
 
     @retry
     def perform_write(self, fn, key, metadata=None, is_compressed=False):
@@ -309,17 +309,17 @@ class AbstractBucket(object):
 
         with self.open_write(key, metadata, is_compressed) as fh:
             return fn(fh)
-            
+
     def perform_write_noretry(self, fn, key, countdown, metadata=None, is_compressed=False):
         '''
         Original perform_write() but without retry decorator.
         The retry times can be adjusted by the changing the value of countdown.
         '''
         countdown = countdown
-        
+
         if countdown <= 0:
             countdown = 1
-            
+
         while countdown > 0:
             countdown = countdown - 1
             try:
@@ -357,7 +357,7 @@ class AbstractBucket(object):
         """
 
         self.perform_write(lambda fh: fh.write(val), key, metadata)
-        
+
     def store_noretry(self, key, val, countdown, metadata=None):
         """
         Original store() but without retry decorator.

@@ -15,7 +15,7 @@ from urlparse import urlsplit
 import json
 import errno
 import hashlib
-import httplib
+from eventlet.green import httplib
 import logging
 import re
 import tempfile
@@ -106,17 +106,6 @@ class Bucket(AbstractBucket):
         be manually restarted if applicable.
         '''
         
-        # wthung, 2012/12/12, timestamp checking
-        if self.net_ts != 0:
-            cur_net_ts = time.time()
-            log.info('previous ts (%d), current ts (%d)' % (self.net_ts, cur_net_ts))
-            if cur_net_ts - self.net_ts > 60:
-                # error happends over 60 seconds, stop retrying
-                log.info('error happends over 60 seconds, stop retrying.')
-                self.net_ts = 0
-                return False
-            self.net_ts = cur_net_ts
-
         if isinstance(exc, (httplib.IncompleteRead,)):
             return True
 

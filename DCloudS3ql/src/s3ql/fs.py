@@ -35,6 +35,9 @@ GIL_RELEASE_INTERVAL = 0.05
 # interval is 20s for getting indicator, thus below setting is equal to half hour
 REFRESH_COUNT = 90
 
+# Jiahong (12/3/2012): Interval for forcing the next sqlite WAL checkpoint
+CHECKPOINT_INTERVAL = 2500
+
 class Operations(llfuse.Operations):
     """A full-featured file system for online data storage
 
@@ -278,26 +281,38 @@ class Operations(llfuse.Operations):
     def lock_tree(self, id0):
         '''Lock directory tree'''
 
+        # Jiahong (12/10/12): Adding code for forcing checkpointing after the checkpoint interval is exceeded
+
         log.debug('lock_tree(%d): start', id0)
-        queue = [ id0 ]
+        queue = [ (id0, 0) ]
         self.inodes[id0].locked = True
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
-            id_p = queue.pop()
-            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
-                                        (id_p,)):
+            (id_p, off) = queue.pop()
+            for (name_id, id_) in self.db.query('SELECT name_id, inode FROM contents '
+                                           'WHERE parent_inode=? AND name_id > ? '
+                                           'ORDER BY name_id', (id_p, off)):
+            #  for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+            #                              (id_p,)):
                 self.inodes[id_].locked = True
                 processed += 1
+                checkpoint_steps += 1
 
                 if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
-                    queue.append(id_)
+                    queue.append((id_, 0))
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    queue.append((id_p, name_id))
+                    break
+
 
             if not queue:
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('lock_tree(%d): Adjusting gil_step to %d',
@@ -306,33 +321,50 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('lock_tree(%d): re-acquired lock', id0)
                 stamp = time.time()
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
 
         log.debug('lock_tree(%d): end', id0)
     
     # wthung, add unlock
     def unlock_tree(self, id0):
-        '''Lock directory tree'''
+        '''Unlock directory tree'''
 
         log.debug('unlock_tree(%d): start', id0)
-        queue = [ id0 ]
+
+        # Jiahong (12/10/12): Adding code for forcing checkpointing after the checkpoint interval is exceeded
+
+        queue = [ (id0, 0) ]
         self.inodes[id0].locked = False
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
-            id_p = queue.pop()
-            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
-                                        (id_p,)):
+            (id_p, off) = queue.pop()
+            for (name_id, id_) in self.db.query('SELECT name_id, inode FROM contents '
+                                           'WHERE parent_inode=? AND name_id > ? '
+                                           'ORDER BY name_id', (id_p, off)):
+            #  for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+            #                              (id_p,)):
                 self.inodes[id_].locked = False
                 processed += 1
+                checkpoint_steps += 1
 
                 if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
-                    queue.append(id_)
+                    queue.append((id_, 0))
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    queue.append((id_p, name_id))
+                    break
+
 
             if not queue:
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('unlock_tree(%d): Adjusting gil_step to %d',
@@ -341,6 +373,10 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('unlock_tree(%d): re-acquired lock', id0)
                 stamp = time.time()
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
 
         log.debug('unlock_tree(%d): end', id0)
 
@@ -355,6 +391,7 @@ class Operations(llfuse.Operations):
         id0 = self.lookup(id_p0, name0).id
         queue = [ id0 ]
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
@@ -376,11 +413,14 @@ class Operations(llfuse.Operations):
                     self._remove(id_p, name, id_, force=True)
 
                 processed += 1
-                if processed > gil_step:
+                checkpoint_steps += 1
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                     if not found_subdirs:
                         found_subdirs = True
                         queue.append(id_p)
                     break
+
 
             if not queue:
                 if id_p0 in self.open_inodes:
@@ -388,7 +428,7 @@ class Operations(llfuse.Operations):
                 self._remove(id_p0, name0, id0, force=True)
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('remove_tree(%d, %s): Adjusting gil_step to %d and yielding',
@@ -397,6 +437,12 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('remove_tree(%d, %s): re-acquired lock', id_p0, name0)
                 stamp = time.time()
+
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
+
 
         self.forget([(id0, 1)])
         log.debug('remove_tree(%d, %s): end', id_p0, name0)
@@ -446,6 +492,7 @@ class Operations(llfuse.Operations):
         queue = [ (src_id, tmp.id, 0) ]
         id_cache = dict()
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while queue:
@@ -493,9 +540,11 @@ class Operations(llfuse.Operations):
                                'id IN (SELECT name_id FROM ext_attributes WHERE inode=?)',
                                (id_,))
 
-                    processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
+                    temp_steps = db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
+                    processed += temp_steps
+                    checkpoint_steps += temp_steps
                     # wthung todo: need to investigate what the following sql command affects
                     db.execute('REPLACE INTO blocks (id, hash, refcount, size, obj_id) '
                                'SELECT id, hash, refcount+COUNT(id), size, obj_id '
@@ -516,25 +565,30 @@ class Operations(llfuse.Operations):
                 db.execute('UPDATE names SET refcount=refcount+1 WHERE id=?', (name_id,))
 
                 processed += 1
+                checkpoint_steps += 1
 
-#Jiahong: commented out the yielding process for now
-                #if processed > gil_step:
-                #    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
-                #              src_inode.id, target_inode.id, src_id, target_id, name_id)
-                #    queue.append((src_id, target_id, name_id))
-                #    break
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
+                              src_inode.id, target_inode.id, src_id, target_id, name_id)
+                    queue.append((src_id, target_id, name_id))
+                    break
 
-#Jiahong: commented out the yielding process for now
-            #if processed > gil_step:
-            #    dt = time.time() - stamp
-            #    gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
-            #    log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
-            #              src_inode.id, target_inode.id, gil_step)
-            #    processed = 0
-            #    llfuse.lock.yield_(100)
-            #    log.debug('copy_tree(%d, %d): re-acquired lock',
-            #              src_inode.id, target_inode.id)
-            #    stamp = time.time()
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                dt = time.time() - stamp
+                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+                log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
+                          src_inode.id, target_inode.id, gil_step)
+                processed = 0
+                llfuse.lock.yield_(100)
+                log.debug('copy_tree(%d, %d): re-acquired lock',
+                          src_inode.id, target_inode.id)
+                stamp = time.time()
+
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    db.execute('PRAGMA wal_checkpoint(RESTART)')
+
 
         # Make replication visible
         self.db.execute('UPDATE contents SET parent_inode=? WHERE parent_inode=?',
@@ -987,7 +1041,8 @@ class Operations(llfuse.Operations):
         cache_maxentries = max(self.cache.max_entries,0)
         # wthung, 2012/11/21, report quota size
         quota_size = max(self.cache.quota_size, 0)
-        
+        cache_openedentries = max(len(self.cache.opened_entries),0)
+
         if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
@@ -1001,8 +1056,8 @@ class Operations(llfuse.Operations):
         else:
             filesys_write = 0
 
-        return struct.pack('QQQQQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write, quota_size)
+        return struct.pack('QQQQQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write, quota_size, cache_openedentries)
 
     def statfs(self):
         log.debug('statfs(): start')
@@ -1037,6 +1092,10 @@ class Operations(llfuse.Operations):
         if inodes < 0:
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
             self.cache.value_cache["inodes"] = inodes
+
+        if data_size < 0:
+            data_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
+            self.cache.value_cache["fs_size"] = data_size
 
         # file system block size, i.e. the minimum amount of space that can
         # be allocated. This doesn't make much sense for S3QL, so we just
@@ -1079,6 +1138,9 @@ class Operations(llfuse.Operations):
         if ((flags & os.O_RDWR or flags & os.O_WRONLY)
             and self.inodes[id_].locked):
             raise FUSEError(errno.EPERM)
+        if id_ in self.cache.cache_to_close:
+            self.cache.cache_to_close.remove(id_)
+            log.debug('Removed %d from cache_to_close list' % id_)
 
         return id_
 
@@ -1354,6 +1416,9 @@ class Operations(llfuse.Operations):
 
     def release(self, fh):
         log.debug('release(%d): start', fh)
+        # Jiahong (11/27/12): TODO, add close cache files routine here
+        self.cache.cache_to_close.add(fh)
+        log.debug('Adding %d to cache_to_close' % fh)
 
     def flush(self, fh):
         log.debug('flush(%d): start', fh)

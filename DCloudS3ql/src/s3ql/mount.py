@@ -75,12 +75,15 @@ def main(args=None):
 
     options = parse_args(args)
 
-#Jiahong: added mechanism for raising the file handle limit.
-    if options.max_cache_entries > 290000:
-        raise QuietError('Too many cache entries (max 290000)')
+#Jiahong on 9/30/12: Mod this to make the cache entry number huge
+#Jiahong on 11/5/12: Do not check the max_cache_entries. Should do this by product.
+    #if options.max_cache_entries > 9990000:
+    #    raise QuietError('Too many cache entries (max 9990000)')
+
     resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))
 
     # Save handler so that we can remove it when daemonizing
+
     stdout_log_handler = setup_logging(options)
 
     if options.threads is None:
@@ -123,6 +126,7 @@ def main(args=None):
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
                              options.cachesize * 1024, options.max_cache_entries)
     commit_thread = CommitThread(block_cache)
+    closecache_thread = CloseCacheThread(block_cache)
     operations = fs.Operations(block_cache, db, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
                                upload_event=metadata_upload_thread.event)
@@ -144,6 +148,7 @@ def main(args=None):
         block_cache.init(options.threads)
         metadata_upload_thread.start()
         commit_thread.start()
+        closecache_thread.start()
 
         if options.upstart:
             os.kill(os.getpid(), signal.SIGSTOP)
@@ -198,9 +203,11 @@ def main(args=None):
         log.debug("Waiting for background threads...")
         for (op, with_lock) in ((metadata_upload_thread.stop, False),
                                 (commit_thread.stop, False),
+                                (closecache_thread.stop, False),
                                 (block_cache.destroy, True),
                                 (metadata_upload_thread.join, False),
-                                (commit_thread.join, False)):
+                                (commit_thread.join, False),
+                                (closecache_thread.join, False)):
             try:
                 if with_lock:
                     with llfuse.lock:
@@ -439,7 +446,7 @@ def get_metadata(bucket, cachepath):
         tmpfh = bucket.perform_read(do_read, "s3ql_metadata")
         os.close(os.open(cachepath + '.db.tmp', os.O_RDWR | os.O_CREAT | os.O_TRUNC,
                          stat.S_IRUSR | stat.S_IWUSR))
-        db = Connection(cachepath + '.db.tmp', fast_mode=True)
+        db = Connection(cachepath + '.db.tmp', fast_mode=False)
         log.info("Reading metadata...")
         tmpfh.seek(0)
         restore_metadata(tmpfh, db)
@@ -710,6 +717,78 @@ def setup_exchook():
 
     return exc_info
 
+# Jiahong (11/27/12): TODO, put a close_cache thread class here.
+# Use CommitThread as a reference.
+class CloseCacheThread(Thread):
+    '''
+    Closing cache files.
+
+    This class uses two algorithms to close cache files: (1) If
+    files are closed, corresponding cache files are also closed.
+    (2) If a cache entry is not accessed for 360 seconds, the 
+    cache entry is closed.
+    '''
+
+    def __init__(self, block_cache):
+        super(CloseCacheThread, self).__init__()
+        self.block_cache = block_cache
+        self.stop_event = threading.Event()
+        self.name = 'CloseCacheThread'
+
+    def run(self):
+        log.debug('CloseCacheThread: start')
+
+        while not self.stop_event.is_set():
+            do_nothing = True
+            timestamp = time.time()
+            local_cache_to_close = self.block_cache.cache_to_close.copy()
+            self.block_cache.cache_to_close.clear()
+            for (inode_id,block_id) in self.block_cache.opened_entries:
+                if self.stop_event.is_set():
+                    break
+
+                # Jiahong (12/12/12): If need to keep the block open for now, skip the check
+                if (inode_id, block_id) in self.block_cache.in_transit:
+                    continue
+
+                #  First check if this block is scheduled for closing due to file closing
+                if len(local_cache_to_close) > 0:
+                    if inode_id in local_cache_to_close:
+                        with llfuse.lock:
+                            try:
+                                if self.block_cache.entries[(inode_id,block_id)].isopen is True:
+                                    self.block_cache.entries[(inode_id,block_id)].close()
+                                    del self.block_cache.opened_entries[(inode_id,block_id)]
+                                log.debug('Closed block (%d, %d) due to file close' % (inode_id,block_id))
+                                do_nothing = False
+                            except:
+                                log.debug('Skipping block (%d, %d), already gone?' % (inode_id,block_id))
+                                pass
+                        continue
+
+                #  Then check if there are cache files sitting idle for over 360 seconds
+                if timestamp - self.block_cache.entries[(inode_id,block_id)].last_access > 360:
+                    with llfuse.lock:
+                        try:
+                            if self.block_cache.entries[(inode_id,block_id)].isopen is True:
+                                self.block_cache.entries[(inode_id,block_id)].close()
+                                del self.block_cache.opened_entries[(inode_id,block_id)]
+                            log.debug('Closed block (%d, %d) due to idle time' % (inode_id,block_id))
+                            do_nothing = False
+                        except:
+                            log.debug('Skipping block (%d, %d), already gone?' % (inode_id,block_id))
+                            pass
+            local_cache_to_close.clear()
+
+            if do_nothing:
+                self.stop_event.wait(60)
+
+        log.debug('CloseCacheThread: end')
+
+    def stop(self):
+        '''Signal thread to terminate'''
+
+        self.stop_event.set()
 
 
 class CommitThread(Thread):
@@ -739,16 +818,31 @@ class CommitThread(Thread):
             if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
                 test_connection = 100
+
+                # Jiahong (12/7/12): Adding code to monitor and fix inconsistent number of dirty cache entries reported
+
+                most_recent_access = 0
+                have_dirty_cache = False
+                total_cache_size = 0
+                dirty_cache_size = 0
+
                 for el in self.block_cache.entries.values_rev():
+                    if (most_recent_access < el.last_access):
+                        most_recent_access = el.last_access
+                    if el.dirty:
+                        have_dirty_cache = True
+                        dirty_cache_size += el.size
+                    total_cache_size += el.size
+
                     if not (self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload):
-                        break;
+                        continue
                     if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit and not el.to_delete):
                         continue
                     #Modified by Jiahong Wu
                     # Wait for one minute since last uploading the block to do it again
                     # TODO: consider new policy on when to upload the block. May need to delay doing
                     # TODO: so if the block or the file is being accessed (either read or write)
-					# Jiahong (10/25/12): Change back to last_access, but now wait for 60 seconds
+                    # Jiahong (10/25/12): Change back to last_access, but now wait for 60 seconds
                     if stamp - el.last_access < 60:
                         continue
 
@@ -779,6 +873,43 @@ class CommitThread(Thread):
 
                     if self.stop_event.is_set():
                         break
+            else:  # Added by Jiahong on 12/7/12 to handle inconsisteny number of dirty cache entries 
+                most_recent_access = 0
+                have_dirty_cache = False
+                total_cache_size = 0
+                dirty_cache_size = 0
+
+                for el in self.block_cache.entries.values_rev():
+                    if (most_recent_access < el.last_access):
+                        most_recent_access = el.last_access
+                    if el.dirty:
+                        have_dirty_cache = True
+                        dirty_cache_size += el.size
+
+                    total_cache_size += el.size
+
+            if have_dirty_cache:
+                log.debug('Computed cache status in committhread: Most_recent_access %d, Have dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
+            else:
+                log.debug('Computed cache status in committhread: Most_recent_access %d, No dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
+
+            if time.time() - most_recent_access > 60 and ((have_dirty_cache is False and self.block_cache.dirty_entries > 0) or total_cache_size != self.block_cache.size or dirty_cache_size != self.block_cache.dirty_size):
+                log.info('Potential cache size inconsistency detected. Conducting sweeping.')
+                with llfuse.lock:
+                    real_total_cache_size = 0
+                    real_dirty_cache_size = 0
+                    real_dirty_entries = 0
+                    for el in self.block_cache.entries.values_rev():
+                        real_total_cache_size += el.size
+                        if el.dirty:
+                            real_dirty_cache_size += el.size
+                            real_dirty_entries += 1
+                    log.debug('Computed value after sweeping: %d, %d, %d' % (real_total_cache_size, real_dirty_cache_size, real_dirty_entries))
+                    if real_total_cache_size != self.block_cache.size or real_dirty_cache_size != self.block_cache.dirty_size or real_dirty_entries != self.block_cache.dirty_entries:
+                        log.error('Inconsistency in cache size detected, correcting to actual value.')
+                        self.block_cache.size = real_total_cache_size
+                        self.block_cache.dirty_size = real_dirty_cache_size
+                        self.block_cache.dirty_entries = real_dirty_entries
 
             if not did_sth:
                 self.stop_event.wait(5)
