@@ -197,8 +197,9 @@ def main(args=None):
         # wthung, 2012/11/28
         # ensure dirty cache and to_remove is empty before terminating work threads
         # this is a block function
-        log.debug("Waiting for dirty cache to be cleaned and remove queue to become empty...")
-        do_cleanup(block_cache)
+        # Jiahong (12/21/12): Will need to review this cleanup operation
+        #log.debug("Waiting for dirty cache to be cleaned and remove queue to become empty...")
+        #do_cleanup(block_cache)
         
         log.debug("Waiting for background threads...")
         for (op, with_lock) in ((metadata_upload_thread.stop, False),
