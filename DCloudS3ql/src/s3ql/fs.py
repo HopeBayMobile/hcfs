@@ -32,8 +32,7 @@ log = logging.getLogger("fs")
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
 # refresh count for value cache
-# interval is 20s for getting indicator, thus below setting is equal to half hour
-REFRESH_COUNT = 90
+REFRESH_COUNT = 180
 
 # Jiahong (12/3/2012): Interval for forcing the next sqlite WAL checkpoint
 CHECKPOINT_INTERVAL = 2500
@@ -488,6 +487,9 @@ class Operations(llfuse.Operations):
         timestamp = time.time()
         tmp = make_inode(mtime=timestamp, ctime=timestamp, atime=timestamp,
                          uid=0, gid=0, mode=0, refcount=0)
+        # wthung, 2012/12/19
+        # update value cache
+        self.cache.value_cache["inodes"] += 1
 
         queue = [ (src_id, tmp.id, 0) ]
         id_cache = dict()
@@ -513,9 +515,6 @@ class Operations(llfuse.Operations):
                         # wthung, 2012/10/24
                         # update value cache
                         self.cache.value_cache["inodes"] += 1
-                        self.cache.value_cache["fs_size"] += inode.size
-                        # check quota
-                        self.cache.check_quota()
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
@@ -593,7 +592,8 @@ class Operations(llfuse.Operations):
         # Make replication visible
         self.db.execute('UPDATE contents SET parent_inode=? WHERE parent_inode=?',
                         (target_inode.id, tmp.id))
-        del self.inodes[tmp.id]
+        #del self.inodes[tmp.id]
+        self.inodes.removeitem(tmp.id)
         llfuse.invalidate_inode(target_inode.id)
 
         #write statistics to /root/.s3ql
@@ -662,11 +662,7 @@ class Operations(llfuse.Operations):
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] -= 1
-        self.cache.value_cache["fs_size"] -= self.inodes[id_].size
         self.cache.value_cache["entries"] = max(self.cache.value_cache["entries"], 0)
-        self.cache.value_cache["fs_size"] = max(self.cache.value_cache["fs_size"], 0)
-        # check quota
-        self.cache.check_quota()
 
         inode = self.inodes[id_]
         inode.refcount -= 1
@@ -689,12 +685,8 @@ class Operations(llfuse.Operations):
                             (id_,))
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-            del self.inodes[id_]
-            
-            # wthung, 2012/10/24
-            # update value cache
-            self.cache.value_cache["inodes"] -= 1
-            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
+            #del self.inodes[id_]
+            self.inodes.removeitem(id_)
 
         log.debug('_remove(%d, %s): start', id_p, name)
 
@@ -844,12 +836,8 @@ class Operations(llfuse.Operations):
             self.db.execute('DELETE FROM names WHERE refcount=0')
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_new,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_new,))
-            del self.inodes[id_new]
-            
-            # wthung, 2012/10/24
-            # update value cache
-            self.cache.value_cache["inodes"] -= 1
-            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
+            #del self.inodes[id_new]
+            self.inodes.removeitem(id_new)
 
 
     def link(self, id_, new_id_p, new_name):
@@ -882,11 +870,6 @@ class Operations(llfuse.Operations):
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] += 1
-        self.cache.value_cache["fs_size"] += self.inodes[id_].size
-        log.debug('link, fs size +%d' % self.inodes[id_].size)
-        
-        # check quota
-        self.cache.check_quota()
         
         inode = self.inodes[id_]
         inode.refcount += 1
@@ -1200,11 +1183,6 @@ class Operations(llfuse.Operations):
             # wthung, 2012/10/24
             # update value cache
             self.cache.value_cache["inodes"] += 1
-            self.cache.value_cache["fs_size"] += size
-            log.debug("fs size +%d" % size)
-            
-            # check quota
-            self.cache.check_quota()
         except OutOfInodesError:
             log.warn('Could not find a free inode')
             raise FUSEError(errno.ENOSPC)
@@ -1313,14 +1291,8 @@ class Operations(llfuse.Operations):
         minsize = offset + total
         while buf:
             written = self._write(fh, offset, buf)
-            # wthung, 2012/10/24
-            # update value cache
-            self.cache.value_cache["fs_size"] += written
             offset += written
             buf = buf[written:]
-            
-        # check quota
-        self.cache.check_quota()
 
         # Update file size if changed
         # Fuse does not ensure that we do not get concurrent write requests,
@@ -1387,7 +1359,7 @@ class Operations(llfuse.Operations):
 
                 inode = self.inodes[id_]
                 if inode.refcount == 0:
-                    log.debug('_forget(%s): removing %d from cache', forget_list, id_)
+                    log.debug('_forget(%s): removing %d from cache, size %d', (forget_list, id_, inode.size))
                     self.cache.remove(id_, 0, int(math.ceil(inode.size / self.max_obj_size)))
                     # Since the inode is not open, it's not possible that new blocks
                     # get created at this point and we can safely delete the inode
@@ -1399,11 +1371,8 @@ class Operations(llfuse.Operations):
                                     (id_,))
                     self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
                     self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-                    del self.inodes[id_]
-                    
-                    # wthung, 2012/10/24
-                    # update value cache
-                    self.cache.value_cache["inodes"] -= 1
+                    #del self.inodes[id_]
+                    self.inodes.removeitem(id_)
 
 
     def fsyncdir(self, fh, datasync):
