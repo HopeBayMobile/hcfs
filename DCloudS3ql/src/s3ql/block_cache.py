@@ -496,16 +496,17 @@ class BlockCache(object):
             # wthung, 2012/11/28
             # check if dirty cache is below predefined threshold.
             # not using full speed to upload if so
-            if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
-                and self.dirty_entries < self.fullspeed_factor * self.max_entries:
-                self.forced_upload = False
-                # yuxun, set user configured upload speed
-                if os.path.exists('/dev/shm/forced_upload'):
-                    cmd = "rm /dev/shm/forced_upload"
-                    os.system(cmd)
-                    log.info("Set user configured upload speed.")
-                else:
-                    pass
+            if self.forced_upload is True:
+                if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                    and self.dirty_entries < self.fullspeed_factor * self.max_entries:
+                    self.forced_upload = False
+                    # yuxun, set user configured upload speed
+                    if os.path.exists('/dev/shm/forced_upload'):
+                        cmd = "rm /dev/shm/forced_upload"
+                        os.system(cmd)
+                        log.info("Set user configured upload speed.")
+                    else:
+                        pass
             
             #Jiahong Wu (5/8/12): Added retry mechanism for cache upload. Will retry until system umount.
             while True:
@@ -547,16 +548,15 @@ class BlockCache(object):
                 except NoSuchRowError:  #  Jiahong: (10/19/2012)Object already is scheduled for deletion
                     #  Do not update dirty cache info. This is already done in remove()
                     if el.dirty:
-                        if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
-                            and self.dirty_entries < self.fullspeed_factor * self.max_entries:
-                            self.forced_upload = False
-                            # yuxun, set user configured upload speed
-                            if os.path.exists('/dev/shm/forced_upload'):
-                                cmd = "rm /dev/shm/forced_upload"
-                                os.system(cmd)
-                                log.info("Set user configured upload speed.")
-                            else:
-                                pass
+                        if self.forced_upload is True:
+                            if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                                and self.dirty_entries < self.fullspeed_factor * self.max_entries:
+                                self.forced_upload = False
+                                # yuxun, set user configured upload speed
+                                if os.path.exists('/dev/shm/forced_upload'):
+                                    cmd = "rm /dev/shm/forced_upload"
+                                    os.system(cmd)
+                                    log.info("Set user configured upload speed.")
                 else:
                     affect_rows = self.db.execute('UPDATE objects SET size=? WHERE id=?',
                                 (obj_size, obj_id))
@@ -575,16 +575,15 @@ class BlockCache(object):
                             self.dirty_size = 0
                         if self.dirty_entries < 0:
                             self.dirty_entries = 0
-                        if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
-                            and self.dirty_entries < self.fullspeed_factor * self.max_entries:
-                            self.forced_upload = False
-                            # yuxun, set user configured upload speed
-                            if os.path.exists('/dev/shm/forced_upload'):
-                                cmd = "rm /dev/shm/forced_upload"
-                                os.system(cmd)
-                                log.info('Set user configured upload speed.')
-                            else:
-                                pass
+                        if self.forced_upload is True:
+                            if self.dirty_size < (self.fullspeed_factor * self.max_size - self.size_gap) \
+                                and self.dirty_entries < self.fullspeed_factor * self.max_entries:
+                                self.forced_upload = False
+                                # yuxun, set user configured upload speed
+                                if os.path.exists('/dev/shm/forced_upload'):
+                                    cmd = "rm /dev/shm/forced_upload"
+                                    os.system(cmd)
+                                    log.info('Set user configured upload speed.')
                     el.dirty = False
                     #el.last_upload = time.time()
                 finally:
@@ -1029,19 +1028,19 @@ class BlockCache(object):
             if self.dirty_entries < 0:
                 self.dirty_entries = 0
 
-#Jiahong: TODO: the parameter value 'fullspeed_factor' may be adjustable by users in the future
-            if self.dirty_size > self.fullspeed_factor * self.max_size \
-                or self.dirty_entries > self.fullspeed_factor * self.max_entries:
-                self.forced_upload = True
-                # yuxun, set full upload speed
-                if os.path.exists('/dev/shm/forced_upload'):
-                    # already in full upload speed
-                    pass
-                else:
-                    #first create the forced_upload file, then set the maximum bandwidth 
-                    cmd = "touch /dev/shm/forced_upload"
-                    os.system(cmd)
-                    log.info("Set full upload speed.")
+            if self.forced_upload is not True:
+                if self.dirty_size > self.fullspeed_factor * self.max_size \
+                    or self.dirty_entries > self.fullspeed_factor * self.max_entries:
+                    self.forced_upload = True
+                    # yuxun, set full upload speed
+                    if os.path.exists('/dev/shm/forced_upload'):
+                        # already in full upload speed
+                        pass
+                    else:
+                        #first create the forced_upload file, then set the maximum bandwidth 
+                        cmd = "touch /dev/shm/forced_upload"
+                        os.system(cmd)
+                        log.info("Set full upload speed.")
 
         log.debug('get(inode=%d, block=%d): end', inode, blockno)
 
