@@ -1531,9 +1531,6 @@ def _mount(storage_url, container):
 
         os.system("sudo mkdir -p %s" % mountpoint)
 
-        if _createS3qlConf(storage_url, container) != 0:
-            raise BuildGWError("Failed to create s3ql conf")
-
         #mount s3ql
         cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/%s/delta %s" % (mountOpt, authfile, storage_url, container, mountpoint)
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1684,6 +1681,18 @@ def build_gateway(user_key):
         if os.path.ismount(mountpoint):
             op_code = 0x800F
             raise BuildGWError("A file system was already mounted.")
+            
+        # wthung, 2012/12/25
+        # in current wizard procedure, upstart script for s3ql and gateway were created by calling apply_storage_account
+        # since build_gateway should be atomic operation, we move these two scripts to /root
+        # in the last of this method, we'll create them again
+        upstart_s3ql = '/etc/init/s3ql.conf'
+        upstart_gw = '/etc/init/pre-gwstart.conf'
+        current_time = int(time.time())
+        if os.path.exists(upstart_s3ql):
+            os.system('sudo mv %s /root/s3ql.conf.%d' % (upstart_s3ql, current_time))
+        if os.path.exists(upstart_gw):
+            os.system('sudo mv %s /root/pre-gwstart.conf.%d' % (upstart_gw, current_time))
 
         if not common.isValidEncKey(user_key):
             op_code = 0x8004
@@ -1747,6 +1756,12 @@ def build_gateway(user_key):
         #   because it is originally launched by upstart 
         # launch background task program
         os.system("/usr/bin/python /etc/delta/gw_bktask.py")
+        
+        # create upstart script for s3ql and gateway
+        # before this step, if gateway is reset accidently, build_gateway can be restarted
+        if _createS3qlConf(url, user_container) != 0:
+            _umount()
+            raise BuildGWError("Failed to create S3QL configuration")
      
         op_ok = True
         op_code = 0x4
