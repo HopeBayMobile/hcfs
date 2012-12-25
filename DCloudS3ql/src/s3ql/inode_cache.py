@@ -121,13 +121,11 @@ class InodeCache(object):
     to the effects of the current method call.
     '''
 
-    def __init__(self, db, inode_gen, value_cache, fn_check_quota):
+    def __init__(self, db, inode_gen):
         self.attrs = dict()
         self.cached_rows = list()
         self.db = db
         self.generation = inode_gen
-        self.value_cache = value_cache
-        self.fn_check_quota = fn_check_quota
 
         # Fill the cache with dummy data, so that we don't have to
         # check if the cache is full or not (it will always be full)        
@@ -168,25 +166,6 @@ class InodeCache(object):
                     self.setattr(old_inode)
             self.attrs[id_] = inode
             return inode
-            
-    def removeitem(self, inode):
-        sql_cmd = 'SELECT size FROM inodes WHERE id=%d' % inode
-        size_in_db = self.db.get_val(sql_cmd)
-        log.debug('removeitem, id %d, size in db %d' % (inode, size_in_db))
-        
-        sql_cmd = 'DELETE FROM inodes WHERE id=%d' % inode
-        if self.db.execute(sql_cmd) != 1:
-            raise KeyError('No such inode')
-        
-        log.debug('removeitem, id %d, -size %d' % (inode, size_in_db))
-        self.value_cache["fs_size"] -= size_in_db
-        self.value_cache["inodes"] -= 1
-        self.fn_check_quota()
-        
-        try:
-            del self.attrs[inode]
-        except KeyError:
-            pass
 
     def getattr(self, id_): #@ReservedAssignment
         attrs = self.db.get_row("SELECT %s FROM inodes WHERE id=? " % ATTRIBUTE_STR,
@@ -219,16 +198,6 @@ class InodeCache(object):
         if not inode.dirty:
             return
         inode.dirty = False
-        
-        sql_cmd = 'SELECT size from inodes WHERE id=%d' % inode.id
-        old_size = self.db.get_val(sql_cmd)
-        log.debug('setattr, id=%d, old_size=%d' % (inode.id, old_size))
-        if old_size > 0:
-            self.value_cache["fs_size"] -= old_size
-        
-        log.debug('setattr, id=%d, size=%d' % (inode.id, inode.size))
-        self.value_cache["fs_size"] += inode.size
-        self.fn_check_quota()
         
         self.db.execute("UPDATE inodes SET %s WHERE id=?" % UPDATE_STR,
                         [ getattr(inode, x) for x in UPDATE_ATTRS ] + [inode.id])

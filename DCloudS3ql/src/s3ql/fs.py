@@ -32,7 +32,7 @@ log = logging.getLogger("fs")
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
 # refresh count for value cache
-REFRESH_COUNT = 180
+REFRESH_COUNT = 10000
 
 # Jiahong (12/3/2012): Interval for forcing the next sqlite WAL checkpoint
 CHECKPOINT_INTERVAL = 2500
@@ -497,6 +497,8 @@ class Operations(llfuse.Operations):
         checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
+        exceed_quota = False
+        
         while queue:
             (src_id, target_id, off) = queue.pop()
             log.debug('copy_tree(%d, %d): Processing directory (%d, %d, %d)',
@@ -515,6 +517,10 @@ class Operations(llfuse.Operations):
                         # wthung, 2012/10/24
                         # update value cache
                         self.cache.value_cache["inodes"] += 1
+                        self.cache.value_cache["fs_size"] += inode.size
+                        self.cache.check_quota()
+                        if not self.cache.do_write:
+                            exceed_quota = True
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
@@ -565,12 +571,18 @@ class Operations(llfuse.Operations):
 
                 processed += 1
                 checkpoint_steps += 1
+                
+                if exceed_quota:
+                    break
 
                 if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                     log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
                               src_inode.id, target_inode.id, src_id, target_id, name_id)
                     queue.append((src_id, target_id, name_id))
                     break
+            
+            if exceed_quota:
+                break
 
             if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
@@ -592,17 +604,35 @@ class Operations(llfuse.Operations):
         # Make replication visible
         self.db.execute('UPDATE contents SET parent_inode=? WHERE parent_inode=?',
                         (target_inode.id, tmp.id))
-        #del self.inodes[tmp.id]
-        self.inodes.removeitem(tmp.id)
-        llfuse.invalidate_inode(target_inode.id)
+        self.cache.value_cache["inodes"] -= 1
 
-        #write statistics to /root/.s3ql
-        try:
-            with open('/root/.s3ql/snapshot.log','w') as fh:
-                fh.write('total files: %d\n' % snapshot_total_files)
-                fh.write('total size: %d\n' % snapshot_total_size)
-        except:
-            log.warning('Unable to write snapshot statistics to log. Skipping logging')
+        del self.inodes[tmp.id]
+        llfuse.invalidate_inode(target_inode.id)
+        
+        # check if quota is exceeded
+        if exceed_quota:
+            self.inodes.flush()
+            # todo: use a single sql command to retrieve name and parent inode id
+            # query name of target_inode
+            sql_cmd = 'SELECT n.name FROM inodes AS i, contents AS c, names AS n ' \
+                        'WHERE i.id=c.inode AND c.name_id=n.id AND i.id=%d' % target_inode.id
+            name = db.get_val(sql_cmd)
+            # query target inode's parent inode
+            sql_cmd = 'SELECT parent_inode FROM contents WHERE inode=%d' % target_inode.id
+            parent_inode = db.get_val(sql_cmd)
+            log.debug('exceed_quota: remove tree, id=%d, id_p=%d, name=%s' % (target_inode.id, parent_inode, name))
+            if name and parent_inode:
+                self.remove_tree(parent_inode, name)
+            # raise exception
+            raise FUSEError(errno.EDQUOT)
+        else:
+            #write statistics to /root/.s3ql
+            try:
+                with open('/root/.s3ql/snapshot.log','w') as fh:
+                    fh.write('total files: %d\n' % snapshot_total_files)
+                    fh.write('total size: %d\n' % snapshot_total_size)
+            except:
+                log.warning('Unable to write snapshot statistics to log. Skipping logging')
 
         self.cache.snapshot_upload = False
 
@@ -685,8 +715,11 @@ class Operations(llfuse.Operations):
                             (id_,))
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-            #del self.inodes[id_]
-            self.inodes.removeitem(id_)
+            self.cache.value_cache["fs_size"] -= inode.size
+            self.cache.value_cache["inodes"] -= 1
+            self.cache.check_quota()
+            
+            del self.inodes[id_]
 
         log.debug('_remove(%d, %s): start', id_p, name)
 
@@ -836,8 +869,11 @@ class Operations(llfuse.Operations):
             self.db.execute('DELETE FROM names WHERE refcount=0')
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_new,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_new,))
-            #del self.inodes[id_new]
-            self.inodes.removeitem(id_new)
+            self.cache.value_cache["fs_size"] -= inode_new.size
+            self.cache.value_cache["inodes"] -= 1
+            self.cache.check_quota()
+
+            del self.inodes[id_new]
 
 
     def link(self, id_, new_id_p, new_name):
@@ -901,6 +937,9 @@ class Operations(llfuse.Operations):
             last_block = len_ // self.max_obj_size
             cutoff = len_ % self.max_obj_size
             total_blocks = int(math.ceil(inode.size / self.max_obj_size))
+            
+            self.cache.value_cache["fs_size"] += (len_ - inode.size)
+            self.cache.check_quota()
 
             # Adjust file size
             inode.size = len_
@@ -966,12 +1005,13 @@ class Operations(llfuse.Operations):
         log.debug('extstat(%d): start')
 
         # Flush inode cache to get better estimate of total fs size
-        self.inodes.flush()
+        #self.inodes.flush()
 
         # wthung, 2012/10/24
         # Use refresh count to control the source of data
         self.cache.refresh_count += 1
         if self.cache.refresh_count > REFRESH_COUNT:
+            self.inodes.flush()
             entries = self.db.get_val("SELECT COUNT(rowid) FROM contents")
             blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
@@ -1052,6 +1092,7 @@ class Operations(llfuse.Operations):
         # Use refresh count to control the source of data
         self.cache.refresh_count += 1
         if self.cache.refresh_count > REFRESH_COUNT:
+            self.inodes.flush()
             blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
             data_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
@@ -1300,7 +1341,10 @@ class Operations(llfuse.Operations):
         # a concurrent write.
         timestamp = time.time()
         inode = self.inodes[fh]
+        old_size = inode.size
         inode.size = max(inode.size, minsize)
+        self.cache.value_cache["fs_size"] += (inode.size - old_size)
+        self.cache.check_quota()
         inode.mtime = timestamp
         inode.ctime = timestamp
 
@@ -1371,8 +1415,11 @@ class Operations(llfuse.Operations):
                                     (id_,))
                     self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
                     self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-                    #del self.inodes[id_]
-                    self.inodes.removeitem(id_)
+                    self.cache.value_cache["fs_size"] -= inode.size
+                    self.cache.value_cache["inodes"] -= 1
+                    self.cache.check_quota()
+
+                    del self.inodes[id_]
 
 
     def fsyncdir(self, fh, datasync):

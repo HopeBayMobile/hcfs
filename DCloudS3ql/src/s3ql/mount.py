@@ -128,8 +128,7 @@ def main(args=None):
     commit_thread = CommitThread(block_cache)
     closecache_thread = CloseCacheThread(block_cache)
     operations = fs.Operations(block_cache, db, max_obj_size=param['max_obj_size'],
-                               inode_cache=InodeCache(db, param['inode_gen'], block_cache.value_cache,
-                               block_cache.check_quota),
+                               inode_cache=InodeCache(db, param['inode_gen']),
                                upload_event=metadata_upload_thread.event)
 
     log.info('Mounting filesystem...')
