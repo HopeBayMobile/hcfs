@@ -9,7 +9,7 @@ import time
 import simplejson as json
 import common
 import subprocess
-from gateway import api
+#~ from gateway import api
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 
@@ -33,9 +33,6 @@ def _read_command_log(log_fname):
 
 #--------------------------------------------------
 def get_gateway_version():
-    """
-    Get current software version of the gateway.
-    """
     try:
         # read current version of gateway
         cmd = "apt-show-versions dcloud-gateway"
@@ -72,61 +69,81 @@ def get_gateway_version():
 
 
 #----------------------------------------------------------------------
-def get_available_upgrade():
+def get_available_upgrade(unittest=False, test_param=None):
     """
-    Get the info. of latest upgrade/update.
+    Check whether there is new upgrade available
+    Return value = '{"result":true/false, "code":op_code, "description":des,
+                    "version":ver, "msg":op_msg}'
     op_code defintion:
-        0x6:    Success and there is an update.
-        0x5:    Success and there is NO new update.
-        0x8012:    Fail.
+        0x5:       No new update
+        0x6:       Has new update
+        0x8022:    Fail, error during apt-get download.
+    Unit Test / mock function usage
+        get_available_upgrade(unittest=True, test_param = 
+                {'new_update':True, 'version':ver, 'description':des} )
     """
+    if unittest:
+        if 'new_update' in test_param.keys():
+            if test_param['new_update']:
+                op_ok = True
+                op_code = 0x6
+                version = test_param['version']
+                description = test_param['description']
+                op_msg = "A newer update is available."
+            else:
+                op_ok = True
+                op_code = 0x5
+                version = None
+                description = None
+                op_msg = "There is no newer update."
+    else:   ## not running unittest
+        res = ''
+        gateway_ver_file = '/dev/shm/gateway_ver'
+        #~ FIXME: change the file name accordingly at gw_bktask.py.
+        try:
+            #~ os.system("sudo apt-get update &")     # update package info.
+            #~ the apt-get update action will be ran at background process
+            
+            # wthung, 2012/8/8
+            # move apt-show-versions to gw_bktask.py to speed up
+            # the result is stored in /dev/shm/gateway_ver
+            # only do apt-show-versions if file is not existed
+            if not os.path.exists(gateway_ver_file):        
+                log.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
+                cmd = "apt-show-versions -u dcloud-gateway"
+                # ToDo: change to "DeltaGateway" package.
+                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
+                                        stderr=subprocess.STDOUT)
+                res = po.stdout.readline()
+                po.wait()
+            else:
+                with open(gateway_ver_file, 'r') as fh:
+                    res = fh.readline()
 
-    res = ''
-    gateway_ver_file = '/dev/shm/gateway_ver'
-    #~ FIXME: change the file name accordingly at gw_bktask.py.
-    try:
-        #~ os.system("sudo apt-get update &")     # update package info.
-        #~ the apt-get update action will be ran at background process
-        
-        # wthung, 2012/8/8
-        # move apt-show-versions to gw_bktask.py to speed up
-        # the result is stored in /dev/shm/gateway_ver
-        # only do apt-show-versions if file is not existed
-        if not os.path.exists(gateway_ver_file):        
-            log.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
-            cmd = "apt-show-versions -u dcloud-gateway"
-            # ToDo: change to "DeltaGateway" package.
-            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
-                                    stderr=subprocess.STDOUT)
-            res = po.stdout.readline()
-            po.wait()
-        else:
-            with open(gateway_ver_file, 'r') as fh:
-                res = fh.readline()
-
-        # if the result is '', it means no available update.
-        if len(res) == 0:
-            op_code = 0x5
-            op_msg = "There is no newer update."
+            # if the result is '', it means no available update.
+            if len(res) == 0:
+                op_code = 0x5
+                op_msg = "There is no newer update."
+                version = None
+                description = ''
+            else:
+                t = res.split(' ')
+                ver = t[-1].replace('\n', '')
+                op_code = 0x6
+                op_msg = "A newer update is available."
+                version = ver
+                description = ''
+            # query for new updates
+        except:
+            op_code = 0x8022
+            op_msg = "Querying new update failed."
             version = None
-            description = ''
-        else:
-            t = res.split(' ')
-            ver = t[-1].replace('\n', '')
-            op_code = 0x6
-            op_msg = "A newer update is available."
-            version = ver
-            description = ''
-        # query for new updates
-    except:
-        op_code = 0x8012
-        op_msg = "Querying new update failed."
-        version = None
-        description = None
+            description = None
 
     # ToDo: description field.
 
-    return_val = {'version':     version,
+    return_val = {'result':      op_ok,
+                  'version':     version,
                   'description': description,
                   'code':        op_code,
                   'msg':         op_msg}
@@ -218,10 +235,103 @@ def upgrade_gateway():
     return json.dumps(return_val)
 
 
+#----------------------------------------------------------------------
+def download_package(unittest=False, test_param=None):
+    """
+    Download package from APT server
+    Return value = '{"result":true/false, "code"=op_code}'
+    op_code defintion:
+        0x16:      Success
+        0x8022:    Fail, error during apt-get download.
+    Unit Test / mock function usage
+        download_package(unittest=True, test_param={'success':True})
+        download_package(unittest=True, test_param={'success':False})
+    """
+    if unittest:
+        if 'success' in test_param.keys():
+            if test_param['success']:
+                op_ok = True
+                op_code = 0x16
+            else:
+                op_ok = False
+                op_code = 0x8022
+    
+    return_val = {'result': op_ok,
+                  'code':   op_code}
+                  
+    return json.dumps(return_val)
+
+#----------------------------------------------------------------------
+def get_download_progress(unittest=False, test_param=None):
+    """
+    Get the progress of downloading packages
+    Return value = '{"result":true/false, "code"=op_code, "progress"=[0..100]}'
+    progress = 0 means 0% is completed.
+    progress = 90 means 90% is completed.
+    op_code defintion:
+        0x16:      Success
+        0x8022:    Fail, error in getting download progress
+    Unit Test / mock function usage
+        get_download_progress(unittest=True, test_param={'progress':60})
+    """
+    op_msg = ''
+    if unittest:
+        if 'progress' in test_param.keys():
+            op_ok = True
+            op_code = 0x16
+            op_progress = test_param['progress']
+    
+    return_val = {'result': op_ok,
+                  'code':   op_code,
+                  'progress':    op_progress}
+
+    return json.dumps(return_val)
+    
+
+#----------------------------------------------------------------------
+def download_complete(unittest=False, test_param=None):
+    """
+    Check whether download is completed.
+    Return value = '{"result":true/false, "code"=op_code}'
+    op_code defintion:
+        0x16:      Success
+        0x8022:    Fail, error in getting download progress
+    Unit Test / mock function usage
+        download_complete(unittest=True, test_param={'success':True})
+        download_complete(unittest=True, test_param={'success':False})
+    """
+    if unittest:
+        if 'success' in test_param.keys():
+            if test_param['success']:
+                op_ok = True
+                op_code = 0x16
+            else:
+                op_ok = False
+                op_code = 0x8022
+    
+    return_val = {'result': op_ok,
+                  'code':   op_code}
+                  
+    return json.dumps(return_val)
+
+
+
 if __name__ == '__main__':
     #~ res = upgrade_gateway()
-    res = get_available_upgrade()
+    params = {'new_update':True, 'version':'1.1.9.9999', 'description':"Test version"}
+    res = get_available_upgrade(unittest=True, test_param = params)
     print res
-    #res = upgrade_gateway()
+    
+    params = {'success':True}
+    res = download_complete(unittest=True, test_param = params)
+    print res
+    
+    params = {'success':True}    
+    res = download_package(unittest=True, test_param = params)
+    print res
+    
+    params = {'progress':60}
+    res = get_download_progress(unittest=True, test_param = params)
+    print res
     #print res
     pass
