@@ -1760,7 +1760,6 @@ def build_gateway(user_key):
         # create upstart script for s3ql and gateway
         # before this step, if gateway is reset accidently, build_gateway can be restarted
         if _createS3qlConf(url, user_container) != 0:
-            _umount()
             raise BuildGWError("Failed to create S3QL configuration")
      
         op_ok = True
@@ -1781,6 +1780,7 @@ def build_gateway(user_key):
         op_msg = str(e)
     finally:
         if not op_ok:
+            _umount()
             log.error(op_msg)
             log.error("Gateway building error. " + op_msg)
         else:
