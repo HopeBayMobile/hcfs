@@ -133,5 +133,5 @@ copy_nssldap_config
 install_nscd_nslcd_package
 restart_nssldap_service
 copy_exports_file
-create_admin_user
+#create_admin_user
 copy_squid3_config
