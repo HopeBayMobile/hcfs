@@ -102,6 +102,9 @@ echo "AllowUsers dclouduser" >> /etc/ssh/sshd_config
     rm /etc/apt/sources.list.d/apt-cache.list
     sed -i 's/cd \/root\/;bash gw_offline_install.sh vm/#/' /etc/rc.local   # clean up first time install
     
+# run one-time programs
+/etc/delta/disable_fsck.py
+
 echo "....."
 echo "Installation of Gateway is completed."
 echo "The system will be powered off in 5 seconds."
