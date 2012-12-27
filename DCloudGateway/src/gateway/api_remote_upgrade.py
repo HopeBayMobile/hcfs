@@ -4,6 +4,18 @@
 
 # Function: API function for gateway remote upgrade
 
+"""
+    There will be a status file recording current status of gateway upgrade.
+    File path = /var/log/gateway_upgrade.status
+    Status Code:
+    0 = UNKNOWN
+    1 = NO_UPGRADE_AVAILABLE
+    3 = NEW_UPGRADE_AVAILABLE
+    5 = DO_DOWNLOAD
+    7 = DOWNLOAD_DONE
+    9 = DO_UPGRAD
+"""
+
 import os
 import time
 import simplejson as json
@@ -11,9 +23,21 @@ import common
 import subprocess
 #~ from gateway import api
 
-log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
+logger = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
+status_file = "/var/log/gateway_upgrade.status"
 
 class InvalidVersionString(Exception): pass
+
+#----------------------------------------------------------------------
+def _set_upgrade_status(val):
+    fh = open(status_file, 'w')
+    fh.write( str(val) )
+    
+def _get_upgrade_status():
+    fh = open(status_file, 'r')
+    s = fh.read()
+    return int(s)
+
 
 #----------------------------------------------------------------------
 def _read_command_log(log_fname):
@@ -99,17 +123,13 @@ def get_available_upgrade(unittest=False, test_param=None):
     else:   ## not running unittest
         res = ''
         gateway_ver_file = '/dev/shm/gateway_ver'
-        #~ FIXME: change the file name accordingly at gw_bktask.py.
         try:
-            #~ os.system("sudo apt-get update &")     # update package info.
-            #~ the apt-get update action will be ran at background process
-            
             # wthung, 2012/8/8
             # move apt-show-versions to gw_bktask.py to speed up
             # the result is stored in /dev/shm/gateway_ver
             # only do apt-show-versions if file is not existed
             if not os.path.exists(gateway_ver_file):        
-                log.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
+                logger.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
                 cmd = "apt-show-versions -u dcloud-gateway"
                 # ToDo: change to "DeltaGateway" package.
                 po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
@@ -160,7 +180,7 @@ def upgrade_gateway():
         0x8022:    Fail, cannot run apt-get install.
         0x15:    Fail, there is no new update.
     """
-    log.debug("Try to upgrade gateway")
+    logger.debug("Try to upgrade gateway")
     try:
         t = get_gateway_version()
         curr_ver = json.loads(t)['version']
@@ -199,25 +219,25 @@ def upgrade_gateway():
                 op_code = 0x16
                 op_msg = "Updating to the latest SAVEBOX version was successful."
                 # ^^^ assign return value
-                log.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
+                logger.info("Gateway is updated to %s (from %s)" % (new_ver, curr_ver))
                 # ^^^ write log info
-                cmd = "rm /root/upgrading.flag"		# clear upgrade flag
-                a = os.system(cmd)                
+                cmd = "rm /root/upgrading.flag"     # clear upgrade flag
+                a = os.system(cmd)
             else:
                 op_ok = False
                 op_code = 0x8022
                 op_msg = "Updating to the latest SAVEBOX version failed."
-                log.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
+                logger.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
         else:
             op_ok = False
             op_code = 0x15
             op_msg = "SAVEBOX is already using the latest version."
-            log.info("There is no new update detected when \
+            logger.info("There is no new update detected when \
                         running upgrade_gateway()")
     except:
         op_ok = False
         op_code = 0x00000403
-        log.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
+        logger.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
 
     # do something here ...
 
@@ -255,10 +275,23 @@ def download_package(unittest=False, test_param=None):
             else:
                 op_ok = False
                 op_code = 0x8022
-    
+    else:   ## not doing unittest
+        try:
+            _set_upgrade_status(5)  ##   5 = DOWNLOAD_IN_PROGRESS
+            #~ ## download DEB files to cache
+            cmd = "./do_download_upgrade_package.sh &"
+            a = os.system(cmd)
+            ## assign return values
+            op_ok = True
+            op_code = 0x16            
+        except Exception as e:
+            logger.debug(str(e))
+            print(str(e))
+            op_ok = False
+            op_code = 0x8022
+
     return_val = {'result': op_ok,
                   'code':   op_code}
-                  
     return json.dumps(return_val)
 
 #----------------------------------------------------------------------
@@ -308,7 +341,23 @@ def download_complete(unittest=False, test_param=None):
             else:
                 op_ok = False
                 op_code = 0x8022
-    
+    else:
+        try:
+            val = int( _get_upgrade_status() )
+            if val == 7:
+                op_ok = True
+                op_code = 0x16
+            else:
+                op_ok = False
+                op_code = 0x8022
+                
+        except Exception as e:
+            logger.debug(str(e))
+            print(str(e))
+            op_ok = False
+            op_code = 0x8022
+        
+        
     return_val = {'result': op_ok,
                   'code':   op_code}
                   
@@ -318,20 +367,26 @@ def download_complete(unittest=False, test_param=None):
 
 if __name__ == '__main__':
     #~ res = upgrade_gateway()
-    params = {'new_update':True, 'version':'1.1.9.9999', 'description':"Test version"}
-    res = get_available_upgrade(unittest=True, test_param = params)
+    #~ params = {'new_update':True, 'version':'1.1.9.9999', 'description':"Test version"}
+    #~ res = get_available_upgrade(unittest=True, test_param = params)
+    #~ print res
+    #~ 
+    #~ params = {'success':True}
+    #~ res = download_complete(unittest=True, test_param = params)
+    #~ print res
+    #~ 
+    #~ params = {'success':True}    
+    #~ res = download_package(unittest=True, test_param = params)
+    #~ print res
+    #~ 
+    #~ params = {'progress':60}
+    #~ res = get_download_progress(unittest=True, test_param = params)
+    #~ print res
+
+    _set_upgrade_status(5)
+    val = _get_upgrade_status()
+    print("upgrade status = %d" % val )
+
+    res = download_package()
     print res
-    
-    params = {'success':True}
-    res = download_complete(unittest=True, test_param = params)
-    print res
-    
-    params = {'success':True}    
-    res = download_package(unittest=True, test_param = params)
-    print res
-    
-    params = {'progress':60}
-    res = get_download_progress(unittest=True, test_param = params)
-    print res
-    #print res
     pass
