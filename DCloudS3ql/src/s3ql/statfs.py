@@ -70,7 +70,7 @@ def main(args=None):
     buf = llfuse.getxattr(ctrlfile, b's3qlcache', size_guess=256)
     (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, 
         cache_maxsize, cache_maxentries, cache_uploading, filesys_write, 
-        quota_size, cache_openedentries) = struct.unpack('QQQQQQQQQQ', buf)
+        quota_size, cache_openedentries, dirty_metadata) = struct.unpack('QQQQQQQQQQQ', buf)
     p_dedup = dedup_size * 100 / fs_size if fs_size else 0
     p_compr_1 = compr_size * 100 / fs_size if fs_size else 0
     p_compr_2 = compr_size * 100 / dedup_size if dedup_size else 0
@@ -104,6 +104,11 @@ def main(args=None):
         print('File system writing: On')
     else:
         print('File system writing: Off')
+        
+    if dirty_metadata == 1:
+        print('Dirty metadata: True')
+    else:
+        print('Dirty metadata: False')
     
     print('Quota: %.2f MB\n' % (quota_size / mb))
 

@@ -18,7 +18,7 @@ from . import fs, CURRENT_FS_REV
 from .backends.common import get_bucket_factory, BucketPool, NoSuchBucket
 from .block_cache import BlockCache
 from .common import (setup_logging, get_bucket_cachedir, get_seq_no, QuietError, stream_write_bz2, 
-    stream_read_bz2)
+    stream_read_bz2, GlobalVarContainer)
 from .daemonize import daemonize
 from .database import Connection
 from .inode_cache import InodeCache
@@ -121,13 +121,16 @@ def main(args=None):
     else:
         db.execute('DROP INDEX IF EXISTS ix_contents_inode')
 
+    # create a global var container. all global vars can be store in it
+    var_container = GlobalVarContainer()
+    
     metadata_upload_thread = MetadataUploadThread(bucket_pool, param, db,
-                                                  options.metadata_upload_interval)
+                                                  options.metadata_upload_interval, var_container)
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
                              options.cachesize * 1024, options.max_cache_entries)
     commit_thread = CommitThread(block_cache)
     closecache_thread = CloseCacheThread(block_cache)
-    operations = fs.Operations(block_cache, db, max_obj_size=param['max_obj_size'],
+    operations = fs.Operations(block_cache, db, var_container, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
                                upload_event=metadata_upload_thread.event)
 
@@ -258,6 +261,7 @@ def main(args=None):
                                           is_compressed=True)
             log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
             pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
+            self.var_container.dirty_metadata = False
         else:
             log.error('Remote metadata is newer than local (%d vs %d), '
                       'refusing to overwrite!', seq_no, param['seq_no'])
@@ -604,7 +608,7 @@ class MetadataUploadThread(Thread):
     passed in the constructor, the global lock is acquired first.    
     '''
 
-    def __init__(self, bucket_pool, param, db, interval):
+    def __init__(self, bucket_pool, param, db, interval, var_container):
         super(MetadataUploadThread, self).__init__()
         self.bucket_pool = bucket_pool
         self.param = param
@@ -615,6 +619,7 @@ class MetadataUploadThread(Thread):
         self.event = threading.Event()
         self.quit = False
         self.name = 'Metadata-Upload-Thread'
+        self.var_container = var_container
 
     def run(self):
         log.debug('MetadataUploadThread: start')
@@ -674,6 +679,7 @@ class MetadataUploadThread(Thread):
 
                     fh.close()
                     self.db_mtime = new_mtime
+                    self.var_container.dirty_metadata = False
             except:
                 log.error('Cannot connect to backend. Skipping metadata upload for now.')
                 fh.close()

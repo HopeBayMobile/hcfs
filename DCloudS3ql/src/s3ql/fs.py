@@ -75,7 +75,7 @@ class Operations(llfuse.Operations):
     explicitly checks the st_mode attribute.
     """
 
-    def __init__(self, block_cache, db, max_obj_size, inode_cache,
+    def __init__(self, block_cache, db, var_container, max_obj_size, inode_cache,
                  upload_event=None):
         super(Operations, self).__init__()
 
@@ -85,6 +85,7 @@ class Operations(llfuse.Operations):
         self.open_inodes = collections.defaultdict(lambda: 0)
         self.max_obj_size = max_obj_size
         self.cache = block_cache
+        self.var_container = var_container
 
     def destroy(self):
         self.forget(self.open_inodes.items())
@@ -255,6 +256,7 @@ class Operations(llfuse.Operations):
             self.db.execute('INSERT OR REPLACE INTO ext_attributes (inode, name_id, value) '
                             'VALUES(?, ?, ?)', (id_, self._add_name(name), value))
             self.inodes[id_].ctime = time.time()
+            self.var_container.dirty_metadata = True
 
     def removexattr(self, id_, name):
         log.debug('removexattr(%d, %r): start', id_, name)
@@ -276,6 +278,7 @@ class Operations(llfuse.Operations):
             raise llfuse.FUSEError(llfuse.ENOATTR)
 
         self.inodes[id_].ctime = time.time()
+        self.var_container.dirty_metadata = True
 
     def lock_tree(self, id0):
         '''Lock directory tree'''
@@ -307,6 +310,8 @@ class Operations(llfuse.Operations):
                     queue.append((id_p, name_id))
                     break
 
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 break
@@ -359,6 +364,8 @@ class Operations(llfuse.Operations):
                     queue.append((id_p, name_id))
                     break
 
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 break
@@ -420,6 +427,8 @@ class Operations(llfuse.Operations):
                         queue.append(id_p)
                     break
 
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 if id_p0 in self.open_inodes:
@@ -581,6 +590,9 @@ class Operations(llfuse.Operations):
                     queue.append((src_id, target_id, name_id))
                     break
             
+            if processed > 0:
+                self.var_container.dirty_metadata = True
+            
             if exceed_quota:
                 break
 
@@ -612,14 +624,12 @@ class Operations(llfuse.Operations):
         # check if quota is exceeded
         if exceed_quota:
             self.inodes.flush()
-            # todo: use a single sql command to retrieve name and parent inode id
-            # query name of target_inode
-            sql_cmd = 'SELECT n.name FROM inodes AS i, contents AS c, names AS n ' \
+            # query name and parent inode id of target_inode
+            sql_cmd = 'SELECT n.name, c.parent_inode FROM inodes AS i, contents AS c, names AS n ' \
                         'WHERE i.id=c.inode AND c.name_id=n.id AND i.id=%d' % target_inode.id
-            name = db.get_val(sql_cmd)
-            # query target inode's parent inode
-            sql_cmd = 'SELECT parent_inode FROM contents WHERE inode=%d' % target_inode.id
-            parent_inode = db.get_val(sql_cmd)
+            result = db.get_row(sql_cmd)
+            name = result[0]
+            parent_inode = result[1]
             log.debug('exceed_quota: remove tree, id=%d, id_p=%d, name=%s' % (target_inode.id, parent_inode, name))
             if name and parent_inode:
                 self.remove_tree(parent_inode, name)
@@ -689,6 +699,8 @@ class Operations(llfuse.Operations):
         self.db.execute("DELETE FROM contents WHERE name_id=? AND parent_inode=?",
                         (name_id, id_p))
         
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] -= 1
@@ -739,6 +751,7 @@ class Operations(llfuse.Operations):
         self.db.execute('INSERT INTO symlink_targets (inode, target) VALUES(?,?)',
                         (inode.id, target))
         self.open_inodes[inode.id] += 1
+        self.var_container.dirty_metadata = True
         return inode
 
     def rename(self, id_p_old, name_old, id_p_new, name_new):
@@ -786,6 +799,8 @@ class Operations(llfuse.Operations):
                                     (name, 1))
         else:
             self.db.execute('UPDATE names SET refcount=refcount+1 WHERE id=?', (name_id,))
+        
+        self.var_container.dirty_metadata = True
         return name_id
 
     def _del_name(self, name):
@@ -802,6 +817,7 @@ class Operations(llfuse.Operations):
         else:
             self.db.execute('DELETE FROM names WHERE id=?', (name_id,))
 
+        self.var_container.dirty_metadata = True
         return name_id
 
     def _rename(self, id_p_old, name_old, id_p_new, name_new):
@@ -813,6 +829,8 @@ class Operations(llfuse.Operations):
         self.db.execute("UPDATE contents SET name_id=?, parent_inode=? WHERE name_id=? "
                         "AND parent_inode=?", (name_id_new, id_p_new,
                                                name_id_old, id_p_old))
+        
+        self.var_container.dirty_metadata = True
 
         inode_p_old = self.inodes[id_p_old]
         inode_p_new = self.inodes[id_p_new]
@@ -840,6 +858,8 @@ class Operations(llfuse.Operations):
         name_id_old = self._del_name(name_old)
         self.db.execute('DELETE FROM contents WHERE name_id=? AND parent_inode=?',
                         (name_id_old, id_p_old))
+        
+        self.var_container.dirty_metadata = True
         
         # wthung, 2012/10/24
         # update value cache
@@ -903,6 +923,9 @@ class Operations(llfuse.Operations):
 
         self.db.execute("INSERT INTO contents (name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(new_name), id_, new_id_p))
+        
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] += 1
@@ -984,6 +1007,8 @@ class Operations(llfuse.Operations):
             inode.ctime = attr.st_ctime
         else:
             inode.ctime = timestamp
+        
+        self.var_container.dirty_metadata = True
 
         return inode
 
@@ -1079,8 +1104,17 @@ class Operations(llfuse.Operations):
         else:
             filesys_write = 0
 
-        return struct.pack('QQQQQQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write, quota_size, cache_openedentries)
+        # wthung, 2012/12/26
+        # show dirty metadata flag
+        if self.var_container.dirty_metadata:
+            dirty_metadata = 1
+        else:
+            dirty_metadata = 0
+        
+        return struct.pack('QQQQQQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries,
+                           cache_maxsize, cache_maxentries, cache_uploading, filesys_write,
+                           quota_size, cache_openedentries, dirty_metadata)
 
     def statfs(self):
         log.debug('statfs(): start')
@@ -1230,6 +1264,9 @@ class Operations(llfuse.Operations):
 
         self.db.execute("INSERT INTO contents(name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(name), inode.id, id_p))
+        
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] += 1
@@ -1372,6 +1409,7 @@ class Operations(llfuse.Operations):
             with self.cache.get(id_, blockno) as fh:
                 fh.seek(offset_rel)
                 fh.write(buf)
+            self.var_container.dirty_metadata = True
 
         except NoSuchObject as exc:
             log.warn('Backend lost block %d of inode %d (id %s)!',
@@ -1415,6 +1453,9 @@ class Operations(llfuse.Operations):
                                     (id_,))
                     self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
                     self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
+                    
+                    self.var_container.dirty_metadata = True
+                    
                     self.cache.value_cache["fs_size"] -= inode.size
                     self.cache.value_cache["inodes"] -= 1
                     self.cache.check_quota()
