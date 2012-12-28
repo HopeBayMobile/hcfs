@@ -18,6 +18,14 @@ start on (filesystem and net-device-up)
 env STORAGE_ADDR="$URL"
 
 script
+    STATUS_FILE="/var/log/gateway_upgrade.status"
+    UPGRADE_STATUS=`cat $STATUS_FILE`
+
+    while [ $UPGRADE_STATUS -eq 9 ]
+    do
+        UPGRADE_STATUS=`cat $STATUS_FILE`
+    done
+
     su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
         /etc/delta/wait_network_up "\$STORAGE_ADDR"
 end script
