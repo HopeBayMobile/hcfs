@@ -875,6 +875,9 @@ class CommitThread(Thread):
                         # Object may have been accessed while waiting for lock
                         if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
                             continue
+                        if el.to_delete is True:
+                            log.debug('Block being deleted. Skipping commiting block.')
+                            continue
                         self.block_cache.upload(el)
                     did_sth = True
 
