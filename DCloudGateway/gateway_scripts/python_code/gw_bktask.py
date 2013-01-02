@@ -16,7 +16,6 @@ from threading import Thread
 # delta specified API
 from gateway import common
 from gateway import api
-from gateway import api_remote_upgrade
 
 log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 
@@ -182,7 +181,6 @@ def thread_aptget():
     while not g_program_exit:
         os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
         os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
-        api_remote_upgrade.get_available_upgrade()   ## call it to change upgrade STATUS
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(120):

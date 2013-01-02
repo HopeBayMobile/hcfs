@@ -26,6 +26,7 @@ import thread
 
 logger = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 status_file = "/var/log/gateway_upgrade.status"
+progress_file = "/var/log/gateway_upgrade.progress"
 
 class InvalidVersionString(Exception): pass
 
@@ -340,16 +341,22 @@ def get_download_progress(unittest=False, test_param=None):
         if 'progress' in test_param.keys():
             op_progress = test_param['progress']
     
-    ## FIX ME - only a test code here
-    op_progress = 50
-    
+    else:   ## not for unittest
+        try:
+            fh = open(progress_file, 'r')
+            op_progress = int( fh.read() )
+        except Exception as e:
+            logger.debug(str(e))
+            code = 0
+            op_progress = 0
+
 
     return op_progress
     
 
 
 if __name__ == '__main__':
-    res = get_upgrade_status(unittest=True, test_param={'code':5,'progress':70})
+    res = get_upgrade_status()
     print res
     #~ print res
     pass

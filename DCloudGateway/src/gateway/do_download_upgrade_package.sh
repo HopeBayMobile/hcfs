@@ -17,7 +17,10 @@ then
     touch $LOCK_FILE
     rm -rf $TMP_PATH    ## clear old files
     mkdir $TMP_PATH
-
+    ## start a thread for polling download progress
+    bash get_download_progress.sh &
+    sleep 2
+    ## start download package
     cd $TMP_PATH
     apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox
     if [ $? == 0 ]

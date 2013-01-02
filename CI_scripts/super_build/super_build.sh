@@ -75,4 +75,5 @@ fi
     cp -r $INITPATH/StorageAppliance/CI_scripts/build_scripts $INITPATH
     cp -rf $INITPATH/StorageAppliance $INITPATH/build_scripts/
     # run build script
+    cd $INITPATH/build_scripts/
     bash build_gw_package.sh $1 $2
