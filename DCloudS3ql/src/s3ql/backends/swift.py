@@ -15,7 +15,7 @@ from urlparse import urlsplit
 import json
 import errno
 import hashlib
-import httplib
+from eventlet.green import httplib
 import logging
 import re
 import tempfile
@@ -56,6 +56,7 @@ class Bucket(AbstractBucket):
         self.conn = self._get_conn()
         
         self._bucket_exists()
+        self.net_ts = 0 # wthung, timestamp to measure network time
     
     def _bucket_exists(self):
         '''Make sure that the bucket exists'''
@@ -104,7 +105,7 @@ class Bucket(AbstractBucket):
         be used to check for temporary problems and so that the request can
         be manually restarted if applicable.
         '''
-
+        
         if isinstance(exc, (httplib.IncompleteRead,)):
             return True
 

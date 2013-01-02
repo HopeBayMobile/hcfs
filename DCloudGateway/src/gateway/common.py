@@ -13,8 +13,10 @@ import re
 import urllib2
 import urllib
 import json
-
 from ConfigParser import ConfigParser
+
+# definition of global variables
+S3QL_CACHE_DIR = '/root/.s3ql'
 
 CAFEPOSTLOG = "http://127.0.0.1:80/restful/services/cafelog/post"
 CAFEGETLOG = "http://127.0.0.1:80/restful/services/cafelog/getlist"

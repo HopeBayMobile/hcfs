@@ -68,7 +68,9 @@ def main(args=None):
 
     # Added by Jiahong Wu: read cache information
     buf = llfuse.getxattr(ctrlfile, b's3qlcache', size_guess=256)
-    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write)= struct.unpack('QQQQQQQQ', buf)
+    (cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, 
+        cache_maxsize, cache_maxentries, cache_uploading, filesys_write, 
+        quota_size, cache_openedentries, dirty_metadata) = struct.unpack('QQQQQQQQQQQ', buf)
     p_dedup = dedup_size * 100 / fs_size if fs_size else 0
     p_compr_1 = compr_size * 100 / fs_size if fs_size else 0
     p_compr_2 = compr_size * 100 / dedup_size if dedup_size else 0
@@ -86,6 +88,7 @@ def main(args=None):
            'Cache size: current: %.2f MB, max: %.2f MB' % ((cache_size / mb),(cache_maxsize / mb)),
            'Cache entries: current: %d, max: %d' % (cache_entries,cache_maxentries),
            'Dirty cache status: size: %.2f MB, entries: %d' % ((cache_dirtysize / mb),cache_dirtyentries),
+           'Opened cache entries: %d' % cache_openedentries,
            sep='\n')
     if cache_uploading == 1:
         print('Cache uploading: On\n')
@@ -98,9 +101,16 @@ def main(args=None):
         print('Dirty cache near full: False')
     
     if filesys_write == 1:
-        print('File system writing: On\n')
+        print('File system writing: On')
     else:
-        print('File system writing: Off\n')
+        print('File system writing: Off')
+        
+    if dirty_metadata == 1:
+        print('Dirty metadata: True')
+    else:
+        print('Dirty metadata: False')
+    
+    print('Quota: %.2f MB\n' % (quota_size / mb))
 
 
 if __name__ == '__main__':

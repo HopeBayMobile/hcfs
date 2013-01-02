@@ -83,7 +83,7 @@ class Connection(object):
         # WAL mode causes trouble with e.g. copy_tree, so we
         # always disable WAL for now. See 
         # http://article.gmane.org/gmane.comp.db.sqlite.general/65243
-        on = True
+        #on = True  #  Commentted out this line. Fast_mode is not always on now
         cur = self.conn.cursor()
         if on:
             cur.execute('PRAGMA synchronous = OFF')

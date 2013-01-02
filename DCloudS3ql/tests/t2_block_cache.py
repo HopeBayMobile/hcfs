@@ -94,8 +94,11 @@ class cache_tests(TestCase):
     def test_expire(self):
         inode = self.inode
 
+        # Jiahong: Modified this unit test. Right now, if we need to sync, we will upload enough so up to 4 blocks becomes clean.
+        # If there are enough clean blocks, we will expire up to 10 clean blocks.
+
         # Define the 4 most recently accessed ones
-        most_recent = [7, 11, 10, 8]
+        most_recent = [7, 11, 10, 8, 1, 14]
         for i in most_recent:
             time.sleep(0.2)
             with self.cache.get(inode, i) as fh:
@@ -109,19 +112,19 @@ class cache_tests(TestCase):
                 fh.write('%d' % i)
 
         # Flush the 2 most recently accessed ones
+        commit(self.cache, inode, most_recent[-1])
         commit(self.cache, inode, most_recent[-2])
-        commit(self.cache, inode, most_recent[-3])
         
         print ('self.cache.entries length=%d' % len(self.cache.entries))
 
         # We want to expire 4 entries, 2 of which are already flushed
         self.cache.max_entries = 16
         # wthung, to work around our modification
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=4)
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=5)
         #self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=2)
         self.cache.expire()
         self.cache.bucket_pool.verify()
-        self.assertEqual(len(self.cache.entries), 15)
+        self.assertEqual(len(self.cache.entries), 14)
         
         print(self.cache.entries)
         print ('self.cache.entries length=%d' % len(self.cache.entries))
@@ -196,7 +199,8 @@ class cache_tests(TestCase):
         self.cache.bucket_pool.verify()
 
         # wthung, to work around our modification
-        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=1)
+        # Jiahong: Dedupe here? Also no need to delete...
+        self.cache.bucket_pool = TestBucketPool(self.bucket_pool, no_write=0)
         #self.cache.bucket_pool = TestBucketPool(self.bucket_pool)
         with self.cache.get(inode, blockno1) as fh:
             fh.seek(0)

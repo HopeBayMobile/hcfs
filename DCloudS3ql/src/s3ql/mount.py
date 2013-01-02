@@ -18,7 +18,7 @@ from . import fs, CURRENT_FS_REV
 from .backends.common import get_bucket_factory, BucketPool, NoSuchBucket
 from .block_cache import BlockCache
 from .common import (setup_logging, get_bucket_cachedir, get_seq_no, QuietError, stream_write_bz2, 
-    stream_read_bz2)
+    stream_read_bz2, GlobalVarContainer)
 from .daemonize import daemonize
 from .database import Connection
 from .inode_cache import InodeCache
@@ -75,12 +75,15 @@ def main(args=None):
 
     options = parse_args(args)
 
-#Jiahong: added mechanism for raising the file handle limit.
-    if options.max_cache_entries > 290000:
-        raise QuietError('Too many cache entries (max 290000)')
+#Jiahong on 9/30/12: Mod this to make the cache entry number huge
+#Jiahong on 11/5/12: Do not check the max_cache_entries. Should do this by product.
+    #if options.max_cache_entries > 9990000:
+    #    raise QuietError('Too many cache entries (max 9990000)')
+
     resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))
 
     # Save handler so that we can remove it when daemonizing
+
     stdout_log_handler = setup_logging(options)
 
     if options.threads is None:
@@ -118,12 +121,16 @@ def main(args=None):
     else:
         db.execute('DROP INDEX IF EXISTS ix_contents_inode')
 
+    # create a global var container. all global vars can be store in it
+    var_container = GlobalVarContainer()
+    
     metadata_upload_thread = MetadataUploadThread(bucket_pool, param, db,
-                                                  options.metadata_upload_interval)
+                                                  options.metadata_upload_interval, var_container)
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
                              options.cachesize * 1024, options.max_cache_entries)
     commit_thread = CommitThread(block_cache)
-    operations = fs.Operations(block_cache, db, max_obj_size=param['max_obj_size'],
+    closecache_thread = CloseCacheThread(block_cache)
+    operations = fs.Operations(block_cache, db, var_container, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
                                upload_event=metadata_upload_thread.event)
 
@@ -144,6 +151,7 @@ def main(args=None):
         block_cache.init(options.threads)
         metadata_upload_thread.start()
         commit_thread.start()
+        closecache_thread.start()
 
         if options.upstart:
             os.kill(os.getpid(), signal.SIGSTOP)
@@ -189,12 +197,21 @@ def main(args=None):
 
     # Terminate threads
     finally:
+        # wthung, 2012/11/28
+        # ensure dirty cache and to_remove is empty before terminating work threads
+        # this is a block function
+        # Jiahong (12/21/12): Will need to review this cleanup operation
+        #log.debug("Waiting for dirty cache to be cleaned and remove queue to become empty...")
+        #do_cleanup(block_cache)
+        
         log.debug("Waiting for background threads...")
         for (op, with_lock) in ((metadata_upload_thread.stop, False),
                                 (commit_thread.stop, False),
+                                (closecache_thread.stop, False),
                                 (block_cache.destroy, True),
                                 (metadata_upload_thread.join, False),
-                                (commit_thread.join, False)):
+                                (commit_thread.join, False),
+                                (closecache_thread.join, False)):
             try:
                 if with_lock:
                     with llfuse.lock:
@@ -244,6 +261,7 @@ def main(args=None):
                                           is_compressed=True)
             log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
             pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
+            self.var_container.dirty_metadata = False
         else:
             log.error('Remote metadata is newer than local (%d vs %d), '
                       'refusing to overwrite!', seq_no, param['seq_no'])
@@ -272,6 +290,82 @@ def main(args=None):
         p.print_stats(50)
         fh.close()
 
+def do_cleanup(block_cache):
+    '''
+    Ensure dirty cache is completely flushed to cloud storage and
+    remove queue is empty. A statistic file will be dumped.
+    '''
+    data_file = '/dev/shm/cleanup_data'
+    if os.path.exists(data_file):
+        os.system('sudo rm -f %s' % data_file)
+    
+    # if backend is disconnected, quit
+    if not block_cache.network_ok:
+        log.debug("Network is down before doing cleanup jobs.")
+        return
+    
+    orig_dirty_size = block_cache.dirty_size
+    orig_remove_qsize = block_cache.to_remove.qsize()
+    cur_dirty_size = orig_dirty_size
+    cur_remove_qsize = orig_remove_qsize
+    prev_completeness = -1
+    stops = 0
+    
+    if cur_dirty_size == 0:
+        completeness1 = 100
+    else:
+        completeness1 = 0
+    if cur_remove_qsize == 0:
+        completeness2 = 100
+    else:
+        completeness2 = 0
+    
+    while cur_dirty_size > 0 or cur_remove_qsize > 0:
+        # ensure s3ql is able to upload
+        block_cache.do_upload = True
+        
+        time.sleep(1)
+        cur_dirty_size = block_cache.dirty_size
+        cur_remove_qsize = block_cache.to_remove.qsize()
+        
+        if cur_dirty_size > 0:
+            completeness1 = ((orig_dirty_size - cur_dirty_size) / orig_dirty_size) * 100
+        if cur_remove_qsize > 0:
+            completeness2 = ((orig_remove_qsize - cur_remove_qsize) / orig_remove_qsize) * 100
+        
+        completeness = min(completeness1, completeness2)
+        if prev_completeness != completeness:
+            prev_completeness = completeness
+            stops = 0
+        else:
+            # value of completeness isn't changed. increase counter
+            stops = stops + 1
+        
+        # echo statistics to a file
+        os.system("echo '%d' > %s" % (completeness, data_file))
+        
+        # if value of completeness isn't changed for 1 min
+        if stops > 60:
+            log.debug("Cleanup progress isn't changed for 1 min.")
+            # check what's happened
+            # backend is connected?
+            if block_cache.network_ok:
+                log.debug("Network is OK. Wait for another 1 min.")
+                # wait for more 5 mins. if problem remains, quit
+                if stops > 120:
+                    log.debug("Cleanup progress isn't changed for a long while. Quit.")
+                    break
+            else:
+                # wait for 30 secs to check network again
+                time.sleep(30)
+                if not block_cache.network_ok:
+                    # network is still not ok, quit
+                    log.debug("Network is down when doing cleanup jobs. Quit.")
+                    break
+            
+    # 100% completed when exiting while loop
+    os.system("echo '100' > %s" % data_file)
+        
 def determine_threads(options):
     '''Return optimum number of upload threads'''
 
@@ -357,7 +451,7 @@ def get_metadata(bucket, cachepath):
         tmpfh = bucket.perform_read(do_read, "s3ql_metadata")
         os.close(os.open(cachepath + '.db.tmp', os.O_RDWR | os.O_CREAT | os.O_TRUNC,
                          stat.S_IRUSR | stat.S_IWUSR))
-        db = Connection(cachepath + '.db.tmp', fast_mode=True)
+        db = Connection(cachepath + '.db.tmp', fast_mode=False)
         log.info("Reading metadata...")
         tmpfh.seek(0)
         restore_metadata(tmpfh, db)
@@ -514,7 +608,7 @@ class MetadataUploadThread(Thread):
     passed in the constructor, the global lock is acquired first.    
     '''
 
-    def __init__(self, bucket_pool, param, db, interval):
+    def __init__(self, bucket_pool, param, db, interval, var_container):
         super(MetadataUploadThread, self).__init__()
         self.bucket_pool = bucket_pool
         self.param = param
@@ -525,6 +619,7 @@ class MetadataUploadThread(Thread):
         self.event = threading.Event()
         self.quit = False
         self.name = 'Metadata-Upload-Thread'
+        self.var_container = var_container
 
     def run(self):
         log.debug('MetadataUploadThread: start')
@@ -584,6 +679,7 @@ class MetadataUploadThread(Thread):
 
                     fh.close()
                     self.db_mtime = new_mtime
+                    self.var_container.dirty_metadata = False
             except:
                 log.error('Cannot connect to backend. Skipping metadata upload for now.')
                 fh.close()
@@ -628,6 +724,78 @@ def setup_exchook():
 
     return exc_info
 
+# Jiahong (11/27/12): TODO, put a close_cache thread class here.
+# Use CommitThread as a reference.
+class CloseCacheThread(Thread):
+    '''
+    Closing cache files.
+
+    This class uses two algorithms to close cache files: (1) If
+    files are closed, corresponding cache files are also closed.
+    (2) If a cache entry is not accessed for 360 seconds, the 
+    cache entry is closed.
+    '''
+
+    def __init__(self, block_cache):
+        super(CloseCacheThread, self).__init__()
+        self.block_cache = block_cache
+        self.stop_event = threading.Event()
+        self.name = 'CloseCacheThread'
+
+    def run(self):
+        log.debug('CloseCacheThread: start')
+
+        while not self.stop_event.is_set():
+            do_nothing = True
+            timestamp = time.time()
+            local_cache_to_close = self.block_cache.cache_to_close.copy()
+            self.block_cache.cache_to_close.clear()
+            for (inode_id,block_id) in self.block_cache.opened_entries:
+                if self.stop_event.is_set():
+                    break
+
+                # Jiahong (12/12/12): If need to keep the block open for now, skip the check
+                if (inode_id, block_id) in self.block_cache.in_transit:
+                    continue
+
+                #  First check if this block is scheduled for closing due to file closing
+                if len(local_cache_to_close) > 0:
+                    if inode_id in local_cache_to_close:
+                        with llfuse.lock:
+                            try:
+                                if self.block_cache.entries[(inode_id,block_id)].isopen is True:
+                                    self.block_cache.entries[(inode_id,block_id)].close()
+                                    del self.block_cache.opened_entries[(inode_id,block_id)]
+                                log.debug('Closed block (%d, %d) due to file close' % (inode_id,block_id))
+                                do_nothing = False
+                            except:
+                                log.debug('Skipping block (%d, %d), already gone?' % (inode_id,block_id))
+                                pass
+                        continue
+
+                #  Then check if there are cache files sitting idle for over 360 seconds
+                if timestamp - self.block_cache.entries[(inode_id,block_id)].last_access > 360:
+                    with llfuse.lock:
+                        try:
+                            if self.block_cache.entries[(inode_id,block_id)].isopen is True:
+                                self.block_cache.entries[(inode_id,block_id)].close()
+                                del self.block_cache.opened_entries[(inode_id,block_id)]
+                            log.debug('Closed block (%d, %d) due to idle time' % (inode_id,block_id))
+                            do_nothing = False
+                        except:
+                            log.debug('Skipping block (%d, %d), already gone?' % (inode_id,block_id))
+                            pass
+            local_cache_to_close.clear()
+
+            if do_nothing:
+                self.stop_event.wait(60)
+
+        log.debug('CloseCacheThread: end')
+
+    def stop(self):
+        '''Signal thread to terminate'''
+
+        self.stop_event.set()
 
 
 class CommitThread(Thread):
@@ -691,9 +859,11 @@ class CommitThread(Thread):
                             with self.block_cache.bucket_pool() as bucket:
                                 bucket.store('cloud_gw_test_connection','nodata')
                             test_connection = 0
+                            self.block_cache.network_ok = True
                         except:
                             log.error('Network appears to be down. Delaying cache upload.')
                             self.stop_event.wait(60)
+                            self.block_cache.network_ok = False
                             break
                     else:
                         test_connection = test_connection + 1
@@ -704,6 +874,9 @@ class CommitThread(Thread):
                             break
                         # Object may have been accessed while waiting for lock
                         if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
+                            continue
+                        if el.to_delete is True:
+                            log.debug('Block being deleted. Skipping commiting block.')
                             continue
                         self.block_cache.upload(el)
                     did_sth = True

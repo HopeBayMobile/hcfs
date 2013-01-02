@@ -1,4 +1,0 @@
-apsw >= 3.7.0
-pycryptopp
-llfuse >= 0.37
-pyliblzma >= 0.5.3

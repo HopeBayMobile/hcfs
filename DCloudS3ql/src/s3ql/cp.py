@@ -101,6 +101,8 @@ def main(args=None):
     except OSError as exc:
         if exc.errno == errno.EAGAIN:
             raise QuietError('Dirty cache has not been completely flushed. Please retry again later.')
+        elif exc.errno == errno.EDQUOT:
+            raise QuietError('Quota exceeded.')
         else:
             raise
 

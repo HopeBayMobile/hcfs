@@ -52,13 +52,14 @@ def parse_args(args):
                           parents=[pparser])
     subparsers.add_parser('writeoff', help='disallow write operation to file system',
                           parents=[pparser])
-
-
-
     sparser = subparsers.add_parser('cachesize', help='Change cache size',
                                     parents=[pparser])
     sparser.add_argument('cachesize', metavar='<size>', type=int,
                          help='New cache size in KB')
+    sparser = subparsers.add_parser('quotasize', help='Change quota size',
+                                    parents=[pparser])
+    sparser.add_argument('quotasize', metavar='<size>', type=int,
+                         help='New quota size in KB')
 
     sparser = subparsers.add_parser('log', help='Change log level',
                                     parents=[pparser])
@@ -136,6 +137,8 @@ def main(args=None):
 
     elif options.action == 'cachesize':
         llfuse.setxattr(ctrlfile, 'cachesize', pickle.dumps(options.cachesize * 1024))
+    elif options.action == 'quotasize':
+        llfuse.setxattr(ctrlfile, 'quotasize', pickle.dumps(options.quotasize * 1024))
 
 
 

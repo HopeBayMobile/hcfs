@@ -198,7 +198,7 @@ class InodeCache(object):
         if not inode.dirty:
             return
         inode.dirty = False
-
+        
         self.db.execute("UPDATE inodes SET %s WHERE id=?" % UPDATE_STR,
                         [ getattr(inode, x) for x in UPDATE_ATTRS ] + [inode.id])
 
