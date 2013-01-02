@@ -19,11 +19,11 @@ env STORAGE_ADDR="$URL"
 
 script
     STATUS_FILE="/var/log/gateway_upgrade.status"
-    UPGRADE_STATUS=`cat $STATUS_FILE`
+    UPGRADE_STATUS=\`cat \$STATUS_FILE\`
 
-    while [ $UPGRADE_STATUS -eq 9 ]
+    while [ \$UPGRADE_STATUS -eq 9 ]
     do
-        UPGRADE_STATUS=`cat $STATUS_FILE`
+        UPGRADE_STATUS=\`cat \$STATUS_FILE\`
     done
 
     su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
