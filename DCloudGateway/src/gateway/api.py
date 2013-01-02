@@ -8,9 +8,11 @@ import subprocess
 import time
 import re
 import signal
+import urllib2
 from datetime import datetime
 from gateway import snapshot
 import api_restore_conf
+from common import S3QL_CACHE_DIR
 
 log = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 DIR = os.path.dirname(os.path.realpath(__file__))
@@ -165,6 +167,54 @@ def getGatewayConfig():
     except IOError:
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
+
+# wthung, 2013/1/2
+def _notify_savebox(status, msg):
+    """
+    Notify SAVEBOX via Restful API.
+    
+    @type status: Integer
+    @param status: Status code of notification
+    @type msg: String
+    @param msg: Notification message
+    @rtype: JSON object
+    @return: Result of the notification
+            - code: Return code of restful API
+            - response: Response of restful API
+    """
+    # format current time
+    now = datetime.utcnow()
+    ts = '%d/%d/%d %d:%d:%d' % (now.year, now.month, now.day,
+                             now.hour, now.minute, now.second)
+    
+    values = {"status": status,
+              "timestamp": ts,
+              "msg": msg}
+    
+    data = json.dumps(values)
+    post_url = "http://127.0.0.1:8000/witch/system/reportSystemStatus/post"
+    req = urllib2.Request(post_url, data, {'Content-Type': 'application/json'})
+    code = -1
+    response = None
+
+    try:
+        f = urllib2.urlopen(req)
+        code = f.getcode()
+        response = f.read()
+        f.close()
+    except urllib2.HTTPError as e:
+        code = e.code
+        response = e.read()
+    except urllib2.URLError as e:
+        response = e.reason
+    except Exception as e:
+        response = str(e)
+    
+    if code != 200:
+        log.warning('Failed to report system status.')
+        log.debug('Failed to report system status. HTTP code = %d, response = %s' % (code, response))
+    
+    return {"code": code, "response": response}
 
 # wthung, 2012/12/10
 def getSaveboxConfig():
@@ -1168,9 +1218,10 @@ def _createS3qlConf(storage_url, container):
         mountOpt = mountOpt + " --compress %s" % compress 
     
         cmd = 'sudo sh %s/createS3qlconf.sh %s %s %s "%s"' % (DIR, iface, "swift://%s/%s/delta" % (storage_url, container), mountpoint, mountOpt)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
+        os.system(cmd)
+        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #~ output = po.stdout.read()
+        #~ po.wait()
     
         ret = po.returncode
         if ret != 0:
@@ -1180,9 +1231,10 @@ def _createS3qlConf(storage_url, container):
         storage_addr = storage_component[0]
 
         cmd = 'sudo sh %s/createpregwconf.sh %s' % (DIR, storage_addr)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
+        os.system(cmd)
+        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #~ output = po.stdout.read()
+        #~ po.wait()
 
         ret = po.returncode
         if ret != 0:

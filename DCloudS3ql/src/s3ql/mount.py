@@ -819,6 +819,14 @@ class CommitThread(Thread):
         
         with llfuse.lock:
             self.block_cache.read_cachefiles()
+        
+        # wthung, 2013/1/2, check 98% full
+        if ((self.block_cache.max_size * 0.98) <= self.block_cache.dirty_size) or \
+            ((self.block_cache.max_entries * 0.98) <= self.block_cache.dirty_entries):
+            self.block_cache.report_cache_almost_full(True)
+        else:
+            self.block_cache.report_cache_almost_full(False)
+        
         while not self.stop_event.is_set():
             did_sth = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
