@@ -6,16 +6,20 @@ UPGRADE_STATUS=`cat $STATUS_FILE`
 if [ $UPGRADE_STATUS == '9' ]
 then
     echo "Upgrade Gateway."
+    #/etc/delta/turnon_LED &
     apt-get remove -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
     apt-get update
     apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
     if [ $? != 0]; then
+        #/etc/delta/turnoff_LED
         exit $?
     fi
     apt-get install --reinstall -y --force-yes savebox
     if [ $? != 0]; then
+        #/etc/delta/turnoff_LED
         exit $?
     fi
     ## change upgrade status
     echo '1' > $STATUS_FILE     ## 1 = NO_UPGRADE_AVAILABLE
+    #/etc/delta/turnoff_LED
 fi
