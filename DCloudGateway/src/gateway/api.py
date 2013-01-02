@@ -1168,9 +1168,10 @@ def _createS3qlConf(storage_url, container):
         mountOpt = mountOpt + " --compress %s" % compress 
     
         cmd = 'sudo sh %s/createS3qlconf.sh %s %s %s "%s"' % (DIR, iface, "swift://%s/%s/delta" % (storage_url, container), mountpoint, mountOpt)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
+        os.system(cmd)
+        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #~ output = po.stdout.read()
+        #~ po.wait()
     
         ret = po.returncode
         if ret != 0:
@@ -1180,9 +1181,10 @@ def _createS3qlConf(storage_url, container):
         storage_addr = storage_component[0]
 
         cmd = 'sudo sh %s/createpregwconf.sh %s' % (DIR, storage_addr)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
+        os.system(cmd)
+        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        #~ output = po.stdout.read()
+        #~ po.wait()
 
         ret = po.returncode
         if ret != 0:
