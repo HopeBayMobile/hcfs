@@ -77,7 +77,7 @@ fi
     source build.conf
     VER="v$GW_VERSION.$BUILDNUM"
     git tag -a $VER -m "build of $VER"
-    git push orgin --tags
+    git push origin --tags
     
 # re-arrange folders for build
     rm -r $INITPATH/build_scripts
