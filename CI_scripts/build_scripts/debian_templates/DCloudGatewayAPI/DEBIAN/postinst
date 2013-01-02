@@ -43,6 +43,37 @@ chkconfig --level 2345 nfs-kernel-server off
 cd /tmp/DCloudGateway/
 python setup.py install
 
+# install additional script files
+cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/
+cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
+cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/python_code/*.py $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/shaping_port_8080.sh $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/uploadon $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/uploadoff $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/check_expired $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/post-gwstart.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/check-gwstart.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/nic.conf /etc/init/  # fixed at 2012/10/15
+cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh /etc/delta/ # fixed at 2012/10/15
+cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/set_proxy.conf /etc/init/
+cp -rf $SRCDIR/gateway_scripts/do_gateway_upgrade /etc/init.d/  # Yen added at 2013/01/01
+cp -rf -rs /etc/init.d/do_gateway_upgrade /etc/rc2.d/S01do_gateway_upgrade  # Yen added at 2013/01/01
+cp -rf $SRCDIR/gateway_scripts/showlog /usr/bin/  # Yen added at 2012/11/16
+cp -rf $SRCDIR/gateway_scripts/snapshot_bot $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/snapshot_check $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/wait_network_up $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/wait_gateway_up $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/service_restart $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
+cp -rs /usr/bin/*s3ql* /usr/local/bin
+
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/rc.local /etc
@@ -58,45 +89,16 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
     cp -rf $SRCDIR/config/savebox.ini $CONFDIR/
     #cp -rf $SRCDIR/config/smb.orig $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/
-    cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
-    cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/python_code/*.py $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/shaping_port_8080.sh $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/uploadon $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/uploadoff $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/check_expired $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/post-gwstart.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/check-gwstart.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/nic.conf /etc/init/  # fixed at 2012/10/15
-    cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh /etc/delta/ # fixed at 2012/10/15
-    cp -rf $SRCDIR/gateway_scripts/nmbd.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/smbd.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/delete_lostfound.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/set_proxy.conf /etc/init/
-    cp -rf $SRCDIR/gateway_scripts/upgrade_failover /etc/init.d/  # Yen added at 2012/10/31
-    cp -rf -rs /etc/init.d/upgrade_failover /etc/rc2.d/S05upgrade_failover  # Yen added at 2012/10/31
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
-    cp -rf $SRCDIR/gateway_scripts/showlog /usr/bin/  # Yen added at 2012/11/16
 
     #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
     # the permission of sudoers_delta is required 0440
     chmod 0440 /etc/sudoers.d/sudoers_delta
     cp -rf $SRCDIR/gateway_scripts/gw-bg-tasks.conf /etc/init/
     #os.system("cp -rf config/smb.conf %s/"%SMBDIR)
-    cp -rf $SRCDIR/gateway_scripts/snapshot_bot $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/snapshot_check $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/wait_network_up $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/wait_gateway_up $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/service_restart $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
-    cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
     rm -rf /root/.s3ql/*
     chmod -R 777 /root
     chown -R www-data:www-data $CONFDIR
-    cp -rs /usr/bin/*s3ql* /usr/local/bin
 fi
 

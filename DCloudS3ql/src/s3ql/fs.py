@@ -32,8 +32,10 @@ log = logging.getLogger("fs")
 # For long requests, we force a GIL release in the following interval
 GIL_RELEASE_INTERVAL = 0.05
 # refresh count for value cache
-# interval is 20s for getting indicator, thus below setting is equal to 6 hours
-REFRESH_COUNT = 1080
+REFRESH_COUNT = 10000
+
+# Jiahong (12/3/2012): Interval for forcing the next sqlite WAL checkpoint
+CHECKPOINT_INTERVAL = 2500
 
 class Operations(llfuse.Operations):
     """A full-featured file system for online data storage
@@ -73,7 +75,7 @@ class Operations(llfuse.Operations):
     explicitly checks the st_mode attribute.
     """
 
-    def __init__(self, block_cache, db, max_obj_size, inode_cache,
+    def __init__(self, block_cache, db, var_container, max_obj_size, inode_cache,
                  upload_event=None):
         super(Operations, self).__init__()
 
@@ -83,6 +85,7 @@ class Operations(llfuse.Operations):
         self.open_inodes = collections.defaultdict(lambda: 0)
         self.max_obj_size = max_obj_size
         self.cache = block_cache
+        self.var_container = var_container
 
     def destroy(self):
         self.forget(self.open_inodes.items())
@@ -234,6 +237,10 @@ class Operations(llfuse.Operations):
                 update_logging(*pickle.loads(value))
             elif name == 'cachesize':
                 self.cache.max_size = pickle.loads(value)
+            elif name == 'quotasize':
+                self.cache.quota_size = pickle.loads(value)
+                # check quota
+                self.cache.check_quota()
             else:
                 raise llfuse.FUSEError(errno.EINVAL)
         else:
@@ -249,6 +256,7 @@ class Operations(llfuse.Operations):
             self.db.execute('INSERT OR REPLACE INTO ext_attributes (inode, name_id, value) '
                             'VALUES(?, ?, ?)', (id_, self._add_name(name), value))
             self.inodes[id_].ctime = time.time()
+            self.var_container.dirty_metadata = True
 
     def removexattr(self, id_, name):
         log.debug('removexattr(%d, %r): start', id_, name)
@@ -270,30 +278,45 @@ class Operations(llfuse.Operations):
             raise llfuse.FUSEError(llfuse.ENOATTR)
 
         self.inodes[id_].ctime = time.time()
+        self.var_container.dirty_metadata = True
 
     def lock_tree(self, id0):
         '''Lock directory tree'''
 
+        # Jiahong (12/10/12): Adding code for forcing checkpointing after the checkpoint interval is exceeded
+
         log.debug('lock_tree(%d): start', id0)
-        queue = [ id0 ]
+        queue = [ (id0, 0) ]
         self.inodes[id0].locked = True
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
-            id_p = queue.pop()
-            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
-                                        (id_p,)):
+            (id_p, off) = queue.pop()
+            for (name_id, id_) in self.db.query('SELECT name_id, inode FROM contents '
+                                           'WHERE parent_inode=? AND name_id > ? '
+                                           'ORDER BY name_id', (id_p, off)):
+            #  for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+            #                              (id_p,)):
                 self.inodes[id_].locked = True
                 processed += 1
+                checkpoint_steps += 1
 
                 if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
-                    queue.append(id_)
+                    queue.append((id_, 0))
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    queue.append((id_p, name_id))
+                    break
+
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('lock_tree(%d): Adjusting gil_step to %d',
@@ -302,33 +325,52 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('lock_tree(%d): re-acquired lock', id0)
                 stamp = time.time()
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
 
         log.debug('lock_tree(%d): end', id0)
     
     # wthung, add unlock
     def unlock_tree(self, id0):
-        '''Lock directory tree'''
+        '''Unlock directory tree'''
 
         log.debug('unlock_tree(%d): start', id0)
-        queue = [ id0 ]
+
+        # Jiahong (12/10/12): Adding code for forcing checkpointing after the checkpoint interval is exceeded
+
+        queue = [ (id0, 0) ]
         self.inodes[id0].locked = False
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
-            id_p = queue.pop()
-            for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
-                                        (id_p,)):
+            (id_p, off) = queue.pop()
+            for (name_id, id_) in self.db.query('SELECT name_id, inode FROM contents '
+                                           'WHERE parent_inode=? AND name_id > ? '
+                                           'ORDER BY name_id', (id_p, off)):
+            #  for (id_,) in self.db.query('SELECT inode FROM contents WHERE parent_inode=?',
+            #                              (id_p,)):
                 self.inodes[id_].locked = False
                 processed += 1
+                checkpoint_steps += 1
 
                 if self.db.has_val('SELECT 1 FROM contents WHERE parent_inode=?', (id_,)):
-                    queue.append(id_)
+                    queue.append((id_, 0))
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    queue.append((id_p, name_id))
+                    break
+
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('unlock_tree(%d): Adjusting gil_step to %d',
@@ -337,6 +379,10 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('unlock_tree(%d): re-acquired lock', id0)
                 stamp = time.time()
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
 
         log.debug('unlock_tree(%d): end', id0)
 
@@ -351,6 +397,7 @@ class Operations(llfuse.Operations):
         id0 = self.lookup(id_p0, name0).id
         queue = [ id0 ]
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
         while True:
@@ -372,11 +419,16 @@ class Operations(llfuse.Operations):
                     self._remove(id_p, name, id_, force=True)
 
                 processed += 1
-                if processed > gil_step:
+                checkpoint_steps += 1
+
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                     if not found_subdirs:
                         found_subdirs = True
                         queue.append(id_p)
                     break
+
+            if processed > 0:
+                self.var_container.dirty_metadata = True
 
             if not queue:
                 if id_p0 in self.open_inodes:
@@ -384,7 +436,7 @@ class Operations(llfuse.Operations):
                 self._remove(id_p0, name0, id0, force=True)
                 break
 
-            if processed > gil_step:
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
                 dt = time.time() - stamp
                 gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
                 log.debug('remove_tree(%d, %s): Adjusting gil_step to %d and yielding',
@@ -393,6 +445,12 @@ class Operations(llfuse.Operations):
                 llfuse.lock.yield_(100)
                 log.debug('remove_tree(%d, %s): re-acquired lock', id_p0, name0)
                 stamp = time.time()
+
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    self.db.execute('PRAGMA wal_checkpoint(RESTART)')
+
 
         self.forget([(id0, 1)])
         log.debug('remove_tree(%d, %s): end', id_p0, name0)
@@ -438,12 +496,18 @@ class Operations(llfuse.Operations):
         timestamp = time.time()
         tmp = make_inode(mtime=timestamp, ctime=timestamp, atime=timestamp,
                          uid=0, gid=0, mode=0, refcount=0)
+        # wthung, 2012/12/19
+        # update value cache
+        self.cache.value_cache["inodes"] += 1
 
         queue = [ (src_id, tmp.id, 0) ]
         id_cache = dict()
         processed = 0 # Number of steps since last GIL release
+        checkpoint_steps = 0
         stamp = time.time() # Time of last GIL release
         gil_step = 250 # Approx. number of steps between GIL releases
+        exceed_quota = False
+        
         while queue:
             (src_id, target_id, off) = queue.pop()
             log.debug('copy_tree(%d, %d): Processing directory (%d, %d, %d)',
@@ -463,6 +527,9 @@ class Operations(llfuse.Operations):
                         # update value cache
                         self.cache.value_cache["inodes"] += 1
                         self.cache.value_cache["fs_size"] += inode.size
+                        self.cache.check_quota()
+                        if not self.cache.do_write:
+                            exceed_quota = True
                     except OutOfInodesError:
                         log.warn('Could not find a free inode')
                         raise FUSEError(errno.ENOSPC)
@@ -487,9 +554,11 @@ class Operations(llfuse.Operations):
                                'id IN (SELECT name_id FROM ext_attributes WHERE inode=?)',
                                (id_,))
 
-                    processed += db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
+                    temp_steps = db.execute('INSERT INTO inode_blocks (inode, blockno, block_id) '
                                             'SELECT ?, blockno, block_id FROM inode_blocks '
                                             'WHERE inode=?', (id_new, id_))
+                    processed += temp_steps
+                    checkpoint_steps += temp_steps
                     # wthung todo: need to investigate what the following sql command affects
                     db.execute('REPLACE INTO blocks (id, hash, refcount, size, obj_id) '
                                'SELECT id, hash, refcount+COUNT(id), size, obj_id '
@@ -510,39 +579,70 @@ class Operations(llfuse.Operations):
                 db.execute('UPDATE names SET refcount=refcount+1 WHERE id=?', (name_id,))
 
                 processed += 1
+                checkpoint_steps += 1
+                
+                if exceed_quota:
+                    break
 
-#Jiahong: commented out the yielding process for now
-                #if processed > gil_step:
-                #    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
-                #              src_inode.id, target_inode.id, src_id, target_id, name_id)
-                #    queue.append((src_id, target_id, name_id))
-                #    break
+                if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                    log.debug('copy_tree(%d, %d): Requeueing (%d, %d, %d) to yield lock',
+                              src_inode.id, target_inode.id, src_id, target_id, name_id)
+                    queue.append((src_id, target_id, name_id))
+                    break
+            
+            if processed > 0:
+                self.var_container.dirty_metadata = True
+            
+            if exceed_quota:
+                break
 
-#Jiahong: commented out the yielding process for now
-            #if processed > gil_step:
-            #    dt = time.time() - stamp
-            #    gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
-            #    log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
-            #              src_inode.id, target_inode.id, gil_step)
-            #    processed = 0
-            #    llfuse.lock.yield_(100)
-            #    log.debug('copy_tree(%d, %d): re-acquired lock',
-            #              src_inode.id, target_inode.id)
-            #    stamp = time.time()
+            if processed > gil_step or checkpoint_steps > CHECKPOINT_INTERVAL:
+                dt = time.time() - stamp
+                gil_step = max(int(gil_step * GIL_RELEASE_INTERVAL / dt), 250)
+                log.debug('copy_tree(%d, %d): Adjusting gil_step to %d and yielding',
+                          src_inode.id, target_inode.id, gil_step)
+                processed = 0
+                llfuse.lock.yield_(100)
+                log.debug('copy_tree(%d, %d): re-acquired lock',
+                          src_inode.id, target_inode.id)
+                stamp = time.time()
+
+                if checkpoint_steps > CHECKPOINT_INTERVAL:
+                    # Jiahong: Added the following codes to force wal checkpoint periodically
+                    checkpoint_steps = 0
+                    db.execute('PRAGMA wal_checkpoint(RESTART)')
+
 
         # Make replication visible
         self.db.execute('UPDATE contents SET parent_inode=? WHERE parent_inode=?',
                         (target_inode.id, tmp.id))
+        self.cache.value_cache["inodes"] -= 1
+
         del self.inodes[tmp.id]
         llfuse.invalidate_inode(target_inode.id)
-
-        #write statistics to /root/.s3ql
-        try:
-            with open('/root/.s3ql/snapshot.log','w') as fh:
-                fh.write('total files: %d\n' % snapshot_total_files)
-                fh.write('total size: %d\n' % snapshot_total_size)
-        except:
-            log.warning('Unable to write snapshot statistics to log. Skipping logging')
+        
+        # check if quota is exceeded
+        if exceed_quota:
+            self.inodes.flush()
+            # query name and parent inode id of target_inode
+            sql_cmd = 'SELECT n.name, c.parent_inode FROM inodes AS i, contents AS c, names AS n ' \
+                        'WHERE i.id=c.inode AND c.name_id=n.id AND i.id=%d' % target_inode.id
+            result = db.get_row(sql_cmd)
+            name = result[0]
+            parent_inode = result[1]
+            log.debug('exceed_quota: remove tree, id=%d, id_p=%d, name=%s' % (target_inode.id, parent_inode, name))
+            if name and parent_inode:
+                self.remove_tree(parent_inode, name)
+            # raise exception
+            raise FUSEError(errno.EDQUOT)
+        else:
+            #write statistics to /root/.s3ql
+            try:
+                with open('/root/.s3ql/snapshot.log','w') as fh:
+                    fh.write('total files: %d\n' % snapshot_total_files)
+                    fh.write('total size: %d\n' % snapshot_total_size)
+            except:
+                log.warning('Unable to write snapshot statistics to log. Skipping logging')
 
         self.cache.snapshot_upload = False
 
@@ -599,12 +699,12 @@ class Operations(llfuse.Operations):
         self.db.execute("DELETE FROM contents WHERE name_id=? AND parent_inode=?",
                         (name_id, id_p))
         
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] -= 1
-        self.cache.value_cache["fs_size"] -= self.inodes[id_].size
         self.cache.value_cache["entries"] = max(self.cache.value_cache["entries"], 0)
-        self.cache.value_cache["fs_size"] = max(self.cache.value_cache["fs_size"], 0)
 
         inode = self.inodes[id_]
         inode.refcount -= 1
@@ -627,12 +727,11 @@ class Operations(llfuse.Operations):
                             (id_,))
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-            del self.inodes[id_]
-            
-            # wthung, 2012/10/24
-            # update value cache
+            self.cache.value_cache["fs_size"] -= inode.size
             self.cache.value_cache["inodes"] -= 1
-            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
+            self.cache.check_quota()
+            
+            del self.inodes[id_]
 
         log.debug('_remove(%d, %s): start', id_p, name)
 
@@ -652,6 +751,7 @@ class Operations(llfuse.Operations):
         self.db.execute('INSERT INTO symlink_targets (inode, target) VALUES(?,?)',
                         (inode.id, target))
         self.open_inodes[inode.id] += 1
+        self.var_container.dirty_metadata = True
         return inode
 
     def rename(self, id_p_old, name_old, id_p_new, name_new):
@@ -699,6 +799,8 @@ class Operations(llfuse.Operations):
                                     (name, 1))
         else:
             self.db.execute('UPDATE names SET refcount=refcount+1 WHERE id=?', (name_id,))
+        
+        self.var_container.dirty_metadata = True
         return name_id
 
     def _del_name(self, name):
@@ -715,6 +817,7 @@ class Operations(llfuse.Operations):
         else:
             self.db.execute('DELETE FROM names WHERE id=?', (name_id,))
 
+        self.var_container.dirty_metadata = True
         return name_id
 
     def _rename(self, id_p_old, name_old, id_p_new, name_new):
@@ -726,6 +829,8 @@ class Operations(llfuse.Operations):
         self.db.execute("UPDATE contents SET name_id=?, parent_inode=? WHERE name_id=? "
                         "AND parent_inode=?", (name_id_new, id_p_new,
                                                name_id_old, id_p_old))
+        
+        self.var_container.dirty_metadata = True
 
         inode_p_old = self.inodes[id_p_old]
         inode_p_new = self.inodes[id_p_new]
@@ -753,6 +858,8 @@ class Operations(llfuse.Operations):
         name_id_old = self._del_name(name_old)
         self.db.execute('DELETE FROM contents WHERE name_id=? AND parent_inode=?',
                         (name_id_old, id_p_old))
+        
+        self.var_container.dirty_metadata = True
         
         # wthung, 2012/10/24
         # update value cache
@@ -782,12 +889,11 @@ class Operations(llfuse.Operations):
             self.db.execute('DELETE FROM names WHERE refcount=0')
             self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_new,))
             self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_new,))
-            del self.inodes[id_new]
-            
-            # wthung, 2012/10/24
-            # update value cache
+            self.cache.value_cache["fs_size"] -= inode_new.size
             self.cache.value_cache["inodes"] -= 1
-            self.cache.value_cache["inodes"] = max(self.cache.value_cache["inodes"], 0)
+            self.cache.check_quota()
+
+            del self.inodes[id_new]
 
 
     def link(self, id_, new_id_p, new_name):
@@ -817,11 +923,12 @@ class Operations(llfuse.Operations):
 
         self.db.execute("INSERT INTO contents (name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(new_name), id_, new_id_p))
+        
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] += 1
-        self.cache.value_cache["fs_size"] += self.inodes[id_].size
-        log.debug('link, fs size +%d' % self.inodes[id_].size)
         
         inode = self.inodes[id_]
         inode.refcount += 1
@@ -853,6 +960,9 @@ class Operations(llfuse.Operations):
             last_block = len_ // self.max_obj_size
             cutoff = len_ % self.max_obj_size
             total_blocks = int(math.ceil(inode.size / self.max_obj_size))
+            
+            self.cache.value_cache["fs_size"] += (len_ - inode.size)
+            self.cache.check_quota()
 
             # Adjust file size
             inode.size = len_
@@ -897,6 +1007,8 @@ class Operations(llfuse.Operations):
             inode.ctime = attr.st_ctime
         else:
             inode.ctime = timestamp
+        
+        self.var_container.dirty_metadata = True
 
         return inode
 
@@ -918,12 +1030,13 @@ class Operations(llfuse.Operations):
         log.debug('extstat(%d): start')
 
         # Flush inode cache to get better estimate of total fs size
-        self.inodes.flush()
+        #self.inodes.flush()
 
         # wthung, 2012/10/24
         # Use refresh count to control the source of data
         self.cache.refresh_count += 1
         if self.cache.refresh_count > REFRESH_COUNT:
+            self.inodes.flush()
             entries = self.db.get_val("SELECT COUNT(rowid) FROM contents")
             blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
@@ -938,6 +1051,9 @@ class Operations(llfuse.Operations):
             self.cache.value_cache["fs_size"] = fs_size
             self.cache.value_cache["dedup_size"] = dedup_size
             self.cache.value_cache["compr_size"] = compr_size
+            
+            # check quota
+            self.cache.check_quota()
 
             self.cache.refresh_count = 0
         else:
@@ -971,6 +1087,10 @@ class Operations(llfuse.Operations):
         cache_dirtyentries = max(self.cache.dirty_entries,0)
         cache_maxsize = max(self.cache.max_size,0)
         cache_maxentries = max(self.cache.max_entries,0)
+        # wthung, 2012/11/21, report quota size
+        quota_size = max(self.cache.quota_size, 0)
+        cache_openedentries = max(len(self.cache.opened_entries),0)
+
         if (self.cache.do_upload or self.cache.forced_upload or self.cache.snapshot_upload) and self.cache.dirty_size>0:
             cache_uploading = 1
         else:
@@ -984,8 +1104,17 @@ class Operations(llfuse.Operations):
         else:
             filesys_write = 0
 
-        return struct.pack('QQQQQQQQ', 
-                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries, cache_maxsize, cache_maxentries, cache_uploading, filesys_write)
+        # wthung, 2012/12/26
+        # show dirty metadata flag
+        if self.var_container.dirty_metadata:
+            dirty_metadata = 1
+        else:
+            dirty_metadata = 0
+        
+        return struct.pack('QQQQQQQQQQQ', 
+                           cache_size, cache_dirtysize, cache_entries, cache_dirtyentries,
+                           cache_maxsize, cache_maxentries, cache_uploading, filesys_write,
+                           quota_size, cache_openedentries, dirty_metadata)
 
     def statfs(self):
         log.debug('statfs(): start')
@@ -997,23 +1126,21 @@ class Operations(llfuse.Operations):
         # Use refresh count to control the source of data
         self.cache.refresh_count += 1
         if self.cache.refresh_count > REFRESH_COUNT:
+            self.inodes.flush()
             blocks = self.db.get_val("SELECT COUNT(id) FROM objects")
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
-            size = self.db.get_val('SELECT SUM(size) FROM blocks')
+            data_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
 
             # update value cache
             self.cache.value_cache["blocks"] = blocks
             self.cache.value_cache["inodes"] = inodes
-            self.cache.value_cache["dedup_size"] = size
+            self.cache.value_cache["fs_size"] = data_size
 
             self.cache.refresh_count = 0
         else:
             blocks = self.cache.value_cache["blocks"]
             inodes = self.cache.value_cache["inodes"]
-            size = self.cache.value_cache["dedup_size"]
-
-        if size is None:
-            size = 0
+            data_size = self.cache.value_cache["fs_size"]
 
         # wthung, 2012/11/12, retrieve db value in negative value
         if blocks < 0:
@@ -1024,14 +1151,17 @@ class Operations(llfuse.Operations):
             inodes = self.db.get_val("SELECT COUNT(id) FROM inodes")
             self.cache.value_cache["inodes"] = inodes
 
-        if size < 0:
-            size = self.db.get_val('SELECT SUM(size) FROM blocks')
-            self.cache.value_cache["dedup_size"] = size
+        if data_size < 0:
+            data_size = self.db.get_val('SELECT SUM(size) FROM inodes') or 0
+            self.cache.value_cache["fs_size"] = data_size
 
         # file system block size, i.e. the minimum amount of space that can
         # be allocated. This doesn't make much sense for S3QL, so we just
         # return the average size of stored blocks.
-        stat_.f_frsize = size // blocks if blocks != 0 else 4096
+        
+        # wthung, 2012/12/4
+        # Used size in df will be data size before dedup
+        stat_.f_frsize = data_size // blocks if blocks != 0 else 4096
         if stat_.f_frsize == 0:  # Jiahong: Extra error handling for ensuring that the f_frsize var won't be zero
             stat_.f_frsize = 4096
 
@@ -1044,10 +1174,13 @@ class Operations(llfuse.Operations):
 
         # size of fs in f_frsize units. Since backend is supposed to be unlimited,
         # always return a half-full filesystem, but at least 1 TB)
-        fs_size = max(2 * size, 1024 ** 4)
+        #fs_size = max(2 * size, 1024 ** 4)
+        # wthung, 2012/12/4
+        # max gateway disk space is equal to quota
+        fs_size = max(self.cache.quota_size, data_size)
 
         stat_.f_blocks = fs_size // stat_.f_frsize
-        stat_.f_bfree = (fs_size - size) // stat_.f_frsize
+        stat_.f_bfree = (fs_size - data_size) // stat_.f_frsize
         stat_.f_bavail = stat_.f_bfree # free for non-root
 
         total_inodes = max(2 * inodes, 1000000)
@@ -1063,6 +1196,9 @@ class Operations(llfuse.Operations):
         if ((flags & os.O_RDWR or flags & os.O_WRONLY)
             and self.inodes[id_].locked):
             raise FUSEError(errno.EPERM)
+        if id_ in self.cache.cache_to_close:
+            self.cache.cache_to_close.remove(id_)
+            log.debug('Removed %d from cache_to_close list' % id_)
 
         return id_
 
@@ -1122,14 +1258,15 @@ class Operations(llfuse.Operations):
             # wthung, 2012/10/24
             # update value cache
             self.cache.value_cache["inodes"] += 1
-            self.cache.value_cache["fs_size"] += size
-            log.debug("fs size +%d" % size)
         except OutOfInodesError:
             log.warn('Could not find a free inode')
             raise FUSEError(errno.ENOSPC)
 
         self.db.execute("INSERT INTO contents(name_id, inode, parent_inode) VALUES(?,?,?)",
                         (self._add_name(name), inode.id, id_p))
+        
+        self.var_container.dirty_metadata = True
+        
         # wthung, 2012/10/24
         # update value cache
         self.cache.value_cache["entries"] += 1
@@ -1221,14 +1358,17 @@ class Operations(llfuse.Operations):
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
+            
+        # wthung, 2012/11/28
+        # if backend is disconnected and dirty cache occupies all cache, raise ENOBUFS
+        if not self.cache.network_ok and self.cache.dirty_size > self.cache.max_size:
+            log.warn('Network appears to be down and dirty cache is full.')
+            raise FUSEError(errno.ENOBUFS)
 
         total = len(buf)
         minsize = offset + total
         while buf:
             written = self._write(fh, offset, buf)
-            # wthung, 2012/10/24
-            # update value cache
-            self.cache.value_cache["fs_size"] += written
             offset += written
             buf = buf[written:]
 
@@ -1238,7 +1378,10 @@ class Operations(llfuse.Operations):
         # a concurrent write.
         timestamp = time.time()
         inode = self.inodes[fh]
+        old_size = inode.size
         inode.size = max(inode.size, minsize)
+        self.cache.value_cache["fs_size"] += (inode.size - old_size)
+        self.cache.check_quota()
         inode.mtime = timestamp
         inode.ctime = timestamp
 
@@ -1266,6 +1409,7 @@ class Operations(llfuse.Operations):
             with self.cache.get(id_, blockno) as fh:
                 fh.seek(offset_rel)
                 fh.write(buf)
+            self.var_container.dirty_metadata = True
 
         except NoSuchObject as exc:
             log.warn('Backend lost block %d of inode %d (id %s)!',
@@ -1297,7 +1441,7 @@ class Operations(llfuse.Operations):
 
                 inode = self.inodes[id_]
                 if inode.refcount == 0:
-                    log.debug('_forget(%s): removing %d from cache', forget_list, id_)
+                    log.debug('_forget(%s): removing %d from cache, size %d', (forget_list, id_, inode.size))
                     self.cache.remove(id_, 0, int(math.ceil(inode.size / self.max_obj_size)))
                     # Since the inode is not open, it's not possible that new blocks
                     # get created at this point and we can safely delete the inode
@@ -1309,11 +1453,14 @@ class Operations(llfuse.Operations):
                                     (id_,))
                     self.db.execute('DELETE FROM ext_attributes WHERE inode=?', (id_,))
                     self.db.execute('DELETE FROM symlink_targets WHERE inode=?', (id_,))
-                    del self.inodes[id_]
                     
-                    # wthung, 2012/10/24
-                    # update value cache
+                    self.var_container.dirty_metadata = True
+                    
+                    self.cache.value_cache["fs_size"] -= inode.size
                     self.cache.value_cache["inodes"] -= 1
+                    self.cache.check_quota()
+
+                    del self.inodes[id_]
 
 
     def fsyncdir(self, fh, datasync):
@@ -1326,6 +1473,9 @@ class Operations(llfuse.Operations):
 
     def release(self, fh):
         log.debug('release(%d): start', fh)
+        # Jiahong (11/27/12): TODO, add close cache files routine here
+        self.cache.cache_to_close.add(fh)
+        log.debug('Adding %d to cache_to_close' % fh)
 
     def flush(self, fh):
         log.debug('flush(%d): start', fh)

@@ -52,6 +52,14 @@ def setup_logging(options):
 
     return stdout_handler
 
+# wthung, 2012/12/26
+class GlobalVarContainer(object):
+    """
+    A container to store global variables.
+    Declare it as a class so it can be passed as a reference.
+    """
+    def __init__(self):
+        self.dirty_metadata = False
 
 class LoggerFilter(object):
     """

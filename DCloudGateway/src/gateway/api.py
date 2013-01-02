@@ -192,6 +192,38 @@ def getSaveboxConfig():
     except IOError:
         op_msg = 'Failed to access %s' % config_name
         raise GatewayConfError(op_msg)
+
+# wthung, 2012/12/26
+def _get_s3ql_db_name():
+    """
+    Get S3QL metadata database name.
+    
+    @rtype: string
+    @return: Name of S3QL metadata database
+    """
+    db_name = None
+    
+    try:
+        config = ConfigParser.ConfigParser()
+        with open('/root/.s3ql/authinfo2') as op_fh:
+            config.readfp(op_fh)
+    
+        section = "CloudStorageGateway"
+        account = config.get(section, 'backend-login')
+        account, username = account.split(':')
+        storage_url = config.get(section, 'storage-url').replace("swift://", "")
+        
+        # list all content in /root/.s3ql
+        for item in os.listdir('/root/.s3ql'):
+            if item.find('.db') != -1 and item.find('swift') != -1 \
+                and item.find(username) != -1 and item.find(storage_url) != -1 \
+                and item.find('wal') == -1:
+                db_name = item
+    except Exception as e:
+        #log.error('Failed to get S3QL metadata DB name: %s.' % str(e))
+        print('Failed to get S3QL metadata DB name: %s.' % str(e))
+    finally:
+        return db_name
         
 # wthung
 def _get_storage_account():
@@ -3271,7 +3303,19 @@ def _get_storage_capacity():
                     crt_tokens = str(crt_size).strip().split(" ")
                     crt_val = crt_tokens[0]
                     real_cloud_data = real_cloud_data - float(crt_val)
-                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val) * 1024 ** 2) 
+                    ret_usage["gateway_cache_usage"]["dirty_cache_size"] = int(float(crt_val) * 1024 ** 2)
+                    
+                    # wthung, 2012/12/26, check if s3ql metadata is dirty
+                    if results.find('Dirty metadata: True') != -1:
+                        # query size of s3ql metadata db
+                        # first compose the file name of db
+                        db_name = _get_s3ql_db_name()
+                        try:
+                            db_size = os.path.getsize('%s/%s' % (S3QL_CACHE_DIR, db_name))
+                            # add one tenth of db size to dirty cache size
+                            ret_usage["gateway_cache_usage"]["dirty_cache_size"] += int(db_size / 10)
+                        except os.error:
+                            log.warning('Failed to get size of S3QL metadata DB.')
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]

@@ -22,7 +22,7 @@ import bz2
 import cPickle as pickle
 import hashlib
 import hmac
-import httplib
+from eventlet.green import httplib
 import logging
 import lzma
 import os
@@ -169,17 +169,18 @@ def http_connection(hostname, port, ssl=False):
         proxy_host = hit.group(2)
         log.info('Using proxy %s:%d', proxy_host, proxy_port)
         
+        # wthung, 2012/12/12, change timeout to 60s
         if ssl:
-            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=300)
+            conn = httplib.HTTPSConnection(proxy_host, proxy_port, timeout=60)
         else:
-            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=300)
+            conn = httplib.HTTPConnection(proxy_host, proxy_port, timeout=60)
         conn.set_tunnel(hostname, port)
         return conn
     
     elif ssl:
-        return httplib.HTTPSConnection(hostname, port, timeout=300)
+        return httplib.HTTPSConnection(hostname, port, timeout=60)
     else:
-        return httplib.HTTPConnection(hostname, port, timeout=300)
+        return httplib.HTTPConnection(hostname, port, timeout=60)
     
 def sha256(s):
     return hashlib.sha256(s).digest()
@@ -276,6 +277,27 @@ class AbstractBucket(object):
         with self.open_read(key) as fh:
             return fn(fh)
 
+    def perform_read_noretry(self, fn, key, countdown):
+        '''  
+        Original perform_read() but without retry decorator.
+        The retry times can be adjusted by the changing the value of countdown.
+        '''
+        countdown = countdown
+     
+        if countdown <= 0:
+            countdown = 1
+     
+        while countdown > 0: 
+            countdown = countdown - 1
+            try:
+                with self.open_read(key) as fh:
+                    return fn(fh)
+            except:
+                if countdown <= 0:
+                    raise
+                else:
+                    continue
+
     @retry
     def perform_write(self, fn, key, metadata=None, is_compressed=False):
         '''Read bucket data using *fn*, retry on temporary failure
@@ -287,6 +309,27 @@ class AbstractBucket(object):
 
         with self.open_write(key, metadata, is_compressed) as fh:
             return fn(fh)
+
+    def perform_write_noretry(self, fn, key, countdown, metadata=None, is_compressed=False):
+        '''
+        Original perform_write() but without retry decorator.
+        The retry times can be adjusted by the changing the value of countdown.
+        '''
+        countdown = countdown
+
+        if countdown <= 0:
+            countdown = 1
+
+        while countdown > 0:
+            countdown = countdown - 1
+            try:
+                with self.open_write(key, metadata, is_compressed) as fh:
+                    return fn(fh)
+            except:
+                if countdown <= 0:
+                    raise
+                else:
+                    continue
 
     def fetch(self, key):
         """Return data stored under `key`.
@@ -314,6 +357,14 @@ class AbstractBucket(object):
         """
 
         self.perform_write(lambda fh: fh.write(val), key, metadata)
+
+    def store_noretry(self, key, val, countdown, metadata=None):
+        """
+        Original store() but without retry decorator.
+        The retry times can be adjusted by the changing the value of countdown.
+        """
+
+        self.perform_write_noretry(lambda fh: fh.write(val), key, countdown, metadata)
 
     @abstractmethod
     def is_temp_failure(self, exc):

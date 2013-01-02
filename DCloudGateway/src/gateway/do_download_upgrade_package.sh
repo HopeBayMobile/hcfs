@@ -33,9 +33,10 @@ then
         ## change upgrade status
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
-        echo '-1' > $PROGRESS_FILE     ## -1 = download failed
         ## change upgrade status
         echo '1' > $STATUS_FILE     ## 1=NO_UPGRADE_AVAILABLE
+        sleep 2  # wait for "get_download_progress.sh" to stop
+        echo '-1' > $PROGRESS_FILE     ## -1 = download failed
     fi
     # unlock
     rm $LOCK_FILE
