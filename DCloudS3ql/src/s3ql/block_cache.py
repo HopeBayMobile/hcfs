@@ -348,6 +348,22 @@ class BlockCache(object):
     def __len__(self):
         '''Get number of objects in cache'''
         return len(self.entries)
+    
+    # wthung, 2013/1/2
+    def report_status(self, file_name, flag):
+        '''Report status by touching/removing a input file.'''
+        if flag:
+            if not os.path.exists(file_name):
+                os.system('sudo touch %s' % file_name)
+        else:
+            if os.path.exists(file_name):
+                os.system('sudo rm %s' % file_name)
+                
+    # wthung, 2013/1/2
+    def report_cache_almost_full(self, full_status):
+        '''Report cache status by touching/removing a file in /dev/shm.'''
+        status_file = '/dev/shm/s3ql_cache_almost_full'
+        self.report_status(status_file, full_status)
         
     # wthung, 2012/11/21
     def check_quota(self):

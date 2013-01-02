@@ -1358,6 +1358,12 @@ class Operations(llfuse.Operations):
 
         if self.inodes[fh].locked:
             raise FUSEError(errno.EPERM)
+        
+        # wthung, 2013/1/2, check 98% full
+        if ((self.cache.max_size * 0.98) <= self.cache.dirty_size) or ((self.cache.max_entries * 0.98) <= self.cache.dirty_entries):
+            self.cache.report_cache_almost_full(True)
+        else:
+            self.cache.report_cache_almost_full(False)
             
         # wthung, 2012/11/28
         # if backend is disconnected and dirty cache occupies all cache, raise ENOBUFS
