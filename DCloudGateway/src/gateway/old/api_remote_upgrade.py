@@ -21,8 +21,7 @@ import time
 import simplejson as json
 import common
 import subprocess
-import thread
-#~ from gateway import api
+from gateway import api
 
 logger = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 status_file = "/var/log/gateway_upgrade.status"
@@ -30,63 +29,19 @@ status_file = "/var/log/gateway_upgrade.status"
 class InvalidVersionString(Exception): pass
 
 #----------------------------------------------------------------------
-def set_upgrade_status(val):
+def _set_upgrade_status(val):
+    fh = open(status_file, 'w')
+    fh.write( str(val) )
+    
+def _get_upgrade_status():
     try:
-        fh = open(status_file, 'w')
-        fh.write( str(val) )
-        op_ok = True
+        fh = open(status_file, 'r')
+        s = int( fh.read() )
     except Exception as e:
         logger.debug(str(e))
-        print(str(e))
-        op_ok = False
-
-    return op_ok
-
-
-def get_upgrade_status(unittest=False, test_param=None):
-    """
-    Get the status code of upgrade
-    Return value = '{"code":status_code, "progress":download_progress}'
-    Status Code:
-        0 = UNKNOWN
-        1 = NO_UPGRADE_AVAILABLE
-        3 = NEW_UPGRADE_AVAILABLE
-        5 = DO_DOWNLOAD
-        7 = DOWNLOAD_DONE
-        9 = DO_UPGRADE
-    Unit Test / mock function usage
-        get_upgrade_status(unittest=True, test_param = 
-                {'code':status_code, 'progress':download_progress} )
-    """
-    if unittest:
-        if 'code' in test_param.keys():
-            try:
-                code = test_param['code']
-                progress = test_param['progress']
-                set_upgrade_status(code)
-            except Exception as e:
-                code = 0
-                progress = 0
-                set_upgrade_status(code)
-                
-    else:       ## not for unit test
-        try:
-            fh = open(status_file, 'r')
-            code = int( fh.read() )
-            progress = get_download_progress()
-            thread.start_new_thread(get_available_upgrade, ())  
-            ## ^^^ trigger status change if new upgrade is available
-            
-        except Exception as e:
-            logger.debug(str(e))
-            code = 0
-            progress = 0
+        s = 0
         
-    return_val = {'code':     code,
-                  'progress': progress}
-
-    return json.dumps(return_val)
-
+    return s
 
 
 #----------------------------------------------------------------------
@@ -164,14 +119,12 @@ def get_available_upgrade(unittest=False, test_param=None):
                 version = test_param['version']
                 description = test_param['description']
                 op_msg = "A newer update is available."
-                set_upgrade_status(3)
             else:
                 op_ok = True
                 op_code = 0x5
                 version = None
                 description = None
                 op_msg = "There is no newer update."
-                set_upgrade_status(1)
     else:   ## not running unittest
         res = ''
         gateway_ver_file = '/dev/shm/gateway_ver'
@@ -198,7 +151,6 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "There is no newer update."
                 version = None
                 description = ''
-                set_upgrade_status(1)
             else:
                 t = res.split(' ')
                 ver = t[-1].replace('\n', '')
@@ -206,7 +158,7 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "A newer update is available."
                 version = ver
                 description = ''
-                set_upgrade_status(3)
+            # query for new updates
         except:
             op_code = 0x8022
             op_msg = "Querying new update failed."
@@ -241,15 +193,14 @@ def upgrade_gateway():
         new_ver = json.loads(t)['version']
         # ^^^ read version info.
         if new_ver is not None:
+            
             op_ok = True
             op_code = 0x16
-            op_msg = "Set upgrade status to 9=DO_UPGRADE."
+            op_msg = "Will reboot to do upgrade."
             # ^^^ assign return value
-            logger.info("Set upgrade status to 9=DO_UPGRADE; update to %s (from %s)" % (new_ver, curr_ver))
+            logger.info("Rebooting gateway to update to %s (from %s)" % (new_ver, curr_ver))
             # ^^^ write log info
-            op_res = set_upgrade_status(9)  ##   9=DO_UPGRADE
-            if not op_res:
-                raise Exception
+            api.reset_gateway()
         else:
             op_ok = False
             op_code = 0x15
@@ -259,7 +210,7 @@ def upgrade_gateway():
     except:
         op_ok = False
         op_code = 0x8022
-        logger.info("Setting upgrade status to 9=DO_UPGRADE failed." % (new_ver) )
+        logger.info("Updating to the latest SAVEBOX version %s failed." % (new_ver) )
 
     # do something here ...
 
@@ -267,12 +218,12 @@ def upgrade_gateway():
                   'code':   op_code,
                   'msg':    op_msg}
     
-    #~ # wthung, 2012/11/14
-    #~ # in the upgrade, savebox services have been stopped.
-    #~ # they cannot get return code from api.
-    #~ # we must dump the result to a file for communication.
-    #~ with open('/dev/shm/upgrade_result', 'w') as fh:        
-        #~ json.dump(return_val, fh)
+    # wthung, 2012/11/14
+    # in the upgrade, savebox services have been stopped.
+    # they cannot get return code from api.
+    # we must dump the result to a file for communication.
+    with open('/dev/shm/upgrade_result', 'w') as fh:        
+        json.dump(return_val, fh)
 
     return json.dumps(return_val)
 
@@ -294,16 +245,12 @@ def download_package(unittest=False, test_param=None):
             if test_param['success']:
                 op_ok = True
                 op_code = 0x16
-                op_res = set_upgrade_status(7)  ##   5 = DOWNLOAD_DONE
             else:
                 op_ok = False
                 op_code = 0x8022
-                op_res = set_upgrade_status(5)  ##   5 = DOWNLOAD_IN_PROGRESS
     else:   ## not doing unittest
         try:
-            op_res = set_upgrade_status(5)  ##   5 = DOWNLOAD_IN_PROGRESS
-            if not op_res:
-                raise Exception
+            _set_upgrade_status(5)  ##   5 = DOWNLOAD_IN_PROGRESS
             #~ ## download DEB files to cache
             cmd = "./do_download_upgrade_package.sh &"
             a = os.system(cmd)
@@ -320,33 +267,103 @@ def download_package(unittest=False, test_param=None):
                   'code':   op_code}
     return json.dumps(return_val)
 
-
 #----------------------------------------------------------------------
 def get_download_progress(unittest=False, test_param=None):
     """
     Get the progress of downloading packages
-    Return value: progress=[-1, 0..100]
-    progress = -1 means donwload failed.
+    Return value = '{"result":true/false, "code"=op_code, "progress"=[0..100]}'
     progress = 0 means 0% is completed.
     progress = 90 means 90% is completed.
+    op_code defintion:
+        0x16:      Success
+        0x8022:    Fail, error in getting download progress
     Unit Test / mock function usage
         get_download_progress(unittest=True, test_param={'progress':60})
     """
     op_msg = ''
     if unittest:
         if 'progress' in test_param.keys():
+            op_ok = True
+            op_code = 0x16
             op_progress = test_param['progress']
     
-    ## FIX ME - only a test code here
+    op_ok = True
     op_progress = 50
+    op_code = 0x16
+    
+    return_val = {'result': op_ok,
+                  'code':   op_code,
+                  'progress':    op_progress}
+
+    return json.dumps(return_val)
     
 
-    return op_progress
-    
+#----------------------------------------------------------------------
+def download_complete(unittest=False, test_param=None):
+    """
+    Check whether download is completed.
+    Return value = '{"result":true/false, "code"=op_code}'
+    op_code defintion:
+        0x16:      Success
+        0x8022:    Fail, error in getting download progress
+    Unit Test / mock function usage
+        download_complete(unittest=True, test_param={'success':True})
+        download_complete(unittest=True, test_param={'success':False})
+    """
+    if unittest:
+        if 'success' in test_param.keys():
+            if test_param['success']:
+                op_ok = True
+                op_code = 0x16
+            else:
+                op_ok = False
+                op_code = 0x8022
+    else:
+        try:
+            val = int( _get_upgrade_status() )
+            if val == 7:
+                op_ok = True
+                op_code = 0x16
+            else:
+                op_ok = False
+                op_code = 0x8022
+                
+        except Exception as e:
+            logger.debug(str(e))
+            print(str(e))
+            op_ok = False
+            op_code = 0x8022
+        
+        
+    return_val = {'result': op_ok,
+                  'code':   op_code}
+                  
+    return json.dumps(return_val)
+
 
 
 if __name__ == '__main__':
-    res = get_upgrade_status(unittest=True, test_param={'code':5,'progress':70})
-    print res
+    #~ res = upgrade_gateway()
+    #~ params = {'new_update':True, 'version':'1.1.9.9999', 'description':"Test version"}
+    #~ res = get_available_upgrade(unittest=True, test_param = params)
     #~ print res
+    #~ 
+    #~ params = {'success':True}
+    #~ res = download_complete(unittest=True, test_param = params)
+    #~ print res
+    #~ 
+    #~ params = {'success':True}    
+    #~ res = download_package(unittest=True, test_param = params)
+    #~ print res
+    #~ 
+    #~ params = {'progress':60}
+    #~ res = get_download_progress(unittest=True, test_param = params)
+    #~ print res
+
+    _set_upgrade_status(5)
+    val = _get_upgrade_status()
+    print("upgrade status = %d" % val )
+
+    res = download_package()
+    print res
     pass

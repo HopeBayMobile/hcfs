@@ -1,0 +1,21 @@
+#!/bin/bash
+# detect any failed upgrade 
+STATUS_FILE="/var/log/gateway_upgrade.status"
+UPGRADE_STATUS=`cat $STATUS_FILE`
+
+if [ $UPGRADE_STATUS == '9' ]
+then
+    echo "Upgrade Gateway."
+    apt-get remove -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
+    apt-get update
+    apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
+    if [ $? != 0]; then
+        exit $?
+    fi
+    apt-get install --reinstall -y --force-yes savebox
+    if [ $? != 0]; then
+        exit $?
+    fi
+    ## change upgrade status
+    echo '1' > $STATUS_FILE     ## 1 = NO_UPGRADE_AVAILABLE
+fi
