@@ -10,22 +10,25 @@ STATUS_FILE="/var/log/gateway_upgrade.status"
 PROGRESS_FILE="/var/log/gateway_upgrade.progress"
 UPGRADE_STATUS=`cat $STATUS_FILE`
 LOCK_FILE="/tmp/downloading_upgrade.lock"
+TMP_PATH="/tmp/debsrc"
 
 if [ ! -f $LOCK_FILE -a $UPGRADE_STATUS == '5' ]
 then
     touch $LOCK_FILE
-    cd /tmp
-    rm *.deb    ## clear old files
+    rm -rf $TMP_PATH    ## clear old files
+    mkdir $TMP_PATH
+
+    cd $TMP_PATH
     apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox
-    if [ $? == 0]
+    if [ $? == 0 ]
     then
         echo "download success."
-        ## change upgrade status
-        echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
-        mv *.deb $DEB_PATH
+        cp *.deb $DEB_PATH
         dpkg-scanpackages $DEB_PATH > $DEB_PATH/Packages
         gzip -f $DEB_PATH/Packages
         apt-get update
+        ## change upgrade status
+        echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
         echo '-1' > $PROGRESS_FILE     ## -1 = download failed
         ## change upgrade status

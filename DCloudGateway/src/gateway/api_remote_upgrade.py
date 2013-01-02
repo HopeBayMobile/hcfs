@@ -195,6 +195,7 @@ def get_available_upgrade(unittest=False, test_param=None):
             # if the result is '', it means no available update.
             if len(res) == 0:
                 op_code = 0x5
+                op_ok = False
                 op_msg = "There is no newer update."
                 version = None
                 description = ''
@@ -203,12 +204,14 @@ def get_available_upgrade(unittest=False, test_param=None):
                 t = res.split(' ')
                 ver = t[-1].replace('\n', '')
                 op_code = 0x6
+                op_ok = True
                 op_msg = "A newer update is available."
                 version = ver
                 description = ''
                 set_upgrade_status(3)
         except:
             op_code = 0x8022
+            op_ok = False
             op_msg = "Querying new update failed."
             version = None
             description = None
@@ -305,7 +308,7 @@ def download_package(unittest=False, test_param=None):
             if not op_res:
                 raise Exception
             #~ ## download DEB files to cache
-            cmd = "./do_download_upgrade_package.sh &"
+            cmd = "bash ./do_download_upgrade_package.sh &"
             a = os.system(cmd)
             ## assign return values
             op_ok = True
