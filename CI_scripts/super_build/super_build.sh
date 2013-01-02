@@ -27,6 +27,15 @@ fi
         exit 1
     fi
 
+# make sure there is no other thread running build
+    LOCK_FILE="/tmp/runnung_build.lock"
+    if [ -f $LOCK_FILE ]
+    then
+        echo "There is another thread doing build."
+        exit 1
+    fi
+    touch $LOCK_FILE   # create a lock file to block concurrent build
+
 ## make sure internet is connectable
     #~ wget www.google.com
     #~ if [ $? -ne 0 ]
@@ -34,7 +43,7 @@ fi
         #~ echo "Cannot connect to internet. Please check proxy's settings."
         #~ exit 1
     #~ fi
-
+    
 # define parameters
     BRANCH=$1
     BUILDNUM=$2
@@ -77,3 +86,5 @@ fi
     # run build script
     cd $INITPATH/build_scripts/
     bash build_gw_package.sh $1 $2
+
+    rm $LOCK_FILE   # release lock file
