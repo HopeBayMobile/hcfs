@@ -18,7 +18,7 @@ then
     rm -rf $TMP_PATH    ## clear old files
     mkdir $TMP_PATH
     ## start a thread for polling download progress
-    bash get_download_progress.sh &
+    bash /usr/local/bin/get_download_progress.sh &
     sleep 2
     ## start download package
     cd $TMP_PATH

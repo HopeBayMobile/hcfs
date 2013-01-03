@@ -73,6 +73,9 @@ cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
 cp -rs /usr/bin/*s3ql* /usr/local/bin
+# Yen added at 2013/01/03
+cp -rf $SRCDIR/gateway_scripts/do_download_upgrade_package.sh /usr/local/bin
+cp -rf $SRCDIR/gateway_scripts/get_download_progress.sh /usr/local/bin
 
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then

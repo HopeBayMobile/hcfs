@@ -72,11 +72,11 @@ def get_upgrade_status(unittest=False, test_param=None):
                 
     else:       ## not for unit test
         try:
+            thread.start_new_thread(get_available_upgrade, ())  
+            ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
             progress = get_download_progress()
-            thread.start_new_thread(get_available_upgrade, ())  
-            ## ^^^ trigger status change if new upgrade is available
             
         except Exception as e:
             logger.debug(str(e))
@@ -209,7 +209,10 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "A newer update is available."
                 version = ver
                 description = ''
-                set_upgrade_status(3)
+                sstr = get_upgrade_status()
+                rres = json.loads( sstr )
+                if rres['code'] == 1:
+                    set_upgrade_status(3)
         except:
             op_code = 0x8022
             op_ok = False
@@ -309,7 +312,7 @@ def download_package(unittest=False, test_param=None):
             if not op_res:
                 raise Exception
             #~ ## download DEB files to cache
-            cmd = "bash ./do_download_upgrade_package.sh &"
+            cmd = "bash /usr/local/bin/do_download_upgrade_package.sh &"
             a = os.system(cmd)
             ## assign return values
             op_ok = True
