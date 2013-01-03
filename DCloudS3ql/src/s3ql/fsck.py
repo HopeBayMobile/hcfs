@@ -1225,6 +1225,9 @@ def main(args=None):
             bucket = get_bucket(options)
         except NoSuchBucket as exc:
             raise QuietError(str(exc))
+        except Exception as exc:
+            log.error("Unable to connect to backend. Please check network connection then reboot to retry. If this cannot solve your problem, please contact service people.")
+            raise QuietError(str(exc))
 
 
     cachepath = get_bucket_cachedir(options.storage_url, options.cachedir)
