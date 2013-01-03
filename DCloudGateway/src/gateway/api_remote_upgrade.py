@@ -72,7 +72,8 @@ def get_upgrade_status(unittest=False, test_param=None):
                 
     else:       ## not for unit test
         try:
-            thread.start_new_thread(get_available_upgrade, ())  
+            #thread.start_new_thread(get_available_upgrade, ())  
+            get_available_upgrade() 
             ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
@@ -209,9 +210,9 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "A newer update is available."
                 version = ver
                 description = ''
-                sstr = get_upgrade_status()
-                rres = json.loads( sstr )
-                if rres['code'] == 1:
+                fh = open(status_file, 'r')
+                code = int( fh.read() )
+                if code == 1:
                     set_upgrade_status(3)
         except:
             op_code = 0x8022

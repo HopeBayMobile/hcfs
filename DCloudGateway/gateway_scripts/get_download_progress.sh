@@ -26,7 +26,11 @@ TMP_PATH="/tmp/debsrc"
     do
         DOWNLOADED=`du -s $TMP_PATH |  cut -d '/' -f 1`
         #PROGRESS=$(echo "scale=0; 100.0*$DOWNLOADED/$TOTAL_SIZE" | bc -l)
-        let PROGRESS=100*1024*$DOWNLOADED/$TOTAL_SIZE
+        let PROGRESS=1000*1024*$DOWNLOADED/$TOTAL_SIZE
+        if [ $PROGRESS -ge 100 ]
+        then
+            PROGRESS=100
+        fi
         echo "=== download progress = $PROGRESS % ==="
         echo $PROGRESS > $PROGRESS_FILE
         UPGRADE_STATUS=`cat $STATUS_FILE`

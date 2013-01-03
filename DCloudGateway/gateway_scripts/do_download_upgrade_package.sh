@@ -23,7 +23,9 @@ then
     ## start download package
     cd $TMP_PATH
     apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox
-    if [ $? == 0 ]
+    sleep 3
+    PROGRESS=`cat $PROGRESS_FILE`
+    if [ $PROGRESS -ge 100 ]
     then
         echo "download success."
         cp *.deb $DEB_PATH
@@ -34,8 +36,8 @@ then
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
         ## change upgrade status
-        echo '1' > $STATUS_FILE     ## 1=NO_UPGRADE_AVAILABLE
-        sleep 2  # wait for "get_download_progress.sh" to stop
+        #~ echo '1' > $STATUS_FILE     ## 1=NO_UPGRADE_AVAILABLE
+        sleep 3  # wait for "get_download_progress.sh" to stop
         echo '-1' > $PROGRESS_FILE     ## -1 = download failed
     fi
     # unlock
