@@ -268,7 +268,9 @@ def thread_swift_s3ql_monitor():
             if not g_prev_swift_connected:
                 g_prev_swift_connected = True
                 # notify savebox with status 0
-                api._notify_savebox(0, "Swift connected.")                
+                api._notify_savebox(0, "Swift connected.")
+                # show system normal led (code = 2)
+                api._show_led(2)
         elif g_swift_disconnect_count >= 3:
             # swift disconnected by 3 continuous tries
             g_swift_disconnect_count = 0
@@ -278,6 +280,8 @@ def thread_swift_s3ql_monitor():
                 if os.path.exists('/dev/shm/s3ql_cache_almost_full'):
                     # notify savebox with status 3
                     api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
+                    # show system error led (code = 3)
+                    api._show_led(3)
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(20):

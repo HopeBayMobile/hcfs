@@ -168,6 +168,18 @@ def getGatewayConfig():
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
 
+# wthung, 2013/1/3
+def _show_led(status):
+    """
+    Show LED status.
+    
+    @type status: Integer
+    @param status: System status passing to interval script.
+    """
+    led_script = '/etc/delta/LED_controller.sh'
+    #os.system('sudo %s %d' % (led_script, status))
+    print('sudo %s %d' % (led_script, status))
+        
 # wthung, 2013/1/2
 def _notify_savebox(status, msg):
     """
