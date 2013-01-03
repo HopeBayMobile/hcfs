@@ -25,6 +25,11 @@ BUFSIZE = 256 * 1024
 
 log = logging.getLogger('common')
 
+def print_log(module, level, msg):
+    log_sh = '/usr/local/TOMCAT/bin/cafeLogLiteSingle.sh'
+    if os.path.exists(log_sh):
+        os.system('sudo %s %s %s %s' % (log_sh, module, level.upper(), msg))
+
 def setup_logging(options):
     root_logger = logging.getLogger()
     if root_logger.handlers:
