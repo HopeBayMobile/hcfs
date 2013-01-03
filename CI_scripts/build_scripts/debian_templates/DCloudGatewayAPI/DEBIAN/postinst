@@ -72,10 +72,24 @@ cp -rf $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/LED_controller.sh $CONFDIR # yuxun added for control LED status
+cp -rf $SRCDIR/gateway_scripts/LED_status $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/LED_status.c $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/LED_booting /etc/init.d/
+cp -rf -rs /etc/init.d/LED_booting /etc/rc2.d/S00LED_booting
+cp -rf $SRCDIR/gateway_scripts/LED_normal /etc/init.d/
+cp -rf -rs /etc/init.d/LED_normal /etc/rc2.d/S100LED_normal
+cp -rf $SRCDIR/gateway_scripts/LED_shutdown /etc/init.d/
+cp -rf -rs /etc/init.d/LED_shutdown /etc/rc0.d/K00LED_shutdown
+cp -rf -rs /etc/init.d/LED_shutdown /etc/rc6.d/K00LED_shutdown
 cp -rs /usr/bin/*s3ql* /usr/local/bin
 # Yen added at 2013/01/03
 cp -rf $SRCDIR/gateway_scripts/do_download_upgrade_package.sh /usr/local/bin
 cp -rf $SRCDIR/gateway_scripts/get_download_progress.sh /usr/local/bin
+
+# disable power button by yuxun
+sed -i 's#action=/etc/acpi/powerbtn.sh#action=#' /etc/acpi/events/powerbtn
+service acpid restart
 
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then

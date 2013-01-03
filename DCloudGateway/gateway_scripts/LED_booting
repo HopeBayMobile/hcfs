@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/etc/delta/LED_controller.sh 0

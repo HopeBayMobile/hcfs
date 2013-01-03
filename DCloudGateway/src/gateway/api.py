@@ -168,6 +168,17 @@ def getGatewayConfig():
         op_msg = 'Failed to access /etc/delta/Gateway.ini'
         raise GatewayConfError(op_msg)
 
+# wthung, 2013/1/3
+def _show_led(status):
+    """
+    Show LED status.
+    
+    @type status: Integer
+    @param status: System status passing to interval script.
+    """
+    led_script = '/etc/delta/LED_controller.sh'
+    os.system('sudo %s %d' % (led_script, status))
+        
 # wthung, 2013/1/2
 def _notify_savebox(status, msg):
     """
@@ -192,7 +203,7 @@ def _notify_savebox(status, msg):
               "msg": msg}
     
     data = json.dumps(values)
-    post_url = "http://127.0.0.1:8000/witch/system/reportSystemStatus/post"
+    post_url = "http://127.0.0.1:8000/witch/services/system/reportSystemStatus/post"
     req = urllib2.Request(post_url, data, {'Content-Type': 'application/json'})
     code = -1
     response = None
@@ -1218,10 +1229,9 @@ def _createS3qlConf(storage_url, container):
         mountOpt = mountOpt + " --compress %s" % compress 
     
         cmd = 'sudo sh %s/createS3qlconf.sh %s %s %s "%s"' % (DIR, iface, "swift://%s/%s/delta" % (storage_url, container), mountpoint, mountOpt)
-        os.system(cmd)
-        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        #~ output = po.stdout.read()
-        #~ po.wait()
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
     
         ret = po.returncode
         if ret != 0:
@@ -1231,10 +1241,9 @@ def _createS3qlConf(storage_url, container):
         storage_addr = storage_component[0]
 
         cmd = 'sudo sh %s/createpregwconf.sh %s' % (DIR, storage_addr)
-        os.system(cmd)
-        #~ po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        #~ output = po.stdout.read()
-        #~ po.wait()
+        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = po.stdout.read()
+        po.wait()
 
         ret = po.returncode
         if ret != 0:
@@ -1633,14 +1642,6 @@ def _mount(storage_url, container):
         if po.returncode != 0:
             raise BuildGWError(output)
 
-        #change the owner of samba share to default smb account
-        cmd = "sudo chown superuser:superuser %s/sambashare" % mountpoint
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-        if po.returncode != 0:
-            raise BuildGWError(output)
-
         #mkdir in the mountpoint for nfs share
         cmd = "sudo mkdir -p %s/nfsshare" % mountpoint
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1823,10 +1824,8 @@ def build_gateway(user_key):
             except Exception as e:
                 log.error(str(e))
         
-        # restart nfs
+        # restart nfs/smb/nmb
         restart_service("nfs-kernel-server")
-
-        set_smb_user_list(default_user_id, default_user_pwd)
         restart_service("smbd")
         restart_service("nmbd")
         
@@ -3298,6 +3297,14 @@ def _get_storage_capacity():
             very boring string parsing process.
             the format should be fixed. otherwise, won't work (no error checking)  
             '''
+            # query size of s3ql metadata db
+            # first compose the file name of db
+            db_name = _get_s3ql_db_name()
+            db_size = 0
+            try:
+                db_size = os.path.getsize('%s/%s' % (S3QL_CACHE_DIR, db_name))
+            except os.error:
+                log.warning('Failed to get size of S3QL metadata DB.')
 
             for line in results.split("\n"):
                 if line.startswith("Total data size:"):
@@ -3305,6 +3312,8 @@ def _get_storage_capacity():
                     val = tokens[1].replace("MB", "").strip()
                     real_cloud_data = float(val)
                     ret_usage["cloud_storage_usage"]["cloud_data"] = int(float(val) * 1024 ** 2)
+                    # always count metadata size in
+                    ret_usage["cloud_storage_usage"]["cloud_data"] += int(db_size / 10)
 
                 if line.startswith("After de-duplication:"):
                     tokens = line.split(":")
@@ -3359,15 +3368,8 @@ def _get_storage_capacity():
                     
                     # wthung, 2012/12/26, check if s3ql metadata is dirty
                     if results.find('Dirty metadata: True') != -1:
-                        # query size of s3ql metadata db
-                        # first compose the file name of db
-                        db_name = _get_s3ql_db_name()
-                        try:
-                            db_size = os.path.getsize('%s/%s' % (S3QL_CACHE_DIR, db_name))
-                            # add one tenth of db size to dirty cache size
-                            ret_usage["gateway_cache_usage"]["dirty_cache_size"] += int(db_size / 10)
-                        except os.error:
-                            log.warning('Failed to get size of S3QL metadata DB.')
+                        # add one tenth of db size to dirty cache size
+                        ret_usage["gateway_cache_usage"]["dirty_cache_size"] += int(db_size / 10)
 
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
