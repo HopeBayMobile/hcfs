@@ -16,7 +16,7 @@ try:
 
     # iterate all logs
     for log in logs.find():
-        print log['time'] + ' - ' + log['advence']
+        print log['time'] + ' - ' + '[' + log['level'] + '] ' + log['message']
 
     # disconnect
     connection.close()

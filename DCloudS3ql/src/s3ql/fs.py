@@ -733,6 +733,9 @@ class Operations(llfuse.Operations):
             
             del self.inodes[id_]
 
+        # wthung, 2013/1/2, check 98% full
+        self.cache.check_cache_capacity()
+        
         log.debug('_remove(%d, %s): start', id_p, name)
 
     def symlink(self, id_p, name, target, ctx):
@@ -1360,10 +1363,7 @@ class Operations(llfuse.Operations):
             raise FUSEError(errno.EPERM)
         
         # wthung, 2013/1/2, check 98% full
-        if ((self.cache.max_size * 0.98) <= self.cache.dirty_size) or ((self.cache.max_entries * 0.98) <= self.cache.dirty_entries):
-            self.cache.report_cache_almost_full(True)
-        else:
-            self.cache.report_cache_almost_full(False)
+        self.cache.check_cache_capacity()
             
         # wthung, 2012/11/28
         # if backend is disconnected and dirty cache occupies all cache, raise ENOBUFS
