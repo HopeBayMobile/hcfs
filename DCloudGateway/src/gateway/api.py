@@ -192,7 +192,7 @@ def _notify_savebox(status, msg):
               "msg": msg}
     
     data = json.dumps(values)
-    post_url = "http://127.0.0.1:8000/witch/system/reportSystemStatus/post"
+    post_url = "http://127.0.0.1:8000/witch/services/system/reportSystemStatus/post"
     req = urllib2.Request(post_url, data, {'Content-Type': 'application/json'})
     code = -1
     response = None
