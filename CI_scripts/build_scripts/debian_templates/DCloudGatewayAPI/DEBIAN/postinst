@@ -83,6 +83,10 @@ cp -rf $SRCDIR/gateway_scripts/LED_shutdown /etc/init.d/
 cp -rf -rs /etc/init.d/LED_shutdown /etc/rc6.d/K00LED_shutdown
 cp -rs /usr/bin/*s3ql* /usr/local/bin
 
+# disable power button by yuxun
+sed -i 's#action=/etc/acpi/powerbtn.sh#action=#' /etc/acpi/events/powerbtn
+service acpid restart
+
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/rc.local /etc
