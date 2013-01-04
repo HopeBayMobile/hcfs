@@ -192,7 +192,7 @@ def get_available_upgrade(unittest=False, test_param=None):
                     res = fh.readline()
 
             # if the result is '', it means no available update.
-            if len(res) == 0:
+            if len(res) < 5:
                 op_code = 0x5
                 op_ok = False
                 op_msg = "There is no newer update."
