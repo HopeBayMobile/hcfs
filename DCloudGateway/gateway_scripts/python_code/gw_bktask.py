@@ -27,9 +27,9 @@ g_program_exit = False
 g_prev_flushing = False
 g_prev_cache_full_log = False
 g_prev_entries_full_log = False
-g_swift_connect_count = 0
 g_swift_disconnect_count = 0
-g_prev_swift_connected = True
+g_swift_connect_count = 0
+g_prev_savebox_on = True
 
 ####################################################################
 '''
@@ -270,31 +270,32 @@ def thread_swift_s3ql_monitor():
     Worker thread to monitor swift and s3ql status.
     """
     global g_program_exit
-    global g_swift_connect_count
     global g_swift_disconnect_count
-    global g_prev_swift_connected
+    global g_swift_connect_count
+    global g_prev_savebox_on
     
     while not g_program_exit:
-        if g_swift_connect_count >= 3:
-            # swift connected by 3 continuous tries
-            g_swift_connect_count = 0
-            if not g_prev_swift_connected:
-                g_prev_swift_connected = True
-                # notify savebox with status 0
-                api._notify_savebox(0, "Swift connected.")
-                # show system normal led (code = 2)
-                api._show_led(2)
-        elif g_swift_disconnect_count >= 3:
+        # check if s3ql's cache or entry is >98% full
+        if os.path.exists('/dev/shm/s3ql_cache_almost_full'):
             # swift disconnected by 3 continuous tries
-            g_swift_disconnect_count = 0
-            if g_prev_swift_connected:
-                g_prev_swift_connected = False
-                # check if s3ql's cache or entry is >98% full
-                if os.path.exists('/dev/shm/s3ql_cache_almost_full'):
-                    # notify savebox with status 3
-                    api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
-                    # show system error led (code = 3)
-                    api._show_led(3)
+            if g_swift_disconnect_count >= 3:
+                g_swift_disconnect_count = 0
+                # if previous savebox is on
+                if g_prev_savebox_on:
+                    g_prev_savebox_on = False
+                    set_savebox_status(False)
+            elif g_swift_connect_count >= 3:
+                g_swift_connect_count = 0
+                # if previous savebox is not on
+                if not g_prev_savebox_on:
+                    g_prev_savebox_on = True
+                    set_savebox_status(True)
+        # if s3ql cache or entry is <98% full, check if savebox is off
+        # if so, start it
+        else:
+            if not g_prev_savebox_on:
+                g_prev_savebox_on = True
+                set_savebox_status(True)
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(20):
@@ -317,6 +318,23 @@ def signal_handler(signum, frame):
     global g_program_exit
     g_program_exit = True
 
+def set_savebox_status(turnon):
+    """
+    Set savebox status.
+    
+    @type turnon: Boolean
+    @param turnon: Savebox status to be set
+    """
+    if turnon:
+        # notify savebox with status 0
+        api._notify_savebox(0, "Swift connected.")
+        # show system normal led (code = 2)
+        api._show_led(2)
+    else:
+        # notify savebox with status 3
+        api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
+        # show system error led (code = 3)
+        api._show_led(3)
 
 def get_gw_indicator():
     """
@@ -333,8 +351,8 @@ def get_gw_indicator():
     return_val = {}
 
     global g_prev_flushing
-    global g_swift_connect_count
     global g_swift_disconnect_count
+    global g_swift_connect_count
 
     try:
         return_val = api.get_indicators()
@@ -358,7 +376,6 @@ def get_gw_indicator():
             g_swift_connect_count += 1
             g_swift_disconnect_count = 0
         else:
-            # reset count to 0 if swift disconnected
             g_swift_connect_count = 0
             g_swift_disconnect_count += 1
 

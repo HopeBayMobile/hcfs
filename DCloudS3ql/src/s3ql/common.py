@@ -25,6 +25,21 @@ BUFSIZE = 256 * 1024
 
 log = logging.getLogger('common')
 
+class LogExporter(object):
+    def __init__(self, _module):
+        self.log_sh = '/usr/local/TOMCAT/bin/cafeLogLiteSingle.sh'
+        self.module = _module
+    def debug(self, msg):
+        os.system("sudo %s '%s' DEBUG '%s'" % (self.log_sh, self.module, msg))
+    def info(self, msg):
+        os.system("sudo %s '%s' INFO '%s'" % (self.log_sh, self.module, msg))
+    def warning(self, msg):
+        os.system("sudo %s '%s' WARNING '%s'" % (self.log_sh, self.module, msg))
+    def error(self, msg):
+        os.system("sudo %s '%s' ERROR '%s'" % (self.log_sh, self.module, msg))
+    def critical(self, msg):
+        os.system("sudo %s '%s' CRITICAL '%s'" % (self.log_sh, self.module, msg))
+
 def setup_logging(options):
     root_logger = logging.getLogger()
     if root_logger.handlers:

@@ -18,7 +18,7 @@ from . import fs, CURRENT_FS_REV
 from .backends.common import get_bucket_factory, BucketPool, NoSuchBucket
 from .block_cache import BlockCache
 from .common import (setup_logging, get_bucket_cachedir, get_seq_no, QuietError, stream_write_bz2, 
-    stream_read_bz2, GlobalVarContainer)
+    stream_read_bz2, GlobalVarContainer, LogExporter)
 from .daemonize import daemonize
 from .database import Connection
 from .inode_cache import InodeCache
@@ -40,6 +40,7 @@ import resource
     
 
 log = logging.getLogger("mount")
+log2 = LogExporter('s3ql.mount')
 
 def install_thread_excepthook():
     """work around sys.excepthook thread bug
@@ -648,7 +649,9 @@ class MetadataUploadThread(Thread):
                 with self.bucket_pool() as bucket:
                     seq_no = get_seq_no(bucket)
             except:
-                log.error('Cannot connect to backend. Skipping metadata upload for now.')
+                msg = 'Cannot connect to backend. Skipping metadata upload for now.'
+                log.warning(msg)
+                log2.warning(msg)
                 fh.close()
                 continue
             
@@ -821,11 +824,7 @@ class CommitThread(Thread):
             self.block_cache.read_cachefiles()
         
         # wthung, 2013/1/2, check 98% full
-        if ((self.block_cache.max_size * 0.98) <= self.block_cache.dirty_size) or \
-            ((self.block_cache.max_entries * 0.98) <= self.block_cache.dirty_entries):
-            self.block_cache.report_cache_almost_full(True)
-        else:
-            self.block_cache.report_cache_almost_full(False)
+        self.block_cache.check_cache_capacity()
         
         while not self.stop_event.is_set():
             did_sth = False
