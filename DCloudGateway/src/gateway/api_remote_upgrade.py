@@ -83,6 +83,7 @@ def get_upgrade_status(unittest=False, test_param=None):
                 os.system("echo '0' > /var/log/gateway_upgrade.progress")
                 
         except Exception as e:
+            set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
             code = 0
             progress = 0
