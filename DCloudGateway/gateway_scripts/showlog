@@ -14,9 +14,14 @@ try:
     # get SystemLog collections
     logs = db.SystemLog
 
-    # iterate all logs
+    # iterate all system logs
     for log in logs.find():
-        print log['time'] + ' - ' + '[' + log['level'] + '] ' + log['message']
+        print log['time'] + ' - ' + '[' + log['module'] + '][' + log['level'] + '] ' + log['message']
+	
+	logs = db.DebugLog
+	# iterate all debug logs
+    for log in logs.find():
+        print log['time'] + ' - ' + '[' + log['module'] + '][' + log['level'] + '] ' + log['message']
 
     # disconnect
     connection.close()
