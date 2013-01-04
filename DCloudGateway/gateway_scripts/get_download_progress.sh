@@ -24,9 +24,9 @@ TMP_PATH="/tmp/debsrc"
     DOWNLOADED=0
     while [ $UPGRADE_STATUS == '5' ]
     do
-        DOWNLOADED=`du -s $TMP_PATH |  cut -d '/' -f 1`
-        #PROGRESS=$(echo "scale=0; 100.0*$DOWNLOADED/$TOTAL_SIZE" | bc -l)
-        let PROGRESS=1000*1024*$DOWNLOADED/$TOTAL_SIZE
+        #~ DOWNLOADED=`du -s $TMP_PATH |  cut -d '/' -f 1`
+        DOWNLOADED=`du -sb $TMP_PATH |  cut -d '/' -f 1`
+        let PROGRESS=1000*$DOWNLOADED/$TOTAL_SIZE
         if [ $PROGRESS -ge 100 ]
         then
             PROGRESS=100

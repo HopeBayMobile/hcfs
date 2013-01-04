@@ -190,9 +190,22 @@ def thread_aptget():
     gateway_version_file = '/dev/shm/gateway_ver'
     
     while not g_program_exit:
-        os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
-        os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
-        
+        ## test if APT server alive
+        apt_file = '/etc/apt/sources.list.d/delta-server-precise.list'
+        fh = open(apt_file, 'r')
+        line = fh.readline()
+        apt_url = line.split(' ')[1]
+        os.system('rm -r /tmp/test_apt')
+        os.system('mkdir /tmp/test_apt')
+        cmd = "wget " + apt_url
+        rsp = os.system(cmd)
+        ## read upgrade info
+        if rsp==0:  ## code=0 means exit SUCCESS
+            os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
+            os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
+        else:
+            os.system("echo '' > %s" % gateway_version_file)
+            
         # sleep for some time by a for loop in order to break at any time
         for _ in range(120):
             time.sleep(1)

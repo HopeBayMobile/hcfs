@@ -181,15 +181,8 @@ def get_available_upgrade(unittest=False, test_param=None):
             # wthung, 2012/8/8
             # move apt-show-versions to gw_bktask.py to speed up
             # the result is stored in /dev/shm/gateway_ver
-            # only do apt-show-versions if file is not existed
             if not os.path.exists(gateway_ver_file):        
-                logger.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
-                cmd = "apt-show-versions -u dcloud-gateway"
-                # ToDo: change to "DeltaGateway" package.
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
-                                        stderr=subprocess.STDOUT)
-                res = po.stdout.readline()
-                po.wait()
+                res = ''    ## version file is not ready
             else:
                 with open(gateway_ver_file, 'r') as fh:
                     res = fh.readline()

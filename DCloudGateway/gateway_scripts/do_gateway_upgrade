@@ -8,22 +8,22 @@ logger "start executing /etc/init.d/do_gateway_upgrade"
 if [ "$UPGRADE_STATUS" == "9" ]
 then
     echo "Upgrade Gateway."
-    #/etc/delta/LED_controller.sh 1
+    bash /etc/delta/LED_controller.sh 1   # start blink LED
     apt-get remove -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
     apt-get update
     apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
     if [ $? != 0 ]; then
-        #/etc/delta/LED_controller.sh 2
+        bash /etc/delta/LED_controller.sh 2       # stop blink LED
         exit $?
     fi
     apt-get install --reinstall -y --force-yes savebox
     if [ $? != 0 ]; then
-        #/etc/delta/LED_controller.sh 2
+        bash /etc/delta/LED_controller.sh 2       # stop blink LED
         exit $?
     fi
     ## change upgrade status
     echo '1' > $STATUS_FILE     ## 1 = NO_UPGRADE_AVAILABLE
-    #/etc/delta/LED_controller.sh 2
+    bash /etc/delta/LED_controller.sh 2       # stop blink LED
 fi
 
 logger "finish executing /etc/init.d/do_gateway_upgrade"
