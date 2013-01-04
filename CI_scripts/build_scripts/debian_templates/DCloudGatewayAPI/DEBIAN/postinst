@@ -86,6 +86,7 @@ cp -rs /usr/bin/*s3ql* /usr/local/bin
 # Yen added at 2013/01/03
 cp -rf $SRCDIR/gateway_scripts/do_download_upgrade_package.sh /usr/local/bin
 cp -rf $SRCDIR/gateway_scripts/get_download_progress.sh /usr/local/bin
+echo '1' > /var/log/gateway_upgrade.status    ## pre-set upgrade status
 
 # disable power button by yuxun
 sed -i 's#action=/etc/acpi/powerbtn.sh#action=#' /etc/acpi/events/powerbtn

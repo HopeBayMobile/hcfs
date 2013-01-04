@@ -78,7 +78,10 @@ def get_upgrade_status(unittest=False, test_param=None):
             fh = open(status_file, 'r')
             code = int( fh.read() )
             progress = get_download_progress()
-            
+            if progress == -1:
+                set_upgrade_status(1)
+                os.system("echo '0' > /var/log/gateway_upgrade.progress")
+                
         except Exception as e:
             logger.debug(str(e))
             code = 0
