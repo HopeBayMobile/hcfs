@@ -1259,15 +1259,14 @@ def main(args=None):
                 output = po.stdout.read()
                 po.wait()
 		
-		if output.split("\n")[0] == "ok":
-		    db = Connection(cachepath + '.db')
-		else:
+                if output.split("\n")[0] == "ok":
+                    db = Connection(cachepath + '.db')
+                else:
                     output = repair_db(cachepath)
-                    
-	            if output.split("\n")[0] == "ok":
- 	                db = Connection(cachepath + '.db')
-	            else:
-	                log.error('Local metadata is corrupted.')
+                    if output.split("\n")[0] == "ok":
+                        db = Connection(cachepath + '.db')
+                    else:
+                        log.error('Local metadata is corrupted.')
             #Since we do not clear cachepath, it most likely will exist
             #assert not param['needs_fsck']
             #assert not os.path.exists(cachepath + '-cache') or param['needs_fsck']
@@ -1335,7 +1334,7 @@ def main(args=None):
             db.close()
             output = repair_db(cachepath)
 
-	    if output.split("\n")[0] != "ok":
+            if output.split("\n")[0] != "ok":
                 log.error('\n'.join(x[0] for x in res))
                 log.error('Local metadata is corrupted after connect db.')
                 download_metadata(bucket, cachepath)
