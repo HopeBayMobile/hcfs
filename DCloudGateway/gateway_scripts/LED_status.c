@@ -347,7 +347,7 @@ int main(int argc, char * argv[])
   switch(LED_status){
     case 0:
       //Booting
-      outb(0 , LED_PORT); 
+      outb(LED_YELLOW , LED_PORT); 
       break;
     case 1:
       //upgrading
@@ -360,7 +360,7 @@ int main(int argc, char * argv[])
       break;
     case 2:
       //normal
-      outb(LED_RED , LED_PORT);
+      outb(LED_RED | LED_YELLOW, LED_PORT);
       break;
     case 3:
       //error
@@ -374,6 +374,12 @@ int main(int argc, char * argv[])
     case 4:
       //shutdown
       outb(LED_RED | LED_YELLOW ,LED_PORT);
+      while(1){
+        outb(LED_RED | LED_YELLOW , LED_PORT);
+        usleep(DELAY*1000);
+        outb(LED_RED,LED_PORT);
+        usleep(DELAY*1000);
+      }
       break;
     default:
       break;

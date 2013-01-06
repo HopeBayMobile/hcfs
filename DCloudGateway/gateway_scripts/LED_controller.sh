@@ -7,12 +7,12 @@
 #    1 - upgrading - on|on|blink
 #    2 - normal - on|off|off
 #    3 - error - on|blink|off
-#    4 - shutdown - on|off|on
+#    4 - shutdown - on|off|blink
 #
 #######################################
 
 #find the upgrade_led pid
-LED_pid=$(ps aux | grep -w "/etc/delta/LED_status" | head -1 | awk '{ print $2 }')
+LED_pid=$(ps | grep -w "LED_status" | awk '{ print $1 }')
 #the kill the process
 kill -9 $LED_pid
 #finally change LED status 
