@@ -262,7 +262,7 @@ def main(args=None):
                                           is_compressed=True)
             log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
             pickle.dump(param, open(cachepath + '.params', 'wb'), 2)
-            self.var_container.dirty_metadata = False
+            #self.var_container.dirty_metadata = False
         else:
             log.error('Remote metadata is newer than local (%d vs %d), '
                       'refusing to overwrite!', seq_no, param['seq_no'])
@@ -635,7 +635,11 @@ class MetadataUploadThread(Thread):
             with llfuse.lock:
                 if self.quit:
                     break
-                self.db.execute('PRAGMA wal_checkpoint(RESTART)')
+                wal_name = "%s-wal" % self.db.file
+                if os.path.exists(wal_name):
+                    wal_mtime = os.stat(wal_name).st_mtime
+                    if wal_mtime > self.db_mtime:
+                        self.db.execute('PRAGMA wal_checkpoint(RESTART)')
                 new_mtime = os.stat(self.db.file).st_mtime
                 if self.db_mtime == new_mtime:
                     log.info('File system unchanged, not uploading metadata.')
