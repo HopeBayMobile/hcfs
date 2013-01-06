@@ -46,7 +46,7 @@ python setup.py install
 # install additional script files
 cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/
 cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
-cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR
+#cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR  # Fixed this so that the following config files can be correctly copied during initial installation
 cp -rf $SRCDIR/gateway_scripts/python_code/*.py $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/shaping_port_8080.sh $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/uploadon $CONFDIR
@@ -94,6 +94,7 @@ service acpid restart
 
 # install configuration files
 if [ ! -e $CONFDIR/update_bandwidth ]; then
+    cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR  # Fixed this so that the following config files can be correctly copied during initial installation
     cp -rf $SRCDIR/config/rc.local /etc
     cp -rf $SRCDIR/config/crontab /etc
     chmod 600 /etc/crontab
