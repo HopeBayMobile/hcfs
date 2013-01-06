@@ -635,6 +635,7 @@ class MetadataUploadThread(Thread):
             with llfuse.lock:
                 if self.quit:
                     break
+                self.db.execute('PRAGMA wal_checkpoint(RESTART)')
                 new_mtime = os.stat(self.db.file).st_mtime
                 if self.db_mtime == new_mtime:
                     log.info('File system unchanged, not uploading metadata.')
