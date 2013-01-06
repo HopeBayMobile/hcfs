@@ -251,6 +251,17 @@ class CacheEntry(object):
         return ('<%sCacheEntry, inode=%d, blockno=%d>'
                 % ('Dirty ' if self.dirty else '', self.inode, self.blockno))
 
+    # Jiahong (01/04/2013): Close file handle before destroying the cache block object
+    def __del__(self):
+        log.debug('Throwing out cache entry %d %d' % (self.inode, self.blockno))
+        try:
+            if self.fh is not None:
+                log.debug('Closing cache file')
+                self.fh.close()
+        except:
+            log.debug('Unable to close cache entry')
+            pass
+
 class BlockCache(object):
     """Provides access to file blocks
     
@@ -413,6 +424,19 @@ class BlockCache(object):
             t.start()
             self.upload_threads.append(t)
 
+        #before create remove threads, first read /root/.s3ql/objects_to_delete and put all objects need to be delete to to_remove queue
+        try:
+            if os.path.exists("/root/.s3ql/objects_to_delete"):
+                with open("/root/.s3ql/objects_to_delete", "r") as fh:
+                    delete_list = fh.read().split("\n")
+                del delete_list[-1]
+
+                for obj_id in delete_list:
+                    self.to_remove.put(int(obj_id))
+                os.system("rm /root/.s3ql/objects_to_delete")
+        except:
+            pass
+
         for _ in range(10):
             t = threading.Thread(target=self._removal_loop)
             t.daemon = True # interruption will do no permanent harm
@@ -462,6 +486,21 @@ class BlockCache(object):
 
             for t in self.removal_threads:
                 self.to_remove.put(QuitSentinel)
+
+            self.to_remove.put(QuitSentinel)  # Add one more for saving to_delete
+            try:
+                if os.path.exists("/root/.s3ql/objects_to_delete"):
+                    os.system("rm /root/.s3ql/objects_to_delete")
+                with open("/root/.s3ql/objects_to_delete", "w") as fh:
+                    while True:
+                        tmp = self.to_remove.get()
+                        if tmp is QuitSentinel:
+                            break
+                        fh.write("%s\n" % str(tmp))
+
+            except:
+                pass
+
 
             log.debug('destroy(): waiting for upload threads...')
             for t in self.upload_threads:
@@ -969,6 +1008,7 @@ class BlockCache(object):
                                     log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
                                     if el is not None:
+                                        el.close()
                                         el.unlink(self.path)
                                     time.sleep(5)
                                     try:
@@ -998,6 +1038,7 @@ class BlockCache(object):
                     # wthung, 2012/12/12, throw exception out
                     except Exception as e:
                         if el is not None:
+                            el.close()
                             el.unlink(self.path)
                         raise e
                     finally:

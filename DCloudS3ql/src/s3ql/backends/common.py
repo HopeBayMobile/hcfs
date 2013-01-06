@@ -42,7 +42,8 @@ log = logging.getLogger("backend")
 
 HMAC_SIZE = 32
 
-RETRY_TIMEOUT = 60 * 60 * 24
+#RETRY_TIMEOUT = 60 * 60 * 24
+RETRY_TIMEOUT = 5 * 60
 
 # Yuxun: add timeout decorator and TimeoutError class
 class TimeoutError(Exception):
@@ -106,7 +107,8 @@ def retry(fn):
 
     @wraps(fn)
     def wrapped(self, *a, **kw):
-        interval = 1 / 50
+        #interval = 1 / 50
+        interval = 10  # Jiahong (1/6/13): Changed to a fixed interval of 10 sec, up to 5 minutes
         waited = 0
         while True:
             try:
@@ -129,7 +131,7 @@ def retry(fn):
                 
             time.sleep(interval)
             waited += interval
-            interval = min(5*60, 2*interval)
+            #interval = min(5*60, 2*interval)
 
     # False positive
     #pylint: disable=E1101
@@ -668,7 +670,7 @@ class BetterBucket(AbstractBucket):
         return self.bucket.contains(key)
 
     # Yuxun, add timeout decorator
-    @timeout(180)
+    # @timeout(180)
     def delete(self, key, force=False):
         """Delete object stored under `key`
 

@@ -37,6 +37,8 @@ log = logging.getLogger("fsck")
 S_IFMT = (stat.S_IFDIR | stat.S_IFREG | stat.S_IFSOCK | stat.S_IFBLK |
           stat.S_IFCHR | stat.S_IFIFO | stat.S_IFLNK)
 
+unlink_later = set()
+
 class Fsck(object):
 
     def __init__(self, cachedir_, bucket_, param, conn):
@@ -872,6 +874,7 @@ class Fsck(object):
 
     def check_objects_refcount(self):
         """Check objects.refcount"""
+        global unlink_later
 
         log.info('Checking objects (reference counts)...')
 
@@ -910,12 +913,14 @@ class Fsck(object):
 
         # Delete objects which (correctly had) refcount=0
         for obj_id in self.conn.query('SELECT id FROM objects WHERE refcount = 0'):
-            del self.bucket['s3ql_data_%d' % obj_id]
+            unlink_later.add(obj_id)
+            #del self.bucket['s3ql_data_%d' % obj_id]
         self.conn.execute("DELETE FROM objects WHERE refcount = 0")
 
 
     def check_objects_id(self):
         """Check objects.id"""
+        global unlink_later
 
         log.info('Checking objects (backend)...')
 
@@ -933,6 +938,8 @@ class Fsck(object):
                 # We only bother with data objects
                 try:
                     obj_id = int(obj_name[10:])
+                    if obj_id in unlink_later:
+                        continue
                 except ValueError:
                     log.warn("Ignoring unexpected object %r", obj_name)
                     continue
@@ -943,10 +950,12 @@ class Fsck(object):
                                              'EXCEPT SELECT id FROM objects'):
                 try:
                     if obj_id in self.unlinked_objects:
-                        del self.bucket['s3ql_data_%d' % obj_id]
+                        unlink_later.add(obj_id)
+                        #del self.bucket['s3ql_data_%d' % obj_id]
                     else:
                         # TODO: Save the data in lost+found instead
-                        del self.bucket['s3ql_data_%d' % obj_id]
+                        unlink_later.add(obj_id)
+                        #del self.bucket['s3ql_data_%d' % obj_id]
                         self.found_errors = True
                         self.log_error("Deleted spurious object %d", obj_id)
                 except NoSuchObject:
@@ -1199,6 +1208,8 @@ def main(args=None):
     if args is None:
         args = sys.argv[1:]
 
+    global unlink_later
+
     resource.setrlimit(resource.RLIMIT_NOFILE,(300000,400000))
     options = parse_args(args)
     stdout_log_handler = setup_logging(options)
@@ -1351,6 +1362,10 @@ def main(args=None):
         additional_checks = additional_checks + 1
         fsck = Fsck(cachepath + '-cache', bucket, param, db)
         fsck.check()
+
+    with open("/root/.s3ql/objects_to_delete", "a") as fh:
+        for obj_id in unlink_later:
+            fh.write("%s\n" % obj_id)
 
     param['max_inode'] = db.get_val('SELECT MAX(id) FROM inodes')
 
