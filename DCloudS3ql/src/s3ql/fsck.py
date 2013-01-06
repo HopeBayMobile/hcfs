@@ -12,7 +12,7 @@ from __future__ import division, print_function, absolute_import
 from . import CURRENT_FS_REV
 from .backends.common import NoSuchObject, get_bucket, NoSuchBucket, TimeoutError
 from .common import (ROOT_INODE, inode_for_path, sha256_fh, get_path, BUFSIZE, get_bucket_cachedir, 
-    setup_logging, QuietError, get_seq_no, stream_write_bz2, stream_read_bz2, CTRL_INODE)
+    setup_logging, QuietError, get_seq_no, stream_write_bz2, stream_read_bz2, CTRL_INODE, LogExporter)
 from .database import NoSuchRowError, Connection
 from .metadata import restore_metadata, cycle_metadata, dump_metadata, create_tables
 from .parse_args import ArgumentParser
@@ -33,6 +33,7 @@ import resource
 
 
 log = logging.getLogger("fsck")
+log2 = LogExporter('s3ql.fsck')
 
 S_IFMT = (stat.S_IFDIR | stat.S_IFREG | stat.S_IFSOCK | stat.S_IFBLK |
           stat.S_IFCHR | stat.S_IFIFO | stat.S_IFLNK)
@@ -1254,6 +1255,12 @@ def main(args=None):
             param = bucket.lookup('s3ql_metadata')
         else:
             log.info('Using cached metadata.')
+            # wthung, 2013/1/4
+            # check param's needs_fsck flag
+            if param['needs_fsck']:
+                msg = 'File system did not umount properly.'
+                log.critical(msg)
+                log2.critical(msg)
             #Chenming: check and repair database
             try:
                 db = Connection(cachepath + '.db')
@@ -1263,15 +1270,14 @@ def main(args=None):
                 output = po.stdout.read()
                 po.wait()
 		
-		if output.split("\n")[0] == "ok":
-		    db = Connection(cachepath + '.db')
-		else:
+                if output.split("\n")[0] == "ok":
+                    db = Connection(cachepath + '.db')
+                else:
                     output = repair_db(cachepath)
-                    
-	            if output.split("\n")[0] == "ok":
- 	                db = Connection(cachepath + '.db')
-	            else:
-	                log.error('Local metadata is corrupted.')
+                    if output.split("\n")[0] == "ok":
+                        db = Connection(cachepath + '.db')
+                    else:
+                        log.error('Local metadata is corrupted.')
             #Since we do not clear cachepath, it most likely will exist
             #assert not param['needs_fsck']
             #assert not os.path.exists(cachepath + '-cache') or param['needs_fsck']
@@ -1339,7 +1345,7 @@ def main(args=None):
             db.close()
             output = repair_db(cachepath)
 
-	    if output.split("\n")[0] != "ok":
+            if output.split("\n")[0] != "ok":
                 log.error('\n'.join(x[0] for x in res))
                 log.error('Local metadata is corrupted after connect db.')
                 download_metadata(bucket, cachepath)

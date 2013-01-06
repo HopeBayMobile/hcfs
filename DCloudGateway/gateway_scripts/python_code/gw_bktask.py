@@ -23,12 +23,13 @@ log = common.getLogger(name="BKTASK", conf="/etc/delta/Gateway.ini")
 
 # global flag to exit while safely
 g_program_exit = False
+# global vars
 g_prev_flushing = False
 g_prev_cache_full_log = False
 g_prev_entries_full_log = False
-g_swift_connect_count = 0
 g_swift_disconnect_count = 0
-g_prev_swift_connected = True
+g_swift_connect_count = 0
+g_prev_savebox_on = True
 
 ####################################################################
 '''
@@ -189,9 +190,22 @@ def thread_aptget():
     gateway_version_file = '/dev/shm/gateway_ver'
     
     while not g_program_exit:
-        os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
-        os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
-        
+        ## test if APT server alive
+        apt_file = '/etc/apt/sources.list.d/delta-server-precise.list'
+        fh = open(apt_file, 'r')
+        line = fh.readline()
+        apt_url = line.split(' ')[1]
+        os.system('rm -r /tmp/test_apt')
+        os.system('mkdir /tmp/test_apt')
+        cmd = "wget " + apt_url
+        rsp = os.system(cmd)
+        ## read upgrade info
+        if rsp==0:  ## code=0 means exit SUCCESS
+            os.system("sudo apt-get update 1>/dev/null 2>/dev/null")
+            os.system("sudo apt-show-versions -u dcloud-gateway > %s" % gateway_version_file)
+        else:
+            os.system("echo '' > %s" % gateway_version_file)
+            
         # sleep for some time by a for loop in order to break at any time
         for _ in range(120):
             time.sleep(1)
@@ -229,6 +243,66 @@ def thread_netspeed():
         # wait
         time.sleep(3)
 
+def thread_retrieve_quota():
+    """
+    Worker thread to retrieve gateway quota from swift
+    """
+    global g_program_exit
+    prev_quota = -1
+    
+    while not g_program_exit:
+        quota = _get_gateway_quota()
+        if quota > 0:
+            # update quota to s3ql if different quota arrival
+            if prev_quota != quota:
+                # set quota to s3ql
+                api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
+                prev_quota = quota
+        
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(60):
+            time.sleep(1)
+            if g_program_exit:
+                break
+
+def thread_swift_s3ql_monitor():
+    """
+    Worker thread to monitor swift and s3ql status.
+    """
+    global g_program_exit
+    global g_swift_disconnect_count
+    global g_swift_connect_count
+    global g_prev_savebox_on
+    
+    while not g_program_exit:
+        # check if s3ql's cache or entry is >98% full
+        if os.path.exists('/dev/shm/s3ql_cache_almost_full'):
+            # swift disconnected by 3 continuous tries
+            if g_swift_disconnect_count >= 3:
+                g_swift_disconnect_count = 0
+                # if previous savebox is on
+                if g_prev_savebox_on:
+                    g_prev_savebox_on = False
+                    set_savebox_status(False)
+            elif g_swift_connect_count >= 3:
+                g_swift_connect_count = 0
+                # if previous savebox is not on
+                if not g_prev_savebox_on:
+                    g_prev_savebox_on = True
+                    set_savebox_status(True)
+        # if s3ql cache or entry is <98% full, check if savebox is off
+        # if so, start it
+        else:
+            if not g_prev_savebox_on:
+                g_prev_savebox_on = True
+                set_savebox_status(True)
+        
+        # sleep for some time by a for loop in order to break at any time
+        for _ in range(20):
+            time.sleep(1)
+            if g_program_exit:
+                break
+
 ##############################################################################
 '''
     Functions.
@@ -244,6 +318,23 @@ def signal_handler(signum, frame):
     global g_program_exit
     g_program_exit = True
 
+def set_savebox_status(turnon):
+    """
+    Set savebox status.
+    
+    @type turnon: Boolean
+    @param turnon: Savebox status to be set
+    """
+    if turnon:
+        # notify savebox with status 0
+        api._notify_savebox(0, "Swift connected.")
+        # show system normal led (code = 2)
+        api._show_led(2)
+    else:
+        # notify savebox with status 3
+        api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
+        # show system error led (code = 3)
+        api._show_led(3)
 
 def get_gw_indicator():
     """
@@ -260,8 +351,8 @@ def get_gw_indicator():
     return_val = {}
 
     global g_prev_flushing
-    global g_swift_connect_count
     global g_swift_disconnect_count
+    global g_swift_connect_count
 
     try:
         return_val = api.get_indicators()
@@ -285,7 +376,6 @@ def get_gw_indicator():
             g_swift_connect_count += 1
             g_swift_disconnect_count = 0
         else:
-            # reset count to 0 if swift disconnected
             g_swift_connect_count = 0
             g_swift_disconnect_count += 1
 
@@ -380,61 +470,6 @@ def _get_gateway_quota():
     
     # return -1 if quota cannot be retrieved
     return -1
-
-def thread_retrieve_quota():
-    """
-    Worker thread to retrieve gateway quota from swift
-    """
-    global g_program_exit
-    prev_quota = -1
-    
-    while not g_program_exit:
-        quota = _get_gateway_quota()
-        if quota > 0:
-            # update quota to s3ql if different quota arrival
-            if prev_quota != quota:
-                # set quota to s3ql
-                api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
-                prev_quota = quota
-        
-        # sleep for some time by a for loop in order to break at any time
-        for _ in range(60):
-            time.sleep(1)
-            if g_program_exit:
-                break
-
-def thread_swift_s3ql_monitor():
-    """
-    Worker thread to monitor swift and s3ql status.
-    """
-    global g_program_exit
-    global g_swift_connect_count
-    global g_swift_disconnect_count
-    global g_prev_swift_connected
-    
-    while not g_program_exit:
-        if g_swift_connect_count >= 3:
-            # swift connected by 3 continuous tries
-            g_swift_connect_count = 0
-            if not g_prev_swift_connected:
-                g_prev_swift_connected = True
-                # notify savebox with status 0
-                api._notify_savebox(0, "Swift connected.")                
-        elif g_swift_disconnect_count >= 3:
-            # swift disconnected by 3 continuous tries
-            g_swift_disconnect_count = 0
-            if g_prev_swift_connected:
-                g_prev_swift_connected = False
-                # check if s3ql's cache or entry is >98% full
-                if os.path.exists('/dev/shm/s3ql_cache_almost_full'):
-                    # notify savebox with status 3
-                    api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
-        
-        # sleep for some time by a for loop in order to break at any time
-        for _ in range(20):
-            time.sleep(1)
-            if g_program_exit:
-                break
     
 def enableSMART(disk):
     """

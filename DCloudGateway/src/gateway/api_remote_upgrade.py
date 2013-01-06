@@ -72,13 +72,18 @@ def get_upgrade_status(unittest=False, test_param=None):
                 
     else:       ## not for unit test
         try:
+            #thread.start_new_thread(get_available_upgrade, ())  
+            get_available_upgrade() 
+            ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
             progress = get_download_progress()
-            thread.start_new_thread(get_available_upgrade, ())  
-            ## ^^^ trigger status change if new upgrade is available
-            
+            if progress == -1:
+                set_upgrade_status(1)
+                os.system("echo '0' > /var/log/gateway_upgrade.progress")
+                
         except Exception as e:
+            set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
             code = 0
             progress = 0
@@ -180,21 +185,14 @@ def get_available_upgrade(unittest=False, test_param=None):
             # wthung, 2012/8/8
             # move apt-show-versions to gw_bktask.py to speed up
             # the result is stored in /dev/shm/gateway_ver
-            # only do apt-show-versions if file is not existed
             if not os.path.exists(gateway_ver_file):        
-                logger.debug("%s is not existed. Spend some time to check gateway version" % gateway_ver_file)
-                cmd = "apt-show-versions -u dcloud-gateway"
-                # ToDo: change to "DeltaGateway" package.
-                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, \
-                                        stderr=subprocess.STDOUT)
-                res = po.stdout.readline()
-                po.wait()
+                res = ''    ## version file is not ready
             else:
                 with open(gateway_ver_file, 'r') as fh:
                     res = fh.readline()
 
             # if the result is '', it means no available update.
-            if len(res) == 0:
+            if len(res) < 5:
                 op_code = 0x5
                 op_ok = False
                 op_msg = "There is no newer update."
@@ -209,7 +207,10 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "A newer update is available."
                 version = ver
                 description = ''
-                set_upgrade_status(3)
+                fh = open(status_file, 'r')
+                code = int( fh.read() )
+                if code == 1:
+                    set_upgrade_status(3)
         except:
             op_code = 0x8022
             op_ok = False
@@ -309,7 +310,7 @@ def download_package(unittest=False, test_param=None):
             if not op_res:
                 raise Exception
             #~ ## download DEB files to cache
-            cmd = "bash ./do_download_upgrade_package.sh &"
+            cmd = "bash /usr/local/bin/do_download_upgrade_package.sh &"
             a = os.system(cmd)
             ## assign return values
             op_ok = True

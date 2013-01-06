@@ -17,13 +17,16 @@ then
     touch $LOCK_FILE
     rm -rf $TMP_PATH    ## clear old files
     mkdir $TMP_PATH
+    apt-get clean   ## clean old deb files in cache
     ## start a thread for polling download progress
-    bash get_download_progress.sh &
+    bash /usr/local/bin/get_download_progress.sh &
     sleep 2
     ## start download package
     cd $TMP_PATH
     apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox
-    if [ $? == 0 ]
+    sleep 3
+    PROGRESS=`cat $PROGRESS_FILE`
+    if [ $PROGRESS -ge 100 ]
     then
         echo "download success."
         cp *.deb $DEB_PATH
@@ -33,9 +36,10 @@ then
         ## change upgrade status
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
-        ## change upgrade status
-        echo '1' > $STATUS_FILE     ## 1=NO_UPGRADE_AVAILABLE
-        sleep 2  # wait for "get_download_progress.sh" to stop
+        #~ write an error log
+        /usr/local/TOMCAT/bin/cafeLogLiteSingle.sh API_REMOTE_UPGRADE ERROR 'Download upgrade failed. Update server disconnected during downloading upgrade package.'
+        PID=$(ps aux | grep -w "get_download_progress" | head -1 | awk '{ print $2 }')
+        kill -9 $PID
         echo '-1' > $PROGRESS_FILE     ## -1 = download failed
     fi
     # unlock

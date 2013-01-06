@@ -360,6 +360,14 @@ class BlockCache(object):
         '''Get number of objects in cache'''
         return len(self.entries)
     
+    # wthung, 2013/1/3
+    def check_cache_capacity(self):
+        '''Check if cache or entry is over 98% full.'''
+        if ((self.max_size * 0.98) <= self.dirty_size) or ((self.max_entries * 0.98) <= self.dirty_entries):
+            self.report_cache_almost_full(True)
+        else:
+            self.report_cache_almost_full(False)
+    
     # wthung, 2013/1/2
     def report_status(self, file_name, flag):
         '''Report status by touching/removing a input file.'''
