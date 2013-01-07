@@ -467,7 +467,7 @@ def get_indicators():
     
     op_ok = False
     op_code = 0x8014
-    op_msg = 'Reading SAVEBOX indicators failed due to unexpected errors.'
+    op_msg = 'Reading SAVEBOX indicators failed.'
     return_val = {
           'result' : op_ok,
           'msg'    : op_msg,
@@ -982,7 +982,7 @@ def get_storage_account():
 
     op_ok = False
     op_code = 0x8016
-    op_msg = 'Reading storage account failed due to unexpected errors.'
+    op_msg = 'Reading storage account failed.'
     op_storage_url = ''
     op_account = ''
 
@@ -1041,7 +1041,7 @@ def apply_storage_account(storage_url, account, password, test=True):
 
     op_ok = False
     op_code = 0x8002
-    op_msg = 'Applying storage account failed due to unexpected errors.'
+    op_msg = 'Applying storage account failed.'
 
     if test:
         test_gw_results = json.loads(test_storage_account(storage_url, account, password))
@@ -1116,8 +1116,8 @@ def apply_user_enc_key(old_key=None, new_key=None):
     log.debug("apply_user_enc_key start")
 
     op_ok = False
-    op_code = 0x800B
-    op_msg = 'Changing encryption key failed due to unexpected errors.'
+    op_code = 0x800A
+    op_msg = 'Changing encryption key failed.'
     
     def do_change_passphrase():
         storage_url = op_config.get(section, 'storage-url')
@@ -1416,7 +1416,7 @@ def _mkfs(storage_url, key, container):
                         if po.returncode != 0:
                             if po.returncode == 128:
                                 # wrong passphrase
-                                raise EncKeyError("The input encryption key is not correct.")
+                                raise EncKeyError
                             raise RuntimeError
                         break
     except Exception as e:
@@ -1635,7 +1635,7 @@ def _mount(storage_url, container):
         po.wait()
         if po.returncode != 0:
             if output.find("Wrong bucket passphrase") != -1:
-                raise EncKeyError("The input encryption key is not correct.")
+                raise EncKeyError
             raise BuildGWError(output)
 
         #mkdir in the mountpoint for smb share
@@ -1758,8 +1758,8 @@ def build_gateway(user_key):
     log.debug("Gateway building")
 
     op_ok = False
-    op_code = 0x8011
-    op_msg = 'Applying storage accounts failed due to unexpected errors.'
+    op_code = 0x8002
+    op_msg = 'Applying storage account failed.'
 
     try:
         # wthung, 2012/8/15
@@ -1808,7 +1808,7 @@ def build_gateway(user_key):
         # wthung, 2012/8/3
         # if a file system is existed, try to rebuild snapshot database
         if has_filesys:
-            log.info('Found existing file system. Try to restore configuration')            
+            log.info('Found existing file system. Try to restore configuration')
             # yen, 2012/10/09.
             # restore configuration from cloud
             api_restore_conf.restore_gateway_configuration()
@@ -1859,7 +1859,7 @@ def build_gateway(user_key):
         op_msg = 'File access failed.'
     except EncKeyError as e:
         op_code = 0x8024
-        op_msg = str(e)
+        op_msg = "The input encryption key is not correct."
     except BuildGWError as e:
         op_msg = str(e)
     except Exception as e:
@@ -2144,8 +2144,8 @@ def test_storage_account(storage_url, account, password):
     log.debug("test_storage_account start")
 
     op_ok = False
-    op_code = 0x8020
-    op_msg = 'Testing storage account failed due to unexpected errors.'
+    op_code = 0x8023
+    op_msg = 'Testing storage account failed.'
 
     try:
         _test_storage_account(storage_url=storage_url, account=account, password=password)
@@ -2162,7 +2162,7 @@ def test_storage_account(storage_url, account, password):
         op_msg = str(e)
         log.error(op_msg)
     except NetworkError as e:
-        op_code = 0x8025
+        op_code = 0x8020
         op_msg = "Testing storage account failed due to network error."
         log.error(op_msg)
     except Exception as e:
