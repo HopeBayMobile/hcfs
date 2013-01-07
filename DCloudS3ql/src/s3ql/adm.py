@@ -335,9 +335,14 @@ def upgrade(bucket, cachepath):
     param['revision'] = CURRENT_FS_REV
     param['last-modified'] = time.time()
 
+    wal_name = "%s-wal" % (cachepath + '.db')
+    if os.path.exists(wal_name):
+        db.execute('PRAGMA wal_checkpoint(RESTART)')
+
     cycle_metadata(bucket)
     log.info('Dumping metadata...')
     fh = tempfile.TemporaryFile()
+
     dump_metadata(db, fh)
     def do_write(obj_fh):
         fh.seek(0)

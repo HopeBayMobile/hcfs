@@ -240,6 +240,12 @@ def main(args=None):
     param['max_inode'] = db.get_val('SELECT MAX(id) FROM inodes')
     with bucket_pool() as bucket:
         seq_no = get_seq_no(bucket)
+        wal_name = "%s-wal" % (cachepath + '.db')
+        if os.path.exists(wal_name):
+            wal_mtime = os.stat(wal_name).st_mtime
+            if wal_mtime > metadata_upload_thread.db_mtime:
+                db.execute('PRAGMA wal_checkpoint(RESTART)')
+
         if metadata_upload_thread.db_mtime == os.stat(cachepath + '.db').st_mtime:
             log.info('File system unchanged, not uploading metadata.')
             del bucket['s3ql_seq_no_%d' % param['seq_no']]

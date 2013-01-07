@@ -495,8 +495,11 @@ class Fsck(object):
                 WHERE size < min_size''')
 
             for (id_, size_old, size) in self.conn.query('SELECT * FROM wrong_sizes'):
-                if size < self.inode_size_cache[id_]:
-                    size = self.inode_size_cache[id_]
+                try:
+                    if size < self.inode_size_cache[id_]:
+                        size = self.inode_size_cache[id_]
+                except KeyError:
+                    pass
                 self.found_errors = True
                 self.log_error("Size of inode %d (%s) does not agree with number of blocks, "
                                "setting from %d to %d",
@@ -1390,6 +1393,10 @@ def main(args=None):
     if fsck.found_errors and not param['needs_fsck']:
         log.warn('File system was marked as clean, yet fsck found problems.')
         log.warn('Please report this to the S3QL mailing list, http://groups.google.com/group/s3ql')
+
+    wal_name = "%s-wal" % (cachepath + '.db')
+    if os.path.exists(wal_name):
+        db.execute('PRAGMA wal_checkpoint(RESTART)')
 
     cycle_metadata(bucket)
     param['needs_fsck'] = False

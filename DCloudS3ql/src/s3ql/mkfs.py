@@ -159,8 +159,13 @@ def main(args=None):
     # in BetterBucket is not required for this file system.
     param['bucket_revision'] = 1
 
+    wal_name = "%s-wal" % (cachepath + '.db')
+    if os.path.exists(wal_name):
+        db.execute('PRAGMA wal_checkpoint(RESTART)')
+
     log.info('Dumping metadata...')
     fh = tempfile.TemporaryFile()
+
     dump_metadata(db, fh)
     def do_write(obj_fh):
         fh.seek(0)
