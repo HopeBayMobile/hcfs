@@ -48,6 +48,10 @@ check_ok() {
     mkdir -p /tmp/pkg_DCloudGatewayAPI/tmp
     cp -r $INITPATH/debian_templates/DCloudGatewayAPI/DEBIAN /tmp/pkg_DCloudGatewayAPI
     cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGatewayAPI/tmp
+    mkdir -p /tmp/pkg_DCloudGatewayAPI/tmp/GatewayPatches/debsrc
+    cp -r $INITPATH/StorageAppliance/GatewayPatches /tmp/pkg_DCloudGatewayAPI/tmp
+    tar -xzf $DEBPATCH -C /tmp/pkg_DCloudGatewayAPI/tmp/GatewayPatches/debsrc
+
     # edit control file
 # 2012/10/17, take out nfs-kernel-server and samba for fixing prompt screen. (Yen)
 # 2012/10/19, WeiTang says nfs-kernel-server is not installed, thus install it back (Yen)
@@ -59,7 +63,7 @@ Version: $GW_VERSION.$BUILD
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: python, python-setuptools, python-software-properties, python-pymongo, curl, portmap, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
+Depends: nfs-kernel-server, python, python-setuptools, python-software-properties, python-pymongo, curl, portmap, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
 Maintainer: CDS Team <ctbd@delta.com.tw>
 Description: Package for gateway API
 EOF
@@ -71,11 +75,9 @@ EOF
     echo "      ***** Building dcloud-gateway *****"
     cd $INITPATH
     rm -r /tmp/pkg_DCloudGateway/
-    mkdir -p /tmp/pkg_DCloudGateway/tmp/GatewayPatches/debsrc
+    mkdir -p /tmp/pkg_DCloudGateway/tmp/
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
     cp -r $INITPATH/StorageAppliance/INSTALL_Gateway /tmp/pkg_DCloudGateway/tmp
-    cp -r $INITPATH/StorageAppliance/GatewayPatches /tmp/pkg_DCloudGateway/tmp
-    tar -xzf $DEBPATCH -C /tmp/pkg_DCloudGateway/tmp/GatewayPatches/debsrc
     # edit control file
 cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
 Section: main
@@ -83,46 +85,9 @@ Priority: optional
 Package: dcloud-gateway
 Version: $GW_VERSION.$BUILD
 Maintainer: CDS Team <ctbd@delta.com.tw>
-Depends: nfs-kernel-server, curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
+Depends: curl, tofrodos, savebox, dcloudgatewayapi (>=$GW_VERSION), s3ql (>=$S3QL_VERSION)
 Architecture: amd64
 Description: Cloud Gateway and SaveBox. Product of Delta Electronics, Inc.
 EOF
     dpkg --build /tmp/pkg_DCloudGateway .
     check_ok
-
-
-## ----- old code -----
-#~ PY_BUILD_PATH="/tmp/pkg_DCloudGatewayAPI/usr/local/lib/python2.7/dist-packages/DCloudGateway"
-#~ BUG in not fully achieve as setup.py install.
-#~ # build DCloudGateway (API)
-    #~ echo "      ***** Building dcloudgatewayapi *****"
-    #~ cd $INITPATH
-    #~ rm -r /tmp/pkg_DCloudGatewayAPI/
-    #~ mkdir -p /tmp/pkg_DCloudGatewayAPI/tmp/
-    #~ cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGatewayAPI
-    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/config /tmp/pkg_DCloudGatewayAPI/tmp/
-    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/gateway_scripts /tmp/pkg_DCloudGatewayAPI/tmp/
-    #~ cp $INITPATH/StorageAppliance/DCloudGateway/src/http_proxy/gen_squid3_conf.sh /tmp/pkg_DCloudGatewayAPI/tmp/
-    #~ cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGatewayAPI/tmp
-
-    #~ mkdir -p $PY_BUILD_PATH
-    #~ # build api files
-    #~ cd StorageAppliance/DCloudGateway
-    #~ python setup.py clean
-    #~ python setup.py build
-    #~ python -m compileall build/lib.linux*     # compile python code
-    #~ find build/ -type f -name "*.py" -exec rm -f {} \;   # clean python source code
-    #~ cp -r build/lib.linux*/* $PY_BUILD_PATH
-    #~ # edit control file
-#~ cat > /tmp/pkg_DCloudGatewayAPI/DEBIAN/control << EOF
-#~ Package: dcloudgatewayapi
-#~ Version: $GW_VERSION.$BUILD
-#~ Section: base
-#~ Priority: optional
-#~ Architecture: amd64
-#~ Depends: python, python-setuptools, python-software-properties, curl, portmap, nfs-kernel-server, samba, ntpdate, chkconfig, traceroute, swift, apt-show-versions, squid3
-#~ Maintainer: CDS Team <ctbd@delta.com.tw>
-#~ Description: Package for gateway API
-#~ EOF
-    #~ dpkg --build /tmp/pkg_DCloudGatewayAPI $INITPATH
-    #~ check_ok
