@@ -144,8 +144,8 @@ def isHttp200(response):
 	else:
 		return False
 
-def isHttp404(response):
-    if response.find("HTTP/1.1 404") != -1:
+def isHttpErr(response, code):
+    if response.find("HTTP/1.1 %d" % code) != -1:
         return True
     else:
         return False

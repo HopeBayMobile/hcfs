@@ -129,6 +129,8 @@ class SnapshotError(Exception):
 class NetworkError(Exception):
     pass
 
+class UnauthorizedError(Exception):
+    pass
 
 def getGatewayConfig():
     """
@@ -2116,8 +2118,11 @@ def _test_storage_account(storage_url, account, password):
             raise NetworkError
         raise TestStorageError(comm_err)
     
-    if common.isHttp404(output):
+    if common.isHttpErr(output, 404):
         raise NetworkError
+    
+    if common.isHttpErr(output, 401):
+        raise UnauthorizedError
     
     if not common.isHttp200(output):
         raise TestStorageError(comm_err)
@@ -2165,6 +2170,9 @@ def test_storage_account(storage_url, account, password):
         op_code = 0x8020
         op_msg = "Testing storage account failed due to network error."
         log.error(op_msg)
+    except UnauthorizedError as e:
+        op_code = 0x8025
+        op_msg = "Testing storage account failed due to unauthorized error."
     except Exception as e:
         log.error(str(e))
 
