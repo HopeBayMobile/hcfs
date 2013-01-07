@@ -75,6 +75,7 @@ EOF
     echo "      ***** Building dcloud-gateway *****"
     cd $INITPATH
     rm -r /tmp/pkg_DCloudGateway/
+    mkdir -p /tmp/pkg_DCloudGateway/tmp/
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
     cp -r $INITPATH/StorageAppliance/INSTALL_Gateway /tmp/pkg_DCloudGateway/tmp
     # edit control file
