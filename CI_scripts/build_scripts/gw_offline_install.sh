@@ -51,42 +51,37 @@ EOF
 apt-get update
 apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
 
-# run gateway installation
-    # *********************************************
-    # Test whether COSA does not need it
-    #~ mkdir -p /mnt/cloudgwfiles/COSA
-    # *********************************************
+## Pre-install dcloudgatewayapi for files to install Install_ldap_samba.sh
+    echo "        ***** pre-install dcloudgatewayapi *****"
+    apt-get install -y --force-yes dcloudgatewayapi
 
-# install all packages of gateway 
+## Install GatewayPatches/
+    cd /tmp/GatewayPatches/
+    # install samba 3.6.6
+    echo "        ***** Install Samba patches *****"
+    apt-get -y --force-yes -f install
+    ./install-samba.sh
+
+    # install ldap and ldap-samba for SaveBox
+    echo "        ***** ldap and ldap-samba patches *****"
+    ## FIX ME - why dependency error here?
+    # avoid system asking keep local version
+    mv /etc/init/nmbd.conf /tmp/
+    mv /etc/init/smbd.conf /tmp/
+    apt-get -y --force-yes -f install   
+    ## FIX ME - why dependency error here?
+    cd /tmp/GatewayPatches/install_ldap
+    ./Install_ldap_samba.sh
+    ## FIX ME - move back config files
+    mv /tmp/nmbd.conf /etc/init/
+    mv /tmp/smbd.conf /etc/init/
+
+
+## run gateway installation
+    # install all packages of gateway 
     echo "        ***** apt-get install dcloud-gateway *****"
     apt-get install -y --force-yes dcloud-gateway
     check_ok
-
-# patch Ubuntu12.04 kernel, fuse and samba 3.6.6
-cd /tmp/GatewayPatches/
-# install samba 3.6.6
-echo "        ***** Install Samba patches *****"
-apt-get -y --force-yes -f install
-./install-samba.sh
-
-# install kernel and fuse patches
-#~ echo "        ***** Install kernel and fuse patches *****"
-#~ ./install-u1204.sh
-
-# install ldap and ldap-samba for SaveBox
-echo "        ***** ldap and ldap-samba patches *****"
-## FIX ME - why dependency error here?
-# avoid system asking keep local version
-mv /etc/init/nmbd.conf /tmp/
-mv /etc/init/smbd.conf /tmp/
-apt-get -y --force-yes -f install   
-## FIX ME - why dependency error here?
-cd /tmp/GatewayPatches/install_ldap
-./Install_ldap_samba.sh
-## FIX ME - move back config files
-mv /tmp/nmbd.conf /etc/init/
-mv /tmp/smbd.conf /etc/init/
-## FIX ME - move back config files
 
 # append a line in sshd_config to only allow dclouduser to login by ssh
 echo "AllowUsers dclouduser" >> /etc/ssh/sshd_config

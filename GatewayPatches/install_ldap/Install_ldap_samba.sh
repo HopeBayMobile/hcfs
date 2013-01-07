@@ -108,6 +108,10 @@ create_admin_user(){
     sudo smbldap-useradd -a -P -s /usr/sbin/nologin admin 0wen1sMyL0rd
 }
 
+install_squid3_package(){
+    sudo apt-get install -y --force-yes squid3
+}
+
 copy_squid3_config(){
     sudo cp $LDAP_PACKAGE/squid.conf /etc/squid3
 }
@@ -134,4 +138,5 @@ install_nscd_nslcd_package
 restart_nssldap_service
 copy_exports_file
 #create_admin_user
+install_squid3_package
 copy_squid3_config
