@@ -48,6 +48,10 @@ check_ok() {
     mkdir -p /tmp/pkg_DCloudGatewayAPI/tmp
     cp -r $INITPATH/debian_templates/DCloudGatewayAPI/DEBIAN /tmp/pkg_DCloudGatewayAPI
     cp -r $INITPATH/StorageAppliance/DCloudGateway/ /tmp/pkg_DCloudGatewayAPI/tmp
+    mkdir -p /tmp/pkg_DCloudGatewayAPI/tmp/GatewayPatches/debsrc
+    cp -r $INITPATH/StorageAppliance/GatewayPatches /tmp/pkg_DCloudGatewayAPI/tmp
+    tar -xzf $DEBPATCH -C /tmp/pkg_DCloudGatewayAPI/tmp/GatewayPatches/debsrc
+
     # edit control file
 # 2012/10/17, take out nfs-kernel-server and samba for fixing prompt screen. (Yen)
 # 2012/10/19, WeiTang says nfs-kernel-server is not installed, thus install it back (Yen)
@@ -71,11 +75,8 @@ EOF
     echo "      ***** Building dcloud-gateway *****"
     cd $INITPATH
     rm -r /tmp/pkg_DCloudGateway/
-    mkdir -p /tmp/pkg_DCloudGateway/tmp/GatewayPatches/debsrc
     cp -r $INITPATH/debian_templates/DCloudGateway/DEBIAN /tmp/pkg_DCloudGateway
     cp -r $INITPATH/StorageAppliance/INSTALL_Gateway /tmp/pkg_DCloudGateway/tmp
-    cp -r $INITPATH/StorageAppliance/GatewayPatches /tmp/pkg_DCloudGateway/tmp
-    tar -xzf $DEBPATCH -C /tmp/pkg_DCloudGateway/tmp/GatewayPatches/debsrc
     # edit control file
 cat > /tmp/pkg_DCloudGateway/DEBIAN/control << EOF
 Section: main
