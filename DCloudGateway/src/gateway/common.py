@@ -144,6 +144,12 @@ def isHttp200(response):
 	else:
 		return False
 
+def isHttp404(response):
+    if response.find("HTTP/1.1 404") != -1:
+        return True
+    else:
+        return False
+
 def isInTestMode():
 	config = ConfigParser()
 	conf = "%s/test.ini"%DIR

@@ -125,6 +125,9 @@ class UmountError(Exception):
 
 class SnapshotError(Exception):
     pass
+    
+class NetworkError(Exception):
+    pass
 
 
 def getGatewayConfig():
@@ -1381,7 +1384,6 @@ def _mkfs(storage_url, key, container):
     # wthung, 2012/8/3
     # add a var to indicate an exiting filesys
     has_existing_filesys = False
-    result = True
 
     try:
         cmd = "sudo python /usr/local/bin/mkfs.s3ql --cachedir /root/.s3ql --authfile /root/.s3ql/authinfo2 --max-obj-size 2048 swift://%s/%s/delta" % (storage_url, container)
@@ -1412,15 +1414,17 @@ def _mkfs(storage_url, key, container):
                     else:
                         # fsck terminated, check return code again
                         if po.returncode != 0:
+                            if po.returncode == 128:
+                                # wrong passphrase
+                                raise EncKeyError("The input encryption key is not correct.")
                             raise RuntimeError
                         break
     except Exception as e:
-        result = False
         log.error('_mkfs error: %s' % str(e))
+        raise
 
-    finally:
-        log.debug("_mkfs end")
-        return (result, has_existing_filesys)
+    log.debug("_mkfs end")
+    return has_existing_filesys
 
 # wthung, 2012/11/26
 def _findChildPids(pid, pslist, cpid_list):
@@ -1631,7 +1635,7 @@ def _mount(storage_url, container):
         po.wait()
         if po.returncode != 0:
             if output.find("Wrong bucket passphrase") != -1:
-                raise EncKeyError("The input encryption key is wrong!")
+                raise EncKeyError("The input encryption key is not correct.")
             raise BuildGWError(output)
 
         #mkdir in the mountpoint for smb share
@@ -1798,9 +1802,7 @@ def build_gateway(user_key):
         password = op_config.get(section, 'backend-password')
         
         user_container = _check_container(storage_url=url, account=account, password=password)
-        mkfs_result, has_filesys = _mkfs(storage_url=url, key=user_key, container=user_container)
-        if not mkfs_result:
-            raise BuildGWError('Error occurred during mkfs.')
+        has_filesys = _mkfs(storage_url=url, key=user_key, container=user_container)
         _mount(storage_url=url, container=user_container)
         
         # wthung, 2012/8/3
@@ -1856,6 +1858,7 @@ def build_gateway(user_key):
         op_code = 0x8003
         op_msg = 'File access failed.'
     except EncKeyError as e:
+        op_code = 0x8024
         op_msg = str(e)
     except BuildGWError as e:
         op_msg = str(e)
@@ -2100,14 +2103,24 @@ def _test_storage_account(storage_url, account, password):
     po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     output = po.stdout.read()
     po.wait()
-
-    if po.returncode != 0:
-        op_msg = "Testing storage account failed for %s." % output
-        raise TestStorageError(op_msg)
-
+    ret_code = po.returncode
+    
+    comm_err = "Testing storage account failed."
+    if ret_code != 0:
+        # wthung, 2013/1/7
+        # modifed to return more specified error message
+        log.error(comm_err)
+        log.error(output)
+        if ret_code == 7:
+            # curl's return code 7 == "Failed to connect to host."
+            raise NetworkError
+        raise TestStorageError(comm_err)
+    
+    if common.isHttp404(output):
+        raise NetworkError
+    
     if not common.isHttp200(output):
-        op_msg = "Testing storage account failed."
-        raise TestStorageError(op_msg)
+        raise TestStorageError(comm_err)
 
 def test_storage_account(storage_url, account, password):
     """
@@ -2147,6 +2160,10 @@ def test_storage_account(storage_url, account, password):
     except TestStorageError as e:
         op_code = 0x8023
         op_msg = str(e)
+        log.error(op_msg)
+    except NetworkError as e:
+        op_code = 0x8025
+        op_msg = "Testing storage account failed due to network error."
         log.error(op_msg)
     except Exception as e:
         log.error(str(e))

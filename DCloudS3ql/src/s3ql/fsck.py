@@ -1241,6 +1241,9 @@ def main(args=None):
         except NoSuchBucket as exc:
             raise QuietError(str(exc))
         except Exception as exc:
+            # return code 128 to indicate "wrong enc key"
+            if (str(exc).find('Wrong bucket passphrase') != -1):
+                return 128
             log.error("Unable to connect to backend. Please check network connection then reboot to retry. If this cannot solve your problem, please contact service people.")
             raise QuietError(str(exc))
 
