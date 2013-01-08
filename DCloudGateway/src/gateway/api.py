@@ -1575,6 +1575,32 @@ def _umount():
         else:
             log.debug("Gateway umounted")
 
+# wthung, 2012/1/8
+def _mount_as_loop_ro(mountpoint):
+    """
+    Mount S3QL mount point to a loopback, read-only device, 
+    so that a unexpected file operation won't succeed if S3QL is down.
+    An entry will also be added into /etc/fstab.
+    
+    The input 'mountpoint' must be created and not mounted prior to this function.
+    
+    @type mountpoint: String
+    @param mountpoint: Path of S3QL mount point
+    """
+    if os.path.exists(mountpoint) and (not os.path.ismount(mountpoint)):
+        img_file = '/storage/ro.img'
+        # create a dummy file using dd
+        _run_subprocess('sudo dd if=/dev/zero of=%s bs=1024 count=500' % img_file, 20)
+        # mkfs
+        _run_subprocess('sudo mkfs -t ext4 -F %s' % img_file, 20)
+        # mount
+        _run_subprocess('sudo mount -t ext4 -o loop,ro %s %s' % (img_file, mountpoint), 20)
+        # check if an entry for this mounting already existed
+        ret_code, _ = _run_subprocess('sudo grep %s /etc/fstab' % img_file, 10)
+        if ret_code == 1:
+            # append an entry to /etc/fstab
+            append_str = '# mount s3ql mount point as read-only fs\n/storage/ro.img /mnt/cloudgwfiles ext4 loop,ro 0 0'
+            _run_subprocess('sudo echo "%s" >> /etc/fstab' % append_str, 10)
 
 @common.timeout(360)
 def _mount(storage_url, container):
@@ -1601,6 +1627,8 @@ def _mount(storage_url, container):
         authfile = "/root/.s3ql/authinfo2"
 
         os.system("sudo mkdir -p %s" % mountpoint)
+        # mount target mount point to a read-only loop fs
+        _mount_as_loop_ro(mountpoint)
 
         #mount s3ql
         cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/%s/delta %s" % (mountOpt, authfile, storage_url, container, mountpoint)
