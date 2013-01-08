@@ -489,6 +489,7 @@ def get_indicators():
           'S3QL_writing': True}}
 
     try:
+        op_s3ql_ok = False
         # get s3ql statistics by s3qlstat
         ret_code, output = _run_subprocess('sudo s3qlstat /mnt/cloudgwfiles', 15)
         # s3qlstat return 0 in success, 1 in failure
@@ -504,16 +505,6 @@ def get_indicators():
             op_Proxy_srv = _check_process_alive('squid3')
             op_s3ql_ok = _check_s3ql()
             op_s3ql_writing = _check_s3ql_writing(output)
-            
-            if not op_s3ql_ok:
-                g_s3ql_fail_count += 1
-                if g_s3ql_fail_count >= 3:
-                    # inform savebox to shutdown their services
-                    log.debug('S3QL is down. Notify SAVEBOX to shut down their services.')
-                    _notify_savebox(3, "S3QL is not ready.")
-                    g_s3ql_fail_count = 0
-            else:
-                g_s3ql_fail_count = 0
 
             op_ok = True
             op_code = 0x8
@@ -534,6 +525,15 @@ def get_indicators():
                   'HTTP_proxy_srv' : op_Proxy_srv,
                   'S3QL_ok': op_s3ql_ok,
                   'S3QL_writing': op_s3ql_writing}}
+        if not op_s3ql_ok:
+            g_s3ql_fail_count += 1
+            if g_s3ql_fail_count >= 3:
+                # inform savebox to shutdown their services
+                log.debug('S3QL is down. Notify SAVEBOX to shut down their services.')
+                _notify_savebox(3, "SAVEBOX is not ready.")
+                g_s3ql_fail_count = 0
+        else:
+            g_s3ql_fail_count = 0
     except Exception as Err:
         log.error("Unable to get indicators")
         log.error("msg: %s" % str(Err))
