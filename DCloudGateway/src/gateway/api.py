@@ -95,6 +95,8 @@ NUM_LOG_LINES = 1024
 
 #Snapshot tag
 snapshot_tag = "/root/.s3ql/.snapshotting"
+# var to remember s3ql fail counts
+g_s3ql_fail_count = 0
 
 ################################################################################
 
@@ -466,7 +468,7 @@ def get_indicators():
             - S3QL_ok: If S3QL service is running.
             - S3QL_writing: If S3QL is allowed to write.
     """
-    
+    global g_s3ql_fail_count
     op_ok = False
     op_code = 0x8014
     op_msg = 'Reading SAVEBOX indicators failed.'
@@ -502,13 +504,16 @@ def get_indicators():
             op_Proxy_srv = _check_process_alive('squid3')
             op_s3ql_ok = _check_s3ql()
             op_s3ql_writing = _check_s3ql_writing(output)
-
-            # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
-            # wthung, 2012/12/19, don't restart smb and nfs by cosa's request
-            #if op_NFS_srv is False and _check_process_alive('mount.s3ql') is True:
-            #    restart_nfs_service()
-            #if op_SMB_srv is False and op_s3ql_ok is True:
-            #    restart_smb_service()
+            
+            if not op_s3ql_ok:
+                g_s3ql_fail_count += 1
+                if g_s3ql_fail_count >= 3:
+                    # inform savebox to shutdown their services
+                    log.debug('S3QL is down. Notify SAVEBOX to shut down their services.')
+                    _notify_savebox(3, "S3QL is not ready.")
+                    g_s3ql_fail_count = 0
+            else:
+                g_s3ql_fail_count = 0
 
             op_ok = True
             op_code = 0x8
@@ -1354,7 +1359,7 @@ def _mkfs(storage_url, key, container):
             if stderr.find("existing file system!") == -1:
                 op_msg = "Failed to mkfs for %s" % stderr
                 log.error(op_msg)
-                raise BuildGWError(0x8028, "Making S3QL file system failed.")
+                raise BuildGWError(0x8028, "Making SAVEBOX file system failed.")
             else:
                 log.info("Found existing file system!")
                 log.info("Conducting forced file system check")
@@ -1477,7 +1482,7 @@ def _undo_umount():
         - Start NetBIOS
         - Start Samba
     """
-    log.debug('Undo gateway umount process')
+    log.debug('Undo SAVEBOX umount process')
     
     # mount cosa related folders if necessary
     # note: we can't use os.path.ismount to check a binded folder
@@ -1518,7 +1523,7 @@ def _umount():
     @rtype: boolean
     @return: True if succeed to umount file system. Otherwise, false.
     """
-    log.debug("Gateway umounting")
+    log.debug("SAVEBOX umounting")
     op_ok = False
 
     try:
@@ -1548,10 +1553,12 @@ def _umount():
             if ret_code:
                 raise UmountError(output)
 
-            # umount s3ql mount point
-            ret_code, output = _run_subprocess("sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint))
-            if ret_code:
-                raise UmountError(output)
+            # check if s3ql is mounted
+            if _is_s3ql_mounted(mountpoint):
+                # umount s3ql mount point
+                ret_code, output = _run_subprocess("sudo python /usr/local/bin/umount.s3ql %s" % (mountpoint))
+                if ret_code:
+                    raise UmountError(output)
             
             op_ok = True
     except Exception as e:
@@ -1559,10 +1566,36 @@ def _umount():
     
     finally:
         if op_ok == False:
-            log.error("Gateway umount error.")
+            log.warning("Umounting SAVEBOX file system failed.")
         else:
-            log.debug("Gateway umounted")
+            log.debug("Umounting SAVEBOX was successful.")
 
+# wthung, 2012/1/8
+def _mount_as_loop_ro(mountpoint):
+    """
+    Mount S3QL mount point to a loopback, read-only device, 
+    so that a unexpected file operation won't succeed if S3QL is down.
+    An entry will also be added into /etc/fstab.
+    
+    The input 'mountpoint' must be created and not mounted prior to this function.
+    
+    @type mountpoint: String
+    @param mountpoint: Path of S3QL mount point
+    """
+    if os.path.exists(mountpoint) and (not os.path.ismount(mountpoint)):
+        img_file = '/storage/ro.img'
+        # create a dummy file using dd
+        _run_subprocess('sudo dd if=/dev/zero of=%s bs=1024 count=500' % img_file, 20)
+        # mkfs
+        _run_subprocess('sudo mkfs -t ext4 -F %s' % img_file, 20)
+        # mount
+        _run_subprocess('sudo mount -t ext4 -o loop,ro %s %s' % (img_file, mountpoint), 20)
+        # check if an entry for this mounting already existed
+        ret_code, _ = _run_subprocess('sudo grep %s /etc/fstab' % img_file, 10)
+        if ret_code == 1:
+            # append an entry to /etc/fstab
+            append_str = '# mount s3ql mount point as read-only fs\n/storage/ro.img /mnt/cloudgwfiles ext4 loop,ro 0 0'
+            _run_subprocess('sudo echo "%s" >> /etc/fstab' % append_str, 10)
 
 @common.timeout(360)
 def _mount(storage_url, container):
@@ -1576,7 +1609,7 @@ def _mount(storage_url, container):
     @param stroage_url: Storage URL.
     """
     
-    log.debug("Gateway mounting")
+    log.debug("Mounting SAVEBOX")
     op_ok = False
     try:
         config = getGatewayConfig()
@@ -1589,6 +1622,11 @@ def _mount(storage_url, container):
         authfile = "/root/.s3ql/authinfo2"
 
         os.system("sudo mkdir -p %s" % mountpoint)
+        # check if mount point is mounted
+        if os.path.ismount(mountpoint):
+            os.system("sudo umount %s" % mountpoint)
+        # mount target mount point to a read-only loop fs
+        _mount_as_loop_ro(mountpoint)
 
         #mount s3ql
         cmd = "sudo python /usr/local/bin/mount.s3ql %s --authfile %s --cachedir /root/.s3ql swift://%s/%s/delta %s" % (mountOpt, authfile, storage_url, container, mountpoint)
@@ -1630,12 +1668,12 @@ def _mount(storage_url, container):
     except Exception as e:
         op_msg = "Failed to mount filesystem for %s" % str(e)
         log.error(str(e))
-        raise BuildGWError(0x8029, "Mounting S3QL file system failed.")
+        raise BuildGWError(0x8029, "Mounting SAVEBOX file system failed.")
 
         if op_ok == False:
-            log.error("Gateway mount error.")
+            log.error("Mounting SAVEBOX file system failed.")
         else:
-            log.debug("Gateway mounted")
+            log.debug("Mounting SAVEBOX file system was successful.")
     
 
 @common.timeout(360)
@@ -1649,7 +1687,7 @@ def _restartServices():
     Will raise BuildGWError if failed.
     """
     
-    log.debug("Gateway restarting")
+    log.debug("Restarting SAVEBOX services.")
 
     try:
         config = getGatewayConfig()
@@ -1687,8 +1725,20 @@ def _restartServices():
         # look like this error won't be catched anymore, assign an valid err code to it
         raise BuildGWError(0x8999, "Restarting system services failed.")
 
-    log.debug("Gateway restarted")
+    log.debug("Restarting SAVEBOX services was successful.")
 
+# wthung, 2013/1/8
+def _is_s3ql_mounted(mountpoint):
+    """
+    Check if S3QL is mounted on input 'mountpoint'.
+    
+    @type mountpoint: String
+    @param mountpoint: Path to check
+    """
+    ret_code, _ = _run_subprocess('sudo s3qlstat %s' % mountpoint, 30)
+    if ret_code == 0:
+        return True
+    return False
 
 def build_gateway(user_key):
     """
@@ -1714,7 +1764,7 @@ def build_gateway(user_key):
         - data: JSON object. Always return empty.
     """
     
-    log.debug("Gateway building")
+    log.debug("Building SAVEBOX.")
 
     op_ok = False
     op_code = 0x8002
@@ -1724,9 +1774,11 @@ def build_gateway(user_key):
         # wthung, 2012/8/15
         # first to check if mount point is available to avoid build gateway twice
         # original checking place is in _mount(). has removed it
+        # wthung, 2013/1/8
+        # change to use s3qlstat for checking
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
-        if os.path.ismount(mountpoint):
+        if _is_s3ql_mounted(mountpoint):
             raise BuildGWError(0x800F, "A file system was already mounted.")
             
         # wthung, 2012/12/25
@@ -1802,7 +1854,7 @@ def build_gateway(user_key):
         # create upstart script for s3ql and gateway
         # before this step, if gateway is reset accidently, build_gateway can be restarted
         if _createS3qlConf(url, user_container) != 0:
-            raise BuildGWError(0x8026, "Creating S3QL configuration failed.")
+            raise BuildGWError(0x8026, "Creating SAVEBOX configuration failed.")
      
         op_ok = True
         op_code = 0x4
@@ -1825,16 +1877,15 @@ def build_gateway(user_key):
         if not op_ok:
             _umount()
             log.error(op_msg)
-            log.error("Gateway building error. " + op_msg)
+            log.debug("Building SAVEBOX failed. " + op_msg)
         else:
-            log.debug("Gateway builded")
+            log.debug("Building SAVEBOX was successful.")
             
         return_val = {'result' : op_ok,
                       'msg'    : op_msg,
                       'code'   : op_code,
                       'data'   : {}}
 
-        log.debug("build_gateway end")
         return json.dumps(return_val)
 
 def restart_nfs_service():
@@ -1987,7 +2038,7 @@ def reset_gateway():
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
     """
-    log.debug("Gateway restarting")
+    log.debug("Rebooting SAVEBOX.")
 
     return_val = {'result': True,
                   'msg': "Restarting SAVEBOX was successful.",
@@ -2001,7 +2052,7 @@ def reset_gateway():
             time.sleep(10)
             os.system("sudo reboot")
         else:
-            log.debug("Gateway will restart after ten seconds")
+            log.debug("SAVEBOX will restart after ten seconds")
     except:
         pass
     
@@ -2019,7 +2070,7 @@ def shutdown_gateway():
         - msg: Explanation of result.
         - data: JSON object. Always return empty.
     """
-    log.debug("Gateway shutdowning")
+    log.debug("Shutdowning SAVEBOX.")
     
     return_val = {'result': True,
                   'msg': "Shutting down SAVEBOX was successful.",
@@ -2033,7 +2084,7 @@ def shutdown_gateway():
             time.sleep(10)
             os.system("sudo poweroff")
         else:
-            log.debug("Gateway will shutdown after ten seconds")
+            log.debug("SAVEBOX will be shuted down after ten seconds")
     except:
         pass
     
@@ -2211,7 +2262,6 @@ def get_network():
             'data': network_info
         }
     
-    log.debug("Gateway networking started")
     return json.dumps(return_val)
 
 def apply_network(ip, gateway, mask, dns1, dns2=None):
@@ -2298,15 +2348,15 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
             except:
                 op_ok = False
-                log.error("Gateway networking starting error")
+                log.warning("Starting SAVEBOX networking failed.")
             else:
                 if os.system("sudo /etc/init.d/networking restart") == 0:
                     op_ok = True
                     op_msg = "Succeeded to apply the network configuration."
-                    log.debug("Gateway networking started")
+                    log.debug("Starting SAVEBOX networking was successful.")
                 else:
                     op_ok = False
-                    log.debug("Gateway networking starting error")
+                    log.warning("Starting SAVEBOX networking failed.")
         else:
             op_ok = False
             log.error(op_msg)
@@ -3532,7 +3582,7 @@ def get_gateway_status():
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
     except:
-        log.error("Unable to get gateway status")
+        log.warning("Getting SAVEBOX status failed.")
 
     return json.dumps(ret_val)
 

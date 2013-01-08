@@ -327,12 +327,12 @@ def set_savebox_status(turnon):
     """
     if turnon:
         # notify savebox with status 0
-        api._notify_savebox(0, "Swift connected.")
+        api._notify_savebox(0, "Cloud storage connected.")
         # show system normal led (code = 2)
         api._show_led(2)
     else:
         # notify savebox with status 3
-        api._notify_savebox(3, "Swift disconnected and S3QL dirty caches/entries are over 98% full.")
+        api._notify_savebox(3, "Cloud storage disconnected and SAVEBOX dirty caches/entries are over 98% full.")
         # show system error led (code = 3)
         api._show_led(3)
 
@@ -347,7 +347,7 @@ def get_gw_indicator():
     indic_file = '/dev/shm/gw_indicator'
     last_backup_time_file = '/root/.s3ql/gw_last_backup_time'
     op_ok = False
-    op_msg = 'Gateway indicators read failed unexpectedly.'
+    op_msg = 'Reading SAVEBOX indicators failed.'
     return_val = {}
 
     global g_prev_flushing
@@ -436,9 +436,11 @@ def _upload_usage_data(usage):
         _, output = api._run_subprocess('sudo swift -A https://%s/auth/v1.0 -U %s -K %s upload %s_private_container %s' 
                                            % (storage_url, account, password, username, target_file), 15)
         if target_file in output:
-            log.info('Uploaded gateway total usage to swift (%d)' % usage)
+            log.debug('Uploaded SAVEBOX total usage to cloud storage (%d)' % usage)
         else:
-            log.error('Failed to upload gateway total usage to swift. %s' % output)
+            err_msg = 'Uploading SAVEBOX data usage to cloud storage failed.'
+            log.warning(err_msg)
+            log.debug('%s. %s' % (err_msg, output))
     
     # remove the temp file
     os.system('sudo rm %s' % target_file)
@@ -466,7 +468,9 @@ def _get_gateway_quota():
                     meta_quota = int(meta_quota)
                     return meta_quota 
         else:
-            log.error('Failed to get gateway quota by swift: %s' % output)
+            err_msg = 'Getting SAVEBOX quota failed.'
+            log.warning(err_msg)
+            log.debug('%s. %s' % (err_msg, output))
     
     # return -1 if quota cannot be retrieved
     return -1
