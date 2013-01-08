@@ -95,6 +95,8 @@ NUM_LOG_LINES = 1024
 
 #Snapshot tag
 snapshot_tag = "/root/.s3ql/.snapshotting"
+# var to remember s3ql fail counts
+g_s3ql_fail_count = 0
 
 ################################################################################
 
@@ -466,7 +468,7 @@ def get_indicators():
             - S3QL_ok: If S3QL service is running.
             - S3QL_writing: If S3QL is allowed to write.
     """
-    
+    global g_s3ql_fail_count
     op_ok = False
     op_code = 0x8014
     op_msg = 'Reading SAVEBOX indicators failed.'
@@ -502,6 +504,16 @@ def get_indicators():
             op_Proxy_srv = _check_process_alive('squid3')
             op_s3ql_ok = _check_s3ql()
             op_s3ql_writing = _check_s3ql_writing(output)
+            
+            if not op_s3ql_ok:
+                g_s3ql_fail_count += 1
+                if g_s3ql_fail_count >= 3:
+                    # inform savebox to shutdown their services
+                    log.debug('S3QL is down. Notify SAVEBOX to shut down their services.')
+                    _notify_savebox(3, "S3QL is not ready.")
+                    g_s3ql_fail_count = 0
+            else:
+                g_s3ql_fail_count = 0
 
             # Jiahong: will need op_s3ql_ok = True to restart nfs and samba
             # wthung, 2012/12/19, don't restart smb and nfs by cosa's request
