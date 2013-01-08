@@ -27,6 +27,7 @@ import thread
 logger = common.getLogger(name="API", conf="/etc/delta/Gateway.ini")
 status_file = "/var/log/gateway_upgrade.status"
 progress_file = "/var/log/gateway_upgrade.progress"
+pkg_version_file = "/var/log/downloaded_package.version"
 
 class InvalidVersionString(Exception): pass
 
@@ -73,7 +74,7 @@ def get_upgrade_status(unittest=False, test_param=None):
     else:       ## not for unit test
         try:
             #thread.start_new_thread(get_available_upgrade, ())  
-            get_available_upgrade() 
+            upgrade_info = get_available_upgrade() 
             ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
@@ -81,7 +82,15 @@ def get_upgrade_status(unittest=False, test_param=None):
             if progress == -1:
                 set_upgrade_status(1)
                 os.system("echo '0' > /var/log/gateway_upgrade.progress")
-                
+            
+            if code == 7:   ## check if downloaded package has been expired
+                fh = open(pkg_version_file, 'r')
+                downloaded_ver = fh.read()
+                latest_ver = json.loads(upgrade_info)['version']
+                if downloaded_ver != latest_ver:
+                    print "downloaded package is expired."
+                    set_upgrade_status(3)
+                    
         except Exception as e:
             set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
@@ -312,6 +321,12 @@ def download_package(unittest=False, test_param=None):
             #~ ## download DEB files to cache
             cmd = "bash /usr/local/bin/do_download_upgrade_package.sh &"
             a = os.system(cmd)
+            ## set a log file to record the version of downloaded package
+            ## this is used for checking whether downloaded package is expired.
+            upgrade_info = get_available_upgrade()
+            ver = json.loads(upgrade_info)['version']
+            fh = open(pkg_version_file, 'w')
+            fh.write( ver )
             ## assign return values
             op_ok = True
             op_code = 0x16            

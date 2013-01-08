@@ -8,6 +8,7 @@ fi
 DEB_PATH="/var/cache/apt/archives"
 STATUS_FILE="/var/log/gateway_upgrade.status"
 PROGRESS_FILE="/var/log/gateway_upgrade.progress"
+PKG_VER_FILE="/var/log/downloaded_package.version"
 UPGRADE_STATUS=`cat $STATUS_FILE`
 LOCK_FILE="/tmp/downloading_upgrade.lock"
 TMP_PATH="/tmp/debsrc"
@@ -37,10 +38,12 @@ then
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
         #~ write an error log
+        apt-get clean
         /usr/local/TOMCAT/bin/cafeLogLiteSingle.sh API_REMOTE_UPGRADE ERROR 'Download upgrade failed. Update server disconnected during downloading upgrade package.'
         PID=$(ps aux | grep -w "get_download_progress" | head -1 | awk '{ print $2 }')
         kill -9 $PID
         echo '-1' > $PROGRESS_FILE     ## -1 = download failed
+        echo '' > $PKG_VER_FILE     ## clean downloaded version file
     fi
     # unlock
     rm $LOCK_FILE
