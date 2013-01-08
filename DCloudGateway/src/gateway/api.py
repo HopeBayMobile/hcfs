@@ -1297,9 +1297,7 @@ def _check_container(storage_url, account, password):
     @type password: string
     @param password: Account password.
     """
-    
     user_container = ''
-    log.debug("_check_container start")
 
     try:
         # get user default container name
@@ -1312,59 +1310,20 @@ def _check_container(storage_url, account, password):
     
         if po.returncode != 0:
             op_msg = "Failed to stat container: %s" % output
-            raise BuildGWError(op_msg)
+            raise Exception(op_msg)
         
         output = output.strip()
-        if not user_container in output:
+        if not "Bytes" in output:
             op_msg = "Failed to find user's container %s. Output=%s" % (user_container, output)
             log.error(op_msg)
-            raise BuildGWError(op_msg)
+            raise Exception(op_msg)
         else:
             log.debug('Found user container %s' % user_container)
-    finally:
-        log.debug("_check_container end")
-    
-    return user_container
-
-# wthung, 2012/8/21
-# now creating container is backend's job 
-'''@common.timeout(180)
-def _openContainter(storage_url, account, password):
-    """
-    Open container.
-    
-    Will raise BuildGWError if failed.
-    
-    @type storage_url: string
-    @param storage_url: Storage URL.
-    @type account: string
-    @param account: Account name.
-    @type password: string
-    @param password: Account password.
-    """
-    
-    log.debug("_openContainer start")
-
-    try:
-        os.system("sudo touch gatewayContainer.txt")
-        cmd = "sudo swift -A https://%s/auth/v1.0 -U %s -K %s upload gateway gatewayContainer.txt" % (storage_url, account, password)
-        po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = po.stdout.read()
-        po.wait()
-    
-        if po.returncode != 0:
-            op_msg = "Failed to open container for" % output
-            raise BuildGWError(op_msg)
+    except Exception as e:
+        log.error(str(e))
+        raise BuildGWError(0x8027, "Checking user container failed.")
         
-        output = output.strip()
-        if output != "gatewayContainer.txt":
-            op_msg = "Failed to open container for %s" % output
-            raise BuildGWError(op_msg)
-        os.system("sudo rm gatewayContainer.txt")
-    finally:
-        log.debug("_openContainer end")'''
-
-
+    return user_container
 
 def _mkfs(storage_url, key, container):
     """
@@ -1394,7 +1353,8 @@ def _mkfs(storage_url, key, container):
         if po.returncode != 0:
             if stderr.find("existing file system!") == -1:
                 op_msg = "Failed to mkfs for %s" % stderr
-                raise BuildGWError(op_msg)
+                log.error(op_msg)
+                raise BuildGWError(0x8028, "Making S3QL file system failed.")
             else:
                 log.info("Found existing file system!")
                 log.info("Conducting forced file system check")
@@ -1638,7 +1598,7 @@ def _mount(storage_url, container):
         if po.returncode != 0:
             if output.find("Wrong bucket passphrase") != -1:
                 raise EncKeyError
-            raise BuildGWError(output)
+            raise Exception(output)
 
         #mkdir in the mountpoint for smb share
         cmd = "sudo mkdir -p %s/sambashare" % mountpoint
@@ -1646,7 +1606,7 @@ def _mount(storage_url, container):
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
-            raise BuildGWError(output)
+            raise Exception(output)
 
         #mkdir in the mountpoint for nfs share
         cmd = "sudo mkdir -p %s/nfsshare" % mountpoint
@@ -1654,7 +1614,7 @@ def _mount(storage_url, container):
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
-            raise BuildGWError(output)
+            raise Exception(output)
 
         #change the owner of nfs share to nobody:nogroup
         cmd = "sudo chown nobody:nogroup %s/nfsshare" % mountpoint
@@ -1662,17 +1622,15 @@ def _mount(storage_url, container):
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
-            raise BuildGWError(output)
+            raise Exception(output)
 
         op_ok = True
-    except GatewayConfError:
-        raise
     except EncKeyError:
         raise
     except Exception as e:
         op_msg = "Failed to mount filesystem for %s" % str(e)
         log.error(str(e))
-        raise BuildGWError(op_msg)
+        raise BuildGWError(0x8029, "Mounting S3QL file system failed.")
 
         if op_ok == False:
             log.error("Gateway mount error.")
@@ -1702,15 +1660,15 @@ def _restartServices():
         po.wait()
         if po.returncode != 0:
             op_msg = "Failed to start samba service for %s." % output
-            raise BuildGWError(op_msg)
+            raise Exception(op_msg)
 
         cmd = "sudo /etc/init.d/nmbd restart"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = po.stdout.read()
         po.wait()
         if po.returncode != 0:
-            op_msg = "Failed to start samba service for %s." % output
-            raise BuildGWError(op_msg)
+            op_msg = "Failed to start netbios service for %s." % output
+            raise Exception(op_msg)
 
         cmd = "sudo /etc/init.d/nfs-kernel-server restart"
         po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -1718,7 +1676,7 @@ def _restartServices():
         po.wait()
         if po.returncode != 0:
             op_msg = "Failed to start nfs service for %s." % output
-            raise BuildGWError(op_msg)
+            raise Exception(op_msg)
 
     except GatewayConfError as e:
         raise e, None, sys.exc_info()[2]
@@ -1726,9 +1684,8 @@ def _restartServices():
     except Exception as e:
         op_msg = "Failed to restart smb&nfs services for %s" % str(e)
         log.error(str(e))
-        raise BuildGWError(op_msg)
-    finally:
-        log.debug("_restartServices start")
+        # look like this error won't be catched anymore, assign an valid err code to it
+        raise BuildGWError(0x8999, "Restarting system services failed.")
 
     log.debug("Gateway restarted")
 
@@ -1770,8 +1727,7 @@ def build_gateway(user_key):
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
         if os.path.ismount(mountpoint):
-            op_code = 0x800F
-            raise BuildGWError("A file system was already mounted.")
+            raise BuildGWError(0x800F, "A file system was already mounted.")
             
         # wthung, 2012/12/25
         # in current wizard procedure, upstart script for s3ql and gateway were created by calling apply_storage_account
@@ -1786,9 +1742,8 @@ def build_gateway(user_key):
             os.system('sudo mv %s /root/pre-gwstart.conf.%d' % (upstart_gw, current_time))
 
         if not common.isValidEncKey(user_key):
-            op_code = 0x8004
             op_msg = "The encryption key must be an alphanumeric string of length between 6 and 20."
-            raise BuildGWError(op_msg)
+            raise BuildGWError(0x8004, op_msg)
 
         op_config = ConfigParser.ConfigParser()
         with open('/root/.s3ql/authinfo2', 'rb') as op_fh:
@@ -1826,7 +1781,7 @@ def build_gateway(user_key):
                 else:
                     os.system('service squid3 stop')
             except Exception as e:
-                log.error(str(e))
+                log.warning(str(e))
         
         # restart nfs/smb/nmb
         restart_service("nfs-kernel-server")
@@ -1847,7 +1802,7 @@ def build_gateway(user_key):
         # create upstart script for s3ql and gateway
         # before this step, if gateway is reset accidently, build_gateway can be restarted
         if _createS3qlConf(url, user_container) != 0:
-            raise BuildGWError("Failed to create S3QL configuration")
+            raise BuildGWError(0x8026, "Creating S3QL configuration failed.")
      
         op_ok = True
         op_code = 0x4
@@ -1863,7 +1818,7 @@ def build_gateway(user_key):
         op_code = 0x8024
         op_msg = "The input encryption key is not correct."
     except BuildGWError as e:
-        op_msg = str(e)
+        op_code, op_msg = e.args
     except Exception as e:
         op_msg = str(e)
     finally:
@@ -3682,5 +3637,4 @@ def get_last_backup_time():
 
 
 if __name__ == '__main__':
-    print get_indicators()
     pass
