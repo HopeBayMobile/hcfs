@@ -535,21 +535,23 @@ def get_indicators():
             g_s3ql_fail_count += 1
             g_s3ql_success_count = 0
             if g_s3ql_fail_count >= 3:
+                g_s3ql_fail_count = 0
                 if g_s3ql_on:
                     # inform savebox to shutdown their services
                     log.debug('S3QL is down. Notify SAVEBOX to shut down services.')
                     _notify_savebox(3, "SAVEBOX is not ready.")
-                    g_s3ql_fail_count = 0
+                    _show_led(3)
                     g_s3ql_on = False
         else:
             g_s3ql_success_count += 1
             g_s3ql_fail_count = 0
             if g_s3ql_success_count >= 3:
+                g_s3ql_success_count = 0
                 if not g_s3ql_on:
                     # inform savebox to restart their services
                     log.debug('S3QL is up again. Notify SAVEBOX to restart services.')
                     _notify_savebox(0, "SAVEBOX is ready.")
-                    g_s3ql_success_count = 0
+                    _show_led(2)
                     g_s3ql_on = True
     except Exception as Err:
         log.error("Unable to get indicators")
