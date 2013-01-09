@@ -129,7 +129,7 @@ def main(args=None):
                                                   options.metadata_upload_interval, var_container)
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
                              options.cachesize * 1024, options.max_cache_entries)
-    commit_thread = CommitThread(block_cache)
+    commit_thread = CommitThread(block_cache, var_container)
     closecache_thread = CloseCacheThread(block_cache)
     operations = fs.Operations(block_cache, db, var_container, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
@@ -821,11 +821,12 @@ class CommitThread(Thread):
     '''
 
 
-    def __init__(self, block_cache):
+    def __init__(self, block_cache, var_container):
         super(CommitThread, self).__init__()
         self.block_cache = block_cache
         self.stop_event = threading.Event()
         self.name = 'CommitThread'
+        self.var_container = var_container
 
 # Start/stop of dirty cache uploading is controlled by ctrl.py using uploadon / uploadoff parameters
     def run(self):
@@ -836,6 +837,10 @@ class CommitThread(Thread):
         
         # wthung, 2013/1/2, check 98% full
         self.block_cache.check_cache_capacity()
+
+        # check if dirty size/entry is > 0
+        if self.block_cache.dirty_size > 0 or self.block_cache.dirty_entries > 0:
+            self.var_container.dirty_metadata = True
         
         while not self.stop_event.is_set():
             did_sth = False
