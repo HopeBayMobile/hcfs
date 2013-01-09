@@ -37,6 +37,7 @@ def set_upgrade_status(val):
         fh = open(status_file, 'w')
         fh.write( str(val) )
         op_ok = True
+        fh.close()
     except Exception as e:
         logger.debug(str(e))
         print(str(e))
@@ -78,6 +79,7 @@ def get_upgrade_status(unittest=False, test_param=None):
             ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
+            fh.close()
             progress = get_download_progress()
             if progress == -1:
                 set_upgrade_status(1)
@@ -86,6 +88,7 @@ def get_upgrade_status(unittest=False, test_param=None):
             if code == 7:   ## check if downloaded package has been expired
                 fh = open(pkg_version_file, 'r')
                 downloaded_ver = fh.read()
+                fh.close()
                 latest_ver = json.loads(upgrade_info)['version']
                 if downloaded_ver != latest_ver:
                     print "downloaded package is expired."
@@ -199,6 +202,7 @@ def get_available_upgrade(unittest=False, test_param=None):
             else:
                 with open(gateway_ver_file, 'r') as fh:
                     res = fh.readline()
+                    fh.close()
 
             # if the result is '', it means no available update.
             if len(res) < 5:
@@ -218,6 +222,7 @@ def get_available_upgrade(unittest=False, test_param=None):
                 description = ''
                 fh = open(status_file, 'r')
                 code = int( fh.read() )
+                fh.close()
                 if code == 1:
                     set_upgrade_status(3)
         except:
@@ -327,6 +332,7 @@ def download_package(unittest=False, test_param=None):
             ver = json.loads(upgrade_info)['version']
             fh = open(pkg_version_file, 'w')
             fh.write( ver )
+            fh.close()
             ## assign return values
             op_ok = True
             op_code = 0x16            
@@ -361,6 +367,7 @@ def get_download_progress(unittest=False, test_param=None):
         try:
             fh = open(progress_file, 'r')
             op_progress = int( fh.read() )
+            fh.close()
         except Exception as e:
             logger.debug(str(e))
             code = 0
