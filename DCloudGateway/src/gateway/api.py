@@ -3299,9 +3299,7 @@ def _get_storage_capacity():
                                     "cloud_data" : 0,
                                     "cloud_data_dedup" : 0,
                                     "cloud_data_dedup_compress" : 0,
-                                    # wthung, 2012/8/17
-                                    # add cloud_capacity. now set to 1TB always
-                                    "cloud_capacity": 1099511627776
+                                    "cloud_capacity": 0
                                   },
               "gateway_cache_usage"   :  {
                                     "max_cache_size" : 0,
@@ -3404,6 +3402,13 @@ def _get_storage_capacity():
                     max_tokens = str(max_size).strip().split(" ")
                     max_val = max_tokens[0]
                     ret_usage["gateway_cache_usage"]["dirty_cache_entries"] = max_val
+                
+                # cloud capacity is the quota value
+                if line.startswith("Quota:"):
+                    tokens = line.split(":")
+                    val = tokens[1].replace("MB", "").strip()
+                    real_cloud_cap = float(val)
+                    ret_usage["cloud_storage_usage"]["cloud_capacity"] = int(float(val) * 1024 ** 2)
 
     except Exception:
         if enable_log:
