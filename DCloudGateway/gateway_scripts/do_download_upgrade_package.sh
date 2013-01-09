@@ -38,7 +38,7 @@ then
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
         #~ write an error log
-        apt-get clean
+        rm -rf $TMP_PATH    ## clear unfinished files
         /usr/local/TOMCAT/bin/cafeLogLiteSingle.sh API_REMOTE_UPGRADE ERROR 'Download upgrade failed. Update server disconnected during downloading upgrade package.'
         PID=$(ps aux | grep -w "get_download_progress" | head -1 | awk '{ print $2 }')
         kill -9 $PID
