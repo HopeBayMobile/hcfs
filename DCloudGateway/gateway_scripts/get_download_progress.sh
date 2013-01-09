@@ -26,7 +26,7 @@ TMP_PATH="/tmp/debsrc"
     do
         #~ DOWNLOADED=`du -s $TMP_PATH |  cut -d '/' -f 1`
         DOWNLOADED=`du -sb $TMP_PATH |  cut -d '/' -f 1`
-        let PROGRESS=1000*$DOWNLOADED/$TOTAL_SIZE
+        let PROGRESS=100*$DOWNLOADED/$TOTAL_SIZE
         if [ $PROGRESS -ge 100 ]
         then
             PROGRESS=100

@@ -33,7 +33,7 @@ then
         cp *.deb $DEB_PATH
         dpkg-scanpackages $DEB_PATH > $DEB_PATH/Packages
         gzip -f $DEB_PATH/Packages
-        apt-get update
+        #~ apt-get update
         ## change upgrade status
         echo '7' > $STATUS_FILE     ## 7 = DOWNLOAD_DONE
     else
@@ -43,7 +43,7 @@ then
         PID=$(ps aux | grep -w "get_download_progress" | head -1 | awk '{ print $2 }')
         kill -9 $PID
         echo '-1' > $PROGRESS_FILE     ## -1 = download failed
-        echo '' > $PKG_VER_FILE     ## clean downloaded version file
+        echo 'na' > $PKG_VER_FILE     ## clean downloaded version file
     fi
     # unlock
     rm $LOCK_FILE

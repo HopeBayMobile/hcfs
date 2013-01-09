@@ -14,12 +14,14 @@ then
     apt-get install -y --force-yes dcloud-gateway dcloudgatewayapi s3ql
     if [ $? != 0 ]; then
         bash /etc/delta/LED_controller.sh 2       # stop blink LED
-        exit $?
+        dpkg --configure -a
+        reboot
     fi
     apt-get install --reinstall -y --force-yes savebox
     if [ $? != 0 ]; then
         bash /etc/delta/LED_controller.sh 2       # stop blink LED
-        exit $?
+        dpkg --configure -a
+        reboot
     fi
     ## change upgrade status
     echo '1' > $STATUS_FILE     ## 1 = NO_UPGRADE_AVAILABLE
