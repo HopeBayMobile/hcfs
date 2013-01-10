@@ -31,7 +31,7 @@ TMP_PATH="/tmp/debsrc"
         then
             PROGRESS=100
         fi
-        echo "=== download progress = $PROGRESS % ==="
+        #~ echo "=== download progress = $PROGRESS % ==="
         echo $PROGRESS > $PROGRESS_FILE
         UPGRADE_STATUS=`cat $STATUS_FILE`
         sleep 1

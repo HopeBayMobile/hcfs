@@ -110,7 +110,9 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     #cp -rf $SRCDIR/config/smb.orig $CONFDIR
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
-
+    # Yen added at 2013/01/10
+    cp -rf $SRCDIR/config/gateway_upgrade.status /var/log/
+    
     #-- Ovid Wu <ovid.wu@delta.com.tw> Wed, 01 Aug 2012 05:34:41 +0000
     # the permission of sudoers_delta is required 0440
     chmod 0440 /etc/sudoers.d/sudoers_delta

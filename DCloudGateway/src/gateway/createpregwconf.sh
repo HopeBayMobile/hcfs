@@ -24,6 +24,7 @@ script
     while [ \$UPGRADE_STATUS -eq 9 ]
     do
         UPGRADE_STATUS=\`cat \$STATUS_FILE\`
+        sleep 1
     done
 
     su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
