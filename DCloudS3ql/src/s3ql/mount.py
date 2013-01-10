@@ -843,8 +843,10 @@ class CommitThread(Thread):
         if self.block_cache.dirty_size > 0 or self.block_cache.dirty_entries > 0:
             self.var_container.dirty_metadata = True
 
+        sweep_completed = False
         while not self.stop_event.is_set():
             did_sth = False
+            sweep_completed = True
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
             if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
@@ -878,9 +880,10 @@ class CommitThread(Thread):
                         continue
 
                     if (time.time() - self.block_cache.last_write_time) < 10:
-                        log.info('delaying cache sync due to file write')
+                        log.debug('delaying cache sync due to file write')
                         self.stop_event.wait(10)
-                        log.info('End of delay')
+                        log.debug('End of delay')
+                        sweep_completed = False
                         break
 
                     # Jiahong: (5/7/12) delay upload process if network is down
@@ -894,6 +897,7 @@ class CommitThread(Thread):
                             log.error('Network appears to be down. Delaying cache upload.')
                             self.stop_event.wait(60)
                             self.block_cache.network_ok = False
+                            sweep_completed = False
                             break
                     else:
                         test_connection = test_connection + 1
@@ -901,6 +905,7 @@ class CommitThread(Thread):
                     # Acquire global lock to access UploadManager instance
                     with llfuse.lock:
                         if self.stop_event.is_set():
+                            sweep_completed = False
                             break
                         # Object may have been accessed while waiting for lock
                         if not (el.dirty and (el.inode, el.blockno) not in self.block_cache.in_transit):
@@ -912,6 +917,7 @@ class CommitThread(Thread):
                     did_sth = True
 
                     if self.stop_event.is_set():
+                        sweep_completed = False
                         break
             else:  # Added by Jiahong on 12/7/12 to handle inconsistent number of dirty cache entries 
                 most_recent_access = 0
@@ -927,13 +933,14 @@ class CommitThread(Thread):
                         dirty_cache_size += el.size
 
                     total_cache_size += el.size
+                sweep_completed = True
 
             if have_dirty_cache:
                 log.debug('Computed cache status in committhread: Most_recent_access %d, Have dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
             else:
                 log.debug('Computed cache status in committhread: Most_recent_access %d, No dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
 
-            if time.time() - most_recent_access > 60 and ((have_dirty_cache is False and self.block_cache.dirty_entries > 0) or total_cache_size != self.block_cache.size or dirty_cache_size != self.block_cache.dirty_size):
+            if sweep_completed is True and time.time() - most_recent_access > 60 and ((have_dirty_cache is False and self.block_cache.dirty_entries > 0) or total_cache_size != self.block_cache.size or dirty_cache_size != self.block_cache.dirty_size):
                 log.info('Potential cache size inconsistency detected. Conducting sweeping.')
                 with llfuse.lock:
                     real_total_cache_size = 0
