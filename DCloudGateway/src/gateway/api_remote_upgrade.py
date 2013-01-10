@@ -94,7 +94,8 @@ def get_upgrade_status(unittest=False, test_param=None):
                     set_upgrade_status(3)
                     
         except Exception as e:
-            #~ set_upgrade_status(1)   ## in case of status file is not generated
+            if not os.path.isfile(status_file):
+                set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
             code = 0
             progress = 0
