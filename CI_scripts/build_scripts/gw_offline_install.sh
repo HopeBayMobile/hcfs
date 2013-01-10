@@ -76,8 +76,6 @@ apt-get upgrade -y --force-yes		# upgrade packages, e.g. ntp
     mv /tmp/nmbd.conf /etc/init/
     mv /tmp/smbd.conf /etc/init/
     # install language packs
-    echo "        ***** Install language packs *****"
-    sudo apt-get install language-pack-zh-hant
 
 
 ## run gateway installation
