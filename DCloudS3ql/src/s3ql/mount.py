@@ -827,6 +827,7 @@ class CommitThread(Thread):
         self.stop_event = threading.Event()
         self.name = 'CommitThread'
         self.var_container = var_container
+        self.pid = os.getpid()
 
 # Start/stop of dirty cache uploading is controlled by ctrl.py using uploadon / uploadoff parameters
     def run(self):
@@ -841,7 +842,9 @@ class CommitThread(Thread):
         # check if dirty size/entry is > 0
         if self.block_cache.dirty_size > 0 or self.block_cache.dirty_entries > 0:
             self.var_container.dirty_metadata = True
-        
+
+        self.check_last_write_time()
+
         while not self.stop_event.is_set():
             did_sth = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
@@ -876,6 +879,12 @@ class CommitThread(Thread):
                     if stamp - el.last_access < 60:
                         continue
 
+                    if (time.time() - self.block_cache.last_write_time) < 10:
+                        log.info('delaying cache sync due to file write')
+                        self.stop_event.wait(10)
+                        log.info('End of delay')
+                        break
+
                     # Jiahong: (5/7/12) delay upload process if network is down
                     if test_connection >= 100:
                         try:
@@ -906,7 +915,7 @@ class CommitThread(Thread):
 
                     if self.stop_event.is_set():
                         break
-            else:  # Added by Jiahong on 12/7/12 to handle inconsisteny number of dirty cache entries 
+            else:  # Added by Jiahong on 12/7/12 to handle inconsistent number of dirty cache entries 
                 most_recent_access = 0
                 have_dirty_cache = False
                 total_cache_size = 0
