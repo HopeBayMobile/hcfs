@@ -64,7 +64,7 @@ def set_http_proxy(setting):
             cmd = 'sudo python /etc/delta/save_conf.py'
             subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except Exception as e:
-            log.error('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
+            log.debug('Failed to save squid3 start_on_boot setting. Error=%s' % str(e))
     else:
         # current proxy status is not the same as api set
         op_ok = False

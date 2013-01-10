@@ -144,17 +144,17 @@ def thread_cache_usage():
             if cache_percent <= criteria_low:
                 g_prev_cache_full_log = False
             elif cache_percent >= criteria_high and not g_prev_cache_full_log:
-                log.info('Full cache')
+                log.debug('Full cache')
                 g_prev_cache_full_log = True
 
             # check cache entries number
             if entries_percent <= criteria_low:
                 g_prev_entries_full_log = False
             elif entries_percent >= criteria_high and not g_prev_entries_full_log:
-                log.info('Full cache entries')
+                log.debug('Full cache entries')
                 g_prev_entries_full_log = True
         else:
-            log.error('Get negative max cache size or max entries')
+            log.debug('Get negative max cache size or max entries')
     
         # sleep for some time by a for loop in order to break at any time
         for _ in range(20):
@@ -234,7 +234,7 @@ def thread_netspeed():
             # todo: may need to return speed of eth0 as well
             ret_val = api.calculate_net_speed('eth1')
         except:
-            log.error('Got exception from calculate_net_speed()')
+            log.debug('Got exception from calculate_net_speed()')
 
         # serialize json object to file
         with open(netspeed_file, 'w') as fh:
@@ -380,8 +380,8 @@ def get_gw_indicator():
             g_swift_disconnect_count += 1
 
     except Exception as err:
-        log.error("Unable to get indicators")
-        log.error("Error message: %s" % str(err))
+        log.debug("Unable to get indicators")
+        log.debug("Error message: %s" % str(err))
 
     if 'result' in return_val:
         return return_val['result']
@@ -409,7 +409,7 @@ def _get_storage_info():
         password = config.get(section, 'backend-password')
 
     except Exception as e:
-        log.error("Failed to get storage info: %s" % str(e))
+        log.debug("Failed to get storage info: %s" % str(e))
     finally:
         pass
     return (storage_url, account, password)
@@ -439,7 +439,7 @@ def _upload_usage_data(usage):
             log.debug('Uploaded SAVEBOX total usage to cloud storage (%d)' % usage)
         else:
             err_msg = 'Uploading SAVEBOX data usage to cloud storage failed.'
-            log.warning(err_msg)
+            log.debug(err_msg)
             log.debug('%s. %s' % (err_msg, output))
     
     # remove the temp file
@@ -469,7 +469,7 @@ def _get_gateway_quota():
                     return meta_quota 
         else:
             err_msg = 'Getting SAVEBOX quota failed.'
-            log.warning(err_msg)
+            log.debug(err_msg)
             log.debug('%s. %s' % (err_msg, output))
     
     # return -1 if quota cannot be retrieved
@@ -498,7 +498,7 @@ def enableSMART(disk):
                     enable_ok = True
                     break                              
         else:
-            log.error('Some error occurred when enable the SMART control of %s' % disk)
+            log.debug('Some error occurred when enable the SMART control of %s' % disk)
             
     except:
         pass    
@@ -539,7 +539,7 @@ def check_RAID_rebuild(disk):
                             is_rebuilding = True
                             break
             else:
-                log.error('Some error occurred when checking whether %s is rebuilding RAID' % disk)
+                log.debug('Some error occurred when checking whether %s is rebuilding RAID' % disk)
     except Exception:
         pass
             
@@ -591,7 +591,7 @@ def get_HDD_status():
                     else:                         
                         single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
                 else:
-                    log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
+                    log.warning("%s (SN: %s) SMART test result: NOT PASSED" % (i, get_serial_number(i)))  
                     single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
                 
                 _data.append(single_hdd)        
@@ -723,7 +723,7 @@ def start_background_tasks(singleloop=False):
         if ret:
             pass
         else:
-            log.error("Failed to get indicator")
+            log.debug("Failed to get indicator")
 
         # in single loop mode, set global flag to true
         if singleloop:

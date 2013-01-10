@@ -81,14 +81,13 @@ class SwiftClient():
             if filename in returnData[1].strip():
                 return True
             else:
-                log.error('swift upload fail: %s' % returnData[1])
+                log.debug('swift upload fail: %s' % returnData[1])
                 raise SwiftUploadError('swift upload fail - error message: %s'
                                        % returnData[1])
         except SwiftUploadError:
             raise
         except Exception as e:
-            print e
-            log.error('exception message: %s' % str(e))
+            log.debug('exception message: %s' % str(e))
             raise SwiftCommandError()
 
     def delete(self, container, filename):
@@ -107,14 +106,13 @@ class SwiftClient():
             if returnData[1].strip() == filename:
                 return True
             else:
-                log.error('swift delete fail: %s' % returnData[1])
+                log.debug('swift delete fail: %s' % returnData[1])
                 raise SwiftDeleteError('swift delete fail - error message: %s'
                                        % returnData[1])
         except SwiftDeleteError:
             raise
         except Exception as e:
-            print e
-            log.error('exception message: %s' % str(e))
+            log.debug('exception message: %s' % str(e))
             raise SwiftCommandError()
 
 

@@ -33,7 +33,7 @@ def _get_Swift_credential():
         password = config.get(section, 'backend-password')
 
     except Exception as e:
-        log.error("Failed to _get_Swift_credential for %s" % str(e))
+        log.debug("Failed to _get_Swift_credential for %s" % str(e))
     finally:
         log.debug("_get_Swift_credential end")
     return [url, login, password]
@@ -204,7 +204,7 @@ def save_gateway_configuration():
     except BackupError as e:
         return json.dumps(return_val)
     except Exception as e:
-        log.error('unexception error: %s' % e)
+        log.debug('unexception error: %s' % e)
 
 
 #----------------------------------------------------------------------
