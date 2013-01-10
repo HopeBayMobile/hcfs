@@ -846,7 +846,7 @@ class CommitThread(Thread):
         sweep_completed = False
         while not self.stop_event.is_set():
             did_sth = False
-            sweep_completed = True
+            sweep_completed = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
             if self.block_cache.do_upload or self.block_cache.forced_upload or self.block_cache.snapshot_upload:
                 stamp = time.time()
@@ -858,6 +858,7 @@ class CommitThread(Thread):
                 have_dirty_cache = False
                 total_cache_size = 0
                 dirty_cache_size = 0
+                sweep_completed = True
 
                 for el in self.block_cache.entries.values_rev():
                     if (most_recent_access < el.last_access):
