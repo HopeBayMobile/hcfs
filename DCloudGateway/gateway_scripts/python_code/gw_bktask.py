@@ -636,26 +636,23 @@ def update_bandwidth():
 
     global g_program_exit
 
-    now_bw = 1 # 0 full bandwidth / 1 configured bandwidth
-    full_bw = 1024 * 1024
+    pre_bw = 1 # default using configured bandwidth 
+    now_bw = 1 # 0 means full bandwidth / 1 means configured bandwidth
 
     while not g_program_exit:
-        if os.path.exists('/dev/shm/forced_upload'):
-            if now_bw == 0:
-                pass
-            else:
-                bw.set_bandwidth(full_bw)
-                cmd = "/etc/delta/uploadon"
-                os.system(cmd)
-                now_bw = 0
-
+       
+        if os.path.exists('/dev/shm/forced_uplaod'):
+            now_bw = 0
         else:
-            if now_bw == 0:
-                cmd = "/etc/delta/update_bandwidth"
-                os.system(cmd)
-                now_bw = 1
-            else:
-                pass
+            now_bw = 1
+
+        if now_bw == pre_bw:
+            pass 
+        else:
+            cmd = ("/etc/delta/update_bandwidth")
+            os.system(cmd)
+        
+        pre_bw = now_bw
 
         for _ in range(10):
             time.sleep(1)

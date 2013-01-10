@@ -36,10 +36,6 @@ def get_scheduled_bandwidth(weekday, hour, schedule):
 
 def main():
 
-    # s3ql start to forced upload, discard the bandwidth scheduling
-    if os.path.exists('/dev/shm/forced_upload'):
-        return 
-
     retry_max = 10;
     while (not os.path.exists('/mnt/cloudgwfiles/nfsshare')) and (retry_max>0):
         time.sleep(1)
@@ -68,7 +64,11 @@ def main():
 
 # find the scheduled bandwidth for now
     bw = 1024 * 1024    # set default bandwidth if it is not defined in cfg file
-    bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
+    # s3ql start to forced upload, discard the bandwidth scheduling
+    if os.path.exists('/dev/shm/forced_upload'):
+        bw2 = bw
+    else:
+        bw2 = get_scheduled_bandwidth(weekday, hour, schedule)
     if bw2 < 0:
         bw2 = bw
     if (bw2 == 0):		# bandwidth is set to 0 means the client wants to turn-off uploading
