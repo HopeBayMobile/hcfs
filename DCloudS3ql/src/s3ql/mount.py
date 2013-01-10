@@ -843,8 +843,6 @@ class CommitThread(Thread):
         if self.block_cache.dirty_size > 0 or self.block_cache.dirty_entries > 0:
             self.var_container.dirty_metadata = True
 
-        self.check_last_write_time()
-
         while not self.stop_event.is_set():
             did_sth = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
