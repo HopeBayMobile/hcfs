@@ -19,5 +19,5 @@ if __name__ == '__main__':
         
         log.debug('Squid3 status in bootup is %s' % setting)
     except Exception as e:
-        log.error('Error occurred when setting squid3 status at bootup')
-        log.error('%s' % str(e))
+        log.debug('Error occurred when setting squid3 status at bootup')
+        log.debug('%s' % str(e))

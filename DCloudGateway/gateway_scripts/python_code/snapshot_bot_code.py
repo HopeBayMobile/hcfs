@@ -272,8 +272,7 @@ def _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, start_time, finish
               "size": size,
               "result": result,
               "err_msg": err_msg}
-    #print('set snapshot task')
-    #print values
+    
     data = json.dumps(values)
     post_url = "http://127.0.0.1:80/restful/services/snapshot2/result/set"
     req = urllib2.Request(post_url, data, {'Content-Type': 'application/json'})
@@ -292,8 +291,7 @@ def _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, start_time, finish
         response = e.reason
     except Exception as e:
         response = str(e)
-    #print('after set snapshot task')
-    #print('code: %d, response=%s' % (code, response))
+    
     return {"code": code, "response": response}
         
 def execute_take_snapshot():
@@ -318,7 +316,7 @@ def execute_take_snapshot():
             #print response
             
             if ret_val["code"] != 200:
-                log.error('Failed to get snapshot task. Response: %s' % response)
+                log.debug('Failed to get snapshot task. Response: %s' % response)
                 os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                 break
 
@@ -344,7 +342,7 @@ def execute_take_snapshot():
                 ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, 0, 0, 0, 0, False, err_msg)
                 response = json.loads(ret_val["response"])
                 if ret_val["code"] != 200 or response["statuscode"] != 200:
-                    log.error('Failed to report snapshot task status (id: %s)' % (sid))
+                    log.debug('Failed to report snapshot task status (id: %s)' % (sid))
                 time.sleep(3)
                 continue
             
@@ -369,7 +367,7 @@ def execute_take_snapshot():
                 else:
                     # s3qlcp failed
                     err_msg = 'Unexpected errors occurred when taking snapshots. Aborting...'
-                    log.error(err_msg)
+                    log.debug(err_msg)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     
                     finish_time = time.time()
@@ -377,7 +375,7 @@ def execute_take_snapshot():
                     ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, start_time, finish_time, 0, 0, False, err_msg)
                     response = json.loads(ret_val["response"])
                     if ret_val["code"] != 200 or response["statuscode"] != 200:
-                        log.error('Failed to report snapshot task status (id: %s)' % (sid))
+                        log.debug('Failed to report snapshot task status (id: %s)' % (sid))
                     time.sleep(3)
                     continue
             else:
@@ -385,7 +383,7 @@ def execute_take_snapshot():
                 if not os.path.exists(snapshot_statistics):
                     # Statistics does not exists
                     err_msg = 'Reading snapshot statistics failed. Please make sure the latest S3QL version was installed.'
-                    log.warning(err_msg)
+                    log.debug(err_msg)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     
                     finish_time = time.time()
@@ -393,7 +391,7 @@ def execute_take_snapshot():
                     ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, start_time, finish_time, 0, 0, False, err_msg)
                     response = json.loads(ret_val["response"])
                     if ret_val["code"] != 200 or response["statuscode"] != 200:
-                        log.error('Failed to report snapshot task status (id: %s). Response: %s' % (sid, response))
+                        log.debug('Failed to report snapshot task status (id: %s). Response: %s' % (sid, response))
                     time.sleep(3)
                     continue
 
@@ -419,168 +417,15 @@ def execute_take_snapshot():
                 ret_val = _post_snapshot_task(sid, sf_uid, src_folder, dest_folder, start_time, finish_time, ss_files, ss_size, True, None)
                 response = json.loads(ret_val["response"])
                 if ret_val["code"] != 200 or response["statuscode"] != 200:
-                    log.error('Failed to report snapshot task status (id: %s)' % (sid))
+                    log.debug('Failed to report snapshot task status (id: %s)' % (sid))
 
                 time.sleep(3)
         except Exception:
             raise
 
-#def execute_take_snapshot():
-#    """
-#    Main function for taking the snapshots.
-#    """
-#    log.debug('Begin snapshotting bot tasks')
-#
-#    if not snapshot._check_snapshot_in_progress():
-#        # if we are initializing a new snapshot process
-#        try:
-#            os.system("sudo touch %s" % snapshot.snapshot_tag)  # Tag snapshotting
-#            new_database_entry()
-#        except snapshot.SnapshotError as Err:
-#            err_msg = str(Err)
-#            log.error('Unexpected error in snapshotting.')
-#            log.error('Error message: %s' % err_msg)
-#            return
-#    else:
-#        if actually_not_in_progress():
-#            # Check if there is actually a "new_snapshot" entry in database
-#            recover_database()    # Fix the snapshot entry and database
-## Note: The database could be updated but the snapshot directory is not
-## renamed or locked. Remove tag after this.
-#            return
-#        else:  # A snapshotting is in progress
-#            pass
-#
-#    finish = False
-#
-#    while not finish:
-#        try:
-#            # Check if file system is still up
-#            if not os.path.exists(samba_folder):
-#                return
-#
-#            if os.path.exists(temp_folder):
-#                os.system("sudo rm -rf %s" % temp_folder)
-#
-#            if os.path.exists(snapshot_statistics):
-#                os.system('sudo rm -rf %s' % snapshot_statistics)
-#
-#            # Attempt the actual snapshotting again
-#
-#            os.system("sudo mkdir %s" % temp_folder)
-#            cmd = "sudo python /usr/local/bin/s3qlcp %s %s/sambashare"\
-#                                % (samba_folder, temp_folder)
-#            po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,\
-#                                stderr=subprocess.STDOUT)
-#            output = po.stdout.read()
-#            po.wait()
-#
-#            if po.returncode != 0:
-#                if output.find("Dirty cache has not been completely flushed")\
-#                              != -1:
-#                    time.sleep(60)  # Wait one minute before retrying
-#                else:
-#                    # Check if file system is still up
-#                    if not os.path.exists(samba_folder):
-#                        return
-#
-#                    invalidate_entry()  # Cannot finish the snapshot for some reason
-#                    log.error('Unable to finish the current snapshotting process. Aborting.')
-#                    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
-#                    return
-#            else:
-#                # Record statistics for samba share
-#
-#                if not os.path.exists(snapshot_statistics):
-#                    # Statistics does not exists
-#                    log.warning('Unable to read snapshot statistics. Do we have the latest S3QL?')
-#                    invalidate_entry()  # Cannot finish the snapshot for some reason
-#                    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
-#                    return
-#
-#                with open(snapshot_statistics, 'r') as fh:
-#                    for lines in fh:
-#                        if lines.find("total files") != -1:
-#                            samba_files = int(lines.lstrip('toal fies:'))
-#                        if lines.find("total size") != -1:
-#                            samba_size = int(lines.lstrip('toal size:'))
-#                samba_size = int(samba_size / 1000000)
-#                os.system('sudo rm -rf %s' % snapshot_statistics)
-#
-#                cmd = "sudo python /usr/local/bin/s3qlcp %s %s/nfsshare" % (nfs_folder, temp_folder)
-#                po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-#                output = po.stdout.read()
-#                po.wait()
-#
-#                if po.returncode != 0:
-#                    if output.find("Dirty cache has not been completely flushed") != -1:
-#                        time.sleep(60)  # Wait one minute before retrying
-#                    else:
-#                        # Check if file system is still up
-#                        if not os.path.exists(samba_folder):
-#                            return
-#
-#                        invalidate_entry()
-#                        log.error('Unable to finish the current snapshotting process. Aborting.')
-#                        os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
-#                        return
-#                else:
-#                    # Record statistics for NFS share
-#
-#                    if not os.path.exists(snapshot_statistics):
-#                        # Statistics does not exists
-#                        log.warning('Unable to read snapshot statistics. Do we have the latest S3QL?')
-#                        invalidate_entry()  # Cannot finish the snapshot for some reason
-#                        os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
-#                        return
-#
-#                    with open(snapshot_statistics, 'r') as fh:
-#                        for lines in fh:
-#                            if lines.find("total files") != -1:
-#                                nfs_files = int(lines.lstrip('toal fies:'))
-#                            if lines.find("total size") != -1:
-#                                nfs_size = int(lines.lstrip('toal size:'))
-#                    nfs_size = int(nfs_size / 1000000)
-#                    os.system('sudo rm -rf %s' % snapshot_statistics)
-#
-#                    finish = True
-#        except Exception:
-#            # Check if file system is still up
-#            if not os.path.exists(samba_folder):
-#                return
-#            raise
-#
-#    # Begin post-processing snapshotting
-#    # Update database
-#    finish_time = time.time()
-#    ftime_format = time.localtime(finish_time)
-#    new_snapshot_name = "snapshot_%s_%s_%s_%s_%s_%s" % (ftime_format.tm_year,\
-#              ftime_format.tm_mon, ftime_format.tm_mday, ftime_format.tm_hour,\
-#              ftime_format.tm_min, ftime_format.tm_sec)
-#    update_new_entry(new_snapshot_name, finish_time, samba_files + nfs_files,\
-#              samba_size + nfs_size)
-#    
-#    # wthung, 2012/7/23
-#    # auto expose this new created snapshot
-#    snapshot.expose_snapshot(new_snapshot_name, True)
-#
-#    # Make necessary changes to the directory structure and lock the snapshot
-#    if not os.path.exists(snapshot.snapshot_dir):
-#        os.system('sudo mkdir %s' % snapshot.snapshot_dir)
-#    new_snapshot_path = os.path.join(snapshot.snapshot_dir, new_snapshot_name)
-#    os.system('sudo mv %s %s' % (temp_folder, new_snapshot_path))
-#    os.system('sudo chown %s %s' % (samba_user, new_snapshot_path))
-#    os.system('sudo python /usr/local/bin/s3qllock %s' % (new_snapshot_path))
-#    os.system('sudo python /usr/local/bin/s3qlctrl upload-meta %s' % mount_point)
-#    os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
-#    
-#
-#    log.debug('Snapshotting finished at %s' % str(ftime_format))
-
-################################################################
 
 if __name__ == '__main__':
     try:
         execute_take_snapshot()
     except Exception as err:
-        log.error('%s' % str(err))
+        log.debug('%s' % str(err))

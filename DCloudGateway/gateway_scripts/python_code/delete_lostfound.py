@@ -35,5 +35,5 @@ if __name__ == '__main__':
         check_lostfound_delete()
         log.debug('Finished checking for unlinked data in lost+found')
     except Exception as err:
-        log.error('Error in deleting unlinked data in lost+found')
-        log.error('%s' % str(err))
+        log.debug('Error in deleting unlinked data in lost+found')
+        log.debug('%s' % str(err))

@@ -86,7 +86,7 @@ class BackupToCloud():
                 shutil.copy2(filename, TEMP_PATH)
                 i = i + 1
             else:
-                log.warning('File(%s) is not exist' % filename)
+                log.debug('File(%s) is not exist' % filename)
         #print self._metaData
         try:
             with open(''.join([TEMP_PATH, '/metadata.txt']), 'w+') as fd:
