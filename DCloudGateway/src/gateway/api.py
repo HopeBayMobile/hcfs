@@ -1406,7 +1406,7 @@ def _mkfs(storage_url, key, container):
                             raise RuntimeError
                         break
     except Exception as e:
-        log.error('_mkfs error: %s' % str(e))
+        log.debug('_mkfs error: %s' % str(e))
         raise
 
     log.debug("_mkfs end")
