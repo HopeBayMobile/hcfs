@@ -640,7 +640,7 @@ def update_bandwidth():
 
     while not g_program_exit:
        
-        if os.path.exists('/dev/shm/forced_uplaod'):
+        if os.path.exists('/dev/shm/forced_upload'):
             now_bw = 0
         else:
             now_bw = 1
