@@ -232,8 +232,9 @@ def _notify_savebox(status, msg):
         response = str(e)
     
     if code != 200:
-        log.warning('Failed to report system status.')
-        log.debug('Failed to report system status. HTTP code = %d, response = %s' % (code, response))
+        err_msg = 'Reporting SAVEBOX system status failed.'
+        log.warning(err_msg)
+        log.debug('%s HTTP code = %d, response = %s' % (err_msg, code, response))
     
     return {"code": code, "response": response}
 
@@ -291,8 +292,7 @@ def _get_s3ql_db_name():
                 and item.find('wal') == -1:
                 db_name = item
     except Exception as e:
-        #log.error('Failed to get S3QL metadata DB name: %s.' % str(e))
-        print('Failed to get S3QL metadata DB name: %s.' % str(e))
+        log.debug('Getting S3QL metadata DB name failed. %s.' % str(e))
     finally:
         return db_name
         
@@ -314,7 +314,7 @@ def _get_storage_account():
         section = "CloudStorageGateway"
         op_account = op_config.get(section, 'backend-login')
     except Exception as e:
-        log.debug("Failed to _get_storage_account: %s" % str(e))
+        log.debug("Getting cloud storage account failed. %s" % str(e))
     
     return op_account
 
@@ -337,7 +337,7 @@ def getStorageUrl():
         section = "CloudStorageGateway"
         storage_url = config.get(section, 'storage-url').replace("swift://", "")
     except Exception as e:
-        log.debug("Failed to getStorageUrl: %s" % str(e))
+        log.debug("Getting cloud storage URL failed. %s" % str(e))
     finally:
         log.debug("getStorageUrl end")
     return storage_url
@@ -368,7 +368,7 @@ def get_compression():
             op_switch = False
 
         op_ok = True
-        op_msg = "Succeeded to get_compression"
+        op_msg = "Getting status of SAVEBOX file system compression was successful."
 
     except GatewayConfError as e:
         op_msg = str(e)
@@ -376,7 +376,7 @@ def get_compression():
         op_msg = str(e)
     finally:
         if not op_ok:
-            log.error(op_msg)
+            log.debug(op_msg)
 
         return_val = {'result': op_ok,
                       'msg': op_msg,
@@ -539,7 +539,7 @@ def get_indicators():
                 if g_s3ql_on:
                     # inform savebox to shutdown their services
                     log.debug('S3QL is down. Notify SAVEBOX to shut down services.')
-                    _notify_savebox(3, "SAVEBOX is not ready.")
+                    _notify_savebox(3, "SAVEBOX file system is not ready.")
                     _show_led(3)
                     g_s3ql_on = False
         else:
@@ -550,12 +550,11 @@ def get_indicators():
                 if not g_s3ql_on:
                     # inform savebox to restart their services
                     log.debug('S3QL is up again. Notify SAVEBOX to restart services.')
-                    _notify_savebox(0, "SAVEBOX is ready.")
+                    _notify_savebox(0, "SAVEBOX file system is ready.")
                     _show_led(2)
                     g_s3ql_on = True
     except Exception as Err:
-        log.error("Unable to get indicators")
-        log.error("msg: %s" % str(Err))
+        log.debug("Getting SAVEBOX indicators failed. %s" % (str(Err)))
         return return_val
 
     return return_val
@@ -627,14 +626,14 @@ def get_gateway_indicators():
                 return_val['data']['HTTP_proxy_srv'] = _check_process_alive('squid3')
         else:
             # invoke regular function calls
-            log.info('No indicator file existed. Try to spend some time to get it')
+            log.debug('No indicator file existed. Try to spend some time to get it')
             return_val = get_indicators()
 
         # below call already checks netspeed indic file
         return_val2 = get_network_speed(MONITOR_IFACE)
            
     except Exception as Err:
-        log.error("msg: %s" % str(Err))
+        log.debug("msg: %s" % str(Err))
         return_val['data'].update(return_val2)
         return json.dumps(return_val)
 
@@ -679,11 +678,11 @@ def _traceroute_backend(backend_IP=None):
             op_msg = op_msg + '\nBackend url: ' + op_storage_url
 
     except IOError as e:
-            op_msg = 'Unable to access /root/.s3ql/authinfo2.'
-            log.error(str(e))
+        op_msg = 'Unable to access /root/.s3ql/authinfo2.'
+        log.debug(str(e))
     except Exception as e:
-            op_msg = 'Unable to obtain storage url or login info.'
-            log.error(str(e))
+        op_msg = 'Unable to obtain storage url or login info.'
+        log.debug(str(e))
 
     finally:
         log.debug("_traceroute_backend end")
@@ -733,14 +732,14 @@ def _check_network():
                     if output.find("Bytes:") != -1:
                         op_network_ok = True
         else:
-            log.info(output)
+            log.debug(output)
 
     except IOError as e:
-            log.error('Unable to access /root/.s3ql/authinfo2.')
-            log.error(str(e))
+            log.debug('Unable to access /root/.s3ql/authinfo2.')
+            log.debug(str(e))
     except Exception as e:
-            log.error('Unable to obtain storage url or login info.')
-            log.error(str(e))
+            log.debug('Unable to obtain storage url or login info.')
+            log.debug(str(e))
     finally:
         pass
     
@@ -769,7 +768,7 @@ def _check_process_alive(process_name=None):
                 if len(lines) > 2:
                     op = True
             else:
-                log.info(lines)
+                log.debug(lines)
         except:
             pass
 
@@ -828,7 +827,7 @@ def _get_serial_number(disk):
                 sn = line[index + len(target_str):]
                 break
         else:
-            log.error('Some error occurred when getting serial number of %s' % disk)
+            log.debug('Getting serial number of %s failed.' % disk)
     except:
         pass
     
@@ -855,10 +854,10 @@ def _check_HDD():
         # check if hdds number is 3. If not, report the serial number of alive hdd to log
         # wthung, 2012/10/3, now we only have 2 hdds
         if nu_all_disk < 2:
-            log.error('Some disks were lost. Please check immediately')
+            log.warning('Some disks were lost. Please check immediately')
             for disk in all_disk:
                 disk_sn = _get_serial_number(disk)
-                log.error('Alive disk serial number: %s' % disk_sn)
+                log.warning('Alive disk serial number: %s' % disk_sn)
             op_disk_num = False
     
         for i in all_disk:
@@ -871,7 +870,7 @@ def _check_HDD():
             if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
                 op_all_disk += 1 
             else:
-                log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
+                log.warning("%s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
         
         if (op_all_disk == len(all_disk)) and op_disk_num:
             op_HDD_ok = True
@@ -934,7 +933,7 @@ def _check_smb_service():
             if output.find("running") != -1:
                 op_SMB_srv = True
         else:
-            log.error(output)
+            log.debug(output)
 
         # if samba service is running, go check netbios
         if op_SMB_srv:
@@ -947,7 +946,7 @@ def _check_smb_service():
                 if output2.find("running") == -1:
                     op_SMB_srv = False
             else:
-                log.error(output)
+                log.debug(output)
 
     except:
         pass
@@ -1031,7 +1030,7 @@ def get_storage_account():
     except Exception as e:
         op_code = 0x8017
         op_msg = 'Obtaining storage url or login info failed.' 
-        log.error(str(e))
+        log.debug(str(e))
 
     return_val = {'result' : op_ok,
              'msg' : op_msg,
@@ -1111,9 +1110,9 @@ def apply_storage_account(storage_url, account, password, test=True):
     except IOError as e:
         op_code = 0x8003
         op_msg = 'File access failed.'
-        log.error(str(e))
+        log.debug(str(e))
     except Exception as e:
-        log.error(str(e))
+        log.debug(str(e))
 
     return_val = {'result' : op_ok,
           'msg': op_msg,
@@ -1157,7 +1156,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
             else:
                 op_code = 0x800A
                 op_msg = "Changing encryption key failed."
-                log.error(stdout)
+                log.debug(stdout)
             raise Exception(op_msg)
         
         op_config.set(section, 'bucket-passphrase', new_key)
@@ -1210,11 +1209,11 @@ def apply_user_enc_key(old_key=None, new_key=None):
     except IOError as e:
         op_code = 0x800C
         op_msg = 'Authentication file access failed.'
-        log.error(str(e))
+        log.debug(str(e))
     except UmountError as e:
         op_code = 0x800D
         op_msg = "Unmounting failed."
-        log.error(str(e))
+        log.debug(str(e))
         # undo the umount process
         _undo_umount()
     except common.TimeoutError as e:
@@ -1225,7 +1224,7 @@ def apply_user_enc_key(old_key=None, new_key=None):
         # change passphrase
         do_change_passphrase()
     except Exception as e:
-        log.error(str(e))
+        log.debug(str(e))
     finally:
         log.debug("apply_user_enc_key end")
 
@@ -1249,6 +1248,7 @@ def _createS3qlConf(storage_url, container):
     
     log.debug("_createS3qlConf start")
     ret = 1
+    err_msg = 'Creating SAVEBOX configuration failed.'
     try:
         config = getGatewayConfig()
         mountpoint = config.get("mountpoint", "dir")
@@ -1264,7 +1264,8 @@ def _createS3qlConf(storage_url, container):
     
         ret = po.returncode
         if ret != 0:
-            log.error("Failed to create s3ql config for %s" % output)
+            log.warning(err_msg)
+            log.debug(output)
                 
         storage_component = storage_url.split(":")
         storage_addr = storage_component[0]
@@ -1276,10 +1277,12 @@ def _createS3qlConf(storage_url, container):
 
         ret = po.returncode
         if ret != 0:
-            log.error("Failed to create s3ql config for %s" % output)
+            log.warning(err_msg)
+            log.debug(output)
 
     except Exception as e:
-        log.error("Failed to create s3ql config for %s" % str(e))
+        log.warning(err_msg)
+        log.debug(str(e))
     finally:
         log.debug("_createS3qlConf end")
     return ret
@@ -1297,7 +1300,7 @@ def _get_user_container_name(account):
     
     # check string format
     if not ":" in account:
-        log.error("Format error: Account name didn't contain ':'")
+        log.debug("Format error: Account name didn't contain ':'")
         return ""
     
     # try to get user name from account
@@ -1339,12 +1342,12 @@ def _check_container(storage_url, account, password):
         output = output.strip()
         if not "Bytes" in output:
             op_msg = "Failed to find user's container %s. Output=%s" % (user_container, output)
-            log.error(op_msg)
+            log.debug(op_msg)
             raise Exception(op_msg)
         else:
             log.debug('Found user container %s' % user_container)
     except Exception as e:
-        log.error(str(e))
+        log.debug(str(e))
         raise BuildGWError(0x8027, "Checking user container failed.")
         
     return user_container
@@ -1377,11 +1380,11 @@ def _mkfs(storage_url, key, container):
         if po.returncode != 0:
             if stderr.find("existing file system!") == -1:
                 op_msg = "Failed to mkfs for %s" % stderr
-                log.error(op_msg)
+                log.debug(op_msg)
                 raise BuildGWError(0x8028, "Making SAVEBOX file system failed.")
             else:
-                log.info("Found existing file system!")
-                log.info("Conducting forced file system check")
+                log.info("Found existing SAVEBOX file system.")
+                log.debug("Conducting forced file system check")
                 has_existing_filesys = True
 
                 cmd = "sudo python /usr/local/bin/fsck.s3ql --batch --force --authfile /root/.s3ql/authinfo2 --cachedir /root/.s3ql swift://%s/%s/delta" % (storage_url, container)
@@ -1393,7 +1396,7 @@ def _mkfs(storage_url, key, container):
                         # fsck not finished
                         countdown = countdown - 1
                         if countdown <= 0:
-                            log.error("Timed out during fsck.")
+                            log.debug("Timed out during fsck.")
                             raise RuntimeError
                         else:
                             time.sleep(1)
@@ -1510,22 +1513,22 @@ def _undo_umount():
         bind_path = '/mnt/cloudgwfiles/COSA /COSASTORAGE/ALFRESCO'
         ret_code, output = _run_subprocess("sudo mount -o bind %s" % bind_path)
         if ret_code:
-            log.error('Unable to bind %s: %s' % (bind_path, output))
+            log.debug('Unable to bind %s: %s' % (bind_path, output))
     
     # start nfs service
     ret_code, output = _run_subprocess("sudo /etc/init.d/nfs-kernel-server restart")
     if ret_code:
-        log.error('Unable to start NFS service: %s' % output)
+        log.debug('Unable to start NFS service: %s' % output)
     
     # start nmbd
     ret_code, output = _run_subprocess("sudo /etc/init.d/nmbd restart")
     if ret_code:
-        log.error('Unable to start nmbd service: %s' % output)
+        log.debug('Unable to start nmbd service: %s' % output)
     
     # start smbd
     ret_code, output = _run_subprocess("sudo /etc/init.d/smbd restart")
     if ret_code:
-        log.error('Unable to start smbd service: %s' % output)
+        log.debug('Unable to start smbd service: %s' % output)
     
 
 @common.timeout(600)
@@ -1585,7 +1588,7 @@ def _umount():
     
     finally:
         if op_ok == False:
-            log.warning("Umounting SAVEBOX file system failed.")
+            log.debug("Umounting SAVEBOX file system failed.")
         else:
             log.debug("Umounting SAVEBOX was successful.")
 
@@ -1686,11 +1689,11 @@ def _mount(storage_url, container):
         raise
     except Exception as e:
         op_msg = "Failed to mount filesystem for %s" % str(e)
-        log.error(str(e))
+        log.debug(str(e))
         raise BuildGWError(0x8029, "Mounting SAVEBOX file system failed.")
 
         if op_ok == False:
-            log.error("Mounting SAVEBOX file system failed.")
+            log.debug("Mounting SAVEBOX file system failed.")
         else:
             log.debug("Mounting SAVEBOX file system was successful.")
     
@@ -1740,7 +1743,7 @@ def _restartServices():
 
     except Exception as e:
         op_msg = "Failed to restart smb&nfs services for %s" % str(e)
-        log.error(str(e))
+        log.debug(str(e))
         # look like this error won't be catched anymore, assign an valid err code to it
         raise BuildGWError(0x8999, "Restarting system services failed.")
 
@@ -1836,7 +1839,7 @@ def build_gateway(user_key):
         # wthung, 2012/8/3
         # if a file system is existed, try to rebuild snapshot database
         if has_filesys:
-            log.info('Found existing file system. Try to restore configuration')
+            log.debug('Found existing file system. Try to restore configuration')
             # yen, 2012/10/09.
             # restore configuration from cloud
             api_restore_conf.restore_gateway_configuration()
@@ -1852,7 +1855,9 @@ def build_gateway(user_key):
                 else:
                     os.system('service squid3 stop')
             except Exception as e:
-                log.warning(str(e))
+                err_msg = 'Restoring SAVEBOX configuration failed.'
+                log.warning(err_msg)
+                log.debug('%s %s' % (err_msg, str(e)))
         
         # restart nfs/smb/nmb
         restart_service("nfs-kernel-server")
@@ -1895,7 +1900,7 @@ def build_gateway(user_key):
     finally:
         if not op_ok:
             _umount()
-            log.error(op_msg)
+            log.debug(op_msg)
             log.debug("Building SAVEBOX failed. " + op_msg)
         else:
             log.debug("Building SAVEBOX was successful.")
@@ -1936,8 +1941,8 @@ def restart_nfs_service():
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
-        log.error("NFS service restarting error")
+        log.debug(str(e))
+        log.debug("NFS service restarting error")
 
     finally:
         return_val = {
@@ -1984,8 +1989,8 @@ def restart_smb_service():
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
-        log.error("Samba service restarting error")
+        log.debug(str(e))
+        log.debug("Samba service restarting error")
 
     finally:
         return_val = {
@@ -2033,8 +2038,8 @@ def restart_service(svc_name):
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
-        log.error("%s service restarting error" % svc_name)
+        log.debug(str(e))
+        log.debug("%s service restarting error" % svc_name)
 
     finally:
         return_val = {
@@ -2136,8 +2141,8 @@ def _test_storage_account(storage_url, account, password):
     if ret_code != 0:
         # wthung, 2013/1/7
         # modifed to return more specified error message
-        log.error(comm_err)
-        log.error(output)
+        log.debug(comm_err)
+        log.debug(output)
         if ret_code == 7:
             # curl's return code 7 == "Failed to connect to host."
             raise NetworkError
@@ -2186,30 +2191,30 @@ def test_storage_account(storage_url, account, password):
     except common.TimeoutError:
         op_code = 0x8021
         op_msg = "Testing storage account failed due to time out." 
-        log.error(op_msg)
+        log.debug(op_msg)
     except TestStorageError as e:
         op_code = 0x8023
         op_msg = str(e)
-        log.error(op_msg)
+        log.debug(op_msg)
     except NetworkError as e:
         op_code = 0x8020
         op_msg = "Testing storage account failed due to network error."
-        log.error(op_msg)
+        log.debug(op_msg)
     except UnauthorizedError as e:
         op_code = 0x8025
         op_msg = "Testing storage account failed due to unauthorized error."
     except Exception as e:
-        log.error(str(e))
+        log.debug(str(e))
 
     #Jiahong: Insert traceroute info in the case of a failed test
     if op_ok is False:
         try:
             url, _ = storage_url.split(':')
             traceroute_info = _traceroute_backend(url)
-            log.error(traceroute_info)
+            log.debug(traceroute_info)
             op_msg = op_msg + '\n' + traceroute_info
         except Exception as e:
-            log.error('Error in traceroute:\n' + str(e))
+            log.debug('Error in traceroute:\n' + str(e))
 
     return_val = {'result' : op_ok,
                   'code'   : op_code,
@@ -2268,11 +2273,11 @@ def get_network():
     except IOError as e:
         op_ok = False
         op_msg = "Failed to access %s" % info_path
-        log.error(op_msg)
+        log.debug(op_msg)
     
     except Exception as e:
         op_ok = False
-        log.error(str(e))
+        log.debug(str(e))
 
     finally:
         return_val = {
@@ -2332,11 +2337,11 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
     except IOError as e:
         op_ok = False
-        log.error("Failed to access %s" % ini_path)
+        log.debug("Failed to access %s" % ini_path)
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
+        log.debug(str(e))
 
     finally:
         if not op_ok:
@@ -2367,7 +2372,7 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
 
             except:
                 op_ok = False
-                log.warning("Starting SAVEBOX networking failed.")
+                log.debug("Starting SAVEBOX networking failed.")
             else:
                 if os.system("sudo /etc/init.d/networking restart") == 0:
                     op_ok = True
@@ -2375,10 +2380,10 @@ def apply_network(ip, gateway, mask, dns1, dns2=None):
                     log.debug("Starting SAVEBOX networking was successful.")
                 else:
                     op_ok = False
-                    log.warning("Starting SAVEBOX networking failed.")
+                    log.debug("Starting SAVEBOX networking failed.")
         else:
             op_ok = False
-            log.error(op_msg)
+            log.debug(op_msg)
 
     except:
         pass
@@ -2437,11 +2442,11 @@ def _storeNetworkInfo(ini_path, ip, gateway, mask, dns1, dns2=None):
 
     except IOError as e:
         op_ok = False
-        log.error("Failed to store the network information in %s." % info_path)
+        log.debug("Failed to store the network information in %s." % info_path)
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
+        log.debug(str(e))
 
     finally:
         return op_ok
@@ -2482,19 +2487,19 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
 
     except IOError as e:
         op_ok = False
-        log.error("Failed to access %s" % ini_path)
+        log.debug("Failed to access %s" % ini_path)
         return op_ok
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
+        log.debug(str(e))
         return op_ok
 
     if os.path.exists(interface_path):
         os.system("sudo cp -p %s %s" % (interface_path, interface_path + "_backup"))
     else:
         os.system("sudo touch %s" % interface_path)
-        log.warning("File does not exist: %s" % interface_path)
+        log.debug("File does not exist: %s" % interface_path)
 
     try:
         with open(interface_path_temp, "w") as f:
@@ -2516,71 +2521,20 @@ def _setInterfaces(ip, gateway, mask, dns1, dns2, ini_path):
 
     except IOError as e:
         op_ok = False
-        log.error("Failed to access %s." % interface_path)
+        log.debug("Failed to access %s." % interface_path)
 
         if os.path.exists(interface_path + "_backup"):
             if os.system("sudo cp -p %s %s" % (interface_path + "_backup", interface_path)) != 0:
-                log.warning("Failed to recover %s" % interface_path)
+                log.debug("Failed to recover %s" % interface_path)
             else:
                 log.debug("Succeeded to recover %s" % interface_path)
 
     except Exception as e:
         op_ok = False
-        log.error(str(e))
+        log.debug(str(e))
 
     finally:
         return op_ok
-
-# wthung, 2012/10/16
-# content of resolv.conf is auto-generated. no need to modify it
-#def _setNameserver(dns1, dns2=None):
-#    """
-#    Set the domain name server.
-#    
-#    @type dns1: string
-#    @param dns1: Primiary DNS.
-#    @type dns2: string
-#    @param dns2: Secondary DNS.
-#    @rtype: boolean
-#    @return: True if successfully applied the DNS. Otherwise, false.
-#    """
-#    
-#    nameserver_path = "/etc/resolv.conf"
-#    nameserver_path_temp = "/etc/delta/temp_resolv.conf"
-#    op_ok = False
-#
-#    if os.system("sudo cp -p %s %s" % (nameserver_path, nameserver_path + "_backup")) != 0:
-#        os.system("sudo touch %s" % nameserver_path)
-#        log.warning("File does not exist: %s" % nameserver_path)
-#
-#    try:
-#        with open(nameserver_path_temp, "w") as f:
-#            f.write("nameserver %s\n" % dns1)
-#    
-#            if dns2 != None:
-#                f.write("nameserver %s\n" % dns2)
-#
-#        os.system('sudo cp %s %s' % (nameserver_path_temp, nameserver_path))
-#
-#        op_ok = True
-#        log.debug("Succeeded to set the nameserver.")
-#
-#    except IOError as e:
-#        op_ok = False
-#        log.error("Failed to access %s." % nameserver_path)
-#
-#        if os.path.exists(nameserver_path + "_backup"):
-#            if os.system("sudo cp -p %s %s" % (nameserver_path + "_backup", nameserver_path)) != 0:
-#                log.warning("Failed to recover %s" % nameserver_path)
-#            else:
-#                log.debug("Succeeded to recover %s" % nameserver_path)
-#
-#    except Exception as e:
-#        op_ok = False
-#        log.error(str(e))
-#
-#    finally:
-#        return op_ok
 
 def get_scheduling_rules():        # by Yen
     """
@@ -2657,7 +2611,7 @@ def get_smb_user_list():
         
     except ConfigParser.ParsingError:
         op_msg = smb_conf_file + ' is not readable.'
-        log.error(op_msg)
+        log.debug(op_msg)
         username.append(default_user_id)  # default
     
     return_val = {
@@ -2693,7 +2647,7 @@ def _chSmbPasswd(username, password):
 
     log.debug("change smb val: %d, message %s" % (ret_val, results))
     if ret_val != 0:
-        log.error("%s" % results)
+        log.debug("%s" % results)
 
     return ret_val
 
@@ -2735,7 +2689,7 @@ def set_smb_user_list(username, password):
             return json.dumps(return_val)
 
     except common.TimeoutError:
-        log.error("set_smb_user_list timeout")
+        log.debug("set_smb_user_list timeout")
         return_val['msg'] = 'Timeout for changing passwd.'
         return json.dumps(return_val)
 
@@ -2789,7 +2743,7 @@ def get_nfs_access_ip_list():
 
                 # format error
                 if len(arr) < 2:
-                    log.error(str(nfs_hosts_allow_file) + " format error")
+                    log.debug(str(nfs_hosts_allow_file) + " format error")
           
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2802,7 +2756,7 @@ def get_nfs_access_ip_list():
 
                 # Jiahong: Hiding the first two ips in the list: 127.0.0.1 and 127.0.0.2
                 if len(ips) < 2:
-                    log.error(str(nfs_hosts_allow_file) + " format error")
+                    log.debug(str(nfs_hosts_allow_file) + " format error")
 
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2811,7 +2765,7 @@ def get_nfs_access_ip_list():
                 return_val['msg'] = "Get ip list success"
                 return_val['data']["array_of_ip"] = ips[2:]
     except :
-        log.error("cannot parse " + str(nfs_hosts_allow_file))
+        log.debug("cannot parse " + str(nfs_hosts_allow_file))
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
     
     log.debug("get_nfs_access_ip_list end")
@@ -2871,7 +2825,7 @@ def set_compression(switch):
         op_msg = str(e)
     finally:
         if not op_ok:
-            log.error(op_msg)
+            log.debug(op_msg)
 
     return_val = {'result' : op_ok,
                   'msg'    : op_msg,
@@ -2917,7 +2871,7 @@ def set_nfs_access_ip_list(array_of_ip):
 
                 # format error
                 if len(arr) < 2:
-                    log.error(str(nfs_hosts_allow_file) + " format error")
+                    log.debug(str(nfs_hosts_allow_file) + " format error")
           
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2929,7 +2883,7 @@ def set_nfs_access_ip_list(array_of_ip):
                 ips = iplist.strip().split(", ")
 
                 if len(ips) < 2:
-                    log.error(str(nfs_hosts_allow_file) + " format error")
+                    log.debug(str(nfs_hosts_allow_file) + " format error")
 
                     return_val['msg'] = str(nfs_hosts_allow_file) + " format error"
                     return json.dumps(return_val)
@@ -2939,7 +2893,7 @@ def set_nfs_access_ip_list(array_of_ip):
                 full_ip_list = fixed_ips + array_of_ip
 
     except :
-        log.error("cannot parse " + str(nfs_hosts_allow_file))
+        log.debug("cannot parse " + str(nfs_hosts_allow_file))
           
         return_val['msg'] = "cannot parse " + str(nfs_hosts_allow_file)
 
@@ -2959,7 +2913,7 @@ def set_nfs_access_ip_list(array_of_ip):
         return_val['msg'] = "Update ip list successfully"
 
     except:
-        log.error("cannot write to " + str(nfs_hosts_allow_file))
+        log.debug("cannot write to " + str(nfs_hosts_allow_file))
         return_val['msg'] = "cannot write to " + str(nfs_hosts_allow_file)
 
     try:
@@ -3351,7 +3305,7 @@ def _get_storage_capacity():
             try:
                 db_size = os.path.getsize('%s/%s' % (S3QL_CACHE_DIR, db_name))
             except os.error:
-                log.warning('Failed to get size of S3QL metadata DB.')
+                log.debug('Failed to get size of S3QL metadata DB.')
 
             for line in results.split("\n"):
                 if line.startswith("Total data size:"):
@@ -3431,7 +3385,7 @@ def _get_storage_capacity():
 
     except Exception:
         if enable_log:
-            log.error(CMD_CHK_STO_CACHE_STATE + " fail")
+            log.debug(CMD_CHK_STO_CACHE_STATE + " fail")
 
     return ret_usage
 
@@ -3606,7 +3560,7 @@ def get_gateway_status():
         ret_val["data"]["gateway_cache_usage"] = usage["gateway_cache_usage"]
 
     except:
-        log.warning("Getting SAVEBOX status failed.")
+        log.debug("Getting SAVEBOX status failed.")
 
     return json.dumps(ret_val)
 
@@ -3699,7 +3653,7 @@ def get_last_backup_time():
             last_time = int(float(time_str))
             result = True
         except Exception as e:
-            log.error('Failed to open %s for reading last backup time: %s' % (last_backup_time_file, str(e)))
+            log.debug('Failed to open %s for reading last backup time: %s' % (last_backup_time_file, str(e)))
             last_time = -1
     
     return_val = {'result': result,
