@@ -470,6 +470,7 @@ class BlockCache(object):
                     if not t.isAlive():
                         log.warning('A upload thread has died. Restarting.')
                         t.join()
+                        self.upload_threads.remove(t)
                         t = threading.Thread(target=self._upload_loop)
                         t.start()
                         self.upload_threads.append(t)
