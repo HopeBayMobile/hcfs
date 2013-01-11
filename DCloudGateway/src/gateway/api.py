@@ -2074,6 +2074,8 @@ def reset_gateway():
     
         if pid == 0:
             time.sleep(10)
+            _show_led(4)
+            os.system("sudo initctl stop s3ql")
             os.system("sudo reboot")
         else:
             log.debug("SAVEBOX will restart after ten seconds")
@@ -2106,6 +2108,8 @@ def shutdown_gateway():
     
         if pid == 0:
             time.sleep(10)
+            _show_led(4)
+            os.system("sudo initctl stop s3ql")
             os.system("sudo poweroff")
         else:
             log.debug("SAVEBOX will be shuted down after ten seconds")
