@@ -1428,6 +1428,7 @@ class Operations(llfuse.Operations):
                      blockno, id_, exc)
             raise
 
+        self.cache.last_write_time = time.time()  # Jiahong (1/11/13): Put another marker at the end to ensure that the write time is not affected by long get()
         return len(buf)
 
     def fsync(self, fh, datasync):
