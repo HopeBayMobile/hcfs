@@ -342,6 +342,7 @@ class BlockCache(object):
         self.opened_entries = OrderedDict() # New dict for maintaining opened cache files
         self.max_opened_entries = 250000
         self.cache_to_close = set()  # Jiahong (11/27/12): Set for maintaining cache files to be closed due to file closing
+        self.last_write_time = 0  # Jiahong (1/10/13): For pausing cache sync when data is written in via FUSE
 
         if os.access(self.path,os.F_OK):
             pass
@@ -463,16 +464,17 @@ class BlockCache(object):
         while (not finished) and (not self.going_down):
             finished = True
             for t in self.upload_threads:
-                if self.going_down:
-                    break
-                if not t.isAlive():
-                    log.warning('A upload thread has died. Restarting.')
-                    t.join
-                    t = threading.Thread(target=self._upload_loop)
-                    t.start()
-                    self.upload_threads.append(t)
-                    finished = False
-                    break
+                with lock:
+                    if self.going_down:
+                        break
+                    if not t.isAlive():
+                        log.warning('A upload thread has died. Restarting.')
+                        t.join()
+                        t = threading.Thread(target=self._upload_loop)
+                        t.start()
+                        self.upload_threads.append(t)
+                        finished = False
+                        break
 
         self.thread_checking = False
         log.debug('Stop checking alive threads')
@@ -483,10 +485,6 @@ class BlockCache(object):
 
         log.debug('Start thread destroy')
         self.going_down = True
-
-        time.sleep(2) #Checking if thread spawning check is in progress
-        while self.thread_checking:
-            time.sleep(1)
 
         with lock_released:
             for t in self.upload_threads:

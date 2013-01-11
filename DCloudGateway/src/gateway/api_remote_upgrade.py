@@ -74,8 +74,7 @@ def get_upgrade_status(unittest=False, test_param=None):
                 
     else:       ## not for unit test
         try:
-            #thread.start_new_thread(get_available_upgrade, ())  
-            upgrade_info = get_available_upgrade() 
+            upgrade_info = get_available_upgrade()
             ## ^^^ trigger status change if new upgrade is available
             fh = open(status_file, 'r')
             code = int( fh.read() )
@@ -90,12 +89,13 @@ def get_upgrade_status(unittest=False, test_param=None):
                 downloaded_ver = fh.read()
                 fh.close()
                 latest_ver = json.loads(upgrade_info)['version']
-                if downloaded_ver != latest_ver:
+                if latest_ver and downloaded_ver != latest_ver:
                     print "downloaded package is expired."
                     set_upgrade_status(3)
                     
         except Exception as e:
-            set_upgrade_status(1)   ## in case of status file is not generated
+            if not os.path.isfile(status_file):
+                set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
             code = 0
             progress = 0
@@ -211,7 +211,8 @@ def get_available_upgrade(unittest=False, test_param=None):
                 op_msg = "There is no newer update."
                 version = None
                 description = ''
-                set_upgrade_status(1)
+                if code == 3:
+                    set_upgrade_status(1)
             else:
                 t = res.split(' ')
                 ver = t[-1].replace('\n', '')

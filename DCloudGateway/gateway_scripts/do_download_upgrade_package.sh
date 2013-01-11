@@ -13,7 +13,13 @@ UPGRADE_STATUS=`cat $STATUS_FILE`
 LOCK_FILE="/tmp/downloading_upgrade.lock"
 TMP_PATH="/tmp/debsrc"
 
-if [ ! -f $LOCK_FILE -a $UPGRADE_STATUS == '5' ]
+if [ -f $LOCK_FILE ]
+then
+    echo "Another process is running. Exit."
+    exit 1
+fi
+
+if [ $UPGRADE_STATUS == '5' ]
 then
     touch $LOCK_FILE
     rm -rf $TMP_PATH    ## clear old files
@@ -24,7 +30,7 @@ then
     sleep 2
     ## start download package
     cd $TMP_PATH
-    apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox
+    apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox > /dev/null
     sleep 3
     PROGRESS=`cat $PROGRESS_FILE`
     if [ $PROGRESS -ge 100 ]
@@ -48,5 +54,5 @@ then
     # unlock
     rm $LOCK_FILE
 else
-    echo "Not DOWNLOAD_IN_PROGRESS or another process is running."
+    echo "Not DOWNLOAD_IN_PROGRESS == 5."
 fi

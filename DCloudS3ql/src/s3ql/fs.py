@@ -1403,6 +1403,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         """
 
+        self.cache.last_write_time = time.time()  # Jiahong (1/10/13): For pausing cache sync when data is writing in via FUSE
         # Calculate required block
         blockno = offset // self.max_obj_size
         offset_rel = offset - blockno * self.max_obj_size
