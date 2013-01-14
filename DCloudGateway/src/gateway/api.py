@@ -1277,11 +1277,11 @@ def _createS3qlConf(storage_url, container):
 
         ret = po.returncode
         if ret != 0:
-            log.warning(err_msg)
+            log.error(err_msg)
             log.debug(output)
 
     except Exception as e:
-        log.warning(err_msg)
+        log.error(err_msg)
         log.debug(str(e))
     finally:
         log.debug("_createS3qlConf end")
