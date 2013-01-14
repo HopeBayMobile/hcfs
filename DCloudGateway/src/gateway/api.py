@@ -233,7 +233,7 @@ def _notify_savebox(status, msg):
     
     if code != 200:
         err_msg = 'Reporting SAVEBOX system status failed.'
-        log.warning(err_msg)
+        log.error(err_msg)
         log.debug('%s HTTP code = %d, response = %s' % (err_msg, code, response))
     
     return {"code": code, "response": response}
@@ -854,10 +854,10 @@ def _check_HDD():
         # check if hdds number is 3. If not, report the serial number of alive hdd to log
         # wthung, 2012/10/3, now we only have 2 hdds
         if nu_all_disk < 2:
-            log.warning('Some disks were lost. Please check immediately.')
+            log.error('Some disks were lost. Please check immediately.')
             for disk in all_disk:
                 disk_sn = _get_serial_number(disk)
-                log.warning('Alive disk serial number: %s' % disk_sn)
+                log.info('Alive disk serial number: %s' % disk_sn)
             op_disk_num = False
     
         for i in all_disk:
@@ -870,7 +870,7 @@ def _check_HDD():
             if output.find("SMART overall-health self-assessment test result: PASSED") != -1:
                 op_all_disk += 1 
             else:
-                log.warning("%s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
+                log.error("%s (SN: %s) SMART test result: NOT PASSED" % (i, _get_serial_number(i)))
         
         if (op_all_disk == len(all_disk)) and op_disk_num:
             op_HDD_ok = True
@@ -1264,7 +1264,7 @@ def _createS3qlConf(storage_url, container):
     
         ret = po.returncode
         if ret != 0:
-            log.warning(err_msg)
+            log.error(err_msg)
             log.debug(output)
                 
         storage_component = storage_url.split(":")
@@ -1856,7 +1856,7 @@ def build_gateway(user_key):
                     os.system('service squid3 stop')
             except Exception as e:
                 err_msg = 'Restoring SAVEBOX configuration failed.'
-                log.warning(err_msg)
+                log.error(err_msg)
                 log.debug('%s %s' % (err_msg, str(e)))
         
         # restart nfs/smb/nmb
