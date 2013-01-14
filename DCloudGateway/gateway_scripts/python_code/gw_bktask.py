@@ -197,6 +197,7 @@ def thread_aptget():
         apt_url = line.split(' ')[1]
         os.system('rm -r /tmp/test_apt')
         os.system('mkdir /tmp/test_apt')
+        os.system('cd /tmp/test_apt')
         cmd = "wget " + apt_url
         rsp = os.system(cmd)
         ## read upgrade info
