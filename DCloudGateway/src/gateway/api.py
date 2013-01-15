@@ -2961,6 +2961,10 @@ def apply_scheduling_rules(schedule):        # by Yen
             header = ["Day", "Start_Hour", "End_Hour", "Bandwidth (in kB/s)"]
             fptr.writerow(header)
             for row in schedule:
+                if row[3] < 0 and row[3] is not -1:
+                    row[3] = -1
+                elif row[3] > 0 and row[3] < 256:
+                    row[3] = -1
                 fptr.writerow(row)
         # apply settings
         os.system("sudo /etc/cron.hourly/hourly_run_this")
