@@ -15,7 +15,7 @@ from urlparse import urlsplit
 import json
 import errno
 import hashlib
-from eventlet.green import httplib
+import httplib
 import logging
 import re
 import tempfile

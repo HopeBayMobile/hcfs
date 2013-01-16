@@ -22,7 +22,7 @@ import bz2
 import cPickle as pickle
 import hashlib
 import hmac
-from eventlet.green import httplib
+import httplib
 import logging
 import lzma
 import os
