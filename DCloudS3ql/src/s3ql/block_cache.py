@@ -1067,7 +1067,8 @@ class BlockCache(object):
         was_dirty = el.dirty
 
         # Added by Jiahong on 9/30/12: Check if the entry is in opened_entries, if not, add it.
-        if to_open is True:
+        if to_open is True and el.to_delete is not True:
+            log.debug('Checking for opened_entries for inode %d, blockno %d' % (inode, blockno))
             try:
                 (opened_inode, opened_blockno) = self.opened_entries[(inode, blockno)]
             except KeyError:
@@ -1169,6 +1170,7 @@ class BlockCache(object):
                             log.debug('expire: %s is dirty, trying to flush', el)
                             break
 
+                log.debug('expire: Deleting inode %d, block %d' % (el.inode, el.blockno))
                 del self.entries[(el.inode, el.blockno)]
                 # Jiahong on 9/30/12: Delete entry in opened_entries if any
                 try:
@@ -1176,7 +1178,8 @@ class BlockCache(object):
                 except:
                     pass
 
-                el.close()
+                #el.close()
+                el.to_delete = True  # Jiahong (1/17/13): Added for marking this block for deletion
                 el.unlink(self.path)
                 need_entries -= 1
                 self.size -= el.size
