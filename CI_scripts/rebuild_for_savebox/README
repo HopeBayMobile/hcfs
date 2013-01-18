@@ -1,0 +1,8 @@
+[Purpose]
+    There are times that savebox is having a new build while other components are not. 
+    In current cross teamwork, it is time consuming to do file transferring via internet and build new gateway package from scratch.
+    Therefore, the program in this folder is for rebuild gateway package with a new savebox DEB file.
+    
+[Warning]
+    This function is only for SaveBox developers' agile testing. It will not handle gateway build version number, 
+    thus it is not suitable for QA's testing.
