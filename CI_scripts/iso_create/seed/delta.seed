@@ -495,6 +495,7 @@ d-i grub-installer/only_debian boolean true
 
 # This one makes grub-installer install to the MBR if it also finds some other
 # OS, which is less safe as it might not be able to boot that other OS.
+# andy: set it true to let sda and sdb are bootable
 d-i grub-installer/with_other_os boolean true
 
 # Alternatively, if you want to install to a location other than the mbr,
