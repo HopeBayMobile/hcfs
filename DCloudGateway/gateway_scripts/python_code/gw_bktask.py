@@ -590,7 +590,7 @@ def get_HDD_status():
                     else:                         
                         single_hdd = {'serial': serial_num, 'status': 2} # HDD is rebuilding RAID            
                 else:
-                    log.warning("%s (SN: %s) SMART test result: NOT PASSED" % (i, serial_num))  
+                    log.debug("%s (SN: %s) SMART test result: NOT PASSED" % (i, serial_num))  
                     single_hdd = {'serial': serial_num, 'status': 1} # HDD is failed  
                 
                 _data.append(single_hdd)        
