@@ -24,14 +24,17 @@ then
     touch $LOCK_FILE
     rm -rf $TMP_PATH    ## clear old files
     mkdir $TMP_PATH
-    apt-get clean   ## clean old deb files in cache
+    ## reset download progress for better GUI consistency
+    echo '0' > $PROGRESS_FILE
+    ## clean old deb files in cache
+    apt-get clean
     ## start a thread for polling download progress
     bash /usr/local/bin/get_download_progress.sh &
-    sleep 2
+    sleep 1
     ## start download package
     cd $TMP_PATH
     apt-get download dcloud-gateway dcloudgatewayapi s3ql savebox > /dev/null
-    sleep 3
+    sleep 3     ## wait for get_download_progress.sh to update info
     PROGRESS=`cat $PROGRESS_FILE`
     if [ $PROGRESS -ge 100 ]
     then
