@@ -18,13 +18,13 @@ deb file:// /var/cache/apt/archives/
 EOF
 
 ### 2. setup config file
-mkdir -p $CACHE_DIR
-bash $SRCDIR/src/http_proxy/gen_squid3_conf.sh $CACHE_DIR
-chmod 777  $CACHE_DIR
-echo "Squid3 configuration has been written."
+#mkdir -p $CACHE_DIR
+#bash $SRCDIR/src/http_proxy/gen_squid3_conf.sh $CACHE_DIR
+#chmod 777  $CACHE_DIR
+#echo "Squid3 configuration has been written."
 
 ### 3. Restart Squid3 service
-service squid3 restart
+#service squid3 restart
 
 # add double check for squid3 cache directory at each power on.
 cat >/etc/init.d/make_http_proxy_cache_dir <<EOF
