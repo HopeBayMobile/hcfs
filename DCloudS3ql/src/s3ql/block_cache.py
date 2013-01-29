@@ -231,6 +231,7 @@ class CacheEntry(object):
             self.dirty = False
 
         self.isopen = True
+        self.pos = 0
 
 
     def unlink(self, path):
