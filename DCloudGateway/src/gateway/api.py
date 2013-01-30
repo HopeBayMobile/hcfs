@@ -1502,15 +1502,6 @@ def _undo_umount():
     """
     log.debug('Undo SAVEBOX umount process')
     
-    # mount cosa related folders if necessary
-    # note: we can't use os.path.ismount to check a binded folder
-    ret_code, output = _run_subprocess("sudo mount | grep /COSASTORAGE/ALFRESCO")
-    if ret_code:
-        bind_path = '/mnt/cloudgwfiles/COSA /COSASTORAGE/ALFRESCO'
-        ret_code, output = _run_subprocess("sudo mount -o bind %s" % bind_path)
-        if ret_code:
-            log.debug('Unable to bind %s: %s' % (bind_path, output))
-    
     # start nfs service
     ret_code, output = _run_subprocess("sudo /etc/init.d/nfs-kernel-server restart")
     if ret_code:
@@ -1549,13 +1540,6 @@ def _umount():
         mountpoint = config.get("mountpoint", "dir")
     
         if os.path.ismount(mountpoint):
-            # umount cosa related folders
-            ret_code, output = _run_subprocess("sudo mount | grep /COSASTORAGE/ALFRESCO")
-            if not ret_code:
-                ret_code, output = _run_subprocess("sudo umount -l /COSASTORAGE/ALFRESCO")
-                if ret_code:
-                    raise UmountError(output)
-            
             # stop smbd
             ret_code, output = _run_subprocess("sudo /etc/init.d/smbd stop")
             if ret_code:
