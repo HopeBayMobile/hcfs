@@ -270,9 +270,7 @@ class Bucket(AbstractBucket):
                 if body:
                     body.seek(0)
                 
-                #self.conn = self._get_conn()
-                #yuxun, using get_conn instead of _get_conn
-                self.get_conn()
+                self.conn = self._get_conn()
                 continue
 
             # New section for handling error 408
@@ -294,9 +292,7 @@ class Bucket(AbstractBucket):
                 if body:
                     body.seek(0)
 
-                #self.conn = self._get_conn()
-                #yuxun, using get_conn instead of _get_conn
-                self.get_conn()
+                self.conn = self._get_conn()
                 continue
 
             # New section for handling server error
