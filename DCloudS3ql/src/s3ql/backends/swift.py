@@ -174,10 +174,10 @@ class Bucket(AbstractBucket):
     
     # Yuxun, add error handler to get connection.
     def get_conn(self):
-		'''Add error handler when getting connection. 
-		After retring three times, force reboot system. 
-		After rebooting three times, raise the exception.      
-		'''
+        '''Add error handler when getting connection. 
+        After retring three times, force reboot system. 
+        After rebooting three times, raise the exception.
+        '''
            
         connect_count = 3
         while True:
