@@ -70,6 +70,7 @@ cp -rf $SRCDIR/gateway_scripts/wait_gateway_up $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/service_restart $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/hourly_snapshotting $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/run_background_tasks $CONFDIR
+cp -rf $SRCDIR/gateway_scripts/synctime.sh $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/reorder_eth.sh $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/delete_lostfound $CONFDIR
 cp -rf $SRCDIR/gateway_scripts/LED_controller.sh $CONFDIR # yuxun added for control LED status
