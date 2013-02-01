@@ -1,5 +1,10 @@
 #!/bin/bash
 
+##################################################################################################################
+# input format: iso_version, e.g. 1.1.7_0001_precise_wt_test_amd64.iso                                           #
+# output format: gateway_install_$iso_version.iso, e.g. gateway_install_pkg_1.1.7_0001_precise_wt_test_amd64.tar #
+##################################################################################################################
+
 #seed_name="delta.seed"
 #seed_name="delta_test.seed"
 seed_name="delta_only_os.seed"
@@ -58,11 +63,17 @@ cp README $dest_dir/
 cp $seed_file $dest_dir/preseed/
 cp $script_dir/* $dest_dir/preseed/
 preseed_md5sum=`md5sum $seed_file | cut -d " " -f 1`
-sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_name preseed/file/checksum=$preseed_md5sum auto=true priority=critical initrd=/install/initrd.gz ramdisk_size=16384 root=/dev/ram rw quiet --" $txt_file
+sed -i "5c \  append preseed/file=/cdrom/preseed/$seed_name preseed/file/checksum=$preseed_md5sum auto=true priority=critical initrd=/install/initrd.gz ramdisk_size=16384 root=/dev/ram rw quiet --" $txt_file # replace the fifth line and the "\ " means that there is a whitespace at the first of the string line.
 sed -i "5c timeout 10" $isolinux_file
-chmod -R 777 $dest_dir
+chmod -R 777 $dest_dir # change the all files mode to 777 in order that the iso can be successfully booted.
 
-ISO_ID="${iso_version:0:10}"
+if [ -n "$1" ]; then 
+    ISO_ID="${iso_version:0:10}"
+else
+    ISO_ID="only_os"
+fi
+
+# build gateway iso
 mkisofs -r -V "$ISO_ID" \
             -cache-inodes \
             -J -l -b isolinux/isolinux.bin \
@@ -70,3 +81,4 @@ mkisofs -r -V "$ISO_ID" \
             -boot-load-size 4 -boot-info-table \
             -o $iso_file $dest_dir
 
+rm -r "dest_ubuntu"
