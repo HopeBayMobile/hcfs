@@ -22,7 +22,7 @@ fi
 if [ -n "$1" ]; then
     iso_version="$1";
     gateway_name=`ls $gateway_dir | grep "$1"`
-    if [ -z gateway_name ]; then
+    if [ -z "$gateway_name" ]; then
         echo "gateway package is not exist!!"
 	exit 0
     fi
@@ -33,7 +33,7 @@ fi
 iso_file="gateway_install_$iso_version.iso"
 
 mkdir -p $seed_dir
-mkdir -p $gateway_dir
+#mkdir -p $gateway_dir
 mkdir -p $script_dir
 
 # generate README file
