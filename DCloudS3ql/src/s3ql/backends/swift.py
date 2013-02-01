@@ -53,7 +53,9 @@ class Bucket(AbstractBucket):
         self.login = login
         self.auth_token = None
         self.auth_prefix = None
-        self.conn = self._get_conn()
+        #self.conn = self._get_conn
+        #yuxun, using get_conn instead of _get_conn
+        self.get_conn()
         
         self._bucket_exists()
         self.net_ts = 0 # wthung, timestamp to measure network time
@@ -170,6 +172,38 @@ class Bucket(AbstractBucket):
         
         raise RuntimeError('No valid authentication path found')
     
+    # Yuxun, add error handler to get connection.
+    def get_conn(self):
+        '''Add error handler when getting connection. 
+        After retring three times, force reboot system. 
+        After rebooting three times, raise the exception.
+        '''
+           
+        connect_count = 3
+        while True:
+            try:
+                self.conn = self._get_conn()
+                break;
+            except:
+                connect_count = cennect_count - 1
+                if connect_count <= 0:
+                    if os.path.exists("/root/gw_reboot_times"):
+                        with open("/root/gw_reboot_times", "r") as fh:
+                            reboot_times = int(fh.read())
+                    else:
+                        reboot_times = 0
+
+                    if reboot_times >= 3:
+                        log.error("Rebooting exceeds three times due to network connection problem")
+                        os.system("sudo rm -f /root/gw_reboot_times")
+                        raise
+
+                    reboot_times = reboot_times + 1
+                    os.system("echo %s > /root/gw_reboot_times" % reboot_times)
+                    log.error("Retrying to get connection exceeds three times, will reboot now")
+                    os.system("sudo reboot")
+                time.sleep(30)
+        
     def _do_request(self, method, path, subres=None, query_string=None,
                     headers=None, body=None):
         '''Send request, read and return response object
@@ -235,7 +269,7 @@ class Bucket(AbstractBucket):
                 self.conn.close()
                 if body:
                     body.seek(0)
-
+                
                 self.conn = self._get_conn()
                 continue
 

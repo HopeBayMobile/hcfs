@@ -28,6 +28,8 @@ script
     done
 
     su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
+        /etc/delta/synctime.sh
+    su -s /bin/sh -c 'exec "\$0" "\$@"' "root" -- \\
         /etc/delta/wait_network_up "\$STORAGE_ADDR"
 end script
 EOF

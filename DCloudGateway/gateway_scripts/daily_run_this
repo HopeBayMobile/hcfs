@@ -1,5 +1,5 @@
 #!/bin/sh -e
 
 #/etc/delta/check_expired
-sudo /usr/sbin/ntpdate -s pool.ntp.org && sudo /sbin/hwclock -w
+#sudo /usr/sbin/ntpdate -s pool.ntp.org && sudo /sbin/hwclock -w
 
