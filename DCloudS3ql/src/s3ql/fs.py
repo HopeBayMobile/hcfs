@@ -1319,6 +1319,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         """
 
+        self.cache.last_readwrite_time = time.time()  # Jiahong (2/4/13): For pausing cache sync when data is read in via FUSE
         # Calculate required block
         blockno = offset // self.max_obj_size
         offset_rel = offset - blockno * self.max_obj_size
@@ -1342,6 +1343,7 @@ class Operations(llfuse.Operations):
                      blockno, id_, exc)
             raise
 
+        self.cache.last_readwrite_time = time.time()  # Jiahong (2/4/13): For pausing cache sync when data is read in via FUSE
         if len(buf) == length:
             return buf
         else:
@@ -1403,7 +1405,7 @@ class Operations(llfuse.Operations):
         This method releases the global lock while it is running.
         """
 
-        self.cache.last_write_time = time.time()  # Jiahong (1/10/13): For pausing cache sync when data is writing in via FUSE
+        self.cache.last_readwrite_time = time.time()  # Jiahong (1/10/13): For pausing cache sync when data is writing in via FUSE
         # Calculate required block
         blockno = offset // self.max_obj_size
         offset_rel = offset - blockno * self.max_obj_size
@@ -1428,7 +1430,7 @@ class Operations(llfuse.Operations):
                      blockno, id_, exc)
             raise
 
-        self.cache.last_write_time = time.time()  # Jiahong (1/11/13): Put another marker at the end to ensure that the write time is not affected by long get()
+        self.cache.last_readwrite_time = time.time()  # Jiahong (1/11/13): Put another marker at the end to ensure that the write time is not affected by long get()
         return len(buf)
 
     def fsync(self, fh, datasync):
