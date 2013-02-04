@@ -21,6 +21,7 @@ import re
 import tempfile
 import time
 import urllib
+import os
 from s3ql.backends.common import NoSuchBucket
 import socket
 socket_timeout = 300
@@ -183,9 +184,10 @@ class Bucket(AbstractBucket):
         while True:
             try:
                 self.conn = self._get_conn()
+                os.system("sudo rm -f /root/gw_reboot_times")
                 break;
             except:
-                connect_count = cennect_count - 1
+                connect_count = connect_count - 1
                 if connect_count <= 0:
                     if os.path.exists("/root/gw_reboot_times"):
                         with open("/root/gw_reboot_times", "r") as fh:
