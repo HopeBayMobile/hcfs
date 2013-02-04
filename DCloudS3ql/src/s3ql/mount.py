@@ -880,7 +880,8 @@ class CommitThread(Thread):
                     if stamp - el.last_access < 60:
                         continue
 
-                    if (time.time() - self.block_cache.last_write_time) < 10:
+                    # Jiahong: Code for delaying upload due to block read/write
+                    if (time.time() - self.block_cache.last_readwrite_time) < 10:
                         log.debug('delaying cache sync due to file write')
                         self.stop_event.wait(10)
                         log.debug('End of delay')

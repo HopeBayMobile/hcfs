@@ -343,7 +343,7 @@ class BlockCache(object):
         self.opened_entries = OrderedDict() # New dict for maintaining opened cache files
         self.max_opened_entries = 250000
         self.cache_to_close = set()  # Jiahong (11/27/12): Set for maintaining cache files to be closed due to file closing
-        self.last_write_time = 0  # Jiahong (1/10/13): For pausing cache sync when data is written in via FUSE
+        self.last_readwrite_time = 0  # Jiahong (1/10/13): For pausing cache sync when data is read/written in via FUSE
 
         if os.access(self.path,os.F_OK):
             pass
