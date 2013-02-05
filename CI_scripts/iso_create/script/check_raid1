@@ -4,6 +4,7 @@
 echo "===start check raid1!"
 echo "===check which disk is new!"
 
+# check whethter there are two hard drives detected
 sda=`dmesg | grep sda`
 sdb=`dmesg | grep sdb`
 if [ -z "$sda" ] || [ -z "$sdb" ]; then
@@ -11,6 +12,7 @@ if [ -z "$sda" ] || [ -z "$sdb" ]; then
     exit 0
 fi
 
+# check which hard drive is the new replaced disk or both not
 sda=`mdadm --detail /dev/md0 | grep sda`
 sdb=`mdadm --detail /dev/md0 | grep sdb`
 new_disk=""
@@ -29,21 +31,37 @@ else
 fi
 
 echo "===new disk name is $new_disk!"
+
+# partition new_disk with the exact same partitions as old_disk 
 echo "===do sfdisk partition rebuild!"
 sfdisk -d "$old_disk" | sfdisk --force "$new_disk"
+
+# dd the MBR of old_disk to new_disk
 echo "===dd MBR to $new_disk!"
 dd if=$old_disk of=$new_disk bs=2048 count=1
+
+# inform th OS of partition table changes
 echo "===write partprobe!"
 partprobe
+
+# delete the superblock
 echo "===do zero superblock to $new_disk!"
 mdadm --zero-superblock $new_disk"1"
 mdadm --zero-superblock $new_disk"2"
+
+# add the new device to the array
 echo "add $new_disk to md0 and md1"
 mdadm --add /dev/md0 $new_disk"1" 
 mdadm --add /dev/md1 $new_disk"2"
+
+# update grub
 echo "grub update"
 update-grub
+
+# install the grub to disk
 echo "grub install to $new_disk"
 grub-install --modules='biosdisk raid' --recheck "$new_disk"
 grub-install --modules='biosdisk raid' --recheck "$old_disk"
+
+# increase the rebuild speed to 60000 KB/s. The default is 1000 KB/s
 echo 60000 > /proc/sys/dev/raid/speed_limit_min
