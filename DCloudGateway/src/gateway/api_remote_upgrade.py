@@ -97,7 +97,7 @@ def get_upgrade_status(unittest=False, test_param=None):
             if not os.path.isfile(status_file):
                 set_upgrade_status(1)   ## in case of status file is not generated
             logger.debug(str(e))
-            code = 0
+            code = 1
             progress = 0
         
     return_val = {'code':     code,
