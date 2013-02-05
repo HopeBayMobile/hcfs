@@ -204,6 +204,7 @@ class Bucket(AbstractBucket):
                     os.system("echo %s > /root/gw_reboot_times" % reboot_times)
                     log.error("Retrying to get connection exceeds three times, will reboot now")
                     os.system("sudo reboot")
+                    exit(1) # exit s3ql process, so that we can reboot success
                 time.sleep(30)
         
     def _do_request(self, method, path, subres=None, query_string=None,
