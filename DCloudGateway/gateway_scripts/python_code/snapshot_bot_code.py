@@ -368,6 +368,7 @@ def execute_take_snapshot():
                     # s3qlcp failed
                     err_msg = 'Unexpected errors occurred when taking snapshots. Aborting...'
                     log.debug(err_msg)
+                    log.debug(output)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
                     
                     finish_time = time.time()
