@@ -366,7 +366,8 @@ def execute_take_snapshot():
                     time.sleep(60)  # Wait one minute before retrying
                 else:
                     # s3qlcp failed
-                    err_msg = 'Unexpected errors occurred when taking snapshots. Aborting...'
+                    snapshot_folder = src_folder.split('/')[-1]
+                    err_msg = 'Taking snapshot of %s failed' % snapshot_folder
                     log.debug(err_msg)
                     log.debug(output)
                     os.system('sudo rm -rf %s' % snapshot.snapshot_tag)
