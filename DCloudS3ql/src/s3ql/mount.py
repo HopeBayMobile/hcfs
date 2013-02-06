@@ -129,7 +129,7 @@ def main(args=None):
                                                   options.metadata_upload_interval, var_container)
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
                              options.cachesize * 1024, options.max_cache_entries)
-    commit_thread = CommitThread(block_cache, var_container)
+    commit_thread = CommitThread(block_cache, var_container, metadata_upload_thread)
     closecache_thread = CloseCacheThread(block_cache)
     operations = fs.Operations(block_cache, db, var_container, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
@@ -627,13 +627,34 @@ class MetadataUploadThread(Thread):
         self.quit = False
         self.name = 'Metadata-Upload-Thread'
         self.var_container = var_container
+        self.last_meta_backup_time = 0  # Jiahong (2/6/13): Time spent on meta backup last time
+        self.last_wait = 0
+        self.processed_meta = False
 
     def run(self):
         log.debug('MetadataUploadThread: start')
 
         while not self.quit:
-            self.event.wait(self.interval)
+            if self.processed_meta is True:
+                self.last_wait = min(360, max(300,2 * self.last_meta_backup_time))  # Jiahong (2/6/13): Cooldown period in seconds
+                if self.last_wait > self.interval:
+                    self.last_wait = self.interval
+                timecount = self.last_wait
+                while timecount > 0:
+                    timecount = timecount - 1
+                    if self.quit:
+                        break
+                    time.sleep(1)
+
+                if self.quit:
+                    break
+            else:
+                self.last_wait = 0
+
+            self.event.wait(self.interval - self.last_wait)  # Jiahong (2/6/13): Changed so that wait for at most one hour
             self.event.clear()
+
+            self.processed_meta = False
 
             if self.quit:
                 break
@@ -641,6 +662,7 @@ class MetadataUploadThread(Thread):
             with llfuse.lock:
                 if self.quit:
                     break
+                meta_upload_start_time = time.time()
                 wal_name = "%s-wal" % self.db.file
                 if os.path.exists(wal_name):
                     wal_mtime = os.stat(wal_name).st_mtime
@@ -651,7 +673,9 @@ class MetadataUploadThread(Thread):
                     log.info('File system unchanged, not uploading metadata.')
                     continue
 
+                log2.info('Starting to backup gateway system information (metadata) to cloud.')
                 log.info('Dumping metadata...')
+                self.processed_meta = True
                 fh = tempfile.TemporaryFile()
                 dump_metadata(self.db, fh)
 
@@ -664,6 +688,7 @@ class MetadataUploadThread(Thread):
                 log.warning(msg)
                 log2.warning(msg)
                 fh.close()
+                self.last_meta_backup_time = time.time() - meta_upload_start_time
                 continue
             
             #  Jiahong (10/24/12): To handle disconnection during meta backup
@@ -673,6 +698,7 @@ class MetadataUploadThread(Thread):
                         log.error('Remote metadata is newer than local (%d vs %d), '
                                   'refusing to overwrite!', seq_no, self.param['seq_no'])
                         fh.close()
+                        self.last_meta_backup_time = time.time() - meta_upload_start_time
                         continue
 
                     cycle_metadata(bucket)
@@ -694,9 +720,14 @@ class MetadataUploadThread(Thread):
                     fh.close()
                     self.db_mtime = new_mtime
                     self.var_container.dirty_metadata = False
+                    self.last_meta_backup_time = time.time() - meta_upload_start_time
+                    log2.info('Completed backing up gateway system information (metadata) to cloud.')
             except:
-                log.error('Cannot connect to backend. Skipping metadata upload for now.')
+                msg = 'Cannot connect to backend. Skipping metadata upload for now.'
+                log.warning(msg)
+                log2.warning(msg)
                 fh.close()
+                self.last_meta_backup_time = time.time() - meta_upload_start_time
                 continue
 
         log.debug('MetadataUploadThread: end')
@@ -706,6 +737,19 @@ class MetadataUploadThread(Thread):
 
         self.quit = True
         self.event.set()
+
+    def trigger(self):
+        '''Triggers metadata upload'''
+
+        log.info('Triggered upload')
+        if self.event.is_set() is False:
+            self.event.set()
+
+    def untrigger(self):
+
+        log.info('Untriggered upload')
+        if (self.quit is False) and (self.event.is_set() is True):
+            self.event.clear()
 
 def setup_exchook():
     '''Send SIGTERM if any other thread terminates with an exception
@@ -821,13 +865,15 @@ class CommitThread(Thread):
     '''
 
 
-    def __init__(self, block_cache, var_container):
+    def __init__(self, block_cache, var_container, metadata_upload_thread):
         super(CommitThread, self).__init__()
         self.block_cache = block_cache
         self.stop_event = threading.Event()
         self.name = 'CommitThread'
         self.var_container = var_container
+        self.metadata_upload_thread = metadata_upload_thread
         self.pid = os.getpid()
+        self.uploading_cache = False
 
 # Start/stop of dirty cache uploading is controlled by ctrl.py using uploadon / uploadoff parameters
     def run(self):
@@ -845,6 +891,14 @@ class CommitThread(Thread):
 
         sweep_completed = False
         while not self.stop_event.is_set():
+            if self.uploading_cache is True and self.block_cache.dirty_entries <= 0:
+                self.uploading_cache = False
+                self.metadata_upload_thread.trigger()
+
+            if self.uploading_cache is False and self.block_cache.dirty_entries > 0:
+                self.uploading_cache = True
+                self.metadata_upload_thread.untrigger()
+
             did_sth = False
             sweep_completed = False
             #Only upload dirty blocks if scheduled or if dirty cache nearly occupied all allocated cache size
@@ -861,6 +915,10 @@ class CommitThread(Thread):
                 sweep_completed = True
 
                 for el in self.block_cache.entries.values_rev():
+                    if self.uploading_cache is False and self.block_cache.dirty_entries > 0:
+                        self.uploading_cache = True
+                        self.metadata_upload_thread.untrigger()
+
                     if (most_recent_access < el.last_access):
                         most_recent_access = el.last_access
                     if el.dirty:
@@ -936,6 +994,10 @@ class CommitThread(Thread):
 
                     total_cache_size += el.size
                 sweep_completed = True
+
+            if self.uploading_cache is False and self.block_cache.dirty_entries > 0:
+                self.uploading_cache = True
+                self.metadata_upload_thread.untrigger()
 
             if have_dirty_cache:
                 log.debug('Computed cache status in committhread: Most_recent_access %d, Have dirty cache, sum cache %d' % (most_recent_access,total_cache_size))
