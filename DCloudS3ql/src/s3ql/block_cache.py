@@ -1026,6 +1026,8 @@ class BlockCache(object):
                                     if el is not None:
                                         el.close()
                                         el.unlink(self.path)
+                                    if os.path.exists(filename):  # Jiahong (2/7/13): Error handling when failed to download object
+                                        os.unlink(filename)
                                     time.sleep(5)
                                     try:
                                         with self.bucket_pool() as bucket:
