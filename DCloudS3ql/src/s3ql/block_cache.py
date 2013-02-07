@@ -297,7 +297,7 @@ class BlockCache(object):
       uploaded)
     """
 
-    def __init__(self, bucket_pool, db, cachedir, max_size, max_entries=768):
+    def __init__(self, bucket_pool, db, cachedir, max_size, var_container, max_entries=768):
         log.debug('Initializing')
 
         self.path = cachedir
@@ -344,6 +344,7 @@ class BlockCache(object):
         self.max_opened_entries = 250000
         self.cache_to_close = set()  # Jiahong (11/27/12): Set for maintaining cache files to be closed due to file closing
         self.last_readwrite_time = 0  # Jiahong (1/10/13): For pausing cache sync when data is read/written in via FUSE
+        self.var_container = var_container
 
         if os.access(self.path,os.F_OK):
             pass
@@ -628,6 +629,7 @@ class BlockCache(object):
                         # update value cache
                         self.value_cache["compr_size"] += obj_size
                         affect_rows -= 1
+                        self.var_container.dirty_metadata = True
                         
                     os.fchmod(el.fh.fileno(), stat.S_IRUSR)
                     #  Jiahong: Update dirty cache size/entries and stop forced uploading if dirty cache size/entries drop below some limit
@@ -747,6 +749,8 @@ class BlockCache(object):
                                 'VALUES(?,?,?)', (block_id, el.inode, el.blockno))
 
                 self.in_transit.add(obj_id)
+                self.var_container.dirty_metadata = True
+                
                 with lock_released:
                     if not self.upload_threads:
                         log.warn("upload(%s): no upload threads, uploading synchronously", el)
@@ -797,6 +801,7 @@ class BlockCache(object):
                 el.dirty = False
                 #el.last_upload = time.time()
                 self.in_transit.remove((el.inode, el.blockno))
+                self.var_container.dirty_metadata = True
         except:
             #  Jiahong (11/5/12): If we have temp reopened it, close it.
             if (el.inode, el.blockno) in self.temp_opened:
@@ -816,6 +821,7 @@ class BlockCache(object):
         if refcount > 1:
             log.debug('upload(%s):  decreased refcount for prev. block: %d', el, old_block_id)
             self.db.execute('UPDATE blocks SET refcount=refcount-1 WHERE id=?', (old_block_id,))
+            self.var_container.dirty_metadata = True
             return el.size
 
         log.debug('upload(%s): removing prev. block %d', el, old_block_id)
@@ -832,6 +838,7 @@ class BlockCache(object):
             log.debug('upload(%s):  decreased refcount for prev. obj: %d', el, old_obj_id)
             self.db.execute('UPDATE objects SET refcount=refcount-1 WHERE id=?',
                             (old_obj_id,))
+            self.var_container.dirty_metadata = True
             return el.size
 
         log.debug('upload(%s): removing object %d', el, old_obj_id)
@@ -858,6 +865,7 @@ class BlockCache(object):
                 log.debug('upload(%s): adding %d to removal queue', el, old_obj_id)
                 self.to_remove.put(old_obj_id)
 
+        self.var_container.dirty_metadata = True
         return el.size
 
 
@@ -1320,6 +1328,7 @@ class BlockCache(object):
                           inode, blockno, block_id)
                 self.db.execute('UPDATE blocks SET refcount=refcount-1 WHERE id=?',
                                 (block_id,))
+                self.var_container.dirty_metadata = True
                 continue
 
             # Detach block from object
@@ -1362,7 +1371,9 @@ class BlockCache(object):
                         self._do_removal(obj_id)
                     else:
                         self.to_remove.put(obj_id)
-
+            
+            self.var_container.dirty_metadata = True
+            
         log.debug('remove(inode=%d, start=%d, end=%s): end', inode, start_no, end_no)
 
     def flush(self, inode):
