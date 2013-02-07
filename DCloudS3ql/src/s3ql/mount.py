@@ -691,6 +691,7 @@ class MetadataUploadThread(Thread):
                 self.last_meta_backup_time = time.time() - meta_upload_start_time
                 continue
             
+            seq_modified = False
             #  Jiahong (10/24/12): To handle disconnection during meta backup
             try:
                 with self.bucket_pool() as bucket:
@@ -706,6 +707,7 @@ class MetadataUploadThread(Thread):
                     self.param['last-modified'] = time.time()
 
                     # Temporarily decrease sequence no, this is not the final upload
+                    seq_modified = True
                     self.param['seq_no'] -= 1
                     def do_write(obj_fh):
                         fh.seek(0)
@@ -716,6 +718,7 @@ class MetadataUploadThread(Thread):
                                                   is_compressed=True)
                     log.info('Wrote %.2f MB of compressed metadata.', obj_fh.get_obj_size() / 1024 ** 2)
                     self.param['seq_no'] += 1
+                    seq_modified = False
 
                     fh.close()
                     self.db_mtime = new_mtime
@@ -728,6 +731,8 @@ class MetadataUploadThread(Thread):
                 log2.warning(msg)
                 fh.close()
                 self.last_meta_backup_time = time.time() - meta_upload_start_time
+                if seq_modified is True and seq_no != self.param['seq_no']:  # Jiahong (2/7/12): Added to prevent the seq no from changed due to interruption in metadata upload
+                    self.param['seq_no'] = seq_no
                 continue
 
         log.debug('MetadataUploadThread: end')
