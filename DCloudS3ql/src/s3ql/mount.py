@@ -128,8 +128,8 @@ def main(args=None):
     metadata_upload_thread = MetadataUploadThread(bucket_pool, param, db,
                                                   options.metadata_upload_interval, var_container)
     block_cache = BlockCache(bucket_pool, db, cachepath + '-cache',
-                             options.cachesize * 1024, options.max_cache_entries)
-    commit_thread = CommitThread(block_cache, var_container, metadata_upload_thread)
+                             options.cachesize * 1024, var_container, options.max_cache_entries)
+    commit_thread = CommitThread(block_cache, metadata_upload_thread)
     closecache_thread = CloseCacheThread(block_cache)
     operations = fs.Operations(block_cache, db, var_container, max_obj_size=param['max_obj_size'],
                                inode_cache=InodeCache(db, param['inode_gen']),
@@ -870,12 +870,11 @@ class CommitThread(Thread):
     '''
 
 
-    def __init__(self, block_cache, var_container, metadata_upload_thread):
+    def __init__(self, block_cache, metadata_upload_thread):
         super(CommitThread, self).__init__()
         self.block_cache = block_cache
         self.stop_event = threading.Event()
         self.name = 'CommitThread'
-        self.var_container = var_container
         self.metadata_upload_thread = metadata_upload_thread
         self.pid = os.getpid()
         self.uploading_cache = False
@@ -892,7 +891,7 @@ class CommitThread(Thread):
 
         # check if dirty size/entry is > 0
         if self.block_cache.dirty_size > 0 or self.block_cache.dirty_entries > 0:
-            self.var_container.dirty_metadata = True
+            self.block_cache.var_container.dirty_metadata = True
 
         sweep_completed = False
         while not self.stop_event.is_set():

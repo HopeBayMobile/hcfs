@@ -226,6 +226,13 @@ def get_available_upgrade(unittest=False, test_param=None):
                 fh.close()
                 if code == 1:
                     set_upgrade_status(3)
+        except ValueError:
+            set_upgrade_status(1)
+            op_code = 0x8022
+            op_ok = False
+            op_msg = "Querying new update failed."
+            version = None
+            description = None
         except:
             op_code = 0x8022
             op_ok = False
