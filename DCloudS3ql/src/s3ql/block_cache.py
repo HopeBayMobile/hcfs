@@ -1017,10 +1017,6 @@ class BlockCache(object):
                                     self.network_ok = True
                                     break
                                 except Exception as exc:
-                                    if no_attempts >= 9:
-                                        log.error('Read cache block error timed out....')
-                                        # block in backend, but cannot download it, raise EAGAIN
-                                        raise(llfuse.FUSEError(errno.EAGAIN))
                                     log.warn('Read s3ql_data_%d error type %s (%s), retrying' % (obj_id, type(exc).__name__, exc))
                                     no_attempts += 1
                                     if el is not None:
@@ -1028,6 +1024,10 @@ class BlockCache(object):
                                         el.unlink(self.path)
                                     if os.path.exists(filename):  # Jiahong (2/7/13): Error handling when failed to download object
                                         os.unlink(filename)
+                                    if no_attempts >= 9:
+                                        log.error('Read cache block error timed out....')
+                                        # block in backend, but cannot download it, raise EAGAIN
+                                        raise(llfuse.FUSEError(errno.EAGAIN))
                                     time.sleep(5)
                                     try:
                                         with self.bucket_pool() as bucket:
