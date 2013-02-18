@@ -108,6 +108,7 @@ if [ ! -e $CONFDIR/update_bandwidth ]; then
     cp -rf $SRCDIR/config/sysctl.conf /etc
     cp -rf $SRCDIR/config/gw_schedule.conf $CONFDIR/
     cp -rf $SRCDIR/config/savebox.ini $CONFDIR/
+    cp -rf $SRCDIR/config/debug_file_list.conf $CONFDIR/
     #cp -rf $SRCDIR/config/smb.orig $CONFDIR
     cp -rf $SRCDIR/config/sudoers_delta /etc/sudoers.d/
     cp -rf $SRCDIR/config/nfs-kernel-server /etc/default/nfs-kernel-server
