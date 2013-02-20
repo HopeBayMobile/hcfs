@@ -385,33 +385,6 @@ def get_gw_indicator():
     if 'result' in return_val:
         return return_val['result']
     return False
-
-def _get_storage_info():
-    """
-    Get storage URL and user name from /root/.s3ql/authinfo2.
-
-    @rtype: tuple
-    @return: Storage URL and user name or None if failed.
-    """
-    storage_url = None
-    account = None
-    password = None
-
-    try:
-        config = ConfigParser.ConfigParser()
-        with open('/root/.s3ql/authinfo2') as op_fh:
-            config.readfp(op_fh)
-
-        section = "CloudStorageGateway"
-        storage_url = config.get(section, 'storage-url').replace("swift://", "")
-        account = config.get(section, 'backend-login')
-        password = config.get(section, 'backend-password')
-
-    except Exception as e:
-        log.debug("Failed to get storage info: %s" % str(e))
-    finally:
-        pass
-    return (storage_url, account, password)
     
 def _upload_usage_data(usage):
     """
@@ -427,7 +400,7 @@ def _upload_usage_data(usage):
     os.system('sudo echo %d > %s' % (usage, target_file))
     
     # get storage info
-    storage_url, account, password = _get_storage_info()
+    storage_url, account, password = api._get_storage_info()
     
     # process if all required data are available
     if storage_url and account and password:
@@ -452,7 +425,7 @@ def _get_gateway_quota():
     @return: -1 if fail. A integer larger than 0 if success. (Unit: byte)
     """
     # get storage info
-    storage_url, account, password = _get_storage_info()
+    storage_url, account, password = api._get_storage_info()
     if storage_url and account and password:
         _, username = account.split(':')
         ret_code, output = api._run_subprocess('sudo swift -A https://%s/auth/v1.0 -U %s -K %s stat %s_private_container' 

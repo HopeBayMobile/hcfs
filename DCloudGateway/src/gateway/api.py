@@ -318,6 +318,34 @@ def _get_storage_account():
     
     return op_account
 
+#yuxun, move this function from gw_bktask.py
+def _get_storage_info():
+    """ 
+    Get storage URL and user name from /root/.s3ql/authinfo2.
+
+    @rtype: tuple
+    @return: Storage URL and user name or None if failed.
+    """
+    storage_url = None
+    account = None
+    password = None
+
+    try:
+        config = ConfigParser.ConfigParser()
+        with open('/root/.s3ql/authinfo2') as op_fh:
+            config.readfp(op_fh)
+
+        section = "CloudStorageGateway"
+        storage_url = config.get(section, 'storage-url').replace("swift://", "") 
+        account = config.get(section, 'backend-login')
+        password = config.get(section, 'backend-password')
+
+    except Exception as e:
+        log.debug("Failed to get storage info: %s" % str(e))
+    finally:
+        pass
+    return (storage_url, account, password)
+
 def getStorageUrl():
     """
     Get storage URL from /root/.s3ql/authinfo2.
