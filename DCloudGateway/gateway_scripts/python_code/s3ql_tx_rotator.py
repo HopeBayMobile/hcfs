@@ -42,7 +42,7 @@ def main():
                     # format s3ql_tx_[TIMESTAMP].gz
                     file_time = int(file.split('.')[0].split('_')[2])
                     if (current_time - file_time) > LOG_DURATION:
-                        outdated_files.add('%s_%d.gz' % (file_prefix, file_time))
+                        outdated_files.add(file)
                 # last line of swift cli output is empty, just catch and ignore it
                 except IndexError:
                     pass
