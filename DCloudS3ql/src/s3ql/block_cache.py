@@ -23,6 +23,7 @@ import threading
 import time
 import stat
 import re
+import json
 from .backends.common import NoSuchObject
 
 # standard logger for this module

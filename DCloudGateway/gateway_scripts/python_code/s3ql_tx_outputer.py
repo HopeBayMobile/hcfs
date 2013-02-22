@@ -19,10 +19,10 @@ from Crypto.Hash import SHA
 from Crypto.Hash import SHA256
 
 
-storage_url = "10.1.0.99:443"
-storage_account = "c002"
-storage_user = "c002"
-storage_passwd = "123456123456"
+storage_url = ""
+storage_account = ""
+storage_user = ""
+storage_passwd = ""
 
 KEYSIZE = 16
 BLOCKSIZE = AES.block_size
@@ -111,7 +111,10 @@ def list_file():
     del file_list[-1]
     
     # the time of last full backup
-    last_full_backup = file_list[-1].split("_")[2].split(".")[0]
+    if len(file_list) == 0:
+        last_full_backup = 0
+    else:
+        last_full_backup = file_list[-1].split("_")[2].split(".")[0]
     # we also need to parse additional s3ql_tx_[timestamp].partial.gz files 
     # since we do not have a full backup yet today  
     cmd = "swift -A https://%s/auth/v1.0 -U %s:%s -K %s list %s_private_container -p s3ql \
@@ -140,6 +143,9 @@ def main():
     os.chdir("s3ql_tx_report")
 
     file_list = list_file()
+    if len(file_list) == 0:
+        os.system("sudo touch No_transction_logs_in_cloud")
+        return
 
     for tx_log in file_list:
         
