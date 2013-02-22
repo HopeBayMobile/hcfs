@@ -695,6 +695,15 @@ class Operations(llfuse.Operations):
         if self.inodes[id_p].locked and not force:
             raise FUSEError(errno.EPERM)
 
+        tx_record = {
+                    'timestamp': timestamp,
+                    'op': 'delete',
+                    'name': name,
+                    'inode': id_,
+                    'blockno': '',
+                    }
+        self.cache.to_log_tx.put(tx_record)
+
         name_id = self._del_name(name)
         self.db.execute("DELETE FROM contents WHERE name_id=? AND parent_inode=?",
                         (name_id, id_p))
