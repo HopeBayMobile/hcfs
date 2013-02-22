@@ -43,6 +43,23 @@ def get_key():
 
     return aeskey[:16]
 
+def check_swift_ok():
+
+    cmd = "swift -A https://%s/auth/v1.0 -U %s:%s -K %s stat %s_private_container" \
+           % (storage_url, storage_account, storage_user, storage_passwd, \
+           storage_user )
+
+    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output = po.stdout.read()
+    po.wait()
+
+    if output.find("Bytes:") != -1:
+        swift_ok = True
+    else:
+        swift_ok = False
+
+    return swift_ok
+
 def get_storage_info():
 
     global storage_url
@@ -139,13 +156,17 @@ def main():
 
     get_storage_info()
 
-    os.system("mkdir s3ql_tx_report")
-    os.chdir("s3ql_tx_report")
+    if not check_swift_ok():
+        print("Get transction log failed: can not connect to backend")
+        return
 
     file_list = list_file()
     if len(file_list) == 0:
-        os.system("sudo touch No_transction_logs_in_cloud")
+        print("Get transction log failed: no transction logs in cloud")
         return
+
+    os.system("mkdir s3ql_tx_report")
+    os.chdir("s3ql_tx_report")
 
     for tx_log in file_list:
         
