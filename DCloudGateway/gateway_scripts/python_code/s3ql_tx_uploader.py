@@ -122,9 +122,18 @@ def do_upload(postfix):
 
             command = 'sudo swift -A https://%s/auth/v1.0 -U %s -K %s upload %s_private_container %s.gz' \
                     % (storage_url, account, password, username, file_name)
-            _, output = api._run_subprocess(command, 300) 
+            _, output = api._run_subprocess(command, 300)
+           
+            if output.find(file_name) != -1:
+                upload_ok = True
+            else:
+                upload_ok = False
+
+            return upload_ok
+
     except Exception as e:
         print(str(e))
+        return False
     
 def start_upload(full_upload=0):
     """
@@ -149,10 +158,12 @@ def start_upload(full_upload=0):
     with open(dest_path, "w") as dest:
         cPickle.dump(cipher, dest, -1)
 
-    do_upload(file_postfix)
+    upload_ok = do_upload(file_postfix)
 
     cmd = 'sudo rm %s.gz' % (dest_path)
     os.system(cmd)
+
+    return upload_ok
 
 def _upload():
     """
@@ -167,12 +178,15 @@ def _upload():
         if os.path.exists("/root/.s3ql/s3ql_txlog/s3ql_txlog.hour"):
             os.system("sudo cat /root/.s3ql/s3ql_txlog/s3ql_txlog.hour >> /root/.s3ql/s3ql_txlog/s3ql_txlog.day")
         if os.path.exists("/root/.s3ql/s3ql_txlog/s3ql_txlog.day"):
-            start_upload(full_upload=1)
-        os.system("sudo rm -f /root/.s3ql/s3ql_txlog/*")
+            upload_ok = start_upload(full_upload=1)
+        if upload_ok:
+            os.system("sudo rm -f /root/.s3ql/s3ql_txlog/*")
+        else:
+            os.system("sudo rm -f /root/.s3ql/s3ql_txlog/s3ql_txlog.hour")
     else:
         if os.path.exists("/root/.s3ql/s3ql_txlog/s3ql_txlog.hour"):
             os.system("sudo cat /root/.s3ql/s3ql_txlog/s3ql_txlog.hour >> /root/.s3ql/s3ql_txlog/s3ql_txlog.day")
-            start_upload()
+            upload_ok = start_upload()
             os.system("sudo rm -f /root/.s3ql/s3ql_txlog/s3ql_txlog.hour")
 
 #TODO: encrypt/decrypt large file
