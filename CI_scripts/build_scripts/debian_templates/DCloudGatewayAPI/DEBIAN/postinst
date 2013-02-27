@@ -45,7 +45,6 @@ python setup.py install
 
 # install additional script files
 cp -rf $SRCDIR/gateway_scripts/hourly_run_this /etc/cron.hourly/
-cp -rf $SRCDIR/gateway_scripts/hourly_upload_txlog /etc/cron.hourly/
 cp -rf $SRCDIR/gateway_scripts/daily_run_this /etc/cron.daily/
 #cp -rf $SRCDIR/gateway_scripts/update_bandwidth $CONFDIR  # Fixed this so that the following config files can be correctly copied during initial installation
 cp -rf $SRCDIR/gateway_scripts/python_code/*.py $CONFDIR

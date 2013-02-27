@@ -23,7 +23,7 @@ def main():
             # file prefix we want to filter
             file_prefix = "s3ql_tx"
             _, username = account.split(':')
-            command = 'sudo swift -A https://%s/auth/v1.0 -U %s -K %s list %s_private_container -p %s' \
+            command = 'sudo swift -A https://%s/auth/v1.0 -U %s -K %s list %s_gateway_config -p %s' \
                     % (storage_url, account, password, username, file_prefix)
             _, output = api._run_subprocess(command, 15)
             
@@ -49,7 +49,7 @@ def main():
             
             # iterate outdated files and call swift cli to delete them
             for file in outdated_files:
-                command = 'sudo swift -A https://%s/auth/v1.0 -U %s -K %s delete %s_private_container %s' \
+                command = 'sudo swift -A https://%s/auth/v1.0 -U %s -K %s delete %s_gateway_config %s' \
                     % (storage_url, account, password, username, file)
                 _, output = api._run_subprocess(command, 15)
                 if output.find(file) != -1:

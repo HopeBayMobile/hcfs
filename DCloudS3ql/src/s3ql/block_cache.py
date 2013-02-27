@@ -23,7 +23,6 @@ import threading
 import time
 import stat
 import re
-import json
 from .backends.common import NoSuchObject
 
 # standard logger for this module
@@ -127,11 +126,11 @@ class CacheEntry(object):
     :pos: current position in file
     """
 
-    __slots__ = [ 'dirty', 'name', 'inode', 'blockno', 'last_access',
+    __slots__ = [ 'dirty', 'inode', 'blockno', 'last_access',
                   'size', 'pos', 'fh', 'to_delete', 'isopen' ]
 
 #Jiahong: modified this function and allow the creation of cache entry from existing cache file
-    def __init__(self, name, inode, blockno, filename, newfile=True, to_open=True):
+    def __init__(self, inode, blockno, filename, newfile=True, to_open=True):
         super(CacheEntry, self).__init__()
         # Writing 100MB in 128k chunks takes 90ms unbuffered and
         # 116ms with 1 MB buffer. Reading time does not depend on
@@ -158,7 +157,6 @@ class CacheEntry(object):
                     os.fchmod(self.fh.fileno(), stat.S_IRUSR)
                 self.dirty = False
 
-        self.name = name
         self.inode = inode
         self.blockno = blockno
         self.last_access = time.time()
@@ -318,10 +316,8 @@ class BlockCache(object):
         self.removed_in_transit = set()
         self.to_upload = Distributor()
         self.to_remove = Queue(0)  # Jiahong on 10/12/12: Disable limit on object deletion queue
-        self.to_log_tx = Queue(0)  # Yuxun, a queue for user transction records
         self.upload_threads = []
         self.removal_threads = []
-        self.log_tx_threads = [] # Yuxun, thread to handle to_log_tx queue
         self.transfer_completed = SimpleEvent()
         self.preload_cache = False
         self.do_upload = False
@@ -458,13 +454,6 @@ class BlockCache(object):
             t.start()
             self.removal_threads.append(t)
 
-        # log_tx thread is to handle the user transction records (both sync and remove)    
-        for _ in range(1):
-            t = threading.Thread(target=self._log_tx_loop)
-            t.daemon = True # interruption will do no permanent harm
-            t.start()
-            self.log_tx_threads.append(t)
-
     #Jiahong Wu (5/7/12): New function for monitoring upload threads
     def check_alive_threads(self):
         '''Monitor if the upload threads are alive. Restart them if necessary'''
@@ -503,9 +492,6 @@ class BlockCache(object):
         with lock_released:
             for t in self.upload_threads:
                 self.to_upload.put(QuitSentinel)
-            
-            for t in self.log_tx_threads:
-                self.to_log_tx.put(QuitSentinel)
 
             for t in self.removal_threads:
                 self.to_remove.put(QuitSentinel)
@@ -532,14 +518,9 @@ class BlockCache(object):
             log.debug('destroy(): waiting for removal threads...')
             for t in self.removal_threads:
                 t.join()
-                
-            log.debug('destroy(): waiting for log_tx threads...')
-            for t in self.log_tx_threads:
-                t.join()
 
         self.upload_threads = []
         self.removal_threads = []
-        self.log_tx_threads = []
 
         #Jiahong: close opened cache files here, after all uploads are completed
         log.debug('destroy(): close opened cache...')
@@ -624,16 +605,6 @@ class BlockCache(object):
                 rate = el.size / (1024 ** 2 * time_) if time_ != 0 else 0
                 log.debug('_do_upload(%s): uploaded %d bytes in %.3f seconds, %.2f MB/s',
                           obj_id, el.size, time_, rate)
-
-            #yuxun, Uplaod successful, add a tx record to the queue
-            tx_record = {
-                    'timestamp': time.time(),
-                    'op': 'sync',
-                    'name': el.name,
-                    'inode': el.inode,
-                    'blockno': el.blockno,
-                    }
-            self.to_log_tx.put(tx_record)
 
             with lock:
                 try:
@@ -789,16 +760,6 @@ class BlockCache(object):
 
             # There is a block with the same hash                        
             else:
-                #yuxun, Block is already exists, also add a transction record to to_log_tx_queue
-                tx_record = {
-                    'timestamp': time.time(),
-                    'op': 'sync',
-                    'name': el.name,
-                    'inode': el.inode,
-                    'blockno': el.blockno,
-                    }
-                self.to_log_tx.put(tx_record)
-
                 if old_block_id == block_id:
                     log.debug('upload(%s): unchanged, block_id=%d', el, block_id)
                     os.fchmod(el.fh.fileno(), stat.S_IRUSR)
@@ -954,33 +915,7 @@ class BlockCache(object):
                             raise
                         log.error('Network may be disconnected. Retrying in 10 seconds.')
                         time.sleep(10)
-    
-    def _log_tx_loop(self):
-        '''Process log_tx queue'''
 
-        while True:
-            if not os.path.exists("/dev/shm/gw_upload_txlog"):
-                try:
-                   tmp = self.to_log_tx.get(timeout=60)
-
-                   if tmp is QuitSentinel:
-                       break
-
-                   self._do_log_tx(tmp)
-                except:
-                   pass
-            else:
-                if not os.path.exists("/root/.s3ql/s3ql_txlog/"):
-                    os.system("sudo mkdir /root/.s3ql/s3ql_txlog")
-                os.system("sudo mv -f /root/.s3ql/s3ql_tx.log /root/.s3ql/s3ql_txlog/s3ql_txlog.hour")
-                os.system("rm /dev/shm/gw_upload_txlog")
-
-    def _do_log_tx(self, tx_record):
-        while True:
-            with open("/root/.s3ql/s3ql_tx.log", "a") as fh:
-                json.dump(tx_record, fh)
-                fh.write("\n")
-            break
 
     # Jiahong on 9/30/12: Changed this function so that the accessed block will be added to the opened_entries
     @contextmanager
@@ -1025,9 +960,7 @@ class BlockCache(object):
                 filename = os.path.join(self.path, 'subdir_%d' % ((inode+blockno) % 100), '%d-%d' % (inode, blockno))
 
                 if os.access(filename,os.F_OK): # If cache file already in cache directory, use that
-                    name_id = self.db.get_val('SELECT name_id FROM contents WHERE inode=?', (inode,))
-                    name = self.db.get_val('SELECT name FROM names WHERE id=?', (name_id,))
-                    el = CacheEntry(name, inode, blockno, filename, False, to_open)
+                    el = CacheEntry(inode, blockno, filename, False, to_open)
                     self.entries[(inode, blockno)] = el
                     self.size += el.size
                     if el.dirty:
@@ -1046,9 +979,7 @@ class BlockCache(object):
                 # No corresponding object
                 except NoSuchRowError:
                     log.debug('get(inode=%d, block=%d): creating new block', inode, blockno)
-                    name_id = self.db.get_val('SELECT name_id FROM contents WHERE inode=?', (inode,))
-                    name = self.db.get_val('SELECT name FROM names WHERE id=?', (name_id,))
-                    el = CacheEntry(name, inode, blockno, filename)
+                    el = CacheEntry(inode, blockno, filename)
                     self.entries[(inode, blockno)] = el
 
                 # Need to download corresponding object
@@ -1068,9 +999,7 @@ class BlockCache(object):
                     log.debug('get(inode=%d, block=%d): downloading object %d..',
                               inode, blockno, obj_id)
                     def do_read(fh):
-                        name_id = self.db.get_val('SELECT name_id FROM contents WHERE inode=?', (inode,))
-                        name = self.db.get_val('SELECT name FROM names WHERE id=?', (name_id,))
-                        new_block = CacheEntry(name, inode, blockno, filename)
+                        new_block = CacheEntry(inode, blockno, filename)
                         #Jiahong: At the start of the download, mark the group read bit to specify that this block is being downloaded
                         new_block.download_set()
                         shutil.copyfileobj(fh, new_block, BUFSIZE)

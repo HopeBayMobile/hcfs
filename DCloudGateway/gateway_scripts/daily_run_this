@@ -1,6 +1,5 @@
 #!/bin/sh -e
 
-/usr/bin/python /etc/delta/s3ql_tx_rotator.py
 #/etc/delta/check_expired
 #sudo /usr/sbin/ntpdate -s pool.ntp.org && sudo /sbin/hwclock -w
 
