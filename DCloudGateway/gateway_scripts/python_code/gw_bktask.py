@@ -457,24 +457,21 @@ def enableSMART(disk):
     """
     
     target_str = 'SMART Enabled.'
-    enable_ok = False
+    enable_ok = True
     
     try:
         cmd = "sudo smartctl --smart=on %s" % disk
         ret_code, output = api._run_subprocess(cmd)
 
-        if ret_code == 0:
-            # check if enable successed
-            for line in output.split('\n'):
-                if target_str in line:
-                    enable_ok = True
-                    break                              
-        else:
-            log.debug('Some error occurred when enable the SMART control of %s' % disk)
+        # check if enable successed
+        for line in output.split('\n'):
+            if target_str in line:
+                break                              
             
     except:
-        pass    
-        
+        enable_ok = False
+        log.debug('Some error occurred when enable the SMART control of %s' % disk)
+
     return enable_ok
 
     
@@ -492,28 +489,25 @@ def check_RAID_rebuild(disk):
     target_str = 'rebuilding'
     dev_no = ''
     is_rebuilding = False
-    op_ok = False
+    op_ok = True
     
     try:
         for i in range(2):            
             cmd = "sudo mdadm --detail /dev/md%d" % i
             ret_code, output = api._run_subprocess(cmd)
     
-            if ret_code == 0:
-                # ckeck RAID status
-                op_ok = True
-                for line in output.split('\n'):
-                    if target_str not in line:
-                        continue
-                    else:
-                        dev_no = line.split()[6][:8]
-                        if dev_no == disk:
-                            is_rebuilding = True
-                            break
-            else:
-                log.debug('Some error occurred when checking whether %s is rebuilding RAID' % disk)
+            # ckeck RAID status
+            for line in output.split('\n'):
+                if target_str not in line:
+                    continue
+                else:
+                    dev_no = line.split()[6][:8]
+                    if dev_no == disk:
+                        is_rebuilding = True
+                        break
     except Exception:
-        pass
+        enable_ok = False
+        log.debug('Some error occurred when checking whether %s is rebuilding RAID' % disk)
             
     return (op_ok, is_rebuilding)
      
@@ -549,7 +543,10 @@ def get_HDD_status():
         
                 op_ok = enableSMART(i)
                 
-                serial_num = api._get_serial_number(i)            
+                serial_num = api._get_serial_number(i)
+                if serial_num == '00000000':
+                    serial_num = 'unrecognized'            
+            
                 all_disks.add(serial_num)
             
                 cmd = "sudo smartctl -H %s" % i
