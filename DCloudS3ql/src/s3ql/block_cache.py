@@ -892,8 +892,8 @@ class BlockCache(object):
         while True:
             try:
                 while obj_id in self.in_transit:
-                    log.debug('remove(inode=%d, blockno=%d): waiting for transfer of '
-                              'object %d to complete', inode, blockno, obj_id)
+                    log.debug('remove: waiting for transfer of '
+                              'object %d to complete', obj_id)
                     self.wait()
 
                 with self.bucket_pool() as bucket:
