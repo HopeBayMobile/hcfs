@@ -255,8 +255,9 @@ def thread_retrieve_quota():
             # update quota to s3ql if different quota arrival
             if prev_quota != quota:
                 # set quota to s3ql
-                api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
-                prev_quota = quota
+                ret_code, output = api._run_subprocess('sudo s3qlctrl quotasize /mnt/cloudgwfiles %d' % (quota / 1024), 10)
+                if ret_code == 0:
+                    prev_quota = quota
         
         # sleep for some time by a for loop in order to break at any time
         for _ in range(60):
