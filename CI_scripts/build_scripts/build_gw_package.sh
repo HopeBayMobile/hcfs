@@ -109,6 +109,8 @@ fi
     mv dcloudgatewayapi*.deb $DEBSAVE
     mv dcloud-gateway*.deb $DEBSAVE
 	mv savebox*.deb $DEBSAVE
+
+    md5sum $DEBSAVE/*.deb > $DEBSAVE/$GW_VERSION_$BUILDNUM.md5
 	
 # Build an ISO with auto-install OS
     rm -r $INITPATH/StorageAppliance/CI_scripts/iso_create/gateway_package  # delete old file
