@@ -59,6 +59,9 @@ void create_root_meta()
   long num_dir_ent;
   long num_reg_ent;
   simple_dirent ent1,ent2;
+  struct timeb currenttime;
+
+  ftime(&currenttime);
 
   sprintf(metapath,"%s/%s", METASTORE,"meta1");
   memset(&rootmeta,0,sizeof(struct stat));
@@ -67,6 +70,9 @@ void create_root_meta()
   rootmeta.st_nlink=2;
   rootmeta.st_ino=1;
   rootmeta.st_mode=S_IFDIR | 0755;
+  rootmeta.st_atime=currenttime.time;
+  rootmeta.st_mtime=rootmeta.st_atime;
+  rootmeta.st_ctime=rootmeta.st_atime;
   meta_fptr=fopen(metapath,"w");
   fwrite(&rootmeta,sizeof(struct stat),1,meta_fptr);
   num_dir_ent=2;

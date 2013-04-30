@@ -93,4 +93,5 @@ int myunlink(const char *path);
 int myrmdir(const char *path);
 int myfsync(const char *path, int datasync, struct fuse_file_info *fi);
 int mytruncate(const char *path, off_t length);
+int mystatfs(const char *path, struct statvfs *buf);
 

@@ -29,6 +29,7 @@ static struct fuse_operations my_fuse_ops = {
   .destroy = mydestroy,
   .truncate = mytruncate,
   .release = myrelease,
+  .statfs = mystatfs,
  };
 
 void main(int argc, char **argv)

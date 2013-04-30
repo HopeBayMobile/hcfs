@@ -1,6 +1,7 @@
 /* Code under development by Jiahong Wu*/
 
 #include "myfuse.h"
+#include <math.h>
 
 int mygetattr(const char *path, struct stat *nodestat)
  {
@@ -496,6 +497,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     
   if (inputstat.st_size < (offset+total_write_bytes))
    {
+    mysystem_meta.system_size += (offset+total_write_bytes) - inputstat.st_size;
     inputstat.st_size = offset+total_write_bytes;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
    }
@@ -523,6 +525,9 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
   char *tmpptr;
   long num_blocks =0;
   unsigned int inodehash;
+  struct timeb currenttime;
+
+  ftime(&currenttime);
 
   tmpptr = strrchr(path,'/');
   show_current_time();
@@ -543,9 +548,16 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       mysystem_meta.total_inodes +=1;
       mysystem_meta.max_inode+=1;
       new_inode = mysystem_meta.max_inode;
+
+      fread(&inputstat,sizeof(struct stat),1,fptr);
+      inputstat.st_mtime=currenttime.time;
+
       fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
       fread(&num_reg,sizeof(long),1,fptr);
       num_reg++;
+      fseek(fptr,0,SEEK_SET);
+      fwrite(&inputstat,sizeof(struct stat),1,fptr);
+
       fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
       fwrite(&num_reg,sizeof(long),1,fptr);
       fseek(fptr,0,SEEK_END);
@@ -561,6 +573,9 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
+      inputstat.st_atime=currenttime.time;
+      inputstat.st_mtime=currenttime.time;
+      inputstat.st_ctime=currenttime.time;
       sprintf(metapath,"%s/meta%ld",METASTORE,new_inode);
       fptr=fopen(metapath,"w");
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
@@ -591,6 +606,9 @@ int mymkdir(const char *path,mode_t thismode)
   long num_subdir,num_reg,count;
   simple_dirent tempent,ent1,ent2;
   char *tmpptr;
+  struct timeb currenttime;
+
+  ftime(&currenttime);
 
   show_current_time();
 
@@ -613,6 +631,7 @@ int mymkdir(const char *path,mode_t thismode)
       new_inode = mysystem_meta.max_inode;
       fread(&inputstat,sizeof(struct stat),1,fptr);
       inputstat.st_nlink++;
+      inputstat.st_mtime=currenttime.time;
       fseek(fptr,0,SEEK_SET);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       fseek(fptr,sizeof(struct stat),SEEK_SET);
@@ -645,6 +664,10 @@ int mymkdir(const char *path,mode_t thismode)
       inputstat.st_nlink = 2;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
+      inputstat.st_atime=currenttime.time;
+      inputstat.st_mtime=currenttime.time;
+      inputstat.st_ctime=currenttime.time;
+
       sprintf(metapath,"%s/meta%ld",METASTORE,new_inode);
       fptr=fopen(metapath,"w");
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
@@ -673,8 +696,45 @@ int mymkdir(const char *path,mode_t thismode)
 
 int myutime(const char *path, struct utimbuf *mymodtime)
  {
+
+  struct stat inputstat;
   int retcode=0;
+  ino_t this_inode;
+  FILE *fptr;
+  char metapath[1024];
+  struct timeb currenttime;
+
+  ftime(&currenttime);
+
   show_current_time();
+
+  printf("Debug myutime\n");
+
+  this_inode = find_inode(path);
+
+  if (this_inode <=0)
+   retcode = -ENOENT;
+  else
+   {
+    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    fptr = fopen(metapath,"r+");
+    if (fptr==NULL)
+     return -ENOENT;
+    fread(&inputstat,sizeof(struct stat),1,fptr);
+    if (mymodtime==NULL)
+     {
+      inputstat.st_atime=currenttime.time;
+      inputstat.st_mtime=currenttime.time;
+     }
+    else
+     {
+      inputstat.st_atime=mymodtime->actime;
+      inputstat.st_mtime=mymodtime->modtime;
+     }
+    fseek(fptr,0,SEEK_SET);
+    fwrite(&inputstat,sizeof(struct stat),1,fptr);
+    fclose(fptr);
+   }
 
   return retcode;
  } 
@@ -950,6 +1010,7 @@ int mytruncate(const char *path, off_t length)
       truncate(blockpath, length - ((last_block -1) * MAX_BLOCK_SIZE));
      }
     total_blocks = last_block;
+    mysystem_meta.system_size += (length - inputstat.st_size);
     inputstat.st_size=length;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
     fseek(fptr,0,SEEK_SET);
@@ -960,4 +1021,22 @@ int mytruncate(const char *path, off_t length)
    }
   return 0;
  }
+int mystatfs(const char *path, struct statvfs *buf)
+ {
+  buf->f_bsize=4096;
+  buf->f_namemax=256;
+  if (mysystem_meta.total_inodes>1000000)
+   buf->f_files=mysystem_meta.total_inodes*2;
+  else
+   buf->f_files = 2000000;
+  buf->f_ffree=buf->f_files - mysystem_meta.total_inodes;
+  buf->f_favail=buf->f_ffree;
+  if (mysystem_meta.system_size > (50*powl(1024,3)))
+   buf->f_blocks=(2*mysystem_meta.system_size)/4096;
+  else
+   buf->f_blocks=(100*powl(1024,3))/4096;
+  buf->f_bfree=buf->f_blocks - ((mysystem_meta.system_size+4095)/4096);
+  buf->f_bavail=buf->f_bfree;
 
+  return 0;
+ }
