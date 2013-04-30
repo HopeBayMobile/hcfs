@@ -882,6 +882,7 @@ int myrmdir(const char *path)
       fseek(fptr,sizeof(struct stat),SEEK_SET);
       fread(&num_subdir,sizeof(long),1,fptr);
       fread(&num_reg,sizeof(long),1,fptr);
+      fclose(fptr);
       if ((num_subdir+num_reg)>2)
        return -ENOTEMPTY;
      }
