@@ -55,7 +55,7 @@ ino_t find_inode_fullpath(const char *path, ino_t this_inode, const char *fullpa
    {
     strcpy(subname,path);
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
 
     printf("debug find inode %s\n",metapath);
 
@@ -104,7 +104,8 @@ ino_t find_inode_fullpath(const char *path, ino_t this_inode, const char *fullpa
     strncpy(subname,path,(ptr-path));
     subname[(ptr-path)]=0;
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
 
     fptr=fopen(metapath,"r");
     if (fptr==NULL)

@@ -5,7 +5,21 @@
 void initsystem()
  {
   char systemmetapath[400];
-  int count;
+  int count,count1,count2;
+
+  for(count1=0;count1<SYS_DIR_WIDTH;count1++)
+   {
+    sprintf(systemmetapath,"%s/sub_%d", METASTORE, count1);
+    if (access(systemmetapath,F_OK)!=0)
+     mkdir(systemmetapath,0755);
+   }
+
+  for(count1=0;count1<SYS_DIR_WIDTH;count1++)
+   {
+    sprintf(systemmetapath,"%s/sub_%d", BLOCKSTORE, count1);
+    if (access(systemmetapath,F_OK)!=0)
+     mkdir(systemmetapath,0755);
+   }
 
   sprintf(systemmetapath,"%s/%s", METASTORE,"systemmeta");
 
@@ -63,7 +77,7 @@ void create_root_meta()
 
   ftime(&currenttime);
 
-  sprintf(metapath,"%s/%s", METASTORE,"meta1");
+  sprintf(metapath,"%s/sub_%d/%s", METASTORE, 1 % SYS_DIR_WIDTH, "meta1");
   memset(&rootmeta,0,sizeof(struct stat));
   rootmeta.st_uid=getuid();
   rootmeta.st_gid=getgid();

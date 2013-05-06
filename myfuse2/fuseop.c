@@ -25,7 +25,8 @@ int mygetattr(const char *path, struct stat *nodestat)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr=fopen(metapath,"r");
     if (fptr==NULL)
      retcode = -ENOENT;
@@ -74,7 +75,8 @@ int myreaddir(const char *path, void *buf, fuse_fill_dir_t filler,
    }
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr=fopen(metapath,"r");
     if (fptr==NULL)
      retcode = -ENOENT;
@@ -167,7 +169,9 @@ int myopen(const char *path, struct fuse_file_info *fi)
   file_handle_table[empty_index].opened_block=0;
   file_handle_table[empty_index].blockptr=NULL;
 
-  sprintf(metapath,"%s/meta%ld",METASTORE,file_handle_table[empty_index].st_ino);
+  sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,
+                                file_handle_table[empty_index].st_ino % SYS_DIR_WIDTH,file_handle_table[empty_index].st_ino);
+
   file_handle_table[empty_index].metaptr=fopen(metapath,"r+");
   printf("debug open metapath is %s\n",metapath);
   if (file_handle_table[empty_index].metaptr ==NULL)
@@ -252,7 +256,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     if (this_inode==0)
      return -ENOENT;
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     metaptr=fopen(metapath,"r+");
     if (metaptr==NULL)
      return -ENOENT;
@@ -260,7 +265,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
   else
    {
     this_inode = file_handle_table[fi->fh].st_ino;
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     metaptr=fopen(metapath,"r+");
     if (metaptr==NULL)
      return -ENOENT;
@@ -303,7 +309,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
      }
     else
      fread(&tmp_block,sizeof(blockent),1,metaptr);
-    sprintf(blockpath,"%s/data_%ld_%ld",BLOCKSTORE,this_inode,count);
+    sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
+
     if (tmp_block.stored_where==1)
      {
       data_fptr=fopen(blockpath,"r");
@@ -382,7 +389,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     if (this_inode==0)
      return -ENOENT;
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     metaptr=fopen(metapath,"r+");
     if (metaptr==NULL)
      return -ENOENT;
@@ -429,7 +437,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
      }
     else
      fread(&tmp_block,sizeof(blockent),1,metaptr);
-    sprintf(blockpath,"%s/data_%ld_%ld",BLOCKSTORE,this_inode,count);
+    sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
+
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
       data_fptr=file_handle_table[fi->fh].blockptr;
@@ -539,7 +548,8 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr=fopen(metapath,"r+");
     if (fptr==NULL)
      retcode = -ENOENT;
@@ -576,7 +586,8 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       inputstat.st_atime=currenttime.time;
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
-      sprintf(metapath,"%s/meta%ld",METASTORE,new_inode);
+      sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
+
       fptr=fopen(metapath,"w");
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_blocks = 0;
@@ -620,7 +631,8 @@ int mymkdir(const char *path,mode_t thismode)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr=fopen(metapath,"r+");
     if (fptr==NULL)
      retcode = -ENOENT;
@@ -668,7 +680,8 @@ int mymkdir(const char *path,mode_t thismode)
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
 
-      sprintf(metapath,"%s/meta%ld",METASTORE,new_inode);
+      sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
+
       fptr=fopen(metapath,"w");
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_subdir=2;
@@ -716,7 +729,8 @@ int myutime(const char *path, struct utimbuf *mymodtime)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr = fopen(metapath,"r+");
     if (fptr==NULL)
      return -ENOENT;
@@ -777,11 +791,14 @@ int myunlink(const char *path)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr = fopen(metapath,"r");
     if (fptr==NULL)
      return -ENOENT;
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
+    fread(&inputstat,sizeof(struct stat),1,fptr);
+    mysystem_meta.system_size -= inputstat.st_size;
+
     fread(&total_blocks,sizeof(long),1,fptr);
     fclose(fptr);
     invalidate_inode_cache(path);
@@ -793,11 +810,14 @@ int myunlink(const char *path)
     /* Removing all blocks for this inode */
     for(block_count=1;block_count<=total_blocks;block_count++)
      {
-      sprintf(blockpath,"%s/data_%ld_%ld",BLOCKSTORE,this_inode,block_count);
+      sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
+                                           (this_inode + block_count) % SYS_DIR_WIDTH,this_inode,block_count);
+
       unlink(blockpath);
      }
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,parent_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,parent_inode % SYS_DIR_WIDTH,parent_inode);
+
 
     fptr=fopen(metapath,"r+");
     if (fptr==NULL)
@@ -870,7 +890,8 @@ int myrmdir(const char *path)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
 
     /*First, check if the subdirectory is empty or not*/
 
@@ -897,7 +918,8 @@ int myrmdir(const char *path)
      return -1;
     mysystem_meta.total_inodes -=1;
 
-    sprintf(metapath,"%s/meta%ld",METASTORE,parent_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,parent_inode % SYS_DIR_WIDTH,parent_inode);
+
 
     fptr=fopen(metapath,"r+");
     if (fptr==NULL)
@@ -962,6 +984,7 @@ int myfsync(const char *path, int datasync, struct fuse_file_info *fi)
  }
 int mytruncate(const char *path, off_t length)
  {
+/* TODO: will need to handle truncate to larger file sizes (need to pad zeros?) */
   struct stat inputstat;
   int retcode=0;
   ino_t parent_inode,this_inode;
@@ -985,7 +1008,8 @@ int mytruncate(const char *path, off_t length)
    retcode = -ENOENT;
   else
    {
-    sprintf(metapath,"%s/meta%ld",METASTORE,this_inode);
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
     fptr = fopen(metapath,"r+");
     if (fptr==NULL)
      return -ENOENT;
@@ -1002,12 +1026,16 @@ int mytruncate(const char *path, off_t length)
     for(block_count=last_block+1;block_count<=total_blocks;block_count++)
      {
       printf("Debug truncate: killing block %ld",block_count);
-      sprintf(blockpath,"%s/data_%ld_%ld",BLOCKSTORE,this_inode,block_count);
+      sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
+                                          (this_inode + block_count) % SYS_DIR_WIDTH,this_inode,block_count);
+
       unlink(blockpath);
      }
     if (length < (last_block * MAX_BLOCK_SIZE))
      {
-      sprintf(blockpath,"%s/data_%ld_%ld",BLOCKSTORE,this_inode,last_block);
+      sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
+                       (this_inode + last_block) % SYS_DIR_WIDTH,this_inode,last_block);
+
       truncate(blockpath, length - ((last_block -1) * MAX_BLOCK_SIZE));
      }
     total_blocks = last_block;
