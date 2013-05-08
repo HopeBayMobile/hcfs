@@ -37,8 +37,9 @@ int mygetattr(const char *path, struct stat *nodestat)
       fclose(fptr);
 */
      {
-      fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-      fread(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      retcode = super_inode_read(&inputstat,this_inode);
+      if (retcode < 0)
+       return retcode;
       nodestat->st_nlink=inputstat.st_nlink;
       nodestat->st_uid=inputstat.st_uid;
       nodestat->st_gid=inputstat.st_gid;
@@ -528,8 +529,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
   fwrite(&inputstat,sizeof(struct stat),1,metaptr);
   fwrite(&total_blocks,sizeof(long),1,metaptr);
 
-  fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-  fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+  super_inode_write(&inputstat,this_inode);
 
 
   if (retsize>=0)
@@ -585,8 +585,7 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       num_reg++;
       fseek(fptr,0,SEEK_SET);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      super_inode_write(&inputstat,this_inode);
 
 
       fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
@@ -614,8 +613,7 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       num_blocks = 0;
       fwrite(&num_blocks,sizeof(long),1,fptr);
       fclose(fptr);
-      fseek(super_inode_fptr,sizeof(struct stat)*(new_inode-1),SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      super_inode_create(&inputstat,new_inode);
 
      }
    }
@@ -670,8 +668,7 @@ int mymkdir(const char *path,mode_t thismode)
       inputstat.st_mtime=currenttime.time;
       fseek(fptr,0,SEEK_SET);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      super_inode_write(&inputstat,this_inode);
 
       fseek(fptr,sizeof(struct stat),SEEK_SET);
       fread(&num_subdir,sizeof(long),1,fptr);
@@ -726,8 +723,7 @@ int mymkdir(const char *path,mode_t thismode)
       fwrite(&ent1,sizeof(simple_dirent),1,fptr);
       fwrite(&ent2,sizeof(simple_dirent),1,fptr);
       fclose(fptr);
-      fseek(super_inode_fptr,sizeof(struct stat)*(new_inode-1),SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      super_inode_create(&inputstat,new_inode);
 
      }
    }
@@ -778,8 +774,7 @@ int myutime(const char *path, struct utimbuf *mymodtime)
     fseek(fptr,0,SEEK_SET);
     fwrite(&inputstat,sizeof(struct stat),1,fptr);
     fclose(fptr);
-    fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-    fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+    super_inode_write(&inputstat,this_inode);
 
    }
 
@@ -836,6 +831,7 @@ int myunlink(const char *path)
     fclose(fptr);
     invalidate_inode_cache(path);
     tmpstatus=unlink(metapath);
+    retcode = super_inode_delete(this_inode);
     if (tmpstatus!=0)
      return -1;
     mysystem_meta.total_inodes -=1;
@@ -947,6 +943,7 @@ int myrmdir(const char *path)
     invalidate_inode_cache(path);
 
     tmpstatus=unlink(metapath);
+    retcode = super_inode_delete(this_inode);
     if (tmpstatus!=0)
      return -1;
     mysystem_meta.total_inodes -=1;
@@ -963,8 +960,7 @@ int myrmdir(const char *path)
       inputstat.st_nlink--;
       fseek(fptr,0,SEEK_SET);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      fseek(super_inode_fptr,sizeof(struct stat)*(parent_inode-1),SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+      super_inode_write(&inputstat,parent_inode);
 
 
       fseek(fptr,sizeof(struct stat),SEEK_SET);
@@ -1082,8 +1078,7 @@ int mytruncate(const char *path, off_t length)
     fwrite(&inputstat,sizeof(struct stat),1,fptr);
     fwrite(&total_blocks,sizeof(long),1,fptr);
     fclose(fptr);
-    fseek(super_inode_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
-    fwrite(&inputstat,sizeof(struct stat),1,super_inode_fptr);
+    super_inode_write(&inputstat,this_inode);
 
     truncate(metapath,sizeof(struct stat)+sizeof(long)+sizeof(blockent)*last_block);
    }

@@ -40,7 +40,8 @@ typedef struct {
 
 system_meta mysystem_meta;
 FILE *system_meta_fptr;
-FILE *super_inode_fptr;
+FILE *super_inode_read_fptr, *super_inode_write_fptr;
+sem_t super_inode_read_sem, super_inode_write_sem;
 
 typedef struct {
   char pathname[MAX_ICACHE_PATHLEN];
@@ -96,4 +97,8 @@ int myrmdir(const char *path);
 int myfsync(const char *path, int datasync, struct fuse_file_info *fi);
 int mytruncate(const char *path, off_t length);
 int mystatfs(const char *path, struct statvfs *buf);
+int super_inode_read(struct stat *inputstat,ino_t this_inode);
+int super_inode_write(struct stat *inputstat,ino_t this_inode);
+int super_inode_create(struct stat *inputstat,ino_t this_inode);
+int super_inode_delete(ino_t this_inode);
 

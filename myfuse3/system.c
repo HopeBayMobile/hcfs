@@ -31,8 +31,12 @@ void initsystem()
 
   if (access(systemmetapath,F_OK)!=0)
    {
-    super_inode_fptr=fopen(superinodepath,"w+");
+    super_inode_write_fptr=fopen(superinodepath,"w+");
+    fclose(super_inode_write_fptr);
+    super_inode_write_fptr=fopen(superinodepath,"w+");
+    super_inode_read_fptr=fopen(superinodepath,"r+");
     create_root_meta();
+    fflush(super_inode_write_fptr);
     mysystem_meta.total_inodes=1;
     mysystem_meta.max_inode=1;
     mysystem_meta.system_size=0;
@@ -44,12 +48,16 @@ void initsystem()
    {
     system_meta_fptr=fopen(systemmetapath,"r+");
     fread(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
-    super_inode_fptr=fopen(superinodepath,"r+");
+    super_inode_write_fptr=fopen(superinodepath,"r+");
+    super_inode_read_fptr=fopen(superinodepath,"r+");
    }
   memset(&path_cache,0,sizeof(path_cache_entry)*(MAX_ICACHE_ENTRY));
   for(count=0;count<MAX_ICACHE_ENTRY;count++)
    sem_init(&(path_cache[count].cache_sem),0,1);
   sem_init(&file_table_sem,0,1);
+  sem_init(&super_inode_read_sem,0,1);
+  sem_init(&super_inode_write_sem,0,1);
+
 
   return;
  }
@@ -66,7 +74,8 @@ void mydestroy(void *private_data)
  {
   mysync_system_meta();
   fclose(system_meta_fptr);
-  fclose(super_inode_fptr);
+  fclose(super_inode_read_fptr);
+  fclose(super_inode_write_fptr);
   return;
  }
 
@@ -94,8 +103,8 @@ void create_root_meta()
   rootmeta.st_ctime=rootmeta.st_atime;
   meta_fptr=fopen(metapath,"w");
   fwrite(&rootmeta,sizeof(struct stat),1,meta_fptr);
-  fseek(super_inode_fptr,0,SEEK_SET);
-  fwrite(&rootmeta,sizeof(struct stat),1,super_inode_fptr);
+  fseek(super_inode_write_fptr,0,SEEK_SET);
+  fwrite(&rootmeta,sizeof(struct stat),1,super_inode_write_fptr);
   num_dir_ent=2;
   num_reg_ent=0;
   fwrite(&num_dir_ent,sizeof(long),1,meta_fptr);
@@ -113,5 +122,67 @@ void create_root_meta()
   fclose(meta_fptr);
 
   return;
+ }
+
+int super_inode_read(struct stat *inputstat,ino_t this_inode)
+ {
+  size_t total_read;
+
+  sem_wait(&(super_inode_read_sem));
+  fseek(super_inode_read_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
+  total_read=fread(inputstat,sizeof(struct stat),1,super_inode_read_fptr);
+  sem_post(&(super_inode_read_sem));
+
+  printf("debug super inode read %ld, size %ld, need 1\n",this_inode, total_read);
+
+  if ((total_read < 1) || (inputstat->st_ino < 1))
+   return -ENOENT;
+  return 0;
+ }
+int super_inode_write(struct stat *inputstat,ino_t this_inode)
+ {
+  int total_write;
+
+  sem_wait(&(super_inode_write_sem));
+  fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
+  total_write=fwrite(inputstat,sizeof(struct stat),1,super_inode_write_fptr);
+  fflush(super_inode_write_fptr);
+  sem_post(&(super_inode_write_sem));
+
+  if (total_write < 1)
+   return -1;
+  return 0;
+ }
+
+int super_inode_create(struct stat *inputstat,ino_t this_inode)
+ {
+  int total_write;
+
+  sem_wait(&(super_inode_write_sem));
+  fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
+  total_write=fwrite(inputstat,sizeof(struct stat),1,super_inode_write_fptr);
+  fflush(super_inode_write_fptr);
+  sem_post(&(super_inode_write_sem));
+
+  if (total_write < 1)
+   return -1;
+  return 0;
+ }
+
+int super_inode_delete(ino_t this_inode)
+ {
+  int total_write;
+  struct stat inputstat;
+
+  memset(&inputstat,0,sizeof(struct stat));
+  sem_wait(&(super_inode_write_sem));
+  fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
+  total_write=fwrite(&inputstat,sizeof(struct stat),1,super_inode_write_fptr);
+  fflush(super_inode_write_fptr);
+  sem_post(&(super_inode_write_sem));
+
+  if (total_write < 1)
+   return -1;
+  return 0;
  }
 
