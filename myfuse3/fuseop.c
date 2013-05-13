@@ -199,7 +199,13 @@ int myopen(const char *path, struct fuse_file_info *fi)
     sem_post(&file_table_sem);
     return -ENOENT;
    }
-  
+
+  sem_init(&(file_handle_table[empty_index].meta_sem),0,1);
+  sem_init(&(file_handle_table[empty_index].block_sem),0,1);
+
+  fread(&(file_handle_table[empty_index].inputstat),sizeof(struct stat),1,file_handle_table[empty_index].metaptr);
+  fread(&(file_handle_table[empty_index].total_blocks),sizeof(long),1,file_handle_table[empty_index].metaptr);
+
   sem_post(&file_table_sem);
   printf("Debug end of myopen\n");
   show_current_time();
@@ -216,10 +222,17 @@ int myrelease(const char *path, struct fuse_file_info *fi)
 
   sem_wait(&file_table_sem);
   index = fi->fh;
+  sem_wait(&(file_handle_table[index].meta_sem));
+  sem_wait(&(file_handle_table[index].block_sem));
+
   if (file_handle_table[index].metaptr!=NULL)
    fclose(file_handle_table[index].metaptr);
   if (file_handle_table[index].blockptr!=NULL)
    fclose(file_handle_table[index].blockptr);
+
+  sem_post(&(file_handle_table[index].meta_sem));
+  sem_post(&(file_handle_table[index].block_sem));
+
   file_handle_table[index].opened_block = 0;
   file_handle_table[index].st_ino = 0;
   file_handle_table[index].metaptr=NULL;
@@ -260,7 +273,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
   show_current_time();
 
-  printf("Debug myread path %s, size %ld, offset %ld\n",path,size,offset);
+//  printf("Debug myread path %s, size %ld, offset %ld\n",path,size,offset);
 
   if (size==0)
    return 0;
@@ -279,20 +292,30 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
    }
   else
    {
+//    sem_wait(&(file_handle_table[fi->fh].meta_sem));
+    metaptr = file_handle_table[fi->fh].metaptr;
     this_inode = file_handle_table[fi->fh].st_ino;
-    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
-
-    metaptr=fopen(metapath,"r+");
-    if (metaptr==NULL)
-     return -ENOENT;
+//    fseek(metaptr,0,SEEK_SET);
    }
 
-  fread(&inputstat,sizeof(struct stat),1,metaptr);
-  fread(&total_blocks,sizeof(long),1,metaptr);
+  if (fi->fh==0)
+   {
+    fread(&inputstat,sizeof(struct stat),1,metaptr);
+    fread(&total_blocks,sizeof(long),1,metaptr);
+   }
+  else
+   {
+    memcpy(&inputstat, &(file_handle_table[fi->fh].inputstat),sizeof(struct stat));
+    total_blocks = file_handle_table[fi->fh].total_blocks;
+   }
 
   if (offset >= inputstat.st_size)  /* If want to read outside file size */
    {
-    fclose(metaptr);
+    if (fi->fh==0)
+     fclose(metaptr);
+//    else
+//     sem_post(&(file_handle_table[fi->fh].meta_sem));
+
     return 0;
    }
   total_read_bytes=0;
@@ -303,18 +326,23 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
   start_block = (offset / (long) MAX_BLOCK_SIZE) + 1;
   end_block = (end_bytes / (long) MAX_BLOCK_SIZE) + 1;  /*Assume that block_index starts from 1. */
 
-  printf("%ld, %ld, %ld\n",start_block,end_block,end_bytes);
-  printf("total block %ld\n",total_blocks);
+//  printf("%ld, %ld, %ld\n",start_block,end_block,end_bytes);
+//  printf("total block %ld\n",total_blocks);
 
   if (start_block > total_blocks)
    {
-    fclose(metaptr);
+    if (fi->fh==0)
+     fclose(metaptr);
+//    else
+//     sem_post(&(file_handle_table[fi->fh].meta_sem));
+
     return 0;
    }
 
-  fseek(metaptr,sizeof(struct stat)+sizeof(long)+(start_block-1)*sizeof(blockent),SEEK_SET); /*Seek to the first block to read on the meta*/
+//  if (fi->fh > 0)
+//   sem_post(&(file_handle_table[fi->fh].meta_sem));
 
-  printf("%ld, %ld\n",start_block,end_block);
+//  printf("%ld, %ld\n",start_block,end_block);
   for(count=start_block;count<=end_block;count++)
    {
     if (count > total_blocks)
@@ -322,25 +350,62 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       /*End of file encountered*/
       break;
      }
-    else
-     fread(&tmp_block,sizeof(blockent),1,metaptr);
+    if (fi->fh > 0)
+     sem_wait(&(file_handle_table[fi->fh].meta_sem));
+    fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET); /* Seek to the current block on the meta */
+    fread(&tmp_block,sizeof(blockent),1,metaptr);
+    if (fi->fh > 0)
+     sem_post(&(file_handle_table[fi->fh].meta_sem));
+
     sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
 
-    if (tmp_block.stored_where==1)
+
+    if (fi->fh>0)
+     sem_wait(&(file_handle_table[fi->fh].block_sem));
+
+    if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
-      data_fptr=fopen(blockpath,"r");
-      if (data_fptr==NULL)
-       {
-        retsize = -1;
-        break;
-       }
+      data_fptr=file_handle_table[fi->fh].blockptr;
      }
     else
      {
-      /*Storage in cloud not implemeted now*/
-      break;
+      if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block!=0))
+       {
+        fclose(file_handle_table[fi->fh].blockptr);
+        file_handle_table[fi->fh].opened_block=0;
+       }
+      if (tmp_block.stored_where==1)
+       {
+        data_fptr=fopen(blockpath,"r+");
+        setbuf(data_fptr,NULL);
+        if (data_fptr==NULL)
+         {
+          retsize = -1;
+          if (fi->fh>0)
+           {
+            sem_post(&(file_handle_table[fi->fh].block_sem));
+           }
+          break;
+         }
+       }
+      else
+       {
+        /*Storage in cloud not implemeted now*/
+
+        if (fi->fh>0)
+         {
+          sem_post(&(file_handle_table[fi->fh].block_sem));
+         }
+        break;
+       }
+      if (fi->fh>0)
+       {
+        file_handle_table[fi->fh].opened_block=count;
+        file_handle_table[fi->fh].blockptr=data_fptr;
+       }
      }
-    printf("%s\n",blockpath);
+
+//    printf("%s\n",blockpath);
     fseek(data_fptr,current_offset - (MAX_BLOCK_SIZE * (count-1)),SEEK_SET);
     if ((MAX_BLOCK_SIZE * count) < (offset+size))
      max_to_read = (MAX_BLOCK_SIZE * count) - current_offset;
@@ -348,14 +413,19 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
      max_to_read = (offset+size) - current_offset;
     actual_read_bytes = fread(&buf[current_offset-offset],sizeof(char),max_to_read,data_fptr);
 
-    printf("Read debug max_to_read %d actual read %d\n",max_to_read, actual_read_bytes);
+//    printf("Read debug max_to_read %d actual read %d\n",max_to_read, actual_read_bytes);
 
     total_read_bytes += actual_read_bytes;
     current_offset +=actual_read_bytes;
     if (actual_read_bytes < max_to_read)
      {
       have_error = ferror(data_fptr);
-      fclose(data_fptr);
+      if (fi->fh==0)
+       fclose(data_fptr);
+      else
+       {
+        sem_post(&(file_handle_table[fi->fh].block_sem));
+       }
       if (have_error>0)
        {
         retsize = -have_error;
@@ -366,14 +436,20 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
      }
     else
      {
-      fclose(data_fptr);
+      if (fi->fh==0)
+       fclose(data_fptr);
+      else
+       {
+        sem_post(&(file_handle_table[fi->fh].block_sem));
+       }
      }
    }
 
   if (retsize>=0)
    retsize = total_read_bytes;
-  printf("Debug myread end path %s, size %ld, offset %ld, total read %d\n",path,size,offset,retsize);
-  fclose(metaptr);
+//  printf("Debug myread end path %s, size %ld, offset %ld, total read %d\n",path,size,offset,retsize);
+  if (fi->fh==0)
+   fclose(metaptr);
 
   return retsize;
  }
@@ -412,13 +488,22 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
    }
   else
    {
+//    sem_wait(&(file_handle_table[fi->fh].meta_sem));
     metaptr = file_handle_table[fi->fh].metaptr;
     this_inode = file_handle_table[fi->fh].st_ino;
-    fseek(metaptr,0,SEEK_SET);
+//    fseek(metaptr,0,SEEK_SET);
    }
 
-  fread(&inputstat,sizeof(struct stat),1,metaptr);
-  fread(&total_blocks,sizeof(long),1,metaptr);
+  if (fi->fh==0)
+   {
+    fread(&inputstat,sizeof(struct stat),1,metaptr);
+    fread(&total_blocks,sizeof(long),1,metaptr);
+   }
+  else
+   {
+    memcpy(&inputstat, &(file_handle_table[fi->fh].inputstat),sizeof(struct stat));
+    total_blocks = file_handle_table[fi->fh].total_blocks;
+   }
 
   total_write_bytes=0;
 
@@ -430,6 +515,9 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   printf("%ld, %ld, %ld\n",start_block,end_block,end_bytes);
   printf("total block %ld\n",total_blocks);
+
+  if (fi->fh > 0)
+   sem_wait(&(file_handle_table[fi->fh].meta_sem));
 
   if ((start_block -1) > total_blocks)  /*Padding the file meta*/
    {
@@ -454,6 +542,9 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
      fread(&tmp_block,sizeof(blockent),1,metaptr);
     sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
 
+    if (fi->fh>0)
+     sem_wait(&(file_handle_table[fi->fh].block_sem));
+
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
       data_fptr=file_handle_table[fi->fh].blockptr;
@@ -468,10 +559,12 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
       if (tmp_block.stored_where==1)
        {
         data_fptr=fopen(blockpath,"r+");
+        setbuf(data_fptr,NULL);
        }
       else
        {
         data_fptr=fopen(blockpath,"w+");
+        setbuf(data_fptr,NULL);
         tmp_block.stored_where=1;
        }
       if (fi->fh>0)
@@ -517,17 +610,28 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
       if (fi->fh==0)
        fclose(data_fptr);
      }
+    if (fi->fh>0)
+     sem_post(&(file_handle_table[fi->fh].block_sem));
    }
     
   if (inputstat.st_size < (offset+total_write_bytes))
    {
+    sem_wait(&mysystem_meta_sem);
     mysystem_meta.system_size += (offset+total_write_bytes) - inputstat.st_size;
+    sem_post(&mysystem_meta_sem);
     inputstat.st_size = offset+total_write_bytes;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
    }
   fseek(metaptr,0,SEEK_SET);
   fwrite(&inputstat,sizeof(struct stat),1,metaptr);
   fwrite(&total_blocks,sizeof(long),1,metaptr);
+
+  if (fi->fh > 0)
+   {
+    memcpy(&(file_handle_table[fi->fh].inputstat),&inputstat,sizeof(struct stat));
+    file_handle_table[fi->fh].total_blocks = total_blocks;
+   }
+
 
   super_inode_write(&inputstat,this_inode);
 
@@ -537,6 +641,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
   printf("Debug mywrite end path %s, size %ld, offset %ld, total write %d\n",path,size,offset,retsize); 
   if (fi->fh == 0)
    fclose(metaptr);
+  else
+   sem_post(&(file_handle_table[fi->fh].meta_sem));
   return retsize;
  }
 
@@ -573,9 +679,11 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
      retcode = -ENOENT;
     else
      {
+      sem_wait(&mysystem_meta_sem);
       mysystem_meta.total_inodes +=1;
       mysystem_meta.max_inode+=1;
       new_inode = mysystem_meta.max_inode;
+      sem_post(&mysystem_meta_sem);
 
       fread(&inputstat,sizeof(struct stat),1,fptr);
       inputstat.st_mtime=currenttime.time;
@@ -660,9 +768,12 @@ int mymkdir(const char *path,mode_t thismode)
      retcode = -ENOENT;
     else
      {
+      sem_wait(&mysystem_meta_sem);
       mysystem_meta.total_inodes +=1;
       mysystem_meta.max_inode+=1;
       new_inode = mysystem_meta.max_inode;
+      sem_post(&mysystem_meta_sem);
+
       fread(&inputstat,sizeof(struct stat),1,fptr);
       inputstat.st_nlink++;
       inputstat.st_mtime=currenttime.time;
@@ -825,7 +936,6 @@ int myunlink(const char *path)
     if (fptr==NULL)
      return -ENOENT;
     fread(&inputstat,sizeof(struct stat),1,fptr);
-    mysystem_meta.system_size -= inputstat.st_size;
 
     fread(&total_blocks,sizeof(long),1,fptr);
     fclose(fptr);
@@ -834,7 +944,11 @@ int myunlink(const char *path)
     retcode = super_inode_delete(this_inode);
     if (tmpstatus!=0)
      return -1;
+
+    sem_wait(&mysystem_meta_sem);
+    mysystem_meta.system_size -= inputstat.st_size;
     mysystem_meta.total_inodes -=1;
+    sem_post(&mysystem_meta_sem);
 
     /* Removing all blocks for this inode */
     for(block_count=1;block_count<=total_blocks;block_count++)
@@ -946,7 +1060,9 @@ int myrmdir(const char *path)
     retcode = super_inode_delete(this_inode);
     if (tmpstatus!=0)
      return -1;
+    sem_wait(&mysystem_meta_sem);
     mysystem_meta.total_inodes -=1;
+    sem_post(&mysystem_meta_sem);
 
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,parent_inode % SYS_DIR_WIDTH,parent_inode);
 
@@ -1071,7 +1187,9 @@ int mytruncate(const char *path, off_t length)
       truncate(blockpath, length - ((last_block -1) * MAX_BLOCK_SIZE));
      }
     total_blocks = last_block;
+    sem_wait(&mysystem_meta_sem);
     mysystem_meta.system_size += (length - inputstat.st_size);
+    sem_post(&mysystem_meta_sem);
     inputstat.st_size=length;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
     fseek(fptr,0,SEEK_SET);

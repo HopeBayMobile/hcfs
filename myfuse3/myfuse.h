@@ -39,6 +39,7 @@ typedef struct {
  } blockent;
 
 system_meta mysystem_meta;
+sem_t mysystem_meta_sem;
 FILE *system_meta_fptr;
 FILE *super_inode_read_fptr, *super_inode_write_fptr;
 sem_t super_inode_read_sem, super_inode_write_sem;
@@ -55,7 +56,11 @@ typedef struct {
   ino_t st_ino;
   FILE *metaptr;
   FILE *blockptr;
+  sem_t meta_sem;
+  sem_t block_sem;
   long opened_block;
+  long total_blocks;
+  struct stat inputstat;  
  } file_handle_entry;
 
 file_handle_entry file_handle_table[MAX_FILE_TABLE_SIZE+1];
@@ -97,6 +102,8 @@ int myrmdir(const char *path);
 int myfsync(const char *path, int datasync, struct fuse_file_info *fi);
 int mytruncate(const char *path, off_t length);
 int mystatfs(const char *path, struct statvfs *buf);
+
+
 int super_inode_read(struct stat *inputstat,ino_t this_inode);
 int super_inode_write(struct stat *inputstat,ino_t this_inode);
 int super_inode_create(struct stat *inputstat,ino_t this_inode);

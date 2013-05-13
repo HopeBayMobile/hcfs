@@ -35,6 +35,8 @@ void initsystem()
     fclose(super_inode_write_fptr);
     super_inode_write_fptr=fopen(superinodepath,"w+");
     super_inode_read_fptr=fopen(superinodepath,"r+");
+    setbuf(super_inode_write_fptr,NULL);  /* Need to set inode pool I/O to unbuf for sync purpose*/
+    setbuf(super_inode_read_fptr,NULL);
     create_root_meta();
     fflush(super_inode_write_fptr);
     mysystem_meta.total_inodes=1;
@@ -50,6 +52,8 @@ void initsystem()
     fread(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
     super_inode_write_fptr=fopen(superinodepath,"r+");
     super_inode_read_fptr=fopen(superinodepath,"r+");
+    setbuf(super_inode_write_fptr,NULL);  /* Need to set inode pool I/O to unbuf for sync purpose*/
+    setbuf(super_inode_read_fptr,NULL);
    }
   memset(&path_cache,0,sizeof(path_cache_entry)*(MAX_ICACHE_ENTRY));
   for(count=0;count<MAX_ICACHE_ENTRY;count++)
@@ -57,6 +61,7 @@ void initsystem()
   sem_init(&file_table_sem,0,1);
   sem_init(&super_inode_read_sem,0,1);
   sem_init(&super_inode_write_sem,0,1);
+  sem_init(&mysystem_meta_sem,0,1);
 
 
   return;
@@ -64,9 +69,11 @@ void initsystem()
 
 void mysync_system_meta()
  {
+  sem_wait(&mysystem_meta_sem);
   fseek(system_meta_fptr,0,SEEK_SET);
   fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
   fflush(system_meta_fptr);
+  sem_post(&mysystem_meta_sem);
   return;
  }
 
@@ -133,8 +140,6 @@ int super_inode_read(struct stat *inputstat,ino_t this_inode)
   total_read=fread(inputstat,sizeof(struct stat),1,super_inode_read_fptr);
   sem_post(&(super_inode_read_sem));
 
-  printf("debug super inode read %ld, size %ld, need 1\n",this_inode, total_read);
-
   if ((total_read < 1) || (inputstat->st_ino < 1))
    return -ENOENT;
   return 0;
@@ -146,7 +151,6 @@ int super_inode_write(struct stat *inputstat,ino_t this_inode)
   sem_wait(&(super_inode_write_sem));
   fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
   total_write=fwrite(inputstat,sizeof(struct stat),1,super_inode_write_fptr);
-  fflush(super_inode_write_fptr);
   sem_post(&(super_inode_write_sem));
 
   if (total_write < 1)
@@ -161,7 +165,6 @@ int super_inode_create(struct stat *inputstat,ino_t this_inode)
   sem_wait(&(super_inode_write_sem));
   fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
   total_write=fwrite(inputstat,sizeof(struct stat),1,super_inode_write_fptr);
-  fflush(super_inode_write_fptr);
   sem_post(&(super_inode_write_sem));
 
   if (total_write < 1)
@@ -178,7 +181,6 @@ int super_inode_delete(ino_t this_inode)
   sem_wait(&(super_inode_write_sem));
   fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
   total_write=fwrite(&inputstat,sizeof(struct stat),1,super_inode_write_fptr);
-  fflush(super_inode_write_fptr);
   sem_post(&(super_inode_write_sem));
 
   if (total_write < 1)
