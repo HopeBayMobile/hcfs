@@ -140,6 +140,8 @@ int super_inode_read(struct stat *inputstat,ino_t this_inode)
   total_read=fread(inputstat,sizeof(struct stat),1,super_inode_read_fptr);
   sem_post(&(super_inode_read_sem));
 
+  printf("total read %ld, inode %ld, %ld\n",total_read, inputstat->st_ino, this_inode);
+
   if ((total_read < 1) || (inputstat->st_ino < 1))
    return -ENOENT;
   return 0;
@@ -152,6 +154,9 @@ int super_inode_write(struct stat *inputstat,ino_t this_inode)
   fseek(super_inode_write_fptr,sizeof(struct stat)*(this_inode-1),SEEK_SET);
   total_write=fwrite(inputstat,sizeof(struct stat),1,super_inode_write_fptr);
   sem_post(&(super_inode_write_sem));
+
+  printf("total write %d, inode %ld, %ld\n",total_write, inputstat->st_ino, this_inode);
+
 
   if (total_write < 1)
    return -1;

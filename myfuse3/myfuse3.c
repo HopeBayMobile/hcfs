@@ -30,6 +30,7 @@ static struct fuse_operations my_fuse_ops = {
   .truncate = mytruncate,
   .release = myrelease,
   .statfs = mystatfs,
+  .create = mycreate,
  };
 
 void main(int argc, char **argv)

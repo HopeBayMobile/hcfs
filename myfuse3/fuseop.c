@@ -112,7 +112,10 @@ int myreaddir(const char *path, void *buf, fuse_fill_dir_t filler,
 
          }
         else
-         filler(buf, tempent.name, NULL, 0);
+         {
+          if (strlen(tempent.name)>0)
+           filler(buf, tempent.name, NULL, 0);
+         }
        }
 
       fclose(fptr);
@@ -188,6 +191,7 @@ int myopen(const char *path, struct fuse_file_info *fi)
                                 file_handle_table[empty_index].st_ino % SYS_DIR_WIDTH,file_handle_table[empty_index].st_ino);
 
   file_handle_table[empty_index].metaptr=fopen(metapath,"r+");
+  setbuf(file_handle_table[empty_index].metaptr,NULL);
   printf("debug open metapath is %s\n",metapath);
   if (file_handle_table[empty_index].metaptr ==NULL)
    {
@@ -287,6 +291,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
 
     metaptr=fopen(metapath,"r+");
+    setbuf(metaptr,NULL);
+
     if (metaptr==NULL)
      return -ENOENT;
    }
@@ -483,6 +489,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
 
     metaptr=fopen(metapath,"r+");
+    setbuf(metaptr,NULL);
     if (metaptr==NULL)
      return -ENOENT;
    }
@@ -493,6 +500,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     this_inode = file_handle_table[fi->fh].st_ino;
 //    fseek(metaptr,0,SEEK_SET);
    }
+
+  printf("Debug write: writing to inode %ld\n", this_inode);
 
   if (fi->fh==0)
    {
@@ -653,6 +662,7 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
   ino_t this_inode,new_inode;
   FILE *fptr;
   char metapath[1024];
+  char filename[1024];
   long num_subdir,num_reg,count;
   simple_dirent tempent;
   char *tmpptr;
@@ -669,14 +679,13 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
   this_inode = find_parent_inode(path);
 
   if (this_inode <=0)
-   retcode = -ENOENT;
+   return -ENOENT;
   else
    {
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
 
-    fptr=fopen(metapath,"r+");
-    if (fptr==NULL)
-     retcode = -ENOENT;
+    if (access(metapath,F_OK)!=0)
+     return -ENOENT;
     else
      {
       sem_wait(&mysystem_meta_sem);
@@ -685,26 +694,9 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       new_inode = mysystem_meta.max_inode;
       sem_post(&mysystem_meta_sem);
 
-      fread(&inputstat,sizeof(struct stat),1,fptr);
-      inputstat.st_mtime=currenttime.time;
+      strcpy(filename,&path[tmpptr-path+1]);
+      dir_add_filename(this_inode,new_inode,filename);
 
-      fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
-      fread(&num_reg,sizeof(long),1,fptr);
-      num_reg++;
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      super_inode_write(&inputstat,this_inode);
-
-
-      fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
-      fwrite(&num_reg,sizeof(long),1,fptr);
-      fseek(fptr,0,SEEK_END);
-      memset(&tempent,0,sizeof(simple_dirent));
-      tempent.st_ino = new_inode;
-      tempent.st_mode = S_IFREG | 0755;
-      strcpy(tempent.name,&path[tmpptr-path+1]);
-      fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-      fclose(fptr);
       memset(&inputstat,0,sizeof(struct stat));
       inputstat.st_ino=new_inode;
       inputstat.st_mode = S_IFREG | 0755;
@@ -892,31 +884,16 @@ int myutime(const char *path, struct utimbuf *mymodtime)
   return retcode;
  } 
 
-int myrename(const char *oldname, const char *newname)
- {
-  int retcode=0;
-  show_current_time();
-
-  return retcode;
- }
-
 int myunlink(const char *path)
  {
-/*Todo: need to revise this to take close after delete into account*/
-/*TODO: will need to actually decrease n_link to inode, and to check if
-  an opened file points to that inode. */
+  /*If unlink in FUSE is called before close, FUSE will first
+    rename the file to a temp name, then unlink it after the file is closed.*/
   struct stat inputstat;
   int retcode=0;
   ino_t parent_inode,this_inode;
-  FILE *fptr;
-  char metapath[1024];
-  char blockpath[1024];
-  long num_subdir,num_reg,total_blocks;
-  simple_dirent tempent;
   char *tmpptr;
   int tmpstatus;
-  int tmp_index,count;
-  long block_count;
+  char filename[1024];
 
   show_current_time();
 
@@ -924,83 +901,26 @@ int myunlink(const char *path)
   tmpptr = strrchr(path,'/');
 
   parent_inode = find_parent_inode(path);
-  this_inode = find_inode(path);
+  retcode = mygetattr(path,&inputstat);
 
-  if (this_inode <=0)
-   retcode = -ENOENT;
+  if (retcode < 0)
+   return retcode;
   else
    {
-    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
-
-    fptr = fopen(metapath,"r");
-    if (fptr==NULL)
-     return -ENOENT;
-    fread(&inputstat,sizeof(struct stat),1,fptr);
-
-    fread(&total_blocks,sizeof(long),1,fptr);
-    fclose(fptr);
     invalidate_inode_cache(path);
-    tmpstatus=unlink(metapath);
-    retcode = super_inode_delete(this_inode);
+
+    tmpstatus = decrease_nlink_ref(&inputstat);
+
     if (tmpstatus!=0)
      return -1;
 
-    sem_wait(&mysystem_meta_sem);
-    mysystem_meta.system_size -= inputstat.st_size;
-    mysystem_meta.total_inodes -=1;
-    sem_post(&mysystem_meta_sem);
+    strcpy(filename,&path[(tmpptr-path)+1]);
+    retcode = dir_remove_filename(parent_inode, filename);
 
-    /* Removing all blocks for this inode */
-    for(block_count=1;block_count<=total_blocks;block_count++)
-     {
-      sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
-                                           (this_inode + block_count) % SYS_DIR_WIDTH,this_inode,block_count);
-
-      unlink(blockpath);
-     }
-
-    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,parent_inode % SYS_DIR_WIDTH,parent_inode);
-
-
-    fptr=fopen(metapath,"r+");
-    if (fptr==NULL)
-     retcode = -ENOENT;
-    else
-     {
-      fseek(fptr,sizeof(struct stat),SEEK_SET);
-      fread(&num_subdir,sizeof(long),1,fptr);
-      fread(&num_reg,sizeof(long),1,fptr);
-      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(num_subdir*sizeof(simple_dirent)),SEEK_SET);
-      for(count=0;count<num_reg;count++)
-       {
-        fread(&tempent,sizeof(simple_dirent),1,fptr);
-        printf("To this file %s, check %s\n",tempent.name,&path[(tmpptr-path)+1]);
-        if (strcmp(tempent.name,&path[(tmpptr-path)+1])==0)
-         {
-          tmp_index = count;
-          break;
-         }
-       }
-      printf("Testing if have this file\n");
-      if (count>=num_reg)
-       return -ENOENT;
-      num_reg--;
-      fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
-      fwrite(&num_reg,sizeof(long),1,fptr);
-      if (tmp_index<num_reg)  /*If the entry to be deleted is not at the end of the meta*/
-       {
-        fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)),SEEK_SET);
-        fread(&tempent,sizeof(simple_dirent),1,fptr);
-        fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((tmp_index+num_subdir)*sizeof(simple_dirent)),SEEK_SET);
-        fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-       }
-      fclose(fptr);
-      truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
-      printf("finished unlink\n");
-     }
    }
 
-   mysync_system_meta();
+  mysync_system_meta();
+  printf("Debug unlink: finished unlink\n");
 
 
   return retcode;
@@ -1012,6 +932,7 @@ int myrmdir(const char *path)
   ino_t parent_inode,this_inode;
   FILE *fptr;
   char metapath[1024];
+  char dirname[1024];
   long num_subdir,num_reg;
   simple_dirent tempent;
   char *tmpptr;
@@ -1064,58 +985,9 @@ int myrmdir(const char *path)
     mysystem_meta.total_inodes -=1;
     sem_post(&mysystem_meta_sem);
 
-    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,parent_inode % SYS_DIR_WIDTH,parent_inode);
+    strcpy(dirname,&path[(tmpptr-path)+1]);
+    retcode = dir_remove_dirname(parent_inode, dirname);
 
-
-    fptr=fopen(metapath,"r+");
-    if (fptr==NULL)
-     retcode = -ENOENT;
-    else
-     {
-      fread(&inputstat,sizeof(struct stat),1,fptr);
-      inputstat.st_nlink--;
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      super_inode_write(&inputstat,parent_inode);
-
-
-      fseek(fptr,sizeof(struct stat),SEEK_SET);
-      fread(&num_subdir,sizeof(long),1,fptr);
-      fread(&num_reg,sizeof(long),1,fptr);
-      fseek(fptr,sizeof(struct stat)+(2*sizeof(long)),SEEK_SET);
-      for(count=0;count<num_subdir;count++)
-       {
-        fread(&tempent,sizeof(simple_dirent),1,fptr);
-        printf("To this directory %s, check %s\n",tempent.name,&path[(tmpptr-path)+1]);
-        if (strcmp(tempent.name,&path[(tmpptr-path)+1])==0)
-         {
-          tmp_index = count;
-          break;
-         }
-       }
-      printf("Testing if have this directory\n");
-      if (count>=num_subdir)
-       return -ENOENT;
-      num_subdir--;
-      fseek(fptr,sizeof(struct stat),SEEK_SET);
-      fwrite(&num_subdir,sizeof(long),1,fptr);
-      if (tmp_index<num_subdir)  /*If the entry to be deleted is not at the end of the subdir meta*/
-       {
-        fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(num_subdir*sizeof(simple_dirent)),SEEK_SET);  /*Last subdir entry*/
-        fread(&tempent,sizeof(simple_dirent),1,fptr);
-        fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(tmp_index*sizeof(simple_dirent)),SEEK_SET);
-        fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-       }
-      if (num_reg > 0) /*If have reg file, also need to swap*/
-      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_subdir+num_reg)*sizeof(simple_dirent)),SEEK_SET);  /*Last file entry*/
-      fread(&tempent,sizeof(simple_dirent),1,fptr);
-      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(num_subdir*sizeof(simple_dirent)),SEEK_SET); /*Overwrite the place occupied by the original last subdir entry*/
-      fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-
-      fclose(fptr);
-      truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
-      printf("finished rmdir\n");
-     }
    }
 
   mysync_system_meta();
@@ -1221,3 +1093,362 @@ int mystatfs(const char *path, struct statvfs *buf)
 
   return 0;
  }
+
+int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
+ {
+  struct stat inputstat;
+  int retcode=0;
+  ino_t this_inode,new_inode;
+  FILE *fptr;
+  char metapath[1024];
+  char filename[1024];
+  long num_subdir,num_reg,count;
+  simple_dirent tempent;
+  char *tmpptr;
+  long num_blocks =0;
+  unsigned int inodehash;
+  struct timeb currenttime;
+  long count2;
+  uint64_t empty_index;
+  uint64_t temp_mask;
+
+  ftime(&currenttime);
+
+  tmpptr = strrchr(path,'/');
+  show_current_time();
+
+
+  this_inode = find_parent_inode(path);
+
+  if (this_inode <=0)
+   return -ENOENT;
+  else
+   {
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
+    if (access(metapath,F_OK)!=0)
+     return -ENOENT;
+    else
+     {
+      sem_wait(&mysystem_meta_sem);
+      mysystem_meta.total_inodes +=1;
+      mysystem_meta.max_inode+=1;
+      new_inode = mysystem_meta.max_inode;
+      sem_post(&mysystem_meta_sem);
+
+      strcpy(filename,&path[tmpptr-path+1]);
+      dir_add_filename(this_inode,new_inode,filename);
+
+      memset(&inputstat,0,sizeof(struct stat));
+      inputstat.st_ino=new_inode;
+      inputstat.st_mode = S_IFREG | 0755;
+      inputstat.st_nlink = 1;
+      inputstat.st_uid=getuid();
+      inputstat.st_gid=getgid();
+      inputstat.st_atime=currenttime.time;
+      inputstat.st_mtime=currenttime.time;
+      inputstat.st_ctime=currenttime.time;
+      sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
+
+      printf("debug create using new inode number %ld\n",new_inode);
+
+      fptr=fopen(metapath,"w+");
+      setbuf(fptr,NULL);
+      fwrite(&inputstat,sizeof(struct stat),1,fptr);
+      num_blocks = 0;
+      fwrite(&num_blocks,sizeof(long),1,fptr);
+      super_inode_create(&inputstat,new_inode);
+      fflush(fptr);
+
+     }
+   }
+
+  if (strlen(path)<MAX_ICACHE_PATHLEN)
+   {
+    inodehash = compute_inode_hash(path);
+    replace_inode_cache(inodehash,path,new_inode);
+   }
+  mysync_system_meta();
+  show_current_time();
+
+  if (num_opened_files > MAX_FILE_TABLE_SIZE)
+   {
+    fi -> fh = 0;
+    return 0;
+   }
+  
+  /*now find the empty file table slot*/
+  sem_wait(&file_table_sem);
+  empty_index=0;
+  for(count=0;count<(MAX_FILE_TABLE_SIZE/64);count++)
+   {
+    temp_mask = ~opened_files_masks[count];
+    if (temp_mask > 0)  /*have empty slot*/
+     {
+      temp_mask = 1;
+      for(count2=0;count2<64;count2++)
+       {
+        if ((opened_files_masks[count] & temp_mask) ==0)
+         {
+          empty_index = count*64+count2+1;
+          opened_files_masks[count] = opened_files_masks[count] | temp_mask;
+          num_opened_files++;
+          break;
+         }
+        if (count2 == 63)
+         break;
+        temp_mask = temp_mask << 1;
+       }
+     }
+    else
+     continue;
+    if (empty_index > 0)
+     break;
+   }
+
+  fi -> fh = empty_index;
+  file_handle_table[empty_index].st_ino = new_inode;
+  if (file_handle_table[empty_index].st_ino==0)
+   {
+    /*No such inode?*/
+    num_opened_files--;
+    temp_mask = ~temp_mask;
+    opened_files_masks[count] = opened_files_masks[count] & temp_mask;
+    fi -> fh =0;
+    sem_post(&file_table_sem);
+    return -ENOENT;
+   }
+  show_current_time();
+
+  file_handle_table[empty_index].opened_block=0;
+  file_handle_table[empty_index].blockptr=NULL;
+
+  file_handle_table[empty_index].metaptr=fptr;
+  if (file_handle_table[empty_index].metaptr ==NULL)
+   {
+    /*No such inode?*/
+    num_opened_files--;
+    temp_mask = ~temp_mask;
+    opened_files_masks[count] = opened_files_masks[count] & temp_mask;
+    fi -> fh =0;
+    sem_post(&file_table_sem);
+    return -ENOENT;
+   }
+
+  sem_init(&(file_handle_table[empty_index].meta_sem),0,1);
+  sem_init(&(file_handle_table[empty_index].block_sem),0,1);
+
+  memcpy(&(file_handle_table[empty_index].inputstat),&inputstat, sizeof(struct stat));
+  file_handle_table[empty_index].total_blocks = num_blocks;
+
+  sem_post(&file_table_sem);
+  printf("Debug end of mycreate\n");
+  show_current_time();
+
+  return 0;
+ }
+
+int myrename(const char *oldpath, const char *newpath)
+ {
+  struct stat oldpathstat;
+  struct stat newpathstat;
+  FILE *fptr;
+  int retcode,newretcode;
+  char metapath[1024];
+  char blockpath[1024];
+  char oldname[512];
+  char newname[512];
+  long sizebuf[2];
+  ino_t oldparent_ino, newparent_ino;
+  char *old_tmpptr,*new_tmpptr;
+  long count,old_entryindex,new_entryindex;
+  simple_dirent tempent, old_tempent, new_tempent;
+  int tmpstatus;
+  long block_count, total_blocks;
+
+  printf("Debug renaming from %s to %s\n",oldpath,newpath);
+
+  if ((strcmp(oldpath,"/")==0) || (strcmp(newpath,"/")==0))
+   return -EACCES;
+
+  retcode=mygetattr(oldpath,&oldpathstat);
+  if (retcode < 0)
+   return retcode;
+
+  if (oldpathstat.st_mode & S_IFDIR)
+   {
+    newretcode = mygetattr(newpath, &newpathstat);
+    if ((newretcode !=-ENOENT) && (newretcode < 0))
+     return newretcode;
+
+    if ((newretcode >= 0) && ( newpathstat.st_mode & S_IFDIR)) /*Check if the target directory is empty*/
+     {
+      sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,newpathstat.st_ino % SYS_DIR_WIDTH,newpathstat.st_ino);
+      fptr = fopen(metapath,"r");
+      fseek(fptr,sizeof(struct stat),SEEK_SET);
+      fread(sizebuf,sizeof(long),2,fptr);
+      fclose(fptr);
+      if ((sizebuf[0]+sizebuf[1]) > 2) /*Non-empty directory*/
+       return -ENOTEMPTY;
+      myrmdir(newpath);
+     }
+    /*Can proceed to rename oldpath to newpath*/
+   }
+  else
+   {
+    newretcode = mygetattr(newpath, &newpathstat);
+    if ((newretcode !=-ENOENT) && (retcode < 0))
+     return newretcode;
+   }
+  if (newpathstat.st_ino == oldpathstat.st_ino)
+   return 0;
+
+  oldparent_ino = find_parent_inode(oldpath);
+  newparent_ino = find_parent_inode(newpath);
+
+  invalidate_inode_cache(oldpath);
+  if (newretcode >=0)
+   invalidate_inode_cache(newpath);
+
+  if (oldparent_ino == newparent_ino) /*Within the same dir*/
+   {
+    if (newretcode == -ENOENT) /*Just rename*/
+     {
+      old_tmpptr = strrchr(oldpath,'/');
+      new_tmpptr = strrchr(newpath,'/');
+
+      strcpy(oldname,&oldpath[old_tmpptr-oldpath+1]);
+      strcpy(newname,&newpath[new_tmpptr-newpath+1]);
+
+      sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,oldparent_ino % SYS_DIR_WIDTH,oldparent_ino);
+      fptr = fopen(metapath,"r+");
+      fseek(fptr,sizeof(struct stat),SEEK_SET);
+      fread(sizebuf,sizeof(long),2,fptr);
+
+      for(count = 0; count<(sizebuf[0]+sizebuf[1]);count++)
+       {
+        fread(&tempent,sizeof(simple_dirent),1,fptr);
+        if (tempent.st_ino == oldpathstat.st_ino)
+         {
+          strcpy(tempent.name,newname);
+          fseek(fptr,sizeof(struct stat)+2*sizeof(long)+sizeof(simple_dirent)*count,SEEK_SET);
+          fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+          fclose(fptr);
+          return 0;
+         }
+       }
+      /*Cannot find old entry?*/
+      fclose(fptr);
+      return -ENOENT;
+     }
+    /* Target path should be a file or sym link*/
+
+    if (newpathstat.st_mode & S_IFDIR)
+     return -EACCES;
+
+    old_tmpptr = strrchr(oldpath,'/');
+    new_tmpptr = strrchr(newpath,'/');
+
+    strcpy(oldname,&oldpath[old_tmpptr-oldpath+1]);
+    strcpy(newname,&newpath[new_tmpptr-newpath+1]);
+
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,oldparent_ino % SYS_DIR_WIDTH,oldparent_ino);
+    fptr = fopen(metapath,"r+");
+    fseek(fptr,sizeof(struct stat),SEEK_SET);
+    fread(sizebuf,sizeof(long),2,fptr);
+
+    old_entryindex = 0;
+    new_entryindex = 0;
+
+    for(count = 0; count<(sizebuf[0]+sizebuf[1]);count++)
+     {
+      fread(&tempent,sizeof(simple_dirent),1,fptr);
+      if (tempent.st_ino == oldpathstat.st_ino)
+       {
+        memcpy(&old_tempent,&tempent,sizeof(simple_dirent));
+        old_entryindex=count;
+       }
+      if (tempent.st_ino == newpathstat.st_ino)
+       {
+        memcpy(&new_tempent,&tempent,sizeof(simple_dirent));
+        new_entryindex=count;
+       }
+      if ((old_entryindex !=0) && (new_entryindex !=0))
+       break;
+     }
+    strcpy(old_tempent.name,newname);
+    memset(&new_tempent,0,sizeof(simple_dirent));
+    fseek(fptr,sizeof(struct stat)+2*sizeof(long)+sizeof(simple_dirent)*old_entryindex,SEEK_SET);
+    fwrite(&old_tempent,sizeof(simple_dirent),1,fptr);
+    fseek(fptr,sizeof(struct stat)+2*sizeof(long)+sizeof(simple_dirent)*new_entryindex,SEEK_SET);
+    fwrite(&new_tempent,sizeof(simple_dirent),1,fptr);
+    fflush(fptr);
+
+    sizebuf[1]--;
+    fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
+    fwrite(&(sizebuf[1]),sizeof(long),1,fptr);
+    if (new_entryindex<(sizebuf[1]+sizebuf[0]))  /*If the entry to be deleted is not at the end of the meta*/
+     {
+      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((sizebuf[1]+sizebuf[0])*sizeof(simple_dirent)),SEEK_SET);
+      fread(&tempent,sizeof(simple_dirent),1,fptr);
+      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(new_entryindex*sizeof(simple_dirent)),SEEK_SET);
+      fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+     }
+    fclose(fptr);
+    truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((sizebuf[1]+sizebuf[0])*sizeof(simple_dirent)));
+
+    tmpstatus = decrease_nlink_ref(&newpathstat);
+    if (tmpstatus !=0)
+     return tmpstatus;
+
+    mysync_system_meta();
+    return 0;
+   }
+  else    /* If not in the same directory */
+   {
+    if (newretcode == -ENOENT) /* Just move to the new parent directory */
+     {
+
+
+/* .................. NOT FINISHED ................. */
+
+
+      old_tmpptr = strrchr(oldpath,'/');
+      new_tmpptr = strrchr(newpath,'/');
+
+      strcpy(oldname,&oldpath[old_tmpptr-oldpath+1]);
+      strcpy(newname,&newpath[new_tmpptr-newpath+1]);
+
+      if (oldpathstat.st_mode & S_IFDIR)
+       {
+//        dir_add_dirname(newparent_ino, oldname);
+        dir_remove_dirname(oldparent_ino, oldname);
+       }
+      else
+       {
+        dir_add_filename(newparent_ino, oldpathstat.st_ino, oldname);
+        dir_remove_filename(oldparent_ino, oldname);
+       }
+
+      return -ENOENT;
+     }
+    /* Target path should be a file or sym link*/
+
+    if (newpathstat.st_mode & S_IFDIR)
+     return -EACCES;
+
+    old_tmpptr = strrchr(oldpath,'/');
+    new_tmpptr = strrchr(newpath,'/');
+
+    strcpy(oldname,&oldpath[old_tmpptr-oldpath+1]);
+    strcpy(newname,&newpath[new_tmpptr-newpath+1]);
+
+
+    mysync_system_meta();
+    return -1;
+   }
+
+  return 0;
+ }
+
+

@@ -25,7 +25,7 @@
 typedef struct {
   ino_t st_ino;
   mode_t st_mode;
-  char name[256];
+  char name[260];
  } simple_dirent;
 
 typedef struct {
@@ -96,12 +96,13 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 int mymknod(const char *path, mode_t filemode,dev_t thisdev);
 int mymkdir(const char *path,mode_t thismode);
 int myutime(const char *path, struct utimbuf *mymodtime);
-int myrename(const char *oldname, const char *newname);
+int myrename(const char *oldpath, const char *newpath);
 int myunlink(const char *path);
 int myrmdir(const char *path);
 int myfsync(const char *path, int datasync, struct fuse_file_info *fi);
 int mytruncate(const char *path, off_t length);
 int mystatfs(const char *path, struct statvfs *buf);
+int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi);
 
 
 int super_inode_read(struct stat *inputstat,ino_t this_inode);
@@ -109,3 +110,7 @@ int super_inode_write(struct stat *inputstat,ino_t this_inode);
 int super_inode_create(struct stat *inputstat,ino_t this_inode);
 int super_inode_delete(ino_t this_inode);
 
+int decrease_nlink_ref(struct stat *inputstat);
+int dir_remove_filename(ino_t parent_inode, char* filename);
+int dir_remove_dirname(ino_t parent_inode, char* dirname);
+int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename);
