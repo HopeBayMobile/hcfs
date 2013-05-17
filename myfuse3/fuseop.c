@@ -648,17 +648,9 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
      return -ENOENT;
     else
      {
-      sem_wait(&mysystem_meta_sem);
-      mysystem_meta.total_inodes +=1;
-      mysystem_meta.max_inode+=1;
-      new_inode = mysystem_meta.max_inode;
-      sem_post(&mysystem_meta_sem);
-
       strcpy(filename,&path[tmpptr-path+1]);
-      dir_add_filename(this_inode,new_inode,filename);
 
       memset(&inputstat,0,sizeof(struct stat));
-      inputstat.st_ino=new_inode;
       inputstat.st_mode = filemode;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
@@ -666,14 +658,20 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       inputstat.st_atime=currenttime.time;
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
+
+      sem_wait(&mysystem_meta_sem);
+      super_inode_create(&inputstat,&new_inode);
+      sem_post(&mysystem_meta_sem);
+
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
+
+      dir_add_filename(this_inode,new_inode,filename);
 
       fptr=fopen(metapath,"w");
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_blocks = 0;
       fwrite(&num_blocks,sizeof(long),1,fptr);
       fclose(fptr);
-      super_inode_create(&inputstat,new_inode);
 
      }
    }
@@ -720,21 +718,13 @@ int mymkdir(const char *path,mode_t thismode)
      retcode = -ENOENT;
     else
      {
-      sem_wait(&mysystem_meta_sem);
-      mysystem_meta.total_inodes +=1;
-      mysystem_meta.max_inode+=1;
-      new_inode = mysystem_meta.max_inode;
-      sem_post(&mysystem_meta_sem);
-
 
       strcpy(dirname,&path[tmpptr-path+1]);
-      dir_add_dirname(this_inode, new_inode, dirname);
 
       /*Done with updating the parent inode meta*/
 
 
       memset(&inputstat,0,sizeof(struct stat));
-      inputstat.st_ino=new_inode;
       inputstat.st_mode = S_IFDIR | thismode;
       inputstat.st_nlink = 2;
       inputstat.st_uid=getuid();
@@ -742,6 +732,12 @@ int mymkdir(const char *path,mode_t thismode)
       inputstat.st_atime=currenttime.time;
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
+
+      sem_wait(&mysystem_meta_sem);
+      super_inode_create(&inputstat,&new_inode);
+      sem_post(&mysystem_meta_sem);
+
+      dir_add_dirname(this_inode, new_inode, dirname);
 
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
 
@@ -762,7 +758,6 @@ int mymkdir(const char *path,mode_t thismode)
       fwrite(&ent1,sizeof(simple_dirent),1,fptr);
       fwrite(&ent2,sizeof(simple_dirent),1,fptr);
       fclose(fptr);
-      super_inode_create(&inputstat,new_inode);
 
      }
    }
@@ -915,6 +910,7 @@ int myrmdir(const char *path)
 
     tmpstatus=unlink(metapath);
     retcode = super_inode_delete(this_inode);
+    super_inode_reclaim(this_inode);
     if (tmpstatus!=0)
      return -1;
     sem_wait(&mysystem_meta_sem);
@@ -1066,17 +1062,9 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
      return -ENOENT;
     else
      {
-      sem_wait(&mysystem_meta_sem);
-      mysystem_meta.total_inodes +=1;
-      mysystem_meta.max_inode+=1;
-      new_inode = mysystem_meta.max_inode;
-      sem_post(&mysystem_meta_sem);
-
       strcpy(filename,&path[tmpptr-path+1]);
-      dir_add_filename(this_inode,new_inode,filename);
 
       memset(&inputstat,0,sizeof(struct stat));
-      inputstat.st_ino=new_inode;
       inputstat.st_mode = filemode;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
@@ -1084,6 +1072,13 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
       inputstat.st_atime=currenttime.time;
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
+
+      sem_wait(&mysystem_meta_sem);
+      super_inode_create(&inputstat,&new_inode);
+      sem_post(&mysystem_meta_sem);
+
+      dir_add_filename(this_inode,new_inode,filename);
+
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
 
       printf("debug create using new inode number %ld\n",new_inode);
@@ -1093,7 +1088,6 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_blocks = 0;
       fwrite(&num_blocks,sizeof(long),1,fptr);
-      super_inode_create(&inputstat,new_inode);
       fflush(fptr);
 
      }

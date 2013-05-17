@@ -32,6 +32,7 @@ typedef struct {
 typedef struct {
   ino_t total_inodes;
   ino_t max_inode;
+  ino_t first_free_inode;
   long system_size;
  } system_meta;
 
@@ -44,6 +45,11 @@ sem_t mysystem_meta_sem;
 FILE *system_meta_fptr;
 FILE *super_inode_read_fptr, *super_inode_write_fptr;
 sem_t super_inode_read_sem, super_inode_write_sem;
+
+typedef struct {
+  struct stat thisstat;
+  ino_t next_free_inode;
+ } super_inode_entry;
 
 typedef struct {
   char pathname[MAX_ICACHE_PATHLEN];
@@ -108,7 +114,7 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi);
 
 int super_inode_read(struct stat *inputstat,ino_t this_inode);
 int super_inode_write(struct stat *inputstat,ino_t this_inode);
-int super_inode_create(struct stat *inputstat,ino_t this_inode);
+int super_inode_create(struct stat *inputstat,ino_t *this_inode);
 int super_inode_delete(ino_t this_inode);
 
 int decrease_nlink_ref(struct stat *inputstat);
