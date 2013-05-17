@@ -25,35 +25,11 @@ int mygetattr(const char *path, struct stat *nodestat)
    retcode = -ENOENT;
   else
    {
-/*
-    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
-
-    fptr=fopen(metapath,"r");
-    if (fptr==NULL)
-     retcode = -ENOENT;
-    else
-     {
-      fread((void*)&inputstat,sizeof(struct stat),1,fptr);
-      fclose(fptr);
-*/
-     {
-      retcode = super_inode_read(&inputstat,this_inode);
-      if (retcode < 0)
-       return retcode;
-      nodestat->st_nlink=inputstat.st_nlink;
-      nodestat->st_uid=inputstat.st_uid;
-      nodestat->st_gid=inputstat.st_gid;
-      nodestat->st_dev=inputstat.st_dev;
-      nodestat->st_ino=inputstat.st_ino;
-      nodestat->st_size=inputstat.st_size;
-      nodestat->st_blksize=MAX_BLOCK_SIZE;
-      nodestat->st_blocks=inputstat.st_blocks;
-      nodestat->st_atime=inputstat.st_atime;
-      nodestat->st_mtime=inputstat.st_mtime;
-      nodestat->st_ctime=inputstat.st_ctime;
-      nodestat->st_mode=inputstat.st_mode;
-     }
-
+    retcode = super_inode_read(&inputstat,this_inode);
+    if (retcode < 0)
+     return retcode;
+    memcpy(nodestat,&inputstat,sizeof(struct stat));
+    nodestat->st_blksize=MAX_BLOCK_SIZE;
    }
 
   return retcode;
@@ -298,10 +274,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
    }
   else
    {
-//    sem_wait(&(file_handle_table[fi->fh].meta_sem));
     metaptr = file_handle_table[fi->fh].metaptr;
     this_inode = file_handle_table[fi->fh].st_ino;
-//    fseek(metaptr,0,SEEK_SET);
    }
 
   if (fi->fh==0)
@@ -319,8 +293,6 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
    {
     if (fi->fh==0)
      fclose(metaptr);
-//    else
-//     sem_post(&(file_handle_table[fi->fh].meta_sem));
 
     return 0;
    }
@@ -332,23 +304,13 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
   start_block = (offset / (long) MAX_BLOCK_SIZE) + 1;
   end_block = (end_bytes / (long) MAX_BLOCK_SIZE) + 1;  /*Assume that block_index starts from 1. */
 
-//  printf("%ld, %ld, %ld\n",start_block,end_block,end_bytes);
-//  printf("total block %ld\n",total_blocks);
-
   if (start_block > total_blocks)
    {
     if (fi->fh==0)
      fclose(metaptr);
-//    else
-//     sem_post(&(file_handle_table[fi->fh].meta_sem));
-
     return 0;
    }
 
-//  if (fi->fh > 0)
-//   sem_post(&(file_handle_table[fi->fh].meta_sem));
-
-//  printf("%ld, %ld\n",start_block,end_block);
   for(count=start_block;count<=end_block;count++)
    {
     if (count > total_blocks)
@@ -495,10 +457,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
    }
   else
    {
-//    sem_wait(&(file_handle_table[fi->fh].meta_sem));
     metaptr = file_handle_table[fi->fh].metaptr;
     this_inode = file_handle_table[fi->fh].st_ino;
-//    fseek(metaptr,0,SEEK_SET);
    }
 
   printf("Debug write: writing to inode %ld\n", this_inode);
@@ -699,7 +659,7 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
 
       memset(&inputstat,0,sizeof(struct stat));
       inputstat.st_ino=new_inode;
-      inputstat.st_mode = S_IFREG | 0755;
+      inputstat.st_mode = filemode;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
@@ -736,6 +696,7 @@ int mymkdir(const char *path,mode_t thismode)
   ino_t this_inode,new_inode;
   FILE *fptr;
   char metapath[1024];
+  char dirname[1024];
   long num_subdir,num_reg,count;
   simple_dirent tempent,ent1,ent2;
   char *tmpptr;
@@ -755,8 +716,7 @@ int mymkdir(const char *path,mode_t thismode)
    {
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
 
-    fptr=fopen(metapath,"r+");
-    if (fptr==NULL)
+    if (access(metapath,F_OK)!=0)
      retcode = -ENOENT;
     else
      {
@@ -766,40 +726,16 @@ int mymkdir(const char *path,mode_t thismode)
       new_inode = mysystem_meta.max_inode;
       sem_post(&mysystem_meta_sem);
 
-      fread(&inputstat,sizeof(struct stat),1,fptr);
-      inputstat.st_nlink++;
-      inputstat.st_mtime=currenttime.time;
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&inputstat,sizeof(struct stat),1,fptr);
-      super_inode_write(&inputstat,this_inode);
 
-      fseek(fptr,sizeof(struct stat),SEEK_SET);
-      fread(&num_subdir,sizeof(long),1,fptr);
-      fread(&num_reg,sizeof(long),1,fptr);
-      num_subdir++;
-      fseek(fptr,sizeof(struct stat),SEEK_SET);
-      fwrite(&num_subdir,sizeof(long),1,fptr);
-      fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_subdir-1)*sizeof(simple_dirent)),SEEK_SET);
-      if (num_reg > 0)    /* We will need to swap the first regular file entry to the end of meta*/
-       {
-        fread(&tempent,sizeof(simple_dirent),1,fptr);
-        fseek(fptr,0,SEEK_END);
-        fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-        fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_subdir-1)*sizeof(simple_dirent)),SEEK_SET);
-       }
+      strcpy(dirname,&path[tmpptr-path+1]);
+      dir_add_dirname(this_inode, new_inode, dirname);
 
-      memset(&tempent,0,sizeof(simple_dirent));
-      tempent.st_ino = new_inode;
-      tempent.st_mode = S_IFDIR | 0755;
-      strcpy(tempent.name,&path[tmpptr-path+1]);
-      fwrite(&tempent,sizeof(simple_dirent),1,fptr);
-      fclose(fptr);
       /*Done with updating the parent inode meta*/
 
 
       memset(&inputstat,0,sizeof(struct stat));
       inputstat.st_ino=new_inode;
-      inputstat.st_mode = S_IFDIR | 0755;
+      inputstat.st_mode = S_IFDIR | thismode;
       inputstat.st_nlink = 2;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
@@ -1141,7 +1077,7 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
 
       memset(&inputstat,0,sizeof(struct stat));
       inputstat.st_ino=new_inode;
-      inputstat.st_mode = S_IFREG | 0755;
+      inputstat.st_mode = filemode;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
@@ -1408,11 +1344,6 @@ int myrename(const char *oldpath, const char *newpath)
    {
     if (newretcode == -ENOENT) /* Just move to the new parent directory */
      {
-
-
-/* .................. NOT FINISHED ................. */
-
-
       old_tmpptr = strrchr(oldpath,'/');
       new_tmpptr = strrchr(newpath,'/');
 
@@ -1421,16 +1352,16 @@ int myrename(const char *oldpath, const char *newpath)
 
       if (oldpathstat.st_mode & S_IFDIR)
        {
-//        dir_add_dirname(newparent_ino, oldname);
+        dir_add_dirname(newparent_ino, oldpathstat.st_ino, newname);
         dir_remove_dirname(oldparent_ino, oldname);
        }
       else
        {
-        dir_add_filename(newparent_ino, oldpathstat.st_ino, oldname);
+        dir_add_filename(newparent_ino, oldpathstat.st_ino, newname);
         dir_remove_filename(oldparent_ino, oldname);
        }
 
-      return -ENOENT;
+      return 0;
      }
     /* Target path should be a file or sym link*/
 
@@ -1443,9 +1374,25 @@ int myrename(const char *oldpath, const char *newpath)
     strcpy(oldname,&oldpath[old_tmpptr-oldpath+1]);
     strcpy(newname,&newpath[new_tmpptr-newpath+1]);
 
+    if (oldpathstat.st_mode & S_IFDIR)
+     {
+      dir_remove_filename(newparent_ino, newname);
+      dir_add_dirname(newparent_ino, oldpathstat.st_ino, newname);
+      dir_remove_dirname(oldparent_ino, oldname);
+     }
+    else
+     {
+      dir_remove_filename(newparent_ino, newname);
+      dir_add_filename(newparent_ino, oldpathstat.st_ino, newname);
+      dir_remove_filename(oldparent_ino, oldname);
+     }
+
+    tmpstatus = decrease_nlink_ref(&newpathstat);
+    if (tmpstatus !=0)
+     return tmpstatus;
 
     mysync_system_meta();
-    return -1;
+    return 0;
    }
 
   return 0;

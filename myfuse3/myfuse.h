@@ -19,6 +19,7 @@
 #define MAX_ICACHE_PATHLEN 1024
 #define MAX_FILE_TABLE_SIZE 1024
 #define SYS_DIR_WIDTH 1024
+#define MAX_NAME_LEN 256
 
 #define MAX_BLOCK_SIZE 2097152
 
@@ -114,3 +115,5 @@ int decrease_nlink_ref(struct stat *inputstat);
 int dir_remove_filename(ino_t parent_inode, char* filename);
 int dir_remove_dirname(ino_t parent_inode, char* dirname);
 int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename);
+int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname);
+

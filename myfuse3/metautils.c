@@ -210,3 +210,52 @@ int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename)
   return 0;
  }
 
+int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname)
+ {
+  char metapath[1024];
+  FILE *fptr;
+  struct stat inputstat;
+  struct timeb currenttime;
+  simple_dirent tempent;
+  long num_subdir,num_reg;
+
+  ftime(&currenttime);
+
+  sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
+  fptr=fopen(metapath,"r+");
+  if (fptr==NULL)
+   return -ENOENT;
+
+  fread(&inputstat,sizeof(struct stat),1,fptr);
+  inputstat.st_nlink++;
+  inputstat.st_mtime=currenttime.time;
+  fseek(fptr,0,SEEK_SET);
+  fwrite(&inputstat,sizeof(struct stat),1,fptr);
+  super_inode_write(&inputstat,this_inode);
+
+  fseek(fptr,sizeof(struct stat),SEEK_SET);
+  fread(&num_subdir,sizeof(long),1,fptr);
+  fread(&num_reg,sizeof(long),1,fptr);
+  num_subdir++;
+  fseek(fptr,sizeof(struct stat),SEEK_SET);
+  fwrite(&num_subdir,sizeof(long),1,fptr);
+  fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_subdir-1)*sizeof(simple_dirent)),SEEK_SET);
+  if (num_reg > 0)    /* We will need to swap the first regular file entry to the end of meta*/
+   {
+    fread(&tempent,sizeof(simple_dirent),1,fptr);
+    fseek(fptr,0,SEEK_END);
+    fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+    fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((num_subdir-1)*sizeof(simple_dirent)),SEEK_SET);
+   }
+
+  memset(&tempent,0,sizeof(simple_dirent));
+  tempent.st_ino = new_inode;
+  tempent.st_mode = S_IFDIR | 0755;
+  strcpy(tempent.name,dirname);
+  fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+  fclose(fptr);
+
+  return 0;
+ }
+
