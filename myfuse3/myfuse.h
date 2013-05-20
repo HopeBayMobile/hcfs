@@ -116,6 +116,7 @@ int super_inode_read(struct stat *inputstat,ino_t this_inode);
 int super_inode_write(struct stat *inputstat,ino_t this_inode);
 int super_inode_create(struct stat *inputstat,ino_t *this_inode);
 int super_inode_delete(ino_t this_inode);
+int super_inode_reclaim(ino_t this_inode);
 
 int decrease_nlink_ref(struct stat *inputstat);
 int dir_remove_filename(ino_t parent_inode, char* filename);
