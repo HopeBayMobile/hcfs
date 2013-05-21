@@ -47,8 +47,10 @@ int decrease_nlink_ref(struct stat *inputstat)
     inputstat->st_nlink-=1;
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,inputstat->st_ino % SYS_DIR_WIDTH,inputstat->st_ino);
     fptr=fopen(metapath,"a+");
+    flock(fileno(fptr),LOCK_EX);
     fseek(fptr,0,SEEK_SET);
     fwrite(inputstat,sizeof(struct stat),1,fptr);
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
     super_inode_write(inputstat,inputstat->st_ino);
    }
@@ -70,6 +72,7 @@ int dir_remove_filename(ino_t parent_inode, char* filename)
    retcode = -ENOENT;
   else
    {
+    flock(fileno(fptr),LOCK_EX);
     fseek(fptr,sizeof(struct stat),SEEK_SET);
     fread(&num_subdir,sizeof(long),1,fptr);
     fread(&num_reg,sizeof(long),1,fptr);
@@ -87,7 +90,11 @@ int dir_remove_filename(ino_t parent_inode, char* filename)
      }
     printf("Testing if have this file\n");
     if (count>=num_reg)
-     return -ENOENT;
+     {
+      flock(fileno(fptr),LOCK_UN);
+      fclose(fptr);
+      return -ENOENT;
+     }
     num_reg--;
     fseek(fptr,sizeof(struct stat)+sizeof(long),SEEK_SET);
     fwrite(&num_reg,sizeof(long),1,fptr);
@@ -98,8 +105,9 @@ int dir_remove_filename(ino_t parent_inode, char* filename)
       fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+((tmp_index+num_subdir)*sizeof(simple_dirent)),SEEK_SET);
       fwrite(&tempent,sizeof(simple_dirent),1,fptr);
      }
+    ftruncate(fileno(fptr),sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
-    truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
    }
   return retcode;
  }
@@ -124,6 +132,7 @@ int dir_remove_dirname(ino_t parent_inode, char* dirname)
    retcode = -ENOENT;
   else
    {
+    flock(fileno(fptr),LOCK_EX);
     fread(&inputstat,sizeof(struct stat),1,fptr);
     inputstat.st_nlink--;
     fseek(fptr,0,SEEK_SET);
@@ -147,7 +156,11 @@ int dir_remove_dirname(ino_t parent_inode, char* dirname)
      }
     printf("Testing if have this directory\n");
     if (count>=num_subdir)
-     return -ENOENT;
+     {
+      flock(fileno(fptr),LOCK_UN);
+      fclose(fptr);
+      return -ENOENT;
+     }
     num_subdir--;
     fseek(fptr,sizeof(struct stat),SEEK_SET);
     fwrite(&num_subdir,sizeof(long),1,fptr);
@@ -164,8 +177,9 @@ int dir_remove_dirname(ino_t parent_inode, char* dirname)
     fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(num_subdir*sizeof(simple_dirent)),SEEK_SET); /*Overwrite the place occupied by the original last subdir entry*/
     fwrite(&tempent,sizeof(simple_dirent),1,fptr);
 
+    ftruncate(fileno(fptr),sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
-    truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((num_reg+num_subdir)*sizeof(simple_dirent)));
     printf("finished rmdir\n");
    }
   return retcode;
@@ -188,6 +202,7 @@ int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename)
   if (fptr==NULL)
    return -ENOENT;
 
+  flock(fileno(fptr),LOCK_EX);
   fread(&inputstat,sizeof(struct stat),1,fptr);
   inputstat.st_mtime=currenttime.time;
 
@@ -207,6 +222,7 @@ int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename)
   tempent.st_mode = S_IFREG | 0755;
   strcpy(tempent.name,filename);
   fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+  flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
   return 0;
  }
@@ -228,6 +244,7 @@ int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname)
   if (fptr==NULL)
    return -ENOENT;
 
+  flock(fileno(fptr),LOCK_EX);
   fread(&inputstat,sizeof(struct stat),1,fptr);
   inputstat.st_nlink++;
   inputstat.st_mtime=currenttime.time;
@@ -255,6 +272,7 @@ int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname)
   tempent.st_mode = S_IFDIR | 0755;
   strcpy(tempent.name,dirname);
   fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+  flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
 
   return 0;

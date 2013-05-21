@@ -1,5 +1,7 @@
 /* Code under development by Jiahong Wu*/
 
+/*TODO: In operations, need to update block location flags */
+
 #include "myfuse.h"
 #include <math.h>
 
@@ -463,6 +465,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   printf("Debug write: writing to inode %ld\n", this_inode);
 
+  flock(fileno(metaptr),LOCK_EX);
+
   if (fi->fh==0)
    {
     fread(&inputstat,sizeof(struct stat),1,metaptr);
@@ -604,6 +608,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   super_inode_write(&inputstat,this_inode);
 
+  flock(fileno(metaptr),LOCK_UN);
 
   if (retsize>=0)
    retsize = total_write_bytes;
@@ -668,9 +673,11 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       dir_add_filename(this_inode,new_inode,filename);
 
       fptr=fopen(metapath,"w");
+      flock(fileno(fptr),LOCK_EX);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_blocks = 0;
       fwrite(&num_blocks,sizeof(long),1,fptr);
+      flock(fileno(fptr),LOCK_UN);
       fclose(fptr);
 
      }
@@ -742,6 +749,7 @@ int mymkdir(const char *path,mode_t thismode)
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
 
       fptr=fopen(metapath,"w");
+      flock(fileno(fptr),LOCK_EX);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_subdir=2;
       num_reg=0;
@@ -757,6 +765,7 @@ int mymkdir(const char *path,mode_t thismode)
       strcpy(ent2.name,"..");
       fwrite(&ent1,sizeof(simple_dirent),1,fptr);
       fwrite(&ent2,sizeof(simple_dirent),1,fptr);
+      flock(fileno(fptr),LOCK_UN);
       fclose(fptr);
 
      }
@@ -794,6 +803,7 @@ int myutime(const char *path, struct utimbuf *mymodtime)
     fptr = fopen(metapath,"r+");
     if (fptr==NULL)
      return -ENOENT;
+    flock(fileno(fptr),LOCK_EX);  
     fread(&inputstat,sizeof(struct stat),1,fptr);
     if (mymodtime==NULL)
      {
@@ -807,6 +817,7 @@ int myutime(const char *path, struct utimbuf *mymodtime)
      }
     fseek(fptr,0,SEEK_SET);
     fwrite(&inputstat,sizeof(struct stat),1,fptr);
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
     super_inode_write(&inputstat,this_inode);
 
@@ -965,6 +976,7 @@ int mytruncate(const char *path, off_t length)
     fptr = fopen(metapath,"r+");
     if (fptr==NULL)
      return -ENOENT;
+    flock(fileno(fptr),LOCK_EX);
     fread(&inputstat,sizeof(struct stat),1,fptr);
     fread(&total_blocks,sizeof(long),1,fptr);
     if (length == 0)
@@ -975,6 +987,7 @@ int mytruncate(const char *path, off_t length)
     printf("Debug truncate: last block is %ld\n",last_block);
 
     /*First delete blocks that need to be thrown away*/
+    /*TODO: Need to be able to delete blocks or truncate blocks on backends as well*/
     for(block_count=last_block+1;block_count<=total_blocks;block_count++)
      {
       printf("Debug truncate: killing block %ld",block_count);
@@ -999,10 +1012,11 @@ int mytruncate(const char *path, off_t length)
     fseek(fptr,0,SEEK_SET);
     fwrite(&inputstat,sizeof(struct stat),1,fptr);
     fwrite(&total_blocks,sizeof(long),1,fptr);
+    ftruncate(fileno(fptr),sizeof(struct stat)+sizeof(long)+sizeof(blockent)*last_block);
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
     super_inode_write(&inputstat,this_inode);
 
-    truncate(metapath,sizeof(struct stat)+sizeof(long)+sizeof(blockent)*last_block);
    }
   return 0;
  }
@@ -1084,10 +1098,12 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
       printf("debug create using new inode number %ld\n",new_inode);
 
       fptr=fopen(metapath,"w+");
+      flock(fileno(fptr),LOCK_EX);
       setbuf(fptr,NULL);
       fwrite(&inputstat,sizeof(struct stat),1,fptr);
       num_blocks = 0;
       fwrite(&num_blocks,sizeof(long),1,fptr);
+      flock(fileno(fptr),LOCK_UN);
       fflush(fptr);
 
      }
@@ -1252,6 +1268,7 @@ int myrename(const char *oldpath, const char *newpath)
 
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,oldparent_ino % SYS_DIR_WIDTH,oldparent_ino);
       fptr = fopen(metapath,"r+");
+      flock(fileno(fptr),LOCK_EX);
       fseek(fptr,sizeof(struct stat),SEEK_SET);
       fread(sizebuf,sizeof(long),2,fptr);
 
@@ -1263,11 +1280,13 @@ int myrename(const char *oldpath, const char *newpath)
           strcpy(tempent.name,newname);
           fseek(fptr,sizeof(struct stat)+2*sizeof(long)+sizeof(simple_dirent)*count,SEEK_SET);
           fwrite(&tempent,sizeof(simple_dirent),1,fptr);
+          flock(fileno(fptr),LOCK_UN);
           fclose(fptr);
           return 0;
          }
        }
       /*Cannot find old entry?*/
+      flock(fileno(fptr),LOCK_UN);
       fclose(fptr);
       return -ENOENT;
      }
@@ -1284,6 +1303,7 @@ int myrename(const char *oldpath, const char *newpath)
 
     sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,oldparent_ino % SYS_DIR_WIDTH,oldparent_ino);
     fptr = fopen(metapath,"r+");
+    flock(fileno(fptr),LOCK_EX);
     fseek(fptr,sizeof(struct stat),SEEK_SET);
     fread(sizebuf,sizeof(long),2,fptr);
 
@@ -1324,8 +1344,9 @@ int myrename(const char *oldpath, const char *newpath)
       fseek(fptr,sizeof(struct stat)+(2*sizeof(long))+(new_entryindex*sizeof(simple_dirent)),SEEK_SET);
       fwrite(&tempent,sizeof(simple_dirent),1,fptr);
      }
+    ftruncate(fileno(fptr),sizeof(struct stat)+(2*sizeof(long))+((sizebuf[1]+sizebuf[0])*sizeof(simple_dirent)));
+    flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
-    truncate(metapath,sizeof(struct stat)+(2*sizeof(long))+((sizebuf[1]+sizebuf[0])*sizeof(simple_dirent)));
 
     tmpstatus = decrease_nlink_ref(&newpathstat);
     if (tmpstatus !=0)
