@@ -344,7 +344,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
         fclose(file_handle_table[fi->fh].blockptr);
         file_handle_table[fi->fh].opened_block=0;
        }
-      if (tmp_block.stored_where==1)
+      if (tmp_block.stored_where % 2 ==1)
        {
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
@@ -529,10 +529,11 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
         fclose(file_handle_table[fi->fh].blockptr);
         file_handle_table[fi->fh].opened_block=0;
        }
-      if (tmp_block.stored_where==1)
+      if (tmp_block.stored_where % 2==1)
        {
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
+        tmp_block.stored_where=1;
        }
       else
        {
@@ -656,7 +657,7 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       strcpy(filename,&path[tmpptr-path+1]);
 
       memset(&inputstat,0,sizeof(struct stat));
-      inputstat.st_mode = filemode;
+      inputstat.st_mode = filemode | S_IFREG;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();
@@ -758,7 +759,7 @@ int mymkdir(const char *path,mode_t thismode)
       memset(&ent1,0,sizeof(simple_dirent));
       memset(&ent2,0,sizeof(simple_dirent));
       ent1.st_ino=new_inode;
-      ent1.st_mode=S_IFDIR | 0755;
+      ent1.st_mode=S_IFDIR | thismode;
       strcpy(ent1.name,".");
       ent2.st_ino=this_inode;
       ent2.st_mode=S_IFDIR | 0755;
@@ -1079,7 +1080,7 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
       strcpy(filename,&path[tmpptr-path+1]);
 
       memset(&inputstat,0,sizeof(struct stat));
-      inputstat.st_mode = filemode;
+      inputstat.st_mode = filemode | S_IFREG;
       inputstat.st_nlink = 1;
       inputstat.st_uid=getuid();
       inputstat.st_gid=getgid();

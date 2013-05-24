@@ -72,6 +72,7 @@ int dir_remove_filename(ino_t parent_inode, char* filename)
    retcode = -ENOENT;
   else
    {
+    setbuf(fptr,NULL);
     flock(fileno(fptr),LOCK_EX);
     fseek(fptr,sizeof(struct stat),SEEK_SET);
     fread(&num_subdir,sizeof(long),1,fptr);
@@ -132,6 +133,7 @@ int dir_remove_dirname(ino_t parent_inode, char* dirname)
    retcode = -ENOENT;
   else
    {
+    setbuf(fptr,NULL);
     flock(fileno(fptr),LOCK_EX);
     fread(&inputstat,sizeof(struct stat),1,fptr);
     inputstat.st_nlink--;
@@ -202,6 +204,8 @@ int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename)
   if (fptr==NULL)
    return -ENOENT;
 
+  setbuf(fptr,NULL);
+
   flock(fileno(fptr),LOCK_EX);
   fread(&inputstat,sizeof(struct stat),1,fptr);
   inputstat.st_mtime=currenttime.time;
@@ -243,6 +247,8 @@ int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname)
   fptr=fopen(metapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
+
+  setbuf(fptr,NULL);
 
   flock(fileno(fptr),LOCK_EX);
   fread(&inputstat,sizeof(struct stat),1,fptr);
