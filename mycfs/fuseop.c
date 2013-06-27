@@ -922,7 +922,7 @@ int myrmdir(const char *path)
 
     tmpstatus=unlink(metapath);
     retcode = super_inode_delete(this_inode);
-//    super_inode_reclaim(this_inode);
+    super_inode_reclaim();
     if (tmpstatus!=0)
      return -1;
     sem_wait(&mysystem_meta_sem);

@@ -25,7 +25,7 @@ int decrease_nlink_ref(struct stat *inputstat)
 
     tmpstatus=unlink(metapath);
     retcode = super_inode_delete(inputstat->st_ino);
-//    super_inode_reclaim(inputstat->st_ino);
+    super_inode_reclaim();
     if (tmpstatus!=0)
      return -1;
     sem_wait(&mysystem_meta_sem);

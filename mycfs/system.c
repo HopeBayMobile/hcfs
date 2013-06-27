@@ -6,6 +6,7 @@ void initsystem()
  {
   char systemmetapath[400];
   char superinodepath[400];
+  char unclaimedlistpath[400];
   int count,count1,count2;
 
   for(count1=0;count1<SYS_DIR_WIDTH;count1++)
@@ -24,6 +25,7 @@ void initsystem()
 
   sprintf(systemmetapath,"%s/%s", METASTORE,"systemmeta");
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
+  sprintf(unclaimedlistpath,"%s/%s", METASTORE,"unclaimedlist");
 
   memset(opened_files_masks,0,sizeof(uint64_t)* (MAX_FILE_TABLE_SIZE/64));
 
@@ -61,6 +63,8 @@ void initsystem()
     mysystem_meta.total_inodes=0;
     mysystem_meta.max_inode=0;
     mysystem_meta.first_free_inode=1;
+    total_unclaimed_inode = 0;
+    unclaimed_list = fopen(unclaimedlistpath,"w+");
 
     super_inode_write_fptr=fopen(superinodepath,"w+");
     fclose(super_inode_write_fptr);
@@ -77,6 +81,11 @@ void initsystem()
    }
   else
    {
+    unclaimed_list = fopen(unclaimedlistpath,"a+");
+    fseek(unclaimed_list,0,SEEK_END);
+    total_unclaimed_inode = ftell(unclaimed_list) / sizeof(ino_t);
+    fseek(unclaimed_list,0,SEEK_SET);
+
     system_meta_fptr=fopen(systemmetapath,"r+");
     fread(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
     super_inode_write_fptr=fopen(superinodepath,"r+");
@@ -94,6 +103,7 @@ void mysync_system_meta()
   fseek(system_meta_fptr,0,SEEK_SET);
   fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
   fflush(system_meta_fptr);
+  fflush(unclaimed_list);
   sem_post(&mysystem_meta_sem);
   return;
  }
@@ -104,6 +114,7 @@ void mydestroy(void *private_data)
   fclose(system_meta_fptr);
   fclose(super_inode_read_fptr);
   fclose(super_inode_write_fptr);
+  fclose(unclaimed_list);
   sem_close(super_inode_read_sem);
   sem_close(super_inode_write_sem);
   sem_unlink("mycfs_inode_read_sem");
@@ -251,6 +262,8 @@ int super_inode_delete(ino_t this_inode)
   sem_wait(super_inode_write_sem);
   fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
   total_write=fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
+  total_unclaimed_inode +=1;
+  fwrite(&this_inode,sizeof(ino_t),1,unclaimed_list);
   sem_post(super_inode_write_sem);
 
   if (total_write < 1)
@@ -258,21 +271,69 @@ int super_inode_delete(ino_t this_inode)
   return 0;
  }
 
-int super_inode_reclaim(ino_t this_inode)
+/*Inode reclaim should be done in batches, e.g., once when a certain amount
+of inodes are freed.*/
+static int compino(const void *firstino,const void *secondino)
+ {
+  ino_t temp1,temp2;
+
+  temp1 = * (ino_t *) firstino;
+  temp2 = * (ino_t *) secondino;
+  if (temp1 > temp2)
+   return 1;
+  if (temp1 == temp2)
+   return 0;
+  return -1;
+ }
+
+int super_inode_reclaim()
  {
   int total_write;
   super_inode_entry temp_entry;
+  ino_t *sorttemp;
+  long count;
+  ino_t this_inode;
+
+  if (total_unclaimed_inode < 10000)
+   return 0;
 
   sem_wait(super_inode_read_sem);
   sem_wait(super_inode_write_sem);
 
-  memset(&temp_entry,0,sizeof(super_inode_entry));
-  temp_entry.next_free_inode = mysystem_meta.first_free_inode;
-  mysystem_meta.first_free_inode = this_inode;
+  sorttemp=malloc(sizeof(ino_t)*total_unclaimed_inode);
+  if (sorttemp==NULL)
+   {
+    sem_post(super_inode_write_sem);
+    sem_post(super_inode_read_sem); 
+    return -1;
+   }
+  
+  fseek(unclaimed_list,0,SEEK_SET);
+  fread(sorttemp,sizeof(ino_t),total_unclaimed_inode,unclaimed_list);
+  fseek(unclaimed_list,0,SEEK_END); /*Should be the same pos*/
+  qsort(sorttemp,total_unclaimed_inode,sizeof(ino_t),compino);
 
-  fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
-  fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
+  for(count=total_unclaimed_inode-1;count>=0;count--)
+   {
+    this_inode = sorttemp[count];
+    fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
+    fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
 
+    if (temp_entry.thisstat.st_ino == 0) /*If indeed is empty*/
+     {
+      memset(&temp_entry,0,sizeof(super_inode_entry));
+      temp_entry.next_free_inode = mysystem_meta.first_free_inode;
+      mysystem_meta.first_free_inode = this_inode;
+
+      fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
+      fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
+     }
+   }
+
+  total_unclaimed_inode = 0;
+  ftruncate(fileno(unclaimed_list),0);
+  fseek(unclaimed_list,0,SEEK_SET);
+  fflush(unclaimed_list);
   sem_post(super_inode_write_sem);
   sem_post(super_inode_read_sem);
 

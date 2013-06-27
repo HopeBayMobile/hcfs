@@ -43,6 +43,9 @@ typedef struct {
   int stored_where;  /*0: not stored, 1: local, 2: cloud, 3: local + cloud*/
  } blockent;
 
+ino_t total_unclaimed_inode;
+FILE *unclaimed_list;
+
 system_meta mysystem_meta;
 sem_t mysystem_meta_sem;
 FILE *system_meta_fptr;
@@ -120,7 +123,7 @@ int super_inode_read(struct stat *inputstat,ino_t this_inode);
 int super_inode_write(struct stat *inputstat,ino_t this_inode);
 int super_inode_create(struct stat *inputstat,ino_t *this_inode);
 int super_inode_delete(ino_t this_inode);
-int super_inode_reclaim(ino_t this_inode);
+int super_inode_reclaim();
 
 int decrease_nlink_ref(struct stat *inputstat);
 int dir_remove_filename(ino_t parent_inode, char* filename);
