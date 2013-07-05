@@ -49,7 +49,7 @@ void main(int argc, char **argv)
    fuse_main(argc,argv,&my_fuse_ops,NULL);
   else
    {
-//    run_maintenance_loop();
+    run_maintenance_loop();
    }
 
   printf("End of main process\n");
