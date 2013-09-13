@@ -4,6 +4,8 @@
 /*TODO: need to debug
 1. How to make delete file and upload file work together
 2. How to handle racing condition in large files
+TODO: locking in block upload / download
+TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -73,6 +75,16 @@ void run_maintenance_loop()
       thispos=ftell(super_inode_sync_fptr);
       fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
       sem_post(super_inode_read_sem);
+
+/* TODO:
+1. Change the scan to create a list of uploads first, then
+2. For each entry in the upload list, upload the blocks and meta, but if non-exists, just write a debug (if any) and continue
+3. If files / directories are deleted after meta/block is opened, worst case is that the data is uploaded, then deleted when
+the delete sequence is called up.
+*/
+/* TODO:
+Find out whether and how to unblock writing more blocks to a big file while some other blocks of the same file is being uploaded
+*/
       if ((temp_entry.thisstat.st_ino>0) && (temp_entry.is_dirty == True))      
        {
         fprintf(fptr,"Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);

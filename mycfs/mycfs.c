@@ -31,6 +31,8 @@ static struct fuse_operations my_fuse_ops = {
   .release = myrelease,
   .statfs = mystatfs,
   .create = mycreate,
+  .chmod = mychmod,
+  .chown = mychown,
  };
 
 void main(int argc, char **argv)

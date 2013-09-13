@@ -117,6 +117,8 @@ int myfsync(const char *path, int datasync, struct fuse_file_info *fi);
 int mytruncate(const char *path, off_t length);
 int mystatfs(const char *path, struct statvfs *buf);
 int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi);
+int mychown(const char *path, uid_t new_uid, gid_t new_gid);
+int mychmod(const char *path, mode_t new_mode);
 
 
 int super_inode_read(struct stat *inputstat,ino_t this_inode);

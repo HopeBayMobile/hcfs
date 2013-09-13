@@ -827,6 +827,89 @@ int myutime(const char *path, struct utimbuf *mymodtime)
   return retcode;
  } 
 
+int mychmod(const char *path, mode_t new_mode)
+ {
+
+  struct stat inputstat;
+  int retcode=0;
+  ino_t this_inode;
+  FILE *fptr;
+  char metapath[1024];
+  struct timeb currenttime;
+
+  ftime(&currenttime);
+
+  show_current_time();
+
+  printf("Debug mychmod\n");
+
+  this_inode = find_inode(path);
+
+  if (this_inode <=0)
+   retcode = -ENOENT;
+  else
+   {
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
+    fptr = fopen(metapath,"r+");
+    if (fptr==NULL)
+     return -ENOENT;
+    flock(fileno(fptr),LOCK_EX);
+    fread(&inputstat,sizeof(struct stat),1,fptr);
+    inputstat.st_mode = new_mode;
+    fseek(fptr,0,SEEK_SET);
+    fwrite(&inputstat,sizeof(struct stat),1,fptr);
+    flock(fileno(fptr),LOCK_UN);
+    fclose(fptr);
+    super_inode_write(&inputstat,this_inode);
+
+   }
+
+  return retcode;
+ }
+
+int mychown(const char *path, uid_t new_uid, gid_t new_gid)
+ {
+
+  struct stat inputstat;
+  int retcode=0;
+  ino_t this_inode;
+  FILE *fptr;
+  char metapath[1024];
+  struct timeb currenttime;
+
+  ftime(&currenttime);
+
+  show_current_time();
+
+  printf("Debug mychown\n");
+
+  this_inode = find_inode(path);
+
+  if (this_inode <=0)
+   retcode = -ENOENT;
+  else
+   {
+    sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+
+    fptr = fopen(metapath,"r+");
+    if (fptr==NULL)
+     return -ENOENT;
+    flock(fileno(fptr),LOCK_EX);
+    fread(&inputstat,sizeof(struct stat),1,fptr);
+    inputstat.st_uid = new_uid;
+    inputstat.st_gid = new_gid;
+    fseek(fptr,0,SEEK_SET);
+    fwrite(&inputstat,sizeof(struct stat),1,fptr);
+    flock(fileno(fptr),LOCK_UN);
+    fclose(fptr);
+    super_inode_write(&inputstat,this_inode);
+
+   }
+
+  return retcode;
+ }
+
 int myunlink(const char *path)
  {
   /*If unlink in FUSE is called before close, FUSE will first
