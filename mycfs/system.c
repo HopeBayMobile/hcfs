@@ -75,6 +75,7 @@ void initsystem()
     create_root_meta();
     fflush(super_inode_write_fptr);
     mysystem_meta.system_size=0;
+    mysystem_meta.cache_size=0;
     system_meta_fptr=fopen(systemmetapath,"w+");
     fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
     fflush(system_meta_fptr);

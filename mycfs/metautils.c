@@ -19,7 +19,7 @@ int decrease_nlink_ref(struct stat *inputstat)
   char blockpath[1024];
   int tmpstatus;
   long block_count, total_blocks;
-
+  struct stat block_stat;
 
   if (inputstat->st_nlink==1)
    {
@@ -44,7 +44,13 @@ int decrease_nlink_ref(struct stat *inputstat)
       sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
                                            (inputstat->st_ino + block_count) % SYS_DIR_WIDTH,inputstat->st_ino,block_count);
 
-      unlink(blockpath);
+      if (stat(blockpath,&block_stat)==0)
+       {
+        unlink(blockpath);
+        mysystem_meta.cache_size-=block_stat.st_size;
+        if (mysystem_meta.cache_size < 0)
+         mysystem_meta.cache_size = 0;
+       }
      }
 
    }

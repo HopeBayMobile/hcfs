@@ -82,46 +82,44 @@ void run_maintenance_loop()
 3. If files / directories are deleted after meta/block is opened, worst case is that the data is uploaded, then deleted when
 the delete sequence is called up.
 */
-/* TODO:
-Find out whether and how to unblock writing more blocks to a big file while some other blocks of the same file is being uploaded
-*/
       if ((temp_entry.thisstat.st_ino>0) && (temp_entry.is_dirty == True))      
        {
         fprintf(fptr,"Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
         metaptr=fopen(metapath,"r+");
-        flock(fileno(metaptr),LOCK_EX);
-
-        if (temp_entry.thisstat.st_mode & S_IFREG)        /*If regular file, need to check which block is dirty*/
-         {
-          fseek(metaptr,sizeof(struct stat),SEEK_SET);      
-          fread(&total_blocks,sizeof(long),1,metaptr);
-          for(count=0;count<total_blocks;count++)
-           {
-            blockflagpos=ftell(metaptr);
-            fread(&temp_block_entry,sizeof(blockent),1,metaptr);
-            printf("Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
-            if (temp_block_entry.stored_where==1)
-             {
-              do_block_sync(this_inode,count+1);
-              temp_block_entry.stored_where=3;
-              fseek(metaptr,blockflagpos,SEEK_SET);
-              fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
-             }
-           }
-          fflush(metaptr);
-          do_meta_sync(metaptr,metapath,this_inode);
-         }
-        else
-         {
-          do_meta_sync(metaptr,metapath,this_inode);
-         }
         sem_wait(super_inode_write_sem);
         temp_entry.is_dirty = False;
         fseek(super_inode_sync_fptr,thispos,SEEK_SET);
         fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
         sem_post(super_inode_write_sem);
+
+
+        if (temp_entry.thisstat.st_mode & S_IFREG)        /*If regular file, need to check which block is dirty*/
+         {
+          fseek(metaptr,sizeof(struct stat),SEEK_SET);
+          fread(&total_blocks,sizeof(long),1,metaptr);
+          for(count=0;count<total_blocks;count++)
+           {
+            flock(fileno(metaptr),LOCK_EX);
+            blockflagpos=ftell(metaptr);
+            fread(&temp_block_entry,sizeof(blockent),1,metaptr);
+            flock(fileno(metaptr),LOCK_UN);
+            printf("Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
+            if (temp_block_entry.stored_where==1)
+             {
+              temp_block_entry.stored_where=3;
+              fseek(metaptr,blockflagpos,SEEK_SET);
+              flock(fileno(metaptr),LOCK_EX);
+              fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
+              fflush(metaptr);
+              flock(fileno(metaptr),LOCK_UN);
+              do_block_sync(this_inode,count+1);
+             }
+           }
+         }
+        flock(fileno(metaptr),LOCK_EX);
+        do_meta_sync(metaptr,metapath,this_inode);
         flock(fileno(metaptr),LOCK_UN);
         fclose(metaptr);
 

@@ -5,6 +5,16 @@
 #include "myfuse.h"
 #include <math.h>
 
+long check_file_size(const char *path)
+ {
+  struct stat block_stat;
+
+  if (stat(path,&block_stat)==0)
+   return block_stat.st_size;
+  else
+   return -1;
+ }
+
 int mygetattr(const char *path, struct stat *nodestat)
  {
 
@@ -436,6 +446,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
   int total_write_bytes, max_to_write, have_error, actual_write_bytes;
   off_t current_offset,end_bytes;
   blockent tmp_block;
+  long old_cache_size, new_cache_size;
 
   show_current_time();
 
@@ -548,6 +559,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
        }
      }
     printf("%s\n",blockpath);
+    old_cache_size = check_file_size(blockpath);
     fseek(data_fptr,current_offset - (MAX_BLOCK_SIZE * (count-1)),SEEK_SET);
     if ((MAX_BLOCK_SIZE * count) < (offset+size))
      max_to_write = (MAX_BLOCK_SIZE * count) - current_offset;
@@ -556,6 +568,19 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     actual_write_bytes = fwrite(&buf[current_offset-offset],sizeof(char),max_to_write,data_fptr);
     total_write_bytes += actual_write_bytes;
     current_offset +=actual_write_bytes;
+
+    new_cache_size = check_file_size(blockpath);
+
+    if (old_cache_size != new_cache_size)
+     {
+      sem_wait(&mysystem_meta_sem);
+      mysystem_meta.cache_size += new_cache_size - old_cache_size;
+      if (mysystem_meta.cache_size < 0)
+       mysystem_meta.cache_size = 0;
+      sem_post(&mysystem_meta_sem);
+     }
+    
+
     fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
     fwrite(&tmp_block,sizeof(blockent),1,metaptr);
     if (actual_write_bytes < max_to_write)
@@ -1044,6 +1069,7 @@ int mytruncate(const char *path, off_t length)
   int tmpstatus;
   int tmp_index,count;
   long block_count;
+  long old_cache_size, new_cache_size;
 
   show_current_time();
 
@@ -1077,15 +1103,31 @@ int mytruncate(const char *path, off_t length)
       printf("Debug truncate: killing block %ld",block_count);
       sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
                                           (this_inode + block_count) % SYS_DIR_WIDTH,this_inode,block_count);
-
+      old_cache_size = check_file_size(blockpath);
       unlink(blockpath);
+      sem_wait(&mysystem_meta_sem);
+      mysystem_meta.cache_size -= old_cache_size;
+      if (mysystem_meta.cache_size < 0)
+       mysystem_meta.cache_size = 0;
+      sem_post(&mysystem_meta_sem);
+
      }
     if (length < (last_block * MAX_BLOCK_SIZE))
      {
       sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,
                        (this_inode + last_block) % SYS_DIR_WIDTH,this_inode,last_block);
 
+      old_cache_size = check_file_size(blockpath);
       truncate(blockpath, length - ((last_block -1) * MAX_BLOCK_SIZE));
+      new_cache_size = check_file_size(blockpath);
+      if (old_cache_size!=new_cache_size)
+       {
+        sem_wait(&mysystem_meta_sem);
+        mysystem_meta.cache_size += new_cache_size - old_cache_size;
+        if (mysystem_meta.cache_size < 0)
+         mysystem_meta.cache_size = 0;
+        sem_post(&mysystem_meta_sem);
+       }
      }
     total_blocks = last_block;
     sem_wait(&mysystem_meta_sem);

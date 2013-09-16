@@ -1,5 +1,12 @@
 /* Code under development by Jiahong Wu */
 
+/*TODO:
+1. cache replacement
+2. restore block from cloud
+3. FS recovery
+4. FS maintenance
+*/
+
 #define FUSE_USE_VERSION 26
 #include <fuse.h>
 #include <stdio.h>
@@ -23,6 +30,9 @@
 
 #define MAX_BLOCK_SIZE 2097152
 
+#define CACHE_SOFT_LIMIT 1024*1024*10
+#define CACHE_HARD_LIMIT 1024*1024*20
+
 #define True 1
 #define False 0
 
@@ -37,6 +47,7 @@ typedef struct {
   ino_t max_inode;
   ino_t first_free_inode;
   long system_size;
+  long cache_size;
  } system_meta;
 
 typedef struct {
