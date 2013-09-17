@@ -18,8 +18,9 @@ CURL *curl;
 CURLcode res;
 
 size_t read_header_auth(void *bufptr, size_t size, size_t nmemb, void *tempbuffer);
-void swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url);
+int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url);
 int init_swift_backend();
 void destroy_swift_backend();
-void swift_list_container();
-void swift_put_object(FILE *fptr, char *objname);
+int swift_list_container();
+int swift_put_object(FILE *fptr, char *objname);
+int swift_get_object(FILE *fptr, char *objname);

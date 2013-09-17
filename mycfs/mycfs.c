@@ -37,7 +37,7 @@ static struct fuse_operations my_fuse_ops = {
 
 void main(int argc, char **argv)
  {
-  pid_t this_pid;
+  pid_t this_pid,this_pid1;
 
   if (argc < 2)
    {
@@ -51,7 +51,11 @@ void main(int argc, char **argv)
    fuse_main(argc,argv,&my_fuse_ops,NULL);
   else
    {
-    run_maintenance_loop();
+    this_pid1 = fork();
+    if (this_pid1 == 0)
+     run_maintenance_loop();
+    else
+     run_cache_loop();
    }
 
   printf("End of main process\n");

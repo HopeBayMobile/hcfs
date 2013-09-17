@@ -1,5 +1,8 @@
 /* Code under development by Jiahong Wu */
 
+/* TODO: complete sleep and wake routines for processes / threads involving in cache replacement
+   This includes at least one sem..... */
+
 #include "myfuse.h"
 
 void initsystem()
@@ -40,6 +43,12 @@ void initsystem()
   if (!access("/dev/shm/sem.mycfs_inode_write_sem",F_OK))
    unlink("/dev/shm/sem.mycfs_inode_write_sem");
 
+  if (!access("/dev/shm/sem.mycfs_cache_sleep_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_cache_sleep_sem");
+
+  if (!access("/dev/shm/sem.mycfs_mysystem_meta_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_mysystem_meta_sem");
+
   super_inode_read_sem = sem_open("mycfs_inode_read_sem",O_CREAT | O_RDWR,0600,1);
   if (super_inode_read_sem == SEM_FAILED)
    {
@@ -54,7 +63,14 @@ void initsystem()
     perror("Error message is:");
     exit(-1);
    }
-  sem_init(&mysystem_meta_sem,0,1);
+
+  mysystem_meta_sem = sem_open("mycfs_mysystem_meta_sem",O_CREAT | O_RDWR,0600,1);
+  if (super_inode_write_sem == SEM_FAILED)
+   {
+    printf("Error in creating system sem\n");
+    perror("Error message is:");
+    exit(-1);
+   }
 
   num_opened_files = 0;
 
@@ -100,12 +116,12 @@ void initsystem()
 
 void mysync_system_meta()
  {
-  sem_wait(&mysystem_meta_sem);
+  sem_wait(mysystem_meta_sem);
   fseek(system_meta_fptr,0,SEEK_SET);
   fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
   fflush(system_meta_fptr);
   fflush(unclaimed_list);
-  sem_post(&mysystem_meta_sem);
+  sem_post(mysystem_meta_sem);
   return;
  }
 

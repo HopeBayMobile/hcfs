@@ -6,6 +6,7 @@
 2. How to handle racing condition in large files
 TODO: locking in block upload / download
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
+TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -60,7 +61,8 @@ void run_maintenance_loop()
 
   while (1==1)
    {
-    sleep(10);
+    if (mysystem_meta.cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
+     sleep(10);
     if (init_swift_backend()!=0)
      {
       printf("error in connecting to swift\n");
@@ -82,14 +84,19 @@ void run_maintenance_loop()
 3. If files / directories are deleted after meta/block is opened, worst case is that the data is uploaded, then deleted when
 the delete sequence is called up.
 */
-      if ((temp_entry.thisstat.st_ino>0) && (temp_entry.is_dirty == True))      
+      if ((temp_entry.thisstat.st_ino>0) && ((temp_entry.is_dirty == True) || (temp_entry.in_transit == True)))
        {
         fprintf(fptr,"Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
         metaptr=fopen(metapath,"r+");
         sem_wait(super_inode_write_sem);
+
+        fseek(super_inode_sync_fptr,thispos,SEEK_SET);
+        fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+
         temp_entry.is_dirty = False;
+        temp_entry.in_transit = True;  /* Adding in_transit flag to avoid interruption during transition */
         fseek(super_inode_sync_fptr,thispos,SEEK_SET);
         fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
         sem_post(super_inode_write_sem);
@@ -106,15 +113,21 @@ the delete sequence is called up.
             fread(&temp_block_entry,sizeof(blockent),1,metaptr);
             flock(fileno(metaptr),LOCK_UN);
             printf("Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
-            if (temp_block_entry.stored_where==1)
+            if ((temp_block_entry.stored_where==1) || (temp_block_entry.stored_where==4))
              {
-              temp_block_entry.stored_where=3;
+              temp_block_entry.stored_where=4;
               fseek(metaptr,blockflagpos,SEEK_SET);
               flock(fileno(metaptr),LOCK_EX);
               fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
               fflush(metaptr);
               flock(fileno(metaptr),LOCK_UN);
               do_block_sync(this_inode,count+1);
+              temp_block_entry.stored_where=3;
+              fseek(metaptr,blockflagpos,SEEK_SET);
+              flock(fileno(metaptr),LOCK_EX);
+              fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
+              fflush(metaptr);
+              flock(fileno(metaptr),LOCK_UN);
              }
            }
          }
@@ -122,6 +135,14 @@ the delete sequence is called up.
         do_meta_sync(metaptr,metapath,this_inode);
         flock(fileno(metaptr),LOCK_UN);
         fclose(metaptr);
+
+        sem_wait(super_inode_write_sem);
+        fseek(super_inode_sync_fptr,thispos,SEEK_SET);
+        fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+        temp_entry.in_transit = False;
+        fseek(super_inode_sync_fptr,thispos,SEEK_SET);
+        fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+        sem_post(super_inode_write_sem);
 
        }
      }

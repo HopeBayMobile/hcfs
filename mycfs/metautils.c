@@ -34,10 +34,10 @@ int decrease_nlink_ref(struct stat *inputstat)
     super_inode_reclaim();
     if (tmpstatus!=0)
      return -1;
-    sem_wait(&mysystem_meta_sem);
+    sem_wait(mysystem_meta_sem);
     mysystem_meta.system_size -= inputstat->st_size;
     mysystem_meta.total_inodes -=1;
-    sem_post(&mysystem_meta_sem);
+    sem_post(mysystem_meta_sem);
 
     for(block_count=1;block_count<=total_blocks;block_count++)
      {

@@ -1,6 +1,10 @@
 /* Code under development by Jiahong Wu*/
 
 /*TODO: In operations, need to update block location flags */
+/* TODO: In mywrite and myread, do not allow new cache block allocation if cache size > hard limit */
+/* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
+/* in myread ==> old cache block but stored in cloud only */
+/* TODO: need to add routine for fetching blocks from cloud in read or write if they are not at local */
 
 #include "myfuse.h"
 #include <math.h>
@@ -25,7 +29,6 @@ int mygetattr(const char *path, struct stat *nodestat)
   char metapath[1024];
 
   show_current_time();
-
 
   memset(nodestat,0,sizeof(struct stat));
 
@@ -573,11 +576,11 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
     if (old_cache_size != new_cache_size)
      {
-      sem_wait(&mysystem_meta_sem);
+      sem_wait(mysystem_meta_sem);
       mysystem_meta.cache_size += new_cache_size - old_cache_size;
       if (mysystem_meta.cache_size < 0)
        mysystem_meta.cache_size = 0;
-      sem_post(&mysystem_meta_sem);
+      sem_post(mysystem_meta_sem);
      }
     
 
@@ -615,9 +618,9 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     
   if (inputstat.st_size < (offset+total_write_bytes))
    {
-    sem_wait(&mysystem_meta_sem);
+    sem_wait(mysystem_meta_sem);
     mysystem_meta.system_size += (offset+total_write_bytes) - inputstat.st_size;
-    sem_post(&mysystem_meta_sem);
+    sem_post(mysystem_meta_sem);
     inputstat.st_size = offset+total_write_bytes;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
    }
@@ -690,9 +693,9 @@ int mymknod(const char *path, mode_t filemode,dev_t thisdev)
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
 
-      sem_wait(&mysystem_meta_sem);
+      sem_wait(mysystem_meta_sem);
       super_inode_create(&inputstat,&new_inode);
-      sem_post(&mysystem_meta_sem);
+      sem_post(mysystem_meta_sem);
 
       sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,new_inode % SYS_DIR_WIDTH,new_inode);
 
@@ -766,9 +769,9 @@ int mymkdir(const char *path,mode_t thismode)
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
 
-      sem_wait(&mysystem_meta_sem);
+      sem_wait(mysystem_meta_sem);
       super_inode_create(&inputstat,&new_inode);
-      sem_post(&mysystem_meta_sem);
+      sem_post(mysystem_meta_sem);
 
       dir_add_dirname(this_inode, new_inode, dirname);
 
@@ -1033,9 +1036,9 @@ int myrmdir(const char *path)
     super_inode_reclaim();
     if (tmpstatus!=0)
      return -1;
-    sem_wait(&mysystem_meta_sem);
+    sem_wait(mysystem_meta_sem);
     mysystem_meta.total_inodes -=1;
-    sem_post(&mysystem_meta_sem);
+    sem_post(mysystem_meta_sem);
 
     strcpy(dirname,&path[(tmpptr-path)+1]);
     retcode = dir_remove_dirname(parent_inode, dirname);
@@ -1105,11 +1108,11 @@ int mytruncate(const char *path, off_t length)
                                           (this_inode + block_count) % SYS_DIR_WIDTH,this_inode,block_count);
       old_cache_size = check_file_size(blockpath);
       unlink(blockpath);
-      sem_wait(&mysystem_meta_sem);
+      sem_wait(mysystem_meta_sem);
       mysystem_meta.cache_size -= old_cache_size;
       if (mysystem_meta.cache_size < 0)
        mysystem_meta.cache_size = 0;
-      sem_post(&mysystem_meta_sem);
+      sem_post(mysystem_meta_sem);
 
      }
     if (length < (last_block * MAX_BLOCK_SIZE))
@@ -1122,17 +1125,17 @@ int mytruncate(const char *path, off_t length)
       new_cache_size = check_file_size(blockpath);
       if (old_cache_size!=new_cache_size)
        {
-        sem_wait(&mysystem_meta_sem);
+        sem_wait(mysystem_meta_sem);
         mysystem_meta.cache_size += new_cache_size - old_cache_size;
         if (mysystem_meta.cache_size < 0)
          mysystem_meta.cache_size = 0;
-        sem_post(&mysystem_meta_sem);
+        sem_post(mysystem_meta_sem);
        }
      }
     total_blocks = last_block;
-    sem_wait(&mysystem_meta_sem);
+    sem_wait(mysystem_meta_sem);
     mysystem_meta.system_size += (length - inputstat.st_size);
-    sem_post(&mysystem_meta_sem);
+    sem_post(mysystem_meta_sem);
     inputstat.st_size=length;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
     fseek(fptr,0,SEEK_SET);
@@ -1213,9 +1216,9 @@ int mycreate(const char *path, mode_t filemode, struct fuse_file_info *fi)
       inputstat.st_mtime=currenttime.time;
       inputstat.st_ctime=currenttime.time;
 
-      sem_wait(&mysystem_meta_sem);
+      sem_wait(mysystem_meta_sem);
       super_inode_create(&inputstat,&new_inode);
-      sem_post(&mysystem_meta_sem);
+      sem_post(mysystem_meta_sem);
 
       dir_add_filename(this_inode,new_inode,filename);
 

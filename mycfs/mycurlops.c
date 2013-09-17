@@ -19,13 +19,14 @@ size_t read_header_auth(void *bufptr, size_t size, size_t nmemb, void *tempbuffe
   return size*nmemb;
  }
 char auth_header_buf[1000];
-void swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url)
+int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url)
  {
   char userstring[1000];
   char passstring[1000];
   char urlstring[1000];
   struct curl_slist *chunk=NULL;
 
+  //printf("%s, %s, %s\n", swift_user, swift_pass, swift_url);
   sprintf(userstring,"X-Storage-User: %s",swift_user);
   sprintf(passstring,"X-Storage-Pass: %s",swift_pass);
   sprintf(urlstring,"https://%s/auth/v1.0",swift_url);
@@ -39,31 +40,36 @@ void swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url)
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, auth_header_buf);
 
   curl_easy_setopt(curl,CURLOPT_URL, urlstring);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
   if (res!=CURLE_OK)
-   fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    return -1;
+   }
 
   curl_slist_free_all(chunk);
 
-  return;
+  return 0;
  }
 
 int init_swift_backend()
  {
   char account_user_string[1000];
+  int ret_code;
   curl = curl_easy_init();
 
   if (curl)
    {
-    struct curl_slist *chunk=NULL;
+    //struct curl_slist *chunk=NULL;
 
     sprintf(account_user_string,"%s:%s",MY_ACCOUNT,MY_USER);
 
-    swift_get_auth_info(account_user_string, MY_PASS, MY_URL);
+    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL);
 
-    return 0;
+    return ret_code;
    }
   return -1;
  }
@@ -98,12 +104,21 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
   return total_size;
  }
 
+size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
+ {
+  long total_size;
+
+  total_size=fwrite(ptr,size,nmemb,fstream);
+
+  return total_size;
+ }
+
 
 char http_header_buffer[1000];
 char http_write_buffer[1000];
 char http_read_buffer[1000];
 
-void swift_list_container()
+int swift_list_container()
  {
   struct curl_slist *chunk=NULL;
 
@@ -123,17 +138,20 @@ void swift_list_container()
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, http_write_buffer);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
   if (res!=CURLE_OK)
-   fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    return -1;
+   }
 
   curl_slist_free_all(chunk);
-  return;
+  return 0;
  }
 
-void swift_put_object(FILE *fptr, char *objname)
+int swift_put_object(FILE *fptr, char *objname)
  {
   struct curl_slist *chunk=NULL;
   long objsize;
@@ -147,6 +165,9 @@ void swift_put_object(FILE *fptr, char *objname)
   objsize=ftell(fptr);
   fseek(fptr,0,SEEK_SET);
 
+  if (objsize < 0)
+   return -1;
+
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
   curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
@@ -154,15 +175,55 @@ void swift_put_object(FILE *fptr, char *objname)
   curl_easy_setopt(curl, CURLOPT_READDATA, (void *) fptr);
   curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
   if (res!=CURLE_OK)
-   fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    return -1;
+   }
 
   curl_slist_free_all(chunk);
-  return;
+  return 0;
  }
+int swift_get_object(FILE *fptr, char *objname)
+ {
+  struct curl_slist *chunk=NULL;
+  long objsize;
+
+  chunk=NULL;
+
+  sprintf(container_string,"%s/%s_private_container/%s",url_string,MY_USER,objname);
+  chunk=curl_slist_append(chunk, auth_string);
+  chunk=curl_slist_append(chunk, "Expect:");
+  fseek(fptr,0,SEEK_END);
+  objsize=ftell(fptr);
+  fseek(fptr,0,SEEK_SET);
+  if (objsize < 0)
+   return -1;
+
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+  curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+  curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) fptr);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+
+  curl_easy_setopt(curl,CURLOPT_URL, container_string);
+  curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
+  res = curl_easy_perform(curl);
+  if (res!=CURLE_OK)
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    return -1;
+   }
+
+  curl_slist_free_all(chunk);
+  return 0;
+ }
+

@@ -51,22 +51,22 @@ typedef struct {
  } system_meta;
 
 typedef struct {
-  int stored_where;  /*0: not stored, 1: local, 2: cloud, 3: local + cloud*/
+  int stored_where;  /*0: not stored, 1: local, 2: cloud, 3: local + cloud, 4: on local but in transit to cloud, 5: on cloud but in transit to local*/
  } blockent;
 
 ino_t total_unclaimed_inode;
 FILE *unclaimed_list;
 
 system_meta mysystem_meta;
-sem_t mysystem_meta_sem;
 FILE *system_meta_fptr;
 FILE *super_inode_read_fptr, *super_inode_write_fptr;
-sem_t *super_inode_read_sem, *super_inode_write_sem;
+sem_t *super_inode_read_sem, *super_inode_write_sem, *mysystem_meta_sem;
 
 typedef struct {
   struct stat thisstat;
   ino_t next_free_inode;
   unsigned char is_dirty;
+  unsigned char in_transit;
  } super_inode_entry;
 
 typedef struct {
@@ -145,3 +145,4 @@ int dir_add_filename(ino_t this_inode, ino_t new_inode, char *filename);
 int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname);
 
 void run_maintenance_loop();
+void run_cache_loop();
