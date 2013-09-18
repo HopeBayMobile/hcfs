@@ -1,9 +1,34 @@
 /* Code under development by Jiahong Wu */
 
-/* TODO: complete sleep and wake routines for processes / threads involving in cache replacement
-   This includes at least one sem..... */
-
 #include "myfuse.h"
+
+void sleep_on_cache_full()  /*Routine for sleeping threads/processes on cache full*/
+ {
+  sem_post(num_cache_sleep_sem);
+  sem_wait(check_cache_sem);
+  sem_wait(num_cache_sleep_sem);
+  sem_post(check_next_sem);
+
+  return;
+ }
+
+void notify_sleep_on_cache()  /*Routine for waking threads/processes on cache not full*/
+ {
+  int num_cache_sleep_sem_value;
+
+  while(1==1)
+   {
+    sem_getvalue(num_cache_sleep_sem,&num_cache_sleep_sem_value);
+    if (num_cache_sleep_sem_value > 0) /*If still have threads/processes waiting on cache not full*/
+     {
+      sem_post(check_cache_sem);
+      sem_wait(check_next_sem);
+     }
+    else
+     break;
+   }
+  return;
+ }
 
 void initsystem()
  {
@@ -43,11 +68,41 @@ void initsystem()
   if (!access("/dev/shm/sem.mycfs_inode_write_sem",F_OK))
    unlink("/dev/shm/sem.mycfs_inode_write_sem");
 
-  if (!access("/dev/shm/sem.mycfs_cache_sleep_sem",F_OK))
-   unlink("/dev/shm/sem.mycfs_cache_sleep_sem");
+  if (!access("/dev/shm/sem.mycfs_num_cache_sleep_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_num_cache_sleep_sem");
+
+  if (!access("/dev/shm/sem.mycfs_check_cache_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_check_cache_sem");
+
+  if (!access("/dev/shm/sem.mycfs_check_next_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_check_next_sem");
 
   if (!access("/dev/shm/sem.mycfs_mysystem_meta_sem",F_OK))
    unlink("/dev/shm/sem.mycfs_mysystem_meta_sem");
+
+  num_cache_sleep_sem = sem_open("mycfs_num_cache_sleep_sem",O_CREAT | O_RDWR,0600,0);
+  if (num_cache_sleep_sem == SEM_FAILED)
+   {
+    printf("Error in creating cache sleep sem\n");
+    perror("Error message is:");
+    exit(-1);
+   }
+
+  check_cache_sem = sem_open("mycfs_check_cache_sem",O_CREAT | O_RDWR,0600,0);
+  if (check_cache_sem == SEM_FAILED)
+   {
+    printf("Error in creating check_cache sem\n");
+    perror("Error message is:");
+    exit(-1);
+   }
+
+  check_next_sem = sem_open("mycfs_check_next_sem",O_CREAT | O_RDWR,0600,0);
+  if (check_next_sem == SEM_FAILED)
+   {
+    printf("Error in creating check_next sem\n");
+    perror("Error message is:");
+    exit(-1);
+   }
 
   super_inode_read_sem = sem_open("mycfs_inode_read_sem",O_CREAT | O_RDWR,0600,1);
   if (super_inode_read_sem == SEM_FAILED)
@@ -65,7 +120,7 @@ void initsystem()
    }
 
   mysystem_meta_sem = sem_open("mycfs_mysystem_meta_sem",O_CREAT | O_RDWR,0600,1);
-  if (super_inode_write_sem == SEM_FAILED)
+  if (mysystem_meta_sem == SEM_FAILED)
    {
     printf("Error in creating system sem\n");
     perror("Error message is:");

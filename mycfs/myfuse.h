@@ -60,7 +60,7 @@ FILE *unclaimed_list;
 system_meta mysystem_meta;
 FILE *system_meta_fptr;
 FILE *super_inode_read_fptr, *super_inode_write_fptr;
-sem_t *super_inode_read_sem, *super_inode_write_sem, *mysystem_meta_sem;
+sem_t *super_inode_read_sem, *super_inode_write_sem, *mysystem_meta_sem, *num_cache_sleep_sem, *check_cache_sem, *check_next_sem;
 
 typedef struct {
   struct stat thisstat;
@@ -146,3 +146,5 @@ int dir_add_dirname(ino_t this_inode, ino_t new_inode, char *dirname);
 
 void run_maintenance_loop();
 void run_cache_loop();
+void sleep_on_cache_full();
+void notify_sleep_on_cache();

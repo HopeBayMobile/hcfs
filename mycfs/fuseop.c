@@ -1,7 +1,7 @@
 /* Code under development by Jiahong Wu*/
 
 /*TODO: In operations, need to update block location flags */
-/* TODO: In mywrite and myread, do not allow new cache block allocation if cache size > hard limit */
+/* TODO: In mywrite and myread, do not allow new cache block allocation if cache size > hard limit (also truncate if going to allow size extension) */
 /* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
 /* in myread ==> old cache block but stored in cloud only */
 /* TODO: need to add routine for fetching blocks from cloud in read or write if they are not at local */
@@ -357,7 +357,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
         fclose(file_handle_table[fi->fh].blockptr);
         file_handle_table[fi->fh].opened_block=0;
        }
-      if (tmp_block.stored_where % 2 ==1)
+      if (((tmp_block.stored_where ==1) || (tmp_block.stored_where ==3)) || (tmp_block.stored_where ==4))
+/* All three cases where block is already at local*/
        {
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
@@ -373,14 +374,44 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        }
       else
        {
-        /*Storage in cloud not implemeted now*/
+        if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+         sleep_on_cache_full();
 
-        if (fi->fh>0)
+        if (tmp_block.stored_where == 0)
          {
-          sem_post(&(file_handle_table[fi->fh].block_sem));
+          retsize = -1;
+          if (fi->fh>0)
+           {
+            sem_post(&(file_handle_table[fi->fh].block_sem));
+           }
+          break;
          }
-        break;
+        else
+         {
+          if (tmp_block.stored_where==2)
+           {
+            flock(fileno(metaptr),LOCK_EX);
+            tmp_block.stored_where = 5;
+            fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+            fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+            fflush(metaptr);
+            flock(fileno(metaptr),LOCK_UN);
+           }
+          fetch_from_cloud();  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
+          flock(fileno(metaptr),LOCK_EX);
+
+          tmp_block.stored_where = 3;
+          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+          fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+          fflush(metaptr);
+
+          flock(fileno(metaptr),LOCK_UN);
+
+          data_fptr=fopen(blockpath,"r+");
+          setbuf(data_fptr,NULL);
+         }
        }
+
       if (fi->fh>0)
        {
         file_handle_table[fi->fh].opened_block=count;
@@ -543,7 +574,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
         fclose(file_handle_table[fi->fh].blockptr);
         file_handle_table[fi->fh].opened_block=0;
        }
-      if (tmp_block.stored_where % 2==1)
+      if (((tmp_block.stored_where ==1) || (tmp_block.stored_where ==3)) || (tmp_block.stored_where ==4))
+/* All three cases where block is already at local*/
        {
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
@@ -551,9 +583,37 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
        }
       else
        {
-        data_fptr=fopen(blockpath,"w+");
-        setbuf(data_fptr,NULL);
-        tmp_block.stored_where=1;
+        if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+         sleep_on_cache_full();
+
+        if (tmp_block.stored_where == 0)
+         {
+          data_fptr=fopen(blockpath,"w+");
+          setbuf(data_fptr,NULL);
+          tmp_block.stored_where=1;
+         }
+        else
+         {
+          if (tmp_block.stored_where==2)
+           {
+            tmp_block.stored_where = 5;
+            fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+            fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+            fflush(metaptr);
+           }
+          flock(fileno(metaptr),LOCK_UN);  
+          fetch_from_cloud();  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
+          flock(fileno(metaptr),LOCK_EX);
+
+          tmp_block.stored_where = 3;
+          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+          fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+          fflush(metaptr);
+
+          data_fptr=fopen(blockpath,"r+");
+          setbuf(data_fptr,NULL);
+          tmp_block.stored_where=1;
+         }
        }
       if (fi->fh>0)
        {
@@ -646,6 +706,14 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
    fclose(metaptr);
   else
    sem_post(&(file_handle_table[fi->fh].meta_sem));
+
+  if (old_cache_size != new_cache_size)  /*Sleep on cache full if the writing actually changes the cached block size*/
+   {
+    if (mysystem_meta.cache_size > CACHE_HARD_LIMIT)
+     sleep_on_cache_full();
+   }
+
+
   return retsize;
  }
 
