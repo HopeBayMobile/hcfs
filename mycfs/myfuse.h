@@ -30,8 +30,8 @@
 
 #define MAX_BLOCK_SIZE 2097152
 
-#define CACHE_SOFT_LIMIT 1024*1024*10
-#define CACHE_HARD_LIMIT 1024*1024*20
+#define CACHE_SOFT_LIMIT 1024*1024*10  /* Will start actively uploading dirty blocks and swapping out blocks beyond this limit*/
+#define CACHE_HARD_LIMIT 1024*1024*20  /* Will stop creation of new cache blocks beyond this limit */
 
 #define True 1
 #define False 0

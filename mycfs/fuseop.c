@@ -333,6 +333,17 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       /*End of file encountered*/
       break;
      }
+    if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+     {
+      if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block!=0))
+       {
+        fclose(file_handle_table[fi->fh].blockptr);
+        file_handle_table[fi->fh].opened_block=0;
+       }
+      sleep_on_cache_full();
+     }
+
+    flock(fileno(metaptr),LOCK_SH);
     if (fi->fh > 0)
      sem_wait(&(file_handle_table[fi->fh].meta_sem));
     fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET); /* Seek to the current block on the meta */
@@ -348,6 +359,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
+      flock(fileno(metaptr),LOCK_UN);
       data_fptr=file_handle_table[fi->fh].blockptr;
      }
     else
@@ -362,6 +374,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        {
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
+        flock(fileno(metaptr),LOCK_UN);
         if (data_fptr==NULL)
          {
           retsize = -1;
@@ -374,6 +387,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        }
       else
        {
+        flock(fileno(metaptr),LOCK_UN);
         if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
          sleep_on_cache_full();
 
@@ -509,6 +523,10 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
    }
 
   printf("Debug write: writing to inode %ld\n", this_inode);
+
+  if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+   sleep_on_cache_full();
+
 
   flock(fileno(metaptr),LOCK_EX);
 

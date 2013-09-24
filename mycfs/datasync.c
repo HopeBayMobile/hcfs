@@ -73,10 +73,10 @@ void run_maintenance_loop()
     fseek(super_inode_sync_fptr,0,SEEK_SET);
     while(!feof(super_inode_sync_fptr))
      {
-      sem_wait(super_inode_read_sem);
+      sem_wait(super_inode_write_sem);
       thispos=ftell(super_inode_sync_fptr);
       fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
-      sem_post(super_inode_read_sem);
+      sem_post(super_inode_write_sem);
 
 /* TODO:
 1. Change the scan to create a list of uploads first, then

@@ -1,5 +1,5 @@
-mycfs : mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o
-	   gcc -o mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o -lfuse -lcurl
+mycfs : mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o
+	   gcc -o mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o -lfuse -lcurl
 
 mycfs.o: mycfs.c myfuse.h
 	   cc -c mycfs.c -D_FILE_OFFSET_BITS=64
@@ -21,5 +21,9 @@ datasync.o: datasync.c myfuse.h mycurl.h
 
 mycurlops.o: mycurlops.c mycurl.h
 	   cc -c mycurlops.c -D_FILE_OFFSET_BITS=64
+
+cache_loop.o: cache_loop.c myfuse.h mycurl.h
+	   cc -c cache_loop.c -D_FILE_OFFSET_BITS=64
+
 clean:
-	rm mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o
+	rm mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o
