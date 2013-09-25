@@ -4,9 +4,10 @@
 /*TODO: need to debug
 1. How to make delete file and upload file work together
 2. How to handle racing condition in large files
-TODO: locking in block upload / download
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
+TODO: multiple connections to backend
+TODO: Uploading one single file may still stuck. Will need to debug
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -34,9 +35,34 @@ void do_block_sync(ino_t this_inode, long block_no)
   return;
  }
 
+void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
+ {
+  char objname[1000];
+  int status;
+
+  sprintf(objname,"data_%ld_%ld",this_inode,block_no);
+  while(1==1)
+   {
+    status=swift_get_object(fptr,objname);
+    if (status!=0)
+     {
+      if (init_swift_backend()!=0)
+       {
+        printf("error in connecting to swift\n");
+        exit(0);
+       }
+     }
+    else
+     break;
+   }
+
+  fflush(fptr);
+  return;
+ }
+
+
 void run_maintenance_loop()
  {
-  FILE *fptr;
   FILE *super_inode_sync_fptr;
   FILE *metaptr;
   long current_inodes;
@@ -52,8 +78,6 @@ void run_maintenance_loop()
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
-  fptr=fopen("data_sync_log","w");
-  setbuf(fptr,NULL);
   super_inode_sync_fptr=fopen(superinodepath,"r+");
   setbuf(super_inode_sync_fptr,NULL);
 
@@ -61,13 +85,15 @@ void run_maintenance_loop()
 
   while (1==1)
    {
-    if (mysystem_meta.cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
+    if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
      sleep(10);
+
     if (init_swift_backend()!=0)
      {
       printf("error in connecting to swift\n");
       break;
      }
+
     printf("Debug running syncing\n");
     ftime(&currenttime);
     fseek(super_inode_sync_fptr,0,SEEK_SET);
@@ -86,7 +112,7 @@ the delete sequence is called up.
 */
       if ((temp_entry.thisstat.st_ino>0) && ((temp_entry.is_dirty == True) || (temp_entry.in_transit == True)))
        {
-        fprintf(fptr,"Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
+        printf("Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
         metaptr=fopen(metapath,"r+");

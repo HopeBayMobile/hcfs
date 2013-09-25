@@ -1,6 +1,7 @@
 /* Code under development by Jiahong Wu*/
 
 #include "myfuse.h"
+#include "mycurl.h"
 
 void show_current_time()
  {
@@ -48,7 +49,15 @@ void main(int argc, char **argv)
   initsystem();
   this_pid = fork();
   if (this_pid ==0)
-   fuse_main(argc,argv,&my_fuse_ops,NULL);
+   {
+    if (init_swift_backend()!=0)
+     {
+      printf("error in connecting to swift\n");
+      exit(0);
+     }
+    fuse_main(argc,argv,&my_fuse_ops,NULL);
+    destroy_swift_backend();
+   }
   else
    {
     this_pid1 = fork();

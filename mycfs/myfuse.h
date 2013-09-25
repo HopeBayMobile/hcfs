@@ -16,6 +16,8 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <unistd.h>
 #include <utime.h>
 #include <semaphore.h>
@@ -57,10 +59,10 @@ typedef struct {
 ino_t total_unclaimed_inode;
 FILE *unclaimed_list;
 
-system_meta mysystem_meta;
+system_meta *mysystem_meta;
 FILE *system_meta_fptr;
 FILE *super_inode_read_fptr, *super_inode_write_fptr;
-sem_t *super_inode_read_sem, *super_inode_write_sem, *mysystem_meta_sem, *num_cache_sleep_sem, *check_cache_sem, *check_next_sem;
+sem_t *super_inode_read_sem, *super_inode_write_sem, *mysystem_meta_sem, *num_cache_sleep_sem, *check_cache_sem, *check_next_sem, *fetch_from_cloud_sem;
 
 typedef struct {
   struct stat thisstat;
@@ -148,3 +150,5 @@ void run_maintenance_loop();
 void run_cache_loop();
 void sleep_on_cache_full();
 void notify_sleep_on_cache();
+
+void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);

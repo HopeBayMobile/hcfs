@@ -27,16 +27,16 @@ void run_cache_loop()
   while(1==1)
    {
     /*Sleep for 10 seconds if not triggered*/
-    if (mysystem_meta.cache_size < CACHE_SOFT_LIMIT)
+    if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
      {
       sleep(10);
       continue;
      }
-
     fseek(super_inode_sync_fptr,0,SEEK_SET);
     while(!feof(super_inode_sync_fptr))
      {
-      if (mysystem_meta.cache_size < CACHE_SOFT_LIMIT)
+      printf("Current cache size is: %ld\n", mysystem_meta->cache_size);
+      if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
        break;
       thispos=ftell(super_inode_sync_fptr);
       fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
@@ -51,6 +51,7 @@ void run_cache_loop()
         fseek(metaptr,sizeof(struct stat),SEEK_SET);
         fread(&total_blocks,sizeof(long),1,metaptr);
         changed = False;
+        printf("Cache checking %s\n",metapath);
         for(count=0;count<total_blocks;count++)
          {
           blockflagpos=ftell(metaptr);
@@ -63,12 +64,14 @@ void run_cache_loop()
             sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + (count+1)) % SYS_DIR_WIDTH,this_inode, (count+1));
             stat(blockpath,&tempstat);
             sem_wait(mysystem_meta_sem);
-            mysystem_meta.cache_size -= tempstat.st_size;
+            mysystem_meta->cache_size -= tempstat.st_size;
             unlink(blockpath);
             sem_post(mysystem_meta_sem);
             changed = True;
            }
-          if (mysystem_meta.cache_size < CACHE_SOFT_LIMIT)
+          if (mysystem_meta->cache_size < CACHE_HARD_LIMIT)
+           notify_sleep_on_cache();
+          if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
            break;
          }
         if (changed == True)

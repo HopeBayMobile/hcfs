@@ -293,6 +293,15 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     this_inode = file_handle_table[fi->fh].st_ino;
    }
 
+  if (fi->fh > 0)
+   sem_wait(&(file_handle_table[fi->fh].meta_sem));
+  fseek(metaptr,0,SEEK_SET);
+  fread(&inputstat,sizeof(struct stat),1,metaptr);
+  fread(&total_blocks,sizeof(long),1,metaptr);
+  if (fi->fh > 0)
+   sem_post(&(file_handle_table[fi->fh].meta_sem));
+
+/*
   if (fi->fh==0)
    {
     fread(&inputstat,sizeof(struct stat),1,metaptr);
@@ -303,6 +312,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     memcpy(&inputstat, &(file_handle_table[fi->fh].inputstat),sizeof(struct stat));
     total_blocks = file_handle_table[fi->fh].total_blocks;
    }
+*/
 
   if (offset >= inputstat.st_size)  /* If want to read outside file size */
    {
@@ -330,10 +340,10 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
    {
     if (count > total_blocks)
      {
-      /*End of file encountered*/
+      /* End of file encountered*/
       break;
      }
-    if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+    if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
      {
       if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block!=0))
        {
@@ -388,7 +398,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       else
        {
         flock(fileno(metaptr),LOCK_UN);
-        if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+        if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
          sleep_on_cache_full();
 
         if (tmp_block.stored_where == 0)
@@ -402,24 +412,35 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
          }
         else
          {
-          if (tmp_block.stored_where==2)
+          data_fptr=fopen(blockpath,"a+");
+          flock(fileno(data_fptr),LOCK_EX);
+          flock(fileno(metaptr),LOCK_EX);
+          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+          fread(&tmp_block,sizeof(blockent),1,metaptr);
+          flock(fileno(metaptr),LOCK_UN);
+          if ((tmp_block.stored_where==2) || (tmp_block.stored_where==5))
            {
+            if (tmp_block.stored_where==2)
+             {
+              flock(fileno(metaptr),LOCK_EX);
+              tmp_block.stored_where = 5;
+              fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+              fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+              fflush(metaptr);
+              flock(fileno(metaptr),LOCK_UN);
+             }
+            fetch_from_cloud(data_fptr,this_inode,count);  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
             flock(fileno(metaptr),LOCK_EX);
-            tmp_block.stored_where = 5;
+
+            tmp_block.stored_where = 3;
             fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
             fwrite(&tmp_block,sizeof(blockent),1,metaptr);
             fflush(metaptr);
+
             flock(fileno(metaptr),LOCK_UN);
            }
-          fetch_from_cloud();  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
-          flock(fileno(metaptr),LOCK_EX);
-
-          tmp_block.stored_where = 3;
-          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
-          fwrite(&tmp_block,sizeof(blockent),1,metaptr);
-          fflush(metaptr);
-
-          flock(fileno(metaptr),LOCK_UN);
+          flock(fileno(data_fptr),LOCK_UN);
+          fclose(data_fptr);
 
           data_fptr=fopen(blockpath,"r+");
           setbuf(data_fptr,NULL);
@@ -498,7 +519,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   show_current_time();
 
-  printf("Debug mywrite path %s, size %ld, offset %ld\n",path,size,offset);
+  printf("Debug mywrite path %s, size %ld, offset %ld, cache size %ld\n",path,size,offset, mysystem_meta->cache_size);
 
   if (size==0)
    return 0;
@@ -524,12 +545,21 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   printf("Debug write: writing to inode %ld\n", this_inode);
 
-  if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+  if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
    sleep_on_cache_full();
 
 
   flock(fileno(metaptr),LOCK_EX);
 
+  if (fi->fh > 0)
+   sem_wait(&(file_handle_table[fi->fh].meta_sem));
+  fseek(metaptr,0,SEEK_SET);
+  fread(&inputstat,sizeof(struct stat),1,metaptr);
+  fread(&total_blocks,sizeof(long),1,metaptr);
+  if (fi->fh > 0)
+   sem_post(&(file_handle_table[fi->fh].meta_sem));
+
+/*
   if (fi->fh==0)
    {
     fread(&inputstat,sizeof(struct stat),1,metaptr);
@@ -540,6 +570,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     memcpy(&inputstat, &(file_handle_table[fi->fh].inputstat),sizeof(struct stat));
     total_blocks = file_handle_table[fi->fh].total_blocks;
    }
+*/
 
   total_write_bytes=0;
 
@@ -601,8 +632,12 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
        }
       else
        {
-        if (mysystem_meta.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
-         sleep_on_cache_full();
+        if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+         {
+          flock(fileno(metaptr),LOCK_UN);
+          sleep_on_cache_full();
+          flock(fileno(metaptr),LOCK_EX);
+         }
 
         if (tmp_block.stored_where == 0)
          {
@@ -612,21 +647,30 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
          }
         else
          {
-          if (tmp_block.stored_where==2)
+          data_fptr=fopen(blockpath,"a+");
+          flock(fileno(data_fptr),LOCK_EX);
+          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+          fread(&tmp_block,sizeof(blockent),1,metaptr);
+          if ((tmp_block.stored_where==2) || (tmp_block.stored_where==5))
            {
-            tmp_block.stored_where = 5;
+            if (tmp_block.stored_where==2)
+             {
+              tmp_block.stored_where = 5;
+              fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+              fwrite(&tmp_block,sizeof(blockent),1,metaptr);
+              fflush(metaptr);
+             }
+            flock(fileno(metaptr),LOCK_UN);
+            fetch_from_cloud(data_fptr,this_inode,count);  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
+            flock(fileno(metaptr),LOCK_EX);
+
+            tmp_block.stored_where = 3;
             fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
             fwrite(&tmp_block,sizeof(blockent),1,metaptr);
             fflush(metaptr);
            }
-          flock(fileno(metaptr),LOCK_UN);  
-          fetch_from_cloud();  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
-          flock(fileno(metaptr),LOCK_EX);
-
-          tmp_block.stored_where = 3;
-          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
-          fwrite(&tmp_block,sizeof(blockent),1,metaptr);
-          fflush(metaptr);
+          flock(fileno(data_fptr),LOCK_UN);
+          fclose(data_fptr);
 
           data_fptr=fopen(blockpath,"r+");
           setbuf(data_fptr,NULL);
@@ -655,9 +699,9 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     if (old_cache_size != new_cache_size)
      {
       sem_wait(mysystem_meta_sem);
-      mysystem_meta.cache_size += new_cache_size - old_cache_size;
-      if (mysystem_meta.cache_size < 0)
-       mysystem_meta.cache_size = 0;
+      mysystem_meta->cache_size += new_cache_size - old_cache_size;
+      if (mysystem_meta->cache_size < 0)
+       mysystem_meta->cache_size = 0;
       sem_post(mysystem_meta_sem);
      }
     
@@ -697,7 +741,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
   if (inputstat.st_size < (offset+total_write_bytes))
    {
     sem_wait(mysystem_meta_sem);
-    mysystem_meta.system_size += (offset+total_write_bytes) - inputstat.st_size;
+    mysystem_meta->system_size += (offset+total_write_bytes) - inputstat.st_size;
     sem_post(mysystem_meta_sem);
     inputstat.st_size = offset+total_write_bytes;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
@@ -727,7 +771,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
 
   if (old_cache_size != new_cache_size)  /*Sleep on cache full if the writing actually changes the cached block size*/
    {
-    if (mysystem_meta.cache_size > CACHE_HARD_LIMIT)
+    if (mysystem_meta->cache_size > CACHE_HARD_LIMIT)
      sleep_on_cache_full();
    }
 
@@ -1123,7 +1167,7 @@ int myrmdir(const char *path)
     if (tmpstatus!=0)
      return -1;
     sem_wait(mysystem_meta_sem);
-    mysystem_meta.total_inodes -=1;
+    mysystem_meta->total_inodes -=1;
     sem_post(mysystem_meta_sem);
 
     strcpy(dirname,&path[(tmpptr-path)+1]);
@@ -1195,9 +1239,9 @@ int mytruncate(const char *path, off_t length)
       old_cache_size = check_file_size(blockpath);
       unlink(blockpath);
       sem_wait(mysystem_meta_sem);
-      mysystem_meta.cache_size -= old_cache_size;
-      if (mysystem_meta.cache_size < 0)
-       mysystem_meta.cache_size = 0;
+      mysystem_meta->cache_size -= old_cache_size;
+      if (mysystem_meta->cache_size < 0)
+       mysystem_meta->cache_size = 0;
       sem_post(mysystem_meta_sem);
 
      }
@@ -1212,15 +1256,15 @@ int mytruncate(const char *path, off_t length)
       if (old_cache_size!=new_cache_size)
        {
         sem_wait(mysystem_meta_sem);
-        mysystem_meta.cache_size += new_cache_size - old_cache_size;
-        if (mysystem_meta.cache_size < 0)
-         mysystem_meta.cache_size = 0;
+        mysystem_meta->cache_size += new_cache_size - old_cache_size;
+        if (mysystem_meta->cache_size < 0)
+         mysystem_meta->cache_size = 0;
         sem_post(mysystem_meta_sem);
        }
      }
     total_blocks = last_block;
     sem_wait(mysystem_meta_sem);
-    mysystem_meta.system_size += (length - inputstat.st_size);
+    mysystem_meta->system_size += (length - inputstat.st_size);
     sem_post(mysystem_meta_sem);
     inputstat.st_size=length;
     inputstat.st_blocks = (inputstat.st_size+511)/512;
@@ -1233,23 +1277,24 @@ int mytruncate(const char *path, off_t length)
     super_inode_write(&inputstat,this_inode);
 
    }
+  printf("Debug End of truncate\n");
   return 0;
  }
 int mystatfs(const char *path, struct statvfs *buf)
  {
   buf->f_bsize=4096;
   buf->f_namemax=256;
-  if (mysystem_meta.total_inodes>1000000)
-   buf->f_files=mysystem_meta.total_inodes*2;
+  if (mysystem_meta->total_inodes>1000000)
+   buf->f_files=mysystem_meta->total_inodes*2;
   else
    buf->f_files = 2000000;
-  buf->f_ffree=buf->f_files - mysystem_meta.total_inodes;
+  buf->f_ffree=buf->f_files - mysystem_meta->total_inodes;
   buf->f_favail=buf->f_ffree;
-  if (mysystem_meta.system_size > (50*powl(1024,3)))
-   buf->f_blocks=(2*mysystem_meta.system_size)/4096;
+  if (mysystem_meta->system_size > (50*powl(1024,3)))
+   buf->f_blocks=(2*mysystem_meta->system_size)/4096;
   else
    buf->f_blocks=(100*powl(1024,3))/4096;
-  buf->f_bfree=buf->f_blocks - ((mysystem_meta.system_size+4095)/4096);
+  buf->f_bfree=buf->f_blocks - ((mysystem_meta->system_size+4095)/4096);
   buf->f_bavail=buf->f_bfree;
 
   return 0;

@@ -1,7 +1,7 @@
 mycfs : mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o
 	   gcc -o mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o -lfuse -lcurl
 
-mycfs.o: mycfs.c myfuse.h
+mycfs.o: mycfs.c myfuse.h mycurl.h
 	   cc -c mycfs.c -D_FILE_OFFSET_BITS=64
 
 system.o: system.c myfuse.h

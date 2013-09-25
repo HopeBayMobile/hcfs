@@ -35,8 +35,8 @@ int decrease_nlink_ref(struct stat *inputstat)
     if (tmpstatus!=0)
      return -1;
     sem_wait(mysystem_meta_sem);
-    mysystem_meta.system_size -= inputstat->st_size;
-    mysystem_meta.total_inodes -=1;
+    mysystem_meta->system_size -= inputstat->st_size;
+    mysystem_meta->total_inodes -=1;
     sem_post(mysystem_meta_sem);
 
     for(block_count=1;block_count<=total_blocks;block_count++)
@@ -47,9 +47,9 @@ int decrease_nlink_ref(struct stat *inputstat)
       if (stat(blockpath,&block_stat)==0)
        {
         unlink(blockpath);
-        mysystem_meta.cache_size-=block_stat.st_size;
-        if (mysystem_meta.cache_size < 0)
-         mysystem_meta.cache_size = 0;
+        mysystem_meta->cache_size-=block_stat.st_size;
+        if (mysystem_meta->cache_size < 0)
+         mysystem_meta->cache_size = 0;
        }
      }
 

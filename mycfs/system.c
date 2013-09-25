@@ -37,6 +37,12 @@ void initsystem()
   char unclaimedlistpath[400];
   int count,count1,count2;
 
+  int shm_id;
+
+  shm_id = shmget(8765,sizeof(system_meta), IPC_CREAT | 0666);
+
+  mysystem_meta = shmat(shm_id,NULL,0);
+
   for(count1=0;count1<SYS_DIR_WIDTH;count1++)
    {
     sprintf(systemmetapath,"%s/sub_%d", METASTORE, count1);
@@ -79,6 +85,17 @@ void initsystem()
 
   if (!access("/dev/shm/sem.mycfs_mysystem_meta_sem",F_OK))
    unlink("/dev/shm/sem.mycfs_mysystem_meta_sem");
+
+  if (!access("/dev/shm/sem.mycfs_fetch_from_cloud_sem",F_OK))
+   unlink("/dev/shm/sem.mycfs_fetch_from_cloud_sem");
+
+  fetch_from_cloud_sem = sem_open("mycfs_fetch_from_cloud_sem",O_CREAT | O_RDWR,0600,1);
+  if (fetch_from_cloud_sem == SEM_FAILED)
+   {
+    printf("Error in creating fetch from cloud sem\n");
+    perror("Error message is:");
+    exit(-1);
+   }
 
   num_cache_sleep_sem = sem_open("mycfs_num_cache_sleep_sem",O_CREAT | O_RDWR,0600,0);
   if (num_cache_sleep_sem == SEM_FAILED)
@@ -131,9 +148,9 @@ void initsystem()
 
   if (access(systemmetapath,F_OK)!=0)
    {
-    mysystem_meta.total_inodes=0;
-    mysystem_meta.max_inode=0;
-    mysystem_meta.first_free_inode=1;
+    mysystem_meta->total_inodes=0;
+    mysystem_meta->max_inode=0;
+    mysystem_meta->first_free_inode=1;
     total_unclaimed_inode = 0;
     unclaimed_list = fopen(unclaimedlistpath,"w+");
 
@@ -145,10 +162,10 @@ void initsystem()
     setbuf(super_inode_read_fptr,NULL);
     create_root_meta();
     fflush(super_inode_write_fptr);
-    mysystem_meta.system_size=0;
-    mysystem_meta.cache_size=0;
+    mysystem_meta->system_size=0;
+    mysystem_meta->cache_size=0;
     system_meta_fptr=fopen(systemmetapath,"w+");
-    fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
+    fwrite(mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
     fflush(system_meta_fptr);
    }
   else
@@ -159,7 +176,7 @@ void initsystem()
     fseek(unclaimed_list,0,SEEK_SET);
 
     system_meta_fptr=fopen(systemmetapath,"r+");
-    fread(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
+    fread(mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
     super_inode_write_fptr=fopen(superinodepath,"r+");
     super_inode_read_fptr=fopen(superinodepath,"r+");
     setbuf(super_inode_write_fptr,NULL);  /* Need to set inode pool I/O to unbuf for sync purpose*/
@@ -173,7 +190,7 @@ void mysync_system_meta()
  {
   sem_wait(mysystem_meta_sem);
   fseek(system_meta_fptr,0,SEEK_SET);
-  fwrite(&mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
+  fwrite(mysystem_meta,sizeof(system_meta),1,system_meta_fptr);
   fflush(system_meta_fptr);
   fflush(unclaimed_list);
   sem_post(mysystem_meta_sem);
@@ -289,27 +306,27 @@ int super_inode_create(struct stat *inputstat,ino_t *this_inode)
 
   sem_wait(super_inode_write_sem);
 
-  (*this_inode) = mysystem_meta.first_free_inode;
+  (*this_inode) = mysystem_meta->first_free_inode;
   inputstat->st_ino = (*this_inode);
-  mysystem_meta.total_inodes++;
-  if (mysystem_meta.first_free_inode == (mysystem_meta.max_inode + 1))
+  mysystem_meta->total_inodes++;
+  if (mysystem_meta->first_free_inode == (mysystem_meta->max_inode + 1))
    {
-    mysystem_meta.max_inode++;
-    mysystem_meta.first_free_inode++;
+    mysystem_meta->max_inode++;
+    mysystem_meta->first_free_inode++;
    }
   else
    {
-    fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(mysystem_meta.first_free_inode-1),SEEK_SET);
+    fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(mysystem_meta->first_free_inode-1),SEEK_SET);
     fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
     if ((temp_entry.thisstat).st_ino > 0)  /* Not really deleted */
      {
-      mysystem_meta.max_inode++;
-      mysystem_meta.first_free_inode = mysystem_meta.max_inode + 1;
-      (*this_inode) = mysystem_meta.max_inode;
+      mysystem_meta->max_inode++;
+      mysystem_meta->first_free_inode = mysystem_meta->max_inode + 1;
+      (*this_inode) = mysystem_meta->max_inode;
       printf("Warning: free inode list might be corrupted. Skipping free inode list\n");
      }
     else
-     mysystem_meta.first_free_inode = temp_entry.next_free_inode;
+     mysystem_meta->first_free_inode = temp_entry.next_free_inode;
    }
 
   memset(&temp_entry,0,sizeof(super_inode_entry));
@@ -394,8 +411,8 @@ int super_inode_reclaim()
     if (temp_entry.thisstat.st_ino == 0) /*If indeed is empty*/
      {
       memset(&temp_entry,0,sizeof(super_inode_entry));
-      temp_entry.next_free_inode = mysystem_meta.first_free_inode;
-      mysystem_meta.first_free_inode = this_inode;
+      temp_entry.next_free_inode = mysystem_meta->first_free_inode;
+      mysystem_meta->first_free_inode = this_inode;
 
       fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
       fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
