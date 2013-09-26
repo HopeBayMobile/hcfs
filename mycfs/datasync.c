@@ -7,7 +7,8 @@
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
 TODO: multiple connections to backend
-TODO: Uploading one single file may still stuck. Will need to debug
+TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
+TODO: Need to debug why data sync process will hang when uploading multiple big files with cache replacement...
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -75,6 +76,7 @@ void run_maintenance_loop()
   long count,total_blocks;
   ino_t this_inode;
   blockent temp_block_entry;
+  size_t super_inode_size;
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
@@ -99,10 +101,17 @@ void run_maintenance_loop()
     fseek(super_inode_sync_fptr,0,SEEK_SET);
     while(!feof(super_inode_sync_fptr))
      {
+      printf("Check sync\n");
       sem_wait(super_inode_write_sem);
       thispos=ftell(super_inode_sync_fptr);
-      fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+      super_inode_size = fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
       sem_post(super_inode_write_sem);
+      if (super_inode_size != 1)
+       {
+        printf("sync with wrong super inode entry size %ld\n",super_inode_size);
+        break;
+       }
+      printf("Inode %ld\n",temp_entry.thisstat.st_ino);
 
 /* TODO:
 1. Change the scan to create a list of uploads first, then
@@ -134,6 +143,7 @@ the delete sequence is called up.
           fread(&total_blocks,sizeof(long),1,metaptr);
           for(count=0;count<total_blocks;count++)
            {
+            printf("Check sync 2\n");
             flock(fileno(metaptr),LOCK_EX);
             blockflagpos=ftell(metaptr);
             fread(&temp_block_entry,sizeof(blockent),1,metaptr);
@@ -148,11 +158,18 @@ the delete sequence is called up.
               fflush(metaptr);
               flock(fileno(metaptr),LOCK_UN);
               do_block_sync(this_inode,count+1);
-              temp_block_entry.stored_where=3;
-              fseek(metaptr,blockflagpos,SEEK_SET);
+              /*First will need to check if the block is modified again*/
+
               flock(fileno(metaptr),LOCK_EX);
-              fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
-              fflush(metaptr);
+              fseek(metaptr,blockflagpos,SEEK_SET);
+              fread(&temp_block_entry,sizeof(blockent),1,metaptr);
+              if (temp_block_entry.stored_where==4)
+               {
+                temp_block_entry.stored_where=3;
+                fseek(metaptr,blockflagpos,SEEK_SET);
+                fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
+                fflush(metaptr);
+               }
               flock(fileno(metaptr),LOCK_UN);
              }
            }

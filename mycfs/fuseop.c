@@ -364,6 +364,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
 
 
+    printf("debug myread: stored where %d, opened_block %ld, this block %ld\n",tmp_block.stored_where, file_handle_table[fi->fh].opened_block, count);
     if (fi->fh>0)
      sem_wait(&(file_handle_table[fi->fh].block_sem));
 
@@ -412,6 +413,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
          }
         else
          {
+          printf("debug myread: fetching from backend inode %ld, blockno %ld\n",this_inode,count);
           data_fptr=fopen(blockpath,"a+");
           flock(fileno(data_fptr),LOCK_EX);
           flock(fileno(metaptr),LOCK_EX);
@@ -615,6 +617,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
       data_fptr=file_handle_table[fi->fh].blockptr;
+      tmp_block.stored_where=1;
      }
     else
      {

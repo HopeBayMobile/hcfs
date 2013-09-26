@@ -2,6 +2,7 @@
 #include "mycurl.h"
 
 /*TODO: Now pick victims with small inode number. Will need to implement something smarter.*/
+/* TODO: Need to change cache size when downloading from cloud*/
 /*Only kick the blocks that's stored on cloud, i.e., stored_where ==3*/
 void run_cache_loop()
  {
@@ -18,6 +19,7 @@ void run_cache_loop()
   blockent temp_block_entry;
   struct stat tempstat;
   unsigned char changed;
+  size_t super_inode_size;
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
@@ -29,6 +31,7 @@ void run_cache_loop()
     /*Sleep for 10 seconds if not triggered*/
     if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
      {
+      printf("not doing cache replacement\n");
       sleep(10);
       continue;
      }
@@ -38,16 +41,27 @@ void run_cache_loop()
       printf("Current cache size is: %ld\n", mysystem_meta->cache_size);
       if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
        break;
+      sem_wait(super_inode_write_sem);
       thispos=ftell(super_inode_sync_fptr);
-      fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+      printf("Debug cache loop: current super inode file pos is %ld\n",thispos);
+      super_inode_size = fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
+      printf("Read entry size is %ld\n",super_inode_size);
+      sem_post(super_inode_write_sem);
+
+      if (super_inode_size != 1)
+       break;
+
 
       if (((temp_entry.thisstat.st_ino>0) && ((temp_entry.is_dirty == False) && (temp_entry.in_transit == False))) && (temp_entry.thisstat.st_mode & S_IFREG))
        {
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
+        printf("Cache checking %s\n",metapath);
         metaptr=fopen(metapath,"r+");
         setbuf(metaptr,NULL);
+        printf("test1\n");
         flock(fileno(metaptr),LOCK_EX);
+        printf("test2\n");
         fseek(metaptr,sizeof(struct stat),SEEK_SET);
         fread(&total_blocks,sizeof(long),1,metaptr);
         changed = False;
@@ -56,6 +70,7 @@ void run_cache_loop()
          {
           blockflagpos=ftell(metaptr);
           fread(&temp_block_entry,sizeof(blockent),1,metaptr);
+          printf("block no %ld is in where %d\n",(count+1),temp_block_entry.stored_where);
           if (temp_block_entry.stored_where==3)  /*Only delete blocks that exists on both cloud and local*/
            {
             temp_block_entry.stored_where=2;
@@ -74,6 +89,7 @@ void run_cache_loop()
           if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
            break;
          }
+
         if (changed == True)
          {     /* Need to mark meta as dirty in super inode */
           sem_wait(super_inode_write_sem);
@@ -85,6 +101,7 @@ void run_cache_loop()
           sem_post(super_inode_write_sem);
          }
         flock(fileno(metaptr),LOCK_UN);
+        fclose(metaptr);
        }
      }
 
