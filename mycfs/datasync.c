@@ -8,7 +8,6 @@ TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
 TODO: multiple connections to backend
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
-TODO: Need to debug why data sync process will hang when uploading multiple big files with cache replacement...
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -16,7 +15,7 @@ void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
   char objname[1000];
 
   sprintf(objname,"meta_%ld",this_inode);
-  printf("syncing inode number %ld\n",this_inode);
+  printf("Debug datasync: syncing inode number %ld\n",this_inode);
   swift_put_object(fptr,objname);
   return;
  }
@@ -28,7 +27,7 @@ void do_block_sync(ino_t this_inode, long block_no)
   FILE *fptr;
 
   sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + block_no) % SYS_DIR_WIDTH,this_inode,block_no);
-  printf("syncing inode number %ld, block number %ld\n",this_inode, block_no);
+  printf("Debug datasync: syncing inode number %ld, block number %ld\n",this_inode, block_no);
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   fptr=fopen(blockpath,"r");
   swift_put_object(fptr,objname);
@@ -49,7 +48,7 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
      {
       if (init_swift_backend()!=0)
        {
-        printf("error in connecting to swift\n");
+        printf("Debug datasync: error in connecting to swift\n");
         exit(0);
        }
      }
@@ -92,26 +91,26 @@ void run_maintenance_loop()
 
     if (init_swift_backend()!=0)
      {
-      printf("error in connecting to swift\n");
+      printf("Debug datasync: error in connecting to swift\n");
       break;
      }
 
-    printf("Debug running syncing\n");
+    printf("Debug datasync: running syncing\n");
     ftime(&currenttime);
     fseek(super_inode_sync_fptr,0,SEEK_SET);
     while(!feof(super_inode_sync_fptr))
      {
-      printf("Check sync\n");
+      printf("Debug datasync: Check sync\n");
       sem_wait(super_inode_write_sem);
       thispos=ftell(super_inode_sync_fptr);
       super_inode_size = fread(&temp_entry,sizeof(super_inode_entry),1,super_inode_sync_fptr);
       sem_post(super_inode_write_sem);
       if (super_inode_size != 1)
        {
-        printf("sync with wrong super inode entry size %ld\n",super_inode_size);
+        printf("Debug datasync: sync with wrong super inode entry size %ld\n",super_inode_size);
         break;
        }
-      printf("Inode %ld\n",temp_entry.thisstat.st_ino);
+      printf("Debug datasync: Inode %ld\n",temp_entry.thisstat.st_ino);
 
 /* TODO:
 1. Change the scan to create a list of uploads first, then
@@ -121,7 +120,7 @@ the delete sequence is called up.
 */
       if ((temp_entry.thisstat.st_ino>0) && ((temp_entry.is_dirty == True) || (temp_entry.in_transit == True)))
        {
-        printf("Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
+        printf("Debug datasync: Inode %ld needs syncing\n",temp_entry.thisstat.st_ino);
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
         metaptr=fopen(metapath,"r+");
@@ -143,12 +142,12 @@ the delete sequence is called up.
           fread(&total_blocks,sizeof(long),1,metaptr);
           for(count=0;count<total_blocks;count++)
            {
-            printf("Check sync 2\n");
+            printf("Debug datasync: Check sync 2\n");
             flock(fileno(metaptr),LOCK_EX);
             blockflagpos=ftell(metaptr);
             fread(&temp_block_entry,sizeof(blockent),1,metaptr);
             flock(fileno(metaptr),LOCK_UN);
-            printf("Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
+            printf("Debug datasync: Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
             if ((temp_block_entry.stored_where==1) || (temp_block_entry.stored_where==4))
              {
               temp_block_entry.stored_where=4;
@@ -159,18 +158,20 @@ the delete sequence is called up.
               flock(fileno(metaptr),LOCK_UN);
               do_block_sync(this_inode,count+1);
               /*First will need to check if the block is modified again*/
-
+              printf("Debug datasync: preparing to update block status\n");
               flock(fileno(metaptr),LOCK_EX);
               fseek(metaptr,blockflagpos,SEEK_SET);
               fread(&temp_block_entry,sizeof(blockent),1,metaptr);
               if (temp_block_entry.stored_where==4)
                {
+                printf("Debug datasync: updated block status\n");
                 temp_block_entry.stored_where=3;
                 fseek(metaptr,blockflagpos,SEEK_SET);
                 fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
                 fflush(metaptr);
                }
               flock(fileno(metaptr),LOCK_UN);
+              printf("Debug datasync: finished block update\n");
              }
            }
          }
@@ -190,7 +191,7 @@ the delete sequence is called up.
        }
      }
     ftime(&currenttime);
-    printf("End running syncing\n");
+    printf("Debug datasync: End running syncing\n");
     destroy_swift_backend();
    }
 

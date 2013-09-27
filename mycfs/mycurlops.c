@@ -1,5 +1,11 @@
 #include "mycurl.h"
 
+typedef struct {
+    FILE *fptr;
+    long object_size;
+    long remaining_size;
+ } object_put_control;
+
 size_t read_header_auth(void *bufptr, size_t size, size_t nmemb, void *tempbuffer)
  {
   if (!strncmp(bufptr,URL_HEADER,strlen(URL_HEADER)))
@@ -86,20 +92,41 @@ size_t read_header_dummy(void *bufptr, size_t size, size_t nmemb, void *tempbuff
 size_t write_function(void *bufptr, size_t size, size_t nmemb, void *tempbuffer)
  {
   FILE *fptr;
+  long num_ele_read;
 
   fptr=fopen("tempstore","a+");
 
-  fwrite(bufptr,size,nmemb,fptr);
+  num_ele_read=fwrite(bufptr,size,nmemb,fptr);
 
   fclose(fptr);
-  return size*nmemb;
+  return size*num_ele_read;
  }
 
-size_t read_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
+size_t read_file_function(void *ptr, size_t size, size_t nmemb, void *put_control1)
  {
+/*TODO: Consider if it is possible for the actual file size to be smaller than object size due to truncating*/
   long total_size;
+  FILE *fptr;
+  size_t actual_to_read;
+  object_put_control *put_control;
 
-  total_size=fread(ptr,size,nmemb,fstream);
+  put_control = (object_put_control *) put_control1; 
+
+  if (put_control->remaining_size <=0)
+   return 0;
+
+  fptr=put_control->fptr;
+  if ((size*nmemb) > put_control->remaining_size)
+   {
+    actual_to_read = put_control->remaining_size;
+   }
+  else
+   actual_to_read = size * nmemb;
+
+//  fprintf(stderr,"Debug swift_put_object: start read %ld %ld\n",size,nmemb);
+  total_size=fread(ptr,1,actual_to_read,fptr);
+  put_control->remaining_size -= total_size;
+//  fprintf(stderr,"Debug swift_put_object: end read %ld\n",total_size);
 
   return total_size;
  }
@@ -110,7 +137,7 @@ size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 
   total_size=fwrite(ptr,size,nmemb,fstream);
 
-  return total_size;
+  return total_size*size;
  }
 
 
@@ -155,6 +182,7 @@ int swift_put_object(FILE *fptr, char *objname)
  {
   struct curl_slist *chunk=NULL;
   long objsize;
+  object_put_control put_control;
 
   chunk=NULL;
 
@@ -164,6 +192,11 @@ int swift_put_object(FILE *fptr, char *objname)
   fseek(fptr,0,SEEK_END);
   objsize=ftell(fptr);
   fseek(fptr,0,SEEK_SET);
+  put_control.fptr=fptr;
+  put_control.object_size = objsize;
+  put_control.remaining_size = objsize;
+
+  printf("Debug swift_put_object: object size is %ld\n",objsize);
 
   if (objsize < 0)
    return -1;
@@ -172,21 +205,24 @@ int swift_put_object(FILE *fptr, char *objname)
   curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
   curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
   curl_easy_setopt(curl, CURLOPT_PUT, 1L);
-  curl_easy_setopt(curl, CURLOPT_READDATA, (void *) fptr);
+  curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &put_control);
   curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
+  printf("Debug swift_put_object: test1\n",objsize);
   if (res!=CURLE_OK)
    {
     fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
     return -1;
    }
 
+  printf("Debug swift_put_object: test2\n",objsize);
   curl_slist_free_all(chunk);
+  printf("Debug swift_put_object: test3\n",objsize);
   return 0;
  }
 int swift_get_object(FILE *fptr, char *objname)
