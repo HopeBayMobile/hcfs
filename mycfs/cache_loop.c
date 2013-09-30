@@ -2,7 +2,6 @@
 #include "mycurl.h"
 
 /*TODO: Now pick victims with small inode number. Will need to implement something smarter.*/
-/* TODO: Need to change cache size when downloading from cloud*/
 /*Only kick the blocks that's stored on cloud, i.e., stored_where ==3*/
 void run_cache_loop()
  {
@@ -74,6 +73,7 @@ void run_cache_loop()
           if (temp_block_entry.stored_where==3)  /*Only delete blocks that exists on both cloud and local*/
            {
             temp_block_entry.stored_where=2;
+            printf("Debug stored_where changed to 2, block %ld\n",count+1);
             fseek(metaptr,blockflagpos,SEEK_SET);
             fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
             sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + (count+1)) % SYS_DIR_WIDTH,this_inode, (count+1));

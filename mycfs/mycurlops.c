@@ -196,7 +196,7 @@ int swift_put_object(FILE *fptr, char *objname)
   put_control.object_size = objsize;
   put_control.remaining_size = objsize;
 
-  printf("Debug swift_put_object: object size is %ld\n",objsize);
+  //printf("Debug swift_put_object: object size is %ld\n",objsize);
 
   if (objsize < 0)
    return -1;
@@ -208,21 +208,21 @@ int swift_put_object(FILE *fptr, char *objname)
   curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &put_control);
   curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
-  printf("Debug swift_put_object: test1\n",objsize);
+  //printf("Debug swift_put_object: test1\n",objsize);
   if (res!=CURLE_OK)
    {
     fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
     return -1;
    }
 
-  printf("Debug swift_put_object: test2\n",objsize);
+  //printf("Debug swift_put_object: test2\n",objsize);
   curl_slist_free_all(chunk);
-  printf("Debug swift_put_object: test3\n",objsize);
+  //printf("Debug swift_put_object: test3\n",objsize);
   return 0;
  }
 int swift_get_object(FILE *fptr, char *objname)

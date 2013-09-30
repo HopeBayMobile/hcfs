@@ -4,7 +4,6 @@
 /* TODO: In mywrite and myread, do not allow new cache block allocation if cache size > hard limit (also truncate if going to allow size extension) */
 /* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
 /* in myread ==> old cache block but stored in cloud only */
-/* TODO: need to add routine for fetching blocks from cloud in read or write if they are not at local */
 
 #include "myfuse.h"
 #include <math.h>
@@ -265,6 +264,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
   int total_read_bytes, max_to_read, have_error, actual_read_bytes;
   off_t current_offset,end_bytes;
   blockent tmp_block;
+  struct stat tempstat;
 
   show_current_time();
 
@@ -426,15 +426,23 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
              {
               flock(fileno(metaptr),LOCK_EX);
               tmp_block.stored_where = 5;
+              printf("Debug stored_where changed to 5, block %ld\n",count);
               fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
               fwrite(&tmp_block,sizeof(blockent),1,metaptr);
               fflush(metaptr);
               flock(fileno(metaptr),LOCK_UN);
              }
-            fetch_from_cloud(data_fptr,this_inode,count);  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
+            fetch_from_cloud(data_fptr,this_inode,count);
+
+            sem_wait(mysystem_meta_sem);
+            fstat(fileno(data_fptr),&tempstat);
+            mysystem_meta->cache_size += tempstat.st_size;
+            sem_post(mysystem_meta_sem);
+
             flock(fileno(metaptr),LOCK_EX);
 
             tmp_block.stored_where = 3;
+            printf("Debug stored_where changed to 3, block %ld\n",count);
             fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
             fwrite(&tmp_block,sizeof(blockent),1,metaptr);
             fflush(metaptr);
@@ -518,6 +526,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
   off_t current_offset,end_bytes;
   blockent tmp_block;
   long old_cache_size, new_cache_size;
+  struct stat tempstat;
 
   show_current_time();
 
@@ -618,6 +627,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
      {
       data_fptr=file_handle_table[fi->fh].blockptr;
       tmp_block.stored_where=1;
+      printf("Debug stored_where changed to 1, block %ld\n",count);
      }
     else
      {
@@ -632,6 +642,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
         tmp_block.stored_where=1;
+        printf("Debug stored_where changed to 1, block %ld\n",count);
        }
       else
        {
@@ -647,6 +658,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
           data_fptr=fopen(blockpath,"w+");
           setbuf(data_fptr,NULL);
           tmp_block.stored_where=1;
+          printf("Debug stored_where changed to 1, block %ld\n",count);
          }
         else
          {
@@ -659,15 +671,23 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
             if (tmp_block.stored_where==2)
              {
               tmp_block.stored_where = 5;
+              printf("Debug stored_where changed to 5, block %ld\n",count);
               fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
               fwrite(&tmp_block,sizeof(blockent),1,metaptr);
               fflush(metaptr);
              }
             flock(fileno(metaptr),LOCK_UN);
-            fetch_from_cloud(data_fptr,this_inode,count);  /*TODO: finish this function. Will need to put in parameters. Will need to mark as downloading, release LOCK, and wait*/
+            fetch_from_cloud(data_fptr,this_inode,count);
+
+            sem_wait(mysystem_meta_sem);
+            fstat(fileno(data_fptr),&tempstat);
+            mysystem_meta->cache_size += tempstat.st_size;
+            sem_post(mysystem_meta_sem);
+
             flock(fileno(metaptr),LOCK_EX);
 
             tmp_block.stored_where = 3;
+            printf("Debug stored_where changed to 3, block %ld\n",count);
             fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
             fwrite(&tmp_block,sizeof(blockent),1,metaptr);
             fflush(metaptr);
@@ -678,6 +698,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
           data_fptr=fopen(blockpath,"r+");
           setbuf(data_fptr,NULL);
           tmp_block.stored_where=1;
+          printf("Debug stored_where changed to 1, block %ld\n",count);
          }
        }
       if (fi->fh>0)
