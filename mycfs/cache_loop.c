@@ -27,13 +27,13 @@ void run_cache_loop()
 
   while(1==1)
    {
-    /*Sleep for 10 seconds if not triggered*/
-    if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
+    /*Sleep if not triggered*/
+    while (mysystem_meta->cache_size < CACHE_SOFT_LIMIT)
      {
-      printf("not doing cache replacement\n");
-      sleep(10);
-      continue;
+//      printf("not doing cache replacement\n");
+      sleep(1);
      }
+
     fseek(super_inode_sync_fptr,0,SEEK_SET);
     while(!feof(super_inode_sync_fptr))
      {

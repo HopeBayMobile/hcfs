@@ -8,6 +8,7 @@ TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
 TODO: multiple connections to backend
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
+TODO: Track if init_swift may not able to connect and terminate process.
 */
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
@@ -76,6 +77,7 @@ void run_maintenance_loop()
   ino_t this_inode;
   blockent temp_block_entry;
   size_t super_inode_size;
+  int sleep_count;
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
@@ -86,8 +88,13 @@ void run_maintenance_loop()
 
   while (1==1)
    {
-    if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
-     sleep(10);
+    for (sleep_count=0;sleep_count<30;sleep_count++)
+     {
+      if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
+       sleep(1);
+      else
+       break;
+     }
 
     if (init_swift_backend()!=0)
      {
