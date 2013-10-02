@@ -6,7 +6,8 @@
 2. How to handle racing condition in large files
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
-TODO: multiple connections to backend
+TODO: multiple upload connections
+TODO: multiple CURL handles and return codes for download connections
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
 TODO: Track if init_swift may not able to connect and terminate process.
 */

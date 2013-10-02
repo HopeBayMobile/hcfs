@@ -3,6 +3,7 @@
 
 /*TODO: Now pick victims with small inode number. Will need to implement something smarter.*/
 /*Only kick the blocks that's stored on cloud, i.e., stored_where ==3*/
+/* TODO: Something better for checking if the inode have cache to be kicked out. Will need to consider whether to force checking of replacement? */
 void run_cache_loop()
  {
   FILE *super_inode_sync_fptr;
@@ -50,12 +51,13 @@ void run_cache_loop()
       if (super_inode_size != 1)
        break;
 
-
-      if (((temp_entry.thisstat.st_ino>0) && ((temp_entry.is_dirty == False) && (temp_entry.in_transit == False))) && (temp_entry.thisstat.st_mode & S_IFREG))
+      /* If inode is not dirty or in transit, or if cache is already full, check if can replace uploaded blocks */
+      if (((temp_entry.thisstat.st_ino>0) && (temp_entry.thisstat.st_mode & S_IFREG)) 
+             && (((temp_entry.is_dirty == False) && (temp_entry.in_transit == False)) || (mysystem_meta->cache_size >= CACHE_HARD_LIMIT)))
        {
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
-//        printf("Cache checking %s\n",metapath);
+        printf("Cache checking %s\n",metapath);
         metaptr=fopen(metapath,"r+");
         setbuf(metaptr,NULL);
 //        printf("test1\n");
