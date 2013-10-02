@@ -25,12 +25,13 @@ size_t read_header_auth(void *bufptr, size_t size, size_t nmemb, void *tempbuffe
   return size*nmemb;
  }
 char auth_header_buf[1000];
-int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url)
+int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url, CURL *curl)
  {
   char userstring[1000];
   char passstring[1000];
   char urlstring[1000];
   struct curl_slist *chunk=NULL;
+  CURLcode res;
 
   //printf("%s, %s, %s\n", swift_user, swift_pass, swift_url);
   sprintf(userstring,"X-Storage-User: %s",swift_user);
@@ -61,7 +62,7 @@ int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url)
   return 0;
  }
 
-int init_swift_backend()
+int init_swift_backend(CURL *curl)
  {
   char account_user_string[1000];
   int ret_code;
@@ -73,13 +74,34 @@ int init_swift_backend()
 
     sprintf(account_user_string,"%s:%s",MY_ACCOUNT,MY_USER);
 
-    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL);
+    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL, curl);
 
     return ret_code;
    }
   return -1;
  }
-void destroy_swift_backend()
+int swift_reauth()
+ {
+  char account_user_string[1000];
+  int ret_code;
+  CURL *curl;
+  curl = curl_easy_init();
+
+  if (curl)
+   {
+    //struct curl_slist *chunk=NULL;
+
+    sprintf(account_user_string,"%s:%s",MY_ACCOUNT,MY_USER);
+
+    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL, curl);
+
+    destroy_swift_backend(curl);
+
+    return ret_code;
+   }
+  return -1;
+ }
+void destroy_swift_backend(CURL *curl)
  {
   curl_easy_cleanup(curl);
   return;
@@ -145,9 +167,10 @@ char http_header_buffer[1000];
 char http_write_buffer[1000];
 char http_read_buffer[1000];
 
-int swift_list_container()
+int swift_list_container(CURL *curl)
  {
   struct curl_slist *chunk=NULL;
+  CURLcode res;
 
   chunk=NULL;
 
@@ -178,11 +201,12 @@ int swift_list_container()
   return 0;
  }
 
-int swift_put_object(FILE *fptr, char *objname)
+int swift_put_object(FILE *fptr, char *objname, CURL *curl)
  {
   struct curl_slist *chunk=NULL;
   long objsize;
   object_put_control put_control;
+  CURLcode res;
 
   chunk=NULL;
 
@@ -225,10 +249,11 @@ int swift_put_object(FILE *fptr, char *objname)
   //printf("Debug swift_put_object: test3\n",objsize);
   return 0;
  }
-int swift_get_object(FILE *fptr, char *objname)
+int swift_get_object(FILE *fptr, char *objname, CURL *curl)
  {
   struct curl_slist *chunk=NULL;
   long objsize;
+  CURLcode res;
 
   chunk=NULL;
 

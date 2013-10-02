@@ -39,6 +39,7 @@ static struct fuse_operations my_fuse_ops = {
 void main(int argc, char **argv)
  {
   pid_t this_pid,this_pid1;
+  int upload_conn_count;
 
   if (argc < 2)
    {
@@ -50,13 +51,21 @@ void main(int argc, char **argv)
   this_pid = fork();
   if (this_pid ==0)
    {
-    if (init_swift_backend()!=0)
+    sem_init(&upload_curl_sem,0,MAX_CURL_HANDLE);
+    for(upload_conn_count=0;upload_conn_count<MAX_CURL_HANDLE;upload_conn_count++)
      {
-      printf("error in connecting to swift\n");
-      exit(0);
+      curl_handle_mask[upload_conn_count]=False;
+      if (init_swift_backend(download_curl_handles[upload_conn_count].curl)!=0)
+       {
+        printf("error in connecting to swift\n");
+        exit(0);
+       }
      }
     fuse_main(argc,argv,&my_fuse_ops,NULL);
-    destroy_swift_backend();
+    for(upload_conn_count=0;upload_conn_count<MAX_CURL_HANDLE;upload_conn_count++)
+     {
+      destroy_swift_backend(download_curl_handles[upload_conn_count].curl);
+     }
    }
   else
    {

@@ -18,7 +18,7 @@ void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
 
   sprintf(objname,"meta_%ld",this_inode);
   //printf("Debug datasync: syncing inode number %ld\n",this_inode);
-  swift_put_object(fptr,objname);
+  swift_put_object(fptr,objname, upload_curl_handle.curl);
   return;
  }
 
@@ -32,7 +32,7 @@ void do_block_sync(ino_t this_inode, long block_no)
   //printf("Debug datasync: syncing inode number %ld, block number %ld\n",this_inode, block_no);
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   fptr=fopen(blockpath,"r");
-  swift_put_object(fptr,objname);
+  swift_put_object(fptr,objname, upload_curl_handle.curl);
   fclose(fptr);
   return;
  }
@@ -41,14 +41,27 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
  {
   char objname[1000];
   int status;
+  int which_curl_handle;
 
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   while(1==1)
    {
-    status=swift_get_object(fptr,objname);
+    sem_wait(&upload_curl_sem);
+    for(which_curl_handle=0;which_curl_handle<MAX_CURL_HANDLE;which_curl_handle++)
+     {
+      if (curl_handle_mask[which_curl_handle] == False)
+       {
+        curl_handle_mask[which_curl_handle] = True;
+        break;
+       }
+     }
+    printf("Debug datasync: downloading using curl handle %d\n",which_curl_handle);
+    status=swift_get_object(fptr,objname,download_curl_handles[which_curl_handle].curl);
+    curl_handle_mask[which_curl_handle] = False;
+    sem_post(&upload_curl_sem);
     if (status!=0)
      {
-      if (init_swift_backend()!=0)
+      if (swift_reauth()!=0)
        {
         printf("Debug datasync: error in connecting to swift\n");
         exit(0);
@@ -97,7 +110,7 @@ void run_maintenance_loop()
        break;
      }
 
-    if (init_swift_backend()!=0)
+    if (init_swift_backend(upload_curl_handle.curl)!=0)
      {
       printf("Debug datasync: error in connecting to swift\n");
       break;
@@ -202,7 +215,7 @@ the delete sequence is called up.
      }
     ftime(&currenttime);
     //printf("Debug datasync: End running syncing\n");
-    destroy_swift_backend();
+    destroy_swift_backend(upload_curl_handle.curl);
    }
 
   return;
