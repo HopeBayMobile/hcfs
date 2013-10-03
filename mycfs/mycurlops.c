@@ -62,19 +62,19 @@ int swift_get_auth_info(char *swift_user,char *swift_pass, char *swift_url, CURL
   return 0;
  }
 
-int init_swift_backend(CURL *curl)
+int init_swift_backend(CURL_HANDLE *curl_handle)
  {
   char account_user_string[1000];
   int ret_code;
-  curl = curl_easy_init();
+  curl_handle->curl = curl_easy_init();
 
-  if (curl)
+  if (curl_handle->curl)
    {
     //struct curl_slist *chunk=NULL;
 
     sprintf(account_user_string,"%s:%s",MY_ACCOUNT,MY_USER);
 
-    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL, curl);
+    ret_code = swift_get_auth_info(account_user_string, MY_PASS, MY_URL, curl_handle->curl);
 
     return ret_code;
    }
@@ -145,10 +145,10 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb, void *put_contro
   else
    actual_to_read = size * nmemb;
 
-//  fprintf(stderr,"Debug swift_put_object: start read %ld %ld\n",size,nmemb);
+  //fprintf(stderr,"Debug swift_put_object: start read %ld %ld\n",size,nmemb);
   total_size=fread(ptr,1,actual_to_read,fptr);
   put_control->remaining_size -= total_size;
-//  fprintf(stderr,"Debug swift_put_object: end read %ld\n",total_size);
+  //fprintf(stderr,"Debug swift_put_object: end read %ld\n",total_size);
 
   return total_size;
  }
@@ -221,6 +221,7 @@ int swift_put_object(FILE *fptr, char *objname, CURL *curl)
   put_control.remaining_size = objsize;
 
   //printf("Debug swift_put_object: object size is %ld\n",objsize);
+  //printf("Put to %s, auth %s\n",container_string,auth_string);
 
   if (objsize < 0)
    return -1;

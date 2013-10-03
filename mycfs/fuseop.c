@@ -4,6 +4,7 @@
 /* TODO: In mywrite and myread, do not allow new cache block allocation if cache size > hard limit (also truncate if going to allow size extension) */
 /* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
 /* in myread ==> old cache block but stored in cloud only */
+/*TODO: debug why copying 50GB files then delete them all may cause df to show negative data size*/
 
 #include "myfuse.h"
 #include <math.h>
@@ -353,13 +354,11 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       sleep_on_cache_full();
      }
 
-    flock(fileno(metaptr),LOCK_SH);
     if (fi->fh > 0)
      sem_wait(&(file_handle_table[fi->fh].meta_sem));
+    flock(fileno(metaptr),LOCK_SH);
     fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET); /* Seek to the current block on the meta */
     fread(&tmp_block,sizeof(blockent),1,metaptr);
-    if (fi->fh > 0)
-     sem_post(&(file_handle_table[fi->fh].meta_sem));
 
     sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
 
@@ -371,6 +370,8 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
       flock(fileno(metaptr),LOCK_UN);
+      if (fi->fh > 0)
+       sem_post(&(file_handle_table[fi->fh].meta_sem));
       data_fptr=file_handle_table[fi->fh].blockptr;
      }
     else
@@ -386,8 +387,12 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
         data_fptr=fopen(blockpath,"r+");
         setbuf(data_fptr,NULL);
         flock(fileno(metaptr),LOCK_UN);
+        if (fi->fh > 0)
+         sem_post(&(file_handle_table[fi->fh].meta_sem));
+
         if (data_fptr==NULL)
          {
+          printf("Debug myread: Unable to open data block inode %ld blockno %ld\n",this_inode,count);
           retsize = -1;
           if (fi->fh>0)
            {
@@ -399,22 +404,39 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       else
        {
         flock(fileno(metaptr),LOCK_UN);
+        if (fi->fh > 0)
+         {
+          sem_post(&(file_handle_table[fi->fh].block_sem));
+          sem_post(&(file_handle_table[fi->fh].meta_sem));
+         }
+
         if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
          sleep_on_cache_full();
 
         if (tmp_block.stored_where == 0)
          {
           retsize = -1;
+/*
           if (fi->fh>0)
            {
             sem_post(&(file_handle_table[fi->fh].block_sem));
            }
+*/
           break;
          }
         else
          {
+          if (fi->fh > 0)
+           {
+            sem_wait(&(file_handle_table[fi->fh].meta_sem));
+            sem_wait(&(file_handle_table[fi->fh].block_sem));
+           }
+
           printf("debug myread: fetching from backend inode %ld, blockno %ld\n",this_inode,count);
           data_fptr=fopen(blockpath,"a+");
+          fclose(data_fptr);
+          data_fptr=fopen(blockpath,"r+");
+          setbuf(data_fptr,NULL);
           flock(fileno(data_fptr),LOCK_EX);
           flock(fileno(metaptr),LOCK_EX);
           fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
@@ -449,11 +471,11 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
             flock(fileno(metaptr),LOCK_UN);
            }
-          flock(fileno(data_fptr),LOCK_UN);
-          fclose(data_fptr);
+          if (fi->fh > 0)
+           sem_post(&(file_handle_table[fi->fh].meta_sem));
 
-          data_fptr=fopen(blockpath,"r+");
-          setbuf(data_fptr,NULL);
+          flock(fileno(data_fptr),LOCK_UN);
+          fseek(data_fptr,0,SEEK_SET);
          }
        }
 
@@ -651,6 +673,8 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
           flock(fileno(metaptr),LOCK_UN);
           sleep_on_cache_full();
           flock(fileno(metaptr),LOCK_EX);
+          fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
+          fread(&tmp_block,sizeof(blockent),1,metaptr);
          }
 
         if (tmp_block.stored_where == 0)
@@ -663,6 +687,9 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
         else
          {
           data_fptr=fopen(blockpath,"a+");
+          fclose(data_fptr);
+          data_fptr=fopen(blockpath,"r+");
+          setbuf(data_fptr,NULL);
           flock(fileno(data_fptr),LOCK_EX);
           fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET);
           fread(&tmp_block,sizeof(blockent),1,metaptr);
@@ -693,10 +720,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
             fflush(metaptr);
            }
           flock(fileno(data_fptr),LOCK_UN);
-          fclose(data_fptr);
-
-          data_fptr=fopen(blockpath,"r+");
-          setbuf(data_fptr,NULL);
+          fseek(data_fptr,0,SEEK_SET);
           tmp_block.stored_where=1;
           printf("Debug stored_where changed to 1, block %ld\n",count);
          }

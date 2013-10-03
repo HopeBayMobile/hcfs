@@ -12,17 +12,17 @@ TODO: Will need to be able to delete files or truncate files while it is being s
 TODO: Track if init_swift may not able to connect and terminate process.
 */
 
-void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode)
+void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode, CURL *curl)
  {
   char objname[1000];
 
   sprintf(objname,"meta_%ld",this_inode);
   //printf("Debug datasync: syncing inode number %ld\n",this_inode);
-  swift_put_object(fptr,objname, upload_curl_handle.curl);
+  swift_put_object(fptr,objname, curl);
   return;
  }
 
-void do_block_sync(ino_t this_inode, long block_no)
+void do_block_sync(ino_t this_inode, long block_no, CURL *curl)
  {
   char objname[1000];
   char blockpath[1000];
@@ -32,7 +32,7 @@ void do_block_sync(ino_t this_inode, long block_no)
   //printf("Debug datasync: syncing inode number %ld, block number %ld\n",this_inode, block_no);
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   fptr=fopen(blockpath,"r");
-  swift_put_object(fptr,objname, upload_curl_handle.curl);
+  swift_put_object(fptr,objname, curl);
   fclose(fptr);
   return;
  }
@@ -46,7 +46,7 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   while(1==1)
    {
-    sem_wait(&upload_curl_sem);
+    sem_wait(&download_curl_sem);
     for(which_curl_handle=0;which_curl_handle<MAX_CURL_HANDLE;which_curl_handle++)
      {
       if (curl_handle_mask[which_curl_handle] == False)
@@ -58,7 +58,7 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
     printf("Debug datasync: downloading using curl handle %d\n",which_curl_handle);
     status=swift_get_object(fptr,objname,download_curl_handles[which_curl_handle].curl);
     curl_handle_mask[which_curl_handle] = False;
-    sem_post(&upload_curl_sem);
+    sem_post(&download_curl_sem);
     if (status!=0)
      {
       if (swift_reauth()!=0)
@@ -92,6 +92,7 @@ void run_maintenance_loop()
   blockent temp_block_entry;
   size_t super_inode_size;
   int sleep_count;
+  CURL_HANDLE uploadcurl;
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
@@ -110,7 +111,7 @@ void run_maintenance_loop()
        break;
      }
 
-    if (init_swift_backend(upload_curl_handle.curl)!=0)
+    if (init_swift_backend(&uploadcurl)!=0)
      {
       printf("Debug datasync: error in connecting to swift\n");
       break;
@@ -172,13 +173,13 @@ the delete sequence is called up.
             if ((temp_block_entry.stored_where==1) || (temp_block_entry.stored_where==4))
              {
               temp_block_entry.stored_where=4;
-              printf("datasync.c Debug stored_where changed to 4, block %ld\n",count+1);
+              //printf("datasync.c Debug stored_where changed to 4, block %ld\n",count+1);
               fseek(metaptr,blockflagpos,SEEK_SET);
               flock(fileno(metaptr),LOCK_EX);
               fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
               fflush(metaptr);
               flock(fileno(metaptr),LOCK_UN);
-              do_block_sync(this_inode,count+1);
+              do_block_sync(this_inode,count+1, uploadcurl.curl);
               /*First will need to check if the block is modified again*/
               //printf("Debug datasync: preparing to update block status\n");
               flock(fileno(metaptr),LOCK_EX);
@@ -188,7 +189,7 @@ the delete sequence is called up.
                {
                 //printf("Debug datasync: updated block status\n");
                 temp_block_entry.stored_where=3;
-                printf("datasync.c Debug stored_where changed to 3, block %ld\n",count+1);
+                //printf("datasync.c Debug stored_where changed to 3, block %ld\n",count+1);
                 fseek(metaptr,blockflagpos,SEEK_SET);
                 fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
                 fflush(metaptr);
@@ -199,7 +200,7 @@ the delete sequence is called up.
            }
          }
         flock(fileno(metaptr),LOCK_EX);
-        do_meta_sync(metaptr,metapath,this_inode);
+        do_meta_sync(metaptr,metapath,this_inode, uploadcurl.curl);
         flock(fileno(metaptr),LOCK_UN);
         fclose(metaptr);
 
@@ -215,7 +216,7 @@ the delete sequence is called up.
      }
     ftime(&currenttime);
     //printf("Debug datasync: End running syncing\n");
-    destroy_swift_backend(upload_curl_handle.curl);
+    destroy_swift_backend(uploadcurl.curl);
    }
 
   return;

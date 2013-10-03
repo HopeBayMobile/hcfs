@@ -51,11 +51,11 @@ void main(int argc, char **argv)
   this_pid = fork();
   if (this_pid ==0)
    {
-    sem_init(&upload_curl_sem,0,MAX_CURL_HANDLE);
+    sem_init(&download_curl_sem,0,MAX_CURL_HANDLE);
     for(upload_conn_count=0;upload_conn_count<MAX_CURL_HANDLE;upload_conn_count++)
      {
       curl_handle_mask[upload_conn_count]=False;
-      if (init_swift_backend(download_curl_handles[upload_conn_count].curl)!=0)
+      if (init_swift_backend(&(download_curl_handles[upload_conn_count]))!=0)
        {
         printf("error in connecting to swift\n");
         exit(0);
