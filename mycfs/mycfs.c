@@ -40,6 +40,7 @@ void main(int argc, char **argv)
  {
   pid_t this_pid,this_pid1;
   int upload_conn_count;
+  FILE *fptr;
 
   if (argc < 2)
    {
@@ -51,6 +52,11 @@ void main(int argc, char **argv)
   this_pid = fork();
   if (this_pid ==0)
    {
+    fptr=fopen("fuse_log","a+");
+    fprintf(fptr,"\nStart logging fuse\n");
+    printf("Redirecting to fuse log\n");
+    dup2(fileno(fptr),fileno(stdout));
+    dup2(fileno(fptr),fileno(stderr));
     sem_init(&download_curl_sem,0,MAX_CURL_HANDLE);
     for(upload_conn_count=0;upload_conn_count<MAX_CURL_HANDLE;upload_conn_count++)
      {
@@ -66,14 +72,30 @@ void main(int argc, char **argv)
      {
       destroy_swift_backend(download_curl_handles[upload_conn_count].curl);
      }
+    fclose(fptr);
    }
   else
    {
     this_pid1 = fork();
     if (this_pid1 == 0)
-     run_maintenance_loop();
+     {
+      fptr=fopen("swift_upload_log","a+");
+      fprintf(fptr,"\nStart logging swift upload\n");
+      printf("Redirecting to swift log\n");
+      dup2(fileno(fptr),fileno(stdout));
+      run_maintenance_loop();
+      fclose(fptr);
+     }
     else
-     run_cache_loop();
+     {
+      fptr=fopen("cache_maintain_log","a+");
+      fprintf(fptr,"\nStart logging cache cleanup\n");
+      printf("Redirecting to cache log\n");
+      dup2(fileno(fptr),fileno(stdout));
+
+      run_cache_loop();
+      fclose(fptr);
+     }
    }
 
   printf("End of main process\n");

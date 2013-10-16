@@ -5,6 +5,8 @@
 /* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
 /* in myread ==> old cache block but stored in cloud only */
 /*TODO: debug why copying 50GB files then delete them all may cause df to show negative data size*/
+/*TODO: Replace flock with some thread-safe file locking mechanism to avoid problem in multiple-users opening the same file*/
+/*TODO: Consider whether to use flockfile instead of per-file entry semaphores*/
 
 #include "myfuse.h"
 #include <math.h>
@@ -269,7 +271,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
   show_current_time();
 
-//  printf("Debug myread path %s, size %ld, offset %ld\n",path,size,offset);
+  printf("Debug myread path %s, size %ld, offset %ld\n",path,size,offset);
 
   if (size==0)
    return 0;
@@ -344,31 +346,56 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
       /* End of file encountered*/
       break;
      }
-    if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
-     {
-      if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block!=0))
-       {
-        fclose(file_handle_table[fi->fh].blockptr);
-        file_handle_table[fi->fh].opened_block=0;
-       }
-      sleep_on_cache_full();
-     }
 
     if (fi->fh > 0)
-     sem_wait(&(file_handle_table[fi->fh].meta_sem));
+     {
+      sem_wait(&(file_handle_table[fi->fh].meta_sem));
+      sem_wait(&(file_handle_table[fi->fh].block_sem));
+     }
     flock(fileno(metaptr),LOCK_SH);
     fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET); /* Seek to the current block on the meta */
     fread(&tmp_block,sizeof(blockent),1,metaptr);
 
     sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
 
+    printf("debug myread: stored where %d, opened_block %ld, this block %ld, inode %ld\n",tmp_block.stored_where, file_handle_table[fi->fh].opened_block, count,this_inode);
 
-    printf("debug myread: stored where %d, opened_block %ld, this block %ld\n",tmp_block.stored_where, file_handle_table[fi->fh].opened_block, count);
-    if (fi->fh>0)
-     sem_wait(&(file_handle_table[fi->fh].block_sem));
+
+    while (((tmp_block.stored_where ==0) || (tmp_block.stored_where ==2)) || (tmp_block.stored_where ==5))
+     {
+      if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+       {
+        printf("debug myread: waiting on full cache\n");
+        flock(fileno(metaptr),LOCK_UN);
+        if (fi->fh > 0)
+         {
+          sem_post(&(file_handle_table[fi->fh].block_sem));
+          sem_post(&(file_handle_table[fi->fh].meta_sem));
+         }
+        sleep_on_cache_full();
+        if (fi->fh > 0)
+         {
+          sem_wait(&(file_handle_table[fi->fh].meta_sem));
+          sem_wait(&(file_handle_table[fi->fh].block_sem));
+         }
+        setbuf(metaptr,NULL); 
+        flock(fileno(metaptr),LOCK_SH);
+        fseek(metaptr,sizeof(struct stat)+sizeof(long)+(count-1)*sizeof(blockent),SEEK_SET); /* Seek to the current block on the meta */
+        fread(&tmp_block,sizeof(blockent),1,metaptr);
+
+        sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + count) % SYS_DIR_WIDTH,this_inode,count);
+
+        printf("debug myread: stored where %d, opened_block %ld, this block %ld\n",tmp_block.stored_where, file_handle_table[fi->fh].opened_block, count);
+       }
+      else
+       break;
+
+     }
+
 
     if ((fi->fh>0) && (file_handle_table[fi->fh].opened_block == count))
      {
+      printf("Debug myread: Cached block\n");
       flock(fileno(metaptr),LOCK_UN);
       if (fi->fh > 0)
        sem_post(&(file_handle_table[fi->fh].meta_sem));
@@ -403,36 +430,20 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        }
       else
        {
-        flock(fileno(metaptr),LOCK_UN);
-        if (fi->fh > 0)
-         {
-          sem_post(&(file_handle_table[fi->fh].block_sem));
-          sem_post(&(file_handle_table[fi->fh].meta_sem));
-         }
-
-        if (mysystem_meta->cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
-         sleep_on_cache_full();
-
         if (tmp_block.stored_where == 0)
          {
           retsize = -1;
-/*
           if (fi->fh>0)
            {
             sem_post(&(file_handle_table[fi->fh].block_sem));
+            sem_post(&(file_handle_table[fi->fh].meta_sem));
            }
-*/
           break;
          }
         else
          {
-          if (fi->fh > 0)
-           {
-            sem_wait(&(file_handle_table[fi->fh].meta_sem));
-            sem_wait(&(file_handle_table[fi->fh].block_sem));
-           }
-
           printf("debug myread: fetching from backend inode %ld, blockno %ld\n",this_inode,count);
+          flock(fileno(metaptr),LOCK_UN);
           data_fptr=fopen(blockpath,"a+");
           fclose(data_fptr);
           data_fptr=fopen(blockpath,"r+");
@@ -486,7 +497,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        }
      }
 
-//    printf("%s\n",blockpath);
+    printf("%s\n",blockpath);
     fseek(data_fptr,current_offset - (MAX_BLOCK_SIZE * (count-1)),SEEK_SET);
     if ((MAX_BLOCK_SIZE * count) < (offset+size))
      max_to_read = (MAX_BLOCK_SIZE * count) - current_offset;
@@ -494,7 +505,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
      max_to_read = (offset+size) - current_offset;
     actual_read_bytes = fread(&buf[current_offset-offset],sizeof(char),max_to_read,data_fptr);
 
-//    printf("Read debug max_to_read %d actual read %d\n",max_to_read, actual_read_bytes);
+    printf("Read debug max_to_read %d actual read %d, inode %ld\n",max_to_read, actual_read_bytes,this_inode);
 
     total_read_bytes += actual_read_bytes;
     current_offset +=actual_read_bytes;
@@ -509,7 +520,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
        }
       if (have_error>0)
        {
-        retsize = -have_error;
+        retsize = -errno;
         break;
        }
       else
@@ -528,7 +539,7 @@ int myread(const char *path, char *buf, size_t size, off_t offset, struct fuse_f
 
   if (retsize>=0)
    retsize = total_read_bytes;
-//  printf("Debug myread end path %s, size %ld, offset %ld, total read %d\n",path,size,offset,retsize);
+  printf("Debug myread end path %s, size %ld, offset %ld, total read %d\n",path,size,offset,retsize);
   if (fi->fh==0)
    fclose(metaptr);
 
@@ -767,7 +778,7 @@ int mywrite(const char *path, const char *buf, size_t size, off_t offset, struct
       fclose(data_fptr);
       if (have_error>0)
        {
-        retsize = -have_error;
+        retsize = -errno;
         break;
        }
       else
@@ -1267,6 +1278,8 @@ int mytruncate(const char *path, off_t length)
     fptr = fopen(metapath,"r+");
     if (fptr==NULL)
      return -ENOENT;
+    setbuf(fptr,NULL);
+/* TODO: May need to debug inability to correctly sync the most recent file meta between truncate and followup writes, e.g., overwriting large files*/
     flock(fileno(fptr),LOCK_EX);
     fread(&inputstat,sizeof(struct stat),1,fptr);
     fread(&total_blocks,sizeof(long),1,fptr);

@@ -57,7 +57,7 @@ void run_cache_loop()
        {
         this_inode=temp_entry.thisstat.st_ino;
         sprintf(metapath,"%s/sub_%ld/meta%ld",METASTORE,this_inode % SYS_DIR_WIDTH,this_inode);
-        printf("Cache checking %s\n",metapath);
+//        printf("Cache checking %s\n",metapath);
         metaptr=fopen(metapath,"r+");
         setbuf(metaptr,NULL);
 //        printf("test1\n");
@@ -75,7 +75,7 @@ void run_cache_loop()
           if (temp_block_entry.stored_where==3)  /*Only delete blocks that exists on both cloud and local*/
            {
             temp_block_entry.stored_where=2;
-            printf("Debug stored_where changed to 2, block %ld\n",count+1);
+            printf("Debug stored_where changed to 2, block %ld, inode %ld\n",count+1,this_inode);
             fseek(metaptr,blockflagpos,SEEK_SET);
             fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
             sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + (count+1)) % SYS_DIR_WIDTH,this_inode, (count+1));
