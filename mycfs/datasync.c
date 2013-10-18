@@ -1,16 +1,32 @@
 #include "myfuse.h"
 #include "mycurl.h"
+#include <pthread.h>
+
+#define max_concurrency 4
 
 /*TODO: need to debug
 1. How to make delete file and upload file work together
-2. How to handle racing condition in large files
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
 TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
-TODO: multiple upload connections
-TODO: multiple CURL handles and return codes for download connections
+TODO: multiple upload connections for multiple files
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
 TODO: Track if init_swift may not able to connect and terminate process.
 */
+
+typedef struct {
+    long filepos;
+    ino_t inode;
+    long blockno;
+    CURL *curlptr;
+ } upload_thread_type;
+
+void do_block_sync(ino_t this_inode, long block_no, CURL *curl);
+
+void con_block_sync(upload_thread_type *upload_thread_ptr)
+ {
+  do_block_sync(upload_thread_ptr->inode, upload_thread_ptr->blockno, upload_thread_ptr->curlptr);
+  return;
+ }
 
 void do_meta_sync(FILE *fptr,char *orig_meta_path,ino_t this_inode, CURL *curl)
  {
@@ -29,8 +45,9 @@ void do_block_sync(ino_t this_inode, long block_no, CURL *curl)
   FILE *fptr;
 
   sprintf(blockpath,"%s/sub_%ld/data_%ld_%ld",BLOCKSTORE,(this_inode + block_no) % SYS_DIR_WIDTH,this_inode,block_no);
-  //printf("Debug datasync: syncing inode number %ld, block number %ld\n",this_inode, block_no);
+  printf("Debug datasync: syncing inode number %ld, block number %ld\n",this_inode, block_no);
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
+  printf("Debug datasync: objname %s, inode %ld, block %ld\n",objname,this_inode,block_no);
   fptr=fopen(blockpath,"r");
   swift_put_object(fptr,objname, curl);
   fclose(fptr);
@@ -92,7 +109,10 @@ void run_maintenance_loop()
   blockent temp_block_entry;
   size_t super_inode_size;
   int sleep_count;
-  CURL_HANDLE uploadcurl;
+  CURL_HANDLE uploadcurl[max_concurrency];
+  int con_count,total_con_upload;
+  upload_thread_type upload_threads[max_concurrency];
+  pthread_t upload_threads_no[max_concurrency];
 
   sprintf(superinodepath,"%s/%s", METASTORE,"superinodefile");
 
@@ -111,10 +131,13 @@ void run_maintenance_loop()
        break;
      }
 
-    if (init_swift_backend(&uploadcurl)!=0)
+    for (con_count = 0; con_count < max_concurrency; con_count ++)
      {
-      printf("Debug datasync: error in connecting to swift\n");
-      break;
+      if (init_swift_backend(&(uploadcurl[con_count]))!=0)
+       {
+        printf("Debug datasync: error in connecting to swift\n");
+        break;
+       }
      }
 
     //printf("Debug datasync: running syncing\n");
@@ -162,24 +185,47 @@ the delete sequence is called up.
          {
           fseek(metaptr,sizeof(struct stat),SEEK_SET);
           fread(&total_blocks,sizeof(long),1,metaptr);
-          for(count=0;count<total_blocks;count++)
+
+          count = 0;
+          while(count < total_blocks)
            {
-            //printf("Debug datasync: Check sync 2\n");
-            flock(fileno(metaptr),LOCK_EX);
-            blockflagpos=ftell(metaptr);
-            fread(&temp_block_entry,sizeof(blockent),1,metaptr);
-            flock(fileno(metaptr),LOCK_UN);
-            //printf("Debug datasync: Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
-            if ((temp_block_entry.stored_where==1) || (temp_block_entry.stored_where==4))
+            for (con_count = 0; con_count < max_concurrency;)
              {
-              temp_block_entry.stored_where=4;
-              //printf("datasync.c Debug stored_where changed to 4, block %ld\n",count+1);
-              fseek(metaptr,blockflagpos,SEEK_SET);
+              if (count >= total_blocks)
+               break;
+            
+            //printf("Debug datasync: Check sync 2\n");
               flock(fileno(metaptr),LOCK_EX);
-              fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
-              fflush(metaptr);
+              blockflagpos=ftell(metaptr);
+              fread(&temp_block_entry,sizeof(blockent),1,metaptr);
               flock(fileno(metaptr),LOCK_UN);
-              do_block_sync(this_inode,count+1, uploadcurl.curl);
+              printf("Debug datasync: Checking block %ld, stored where %d\n",count+1,temp_block_entry.stored_where);
+              if ((temp_block_entry.stored_where==1) || (temp_block_entry.stored_where==4))
+               {
+                temp_block_entry.stored_where=4;
+                printf("datasync.c Debug stored_where changed to 4, block %ld\n",count+1);
+                fseek(metaptr,blockflagpos,SEEK_SET);
+                flock(fileno(metaptr),LOCK_EX);
+                fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
+                fflush(metaptr);
+                flock(fileno(metaptr),LOCK_UN);
+                upload_threads[con_count].filepos = blockflagpos;
+                upload_threads[con_count].inode = this_inode;
+                upload_threads[con_count].blockno = count+1;
+                upload_threads[con_count].curlptr = uploadcurl[con_count].curl;
+                pthread_create(&(upload_threads_no[con_count]),NULL, (void *)&con_block_sync,(void *)&(upload_threads[con_count]));
+                con_count ++;
+               }
+              count ++;
+             }
+            total_con_upload = con_count;
+            
+            for (con_count = 0; con_count < total_con_upload; con_count++)
+             {
+              pthread_join(upload_threads_no[con_count],NULL);
+              blockflagpos = upload_threads[con_count].filepos;
+
+//              do_block_sync(this_inode,count+1, uploadcurl.curl);
               /*First will need to check if the block is modified again*/
               //printf("Debug datasync: preparing to update block status\n");
               flock(fileno(metaptr),LOCK_EX);
@@ -189,7 +235,7 @@ the delete sequence is called up.
                {
                 //printf("Debug datasync: updated block status\n");
                 temp_block_entry.stored_where=3;
-                //printf("datasync.c Debug stored_where changed to 3, block %ld\n",count+1);
+                printf("datasync.c Debug stored_where changed to 3, block %ld\n",upload_threads[con_count].blockno);
                 fseek(metaptr,blockflagpos,SEEK_SET);
                 fwrite(&temp_block_entry,sizeof(blockent),1,metaptr);
                 fflush(metaptr);
@@ -200,7 +246,7 @@ the delete sequence is called up.
            }
          }
         flock(fileno(metaptr),LOCK_EX);
-        do_meta_sync(metaptr,metapath,this_inode, uploadcurl.curl);
+        do_meta_sync(metaptr,metapath,this_inode, uploadcurl[0].curl);
         flock(fileno(metaptr),LOCK_UN);
         fclose(metaptr);
 
@@ -216,7 +262,8 @@ the delete sequence is called up.
      }
     ftime(&currenttime);
     //printf("Debug datasync: End running syncing\n");
-    destroy_swift_backend(uploadcurl.curl);
+    for(con_count=0;con_count<max_concurrency;con_count++)
+     destroy_swift_backend(uploadcurl[con_count].curl);
    }
 
   return;

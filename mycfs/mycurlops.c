@@ -171,6 +171,7 @@ int swift_list_container(CURL *curl)
  {
   struct curl_slist *chunk=NULL;
   CURLcode res;
+  char container_string[200];
 
   chunk=NULL;
 
@@ -207,6 +208,7 @@ int swift_put_object(FILE *fptr, char *objname, CURL *curl)
   long objsize;
   object_put_control put_control;
   CURLcode res;
+  char container_string[200];
 
   chunk=NULL;
 
@@ -220,8 +222,8 @@ int swift_put_object(FILE *fptr, char *objname, CURL *curl)
   put_control.object_size = objsize;
   put_control.remaining_size = objsize;
 
-  //printf("Debug swift_put_object: object size is %ld\n",objsize);
-  //printf("Put to %s, auth %s\n",container_string,auth_string);
+  printf("Debug swift_put_object: object size is %ld\n",objsize);
+  printf("Put to %s, auth %s\n",container_string,auth_string);
 
   if (objsize < 0)
    return -1;
@@ -233,7 +235,7 @@ int swift_put_object(FILE *fptr, char *objname, CURL *curl)
   curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &put_control);
   curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
@@ -255,6 +257,7 @@ int swift_get_object(FILE *fptr, char *objname, CURL *curl)
   struct curl_slist *chunk=NULL;
   long objsize;
   CURLcode res;
+  char container_string[200];
 
   chunk=NULL;
 

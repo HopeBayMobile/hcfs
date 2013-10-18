@@ -83,6 +83,7 @@ void main(int argc, char **argv)
       fprintf(fptr,"\nStart logging swift upload\n");
       printf("Redirecting to swift log\n");
       dup2(fileno(fptr),fileno(stdout));
+      dup2(fileno(fptr),fileno(stderr));
       run_maintenance_loop();
       fclose(fptr);
      }
@@ -92,6 +93,7 @@ void main(int argc, char **argv)
       fprintf(fptr,"\nStart logging cache cleanup\n");
       printf("Redirecting to cache log\n");
       dup2(fileno(fptr),fileno(stdout));
+      dup2(fileno(fptr),fileno(stderr));
 
       run_cache_loop();
       fclose(fptr);

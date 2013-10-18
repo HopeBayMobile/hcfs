@@ -5,8 +5,8 @@
 /* Note: in mywrite ==> new cache block or old cache block but stored in cloud only */
 /* in myread ==> old cache block but stored in cloud only */
 /*TODO: debug why copying 50GB files then delete them all may cause df to show negative data size*/
-/*TODO: Replace flock with some thread-safe file locking mechanism to avoid problem in multiple-users opening the same file*/
 /*TODO: Consider whether to use flockfile instead of per-file entry semaphores*/
+/*TODO: How to use command-line based unmounting method to safely stop all processes */
 
 #include "myfuse.h"
 #include <math.h>

@@ -15,7 +15,6 @@
 #define MAX_CURL_HANDLE 16
 
 char url_string[200];
-char container_string[200];
 char auth_string[200];
 
 typedef struct {
