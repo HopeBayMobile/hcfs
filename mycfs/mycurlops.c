@@ -1,5 +1,7 @@
 #include "mycurl.h"
 
+/* TODO: Need to implement routine to parse http return code to distinguish errors from normal ops*/
+
 typedef struct {
     FILE *fptr;
     long object_size;
