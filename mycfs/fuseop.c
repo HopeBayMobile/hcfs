@@ -1445,8 +1445,9 @@ int mytruncate(const char *path, off_t length)
              flock(fileno(fptr),LOCK_UN);
            }
 
-          fseek(data_fptr,0,SEEK_SET);
           flock(fileno(fptr),LOCK_EX);
+          flock(fileno(data_fptr),LOCK_UN);
+          fclose(data_fptr);
          }
 
         if (stat(blockpath,&tempstat)==0)
@@ -1468,7 +1469,6 @@ int mytruncate(const char *path, off_t length)
             sem_post(mysystem_meta_sem);
            }
          }
-        flock(fileno(data_fptr),LOCK_UN);
        }
       total_blocks = last_block;
       sem_wait(mysystem_meta_sem);
