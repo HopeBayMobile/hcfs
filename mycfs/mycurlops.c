@@ -237,7 +237,7 @@ int swift_put_object(FILE *fptr, char *objname, CURL *curl)
   curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &put_control);
   curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
@@ -293,4 +293,41 @@ int swift_get_object(FILE *fptr, char *objname, CURL *curl)
   curl_slist_free_all(chunk);
   return 0;
  }
+int swift_delete_object(char *objname, CURL *curl)
+ {
+  struct curl_slist *chunk=NULL;
+  long objsize;
+  CURLcode res;
+  char container_string[200];
+  char delete_command[10];
+
+  strcpy(delete_command,"DELETE");
+
+  chunk=NULL;
+
+  sprintf(container_string,"%s/%s_private_container/%s",url_string,MY_USER,objname);
+  chunk=curl_slist_append(chunk, auth_string);
+  chunk=curl_slist_append(chunk, "Expect:");
+
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+  curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+  curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
+
+  curl_easy_setopt(curl,CURLOPT_URL, container_string);
+  curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
+  res = curl_easy_perform(curl);
+  if (res!=CURLE_OK)
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    return -1;
+   }
+
+  curl_slist_free_all(chunk);
+  return 0;
+ }
+
 

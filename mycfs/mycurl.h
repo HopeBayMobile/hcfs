@@ -33,3 +33,4 @@ int swift_list_container(CURL *curl);
 int swift_put_object(FILE *fptr, char *objname, CURL *curl);
 int swift_get_object(FILE *fptr, char *objname, CURL *curl);
 int swift_reauth();
+int swift_delete_object(char *objname, CURL *curl);

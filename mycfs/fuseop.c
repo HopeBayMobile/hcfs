@@ -4,7 +4,6 @@
 /*TODO: debug why copying 50GB files then delete them all may cause df to show negative data size*/
 /*TODO: Consider whether to use flockfile instead of per-file entry semaphores*/
 /*TODO: How to use command-line based unmounting method to safely stop all processes */
-/*TODO: Test if fuse write and truncate are mutually exclusive by default, or need to handle concurrent problem in st_size*/
 
 #include "myfuse.h"
 #include <math.h>

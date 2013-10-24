@@ -3,9 +3,9 @@
 #include "myfuse.h"
 #include <math.h>
 
-/* TODO: 
+/*  
 
-If inode is deleted, first should mark the inode as "cleaning up" in super inode, which
+TODO: If inode is deleted, first should mark the inode as "cleaning up" in super inode, which
 will not be reclaimed. After the delete sequence in datasync completed, the inode is changed
 from "cleaning up" to "deleted" in super inode.
 

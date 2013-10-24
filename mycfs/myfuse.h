@@ -1,8 +1,6 @@
 /* Code under development by Jiahong Wu */
 
 /*TODO:
-1. cache replacement
-2. restore block from cloud
 3. FS recovery
 4. FS maintenance
 */
