@@ -1275,8 +1275,8 @@ int myrmdir(const char *path)
     invalidate_inode_cache(path);
 
     tmpstatus=unlink(metapath);
-    retcode = super_inode_delete(this_inode);
-    super_inode_reclaim();
+    /*TODO: add call to delete object queue routine*/
+    retcode = super_inode_to_delete(this_inode);
     if (tmpstatus!=0)
      return -1;
     sem_wait(mysystem_meta_sem);

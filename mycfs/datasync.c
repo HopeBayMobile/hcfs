@@ -11,6 +11,10 @@ TODO: Will need to consider the case when system restarted or broken connection 
 TODO: multiple upload connections for multiple files
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
 TODO: Track if init_swift may not able to connect and terminate process.
+TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim after delete batch is done
+TODO: If deleting a block, first check if the meta is there then check if the blocks are reused by checking the length of meta
+TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
+TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
 */
 
 typedef struct {

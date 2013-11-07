@@ -342,6 +342,24 @@ int super_inode_create(struct stat *inputstat,ino_t *this_inode)
   return 0;
  }
 
+int super_inode_to_delete(ino_t this_inode)
+ {
+  int total_write;
+  super_inode_entry temp_entry;
+
+  memset(&temp_entry,0,sizeof(super_inode_entry));
+  temp_entry.to_be_deleted=True;
+  sem_wait(super_inode_write_sem);
+  fseek(super_inode_write_fptr,sizeof(super_inode_entry)*(this_inode-1),SEEK_SET);
+  total_write=fwrite(&temp_entry,sizeof(super_inode_entry),1,super_inode_write_fptr);
+  sem_post(super_inode_write_sem);
+
+  if (total_write < 1)
+   return -1;
+  return 0;
+ }
+
+
 int super_inode_delete(ino_t this_inode)
  {
   int total_write;

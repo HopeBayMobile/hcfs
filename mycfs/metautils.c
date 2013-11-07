@@ -30,8 +30,7 @@ int decrease_nlink_ref(struct stat *inputstat)
     fclose(fptr);
 
     tmpstatus=unlink(metapath);
-    retcode = super_inode_delete(inputstat->st_ino);
-    super_inode_reclaim();
+    retcode = super_inode_to_delete(inputstat->st_ino);
     if (tmpstatus!=0)
      return -1;
     sem_wait(mysystem_meta_sem);
@@ -47,11 +46,13 @@ int decrease_nlink_ref(struct stat *inputstat)
       if (stat(blockpath,&block_stat)==0)
        {
         unlink(blockpath);
+        /* TODO: queue deletion of block object here*/
         mysystem_meta->cache_size-=block_stat.st_size;
         if (mysystem_meta->cache_size < 0)
          mysystem_meta->cache_size = 0;
        }
      }
+    /* TODO: queue deletion of meta object here*/
 
    }
   else

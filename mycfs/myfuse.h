@@ -67,6 +67,7 @@ typedef struct {
   ino_t next_free_inode;
   unsigned char is_dirty;
   unsigned char in_transit;
+  unsigned char to_be_deleted;
  } super_inode_entry;
 
 typedef struct {
@@ -136,6 +137,7 @@ int super_inode_read(struct stat *inputstat,ino_t this_inode);
 int super_inode_write(struct stat *inputstat,ino_t this_inode);
 int super_inode_create(struct stat *inputstat,ino_t *this_inode);
 int super_inode_delete(ino_t this_inode);
+int super_inode_to_delete(ino_t this_inode);
 int super_inode_reclaim();
 
 int decrease_nlink_ref(struct stat *inputstat);
