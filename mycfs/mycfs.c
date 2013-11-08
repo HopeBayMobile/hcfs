@@ -49,6 +49,7 @@ void main(int argc, char **argv)
    }
 
   initsystem();
+  pipe(delete_pipe);
   this_pid = fork();
   if (this_pid ==0)
    {
@@ -57,7 +58,9 @@ void main(int argc, char **argv)
     printf("Redirecting to fuse log\n");
     dup2(fileno(fptr),fileno(stdout));
     dup2(fileno(fptr),fileno(stderr));
+    close(delete_pipe[0]);   /* FUSE process only write to-deletes to the pipe */
     sem_init(&download_curl_sem,0,MAX_CURL_HANDLE);
+    sem_init(&delete_enqueue_sem,0,1);
     for(upload_conn_count=0;upload_conn_count<MAX_CURL_HANDLE;upload_conn_count++)
      {
       curl_handle_mask[upload_conn_count]=False;
@@ -84,6 +87,8 @@ void main(int argc, char **argv)
       printf("Redirecting to swift log\n");
       dup2(fileno(fptr),fileno(stdout));
       dup2(fileno(fptr),fileno(stderr));
+      close(delete_pipe[1]);  /* datasync process only read from the pipe */
+      sem_init(&delete_queue_sem,0,1);
       run_maintenance_loop();
       fclose(fptr);
      }
@@ -94,6 +99,8 @@ void main(int argc, char **argv)
       printf("Redirecting to cache log\n");
       dup2(fileno(fptr),fileno(stdout));
       dup2(fileno(fptr),fileno(stderr));
+      close(delete_pipe[0]);
+      close(delete_pipe[1]);   /* cache replacement process does not interact with the pipe */
 
       run_cache_loop();
       fclose(fptr);

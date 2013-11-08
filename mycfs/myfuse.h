@@ -95,6 +95,9 @@ uint64_t num_opened_files;
 uint64_t opened_files_masks[MAX_FILE_TABLE_SIZE/64];
 sem_t file_table_sem;
 
+int delete_pipe[2];
+sem_t delete_enqueue_sem, delete_queue_sem;
+
 void create_root_meta();
 
 void initsystem();

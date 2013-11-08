@@ -1,5 +1,5 @@
-mycfs : mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o
-	   gcc -g -pthread -o mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o -lfuse -lcurl
+mycfs : mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o delete_object.o
+	   gcc -g -pthread -o mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o delete_obejct.o -lfuse -lcurl
 
 mycfs.o: mycfs.c myfuse.h mycurl.h
 	   cc -g -pthread -c mycfs.c -D_FILE_OFFSET_BITS=64
@@ -25,5 +25,8 @@ mycurlops.o: mycurlops.c mycurl.h
 cache_loop.o: cache_loop.c myfuse.h mycurl.h
 	   cc -g -pthread -c cache_loop.c -D_FILE_OFFSET_BITS=64
 
+delete_object.o: delete_object.c myfuse.h mycurl.h
+	   cc -g -pthread -c delete_object.c -D_FILE_OFFSET_BITS=64
+
 clean:
-	rm mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o
+	rm mycfs mycfs.o system.o inode.o fuseop.o metautils.o datasync.o mycurlops.o cache_loop.o delete_object.o
