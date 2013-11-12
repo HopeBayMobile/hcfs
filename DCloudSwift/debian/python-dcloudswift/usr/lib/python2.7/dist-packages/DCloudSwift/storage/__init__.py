@@ -1,1 +1,0 @@
-../../../../../share/pyshared/DCloudSwift/storage/__init__.py

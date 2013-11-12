@@ -1,8 +1,0 @@
-#!/bin/bash
-
-#~ rm /etc/exports     # avoid "keep the local version" dialog during installation
-    # however, this does not work:
-    # Errors were encountered while processing:^M
-    # /var/cache/apt/archives/dcloudgatewayapi_1.1.6.0019_amd64.deb^M
-
-

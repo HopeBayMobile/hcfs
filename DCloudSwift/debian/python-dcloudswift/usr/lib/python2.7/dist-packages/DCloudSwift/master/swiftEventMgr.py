@@ -1,1 +1,0 @@
-../../../../../share/pyshared/DCloudSwift/master/swiftEventMgr.py

@@ -1,1 +1,0 @@
-../../../../../share/pyshared/DCloudSwift/storage/rsync.sh

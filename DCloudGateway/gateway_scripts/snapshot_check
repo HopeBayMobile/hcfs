@@ -1,3 +1,0 @@
-#!/bin/sh -e
-
-/usr/bin/python /etc/delta/snapshot_check_code.py

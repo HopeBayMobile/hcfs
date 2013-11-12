@@ -1,1 +1,0 @@
-../../../../../share/pyshared/DCloudSwift/monitor/swiftMonitor.py

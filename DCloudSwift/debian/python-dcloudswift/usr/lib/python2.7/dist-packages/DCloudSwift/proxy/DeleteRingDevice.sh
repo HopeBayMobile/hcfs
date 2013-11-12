@@ -1,1 +1,0 @@
-../../../../../share/pyshared/DCloudSwift/proxy/DeleteRingDevice.sh

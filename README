@@ -1,3 +1,0 @@
-[Introduction]
-    Purpose of this branch is to test moving the installation of 
-    Install_ldap_samba.sh to the front of savebox (in dcloud-gateway)

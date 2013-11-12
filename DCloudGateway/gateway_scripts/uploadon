@@ -1,3 +1,0 @@
-#!/bin/sh -e
-
-su -s /bin/sh -c 'exec "$0" "$@"' "root" -- /usr/local/bin/s3qlctrl uploadon /mnt/cloudgwfiles

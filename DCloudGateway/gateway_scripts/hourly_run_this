@@ -1,7 +1,0 @@
-#!/bin/sh -e
-
-/etc/delta/update_bandwidth
-/etc/delta/delete_lostfound
-/etc/delta/synctime.sh
-#/etc/delta/hourly_snapshing
-

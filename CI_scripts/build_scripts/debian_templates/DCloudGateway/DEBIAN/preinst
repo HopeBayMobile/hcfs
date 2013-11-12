@@ -1,4 +1,0 @@
-#!/bin/bash
-
-sudo echo "ucf     ucf/changeprompt_threeway       select  keep_current" | debconf-set-selections
-sudo echo "ucf     ucf/changeprompt        select  keep_current" | debconf-set-selections

@@ -1,1 +1,0 @@
-gcc -D_FILE_OFFSET_BITS=64 myfuse.c -o myfuse -lfuse

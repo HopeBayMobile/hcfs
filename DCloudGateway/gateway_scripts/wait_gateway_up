@@ -1,9 +1,0 @@
-#!/bin/bash
-
-val=1
-while [[ "$val" -ne "0" ]]
-do
-  ls /mnt/cloudgwfiles/sambashare > /var/log/gateway_sambashare
-  val=$?
-done
-
