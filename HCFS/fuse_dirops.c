@@ -142,7 +142,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
   char tempname[400];
   long thisfile_pos;
   ino_t hit_inode;
-  FUSE_META_TYPE tempmeta;
+  DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
 
   if ((partialpath[0]=='/') && (strlen(partialpath)==1))
@@ -164,7 +164,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   if (search_subdir_only)
    {
-    fread(&tempmeta,sizeof(FUSE_META_TYPE),1,fptr);
+    fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
     thisfile_pos = tempmeta.next_subdir_page;
 
     while(thisfile_pos != -1)
@@ -195,7 +195,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   strcpy(target_entry_name,&(partialpath[1]));
 
-  fread(&tempmeta,sizeof(FUSE_META_TYPE),1,fptr);
+  fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
   thisfile_pos = tempmeta.next_subdir_page;
 
   while(thisfile_pos != -1)

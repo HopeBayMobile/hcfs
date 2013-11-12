@@ -1,14 +1,24 @@
 #include "fuseop.h"
 #include "dir_lookup.h"
+#include "super_inode.h"
+#include "params.h"
 
 int hfuse_getattr(const char *path, struct stat *inode_stat)
  {
   ino_t hit_inode;
+  SUPER_INODE_ENTRY tempentry;
+  int ret_code;
 
   hit_inode = lookup_pathname(path);
 
   if (hit_inode > 0)
-   return super_inode_read(hit_inode, inode_stat);
+   {
+    ret_code =super_inode_read(hit_inode, &tempentry);
+    if (ret_code < 0)
+     return -ENOENT;
+    memcpy(inode_stat,&(tempentry.inode_stat),sizeof(struct stat));
+    return 0;
+   }
   else
    return -ENOENT;
  }
@@ -44,7 +54,7 @@ int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off
   int count;
   long thisfile_pos;
   ino_t hit_inode;
-  FUSE_META_TYPE tempmeta;
+  DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
   struct stat tempstat;
 
@@ -57,7 +67,7 @@ int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off
   fetch_dirmeta_path(pathname,this_inode);
   fptr = fopen(pathname,"r");
 
-  fread(&tempmeta,sizeof(FUSE_META_TYPE),1,fptr);
+  fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
   thisfile_pos = tempmeta.next_subdir_page;
 
   while(thisfile_pos != -1)

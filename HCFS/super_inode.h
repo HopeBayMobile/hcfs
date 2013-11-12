@@ -5,8 +5,8 @@
 typedef struct {
     struct stat inode_stat;
     char is_dirty;
-    char to_be_deleted;
-    char to_be_reclaimed;
+    char to_be_deleted;   /*Meta and local blocks are deleted if this is true, but backend objects are still being deleted in background. Should not reclaim.*/
+    char to_be_reclaimed; /*Meta, local blocks, and backend objects are deleted completely. Can be reclaimed.*/
     ino_t next_reclaimed_inode;
     ino_t this_index;
   } SUPER_INODE_ENTRY;
@@ -34,5 +34,5 @@ int super_inode_read(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 int super_inode_write(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 int super_inode_to_delete(ino_t this_inode);
 int super_inode_delete(ino_t this_inode);
-int super_inode_reclaim();
-ino_t 
+int super_inode_reclaim(int fullscan);  /*fullscan is a reserved flag for conducting full reclaim scan*/
+ino_t super_inode_new_inode(struct stat *in_stat, SUPER_INODE_ENTRY *inode_ptr);
