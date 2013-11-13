@@ -191,8 +191,6 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   if (self_inode < 1)
    return -ENOENT;
 
-  invalidate_cache_entry(oldpath);
-
   if (lookup_pathname(newpath) > 0)
    return -EACCES;
 

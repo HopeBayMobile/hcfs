@@ -52,7 +52,5 @@ void parse_parent_self(const char *pathname, char *parentname, char *selfname);
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);
 int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char *newname, mode_t child_mode);
 int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);
-int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2);
-
 void init_hfuse();
  

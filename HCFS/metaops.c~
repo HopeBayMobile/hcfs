@@ -2,6 +2,7 @@
 #include "fuseop.h"
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
 /*TODO: Consider whether to put changes to super_inode is_dirty here */
+/*TODO: Need to invalidate cache entry if rename/deleted */
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode)
  {

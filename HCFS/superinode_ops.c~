@@ -66,7 +66,7 @@ int super_inode_write(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr)
 
   ret_val = 0;
   sem_wait(&(sys_super_inode->io_sem));
-  inode_ptr->is_dirty = TRUE;
+  inode_ptr.is_dirty = TRUE;
   fseek(sys_super_inode->iofptr,sizeof(SUPER_INODE_HEAD) + (this_inode-1) * sizeof(SUPER_INODE_ENTRY),SEEK_SET);
   if (ftell(sys_super_inode->iofptr)!=sizeof(SUPER_INODE_HEAD) + (this_inode-1) * sizeof(SUPER_INODE_ENTRY))
    ret_val = -1;

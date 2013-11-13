@@ -51,7 +51,7 @@ void replace_pathname_cache(long index, char *path, ino_t inode_number)
 
   return;
  }
-void invalidate_cache_entry(const char *path)
+void invalidate_cache_entry(char *path)
  {
   unsigned long index;
 
