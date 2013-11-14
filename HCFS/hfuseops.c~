@@ -32,6 +32,7 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
  }
 
 //int hfuse_readlink(const char *path, char *buf, size_t buf_size);
+
 static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
  {
   char *parentname;
@@ -173,9 +174,13 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 
   return 0;
  }
+
+
 //int hfuse_unlink(const char *path);
 //int hfuse_rmdir(const char *path);
 //int hfuse_symlink(const char *oldpath, const char *newpath);
+
+
 static int hfuse_rename(const char *oldpath, const char *newpath)
  {
   char *parentname1;
@@ -190,6 +195,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   self_inode = lookup_pathname(oldpath);
   if (self_inode < 1)
    return -ENOENT;
+
+  invalidate_cache_entry(oldpath);
 
   if (lookup_pathname(newpath) > 0)
    return -EACCES;
@@ -246,17 +253,160 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 //int hfuse_chmod(const char *path, mode_t mode);
 //int hfuse_chown(const char *path, uid_t owner, gid_t group);
 //int hfuse_truncate(const char *path, off_t offset);
-//int hfuse_open(const char *path, struct fuse_file_info *file_info);
+int hfuse_open(const char *path, struct fuse_file_info *file_info)
+ {
+  /*TODO: Need to check permission here*/
+  ino_t thisinode;
+  long fh;
+
+  thisinode = lookup_pathname(path);
+  if (thisinode < 1)
+   return -ENOENT;
+
+  fh = open_fh(thisinode);
+  if (fh < 0)
+   return -ENFILE;
+
+  file_info->fh = fh;
+
+  return 0;
+ }
+
 //int hfuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *file_info);
-//int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *file_info);
+int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *file_info)
+ {
+  FH_ENTRY *fh_ptr;
+  long start_block, end_block, current_block;
+  long start_page, end_page, current_page;
+  long nextfilepos, prevfilepos, currentfilepos;
+  BLOCK_ENTRY_PAGE temppage;
+  long entry_index;
+  long block_index;
+  char thisblockpath[400];
+  int total_bytes_written;
+  int this_bytes_written;
+  off_t current_offset;
+  int target_bytes_written;
+
+  if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
+   return 0;
+
+  total_bytes_written = 0;
+
+  start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
+  end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
+
+  start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
+  end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+  fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+  flockfile(fh_ptr-> metafptr);
+  flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+
+  if (fh_ptr->cached_page_index != start_page)
+   seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
+
+  entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+  for(block_index = start_block; block_index <= end_block; block_index++)
+   {
+    /*TODO: For now, only consider storing locally*/
+
+    if (fh_ptr->opened_block != block_index)
+     {
+      if (fh_ptr->opened_block != -1)
+       {
+        fclose(fh_ptr->blockfptr);
+        fh_ptr->opened_block = -1;
+       }
+      fetch_block_path(thisblockpath,fh_ptr->cached_meta.thisstat.st_ino,block_index);
+      if (fh_ptr->cached_page.block_entries[entry_index].status == ST_NONE)
+       {     /*If not stored anywhere, make it on local disk*/
+        fh_ptr->blockfptr=fopen(thisblockpath,"a+");
+        fclose(fh_ptr->blockfptr);
+        fh_ptr->cached_page.block_entries[entry_index].status = ST_LDISK;
+        fh_ptr->page_modified = TRUE;
+       }
+
+      fh_ptr->blockfptr=fopen(thisblockpath,"r+");
+      setbuf(fh_ptr->blockfptr,NULL);
+      fh_ptr->opened_block = block_index;
+     }
+    flockfile(fh_ptr->blockfptr);
+    flock(fileno(fh_ptr->blockfptr),LOCK_EX);
+
+    current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
+    target_bytes_written = MAX_BLOCK_SIZE - current_offset;
+    if ((size - total_bytes_written) < target_bytes_written) /*Do not need to write that much*/
+     target_bytes_written = size - total_bytes_written;
+
+    this_bytes_written = fwrite(&buf[total_bytes_written],sizeof(char),target_bytes_written, fh_ptr->blockfptr);
+
+    total_bytes_written += this_bytes_written;
+
+    flock(fileno(fh_ptr->blockfptr),LOCK_UN);
+    funlockfile(fh_ptr->blockfptr);
+
+    if (this_bytes_written < target_bytes_written) /*Terminate if cannot write as much as we want*/
+     break;
+
+    if (block_index < end_block)  /*If this is not the last block, need to advance one more*/
+     advance_block(fh_ptr-> metafptr,fh_ptr,&entry_index);
+   }
+  if (fh_ptr->page_modified == TRUE)  /*Flush dirty page data to file if any */
+   {
+    fseek(fh_ptr->metafptr,fh_ptr->cached_page_start_fpos,SEEK_SET);
+    fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+   }
+
+  /*Update and flush file meta*/
+  if (fh_ptr->cached_meta.thisstat.st_size < (offset + total_bytes_written))
+   fh_ptr->cached_meta.thisstat.st_size = (offset + total_bytes_written);
+
+  if (total_bytes_written > 0)
+   fh_ptr->cached_meta.thisstat.st_mtime = time(NULL);
+
+  fseek(fh_ptr->metafptr,0,SEEK_SET);
+  fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+  super_inode_update_stat(fh_ptr->cached_meta.thisstat.st_ino, &(fh_ptr->cached_meta.thisstat))
+
+  flock(fileno(fh_ptr-> metafptr),LOCK_UN);
+  funlockfile(fh_ptr-> metafptr);
+
+  return total_bytes_written;
+ }
+  
 //int hfuse_statfs(const char *path, struct statvfs *buf);      /*Prototype is linux statvfs call*/
 //int hfuse_flush(const char *path, struct fuse_file_info *file_info);
-//int hfuse_release(const char *path, struct fuse_file_info *file_info);
+int hfuse_release(const char *path, struct fuse_file_info *file_info)
+ {
+  ino_t thisinode;
+
+  thisinode = lookup_pathname(path);
+  if (file_info->fh < 0)
+   return -EBADF;
+
+  if (file_info->fh >= MAX_OPEN_FILE_ENTRIES)
+   return -EBADF;
+
+  if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
+   return -EBADF;
+
+  if (system_fh_table.entry_table[file_info->fh].thisinode != thisinode)
+   return -EBADF;
+
+  close_fh(file_info->fh);
+  return 0;
+ }
 //int hfuse_fsync(const char *path, int, struct fuse_file_info *file_info);
 //int hfuse_setxattr(const char *path, const char *name, const char *value, size_t size, int flags);
 //int hfuse_getxattr(const char *path, const char *name, char *value, size_t size);
 //int hfuse_listxattr(const char *path, char *list, size_t size);
 //int hfuse_removexattr(const char *path, const char *name);
+
+
 static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
  {
   /*TODO: Need to check for access rights */
@@ -342,6 +492,9 @@ static struct fuse_operations hfuse_ops = {
     .opendir = hfuse_opendir,
     .access = hfuse_access,
     .rename = hfuse_rename,
+    .open = hfuse_open,
+    .release = hfuse_release,
+    .write = hfuse_write,
  };
 
 int hook_fuse(int argc, char **argv)

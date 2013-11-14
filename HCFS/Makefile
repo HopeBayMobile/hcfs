@@ -1,8 +1,8 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64
 
-hcfs: hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o
-	$(CC) -g -o hcfs hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o -lfuse -lcurl
+hcfs: hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o
+	$(CC) -g -o hcfs hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o -lfuse -lcurl
 
 fuse_dirops.o: fuse_dirops.c fuseop.h dir_lookup.h
 	$(CC) $(CFLAGS) -c fuse_dirops.c
@@ -21,6 +21,9 @@ hfuse_system.o: hfuse_system.c fuseop.h super_inode.h dir_lookup.h
 
 metaops.o: metaops.c fuseop.h
 	$(CC) $(CFLAGS) -c metaops.c
+
+filetables.o: filetables.c fuseop.h
+	$(CC) $(CFLAGS) -c filetables.c
 
 clean:
 	rm -rf *.o hcfs

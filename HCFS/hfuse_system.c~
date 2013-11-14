@@ -1,6 +1,7 @@
 #include "fuseop.h"
 #include "super_inode.h"
 #include "dir_lookup.h"
+#include "filetables.h"
 #include <fuse.h>
 
 void init_hfuse()
@@ -16,6 +17,7 @@ void init_hfuse()
 
   ret_val = super_inode_init();
   init_pathname_cache();
+  ret_val = init_system_fh_table();
 
   /* Check if need to initialize the root meta file */
   fetch_meta_path(rootmetapath,1);
@@ -55,7 +57,7 @@ void init_hfuse()
     strcpy(temppage.dir_entries[0].d_name,".");
     strcpy(temppage.dir_entries[1].d_name,"..");
 
-    ret_val = fwrite(&this_meta,sizeof(DIR_ENTRY_PAGE),1,metafptr);
+    ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
     fclose(metafptr);
    }
   return;

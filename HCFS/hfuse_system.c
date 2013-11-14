@@ -16,6 +16,7 @@ void init_hfuse()
 
   ret_val = super_inode_init();
   init_pathname_cache();
+  ret_val = init_system_fh_table();
 
   /* Check if need to initialize the root meta file */
   fetch_meta_path(rootmetapath,1);

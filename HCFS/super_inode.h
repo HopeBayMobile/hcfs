@@ -36,3 +36,4 @@ int super_inode_to_delete(ino_t this_inode);
 int super_inode_delete(ino_t this_inode);
 int super_inode_reclaim(int fullscan);  /*fullscan is a reserved flag for conducting full reclaim scan*/
 ino_t super_inode_new_inode(struct stat *in_stat);
+int super_inode_update_stat(ino_t this_inode, struct stat *newstat);

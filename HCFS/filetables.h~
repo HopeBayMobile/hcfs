@@ -1,0 +1,34 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
+
+#define MAX_OPEN_FILE_ENTRIES 65536
+
+typedef struct {
+    ino_t thisinode;
+    FILE *metafptr;   /*TODO: use flockfile function to lock these ptrs between threads*/
+    FILE *blockfptr;
+    long opened_block;
+    struct FILE_META_TYPE cached_meta;
+    struct BLOCK_ENTRY_PAGE cached_page;
+    long cached_page_index;
+    long cached_page_start_fpos;
+    char page_modified;
+    char meta_modified;
+  } FH_ENTRY;
+
+typedef struct {
+    long num_opened_files;
+    char *entry_table_flags;
+    FH_ENTRY *entry_table;
+    long last_available_index;
+    sem_t fh_table_sem;
+  } FH_TABLE_TYPE;
+
+FH_TABLE_TYPE system_fh_table;
+
+int init_system_fh_table();
+long open_fh(ino_t thisinode);
+int close_fh(long index);
+int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page);
+void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index); /*In advance block, need to write back dirty page if change page */
