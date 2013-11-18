@@ -54,3 +54,4 @@ void parse_parent_self(const char *pathname, char *parentname, char *selfname)
    }
   return;
  }
+

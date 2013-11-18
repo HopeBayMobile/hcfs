@@ -9,6 +9,7 @@
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <semaphore.h>
+#include <sys/mman.h>
 
 #define TRUE 1
 #define FALSE 0
@@ -34,7 +35,6 @@ typedef struct {
 
 typedef struct {
     unsigned char status;
-    long block_size;
   } BLOCK_ENTRY;
 
 typedef struct {
@@ -89,8 +89,7 @@ typedef struct {
     BLOCK_ENTRY_PAGE cached_page;
     long cached_page_index;
     long cached_page_start_fpos;
-    char page_modified;
-    char meta_modified;
+    sem_t block_sem;
   } FH_ENTRY;
 
 typedef struct {

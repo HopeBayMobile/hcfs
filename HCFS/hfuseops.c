@@ -272,7 +272,168 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
   return 0;
  }
 
-//int hfuse_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *file_info);
+int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struct fuse_file_info *file_info)
+ {
+  FH_ENTRY *fh_ptr;
+  long start_block, end_block, current_block;
+  long start_page, end_page, current_page;
+  long nextfilepos, prevfilepos, currentfilepos;
+  BLOCK_ENTRY_PAGE temppage;
+  long entry_index;
+  long block_index;
+  char thisblockpath[400];
+  int total_bytes_read;
+  int this_bytes_read;
+  off_t current_offset;
+  int target_bytes_read;
+  size_t size;
+  char fill_zeros;
+
+  if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
+   return 0;
+
+  fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+  flockfile(fh_ptr-> metafptr);
+  fseek(fh_ptr->metafptr,0,SEEK_SET);
+  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+  funlockfile(fh_ptr-> metafptr);
+
+
+  if ((fh_ptr->cached_meta).thisstat.st_size < (offset+size_org))
+   size = ((fh_ptr->cached_meta).thisstat.st_size - offset);
+  else
+   size = size_org;
+
+  total_bytes_read = 0;
+
+  start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
+  end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
+
+  start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
+  end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+  if (fh_ptr->cached_page_index != start_page)
+   {
+    flockfile(fh_ptr-> metafptr);
+    flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+    fseek(fh_ptr->metafptr,0,SEEK_SET);
+    fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+    if (fh_ptr->cached_page_index != start_page)  /*Check if other threads have already done the work*/
+     seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
+    flock(fileno(fh_ptr->metafptr),LOCK_UN);
+    funlockfile(fh_ptr->metafptr);
+   }
+
+  entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+  for(block_index = start_block; block_index <= end_block; block_index++)
+   {
+    /*TODO: For now, only consider storing locally*/
+
+    sem_wait(&(fh_ptr->block_sem));
+    if (fh_ptr->opened_block != block_index)
+     {
+      if (fh_ptr->opened_block != -1)
+       {
+        fclose(fh_ptr->blockfptr);
+        fh_ptr->opened_block = -1;
+       }
+
+      flockfile(fh_ptr->metafptr);
+      fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+      fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+      funlockfile(fh_ptr->metafptr);
+
+
+      if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_NONE)
+       {     /*If not stored anywhere, fill with zeros*/
+        fill_zeros = TRUE;
+       }
+      else
+        fill_zeros = FALSE;
+
+      if (fill_zeros != TRUE)
+       {
+        fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+
+        fh_ptr->blockfptr=fopen(thisblockpath,"r+");
+        setbuf(fh_ptr->blockfptr,NULL);
+        fh_ptr->opened_block = block_index;
+       }
+     }
+
+    if (fill_zeros != TRUE)
+     flock(fileno(fh_ptr->blockfptr),LOCK_SH);
+
+    current_offset = (offset+total_bytes_read) % MAX_BLOCK_SIZE;
+    target_bytes_read = MAX_BLOCK_SIZE - current_offset;
+    if ((size - total_bytes_read) < target_bytes_read) /*Do not need to read that much*/
+     target_bytes_read = size - total_bytes_read;
+
+    if (fill_zeros != TRUE)
+     {
+      fseek(fh_ptr->blockfptr,current_offset,SEEK_SET);
+      this_bytes_read = fread(&buf[total_bytes_read],sizeof(char),target_bytes_read, fh_ptr->blockfptr);
+     }
+    else
+     {
+      this_bytes_read = target_bytes_read;
+      memset(&buf[total_bytes_read],0,sizeof(char) * target_bytes_read);
+     }
+
+    total_bytes_read += this_bytes_read;
+
+    if (fill_zeros != TRUE)
+     flock(fileno(fh_ptr->blockfptr),LOCK_UN);
+ 
+    sem_post(&(fh_ptr->block_sem));
+
+    if (this_bytes_read < target_bytes_read) /*Terminate if cannot write as much as we want*/
+     break;
+
+    if (block_index < end_block)  /*If this is not the last block, need to advance one more*/
+     {
+      if ((entry_index+1) >= MAX_BLOCK_ENTRIES_PER_PAGE) /*If may need to change meta, lock*/
+       {
+        flockfile(fh_ptr-> metafptr);
+        flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+        advance_block(fh_ptr-> metafptr,fh_ptr,&entry_index);
+        flock(fileno(fh_ptr-> metafptr),LOCK_UN);
+        funlockfile(fh_ptr-> metafptr);
+       }
+      else
+       entry_index++;
+     }
+   }
+
+  if (total_bytes_read > 0)
+   {
+    flockfile(fh_ptr-> metafptr);
+    flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+
+    /*Update and flush file meta*/
+
+    fseek(fh_ptr->metafptr,0,SEEK_SET);
+    fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+
+    if (total_bytes_read > 0)
+     (fh_ptr->cached_meta).thisstat.st_atime = time(NULL);
+
+    fseek(fh_ptr->metafptr,0,SEEK_SET);
+    fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+    super_inode_update_stat((fh_ptr->cached_meta).thisstat.st_ino, &((fh_ptr->cached_meta).thisstat));
+
+    flock(fileno(fh_ptr-> metafptr),LOCK_UN);
+    funlockfile(fh_ptr-> metafptr);
+   }
+
+  return total_bytes_read;
+ }
+
 int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *file_info)
  {
   FH_ENTRY *fh_ptr;
@@ -304,6 +465,10 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   flockfile(fh_ptr-> metafptr);
   flock(fileno(fh_ptr-> metafptr),LOCK_EX);
 
+  fseek(fh_ptr->metafptr,0,SEEK_SET);
+  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+
   if (fh_ptr->cached_page_index != start_page)
    seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
 
@@ -312,7 +477,9 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   for(block_index = start_block; block_index <= end_block; block_index++)
    {
     /*TODO: For now, only consider storing locally*/
+    /*TODO: Need to be able to modify status to locally stored for cases other than ST_NONE*/
 
+    sem_wait(&(fh_ptr->block_sem));
     if (fh_ptr->opened_block != block_index)
      {
       if (fh_ptr->opened_block != -1)
@@ -320,20 +487,22 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
         fclose(fh_ptr->blockfptr);
         fh_ptr->opened_block = -1;
        }
-      fetch_block_path(thisblockpath,fh_ptr->cached_meta.thisstat.st_ino,block_index);
-      if (fh_ptr->cached_page.block_entries[entry_index].status == ST_NONE)
+      fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+      fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+      fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+      if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_NONE)
        {     /*If not stored anywhere, make it on local disk*/
         fh_ptr->blockfptr=fopen(thisblockpath,"a+");
         fclose(fh_ptr->blockfptr);
-        fh_ptr->cached_page.block_entries[entry_index].status = ST_LDISK;
-        fh_ptr->page_modified = TRUE;
+        (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
+        fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+        fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
        }
 
       fh_ptr->blockfptr=fopen(thisblockpath,"r+");
       setbuf(fh_ptr->blockfptr,NULL);
       fh_ptr->opened_block = block_index;
      }
-    flockfile(fh_ptr->blockfptr);
     flock(fileno(fh_ptr->blockfptr),LOCK_EX);
 
     current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
@@ -341,12 +510,13 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
     if ((size - total_bytes_written) < target_bytes_written) /*Do not need to write that much*/
      target_bytes_written = size - total_bytes_written;
 
+    fseek(fh_ptr->blockfptr,current_offset,SEEK_SET);
     this_bytes_written = fwrite(&buf[total_bytes_written],sizeof(char),target_bytes_written, fh_ptr->blockfptr);
 
     total_bytes_written += this_bytes_written;
 
     flock(fileno(fh_ptr->blockfptr),LOCK_UN);
-    funlockfile(fh_ptr->blockfptr);
+    sem_post(&(fh_ptr->block_sem));
 
     if (this_bytes_written < target_bytes_written) /*Terminate if cannot write as much as we want*/
      break;
@@ -354,23 +524,22 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
     if (block_index < end_block)  /*If this is not the last block, need to advance one more*/
      advance_block(fh_ptr-> metafptr,fh_ptr,&entry_index);
    }
-  if (fh_ptr->page_modified == TRUE)  /*Flush dirty page data to file if any */
-   {
-    fseek(fh_ptr->metafptr,fh_ptr->cached_page_start_fpos,SEEK_SET);
-    fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
-   }
 
   /*Update and flush file meta*/
-  if (fh_ptr->cached_meta.thisstat.st_size < (offset + total_bytes_written))
-   fh_ptr->cached_meta.thisstat.st_size = (offset + total_bytes_written);
+
+  fseek(fh_ptr->metafptr,0,SEEK_SET);
+  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+
+  if ((fh_ptr->cached_meta).thisstat.st_size < (offset + total_bytes_written))
+   (fh_ptr->cached_meta).thisstat.st_size = (offset + total_bytes_written);
 
   if (total_bytes_written > 0)
-   fh_ptr->cached_meta.thisstat.st_mtime = time(NULL);
+   (fh_ptr->cached_meta).thisstat.st_mtime = time(NULL);
 
   fseek(fh_ptr->metafptr,0,SEEK_SET);
   fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
 
-  super_inode_update_stat(fh_ptr->cached_meta.thisstat.st_ino, &(fh_ptr->cached_meta.thisstat));
+  super_inode_update_stat((fh_ptr->cached_meta).thisstat.st_ino, &((fh_ptr->cached_meta).thisstat));
 
   flock(fileno(fh_ptr-> metafptr),LOCK_UN);
   funlockfile(fh_ptr-> metafptr);
@@ -444,7 +613,6 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 
     for(count=0;count<temp_page.num_entries;count++)
      {
-/*put stuff here......*/
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
       tempstat.st_mode = S_IFDIR;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
@@ -460,7 +628,6 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
     fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
     for (count=0;count<temp_page.num_entries;count++)
      {
-/*put more stuff here.......*/
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
       tempstat.st_mode = S_IFREG;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
@@ -473,9 +640,18 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   return 0;
  }
 
-//int hfuse_releasedir(const char *path, struct fuse_file_info *file_info);
-//void* hfuse_init(struct fuse_conn_info *conn);
-//void hfuse_destroy(void *private_data);
+int hfuse_releasedir(const char *path, struct fuse_file_info *file_info)
+ {
+  return 0;
+ }
+void* hfuse_init(struct fuse_conn_info *conn)
+ {
+  return ((void*) sys_super_inode);
+ }
+void hfuse_destroy(void *private_data)
+ {
+  return;
+ }
 //int hfuse_create(const char *path, mode_t mode, struct fuse_file_info *file_info);
 static int hfuse_access(const char *path, int mode)
  {
@@ -495,6 +671,10 @@ static struct fuse_operations hfuse_ops = {
     .open = hfuse_open,
     .release = hfuse_release,
     .write = hfuse_write,
+    .read = hfuse_read,
+    .init = hfuse_init,
+    .destroy = hfuse_destroy,
+    .releasedir = hfuse_releasedir,
  };
 
 int hook_fuse(int argc, char **argv)

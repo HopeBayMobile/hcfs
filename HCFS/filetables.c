@@ -53,10 +53,9 @@ long open_fh(ino_t thisinode)
 
   system_fh_table.entry_table[index].blockfptr = NULL;
   system_fh_table.entry_table[index].opened_block = -1;
-  system_fh_table.entry_table[index].page_modified = FALSE;
-  system_fh_table.entry_table[index].meta_modified = FALSE;
   system_fh_table.entry_table[index].cached_page_index = -1;
   system_fh_table.entry_table[index].cached_page_start_fpos = 0;
+  sem_init(&(system_fh_table.entry_table[index].block_sem),0,1);
 
   sem_post(&(system_fh_table.fh_table_sem));
   return index;
@@ -79,6 +78,7 @@ int close_fh(long index)
     system_fh_table.entry_table[index].metafptr = NULL;
     system_fh_table.entry_table[index].blockfptr = NULL;
     system_fh_table.entry_table[index].opened_block = -1;
+    sem_destroy(&(system_fh_table.entry_table[index].block_sem));
    }
 
   sem_post(&(system_fh_table.fh_table_sem));
@@ -108,6 +108,8 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page)
         fh_ptr->cached_meta.next_block_page = prevfilepos;
         memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
         fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+        fseek(fptr,0,SEEK_SET);
+        fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fptr);
        }
       else
        {
@@ -139,8 +141,6 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page)
    }
   fh_ptr->cached_page_index = target_page;
   fh_ptr->cached_page_start_fpos = prevfilepos;
-  fh_ptr->page_modified = FALSE;
-  memcpy(&(fh_ptr->cached_page), &temppage, sizeof(BLOCK_ENTRY_PAGE));
   return 0;
  }
 
@@ -174,21 +174,9 @@ void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index)
     memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
     fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
    }
-  else
-   {
-    if (fh_ptr->page_modified)
-     {
-      fseek(fptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-      fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fptr);
-     }
-    fseek(fptr, nextfilepos, SEEK_SET);
-    fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
-   }
 
   fh_ptr->cached_page_index++;
   fh_ptr->cached_page_start_fpos = nextfilepos;
-  fh_ptr->page_modified = FALSE;
-  memcpy(&(fh_ptr->cached_page), &temppage, sizeof(BLOCK_ENTRY_PAGE));
   *entry_index = 0;
   return;
  }
