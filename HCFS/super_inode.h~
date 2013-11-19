@@ -2,6 +2,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+/*TODO: Can convert the linked list in reclaimed to being multi-purpose doubly-linked list*/
+/*TODO: The inode can be in only one or none of the following list: have dirty block or meta, to be deleted, to be reclaimed (backend objects completely deleted)*/
+/*TODO: Need another doubly-linked link here for the inodes that have blocks cached*/
+
+
+
 typedef struct {
     struct stat inode_stat;
     ino_t util_ll_next;

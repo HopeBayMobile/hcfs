@@ -277,7 +277,7 @@ int hfuse_chmod(const char *path, mode_t mode)
 
   fetch_meta_path(thismetapath,this_inode);
   printf("%ld %s\n",this_inode,thismetapath);
-  fptr = fopen(thismetapath,"r+");
+  fptr = fopen(metapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
   setbuf(fptr,NULL);
@@ -336,7 +336,7 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
    return -ENOENT;
 
   fetch_meta_path(thismetapath,this_inode);
-  fptr = fopen(thismetapath,"r+");
+  fptr = fopen(metapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
   setbuf(fptr,NULL);
@@ -814,7 +814,7 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
    return -ENOENT;
 
   fetch_meta_path(thismetapath,this_inode);
-  fptr = fopen(thismetapath,"r+");
+  fptr = fopen(metapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
   setbuf(fptr,NULL);

@@ -69,11 +69,11 @@ int main(int argc, char **argv)
   int ret_val;
   
   sprintf(curl_handle.id,"main");
-  ret_val = hcfs_init_swift_backend(&curl_handle);
+  ret_val = init_swift_backend(&curl_handle);
   printf("%s\n %s\n %d\n",swift_auth_string,swift_url_string,ret_val);
   ret_val = hcfs_swift_list_container(&curl_handle);
   printf("ret code %d\n",ret_val);
-  hcfs_destroy_swift_backend(curl_handle.curl);
+  destroy_swift_backend(curl_handle.curl);
   init_hfuse();
   return hook_fuse(argc,argv);
  }

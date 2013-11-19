@@ -41,7 +41,6 @@ typedef struct {
     struct stat thisstat;
     long next_subdir_page;
     long next_file_page;
-    long next_xattr_page;
   } DIR_META_TYPE;
 
 typedef struct {
