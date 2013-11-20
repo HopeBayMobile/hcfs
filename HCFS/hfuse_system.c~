@@ -18,6 +18,7 @@ void init_hfuse()
   ret_val = super_inode_init();
   init_pathname_cache();
   ret_val = init_system_fh_table();
+  init_hcfs_system_data();
 
   /* Check if need to initialize the root meta file */
   fetch_meta_path(rootmetapath,1);
@@ -69,11 +70,11 @@ int main(int argc, char **argv)
   int ret_val;
   
   sprintf(curl_handle.id,"main");
-  ret_val = init_swift_backend(&curl_handle);
+  ret_val = hcfs_init_swift_backend(&curl_handle);
   printf("%s\n %s\n %d\n",swift_auth_string,swift_url_string,ret_val);
   ret_val = hcfs_swift_list_container(&curl_handle);
   printf("ret code %d\n",ret_val);
-  destroy_swift_backend(curl_handle.curl);
+  hcfs_destroy_swift_backend(curl_handle.curl);
   init_hfuse();
   return hook_fuse(argc,argv);
  }

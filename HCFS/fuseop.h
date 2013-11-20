@@ -19,8 +19,6 @@
 #define MAX_DIR_ENTRIES_PER_PAGE 100
 #define MAX_BLOCK_ENTRIES_PER_PAGE 100
 
-#define MAX_BLOCK_SIZE 10485760
-
 #define ST_NONE 0   /* Not stored on any media or storage. Value should be zero.*/
 #define ST_LDISK 1  /* Stored only on local cache */
 #define ST_CLOUD 2  /* Stored only on cloud storage */
@@ -39,6 +37,7 @@ typedef struct {
 
 typedef struct {
     struct stat thisstat;
+    long total_children;   /*Total children not including "." and "..*/
     long next_subdir_page;
     long next_file_page;
     long next_xattr_page;
@@ -74,6 +73,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
 int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char *newname, mode_t child_mode);
 int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2);
+int decrease_nlink_inode_file(ino_t this_inode);
 
 void init_hfuse();
 
@@ -110,4 +110,18 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page);
 void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index); /*In advance block, need to write back dirty page if change page */
 
 /*END definition of file handle */
+
+
+typedef struct {
+    FILE *system_val_fptr;
+    long system_size;
+    long dirty_size;
+    long cached_size;
+    sem_t access_sem;
+  } SYSTEM_DATA_TYPE;
+
+SYSTEM_DATA_TYPE hcfs_system;
+
+int init_hcfs_system_data();
+int sync_hcfs_system_data();
 

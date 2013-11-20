@@ -1,4 +1,6 @@
 /*TODO: Need to create a queue for block upload and maybe another queue for meta upload*/
+/*TODO: When queueing blocks and meta of an inode for upload, dequeue super inode from IS_DIRTY. If at the end of meta upload the meta is moved back to IS_DIRTY, then the content has been updated in between thus it will be scheduled for upload again */
+
 #include "hcfs_tocloud.h"
 #include "params.h"
 

@@ -9,6 +9,8 @@
 /* TODO: Need to go over the access rights problem for the ops */
 /*TODO: Need to invalidate cache entry if rename/deleted */
 /*TODO: Need to revisit the error handling in all operations */
+/*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
+/*TODO: Should handle updating number of blocks and other uncovered info in an inode*/
 
 long check_file_size(const char *path)
  {
@@ -186,8 +188,110 @@ static int hfuse_mkdir(const char *path, mode_t mode)
  }
 
 
-//int hfuse_unlink(const char *path);
-//int hfuse_rmdir(const char *path);
+int hfuse_unlink(const char *path)
+ {
+  char *parentname;
+  char selfname[400];
+  char thismetapath[400];
+  ino_t this_inode, parent_inode;
+  int ret_val;
+
+  this_inode = lookup_pathname(path);
+  if (this_inode < 1)
+   return -ENOENT;
+
+  parentname = malloc(strlen(path)*sizeof(char));
+  parse_parent_self(path,parentname,selfname);
+
+  parent_inode = lookup_pathname(parentname);
+
+  parse_parent_self(path,parentname,selfname);
+
+  free(parentname);
+  if (parent_inode < 1)
+   return -ENOENT;
+
+  invalidate_cache_entry(path);
+
+  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFREG);
+  if (ret_val < 0)
+   return -EACCES;
+
+  ret_val = decrease_nlink_inode_file(this_inode);
+
+  return ret_val;
+ }
+
+
+int hfuse_rmdir(const char *path)
+ {
+  char *parentname;
+  char selfname[400];
+  char thismetapath[400];
+  ino_t this_inode, parent_inode;
+  int ret_val;
+  FILE *metafptr;
+  DIR_META_TYPE tempmeta;
+
+  this_inode = lookup_pathname(path);
+  if (this_inode < 1)
+   return -ENOENT;
+
+  parentname = malloc(strlen(path)*sizeof(char));
+  parse_parent_self(path,parentname,selfname);
+
+  parent_inode = lookup_pathname(parentname);
+
+  parse_parent_self(path,parentname,selfname);
+
+  free(parentname);
+  if (!strcmp(selfname,"."))
+   return -EINVAL;
+  if (!strcmp(selfname,".."))
+   return -ENOTEMPTY;
+
+  if (parent_inode < 1)
+   return -ENOENT;
+
+  invalidate_cache_entry(path);
+
+  fetch_meta_path(thismetapath,this_inode);
+
+  metafptr = fopen(thismetapath,"r+");
+
+  if (metafptr == NULL)
+   return -EACCES;
+  setbuf(metafptr,NULL);
+  flock(fileno(metafptr),LOCK_EX);
+  fread(&tempmeta,sizeof(DIR_META_TYPE),1,metafptr);
+  printf("TOTAL CHILDREN is now %ld\n",tempmeta.total_children);
+
+  if (tempmeta.total_children > 0)
+   {
+    flock(fileno(metafptr),LOCK_UN);
+    fclose(metafptr);
+    return -ENOTEMPTY;
+   }
+
+  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFDIR);
+  if (ret_val < 0)
+   {
+    flock(fileno(metafptr),LOCK_UN);
+    fclose(metafptr);
+    return -EACCES;
+   }
+
+  ftruncate(fileno(metafptr),0);
+  super_inode_delete(this_inode);
+  super_inode_reclaim();
+  unlink(thismetapath);
+
+  flock(fileno(metafptr),LOCK_UN);
+  fclose(metafptr);
+
+  return ret_val;
+ }
+
 //int hfuse_symlink(const char *oldpath, const char *newpath);
 
 
@@ -728,20 +832,22 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   FILE *fptr;
   int count;
   long thisfile_pos;
-  ino_t hit_inode;
   DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
   struct stat tempstat;
 
+/*TODO: Need to include symlinks*/
   fprintf(stderr,"DEBUG readdir entering readdir\n");
 
   this_inode = lookup_pathname(path);
 
-  if (hit_inode == 0)
+  if (this_inode == 0)
    return -ENOENT;
 
   fetch_meta_path(pathname,this_inode);
   fptr = fopen(pathname,"r");
+  setbuf(fptr,NULL);
+  flock(fileno(fptr),LOCK_SH);
 
   fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
   thisfile_pos = tempmeta.next_subdir_page;
@@ -756,7 +862,11 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
       tempstat.st_mode = S_IFDIR;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
-       return 0;
+       {
+        flock(fileno(fptr),LOCK_UN);
+        fclose(fptr);
+        return 0;
+       }
      }
     thisfile_pos = temp_page.next_page;
    }
@@ -771,11 +881,15 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
       tempstat.st_mode = S_IFREG;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
-       return 0;
+       {
+        flock(fileno(fptr),LOCK_UN);
+        fclose(fptr);
+        return 0;
+       }
      }
     thisfile_pos = temp_page.next_page;
    }
-
+  flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
   return 0;
  }
@@ -880,6 +994,8 @@ static struct fuse_operations hfuse_ops = {
     .truncate = hfuse_truncate,
     .flush = hfuse_flush,
     .fsync = hfuse_fsync,
+    .unlink = hfuse_unlink,
+    .rmdir = hfuse_rmdir,
  };
 
 int hook_fuse(int argc, char **argv)

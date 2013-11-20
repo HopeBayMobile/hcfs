@@ -8,6 +8,7 @@
 #define CACHE_SOFT_LIMIT (1024*1024*200)  /*200MB soft cache limit*/
 #define CACHE_HARD_LIMIT (1024*1024*300)
 
+#define MAX_BLOCK_SIZE 2097152
 
 #define MAX_UPLOAD_CONCURRENCY 4
 

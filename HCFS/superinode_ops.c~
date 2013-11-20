@@ -512,7 +512,7 @@ int ll_dequeue(ino_t thisinode, SUPER_INODE_ENTRY *this_entry)
  {
   SUPER_INODE_ENTRY tempentry;  
   char old_which_ll;
-  ino_t temp_inode
+  ino_t temp_inode;
 
   old_which_ll = this_entry->status;
 

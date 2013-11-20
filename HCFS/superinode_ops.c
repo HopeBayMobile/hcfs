@@ -239,10 +239,10 @@ int super_inode_reclaim()
 
   ret_val = 0;
 
-  sem_wait(&(sys_super_inode->io_sem));
-
   if (sys_super_inode->head.num_to_be_reclaimed < RECLAIM_TRIGGER)
    return 0;
+
+  sem_wait(&(sys_super_inode->io_sem));
 
   fseek(sys_super_inode->unclaimed_list_fptr,0,SEEK_END);
   num_unclaimed_in_list = (ftell(sys_super_inode->unclaimed_list_fptr))/(sizeof(ino_t));

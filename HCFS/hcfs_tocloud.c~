@@ -1,10 +1,11 @@
 /*TODO: Need to create a queue for block upload and maybe another queue for meta upload*/
 #include "hcfs_tocloud.h"
+#include "params.h"
 
 > #include <pthread.h>
 
 
-> #define max_concurrency 4
+> 
 > 
 > /*TODO: need to debug
 > 1. How to make delete file and upload file work together

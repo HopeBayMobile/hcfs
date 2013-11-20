@@ -19,7 +19,7 @@ utils.o: utils.c fuseop.h params.h
 hfuse_system.o: hfuse_system.c fuseop.h super_inode.h dir_lookup.h
 	$(CC) $(CFLAGS) -c hfuse_system.c
 
-metaops.o: metaops.c fuseop.h
+metaops.o: metaops.c fuseop.h params.h
 	$(CC) $(CFLAGS) -c metaops.c
 
 filetables.o: filetables.c fuseop.h

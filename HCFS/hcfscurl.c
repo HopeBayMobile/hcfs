@@ -1,4 +1,6 @@
-/* TODO: Need to implement routine to parse http return code to distinguish errors from normal ops*/
+/* Implemented routines to parse http return code to distinguish errors from normal ops*/
+/*TODO: Need to implement retry mechanisms and also http timeout */
+
 #include "hcfscurl.h"
 #include <stdio.h>
 #include <stdlib.h>
