@@ -2,17 +2,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/*TODO: Can convert the linked list in reclaimed to being multi-purpose doubly-linked list*/
-/*TODO: The inode can be in only one or none of the following list: have dirty block or meta, to be deleted, to be reclaimed (backend objects completely deleted)*/
-/*TODO: Need another doubly-linked link here for the inodes that have blocks cached*/
-
-
-
 typedef struct {
     struct stat inode_stat;
     ino_t util_ll_next;
     ino_t util_ll_prev;
     char status;      /* status is one of NO_LL, IS_DIRTY, TO_BE_DELETED, TO_BE_RECLAIMED, or RECLAIMED*/
+    char in_transit;  /*Indicate that the data in this inode is being synced to cloud, but not finished*/
     ino_t this_index;
   } SUPER_INODE_ENTRY;
 
@@ -62,3 +57,6 @@ int ll_dequeue(ino_t thisinode, SUPER_INODE_ENTRY *this_entry);
 int write_super_inode_head();
 int read_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 int write_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
+
+int super_inode_update_transit(ino_t this_inode, char is_start_transit);
+

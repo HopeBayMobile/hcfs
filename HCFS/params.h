@@ -10,8 +10,6 @@
 
 #define MAX_BLOCK_SIZE 2097152
 
-#define MAX_UPLOAD_CONCURRENCY 4
-
 #define NO_LL 0
 #define IS_DIRTY 1
 #define TO_BE_DELETED 2

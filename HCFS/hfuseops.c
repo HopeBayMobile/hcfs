@@ -71,6 +71,9 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 
   self_mode = mode | S_IFREG;
   this_stat.st_mode = self_mode;
+  this_stat.st_size = 0;
+  this_stat.st_blksize = MAX_BLOCK_SIZE;
+  this_stat.st_blocks = 0;
   this_stat.st_dev = dev;
   this_stat.st_nlink = 1;
   this_stat.st_uid = getuid();
@@ -137,6 +140,9 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   this_stat.st_atime = time(NULL);
   this_stat.st_mtime = this_stat.st_atime;
   this_stat.st_ctime = this_stat.st_ctime;
+  this_stat.st_size = 0;
+  this_stat.st_blksize = MAX_BLOCK_SIZE;
+  this_stat.st_blocks = 0;
 
   self_inode = super_inode_new_inode(&this_stat);
   if (self_inode < 1)
@@ -543,6 +549,9 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
   else
    size = size_org;
 
+  if (size <=0)
+   return 0;
+
   total_bytes_read = 0;
 
   start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
@@ -690,6 +699,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
 
+  if (size <=0)
+   return 0;
   total_bytes_written = 0;
 
   start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
@@ -769,7 +780,10 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
 
   if ((fh_ptr->cached_meta).thisstat.st_size < (offset + total_bytes_written))
-   (fh_ptr->cached_meta).thisstat.st_size = (offset + total_bytes_written);
+   {
+    (fh_ptr->cached_meta).thisstat.st_size = (offset + total_bytes_written);
+    (fh_ptr->cached_meta).thisstat.st_blocks = ((fh_ptr->cached_meta).thisstat.st_size +511) / 512;
+   }
 
   if (total_bytes_written > 0)
    (fh_ptr->cached_meta).thisstat.st_mtime = time(NULL);

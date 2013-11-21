@@ -7,6 +7,8 @@ typedef struct {
     ino_t util_ll_next;
     ino_t util_ll_prev;
     char status;      /* status is one of NO_LL, IS_DIRTY, TO_BE_DELETED, TO_BE_RECLAIMED, or RECLAIMED*/
+    char in_transit;  /*Indicate that the data in this inode is being synced to cloud, but not finished*/
+    char mod_after_in_transit;
     ino_t this_index;
   } SUPER_INODE_ENTRY;
 
@@ -56,3 +58,6 @@ int ll_dequeue(ino_t thisinode, SUPER_INODE_ENTRY *this_entry);
 int write_super_inode_head();
 int read_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 int write_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
+
+int super_inode_update_transit(ino_t this_inode, char is_start_transit);
+

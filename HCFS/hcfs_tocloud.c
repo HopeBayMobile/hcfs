@@ -1,26 +1,215 @@
-/*TODO: Need to create a queue for block upload and maybe another queue for meta upload*/
 /*TODO: When queueing blocks and meta of an inode for upload, dequeue super inode from IS_DIRTY. If at the end of meta upload the meta is moved back to IS_DIRTY, then the content has been updated in between thus it will be scheduled for upload again */
+/*TODO: need to debug
+1. How to make delete file and upload file work together
+TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
+TODO: Will need to consider the case when system restarted or broken connection during meta or ock upload
+TODO: multiple upload connections for multiple files
+TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
+TODO: Track if init_swift may not able to connect and terminate process.
+TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim after delete batch is done
+TODO: If deleting a block, first check if the meta is there then check if the blocks are reused by checking the length of meta
+TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
+TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
+*/
 
 #include "hcfs_tocloud.h"
 #include "params.h"
+#include "hcfscurl.h"
+#include "super_inode.h"
 
-> #include <pthread.h>
+CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
+
+void collect_finished_sync_threads(void *ptr)
+ {
+  int count;
+  int ret_val;
+  while(TRUE)  /*TODO: Perhaps need to change this flag to allow terminating at shutdown*/
+   {
+    sem_wait(&(sync_thread_control.sync_op_sem);
+
+    if (sync_thread_control.total_active_sync_threads <=0)
+     {
+      sem_post(&(sync_thread_control.sync_op_sem);
+      sleep(1);
+      continue;
+     }
+    for(count=0;count<MAX_SYNC_CONCURRENCY;count++)
+     {
+      if (sync_thread_control.sync_threads_in_use[count]!=0)
+       {
+        ret_val = pthread_tryjoin_np(sync_thread_control.inode_sync_thread[count],NULL);
+        if (ret_val == 0)
+         {
+          sync_thread_control.sync_threads_in_use[count]=0;
+          sync_thread_control.total_active_sync_threads --;
+          sem_post(&(sync_thread_control.sync_queue_sem));
+         }
+       }
+     }
+    sem_post(&(sync_thread_control.sync_op_sem);
+    sleep(1);
+    continue;
+   }
+  return;
+ }
+
+void init_sync_control()
+ {
+  sem_init(&(sync_thread_control.sync_op_sem),0,1);
+  sem_init(&(sync_thread_control.sync_queue_sem),0,MAX_SYNC_CONCURRENCY);
+  memset(&(sync_thread_control.sync_threads_in_use),0,sizeof(ino_t)*MAX_SYNC_CONCURRENCY);
+  sync_thread_control.total_active_sync_threads = 0;
+  sync_thread_control.total_active_sync_threads = 0;
+
+  pthread_create(&(sync_thread_control.sync_handler_thread),NULL,(void *)&collect_finished_sync_threads, NULL);
+
+  return;
+ }
+
+void sync_single_inode(SYNC_THREAD_TYPE *ptr)
+ {
+  char thismetapath[400];
+  ino_t this_inode;
+  FILE *metafptr;
+  FILE_META_TYPE tempfilemeta;
+  BLOCK_ENTRY_PAGE temppage;
+  int which_curl;
+  long page_pos,block_no, current_entry_index;
+  long total_blocks,total_pages;
+  long count;
+  SUPER_INODE_ENTRY temp_entry;
+
+  this_inode = ptr->inode;
+
+  fetch_meta_path(thismetapath,this_inode);
+
+  metafptr=fopen(thismetapath,"r+");
+  setbuf(metafptr,NULL);
+
+  if ((ptr->this_mode) & S_ISREG)
+   {
+    flock(fileno(metafptr),LOCK_EX);
+    fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,metafptr);
+    page_pos=tempfilemeta.next_block_page;
+    current_entry_index = 0;
+    if (tempfilemeta.thisstat.st_size == 0)
+     total_blocks = 0;
+    else
+     total_blocks = ((tempfilemeta.thisstat.st_size - 1) / MAX_BLOCK_SIZE) + 1;
+
+    if (total_blocks ==0)
+     total_pages = 0;
+    else
+     total_pages = ((total_blocks - 1) / MAX_BLOCK_ENTRIES_PER_PAGE) + 1;
+
+    flock(fileno(metafptr),LOCK_UN);
+
+    for(count=0;count<total_blocks;count++)
+     {
+      flock(fileno(metafptr),LOCK_EX);
+
+      if (current_entry_index >= BLOCK_ENTRY_PAGE)
+       {
+        page_pos = temppage.next_page;
+        current_entry_index = 0;
+        if (page_pos == 0)
+         {
+          flock(fileno(metafptr),LOCK_UN);
+          break;
+         }
+       }
+
+      fseek(metafptr,page_pos,SEEK_SET);
+      fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+
+      block_status = temppage.block_entries[current_entry_index].status;
+      flock(fileno(metafptr),LOCK_UN);
+
+      if ((block_status == ST_LDISK) || (block_status == ST_LtoC))
+       {
+        sem_wait(&(upload_thread_control.upload_queue_sem));
+        sem_wait(&(upload_thread_control.upload_op_sem));
+        which_curl = -1;
+        for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
+         {
+          if (upload_thread_control.upload_threads_in_use[count] == FALSE)
+           {
+            upload_thread_control.upload_threads_in_use[count] = TRUE;
+            upload_thread_control.upload_threads[count].is_block = TRUE;
+            upload_thread_control.upload_threads[count].inode = ptr->inode;
+            upload_thread_control.upload_threads[count].blockno = count;
+            upload_thread_control.upload_threads[count].page_filepos = page_pos;
+            upload_thread_control.upload_threads[count].page_entry_index = current_entry_index;
+            upload_thread_control.upload_threads[count].which_curl = count;
+
+            upload_thread_control.total_active_upload_threads++;
+            which_curl = count;
+            break;
+           }
+         }
+        sem_post(&(upload_thread_control.upload_op_sem));
+        dispatch_upload_block(which_curl); /*Maybe should also first copy block out first*/
+       }
+
+      current_entry_index++;
+     }
+/* Block sync should be done here. Check if all upload threads for this inode has returned before starting meta sync*/
+
+    upload_done = FALSE;
+    while(upload_done == FALSE)
+     {
+      sleep(1);
+      upload_done = TRUE;
+      sem_wait(&(upload_thread_control.upload_op_sem));
+      for(count = 0;count<MAX_UPLOAD_CONCURRENCY;count++)
+       {
+        if ((upload_thread_control.upload_threads_in_use[count] == TRUE) && (upload_thread_control.upload_threads[count].inode == ptr->inode)
+         {
+          upload_done = FALSE;
+          break;
+         }
+       }
+      sem_post(&(upload_thread_control.upload_op_sem));
+     }
+   }
+
+  sem_wait(&(upload_thread_control.upload_queue_sem));
+  sem_wait(&(upload_thread_control.upload_op_sem));
+  which_curl = -1;
+  for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
+   {
+    if (upload_thread_control.upload_threads_in_use[count] == FALSE)
+     {
+      upload_thread_control.upload_threads_in_use[count] = TRUE;
+      upload_thread_control.upload_threads[count].is_block = FALSE;
+      upload_thread_control.upload_threads[count].inode = ptr->inode;
+      upload_thread_control.upload_threads[count].which_curl = count;
+      upload_thread_control.total_active_upload_threads++;
+      which_curl = count;
+      break;
+     }
+   }
+  sem_post(&(upload_thread_control.upload_op_sem));
+
+  flock(fileno(metafptr),LOCK_EX);
+  schedule_sync_meta(metafptr,which_curl); /*Should first copy meta file to a tmp file to avoid inconsistency, then start the upload thread*/
+  flock(fileno(metafptr),LOCK_UN);
+  fclose(metafptr);
+
+  pthread_join(upload_thread_control.upload_threads_no[which_curl]);
+  sem_wait(&(upload_thread_control.upload_op_sem));
+  upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
+  upload_thread_control.total_active_upload_threads--;
+  sem_post(&(upload_thread_control.upload_op_sem));
+  sem_post(&(upload_thread_control.upload_queue_sem));
+
+  super_inode_update_transit(ptr->inode,FALSE);
+
+  return;
+ }
 
 
-> 
-> 
-> /*TODO: need to debug
-> 1. How to make delete file and upload file work together
-> TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
-> TODO: Will need to consider the case when system restarted or broken connection during meta or block upload
-> TODO: multiple upload connections for multiple files
-> TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
-> TODO: Track if init_swift may not able to connect and terminate process.
-> TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim after delete batch is done
-> TODO: If deleting a block, first check if the meta is there then check if the blocks are reused by checking the length of meta
-> TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
-> TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
-> */
+
 > 
 > 
 > void do_block_sync(ino_t this_inode, long block_no, CURL *curl);

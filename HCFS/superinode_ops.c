@@ -1,4 +1,5 @@
 /*TODO: Consider to convert super inode to multiple files and use striping for efficiency*/
+/*TODO: Consider using multiple FILE handles for super inode IO.*/
 
 #include "fuseop.h"
 #include "super_inode.h"
@@ -109,6 +110,8 @@ int super_inode_write(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr)
     ll_enqueue(this_inode,IS_DIRTY,inode_ptr);
     write_super_inode_head();
    }
+  if (inode_ptr -> in_transit == TRUE)
+   inode_ptr -> mod_after_in_transit = TRUE;
   ret_val = write_super_inode_entry(this_inode, inode_ptr);
 
   sem_post(&(sys_super_inode->io_sem));
@@ -134,8 +137,37 @@ int super_inode_update_stat(ino_t this_inode, struct stat *newstat)
       ll_enqueue(this_inode,IS_DIRTY,&tempentry);
       write_super_inode_head();
      }
+    if (tempentry.in_transit == TRUE)
+     tempentry.mod_after_in_transit = TRUE;
 
     memcpy(&(tempentry.inode_stat),newstat,sizeof(struct stat));
+    ret_val = write_super_inode_entry(this_inode, &tempentry);
+   }
+  sem_post(&(sys_super_inode->io_sem));
+
+  return ret_val;
+ }
+
+int super_inode_update_transit(ino_t this_inode, char is_start_transit)
+ {
+  int ret_val;
+  int ret_items;
+  SUPER_INODE_ENTRY tempentry;
+
+  ret_val = 0;
+  sem_wait(&(sys_super_inode->io_sem));
+
+  ret_val = read_super_inode_entry(this_inode,&tempentry);
+  if (ret_val >=0)
+   {
+    if (((is_start_transit == FALSE) && (tempentry.status == IS_DIRTY)) && (tempentry.mod_after_in_transit == FALSE))
+     {  /*If finished syncing and no more mod is done after queueing the inode for syncing*/
+      /*Remove from is_dirty list*/
+      ll_dequeue(this_inode,&tempentry);
+      write_super_inode_head();
+     }
+    tempentry.in_transit = is_start_transit;
+    tempentry.mod_after_in_transit = FALSE;
     ret_val = write_super_inode_entry(this_inode, &tempentry);
    }
   sem_post(&(sys_super_inode->io_sem));
@@ -161,6 +193,7 @@ int super_inode_to_delete(ino_t this_inode)
       ll_dequeue(this_inode,&tempentry);
       ll_enqueue(this_inode,TO_BE_DELETED,&tempentry);
      }
+    tempentry.in_transit = FALSE;
     memset(&(tempentry.inode_stat),0,sizeof(struct stat));
     ret_val = write_super_inode_entry(this_inode, &tempentry);
 
@@ -194,6 +227,7 @@ int super_inode_delete(ino_t this_inode)
       ll_dequeue(this_inode, &tempentry);
       tempentry.status = TO_BE_RECLAIMED;
      }
+    tempentry.in_transit = FALSE;
     memset(&(tempentry.inode_stat),0,sizeof(struct stat));
     ret_val = write_super_inode_entry(this_inode,&tempentry);
 
