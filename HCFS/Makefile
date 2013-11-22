@@ -1,8 +1,8 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64
 
-hcfs: hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o hcfscurl.o
-	$(CC) -g -o hcfs hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o hcfscurl.o -lfuse -lcurl
+hcfs: hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o hcfscurl.o hcfs_tocloud.o
+	$(CC) -g -o hcfs hfuse_system.o utils.o superinode_ops.o hfuseops.o metaops.o fuse_dirops.o filetables.o hcfscurl.o hcfs_tocloud.o -lfuse -lcurl -pthread
 
 fuse_dirops.o: fuse_dirops.c fuseop.h dir_lookup.h
 	$(CC) $(CFLAGS) -c fuse_dirops.c
@@ -27,6 +27,9 @@ filetables.o: filetables.c fuseop.h
 
 hcfscurl.o: hcfscurl.c hcfscurl.h
 	$(CC) $(CFLAGS) -c hcfscurl.c
+
+hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_inode.h fuseop.h
+	$(CC) $(CFLAGS) -c hcfs_tocloud.c
 
 clean:
 	rm -rf *.o hcfs

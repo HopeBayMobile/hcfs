@@ -12,7 +12,7 @@
 
 typedef struct {
     CURL *curl;
-    char id[10];  /*A short name representing the unique identity of the handle*/
+    char id[256];  /*A short name representing the unique identity of the handle*/
   } CURL_HANDLE;
 
 char swift_auth_string[1024];
@@ -30,4 +30,6 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_reauth();
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
+void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
+void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 

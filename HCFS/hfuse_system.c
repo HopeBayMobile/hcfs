@@ -2,6 +2,7 @@
 #include "super_inode.h"
 #include "dir_lookup.h"
 #include "hcfscurl.h"
+#include "hcfs_tocloud.h"
 #include <fuse.h>
 
 void init_hfuse()
@@ -68,6 +69,7 @@ int main(int argc, char **argv)
  {
   CURL_HANDLE curl_handle;
   int ret_val;
+  pid_t this_pid, this_pid1;
   
   sprintf(curl_handle.id,"main");
   ret_val = hcfs_init_swift_backend(&curl_handle);
@@ -76,5 +78,14 @@ int main(int argc, char **argv)
   printf("ret code %d\n",ret_val);
   hcfs_destroy_swift_backend(curl_handle.curl);
   init_hfuse();
-  return hook_fuse(argc,argv);
+  this_pid = fork();
+  if (this_pid == 0)
+   {
+    upload_loop();
+   }
+  else
+   {
+    return hook_fuse(argc,argv);
+   }
+  return;
  }
