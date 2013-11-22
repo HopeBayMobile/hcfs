@@ -37,24 +37,25 @@ void collect_finished_sync_threads(void *ptr)
     if (sync_thread_control.total_active_sync_threads <=0)
      {
       sem_post(&(sync_thread_control.sync_op_sem));
-      nanosleep(&time_to_sleep);
+      nanosleep(&time_to_sleep,NULL);
       continue;
      }
     for(count=0;count<MAX_SYNC_CONCURRENCY;count++)
      {
-      if (sync_thread_control.sync_threads_in_use[count]!=0)
+      if ((sync_thread_control.sync_threads_in_use[count]!=0) && (sync_thread_control.sync_threads_created[count] == TRUE))
        {
         ret_val = pthread_tryjoin_np(sync_thread_control.inode_sync_thread[count],NULL);
         if (ret_val == 0)
          {
           sync_thread_control.sync_threads_in_use[count]=0;
+          sync_thread_control.sync_threads_created[count] == FALSE;
           sync_thread_control.total_active_sync_threads --;
           sem_post(&(sync_thread_control.sync_queue_sem));
          }
        }
      }
     sem_post(&(sync_thread_control.sync_op_sem));
-    nanosleep(&time_to_sleep);
+    nanosleep(&time_to_sleep,NULL);
     continue;
    }
   return;
@@ -83,12 +84,12 @@ void collect_finished_upload_threads(void *ptr)
     if (upload_thread_control.total_active_upload_threads <=0)
      {
       sem_post(&(upload_thread_control.upload_op_sem));
-      nanosleep(&time_to_sleep);
+      nanosleep(&time_to_sleep,NULL);
       continue;
      }
     for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
      {
-      if ((upload_thread_control.upload_threads_in_use[count]!=0) && (upload_thread_control.upload_threads[count].is_block == TRUE))
+      if (((upload_thread_control.upload_threads_in_use[count]!=0) && (upload_thread_control.upload_threads[count].is_block == TRUE)) && (upload_thread_control.upload_threads_created[count] == TRUE))
        {
         ret_val = pthread_tryjoin_np(upload_thread_control.upload_threads_no[count],NULL);
         if (ret_val == 0)
@@ -119,13 +120,14 @@ void collect_finished_upload_threads(void *ptr)
            }
 
           upload_thread_control.upload_threads_in_use[count]=FALSE;
+          upload_thread_control.upload_threads_created[count]=FALSE;
           upload_thread_control.total_active_upload_threads --;
           sem_post(&(upload_thread_control.upload_queue_sem));
          }
        }
      }
     sem_post(&(upload_thread_control.upload_op_sem));
-    nanosleep(&time_to_sleep);
+    nanosleep(&time_to_sleep,NULL);
     continue;
    }
   return;
@@ -137,6 +139,7 @@ void init_sync_control()
   sem_init(&(sync_thread_control.sync_op_sem),0,1);
   sem_init(&(sync_thread_control.sync_queue_sem),0,MAX_SYNC_CONCURRENCY);
   memset(&(sync_thread_control.sync_threads_in_use),0,sizeof(ino_t)*MAX_SYNC_CONCURRENCY);
+  memset(&(sync_thread_control.sync_threads_created),0,sizeof(char)*MAX_SYNC_CONCURRENCY);
   sync_thread_control.total_active_sync_threads = 0;
 
   pthread_create(&(sync_thread_control.sync_handler_thread),NULL,(void *)&collect_finished_sync_threads, NULL);
@@ -158,6 +161,7 @@ void init_upload_control()
   sem_init(&(upload_thread_control.upload_op_sem),0,1);
   sem_init(&(upload_thread_control.upload_queue_sem),0,MAX_UPLOAD_CONCURRENCY);
   memset(&(upload_thread_control.upload_threads_in_use),0,sizeof(char)*MAX_UPLOAD_CONCURRENCY);
+  memset(&(upload_thread_control.upload_threads_created),0,sizeof(char)*MAX_UPLOAD_CONCURRENCY);
   upload_thread_control.total_active_upload_threads = 0;
 
   pthread_create(&(upload_thread_control.upload_handler_thread),NULL,(void *)&collect_finished_upload_threads, NULL);
@@ -254,6 +258,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
           if (upload_thread_control.upload_threads_in_use[count] == FALSE)
            {
             upload_thread_control.upload_threads_in_use[count] = TRUE;
+            upload_thread_control.upload_threads_created[count] = FALSE;
             upload_thread_control.upload_threads[count].is_block = TRUE;
             upload_thread_control.upload_threads[count].inode = ptr->inode;
             upload_thread_control.upload_threads[count].blockno = block_count;
@@ -280,7 +285,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
     upload_done = FALSE;
     while(upload_done == FALSE)
      {
-      nanosleep(&time_to_sleep);
+      nanosleep(&time_to_sleep,NULL);
       upload_done = TRUE;
       sem_wait(&(upload_thread_control.upload_op_sem));
       for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
@@ -303,6 +308,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
     if (upload_thread_control.upload_threads_in_use[count] == FALSE)
      {
       upload_thread_control.upload_threads_in_use[count] = TRUE;
+      upload_thread_control.upload_threads_created[count] = FALSE;
       upload_thread_control.upload_threads[count].is_block = FALSE;
       upload_thread_control.upload_threads[count].inode = ptr->inode;
       upload_thread_control.upload_threads[count].which_curl = count;
@@ -321,6 +327,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   pthread_join(upload_thread_control.upload_threads_no[which_curl],NULL);
   sem_wait(&(upload_thread_control.upload_op_sem));
   upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
+  upload_thread_control.upload_threads_created[which_curl] = FALSE;
   upload_thread_control.total_active_upload_threads--;
   sem_post(&(upload_thread_control.upload_op_sem));
   sem_post(&(upload_thread_control.upload_queue_sem));
@@ -410,6 +417,7 @@ void schedule_sync_meta(FILE *metafptr,int which_curl)
 
   strcpy(upload_thread_control.upload_threads[which_curl].tempfilename,tempfilename);
   pthread_create(&(upload_thread_control.upload_threads_no[which_curl]),NULL, (void *)&con_object_sync,(void *)&(upload_thread_control.upload_threads[which_curl]));
+  upload_thread_control.upload_threads_created[which_curl] = TRUE;
 
   return;
  }
@@ -460,6 +468,7 @@ void dispatch_upload_block(int which_curl)
 
     strcpy(upload_thread_control.upload_threads[which_curl].tempfilename,tempfilename);
     pthread_create(&(upload_thread_control.upload_threads_no[which_curl]),NULL, (void *)&con_object_sync,(void *)&(upload_thread_control.upload_threads[which_curl]));
+    upload_thread_control.upload_threads_created[which_curl]=TRUE;
    }
   else
    {  /*Block is gone. Undo changes*/
@@ -530,10 +539,11 @@ void upload_loop()
           if (sync_thread_control.sync_threads_in_use[count]==0)
            {
             sync_thread_control.sync_threads_in_use[count]=inode_to_sync;
+            sync_thread_control.sync_threads_created[count]=FALSE;
             sync_threads[count].inode = inode_to_sync;
             sync_threads[count].this_mode = tempentry.inode_stat.st_mode;
             pthread_create(&(sync_thread_control.inode_sync_thread[count]),NULL, (void *)&sync_single_inode,(void *)&(sync_threads[count]));
-
+            sync_thread_control.inode_sync_created[count]=TRUE;
             sync_thread_control.total_active_sync_threads++;
             break;
            }

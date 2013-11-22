@@ -2,8 +2,8 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-#define MAX_UPLOAD_CONCURRENCY 4
-#define MAX_SYNC_CONCURRENCY 4
+#define MAX_UPLOAD_CONCURRENCY 16
+#define MAX_SYNC_CONCURRENCY 16
 
 typedef struct {
     long page_filepos;
@@ -27,6 +27,7 @@ typedef struct {
     UPLOAD_THREAD_TYPE upload_threads[MAX_UPLOAD_CONCURRENCY];
     pthread_t upload_threads_no[MAX_UPLOAD_CONCURRENCY];
     char upload_threads_in_use[MAX_UPLOAD_CONCURRENCY];
+    char upload_threads_created[MAX_UPLOAD_CONCURRENCY];
     int total_active_upload_threads;
 /*upload threads: used for upload objects to backends*/
 
@@ -38,6 +39,7 @@ typedef struct {
     pthread_t sync_handler_thread;
     pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
     ino_t sync_threads_in_use[MAX_SYNC_CONCURRENCY];
+    char sync_threads_created[MAX_SYNC_CONCURRENCY];
     int total_active_sync_threads;
 /*sync threads: used for syncing meta/block in a single inode*/
   } SYNC_THREAD_CONTROL;

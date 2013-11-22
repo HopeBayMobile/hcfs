@@ -2,8 +2,8 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-#define MAX_UPLOAD_CONCURRENCY 4
-#define MAX_SYNC_CONCURRENCY 4
+#define MAX_UPLOAD_CONCURRENCY 16
+#define MAX_SYNC_CONCURRENCY 16
 
 typedef struct {
     long page_filepos;
@@ -52,8 +52,6 @@ void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
 void dispatch_upload_block(int which_curl);
 void schedule_sync_meta(FILE *metafptr,int which_curl);
-void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
 void con_object_sync(UPLOAD_THREAD_TYPE *upload_thread_ptr);
-void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 void upload_loop();
 
