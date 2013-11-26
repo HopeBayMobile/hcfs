@@ -2,8 +2,6 @@
 /*TODO: need to debug
 1. How to make delete file and upload file work together
 TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
-TODO: Will need to consider the case when system restarted or broken connection during meta or ock upload
-TODO: multiple upload connections for multiple files
 TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
 TODO: Track if init_swift may not able to connect and terminate process.
 TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim after delete batch is done
@@ -12,7 +10,6 @@ TODO: Perhaps should compact the deletion of blocks and/or meta in one file into
 TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
 */
 
-/*TODO: use nanosleep or signal to replace sleep for 1 second*/
 #include "hcfs_tocloud.h"
 #include "params.h"
 #include "hcfscurl.h"
@@ -149,13 +146,20 @@ void init_sync_control()
 
 void init_upload_control()
  {
-  int count;
+  int count,ret_val;
 
   memset(&upload_thread_control,0,sizeof(UPLOAD_THREAD_CONTROL));
   memset(&upload_curl_handles,0,sizeof(CURL_HANDLE)*MAX_UPLOAD_CONCURRENCY);
   for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
    {
-    hcfs_init_swift_backend(&(upload_curl_handles[count]));
+    ret_val = hcfs_init_swift_backend(&(upload_curl_handles[count]));
+    while ((ret_val < 200) || (ret_val > 299))
+     {
+      if (upload_curl_handles[count].curl !=NULL)
+       hcfs_destroy_swift_backend(upload_curl_handles[count].curl);
+      ret_val = hcfs_init_swift_backend(&(upload_curl_handles[count]));
+     }
+
    }
 
   sem_init(&(upload_thread_control.upload_op_sem),0,1);
@@ -247,7 +251,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
          {
           temppage.block_entries[current_entry_index].status = ST_LtoC;
           fseek(metafptr,page_pos,SEEK_SET);
-          fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+          fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
          }      
         flock(fileno(metafptr),LOCK_UN);
         sem_wait(&(upload_thread_control.upload_queue_sem));
@@ -342,12 +346,22 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
  {
   char objname[1000];
   FILE *fptr;
+  int ret_val;
  
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
   printf("Debug datasync: objname %s, inode %ld, block %ld\n",objname,this_inode,block_no);
   sprintf(curl_handle->id,"upload_blk_%ld_%ld",this_inode,block_no);
   fptr=fopen(filename,"r");
-  hcfs_swift_put_object(fptr,objname, curl_handle);
+  ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
+  while ((ret_val < 200) || (ret_val > 299))
+   {
+    ret_val = swift_reauth();
+    if ((ret_val >= 200) && (ret_val <=299))
+     {
+      fseek(fptr,0,SEEK_SET);
+      ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
+     }
+   }
   fclose(fptr);
   return;
  }
@@ -355,13 +369,23 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
  {
   char objname[1000];
+  int ret_val;
   FILE *fptr;
 
   sprintf(objname,"meta_%ld",this_inode);
   printf("Debug datasync: objname %s, inode %ld\n",objname,this_inode);
   sprintf(curl_handle->id,"upload_meta_%ld",this_inode);
   fptr=fopen(filename,"r");
-  hcfs_swift_put_object(fptr,objname, curl_handle);
+  ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
+  while ((ret_val < 200) || (ret_val > 299))
+   {
+    ret_val = swift_reauth();
+    if ((ret_val >= 200) && (ret_val <=299))
+     {
+      fseek(fptr,0,SEEK_SET);
+      ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
+     }
+   }
   fclose(fptr);
   return;
  }
@@ -487,6 +511,8 @@ void upload_loop()
   SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
   SUPER_INODE_ENTRY tempentry;
   int count,sleep_count;
+  char in_sync;
+  int ret_val;
 
   init_upload_control();
   init_sync_control();
@@ -515,18 +541,26 @@ void upload_loop()
        {
         inode_to_sync = inode_to_check;
 
-        read_super_inode_entry(inode_to_sync,&tempentry);
-        if (tempentry.in_transit == TRUE)
+        ret_val = read_super_inode_entry(inode_to_sync,&tempentry);
+
+        if ((ret_val < 0) || (tempentry.status!=IS_DIRTY))
          {
           inode_to_sync = 0;
-          inode_to_check = tempentry.util_ll_next;
+          inode_to_check = 0;
          }
         else
          {
-          tempentry.in_transit = TRUE;
-          tempentry.mod_after_in_transit = FALSE;
-          inode_to_check = tempentry.util_ll_next;
-          write_super_inode_entry(inode_to_sync, &tempentry);
+          if (tempentry.in_transit == TRUE)
+           {
+            inode_to_check = tempentry.util_ll_next;
+           }
+          else
+           {
+            tempentry.in_transit = TRUE;
+            tempentry.mod_after_in_transit = FALSE;
+            inode_to_check = tempentry.util_ll_next;
+            write_super_inode_entry(inode_to_sync, &tempentry);
+           }
          }
        }
       sem_post(&(sys_super_inode->io_sem));
@@ -534,21 +568,40 @@ void upload_loop()
       if (inode_to_sync!=0)
        {
         sem_wait(&(sync_thread_control.sync_op_sem));
+        /*First check if this inode is actually being synced now*/
+        in_sync = FALSE;
         for(count=0;count<MAX_SYNC_CONCURRENCY;count++)
          {
-          if (sync_thread_control.sync_threads_in_use[count]==0)
+          if (sync_thread_control.sync_threads_in_use[count]==inode_to_sync)
            {
-            sync_thread_control.sync_threads_in_use[count]=inode_to_sync;
-            sync_thread_control.sync_threads_created[count]=FALSE;
-            sync_threads[count].inode = inode_to_sync;
-            sync_threads[count].this_mode = tempentry.inode_stat.st_mode;
-            pthread_create(&(sync_thread_control.inode_sync_thread[count]),NULL, (void *)&sync_single_inode,(void *)&(sync_threads[count]));
-            sync_thread_control.sync_threads_created[count]=TRUE;
-            sync_thread_control.total_active_sync_threads++;
+            in_sync = TRUE;
             break;
            }
          }
-        sem_post(&(sync_thread_control.sync_op_sem));
+
+        if (in_sync == FALSE)
+         {
+          for(count=0;count<MAX_SYNC_CONCURRENCY;count++)
+           {
+            if (sync_thread_control.sync_threads_in_use[count]==0)
+             {
+              sync_thread_control.sync_threads_in_use[count]=inode_to_sync;
+              sync_thread_control.sync_threads_created[count]=FALSE;
+              sync_threads[count].inode = inode_to_sync;
+              sync_threads[count].this_mode = tempentry.inode_stat.st_mode;
+              pthread_create(&(sync_thread_control.inode_sync_thread[count]),NULL, (void *)&sync_single_inode,(void *)&(sync_threads[count]));
+              sync_thread_control.sync_threads_created[count]=TRUE;
+              sync_thread_control.total_active_sync_threads++;
+              break;
+             }
+           }
+          sem_post(&(sync_thread_control.sync_op_sem));
+         }
+        else  /*If already syncing to cloud*/
+         {
+          sem_post(&(sync_thread_control.sync_op_sem));
+          sem_post(&(sync_thread_control.sync_queue_sem));
+         }        
        }
       else
        {      

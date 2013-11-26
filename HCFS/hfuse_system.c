@@ -113,13 +113,23 @@ int main(int argc, char **argv)
   CURL_HANDLE curl_handle;
   int ret_val;
   pid_t this_pid, this_pid1;
-  FILE *fptr;
   int download_handle_count;
   
   sprintf(curl_handle.id,"main");
   ret_val = hcfs_init_swift_backend(&curl_handle);
+  if ((ret_val < 200) || (ret_val > 299))
+   {
+    printf("error in connecting to swift\n");
+    exit(0);
+   }
+
   printf("%s\n %s\n %d\n",swift_auth_string,swift_url_string,ret_val);
   ret_val = hcfs_swift_list_container(&curl_handle);
+  if ((ret_val < 200) || (ret_val > 299))
+   {
+    printf("error in connecting to swift\n");
+    exit(0);
+   }
   printf("ret code %d\n",ret_val);
   hcfs_destroy_swift_backend(curl_handle.curl);
   init_hfuse();
@@ -129,34 +139,34 @@ int main(int argc, char **argv)
     this_pid1 = fork();
     if (this_pid1 == 0)
      {
-      fptr=fopen("swift_upload_log","a+");
-      fprintf(fptr,"\nStart logging swift upload\n");
+      logfptr=fopen("swift_upload_log","a+");
+      fprintf(logfptr,"\nStart logging swift upload\n");
       printf("Redirecting to swift log\n");
-      dup2(fileno(fptr),fileno(stdout));
-      dup2(fileno(fptr),fileno(stderr));
+      dup2(fileno(logfptr),fileno(stdout));
+      dup2(fileno(logfptr),fileno(stderr));
 
       upload_loop();
-      fclose(fptr);
+      fclose(logfptr);
      }
     else
      {
-      fptr=fopen("cache_maintain_log","a+");
-      fprintf(fptr,"\nStart logging cache cleanup\n");
+      logfptr=fopen("cache_maintain_log","a+");
+      fprintf(logfptr,"\nStart logging cache cleanup\n");
       printf("Redirecting to cache log\n");
-      dup2(fileno(fptr),fileno(stdout));
-      dup2(fileno(fptr),fileno(stderr));
+      dup2(fileno(logfptr),fileno(stdout));
+      dup2(fileno(logfptr),fileno(stderr));
 
       run_cache_loop();
-      fclose(fptr);
+      fclose(logfptr);
      }
    }
   else
    {
-    fptr=fopen("fuse_log","a+");
-    fprintf(fptr,"\nStart logging fuse\n");
+    logfptr=fopen("fuse_log","a+");
+    fprintf(logfptr,"\nStart logging fuse\n");
     printf("Redirecting to fuse log\n");
-    dup2(fileno(fptr),fileno(stdout));
-    dup2(fileno(fptr),fileno(stderr));
+    dup2(fileno(logfptr),fileno(stdout));
+    dup2(fileno(logfptr),fileno(stderr));
 //    close(delete_pipe[0]);   /* FUSE process only write to-deletes to the pipe */
     sem_init(&download_curl_sem,0,MAX_DOWNLOAD_CURL_HANDLE);
 //    sem_init(&delete_enqueue_sem,0,1);
@@ -165,20 +175,16 @@ int main(int argc, char **argv)
      {
       curl_handle_mask[download_handle_count]=FALSE;
       ret_val = hcfs_init_swift_backend(&(download_curl_handles[download_handle_count]));
-      if ((ret_val < 200) || (ret_val > 299))
+      while ((ret_val < 200) || (ret_val > 299))
        {
         printf("error in connecting to swift\n");
-        exit(0);
+        if (download_curl_handles[download_handle_count].curl !=NULL)
+         hcfs_destroy_swift_backend(download_curl_handles[download_handle_count].curl);
+        ret_val = hcfs_init_swift_backend(&(download_curl_handles[download_handle_count]));
+
        }
      }
     hook_fuse(argc,argv);
-
-    for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
-     {
-      hcfs_destroy_swift_backend(download_curl_handles[download_handle_count].curl);
-     }
-    fclose(fptr);
-
     return;
    }
   return;

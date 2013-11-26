@@ -153,7 +153,9 @@ int super_inode_mark_dirty(ino_t this_inode)
   int ret_val;
   int ret_items;
   SUPER_INODE_ENTRY tempentry;
+  char need_write;
 
+  need_write = FALSE;
   ret_val = 0;
   sem_wait(&(sys_super_inode->io_sem));
 
@@ -164,8 +166,16 @@ int super_inode_mark_dirty(ino_t this_inode)
      {
       ll_enqueue(this_inode,IS_DIRTY,&tempentry);
       write_super_inode_head();
-      ret_val = write_super_inode_entry(this_inode, &tempentry);
+      need_write = TRUE;
      }
+    if (tempentry.in_transit == TRUE)
+     {
+      need_write = TRUE;
+      tempentry.mod_after_in_transit = TRUE;
+     }
+
+    if (need_write == TRUE)
+     ret_val = write_super_inode_entry(this_inode, &tempentry);
 
    }
   sem_post(&(sys_super_inode->io_sem));

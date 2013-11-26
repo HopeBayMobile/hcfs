@@ -5,6 +5,11 @@
 #include "params.h"
 #include <fuse.h>
 #include <time.h>
+#include <math.h>
+#include <sys/statvfs.h>
+#include "hcfscurl.h"
+#include "hcfs_tocloud.h"
+
 
 /* TODO: Need to go over the access rights problem for the ops */
 /*TODO: Need to invalidate cache entry if rename/deleted */
@@ -999,7 +1004,38 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   return total_bytes_written;
  }
   
-//int hfuse_statfs(const char *path, struct statvfs *buf);      /*Prototype is linux statvfs call*/
+int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linux statvfs call*/
+ {
+
+  sem_wait(&(hcfs_system->access_sem));
+  buf->f_bsize = 4096;
+  buf->f_frsize = 4096;
+  if (hcfs_system->systemdata.system_size > (50*powl(1024,3)))
+   buf->f_blocks = (2*hcfs_system->systemdata.system_size) / 4096;
+  else
+   buf->f_blocks = (100*powl(1024,3)) / 4096;
+
+  buf->f_bfree = buf->f_blocks - ((hcfs_system->systemdata.system_size) / 4096);
+  if (buf->f_bfree < 0)
+   buf->f_bfree = 0;
+  buf->f_bavail = buf->f_bfree;
+  sem_post(&(hcfs_system->access_sem));  
+
+  sem_wait(&(sys_super_inode->io_sem));
+  if (sys_super_inode->head.num_active_inodes > 1000000)
+   buf->f_files = (sys_super_inode->head.num_active_inodes * 2);
+  else
+   buf->f_files = 2000000;
+
+  buf->f_ffree = buf->f_files - sys_super_inode->head.num_active_inodes;
+  if (buf->f_ffree < 0)
+   buf->f_ffree = 0;
+  buf->f_favail = buf->f_ffree;
+  sem_post(&(sys_super_inode->io_sem));
+  buf->f_namemax = 256;
+
+  return 0;
+ }
 int hfuse_flush(const char *path, struct fuse_file_info *file_info)
  {
   return 0;
@@ -1118,6 +1154,14 @@ void* hfuse_init(struct fuse_conn_info *conn)
  }
 void hfuse_destroy(void *private_data)
  {
+  int download_handle_count;
+
+  for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
+   {
+    hcfs_destroy_swift_backend(download_curl_handles[download_handle_count].curl);
+   }
+  fclose(logfptr);
+
   return;
  }
 //int hfuse_create(const char *path, mode_t mode, struct fuse_file_info *file_info);
@@ -1210,6 +1254,7 @@ static struct fuse_operations hfuse_ops = {
     .fsync = hfuse_fsync,
     .unlink = hfuse_unlink,
     .rmdir = hfuse_rmdir,
+    .statfs = hfuse_statfs,
  };
 
 int hook_fuse(int argc, char **argv)

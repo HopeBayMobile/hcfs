@@ -650,6 +650,8 @@ int ll_dequeue(ino_t thisinode, SUPER_INODE_ENTRY *this_entry)
    }
 
   this_entry -> status = NO_LL;
+  this_entry -> util_ll_next = 0;
+  this_entry -> util_ll_prev = 0;
   return 0;
  }
 

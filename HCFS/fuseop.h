@@ -130,6 +130,8 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
+FILE *logfptr;
+
 int init_hcfs_system_data();
 int sync_hcfs_system_data(char need_lock);
 long check_file_size(const char *path);

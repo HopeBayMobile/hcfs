@@ -13,6 +13,8 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
   while(1==1)
    {
     sem_wait(&download_curl_sem);
+    fseek(fptr,0,SEEK_SET);
+    ftruncate(fileno(fptr),0);
     for(which_curl_handle=0;which_curl_handle<MAX_DOWNLOAD_CURL_HANDLE;which_curl_handle++)
      {
       if (curl_handle_mask[which_curl_handle] == FALSE)
