@@ -19,8 +19,6 @@
 #define MAX_DIR_ENTRIES_PER_PAGE 100
 #define MAX_BLOCK_ENTRIES_PER_PAGE 100
 
-#define MAX_BLOCK_SIZE 10485760
-
 #define ST_NONE 0   /* Not stored on any media or storage. Value should be zero.*/
 #define ST_LDISK 1  /* Stored only on local cache */
 #define ST_CLOUD 2  /* Stored only on cloud storage */
@@ -115,15 +113,23 @@ void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index); /*In advance
 
 
 typedef struct {
-    FILE *system_val_fptr;
     long system_size;
     long dirty_size;
-    long cached_size;
-    sem_t access_sem;
+    long cache_size;
+    long cache_blocks;
   } SYSTEM_DATA_TYPE;
 
-SYSTEM_DATA_TYPE hcfs_system;
+typedef struct {
+    FILE *system_val_fptr;
+    SYSTEM_DATA_TYPE systemdata;
+    sem_t access_sem;
+    sem_t num_cache_sleep_sem;
+    sem_t check_cache_sem;
+    sem_t check_next_sem;
+  } SYSTEM_DATA_HEAD;
+
+SYSTEM_DATA_HEAD *hcfs_system;
 
 int init_hcfs_system_data();
-int sync_hcfs_system_data();
+int sync_hcfs_system_data(char need_lock);
 

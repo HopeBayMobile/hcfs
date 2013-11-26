@@ -2,6 +2,9 @@
 #define BLOCKPATH "/storage/home/jiahongwu/HCFS/blockstorage"
 #define SUPERINODE "/storage/home/jiahongwu/HCFS/metastorage/superinode"
 #define UNCLAIMEDFILE "/storage/home/jiahongwu/HCFS/metastorage/unclaimedlist"
+#define HCFSSYSTEM "/storage/home/jiahongwu/HCFS/metastorage/hcfssystemfile"
+
+#define NUMSUBDIR 1000
 
 #define RECLAIM_TRIGGER 10000
 

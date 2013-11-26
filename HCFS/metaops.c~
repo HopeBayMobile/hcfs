@@ -1,5 +1,6 @@
 #include <sys/file.h>
 #include "fuseop.h"
+#include "params.h"
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
 /*TODO: Consider whether to put changes to super_inode is_dirty here */
 
@@ -465,6 +466,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   int ret_val;
   long count;
   long total_blocks;
+  long cache_block_size;
 
   fetch_meta_path(thismetapath,this_inode);
 
@@ -499,10 +501,22 @@ int decrease_nlink_inode_file(ino_t this_inode)
      total_blocks = ((this_meta.thisstat.st_size-1) / MAX_BLOCK_SIZE) + 1;
     for(count = 0;count<total_blocks;count++)
      {
-      fetch_block_path(thisblockpath,this_inode,total_blocks);
+      fetch_block_path(thisblockpath,this_inode,count);
       if (!access(thisblockpath,F_OK))
-       unlink(thisblockpath);
+       {
+        cache_block_size = check_file_size(thisblockpath);
+        unlink(thisblockpath);
+        sem_wait(&(hcfs_system->access_sem));
+        hcfs_system->systemdata.cache_size -= cache_block_size;
+        hcfs_system->systemdata.cache_block -=1;
+        sem_post(&(hcfs_system->access_sem));           
+       }
      }
+    sem_wait(&(hcfs_system->access_sem));
+    hcfs_system->systemdata.system_size -= this_meta.thisstat.st_size;
+    sync_hcfs_system_data(FALSE);
+    sem_post(&(hcfs_system->access_sem));           
+
     flock(fileno(metafptr),LOCK_UN);
     fclose(metafptr);
 

@@ -10,7 +10,7 @@ void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filenam
   char tempname[400];
   int sub_dir;
 
-  sub_dir = this_inode % 1000;
+  sub_dir = this_inode % NUMSUBDIR;
   sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
@@ -23,7 +23,7 @@ void fetch_block_path(char *pathname, ino_t this_inode, long block_num)   /*Will
   char tempname[400];
   int sub_dir;
 
-  sub_dir = (this_inode + block_num) % 1000;
+  sub_dir = (this_inode + block_num) % NUMSUBDIR;
   sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);

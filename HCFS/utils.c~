@@ -11,10 +11,10 @@ void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filenam
   int sub_dir;
 
   sub_dir = this_inode % 1000;
-  sprintf(tempname,"%s/sub_%d",metapath,sub_dir);
+  sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/sub_%d/meta%ld",metapath,sub_dir,this_inode);
+  sprintf(tempname,"%s/sub_%d/meta%ld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
   return;
  }
@@ -24,10 +24,10 @@ void fetch_block_path(char *pathname, ino_t this_inode, long block_num)   /*Will
   int sub_dir;
 
   sub_dir = (this_inode + block_num) % 1000;
-  sprintf(tempname,"%s/sub_%d",blockpath,sub_dir);
+  sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/sub_%d/block%ld_%ld",blockpath,sub_dir,this_inode,block_num);
+  sprintf(tempname,"%s/sub_%d/block%ld_%ld",BLOCKPATH,sub_dir,this_inode,block_num);
   strcpy(pathname,tempname);
   return;
  }

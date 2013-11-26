@@ -466,6 +466,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   int ret_val;
   long count;
   long total_blocks;
+  long cache_block_size;
 
   fetch_meta_path(thismetapath,this_inode);
 
@@ -502,8 +503,20 @@ int decrease_nlink_inode_file(ino_t this_inode)
      {
       fetch_block_path(thisblockpath,this_inode,count);
       if (!access(thisblockpath,F_OK))
-       unlink(thisblockpath);
+       {
+        cache_block_size = check_file_size(thisblockpath);
+        unlink(thisblockpath);
+        sem_wait(&(hcfs_system->access_sem));
+        hcfs_system->systemdata.cache_size -= cache_block_size;
+        hcfs_system->systemdata.cache_blocks -=1;
+        sem_post(&(hcfs_system->access_sem));           
+       }
      }
+    sem_wait(&(hcfs_system->access_sem));
+    hcfs_system->systemdata.system_size -= this_meta.thisstat.st_size;
+    sync_hcfs_system_data(FALSE);
+    sem_post(&(hcfs_system->access_sem));           
+
     flock(fileno(metafptr),LOCK_UN);
     fclose(metafptr);
 

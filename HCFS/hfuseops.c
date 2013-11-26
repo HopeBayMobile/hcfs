@@ -12,6 +12,10 @@
 /*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
 /*TODO: Should handle updating number of blocks and other uncovered info in an inode*/
 
+/*TODO: Mod ops to correctly change system size and cache size*/
+/*TODO: Will need to fix the cache size prob if a cache entry is opened for writing and then deleted before the opened entry is closed*/
+
+
 long check_file_size(const char *path)
  {
   struct stat block_stat;
@@ -532,6 +536,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
   int target_bytes_read;
   size_t size;
   char fill_zeros;
+  struct stat tempstat;
 
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
@@ -577,8 +582,6 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
   for(block_index = start_block; block_index <= end_block; block_index++)
    {
-    /*TODO: For now, only consider storing locally*/
-
     sem_wait(&(fh_ptr->block_sem));
     if (fh_ptr->opened_block != block_index)
      {
@@ -593,13 +596,88 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
       fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
       funlockfile(fh_ptr->metafptr);
 
-
-      if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_NONE)
-       {     /*If not stored anywhere, fill with zeros*/
-        fill_zeros = TRUE;
+      while (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
+             ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+       {
+        if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+         {
+          sem_post(&(fh_ptr->block_sem));
+          printf("debug read waiting on full cache\n");
+          sleep_on_cache_full();
+          sem_wait(&(fh_ptr->block_sem));
+          /*Re-read status*/
+          flockfile(fh_ptr->metafptr);
+          fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+          fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+          funlockfile(fh_ptr->metafptr);
+         }
+        else
+         break;
        }
-      else
-        fill_zeros = FALSE;
+
+
+      switch((fh_ptr->cached_page).block_entries[entry_index].status)
+       {
+        case ST_NONE: 
+            fill_zeros = TRUE;
+            break;
+        case ST_LDISK:
+        case ST_BOTH:
+        case ST_LtoC:
+            fill_zeros = FALSE;
+            break;
+        case ST_CLOUD:
+        case ST_CtoL:        
+            /*Download from backend */
+            fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+            fh_ptr->blockfptr = fopen(thisblockpath,"a+");
+            fclose(fh_ptr->blockfptr);
+            fh_ptr->blockfptr = fopen(thisblockpath,"r+");
+            setbuf(fh_ptr->blockfptr,NULL);
+            flock(fileno(fh_ptr->blockfptr),LOCK_EX);
+            flockfile(fh_ptr->metafptr);
+            flock(fileno(fh_ptr->metafptr),LOCK_EX);
+            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+            fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            if (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
+                ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+             {
+              if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD)
+               {
+                (fh_ptr->cached_page).block_entries[entry_index].status = ST_CtoL;
+                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                fflush(fh_ptr->metafptr);
+               }
+              flock(fileno(fh_ptr->metafptr),LOCK_UN);
+              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+              /*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
+              flock(fileno(fh_ptr->metafptr),LOCK_EX);
+              fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+              fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+              if (stat(thisblockpath,&tempstat)==0)
+               {
+                (fh_ptr->cached_page).block_entries[entry_index].status = ST_BOTH;
+                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                fflush(fh_ptr->metafptr);
+
+                sem_wait(&(hcfs_system->access_sem));
+                hcfs_system->systemdata.cache_size += tempstat.st_size;
+                hcfs_system->systemdata.cache_blocks++;
+                sync_hcfs_system_data(FALSE);
+                sem_post(&(hcfs_system->access_sem));           
+               }
+             }
+            flock(fileno(fh_ptr->metafptr),LOCK_UN);
+            funlockfile(fh_ptr->metafptr);
+            flock(fileno(fh_ptr->blockfptr),LOCK_UN);
+            fclose(fh_ptr->blockfptr);
+            fill_zeros = FALSE;
+            break;
+        default:
+            break;
+       }
 
       if (fill_zeros != TRUE)
        {
@@ -623,6 +701,11 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
      {
       fseek(fh_ptr->blockfptr,current_offset,SEEK_SET);
       this_bytes_read = fread(&buf[total_bytes_read],sizeof(char),target_bytes_read, fh_ptr->blockfptr);
+      if (this_bytes_read < target_bytes_read)
+       {  /*Need to pad zeros*/
+        memset(&buf[total_bytes_read + this_bytes_read],0,sizeof(char) * (target_bytes_read - this_bytes_read));
+        this_bytes_read = target_bytes_read;
+       }
      }
     else
      {
@@ -695,12 +778,19 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   int this_bytes_written;
   off_t current_offset;
   int target_bytes_written;
+  long old_cache_size, new_cache_size;
+  struct stat tempstat;
+
 
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
 
   if (size <=0)
    return 0;
+
+  if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+    sleep_on_cache_full();
+
   total_bytes_written = 0;
 
   start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
@@ -728,6 +818,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
     /*TODO: For now, only consider storing locally*/
     /*TODO: Need to be able to modify status to locally stored for cases other than ST_NONE*/
 
+    fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
     sem_wait(&(fh_ptr->block_sem));
     if (fh_ptr->opened_block != block_index)
      {
@@ -738,14 +829,98 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
        }
       fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
       fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
-      fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
-      if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_NONE)
-       {     /*If not stored anywhere, make it on local disk*/
-        fh_ptr->blockfptr=fopen(thisblockpath,"a+");
-        fclose(fh_ptr->blockfptr);
-        (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
-        fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-        fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+
+      while (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
+             ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+       {
+        if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+         {
+          sem_post(&(fh_ptr->block_sem));
+          flock(fileno(fh_ptr-> metafptr),LOCK_UN);
+          funlockfile(fh_ptr-> metafptr);
+          printf("debug read waiting on full cache\n");
+          sleep_on_cache_full();
+          /*Re-read status*/
+          flockfile(fh_ptr->metafptr);
+          flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+          sem_wait(&(fh_ptr->block_sem));
+          fseek(fh_ptr->metafptr,0,SEEK_SET);
+          fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+          fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+          fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+         }
+        else
+         break;
+       }
+
+
+      switch((fh_ptr->cached_page).block_entries[entry_index].status)
+       {
+        case ST_NONE:
+             /*If not stored anywhere, make it on local disk*/
+            fh_ptr->blockfptr=fopen(thisblockpath,"a+");
+            fclose(fh_ptr->blockfptr);
+            (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
+            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+            fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            sem_wait(&(hcfs_system->access_sem));
+            hcfs_system->systemdata.cache_blocks++;
+            sync_hcfs_system_data(FALSE);
+            sem_post(&(hcfs_system->access_sem));           
+            break;
+        case ST_LDISK:
+        case ST_BOTH:
+        case ST_LtoC:
+            break;
+        case ST_CLOUD:
+        case ST_CtoL:        
+            /*Download from backend */
+            fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+            fh_ptr->blockfptr = fopen(thisblockpath,"a+");
+            fclose(fh_ptr->blockfptr);
+            fh_ptr->blockfptr = fopen(thisblockpath,"r+");
+            setbuf(fh_ptr->blockfptr,NULL);
+            flock(fileno(fh_ptr->blockfptr),LOCK_EX);
+            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+            fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            if (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
+                ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+             {
+              if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD)
+               {
+                (fh_ptr->cached_page).block_entries[entry_index].status = ST_CtoL;
+                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                fflush(fh_ptr->metafptr);
+               }
+              flock(fileno(fh_ptr-> metafptr),LOCK_UN);
+              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+              /*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
+
+              /*Re-read status*/
+              flock(fileno(fh_ptr-> metafptr),LOCK_EX);
+              fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+              fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+
+              if (stat(thisblockpath,&tempstat)==0)
+               {
+                (fh_ptr->cached_page).block_entries[entry_index].status = ST_BOTH;
+                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                fflush(fh_ptr->metafptr);
+
+                sem_wait(&(hcfs_system->access_sem));
+                hcfs_system->systemdata.cache_size += tempstat.st_size;
+                hcfs_system->systemdata.cache_blocks++;
+                sync_hcfs_system_data(FALSE);
+                sem_post(&(hcfs_system->access_sem));           
+               }
+             }
+            flock(fileno(fh_ptr->blockfptr),LOCK_UN);
+            fclose(fh_ptr->blockfptr);
+            break;
+        default:
+            break;
        }
 
       fh_ptr->blockfptr=fopen(thisblockpath,"r+");
@@ -755,6 +930,14 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
     flock(fileno(fh_ptr->blockfptr),LOCK_EX);
 
     current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
+
+    old_cache_size = check_file_size(thisblockpath);
+    if (current_offset > old_cache_size)
+     {
+      printf("Debug write: cache block size smaller than starting offset. Extending\n");
+      ftruncate(fileno(fh_ptr->blockfptr),current_offset);
+     }
+
     target_bytes_written = MAX_BLOCK_SIZE - current_offset;
     if ((size - total_bytes_written) < target_bytes_written) /*Do not need to write that much*/
      target_bytes_written = size - total_bytes_written;
@@ -763,6 +946,18 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
     this_bytes_written = fwrite(&buf[total_bytes_written],sizeof(char),target_bytes_written, fh_ptr->blockfptr);
 
     total_bytes_written += this_bytes_written;
+
+    new_cache_size = check_file_size(thisblockpath);
+
+    if (old_cache_size != new_cache_size)
+     {
+      sem_wait(&(hcfs_system->access_sem));
+      hcfs_system->systemdata.cache_size += new_cache_size - old_cache_size;
+      if (hcfs_system->systemdata.cache_size < 0)
+       hcfs_system->systemdata.cache_size = 0;
+      sync_hcfs_system_data(FALSE);
+      sem_post(&(hcfs_system->access_sem));           
+     }
 
     flock(fileno(fh_ptr->blockfptr),LOCK_UN);
     sem_post(&(fh_ptr->block_sem));
@@ -781,6 +976,11 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
   if ((fh_ptr->cached_meta).thisstat.st_size < (offset + total_bytes_written))
    {
+    sem_wait(&(hcfs_system->access_sem));
+    hcfs_system->systemdata.system_size += (offset + total_bytes_written) - (fh_ptr->cached_meta).thisstat.st_size;
+    sync_hcfs_system_data(FALSE);
+    sem_post(&(hcfs_system->access_sem));           
+
     (fh_ptr->cached_meta).thisstat.st_size = (offset + total_bytes_written);
     (fh_ptr->cached_meta).thisstat.st_blocks = ((fh_ptr->cached_meta).thisstat.st_size +511) / 512;
    }

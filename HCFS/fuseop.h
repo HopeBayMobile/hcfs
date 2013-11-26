@@ -113,15 +113,24 @@ void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index); /*In advance
 
 
 typedef struct {
-    FILE *system_val_fptr;
     long system_size;
     long dirty_size;
-    long cached_size;
-    sem_t access_sem;
+    long cache_size;
+    long cache_blocks;
   } SYSTEM_DATA_TYPE;
 
-SYSTEM_DATA_TYPE hcfs_system;
+typedef struct {
+    FILE *system_val_fptr;
+    SYSTEM_DATA_TYPE systemdata;
+    sem_t access_sem;
+    sem_t num_cache_sleep_sem;
+    sem_t check_cache_sem;
+    sem_t check_next_sem;
+  } SYSTEM_DATA_HEAD;
+
+SYSTEM_DATA_HEAD *hcfs_system;
 
 int init_hcfs_system_data();
-int sync_hcfs_system_data();
+int sync_hcfs_system_data(char need_lock);
+long check_file_size(const char *path);
 

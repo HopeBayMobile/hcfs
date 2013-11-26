@@ -60,4 +60,5 @@ int read_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 int write_super_inode_entry(ino_t this_inode, SUPER_INODE_ENTRY *inode_ptr);
 
 int super_inode_update_transit(ino_t this_inode, char is_start_transit);
+int super_inode_mark_dirty(ino_t this_inode);
 

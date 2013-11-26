@@ -8,7 +8,7 @@
 #define MY_URL "https://10.10.0.1:8080"
 
  
-#define MAX_CURL_HANDLE 16
+#define MAX_DOWNLOAD_CURL_HANDLE 16
 
 typedef struct {
     CURL *curl;
@@ -18,8 +18,8 @@ typedef struct {
 char swift_auth_string[1024];
 char swift_url_string[1024];
 
-CURL_HANDLE download_curl_handles[MAX_CURL_HANDLE];
-short curl_handle_mask[MAX_CURL_HANDLE];
+CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
+short curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
 sem_t download_curl_sem;
 
 int hcfs_get_auth_swift(char *swift_user,char *swift_pass, char *swift_url, CURL_HANDLE *curl_handle);
@@ -32,4 +32,6 @@ int hcfs_swift_reauth();
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
 void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
+
+void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);
 

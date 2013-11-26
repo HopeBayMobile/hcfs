@@ -386,7 +386,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
   return ret_val;
  }
-int swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
  {
   struct curl_slist *chunk=NULL;
   long objsize;
@@ -450,7 +450,7 @@ int swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
   return ret_val;
  }
-int swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
+int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
  {
   struct curl_slist *chunk=NULL;
   long objsize;

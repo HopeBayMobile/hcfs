@@ -148,6 +148,43 @@ int super_inode_update_stat(ino_t this_inode, struct stat *newstat)
   return ret_val;
  }
 
+int super_inode_mark_dirty(ino_t this_inode)
+ {
+  int ret_val;
+  int ret_items;
+  SUPER_INODE_ENTRY tempentry;
+  char need_write;
+
+  need_write = FALSE;
+  ret_val = 0;
+  sem_wait(&(sys_super_inode->io_sem));
+
+  ret_val = read_super_inode_entry(this_inode,&tempentry);
+  if (ret_val >=0)
+   {
+    if (tempentry.status == NO_LL)
+     {
+      ll_enqueue(this_inode,IS_DIRTY,&tempentry);
+      write_super_inode_head();
+      need_write = TRUE;
+     }
+    if (tempentry.in_transit == TRUE)
+     {
+      need_write = TRUE;
+      tempentry.mod_after_in_transit = TRUE;
+     }
+
+    if (need_write == TRUE)
+     ret_val = write_super_inode_entry(this_inode, &tempentry);
+
+   }
+  sem_post(&(sys_super_inode->io_sem));
+
+  return ret_val;
+ }
+
+
+
 int super_inode_update_transit(ino_t this_inode, char is_start_transit)
  {
   int ret_val;

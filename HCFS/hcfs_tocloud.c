@@ -247,7 +247,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
          {
           temppage.block_entries[current_entry_index].status = ST_LtoC;
           fseek(metafptr,page_pos,SEEK_SET);
-          fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+          fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
          }      
         flock(fileno(metafptr),LOCK_UN);
         sem_wait(&(upload_thread_control.upload_queue_sem));
@@ -497,10 +497,10 @@ void upload_loop()
    {
     for (sleep_count=0;sleep_count<30;sleep_count++)
      {
-//      if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
+      if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
       sleep(1);
-//      else
-//      break;
+      else
+      break;
      }
 
     inode_to_check = 0;

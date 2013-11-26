@@ -497,10 +497,10 @@ void upload_loop()
    {
     for (sleep_count=0;sleep_count<30;sleep_count++)
      {
-//      if (mysystem_meta->cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
+      if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) /*Sleep for a while if we are not really in a hurry*/
       sleep(1);
-//      else
-//      break;
+      else
+      break;
      }
 
     inode_to_check = 0;
@@ -543,7 +543,7 @@ void upload_loop()
             sync_threads[count].inode = inode_to_sync;
             sync_threads[count].this_mode = tempentry.inode_stat.st_mode;
             pthread_create(&(sync_thread_control.inode_sync_thread[count]),NULL, (void *)&sync_single_inode,(void *)&(sync_threads[count]));
-            sync_thread_control.inode_sync_created[count]=TRUE;
+            sync_thread_control.sync_threads_created[count]=TRUE;
             sync_thread_control.total_active_sync_threads++;
             break;
            }
