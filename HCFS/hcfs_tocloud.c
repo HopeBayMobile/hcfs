@@ -103,18 +103,32 @@ void collect_finished_upload_threads(void *ptr)
              {
               setbuf(metafptr,NULL);
               flock(fileno(metafptr),LOCK_EX);
-              fseek(metafptr,page_filepos,SEEK_SET);
-              fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
-              if (temppage.block_entries[page_entry_index].status==ST_LtoC)
+              if (!access(thismetapath,F_OK)) /*Perhaps the file is deleted already*/
                {
-                temppage.block_entries[page_entry_index].status=ST_BOTH;
                 fseek(metafptr,page_filepos,SEEK_SET);
-                fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+                fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+                if (temppage.block_entries[page_entry_index].status==ST_LtoC)
+                 {
+                  temppage.block_entries[page_entry_index].status=ST_BOTH;
+                  fseek(metafptr,page_filepos,SEEK_SET);
+                  fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+                 }
+                /*TODO: Check if status is ST_NONE. If so, the block is removed due to truncating. Need to schedule block for deletion due to truncating*/
                }
+
+          /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
+          /*TODO: This must be before the usage flag is cleared*/
+
               flock(fileno(metafptr),LOCK_UN);
               fclose(metafptr);
              }
+
+          /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
+          /*TODO: This must be before the usage flag is cleared*/
+
            }
+          /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
+          /*TODO: This must be before the usage flag is cleared*/
 
           upload_thread_control.upload_threads_in_use[count]=FALSE;
           upload_thread_control.upload_threads_created[count]=FALSE;
@@ -227,6 +241,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
      {
       flock(fileno(metafptr),LOCK_EX);
 
+      if (!access(thismetapath,F_OK)) /*Perhaps the file is deleted already*/
+       {
+        flock(fileno(metafptr),LOCK_UN);
+        break;
+       }
+
       if (current_entry_index >= MAX_BLOCK_ENTRIES_PER_PAGE)
        {
         page_pos = temppage.next_page;
@@ -244,6 +264,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
       fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
 
       block_status = temppage.block_entries[current_entry_index].status;
+      /*TODO: If going to upload the block, check if it is scheduled for deletion already. If so, need to cancel the scheduled deletion. Perhaps can check this fast by adding another flag in block entry*/
 
       if ((block_status == ST_LDISK) || (block_status == ST_LtoC))
        {
@@ -304,6 +325,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
      }
    }
 
+/*Check if metafile still exists. If not, forget the meta upload*/
+  if (access(thismetapath,F_OK)<0)
+   return;
+
   sem_wait(&(upload_thread_control.upload_queue_sem));
   sem_wait(&(upload_thread_control.upload_op_sem));
   which_curl = -1;
@@ -324,19 +349,38 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   sem_post(&(upload_thread_control.upload_op_sem));
 
   flock(fileno(metafptr),LOCK_EX);
-  schedule_sync_meta(metafptr,which_curl); /*Should first copy meta file to a tmp file to avoid inconsistency, then start the upload thread*/
-  flock(fileno(metafptr),LOCK_UN);
-  fclose(metafptr);
+  /*Check if metafile still exists. If not, forget the meta upload*/
+  if (!access(thismetapath,F_OK))
+   {
+    schedule_sync_meta(metafptr,which_curl);
+    flock(fileno(metafptr),LOCK_UN);
+    fclose(metafptr);
 
-  pthread_join(upload_thread_control.upload_threads_no[which_curl],NULL);
-  sem_wait(&(upload_thread_control.upload_op_sem));
-  upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
-  upload_thread_control.upload_threads_created[which_curl] = FALSE;
-  upload_thread_control.total_active_upload_threads--;
-  sem_post(&(upload_thread_control.upload_op_sem));
-  sem_post(&(upload_thread_control.upload_queue_sem));
+    pthread_join(upload_thread_control.upload_threads_no[which_curl],NULL);
+  /*TODO: Need to check if metafile still exists. If not, schedule the deletion of meta*/
 
-  super_inode_update_transit(ptr->inode,FALSE);
+    sem_wait(&(upload_thread_control.upload_op_sem));
+    upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
+    upload_thread_control.upload_threads_created[which_curl] = FALSE;
+    upload_thread_control.total_active_upload_threads--;
+    sem_post(&(upload_thread_control.upload_op_sem));
+    sem_post(&(upload_thread_control.upload_queue_sem));
+
+    super_inode_update_transit(ptr->inode,FALSE);
+
+   }
+  else
+   {
+    flock(fileno(metafptr),LOCK_UN);
+    fclose(metafptr);
+
+    sem_wait(&(upload_thread_control.upload_op_sem));
+    upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
+    upload_thread_control.upload_threads_created[which_curl] = FALSE;
+    upload_thread_control.total_active_upload_threads--;
+    sem_post(&(upload_thread_control.upload_op_sem));
+    sem_post(&(upload_thread_control.upload_queue_sem));
+   }
 
   return;
  }

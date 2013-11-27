@@ -508,7 +508,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
         unlink(thisblockpath);
         sem_wait(&(hcfs_system->access_sem));
         hcfs_system->systemdata.cache_size -= cache_block_size;
-        hcfs_system->systemdata.cache_block -=1;
+        hcfs_system->systemdata.cache_blocks -=1;
         sem_post(&(hcfs_system->access_sem));           
        }
      }

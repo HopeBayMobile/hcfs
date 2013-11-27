@@ -493,6 +493,9 @@ int decrease_nlink_inode_file(ino_t this_inode)
     super_inode_reclaim();
     unlink(thismetapath);
 
+    /*TODO: to queue blocks for deletion in backends, should scan block status
+    to find out what blocks are stored in backends or being moved to backends.*/
+
     /*Need to delete blocks as well*/
     /*TODO: queue blocks for deletion in backends*/
     if (this_meta.thisstat.st_size == 0)

@@ -12,7 +12,6 @@ Any new entry will be appended to the tail. Any deletion will be popped from hea
 /*TODO: use a pipe to communicate between FUSE process and datasync process */
 /*TODO: In datasync process, will need to first fork a thread to handle reading of the deletion pipe and put it in the to-delete pages*/
 /*TODO: There should be one deletion pipe write semaphre in FUSE process and one to-delete page access semaphore in the datasync process*/
-/*TODO: before actually moving the inode from to_be_deleted to deleted, must first check the upload threads and sync threads to find out if there are any pending uploads. It must wait until those are cleared. It must then wait for any additional pending meta or block deletion for this inode to finish.*/
 
 typedef struct {
     char obj_type;

@@ -7,14 +7,17 @@
 #include <time.h>
 #include <math.h>
 #include <sys/statvfs.h>
+#include "hcfscurl.h"
+#include "hcfs_tocloud.h"
+
 
 /* TODO: Need to go over the access rights problem for the ops */
 /*TODO: Need to invalidate cache entry if rename/deleted */
 /*TODO: Need to revisit the error handling in all operations */
+/*TODO: Will need to implement rollback or error marking when ops failed*/
 /*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
 /*TODO: Should handle updating number of blocks and other uncovered info in an inode*/
 
-/*TODO: Mod ops to correctly change system size and cache size*/
 /*TODO: Will need to fix the cache size prob if a cache entry is opened for writing and then deleted before the opened entry is closed*/
 
 
@@ -110,6 +113,8 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   if (ret_val < 0)
    return -EACCES;
 
+  super_inode_mark_dirty(self_inode);
+
   return 0;
  }
 static int hfuse_mkdir(const char *path, mode_t mode)
@@ -195,6 +200,8 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   ret_val = dir_add_entry(parent_inode, self_inode, selfname,self_mode);
   if (ret_val < 0)
    return -EACCES;
+
+  super_inode_mark_dirty(self_inode);
 
   return 0;
  }
@@ -293,10 +300,14 @@ int hfuse_rmdir(const char *path)
     return -EACCES;
    }
 
+  /*Need to delete the inode*/
+  /*TODO: queue inode as to delete. Now will jump to delete*/
+  /*TODO: Schedule backend meta object for deletion*/
+
+  unlink(thismetapath);
   ftruncate(fileno(metafptr),0);
   super_inode_delete(this_inode);
   super_inode_reclaim();
-  unlink(thismetapath);
 
   flock(fileno(metafptr),LOCK_UN);
   fclose(metafptr);
@@ -501,6 +512,7 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
 
 int hfuse_truncate(const char *path, off_t offset)
  {
+/*TODO: If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_NONE or others*/
   return 0;
  }
 int hfuse_open(const char *path, struct fuse_file_info *file_info)
@@ -871,8 +883,12 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
             sem_post(&(hcfs_system->access_sem));           
             break;
         case ST_LDISK:
+            break;
         case ST_BOTH:
         case ST_LtoC:
+            (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
+            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
+            fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
             break;
         case ST_CLOUD:
         case ST_CtoL:        
@@ -906,7 +922,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
               if (stat(thisblockpath,&tempstat)==0)
                {
-                (fh_ptr->cached_page).block_entries[entry_index].status = ST_BOTH;
+                (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
                 fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
                 fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
@@ -1084,6 +1100,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   struct stat tempstat;
 
 /*TODO: Need to include symlinks*/
+/*TODO: Will need to test the boundary of the operation. When will buf run out of space?*/
   fprintf(stderr,"DEBUG readdir entering readdir\n");
 
   this_inode = lookup_pathname(path);

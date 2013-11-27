@@ -480,7 +480,8 @@ ino_t super_inode_new_inode(struct stat *in_stat)
   /*Update the new super inode entry*/
   memset(&tempentry,0,sizeof(SUPER_INODE_ENTRY));
   tempentry.this_index = this_inode;
-  ll_enqueue(this_inode,IS_DIRTY,&tempentry);
+//  ll_enqueue(this_inode,IS_DIRTY,&tempentry); /*Don't do it here to prevent premature meta upload
+
   memcpy(&tempstat,in_stat,sizeof(struct stat));
   tempstat.st_ino = this_inode;
   memcpy(&(tempentry.inode_stat),&tempstat,sizeof(struct stat));
