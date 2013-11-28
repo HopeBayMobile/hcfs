@@ -15,6 +15,7 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
     sem_wait(&download_curl_sem);
     fseek(fptr,0,SEEK_SET);
     ftruncate(fileno(fptr),0);
+    sem_wait(&download_curl_control_sem);
     for(which_curl_handle=0;which_curl_handle<MAX_DOWNLOAD_CURL_HANDLE;which_curl_handle++)
      {
       if (curl_handle_mask[which_curl_handle] == FALSE)
@@ -23,12 +24,17 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
         break;
        }
      }
+    sem_post(&download_curl_control_sem);
     printf("Debug: downloading using curl handle %d\n",which_curl_handle);
     sprintf(idname,"download_thread_%d",which_curl_handle);
     strcpy(download_curl_handles[which_curl_handle].id,idname);
     status=hcfs_swift_get_object(fptr,objname,&(download_curl_handles[which_curl_handle]));
+
+    sem_wait(&download_curl_control_sem);
     curl_handle_mask[which_curl_handle] = FALSE;
     sem_post(&download_curl_sem);
+    sem_post(&download_curl_control_sem);
+
     if ((status< 200) || (status > 299))
      {
       while ((status< 200) || (status > 299))

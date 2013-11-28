@@ -20,6 +20,7 @@ char swift_url_string[1024];
 
 CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
 short curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
+sem_t download_curl_control_sem;
 sem_t download_curl_sem;
 
 int hcfs_get_auth_swift(char *swift_user,char *swift_pass, char *swift_url, CURL_HANDLE *curl_handle);

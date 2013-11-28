@@ -31,8 +31,13 @@ void run_cache_loop()
 
     for(count = 1;count<=sys_super_inode->head.num_total_inodes;count++)
      {
-      while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
+      if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
+       break;
+
+      for(count2=0;count2<30;count2++)
        {
+        if (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT)
+         break;
         sleep(1);
        }
       this_inode = count;
@@ -40,6 +45,10 @@ void run_cache_loop()
 
 
       /* If inode is not dirty or in transit, or if cache is already full, check if can replace uploaded blocks */
+
+/*TODO: Need to consider last access time and download time to prevent downloaded blocks being
+thrown out immediately*/
+/*TODO: if hard limit not reached, perhaps should not throw out blocks so aggressively and can sleep for a while*/
       if (((tempentry.inode_stat.st_ino>0) && (tempentry.inode_stat.st_mode & S_IFREG)) 
              && (((tempentry.status != IS_DIRTY) && (tempentry.in_transit == FALSE)) || (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT)))
        {

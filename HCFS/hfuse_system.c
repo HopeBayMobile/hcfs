@@ -72,7 +72,7 @@ void init_hfuse()
     memset(&this_meta,0,sizeof(DIR_META_TYPE));
     memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
 
-    self_mode = S_IFDIR | 0755;
+    self_mode = S_IFDIR | 0777;
     this_stat.st_mode = self_mode;
     this_stat.st_nlink = 2;   /*One pointed by the parent, another by self*/
     this_stat.st_uid = getuid();
@@ -169,6 +169,7 @@ int main(int argc, char **argv)
     dup2(fileno(logfptr),fileno(stderr));
 //    close(delete_pipe[0]);   /* FUSE process only write to-deletes to the pipe */
     sem_init(&download_curl_sem,0,MAX_DOWNLOAD_CURL_HANDLE);
+    sem_init(&download_curl_control_sem,0,1);
 //    sem_init(&delete_enqueue_sem,0,1);
 
     for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)

@@ -72,7 +72,7 @@ void init_hfuse()
     memset(&this_meta,0,sizeof(DIR_META_TYPE));
     memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
 
-    self_mode = S_IFDIR | 0755;
+    self_mode = S_IFDIR | 0777;
     this_stat.st_mode = self_mode;
     this_stat.st_nlink = 2;   /*One pointed by the parent, another by self*/
     this_stat.st_uid = getuid();
@@ -117,8 +117,19 @@ int main(int argc, char **argv)
   
   sprintf(curl_handle.id,"main");
   ret_val = hcfs_init_swift_backend(&curl_handle);
+  if ((ret_val < 200) || (ret_val > 299))
+   {
+    printf("error in connecting to swift\n");
+    exit(0);
+   }
+
   printf("%s\n %s\n %d\n",swift_auth_string,swift_url_string,ret_val);
   ret_val = hcfs_swift_list_container(&curl_handle);
+  if ((ret_val < 200) || (ret_val > 299))
+   {
+    printf("error in connecting to swift\n");
+    exit(0);
+   }
   printf("ret code %d\n",ret_val);
   hcfs_destroy_swift_backend(curl_handle.curl);
   init_hfuse();

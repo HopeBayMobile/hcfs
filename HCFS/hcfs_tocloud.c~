@@ -264,6 +264,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
       fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
 
       block_status = temppage.block_entries[current_entry_index].status;
+      /*TODO: If going to upload the block, check if it is scheduled for deletion already. If so, need to cancel the scheduled deletion. Perhaps can check this fast by adding another flag in block entry*/
 
       if ((block_status == ST_LDISK) || (block_status == ST_LtoC))
        {
