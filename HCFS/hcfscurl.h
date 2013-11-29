@@ -36,3 +36,13 @@ void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);
 
+typedef struct {
+    ino_t this_inode;
+    long block_no;
+    long page_start_fpos;
+    int entry_index;
+  } PREFETCH_STRUCT_TYPE;
+
+pthread_attr_t prefetch_thread_attr;
+void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
+

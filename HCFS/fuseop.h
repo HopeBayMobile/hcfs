@@ -87,7 +87,7 @@ typedef struct {
     FILE *blockfptr;
     long opened_block;
     FILE_META_TYPE cached_meta;
-    BLOCK_ENTRY_PAGE cached_page;
+//    BLOCK_ENTRY_PAGE cached_page;
     long cached_page_index;
     long cached_page_start_fpos;
     sem_t block_sem;
@@ -107,7 +107,7 @@ int init_system_fh_table();
 long open_fh(ino_t thisinode);
 int close_fh(long index);
 int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page);
-void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index); /*In advance block, need to write back dirty page if change page */
+long advance_block(FILE *fptr, long thisfilepos,long *entry_index); /*In advance block, need to write back dirty page if change page */
 
 /*END definition of file handle */
 

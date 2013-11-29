@@ -241,7 +241,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
      {
       flock(fileno(metafptr),LOCK_EX);
 
-      if (!access(thismetapath,F_OK)) /*Perhaps the file is deleted already*/
+      if (access(thismetapath,F_OK)<0) /*Perhaps the file is deleted already*/
        {
         flock(fileno(metafptr),LOCK_UN);
         break;

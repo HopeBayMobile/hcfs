@@ -551,9 +551,13 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
   size_t size;
   char fill_zeros;
   struct stat tempstat;
+  PREFETCH_STRUCT_TYPE *temp_prefetch;
+  pthread_t prefetch_thread;
+  long this_page_fpos;
 
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
+/*TODO: Fixme: cached page pointer and file offset may be changed during the operation, so cannot be used as a reliable source for seeking and read/write meta */
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
 
@@ -581,9 +585,10 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
   start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
   end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
+
+  flockfile(fh_ptr-> metafptr);
   if (fh_ptr->cached_page_index != start_page)
    {
-    flockfile(fh_ptr-> metafptr);
     flock(fileno(fh_ptr-> metafptr),LOCK_EX);
     fseek(fh_ptr->metafptr,0,SEEK_SET);
     fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
@@ -591,15 +596,16 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
     if (fh_ptr->cached_page_index != start_page)  /*Check if other threads have already done the work*/
      seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
     flock(fileno(fh_ptr->metafptr),LOCK_UN);
-    funlockfile(fh_ptr->metafptr);
    }
+  this_page_fpos = fh_ptr->cached_page_start_fpos;
+  funlockfile(fh_ptr->metafptr);
 
   entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
   for(block_index = start_block; block_index <= end_block; block_index++)
    {
     sem_wait(&(fh_ptr->block_sem));
-    if (fh_ptr->opened_block != block_index)
+    while (fh_ptr->opened_block != block_index)
      {
       if (fh_ptr->opened_block != -1)
        {
@@ -608,12 +614,12 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
        }
 
       flockfile(fh_ptr->metafptr);
-      fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-      fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+      fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+      fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
       funlockfile(fh_ptr->metafptr);
 
-      while (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
-             ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+      while (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
+             ((temppage).block_entries[entry_index].status == ST_CtoL))
        {
         if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
          {
@@ -623,16 +629,30 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
           sem_wait(&(fh_ptr->block_sem));
           /*Re-read status*/
           flockfile(fh_ptr->metafptr);
-          fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-          fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+          fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+          fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
           funlockfile(fh_ptr->metafptr);
          }
         else
          break;
        }
 
+      if ((entry_index+1) < MAX_BLOCK_ENTRIES_PER_PAGE)
+       {
+        if (((temppage).block_entries[entry_index+1].status == ST_CLOUD) || 
+            ((temppage).block_entries[entry_index+1].status == ST_CtoL))
+         {
+          temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
+          temp_prefetch -> this_inode = (fh_ptr->cached_meta).thisstat.st_ino;
+          temp_prefetch -> block_no = block_index + 1;
+          temp_prefetch -> page_start_fpos = this_page_fpos;
+          temp_prefetch -> entry_index = entry_index + 1;
+          pthread_create(&(prefetch_thread),&prefetch_thread_attr,(void *)&prefetch_block, ((void *)temp_prefetch));
+         }
+       }
+          
 
-      switch((fh_ptr->cached_page).block_entries[entry_index].status)
+      switch((temppage).block_entries[entry_index].status)
        {
         case ST_NONE: 
             fill_zeros = TRUE;
@@ -653,29 +673,29 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
             flock(fileno(fh_ptr->blockfptr),LOCK_EX);
             flockfile(fh_ptr->metafptr);
             flock(fileno(fh_ptr->metafptr),LOCK_EX);
-            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-            fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
-            if (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
-                ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+            fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+            fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
+                ((temppage).block_entries[entry_index].status == ST_CtoL))
              {
-              if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD)
+              if ((temppage).block_entries[entry_index].status == ST_CLOUD)
                {
-                (fh_ptr->cached_page).block_entries[entry_index].status = ST_CtoL;
-                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                (temppage).block_entries[entry_index].status = ST_CtoL;
+                fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+                fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
                }
               flock(fileno(fh_ptr->metafptr),LOCK_UN);
               fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
               /*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
               flock(fileno(fh_ptr->metafptr),LOCK_EX);
-              fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-              fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+              fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+              fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
               if (stat(thisblockpath,&tempstat)==0)
                {
-                (fh_ptr->cached_page).block_entries[entry_index].status = ST_BOTH;
-                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                (temppage).block_entries[entry_index].status = ST_BOTH;
+                fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+                fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
 
                 sem_wait(&(hcfs_system->access_sem));
@@ -700,8 +720,16 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
         fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
 
         fh_ptr->blockfptr=fopen(thisblockpath,"r+");
-        setbuf(fh_ptr->blockfptr,NULL);
-        fh_ptr->opened_block = block_index;
+        if (fh_ptr->blockfptr != NULL)
+         {
+          setbuf(fh_ptr->blockfptr,NULL);
+          fh_ptr->opened_block = block_index;
+         }
+        else  /*Some exception that block file is deleted in the middle of the status check*/
+         {
+          printf("Debug read: cannot open block file. Perhaps replaced?\n");
+          fh_ptr->opened_block = -1;
+         }
        }
      }
 
@@ -745,7 +773,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
        {
         flockfile(fh_ptr-> metafptr);
         flock(fileno(fh_ptr-> metafptr),LOCK_EX);
-        advance_block(fh_ptr-> metafptr,fh_ptr,&entry_index);
+        this_page_fpos = advance_block(fh_ptr-> metafptr,this_page_fpos,&entry_index);
         flock(fileno(fh_ptr-> metafptr),LOCK_UN);
         funlockfile(fh_ptr-> metafptr);
        }
@@ -796,6 +824,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   int target_bytes_written;
   long old_cache_size, new_cache_size;
   struct stat tempstat;
+  long this_page_fpos;
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
 
@@ -828,6 +857,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   if (fh_ptr->cached_page_index != start_page)
    seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
 
+  this_page_fpos = fh_ptr->cached_page_start_fpos;
+
   entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
   for(block_index = start_block; block_index <= end_block; block_index++)
@@ -844,11 +875,11 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
         fclose(fh_ptr->blockfptr);
         fh_ptr->opened_block = -1;
        }
-      fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-      fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+      fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+      fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
 
-      while (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
-             ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+      while (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
+             ((temppage).block_entries[entry_index].status == ST_CtoL))
        {
         if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
          {
@@ -863,23 +894,23 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
           sem_wait(&(fh_ptr->block_sem));
           fseek(fh_ptr->metafptr,0,SEEK_SET);
           fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
-          fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-          fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+          fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+          fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
          }
         else
          break;
        }
 
 
-      switch((fh_ptr->cached_page).block_entries[entry_index].status)
+      switch((temppage).block_entries[entry_index].status)
        {
         case ST_NONE:
              /*If not stored anywhere, make it on local disk*/
             fh_ptr->blockfptr=fopen(thisblockpath,"a+");
             fclose(fh_ptr->blockfptr);
-            (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
-            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-            fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            (temppage).block_entries[entry_index].status = ST_LDISK;
+            fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+            fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
             sem_wait(&(hcfs_system->access_sem));
             hcfs_system->systemdata.cache_blocks++;
             sync_hcfs_system_data(FALSE);
@@ -889,9 +920,9 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
             break;
         case ST_BOTH:
         case ST_LtoC:
-            (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
-            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-            fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            (temppage).block_entries[entry_index].status = ST_LDISK;
+            fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+            fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
             break;
         case ST_CLOUD:
         case ST_CtoL:        
@@ -902,16 +933,16 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
             fh_ptr->blockfptr = fopen(thisblockpath,"r+");
             setbuf(fh_ptr->blockfptr,NULL);
             flock(fileno(fh_ptr->blockfptr),LOCK_EX);
-            fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-            fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
-            if (((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD) ||
-                ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CtoL))
+            fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+            fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+            if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
+                ((temppage).block_entries[entry_index].status == ST_CtoL))
              {
-              if ((fh_ptr->cached_page).block_entries[entry_index].status == ST_CLOUD)
+              if ((temppage).block_entries[entry_index].status == ST_CLOUD)
                {
-                (fh_ptr->cached_page).block_entries[entry_index].status = ST_CtoL;
-                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                (temppage).block_entries[entry_index].status = ST_CtoL;
+                fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+                fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
                }
               flock(fileno(fh_ptr-> metafptr),LOCK_UN);
@@ -920,14 +951,14 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
               /*Re-read status*/
               flock(fileno(fh_ptr-> metafptr),LOCK_EX);
-              fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-              fread(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+              fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+              fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
 
               if (stat(thisblockpath,&tempstat)==0)
                {
-                (fh_ptr->cached_page).block_entries[entry_index].status = ST_LDISK;
-                fseek(fh_ptr->metafptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-                fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
+                (temppage).block_entries[entry_index].status = ST_LDISK;
+                fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
+                fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
 
                 sem_wait(&(hcfs_system->access_sem));
@@ -987,7 +1018,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
      break;
 
     if (block_index < end_block)  /*If this is not the last block, need to advance one more*/
-     advance_block(fh_ptr-> metafptr,fh_ptr,&entry_index);
+     this_page_fpos=advance_block(fh_ptr-> metafptr,this_page_fpos,&entry_index);
    }
 
   /*Update and flush file meta*/
@@ -1167,6 +1198,8 @@ int hfuse_releasedir(const char *path, struct fuse_file_info *file_info)
  }
 void* hfuse_init(struct fuse_conn_info *conn)
  {
+  pthread_attr_init(&prefetch_thread_attr);
+  pthread_attr_setdetachstate(&prefetch_thread_attr,PTHREAD_CREATE_DETACHED);
   return ((void*) sys_super_inode);
  }
 void hfuse_destroy(void *private_data)

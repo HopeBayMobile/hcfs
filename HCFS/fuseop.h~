@@ -87,7 +87,7 @@ typedef struct {
     FILE *blockfptr;
     long opened_block;
     FILE_META_TYPE cached_meta;
-    BLOCK_ENTRY_PAGE cached_page;
+//    BLOCK_ENTRY_PAGE cached_page;
     long cached_page_index;
     long cached_page_start_fpos;
     sem_t block_sem;
@@ -129,6 +129,8 @@ typedef struct {
   } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;
+
+FILE *logfptr;
 
 int init_hcfs_system_data();
 int sync_hcfs_system_data(char need_lock);

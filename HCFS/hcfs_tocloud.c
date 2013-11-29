@@ -8,6 +8,7 @@ TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim
 TODO: If deleting a block, first check if the meta is there then check if the blocks are reused by checking the length of meta
 TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
 TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
+TODO: Will need to check mod time of meta file and not upload meta for every block status change.
 */
 
 #include "hcfs_tocloud.h"

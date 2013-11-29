@@ -20,6 +20,7 @@ char swift_url_string[1024];
 
 CURL_HANDLE download_curl_handles[MAX_DOWNLOAD_CURL_HANDLE];
 short curl_handle_mask[MAX_DOWNLOAD_CURL_HANDLE];
+sem_t download_curl_control_sem;
 sem_t download_curl_sem;
 
 int hcfs_get_auth_swift(char *swift_user,char *swift_pass, char *swift_url, CURL_HANDLE *curl_handle);
@@ -34,4 +35,13 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);
+
+typedef struct {
+    ino_t this_inode;
+    long block_no;
+    long page_start_fpos;
+    int entry_index;
+  } PREFETCH_STRUCT_TYPE;
+
+void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
 

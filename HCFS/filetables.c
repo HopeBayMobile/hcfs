@@ -144,7 +144,7 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page)
   return 0;
  }
 
-void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index)
+long advance_block(FILE *fptr, long thisfilepos,long *entry_index)
  {
   long temp_index;
   long nextfilepos;
@@ -156,27 +156,27 @@ void advance_block(FILE *fptr, FH_ENTRY *fh_ptr,long *entry_index)
    {
     temp_index++;
     *entry_index = temp_index;
-    return;
+    return thisfilepos;
    }
 
   /*We need to change to another page*/
 
-  nextfilepos = fh_ptr->cached_page.next_page;
+  fseek(fptr,thisfilepos,SEEK_SET);
+  fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+  nextfilepos = temppage.next_page;
 
   if (nextfilepos == 0)   /*Need to allocate a new page*/
    {
     fseek(fptr,0,SEEK_END);
     nextfilepos = ftell(fptr);
-    fh_ptr->cached_page.next_page = nextfilepos;
-    fseek(fptr, fh_ptr->cached_page_start_fpos,SEEK_SET);
-    fwrite(&(fh_ptr->cached_page),sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+    temppage.next_page = nextfilepos;
+    fseek(fptr, thisfilepos,SEEK_SET);
+    fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fptr);
     fseek(fptr,nextfilepos,SEEK_SET);
     memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
     fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
    }
 
-  fh_ptr->cached_page_index++;
-  fh_ptr->cached_page_start_fpos = nextfilepos;
   *entry_index = 0;
-  return;
+  return nextfilepos;
  }
