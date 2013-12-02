@@ -104,7 +104,8 @@ thrown out immediately*/
             sem_post(&(hcfs_system->access_sem));           
             super_inode_mark_dirty(this_inode);
            }
-          if (hcfs_system->systemdata.cache_size < CACHE_HARD_LIMIT)
+/*Adding a delta threshold to avoid thrashing at hard limit boundary*/
+          if (hcfs_system->systemdata.cache_size < (CACHE_HARD_LIMIT - CACHE_DELTA))
            notify_sleep_on_cache();
           if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
            break;

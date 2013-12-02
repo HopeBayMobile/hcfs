@@ -10,6 +10,7 @@
 
 #define CACHE_SOFT_LIMIT (1024*1024*200)  /*200MB soft cache limit*/
 #define CACHE_HARD_LIMIT (1024*1024*300)
+#define CACHE_DELTA 10485760
 
 #define MAX_BLOCK_SIZE 2097152
 

@@ -189,23 +189,23 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
   return -1;
  }
 
-int hcfs_swift_reauth()
+int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
  {
   char account_user_string[1000];
   int ret_code;
-  CURL *curl;
 
-  curl = curl_easy_init();
+  if (curl_handle->curl != NULL)
+   hcfs_destroy_swift_backend(curl_handle->curl);
 
-  if (curl)
+  curl_handle->curl = curl_easy_init();
+
+  if (curl_handle->curl)
    {
     //struct curl_slist *chunk=NULL;
 
     sprintf(account_user_string,"%s:%s",MY_ACCOUNT,MY_USER);
 
-    ret_code = hcfs_get_auth_swift(account_user_string, MY_PASS, MY_URL, curl);
-
-    hcfs_destroy_swift_backend(curl);
+    ret_code = hcfs_get_auth_swift(account_user_string, MY_PASS, MY_URL, curl_handle);
 
     return ret_code;
    }

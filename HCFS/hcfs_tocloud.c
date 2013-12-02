@@ -400,7 +400,7 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
   ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
   while ((ret_val < 200) || (ret_val > 299))
    {
-    ret_val = hcfs_swift_reauth();
+    ret_val = hcfs_swift_reauth(curl_handle);
     if ((ret_val >= 200) && (ret_val <=299))
      {
       fseek(fptr,0,SEEK_SET);
@@ -424,7 +424,7 @@ void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
   ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
   while ((ret_val < 200) || (ret_val > 299))
    {
-    ret_val = hcfs_swift_reauth();
+    ret_val = hcfs_swift_reauth(curl_handle);
     if ((ret_val >= 200) && (ret_val <=299))
      {
       fseek(fptr,0,SEEK_SET);

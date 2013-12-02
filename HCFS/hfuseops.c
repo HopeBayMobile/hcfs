@@ -65,6 +65,7 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   mode_t self_mode;
   FILE *metafptr;
   int ret_val;
+  struct fuse_context *temp_context;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
@@ -77,6 +78,7 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 
   memset(&this_stat,0,sizeof(struct stat));
   memset(&this_meta,0,sizeof(FILE_META_TYPE));
+  temp_context = fuse_get_context();
 
   self_mode = mode | S_IFREG;
   this_stat.st_mode = self_mode;
@@ -85,8 +87,8 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   this_stat.st_blocks = 0;
   this_stat.st_dev = dev;
   this_stat.st_nlink = 1;
-  this_stat.st_uid = getuid();
-  this_stat.st_gid = getgid();
+  this_stat.st_uid = temp_context->uid; /*Use the uid and gid of the fuse caller*/
+  this_stat.st_gid = temp_context->gid;
   this_stat.st_atime = time(NULL);
   this_stat.st_mtime = this_stat.st_atime;
   this_stat.st_ctime = this_stat.st_ctime;
@@ -129,6 +131,7 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   mode_t self_mode;
   FILE *metafptr;
   int ret_val;
+  struct fuse_context *temp_context;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
@@ -142,12 +145,14 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   memset(&this_stat,0,sizeof(struct stat));
   memset(&this_meta,0,sizeof(DIR_META_TYPE));
   memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
+  temp_context = fuse_get_context();
 
   self_mode = mode | S_IFDIR;
   this_stat.st_mode = self_mode;
   this_stat.st_nlink = 2;   /*One pointed by the parent, another by self*/
-  this_stat.st_uid = getuid();
-  this_stat.st_gid = getgid();
+  this_stat.st_uid = temp_context->uid;   /*Use the uid and gid of the fuse caller*/
+  this_stat.st_gid = temp_context->gid;
+
   this_stat.st_atime = time(NULL);
   this_stat.st_mtime = this_stat.st_atime;
   this_stat.st_ctime = this_stat.st_ctime;
@@ -429,7 +434,7 @@ int hfuse_chmod(const char *path, mode_t mode)
     if (tempentry.inode_stat.st_mode & S_IFDIR)
      {
       fread(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      tempfilemeta.thisstat.st_mode = mode;
+      tempdirmeta.thisstat.st_mode = mode;
       tempdirmeta.thisstat.st_ctime = time(NULL);
       fseek(fptr,0,SEEK_SET);
       fwrite(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
@@ -1261,8 +1266,8 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
     if (tempentry.inode_stat.st_mode & S_IFDIR)
      {
       fread(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      tempfilemeta.thisstat.st_atime = (time_t)(tv[0].tv_sec);
-      tempfilemeta.thisstat.st_mtime = (time_t)(tv[1].tv_sec);
+      tempdirmeta.thisstat.st_atime = (time_t)(tv[0].tv_sec);
+      tempdirmeta.thisstat.st_mtime = (time_t)(tv[1].tv_sec);
       fseek(fptr,0,SEEK_SET);
       fwrite(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
       memcpy(&(tempentry.inode_stat),&(tempdirmeta.thisstat),sizeof(struct stat));

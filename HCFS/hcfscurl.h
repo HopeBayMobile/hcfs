@@ -29,7 +29,7 @@ void hcfs_destroy_swift_backend(CURL *curl);
 int hcfs_swift_list_container(CURL_HANDLE *curl_handle);
 int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
-int hcfs_swift_reauth();
+int hcfs_swift_reauth(CURL_HANDLE *curl_handle);
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
 void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);

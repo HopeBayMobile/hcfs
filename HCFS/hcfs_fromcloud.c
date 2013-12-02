@@ -30,19 +30,25 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
     strcpy(download_curl_handles[which_curl_handle].id,idname);
     status=hcfs_swift_get_object(fptr,objname,&(download_curl_handles[which_curl_handle]));
 
-    sem_wait(&download_curl_control_sem);
-    curl_handle_mask[which_curl_handle] = FALSE;
-    sem_post(&download_curl_sem);
-    sem_post(&download_curl_control_sem);
-
     if ((status< 200) || (status > 299))
      {
       while ((status< 200) || (status > 299))
-        status = hcfs_swift_reauth();
+        status = hcfs_swift_reauth(&(download_curl_handles[which_curl_handle]));
       printf("Reauth\n");
+
+      sem_wait(&download_curl_control_sem);
+      curl_handle_mask[which_curl_handle] = FALSE;
+      sem_post(&download_curl_sem);
+      sem_post(&download_curl_control_sem);
      }
     else
-     break;
+     {
+      sem_wait(&download_curl_control_sem);
+      curl_handle_mask[which_curl_handle] = FALSE;
+      sem_post(&download_curl_sem);
+      sem_post(&download_curl_control_sem);
+      break;
+     }
    }
 
   fflush(fptr);
