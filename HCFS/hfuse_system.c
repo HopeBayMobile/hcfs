@@ -7,6 +7,8 @@
 #include <fuse.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 
 int init_hcfs_system_data()
@@ -114,7 +116,12 @@ int main(int argc, char **argv)
   int ret_val;
   pid_t this_pid, this_pid1;
   int download_handle_count;
+  struct rlimit nofile_limit;
+
+  nofile_limit.rlim_cur = 100000;
+  nofile_limit.rlim_max = 100001;
   
+  ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
   sprintf(curl_handle.id,"main");
   ret_val = hcfs_init_swift_backend(&curl_handle);
   if ((ret_val < 200) || (ret_val > 299))
