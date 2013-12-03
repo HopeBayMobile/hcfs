@@ -9,6 +9,7 @@ TODO: If deleting a block, first check if the meta is there then check if the bl
 TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
 TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
 TODO: Will need to check mod time of meta file and not upload meta for every block status change.
+TODO: If block status is ST_TODELETE, will need to run swift delete object function
 */
 
 #include "hcfs_tocloud.h"
@@ -70,6 +71,7 @@ void collect_finished_upload_threads(void *ptr)
   long page_entry_index;
   BLOCK_ENTRY_PAGE temppage;
   struct timespec time_to_sleep;
+  char is_delete;
 
   time_to_sleep.tv_sec = 0;
   time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -93,6 +95,7 @@ void collect_finished_upload_threads(void *ptr)
         if (ret_val == 0)
          {
           this_inode = upload_thread_control.upload_threads[count].inode;
+          is_delete = upload_thread_control.upload_threads[count].is_delete;
           page_filepos = upload_thread_control.upload_threads[count].page_filepos;
           page_entry_index = upload_thread_control.upload_threads[count].page_entry_index;
           fetch_meta_path(thismetapath,this_inode);
@@ -108,11 +111,20 @@ void collect_finished_upload_threads(void *ptr)
                {
                 fseek(metafptr,page_filepos,SEEK_SET);
                 fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
-                if (temppage.block_entries[page_entry_index].status==ST_LtoC)
+                if ((temppage.block_entries[page_entry_index].status==ST_LtoC) && (is_delete == FALSE))
                  {
                   temppage.block_entries[page_entry_index].status=ST_BOTH;
                   fseek(metafptr,page_filepos,SEEK_SET);
                   fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+                 }
+                else
+                 {
+                  if ((temppage.block_entries[page_entry_index].status==ST_TODELETE) && (is_delete == TRUE))
+                   {
+                    temppage.block_entries[page_entry_index].status=ST_NONE;
+                    fseek(metafptr,page_filepos,SEEK_SET);
+                    fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+                   }
                  }
                 /*TODO: Check if status is ST_NONE. If so, the block is removed due to truncating. Need to schedule block for deletion due to truncating*/
                }
@@ -202,6 +214,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   long count, block_count;
   unsigned char block_status;
   char upload_done;
+  int ret_val;
   struct timespec time_to_sleep;
 
   time_to_sleep.tv_sec = 0;
@@ -238,7 +251,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
     flock(fileno(metafptr),LOCK_UN);
 
-    for(block_count=0;block_count<total_blocks;block_count++)
+    for(block_count=0;;block_count++)
      {
       flock(fileno(metafptr),LOCK_EX);
 
@@ -262,12 +275,24 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 /*TODO: error handling here if cannot read correctly*/
 
       fseek(metafptr,page_pos,SEEK_SET);
-      fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+      if (ftell(metafptr)!=page_pos)
+       {
+        flock(fileno(metafptr),LOCK_UN);
+        break;
+       }
+
+      ret_val = fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+      if (ret_val < 1)
+       {
+        flock(fileno(metafptr),LOCK_UN);
+        break;
+       }
+
 
       block_status = temppage.block_entries[current_entry_index].status;
       /*TODO: If going to upload the block, check if it is scheduled for deletion already. If so, need to cancel the scheduled deletion. Perhaps can check this fast by adding another flag in block entry*/
 
-      if ((block_status == ST_LDISK) || (block_status == ST_LtoC))
+      if (((block_status == ST_LDISK) || (block_status == ST_LtoC)) && (block_count < total_blocks))
        {
         if (block_status == ST_LDISK)
          {
@@ -286,6 +311,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
             upload_thread_control.upload_threads_in_use[count] = TRUE;
             upload_thread_control.upload_threads_created[count] = FALSE;
             upload_thread_control.upload_threads[count].is_block = TRUE;
+            upload_thread_control.upload_threads[count].is_delete = FALSE;
             upload_thread_control.upload_threads[count].inode = ptr->inode;
             upload_thread_control.upload_threads[count].blockno = block_count;
             upload_thread_control.upload_threads[count].page_filepos = page_pos;
@@ -301,8 +327,38 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
         dispatch_upload_block(which_curl); /*Maybe should also first copy block out first*/
        }
       else
-       flock(fileno(metafptr),LOCK_UN);
+       {
+        if (block_status == ST_TODELETE)
+         {
+          flock(fileno(metafptr),LOCK_UN);
+          sem_wait(&(upload_thread_control.upload_queue_sem));
+          sem_wait(&(upload_thread_control.upload_op_sem));
+          which_curl = -1;
+          for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
+           {
+            if (upload_thread_control.upload_threads_in_use[count] == FALSE)
+             {
+              upload_thread_control.upload_threads_in_use[count] = TRUE;
+              upload_thread_control.upload_threads_created[count] = FALSE;
+              upload_thread_control.upload_threads[count].is_block = TRUE;
+              upload_thread_control.upload_threads[count].is_delete = TRUE;
+              upload_thread_control.upload_threads[count].inode = ptr->inode;
+              upload_thread_control.upload_threads[count].blockno = block_count;
+              upload_thread_control.upload_threads[count].page_filepos = page_pos;
+              upload_thread_control.upload_threads[count].page_entry_index = current_entry_index;
+              upload_thread_control.upload_threads[count].which_curl = count;
 
+              upload_thread_control.total_active_upload_threads++;
+              which_curl = count;
+              break;
+             }
+           }
+          sem_post(&(upload_thread_control.upload_op_sem));
+          dispatch_delete_block(which_curl); /*Maybe should also first copy block out first*/
+         }
+        else
+         flock(fileno(metafptr),LOCK_UN);
+       }
 
       current_entry_index++;
      }
@@ -340,6 +396,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
       upload_thread_control.upload_threads_in_use[count] = TRUE;
       upload_thread_control.upload_threads_created[count] = FALSE;
       upload_thread_control.upload_threads[count].is_block = FALSE;
+      upload_thread_control.upload_threads[count].is_delete = FALSE;
       upload_thread_control.upload_threads[count].inode = ptr->inode;
       upload_thread_control.upload_threads[count].which_curl = count;
       upload_thread_control.total_active_upload_threads++;
@@ -411,6 +468,28 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
   return;
  }
 
+void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle)
+ {
+  char objname[1000];
+  FILE *fptr;
+  int ret_val;
+ 
+  sprintf(objname,"data_%ld_%ld",this_inode,block_no);
+  printf("Debug delete object: objname %s, inode %ld, block %ld\n",objname,this_inode,block_no);
+  sprintf(curl_handle->id,"delete_blk_%ld_%ld",this_inode,block_no);
+  ret_val = hcfs_swift_delete_object(objname, curl_handle);
+  while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
+   {
+    ret_val = hcfs_swift_reauth(curl_handle);
+    if ((ret_val >= 200) && (ret_val <=299))
+     {
+      ret_val = hcfs_swift_delete_object(objname, curl_handle);
+     }
+   }
+  fclose(fptr);
+  return;
+ }
+
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
  {
   char objname[1000];
@@ -445,6 +524,16 @@ void con_object_sync(UPLOAD_THREAD_TYPE *upload_thread_ptr)
    do_meta_sync(upload_thread_ptr->inode, &(upload_curl_handles[which_curl]), upload_thread_ptr->tempfilename);
 
   unlink(upload_thread_ptr->tempfilename);
+  return;
+ }
+
+void delete_object_sync(UPLOAD_THREAD_TYPE *upload_thread_ptr)
+ {
+  int which_curl;
+  which_curl = upload_thread_ptr->which_curl;
+  if (upload_thread_ptr->is_block == TRUE)
+   do_block_delete(upload_thread_ptr->inode, upload_thread_ptr->blockno, &(upload_curl_handles[which_curl]));
+
   return;
  }
 
@@ -546,6 +635,20 @@ void dispatch_upload_block(int which_curl)
     sem_post(&(upload_thread_control.upload_op_sem));
     sem_post(&(upload_thread_control.upload_queue_sem));
    }
+
+  return;
+ }
+void dispatch_delete_block(int which_curl)
+ {
+  char tempfilename[400];
+  char thisblockpath[400];
+  char filebuf[4100];
+  int read_size;
+  int count;
+  FILE *fptr,*blockfptr;
+
+  pthread_create(&(upload_thread_control.upload_threads_no[which_curl]),NULL, (void *)&delete_object_sync,(void *)&(upload_thread_control.upload_threads[which_curl]));
+  upload_thread_control.upload_threads_created[which_curl]=TRUE;
 
   return;
  }

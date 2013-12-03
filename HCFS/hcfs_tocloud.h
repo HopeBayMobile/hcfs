@@ -11,6 +11,7 @@ typedef struct {
     ino_t inode;
     long blockno;
     char is_block;
+    char is_delete;
     int which_curl;
     char tempfilename[400];
  } UPLOAD_THREAD_TYPE;
@@ -53,7 +54,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr);
 void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
 void dispatch_upload_block(int which_curl);
+void dispatch_delete_block(int which_curl);
 void schedule_sync_meta(FILE *metafptr,int which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *upload_thread_ptr);
+void delete_object_sync(UPLOAD_THREAD_TYPE *upload_thread_ptr);
 void upload_loop();
 

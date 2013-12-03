@@ -12,13 +12,13 @@
 
 
 /* TODO: Need to go over the access rights problem for the ops */
-/*TODO: Need to invalidate cache entry if rename/deleted */
 /*TODO: Need to revisit the error handling in all operations */
 /*TODO: Will need to implement rollback or error marking when ops failed*/
 /*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
 /*TODO: Should handle updating number of blocks and other uncovered info in an inode*/
 
 /*TODO: Will need to fix the cache size prob if a cache entry is opened for writing and then deleted before the opened entry is closed*/
+/*TODO: A file-handle table manager that dynamically allocate extra block pointers and recycle them if not in use (but file not closed). Number of block pointers that can be allocated can be a variable of available process-wide opened files*/
 
 
 long check_file_size(const char *path)
@@ -517,7 +517,10 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
 
 int hfuse_truncate(const char *path, off_t offset)
  {
-/*TODO: If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_NONE or others*/
+/*TODO: If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_TODELETE (which will be changed to ST_NONE once object deleted)*/
+/*TODO: Add ST_TODELETE as a new block status. In truncate, if need to throw away a block, set the status to ST_TODELETE and upload process will handle the actual deletion.*/
+/*If need to truncate some block that's ST_CtoL or ST_CLOUD, download it first, mod it, then set to ST_LDISK*/
+
   return 0;
  }
 int hfuse_open(const char *path, struct fuse_file_info *file_info)
@@ -660,6 +663,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
       switch((temppage).block_entries[entry_index].status)
        {
         case ST_NONE: 
+        case ST_TODELETE:
             fill_zeros = TRUE;
             break;
         case ST_LDISK:
@@ -910,6 +914,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
       switch((temppage).block_entries[entry_index].status)
        {
         case ST_NONE:
+        case ST_TODELETE:
              /*If not stored anywhere, make it on local disk*/
             fh_ptr->blockfptr=fopen(thisblockpath,"a+");
             fclose(fh_ptr->blockfptr);

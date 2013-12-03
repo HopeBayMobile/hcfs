@@ -7,6 +7,8 @@
 #include <fuse.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 
 int init_hcfs_system_data()
@@ -114,7 +116,12 @@ int main(int argc, char **argv)
   int ret_val;
   pid_t this_pid, this_pid1;
   int download_handle_count;
+  struct rlimit nofile_limit;
+
+  nofile_limit.rlim_cur = 150000;
+  nofile_limit.rlim_max = 150001;
   
+  ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
   sprintf(curl_handle.id,"main");
   ret_val = hcfs_init_swift_backend(&curl_handle);
   if ((ret_val < 200) || (ret_val > 299))
@@ -169,6 +176,7 @@ int main(int argc, char **argv)
     dup2(fileno(logfptr),fileno(stderr));
 //    close(delete_pipe[0]);   /* FUSE process only write to-deletes to the pipe */
     sem_init(&download_curl_sem,0,MAX_DOWNLOAD_CURL_HANDLE);
+    sem_init(&download_curl_control_sem,0,1);
 //    sem_init(&delete_enqueue_sem,0,1);
 
     for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)

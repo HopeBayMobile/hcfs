@@ -118,8 +118,8 @@ int main(int argc, char **argv)
   int download_handle_count;
   struct rlimit nofile_limit;
 
-  nofile_limit.rlim_cur = 100000;
-  nofile_limit.rlim_max = 100001;
+  nofile_limit.rlim_cur = 150000;
+  nofile_limit.rlim_max = 150001;
   
   ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
   sprintf(curl_handle.id,"main");
@@ -174,10 +174,8 @@ int main(int argc, char **argv)
     printf("Redirecting to fuse log\n");
     dup2(fileno(logfptr),fileno(stdout));
     dup2(fileno(logfptr),fileno(stderr));
-//    close(delete_pipe[0]);   /* FUSE process only write to-deletes to the pipe */
     sem_init(&download_curl_sem,0,MAX_DOWNLOAD_CURL_HANDLE);
     sem_init(&download_curl_control_sem,0,1);
-//    sem_init(&delete_enqueue_sem,0,1);
 
     for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
      {
