@@ -107,6 +107,7 @@ void init_hfuse()
 
     ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
     fclose(metafptr);
+    super_inode_mark_dirty(1);
    }
   return;
  }

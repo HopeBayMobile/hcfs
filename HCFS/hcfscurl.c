@@ -58,10 +58,11 @@ int parse_list_header(FILE *fptr)
   int ret_val,retcodenum, total_objs;
 
   fseek(fptr,0,SEEK_SET);
-  ret_val = fscanf(fptr,"%s %s %s\n",httpcode,retcode,retstatus);
-  if (ret_val < 3)
+  ret_val = fscanf(fptr,"%s %s",httpcode,retcode);
+  if (ret_val < 2)
    return -1;
 
+  fgets(retstatus, 19, fptr);
   retcodenum=atoi(retcode);
 
   if ((retcodenum<200) || (retcodenum>299))

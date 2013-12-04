@@ -2,7 +2,6 @@
 #include "fuseop.h"
 #include "params.h"
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
-/*TODO: Consider whether to put changes to super_inode is_dirty here */
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode)
  {
@@ -96,6 +95,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
       flock(fileno(parent_meta),LOCK_UN);
       fclose(parent_meta);
 
+      super_inode_mark_dirty(parent_inode);
       return 0;
      }
     if (temppage.next_page == 0)
@@ -168,6 +168,9 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
 
   flock(fileno(parent_meta),LOCK_UN);
   fclose(parent_meta);
+
+  super_inode_mark_dirty(parent_inode);
+
   return 0;
  }
 
@@ -277,6 +280,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
         flock(fileno(parent_meta),LOCK_UN);
         fclose(parent_meta);
 
+        super_inode_mark_dirty(parent_inode);
+
         return 0;
        }
      }
@@ -366,6 +371,7 @@ int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char 
  
         flock(fileno(parent_meta),LOCK_UN);
         fclose(parent_meta);
+        super_inode_mark_dirty(parent_inode);
 
         return 0;
        }
@@ -448,6 +454,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inod
  
       flock(fileno(self_meta),LOCK_UN);
       fclose(self_meta);
+      super_inode_mark_dirty(self_inode);
 
       return 0;
      }
@@ -557,6 +564,9 @@ int decrease_nlink_inode_file(ino_t this_inode)
      }
     super_inode_update_stat(this_inode, &(this_meta.thisstat));
     flock(fileno(metafptr),LOCK_UN);
+
+    super_inode_mark_dirty(this_inode);
+
     fclose(metafptr);
    }
 
