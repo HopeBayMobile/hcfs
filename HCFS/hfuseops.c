@@ -252,10 +252,14 @@ int hfuse_rmdir(const char *path)
   char *parentname;
   char selfname[400];
   char thismetapath[400];
+  char todelete_metapath[400];
   ino_t this_inode, parent_inode;
   int ret_val;
   FILE *metafptr;
   DIR_META_TYPE tempmeta;
+  FILE *todeletefptr;
+  char filebuf[5000];
+  long read_size;
 
   this_inode = lookup_pathname(path);
   if (this_inode < 1)
@@ -306,14 +310,31 @@ int hfuse_rmdir(const char *path)
    }
 
   /*Need to delete the inode*/
-  /*TODO: queue inode as to delete. Now will jump to delete*/
-  /*TODO: Schedule backend meta object for deletion*/
+  super_inode_to_delete(this_inode);
+  fetch_todelete_path(todelete_metapath,this_inode);
+  /*Try a rename first*/
+  ret_val = rename(thismetapath,todelete_metapath);
+  if (ret_val < 0)
+   {
+    /*If not successful, copy the meta*/
+    unlink(todelete_metapath);
+    todeletefptr = fopen(todelete_metapath,"w");
+    fseek(metafptr,0,SEEK_SET);
+    while(!feof(metafptr))
+     {
+      read_size = fread(filebuf,1,4096,metafptr);
+      if (read_size > 0)
+       {
+        fwrite(filebuf,1,read_size,todeletefptr);
+       }
+      else
+       break;
+     }
+    fclose(todeletefptr);
 
-  unlink(thismetapath);
-  ftruncate(fileno(metafptr),0);
-  super_inode_delete(this_inode);
-  super_inode_reclaim();
-
+    unlink(thismetapath);
+   }
+     
   flock(fileno(metafptr),LOCK_UN);
   fclose(metafptr);
 

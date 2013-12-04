@@ -463,6 +463,8 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
   char header_filename[100];
   int ret_val;
 
+  printf("Debug swift_delete_object: object is %s\n",objname);
+
   sprintf(header_filename,"/run/shm/swiftdeletehead%s.tmp",curl_handle->id);
   curl = curl_handle->curl;
 

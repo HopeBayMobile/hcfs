@@ -34,6 +34,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
 void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle);
+void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
 void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);
 

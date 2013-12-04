@@ -36,7 +36,7 @@ void run_cache_loop()
 
       for(count2=0;count2<30;count2++)
        {
-        if (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT)
+        if (hcfs_system->systemdata.cache_size >= (CACHE_HARD_LIMIT - 2 * CACHE_DELTA))
          break;
         sleep(1);
        }
@@ -50,7 +50,7 @@ void run_cache_loop()
 thrown out immediately*/
 /*TODO: if hard limit not reached, perhaps should not throw out blocks so aggressively and can sleep for a while*/
       if (((tempentry.inode_stat.st_ino>0) && (tempentry.inode_stat.st_mode & S_IFREG)) 
-             && (((tempentry.status != IS_DIRTY) && (tempentry.in_transit == FALSE)) || (hcfs_system->systemdata.cache_size >= CACHE_HARD_LIMIT)))
+             && (((tempentry.status != IS_DIRTY) && (tempentry.in_transit == FALSE)) || (hcfs_system->systemdata.cache_size >= (CACHE_HARD_LIMIT - 2 * CACHE_DELTA))))
        {
         fetch_meta_path(thismetapath,this_inode);
         metafptr=fopen(thismetapath,"r+");
@@ -59,6 +59,14 @@ thrown out immediately*/
 
         setbuf(metafptr,NULL);
         flock(fileno(metafptr),LOCK_EX);
+        if (access(thismetapath,F_OK)<0)
+         {
+          /*If meta file does not exist, do nothing*/
+          flock(fileno(metafptr),LOCK_UN);
+          fclose(metafptr);
+          continue;
+         }
+
         current_block = 0;
 
         fread(&temphead,sizeof(FILE_META_TYPE),1,metafptr);

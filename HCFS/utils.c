@@ -18,6 +18,17 @@ void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filenam
   strcpy(pathname,tempname);
   return;
  }
+void fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
+ {
+  char tempname[400];
+
+  sprintf(tempname,"%s/todelete",METAPATH);
+  if (access(tempname,F_OK)==-1)
+   mkdir(tempname,0700);
+  sprintf(tempname,"%s/todelete/meta%ld",METAPATH,this_inode);
+  strcpy(pathname,tempname);
+  return;
+ }
 void fetch_block_path(char *pathname, ino_t this_inode, long block_num)   /*Will copy the filename of the block file to pathname*/
  {
   char tempname[400];

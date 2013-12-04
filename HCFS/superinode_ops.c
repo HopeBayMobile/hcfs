@@ -218,6 +218,7 @@ int super_inode_to_delete(ino_t this_inode)
   int ret_val;
   int ret_items;
   SUPER_INODE_ENTRY tempentry;
+  mode_t tempmode;
 
   ret_val = 0;
   sem_wait(&(sys_super_inode->io_sem));
@@ -231,7 +232,9 @@ int super_inode_to_delete(ino_t this_inode)
       ll_enqueue(this_inode,TO_BE_DELETED,&tempentry);
      }
     tempentry.in_transit = FALSE;
+    tempmode = tempentry.inode_stat.st_mode;
     memset(&(tempentry.inode_stat),0,sizeof(struct stat));
+    tempentry.inode_stat.st_mode = tempmode;
     ret_val = write_super_inode_entry(this_inode, &tempentry);
 
     if (ret_val >=0)

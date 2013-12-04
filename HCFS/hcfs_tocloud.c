@@ -1,15 +1,5 @@
-/*TODO: When queueing blocks and meta of an inode for upload, dequeue super inode from IS_DIRTY. If at the end of meta upload the meta is moved back to IS_DIRTY, then the content has been updated in between thus it will be scheduled for upload again */
 /*TODO: need to debug
-1. How to make delete file and upload file work together
-TODO: add a "delete from cloud" sequence after the sequence of upload to cloud.
-TODO: Will need to be able to delete files or truncate files while it is being synced to cloud or involved in cache replacement
-TODO: Track if init_swift may not able to connect and terminate process.
-TODO: put super_inode_delete here at delete sequence and run super_inode_reclaim after delete batch is done
-TODO: If deleting a block, first check if the meta is there then check if the blocks are reused by checking the length of meta
-TODO: Perhaps should compact the deletion of blocks and/or meta in one file into one single entry in the queue
-TODO: If compact delete requests in one entry, and only blocks are deleted, can scan the meta to see if blocks are reused but stored locally only. If so, can still delete
 TODO: Will need to check mod time of meta file and not upload meta for every block status change.
-TODO: If block status is ST_TODELETE, will need to run swift delete object function
 */
 
 #include "hcfs_tocloud.h"
@@ -290,7 +280,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 
       block_status = temppage.block_entries[current_entry_index].status;
-      /*TODO: If going to upload the block, check if it is scheduled for deletion already. If so, need to cancel the scheduled deletion. Perhaps can check this fast by adding another flag in block entry*/
 
       if (((block_status == ST_LDISK) || (block_status == ST_LtoC)) && (block_count < total_blocks))
        {
@@ -471,7 +460,6 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
 void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle)
  {
   char objname[1000];
-  FILE *fptr;
   int ret_val;
  
   sprintf(objname,"data_%ld_%ld",this_inode,block_no);
@@ -486,7 +474,6 @@ void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle)
       ret_val = hcfs_swift_delete_object(objname, curl_handle);
      }
    }
-  fclose(fptr);
   return;
  }
 
@@ -631,6 +618,8 @@ void dispatch_upload_block(int which_curl)
   else
    {  /*Block is gone. Undo changes*/
     sem_wait(&(upload_thread_control.upload_op_sem));
+    upload_thread_control.upload_threads_in_use[which_curl] = FALSE;
+    upload_thread_control.upload_threads_created[which_curl] = FALSE;
     upload_thread_control.total_active_upload_threads--;
     sem_post(&(upload_thread_control.upload_op_sem));
     sem_post(&(upload_thread_control.upload_queue_sem));

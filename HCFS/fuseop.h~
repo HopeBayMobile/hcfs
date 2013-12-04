@@ -25,6 +25,7 @@
 #define ST_BOTH 3   /* Stored both on local cache and cloud storage */
 #define ST_LtoC 4   /* In transition from local cache to cloud storage */
 #define ST_CtoL 5   /* In transition from cloud storage to local cache */
+#define ST_TODELETE 6 /* Block to be deleted in backend */
 
 typedef struct {
     ino_t d_ino;

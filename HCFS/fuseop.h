@@ -68,6 +68,8 @@ typedef struct {
 void fetch_meta_path(char *pathname, ino_t this_inode);   /*Will copy the filename of the meta file to pathname*/
 void fetch_block_path(char *pathname, ino_t this_inode, long block_num);   /*Will copy the filename of the block file to pathname*/
 void parse_parent_self(const char *pathname, char *parentname, char *selfname);
+void fetch_todelete_path(char *pathname, ino_t this_inode);   /*Will copy the filename of the meta file in todelete folder to pathname*/
+
 /*END string utility definition*/
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);

@@ -3,6 +3,7 @@
 #include "dir_lookup.h"
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
+#include "hcfs_clouddelete.h"
 #include "params.h"
 #include <fuse.h>
 #include <sys/ipc.h>
@@ -117,6 +118,7 @@ int main(int argc, char **argv)
   pid_t this_pid, this_pid1;
   int download_handle_count;
   struct rlimit nofile_limit;
+  pthread_t delete_loop_thread;
 
   nofile_limit.rlim_cur = 150000;
   nofile_limit.rlim_max = 150001;
@@ -151,7 +153,7 @@ int main(int argc, char **argv)
       printf("Redirecting to swift log\n");
       dup2(fileno(logfptr),fileno(stdout));
       dup2(fileno(logfptr),fileno(stderr));
-
+      pthread_create(&delete_loop_thread,NULL,(void *)&delete_loop,NULL);
       upload_loop();
       fclose(logfptr);
      }
