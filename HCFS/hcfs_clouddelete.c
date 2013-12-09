@@ -336,7 +336,7 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
   int ret_val;
 
   sprintf(objname,"meta_%ld",this_inode);
-  printf("Debug datadsync: objname %s, inode %ld\n",objname,this_inode);
+  printf("Debug meta deletion: objname %s, inode %ld\n",objname,this_inode);
   sprintf(curl_handle->id,"delete_meta_%ld",this_inode);
   ret_val = hcfs_swift_delete_object(objname, curl_handle);
   while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))

@@ -72,7 +72,7 @@ int close_fh(long index)
     system_fh_table.entry_table[index].thisinode = 0;
     if (system_fh_table.entry_table[index].metafptr!=NULL)
      fclose(system_fh_table.entry_table[index].metafptr);
-    if (system_fh_table.entry_table[index].blockfptr!=NULL)
+    if ((system_fh_table.entry_table[index].blockfptr!=NULL) && (system_fh_table.entry_table[index].opened_block>=0))
      fclose(system_fh_table.entry_table[index].blockfptr);
 
     system_fh_table.entry_table[index].metafptr = NULL;

@@ -650,6 +650,7 @@ void upload_loop()
   int count,sleep_count;
   char in_sync;
   int ret_val;
+  char do_something;
 
   init_upload_control();
   init_sync_control();
@@ -667,6 +668,7 @@ void upload_loop()
      }
 
     inode_to_check = 0;
+    do_something = FALSE;
     while(TRUE)
      {
       sem_wait(&(sync_thread_control.sync_queue_sem));
@@ -732,6 +734,7 @@ void upload_loop()
               break;
              }
            }
+          do_something = TRUE;
           sem_post(&(sync_thread_control.sync_op_sem));
          }
         else  /*If already syncing to cloud*/
@@ -745,7 +748,11 @@ void upload_loop()
         sem_post(&(sync_thread_control.sync_queue_sem));
        }
       if (inode_to_check == 0)
-       break;
+       {
+        if (do_something == FALSE)
+         sleep(5);
+        break;
+       }
      }
    }
   return;
