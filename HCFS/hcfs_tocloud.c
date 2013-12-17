@@ -56,9 +56,11 @@ void collect_finished_upload_threads(void *ptr)
   int ret_val;
   FILE *metafptr;
   char thismetapath[400];
+  char blockpath[400];
   ino_t this_inode;
   long page_filepos;
   long page_entry_index;
+  long blockno;
   BLOCK_ENTRY_PAGE temppage;
   struct timespec time_to_sleep;
   char is_delete;
@@ -88,6 +90,7 @@ void collect_finished_upload_threads(void *ptr)
           is_delete = upload_thread_control.upload_threads[count].is_delete;
           page_filepos = upload_thread_control.upload_threads[count].page_filepos;
           page_entry_index = upload_thread_control.upload_threads[count].page_entry_index;
+          blockno = upload_thread_control.upload_threads[count].blockno;
           fetch_meta_path(thismetapath,this_inode);
 
           if (!access(thismetapath,F_OK)) /*Perhaps the file is deleted already*/
@@ -104,6 +107,8 @@ void collect_finished_upload_threads(void *ptr)
                 if ((temppage.block_entries[page_entry_index].status==ST_LtoC) && (is_delete == FALSE))
                  {
                   temppage.block_entries[page_entry_index].status=ST_BOTH;
+                  fetch_block_path(blockpath,this_inode,blockno);
+                  setxattr(blockpath,"user.dirty","F",1,0);
                   fseek(metafptr,page_filepos,SEEK_SET);
                   fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
                  }

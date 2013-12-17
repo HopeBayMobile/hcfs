@@ -688,6 +688,7 @@ int hfuse_truncate(const char *path, off_t offset)
                 if (stat(thisblockpath,&tempstat)==0)
                  {
                   (temppage).block_entries[last_entry_index].status = ST_LDISK;
+                  setxattr(thisblockpath,"user.dirty","T",1,0);
                   fseek(fptr,currentfilepos,SEEK_SET);
                   fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
                   fflush(fptr);
@@ -704,6 +705,7 @@ int hfuse_truncate(const char *path, off_t offset)
                 if (stat(thisblockpath,&tempstat)==0)
                  {
                   (temppage).block_entries[last_entry_index].status = ST_LDISK;
+                  setxattr(thisblockpath,"user.dirty","T",1,0);
                   fseek(fptr,currentfilepos,SEEK_SET);
                   fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
                   fflush(fptr);
@@ -731,6 +733,7 @@ int hfuse_truncate(const char *path, off_t offset)
               if (stat(thisblockpath,&tempstat)==0)
                {
                 (temppage).block_entries[last_entry_index].status = ST_LDISK;
+                setxattr(thisblockpath,"user.dirty","T",1,0);
                 fseek(fptr,currentfilepos,SEEK_SET);
                 fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
                 fflush(fptr);
@@ -1045,6 +1048,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
               if (stat(thisblockpath,&tempstat)==0)
                {
                 (temppage).block_entries[entry_index].status = ST_BOTH;
+                fsetxattr(fileno(fh_ptr->blockfptr),"user.dirty","F",1,0);
                 fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
                 fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
@@ -1268,6 +1272,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
             fh_ptr->blockfptr=fopen(thisblockpath,"a+");
             fclose(fh_ptr->blockfptr);
             (temppage).block_entries[entry_index].status = ST_LDISK;
+            setxattr(thisblockpath,"user.dirty","T",1,0);
             fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
             fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
             sem_wait(&(hcfs_system->access_sem));
@@ -1280,6 +1285,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
         case ST_BOTH:
         case ST_LtoC:
             (temppage).block_entries[entry_index].status = ST_LDISK;
+            setxattr(thisblockpath,"user.dirty","T",1,0);
             fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
             fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
             break;
@@ -1316,6 +1322,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
               if (stat(thisblockpath,&tempstat)==0)
                {
                 (temppage).block_entries[entry_index].status = ST_LDISK;
+                setxattr(thisblockpath,"user.dirty","T",1,0);
                 fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
                 fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);
@@ -1332,6 +1339,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
               if (stat(thisblockpath,&tempstat)==0)
                {
                 (temppage).block_entries[entry_index].status = ST_LDISK;
+                setxattr(thisblockpath,"user.dirty","T",1,0);
                 fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
                 fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
                 fflush(fh_ptr->metafptr);

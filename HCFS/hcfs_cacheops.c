@@ -21,36 +21,90 @@ void run_cache_loop()
   int ret_val, current_page_index;
   FILE_META_TYPE temphead;
   struct stat tempstat;
+  struct timeval builttime,currenttime;
+  long seconds_slept;
+  int current_entry_index;
+  char skip_recent, do_something;
+  time_t node_time;
+  CACHE_USAGE_NODE *this_cache_node;
+
+  build_cache_usage();
+  gettimeofday(&builttime,NULL);
+  current_entry_index=0;  /*Index for doing the round robin in cache dropping*/
+  skip_recent = TRUE;
+  do_something = FALSE;
 
   while(1==1)
    {
-    while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
-     {
-      sleep(1);
-     }
+    seconds_slept = 0;
 
-    for(count = 1;count<=sys_super_inode->head.num_total_inodes;count++)
+    while(hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT)
      {
-      if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
-       break;
-
-      for(count2=0;count2<30;count2++)
+      if (nonempty_cache_hash_entries <=0)
        {
-        if (hcfs_system->systemdata.cache_size >= (CACHE_HARD_LIMIT - 2 * CACHE_DELTA))
-         break;
-        sleep(1);
+        build_cache_usage();
+        gettimeofday(&builttime,NULL);
+        current_entry_index=0;
+        skip_recent = TRUE;
+        do_something = FALSE;
        }
-      this_inode = count;
-      super_inode_read(this_inode, &tempentry);
 
+      if (current_entry_index >= CACHE_USAGE_NUM_ENTRIES)
+       {
+        if ((do_something == FALSE) && (skip_recent == FALSE))
+         {
+          build_cache_usage();
+          gettimeofday(&builttime,NULL);
+          current_entry_index=0;
+          skip_recent = TRUE;
+          do_something = FALSE;
+         }
+        else
+         {
+          if ((do_something == FALSE) && (skip_recent == TRUE))
+           skip_recent = FALSE;
+          current_entry_index = 0;
+          do_something = FALSE;
+         }
+       }
+
+      if (inode_cache_usage_hash[current_entry_index] == NULL)
+       {
+        current_entry_index++;
+        continue;
+       }
+      if (inode_cache_usage_hash[current_entry_index]->clean_cache_size <=0)
+       {
+        current_entry_index++;
+        continue;
+       }
+
+      if (skip_recent == TRUE)
+       {
+        gettimeofday(&currenttime,NULL);
+        node_time = inode_cache_usage_hash[current_entry_index]-> last_access_time;
+        if (node_time < inode_cache_usage_hash[current_entry_index]-> last_mod_time)
+         node_time = inode_cache_usage_hash[current_entry_index]-> last_mod_time;
+        if ((currenttime.tv_sec - node_time) < 300)
+         {
+          current_entry_index++;
+          continue;
+         }
+       }
+      do_something = TRUE;
+
+      this_inode = inode_cache_usage_hash[current_entry_index]-> this_inode;
+
+      this_cache_node = return_cache_usage_node(inode_cache_usage_hash[current_entry_index]-> this_inode);
+      free(this_cache_node);
+      current_entry_index++;
+
+      super_inode_read(this_inode, &tempentry);
 
       /* If inode is not dirty or in transit, or if cache is already full, check if can replace uploaded blocks */
 
-/*TODO: Need to consider last access time and download time to prevent downloaded blocks being
-thrown out immediately*/
 /*TODO: if hard limit not reached, perhaps should not throw out blocks so aggressively and can sleep for a while*/
-      if (((tempentry.inode_stat.st_ino>0) && (tempentry.inode_stat.st_mode & S_IFREG)) 
-             && (((tempentry.status != IS_DIRTY) && (tempentry.in_transit == FALSE)) || (hcfs_system->systemdata.cache_size >= (CACHE_HARD_LIMIT - 2 * CACHE_DELTA))))
+      if ((tempentry.inode_stat.st_ino>0) && (tempentry.inode_stat.st_mode & S_IFREG)) 
        {
         fetch_meta_path(thismetapath,this_inode);
         metafptr=fopen(thismetapath,"r+");
@@ -116,13 +170,58 @@ thrown out immediately*/
           if (hcfs_system->systemdata.cache_size < (CACHE_HARD_LIMIT - CACHE_DELTA))
            notify_sleep_on_cache();
           if (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
-           break;
+           {
+            flock(fileno(metafptr),LOCK_UN);
+            while(hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
+             {
+              gettimeofday(&currenttime,NULL);
+              /*Rebuild cache usage every five minutes if cache usage not near full*/
+              if (((currenttime.tv_sec-builttime.tv_sec) > 300) || (seconds_slept > 300))
+               break;
+              sleep(1);
+              seconds_slept++;
+             }
+            if ((hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) &&
+                (((currenttime.tv_sec-builttime.tv_sec) > 300) || (seconds_slept > 300)))
+             break;
+
+
+            flock(fileno(metafptr),LOCK_EX);
+            if (access(thismetapath,F_OK)<0)
+             {
+              /*If meta file does not exist, do nothing*/
+              break;
+             }
+
+            fseek(metafptr,pagepos,SEEK_SET);
+            ret_val = fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
+            if (ret_val < 1)
+             break;
+            nextpagepos = temppage.next_page;
+           }
           current_page_index++;
          }
 
         flock(fileno(metafptr),LOCK_UN);
         fclose(metafptr);
        }
+     }
+
+    while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT)
+     {
+      gettimeofday(&currenttime,NULL);
+      /*Rebuild cache usage every five minutes if cache usage not near full*/
+      if (((currenttime.tv_sec-builttime.tv_sec) > 300) || (seconds_slept > 300))
+       {
+        build_cache_usage();
+        gettimeofday(&builttime,NULL);
+        seconds_slept=0;
+        current_entry_index=0;
+        skip_recent = TRUE;
+        do_something = FALSE;
+       }
+      sleep(1);
+      seconds_slept++;
      }
 
     

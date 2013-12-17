@@ -10,6 +10,8 @@
 #include <sys/shm.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/types.h>
+#include <attr/xattr.h>
 
 
 int init_hcfs_system_data()
@@ -120,6 +122,27 @@ int main(int argc, char **argv)
   int download_handle_count;
   struct rlimit nofile_limit;
   pthread_t delete_loop_thread;
+  FILE *fptr;
+  char pathname[400];
+  char tempval[10];
+
+  sprintf(pathname,"%s/testfile",BLOCKPATH);
+
+  fptr=fopen(pathname,"w");
+  fprintf(fptr,"test\n");
+  fclose(fptr);
+  
+  ret_val = setxattr(pathname,"user.dirty","T",1,0);
+  if (ret_val < 0)
+   {
+    printf("Needs support for extended attributes, error no: %d\n",errno);
+    exit(-1);
+   }
+
+  tempval[0]=0;
+  getxattr(pathname,"user.dirty",(void *)tempval,1);
+  printf("test value is: %s, %d\n",tempval,strncmp(tempval,"T",1));
+  unlink(pathname);
 
   nofile_limit.rlim_cur = 150000;
   nofile_limit.rlim_max = 150001;

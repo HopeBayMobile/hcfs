@@ -108,6 +108,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
     if (stat(thisblockpath,&tempstat)==0)
      {
       (temppage).block_entries[entry_index].status = ST_BOTH;
+      fsetxattr(fileno(blockfptr),"user.dirty","F",1,0);
       fseek(metafptr, ptr->page_start_fpos,SEEK_SET);
       fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
       fflush(metafptr);
