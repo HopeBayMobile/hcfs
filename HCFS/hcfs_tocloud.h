@@ -6,10 +6,10 @@
 #define MAX_SYNC_CONCURRENCY 16
 
 typedef struct {
-    long page_filepos;
-    long page_entry_index;
+    off_t page_filepos;
+    long long page_entry_index;
     ino_t inode;
-    long blockno;
+    long long blockno;
     char is_block;
     char is_delete;
     int which_curl;

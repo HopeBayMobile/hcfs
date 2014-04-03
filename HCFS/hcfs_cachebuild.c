@@ -163,7 +163,7 @@ void build_cache_usage()
   struct dirent temp_dirent;
   struct dirent *direntptr;
   int ret_val;
-  long blockno;
+  long long blockno;
   ino_t this_inode;
   struct stat tempstat;
   CACHE_USAGE_NODE *tempnode;
@@ -184,7 +184,7 @@ void build_cache_usage()
     readdir_r(dirptr,&temp_dirent,&direntptr);
     while(direntptr!=NULL)
      {
-      ret_val = sscanf(temp_dirent.d_name,"block%ld_%ld",&this_inode, &blockno);
+      ret_val = sscanf(temp_dirent.d_name,"block%lld_%lld",&this_inode, &blockno);
       if (ret_val == 2)
        {
         fetch_block_path(thisblockpath,this_inode,blockno);

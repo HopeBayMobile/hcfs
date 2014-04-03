@@ -58,9 +58,9 @@ void collect_finished_upload_threads(void *ptr)
   char thismetapath[400];
   char blockpath[400];
   ino_t this_inode;
-  long page_filepos;
-  long page_entry_index;
-  long blockno;
+  off_t page_filepos;
+  long long page_entry_index;
+  long long blockno;
   BLOCK_ENTRY_PAGE temppage;
   struct timespec time_to_sleep;
   char is_delete;
@@ -204,9 +204,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   FILE_META_TYPE tempfilemeta;
   BLOCK_ENTRY_PAGE temppage;
   int which_curl;
-  long page_pos,block_no, current_entry_index;
-  long total_blocks,total_pages;
-  long count, block_count;
+  long long page_pos,block_no, current_entry_index;
+  long long total_blocks,total_pages;
+  long long count, block_count;
   unsigned char block_status;
   char upload_done;
   int ret_val;
@@ -438,15 +438,15 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
  }
 
 
-void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename)
+void do_block_sync(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle, char *filename)
  {
   char objname[1000];
   FILE *fptr;
   int ret_val;
  
-  sprintf(objname,"data_%ld_%ld",this_inode,block_no);
-  printf("Debug datasync: objname %s, inode %ld, block %ld\n",objname,this_inode,block_no);
-  sprintf(curl_handle->id,"upload_blk_%ld_%ld",this_inode,block_no);
+  sprintf(objname,"data_%lld_%lld",this_inode,block_no);
+  printf("Debug datasync: objname %s, inode %lld, block %lld\n",objname,this_inode,block_no);
+  sprintf(curl_handle->id,"upload_blk_%lld_%lld",this_inode,block_no);
   fptr=fopen(filename,"r");
   ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
   while ((ret_val < 200) || (ret_val > 299))
@@ -462,14 +462,14 @@ void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, ch
   return;
  }
 
-void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle)
+void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
  {
   char objname[1000];
   int ret_val;
  
-  sprintf(objname,"data_%ld_%ld",this_inode,block_no);
-  printf("Debug delete object: objname %s, inode %ld, block %ld\n",objname,this_inode,block_no);
-  sprintf(curl_handle->id,"delete_blk_%ld_%ld",this_inode,block_no);
+  sprintf(objname,"data_%lld_%lld",this_inode,block_no);
+  printf("Debug delete object: objname %s, inode %lld, block %lld\n",objname,this_inode,block_no);
+  sprintf(curl_handle->id,"delete_blk_%lld_%lld",this_inode,block_no);
   ret_val = hcfs_swift_delete_object(objname, curl_handle);
   while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
    {
@@ -488,9 +488,9 @@ void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
   int ret_val;
   FILE *fptr;
 
-  sprintf(objname,"meta_%ld",this_inode);
-  printf("Debug datasync: objname %s, inode %ld\n",objname,this_inode);
-  sprintf(curl_handle->id,"upload_meta_%ld",this_inode);
+  sprintf(objname,"meta_%lld",this_inode);
+  printf("Debug datasync: objname %s, inode %lld\n",objname,this_inode);
+  sprintf(curl_handle->id,"upload_meta_%lld",this_inode);
   fptr=fopen(filename,"r");
   ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
   while ((ret_val < 200) || (ret_val > 299))
@@ -537,7 +537,7 @@ void schedule_sync_meta(FILE *metafptr,int which_curl)
   int count;
   FILE *fptr;
 
-  sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%ld.tmp", upload_thread_control.upload_threads[which_curl].inode);
+  sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%lld.tmp", upload_thread_control.upload_threads[which_curl].inode);
 
   count = 0;
   while(TRUE)
@@ -545,7 +545,7 @@ void schedule_sync_meta(FILE *metafptr,int which_curl)
     if (!access(tempfilename,F_OK))
      {
       count++;
-      sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%ld.%d", upload_thread_control.upload_threads[which_curl].inode,count);
+      sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%lld.%d", upload_thread_control.upload_threads[which_curl].inode,count);
      }
     else
      break;
@@ -581,7 +581,7 @@ void dispatch_upload_block(int which_curl)
   int count;
   FILE *fptr,*blockfptr;
 
-  sprintf(tempfilename,"/dev/shm/hcfs_sync_block_%ld_%ld.tmp", upload_thread_control.upload_threads[which_curl].inode,upload_thread_control.upload_threads[which_curl].blockno);
+  sprintf(tempfilename,"/dev/shm/hcfs_sync_block_%lld_%lld.tmp", upload_thread_control.upload_threads[which_curl].inode,upload_thread_control.upload_threads[which_curl].blockno);
 
   count = 0;
   while(TRUE)
@@ -589,7 +589,7 @@ void dispatch_upload_block(int which_curl)
     if (!access(tempfilename,F_OK))
      {
       count++;
-      sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%ld_%ld.%d", upload_thread_control.upload_threads[which_curl].inode,upload_thread_control.upload_threads[which_curl].blockno, count);
+      sprintf(tempfilename,"/dev/shm/hcfs_sync_meta_%lld_%lld.%d", upload_thread_control.upload_threads[which_curl].inode,upload_thread_control.upload_threads[which_curl].blockno, count);
      }
     else
      break;

@@ -7,7 +7,7 @@
 
 typedef struct {
     ino_t inode;
-    long blockno;
+    long long blockno;
     char is_block;
     int which_curl;
  } DELETE_THREAD_TYPE;

@@ -2,10 +2,10 @@
 #include <curl/curl.h>
 
 
-#define MY_ACCOUNT "mycfs"
-#define MY_USER "mycfs"
-#define MY_PASS "mycfs"
-#define MY_URL "https://10.10.0.1:8080"
+#define MY_ACCOUNT "jiahong"
+#define MY_USER "jiahong"
+#define MY_PASS "oGb8MeL6Up1F"
+#define MY_URL "https://arkflex:8080"
 
  
 #define MAX_DOWNLOAD_CURL_HANDLE 16
@@ -31,17 +31,17 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_reauth(CURL_HANDLE *curl_handle);
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
-void do_block_sync(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle, char *filename);
+void do_block_sync(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle, char *filename);
 void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
-void do_block_delete(ino_t this_inode, long block_no, CURL_HANDLE *curl_handle);
+void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle);
 void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
-void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no);
+void fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no);
 
 typedef struct {
     ino_t this_inode;
-    long block_no;
-    long page_start_fpos;
+    long long block_no;
+    off_t page_start_fpos;
     int entry_index;
   } PREFETCH_STRUCT_TYPE;
 

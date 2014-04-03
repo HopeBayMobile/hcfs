@@ -4,7 +4,7 @@
 
 void init_pathname_cache()
  {
-  long count;
+  long long count;
 
   for(count=0;count<PATHNAME_CACHE_ENTRY_NUM;count++)
    {
@@ -15,13 +15,13 @@ void init_pathname_cache()
   return;
  }
 
-unsigned long compute_hash(const char *path)
+unsigned long long compute_hash(const char *path)
  {
-  unsigned long seed=0;
-  long count;
+  unsigned long long seed=0;
+  long long count;
   unsigned char temp;
-  unsigned long temp1;
-  unsigned long mode_base;
+  unsigned long long temp1;
+  unsigned long long mode_base;
 
   if (PATHNAME_CACHE_ENTRY_NUM > 65536)
    mode_base = PATHNAME_CACHE_ENTRY_NUM;
@@ -31,7 +31,7 @@ unsigned long compute_hash(const char *path)
   for(count=0;count<strlen(path);count++)
    {
     temp = (unsigned char) path[count];
-    temp1 = (unsigned long) temp;
+    temp1 = (unsigned long long) temp;
     seed = (3 * seed + (temp1 * 13)) % mode_base;
    }
   seed = seed % PATHNAME_CACHE_ENTRY_NUM;
@@ -39,7 +39,7 @@ unsigned long compute_hash(const char *path)
   return seed;
  }
 
-void replace_pathname_cache(long index, char *path, ino_t inode_number)
+void replace_pathname_cache(long long index, char *path, ino_t inode_number)
  {
   if (strlen(path) > MAX_PATHNAME)
    return;
@@ -53,7 +53,7 @@ void replace_pathname_cache(long index, char *path, ino_t inode_number)
  }
 void invalidate_cache_entry(const char *path)
  {
-  unsigned long index;
+  unsigned long long index;
 
   if (strlen(path) > MAX_PATHNAME)
    return;
@@ -72,7 +72,7 @@ void invalidate_cache_entry(const char *path)
 
 ino_t check_cached_path(const char *path)
  {
-  unsigned long index;
+  unsigned long long index;
   ino_t return_val;
 
   if (strlen(path) > MAX_PATHNAME)
@@ -92,7 +92,7 @@ ino_t check_cached_path(const char *path)
 ino_t lookup_pathname(const char *path)
  {
   int strptr;
-  unsigned long index;
+  unsigned long long index;
   char tempdir[MAX_PATHNAME+10];
   ino_t cached_inode;
 
@@ -140,7 +140,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
   char pathname[400];
   char target_entry_name[400];
   char tempname[400];
-  long thisfile_pos;
+  off_t thisfile_pos;
   ino_t hit_inode;
   DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;

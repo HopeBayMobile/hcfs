@@ -12,7 +12,7 @@ greater than the last update time for uploads, and scan for atime for cache repl
 void run_cache_loop()
  {
   ino_t this_inode;
-  long count,count2,current_block, total_blocks, pagepos, nextpagepos;
+  long long count,count2,current_block, total_blocks, pagepos, nextpagepos;
   SUPER_INODE_ENTRY tempentry;
   char thismetapath[400];
   char thisblockpath[400];
@@ -150,7 +150,7 @@ void run_cache_loop()
           /*Only delete blocks that exists on both cloud and local*/
             temppage.block_entries[current_page_index].status = ST_CLOUD;
 
-            printf("Debug status changed to ST_CLOUD, block %ld, inode %ld\n",current_block,this_inode);
+            printf("Debug status changed to ST_CLOUD, block %lld, inode %lld\n",current_block,this_inode);
             fseek(metafptr,pagepos,SEEK_SET);
             ret_val = fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,metafptr);
             if (ret_val < 1)

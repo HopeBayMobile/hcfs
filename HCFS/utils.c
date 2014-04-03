@@ -14,7 +14,7 @@ void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filenam
   sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/sub_%d/meta%ld",METAPATH,sub_dir,this_inode);
+  sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
   return;
  }
@@ -25,11 +25,11 @@ void fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the fil
   sprintf(tempname,"%s/todelete",METAPATH);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/todelete/meta%ld",METAPATH,this_inode);
+  sprintf(tempname,"%s/todelete/meta%lld",METAPATH,this_inode);
   strcpy(pathname,tempname);
   return;
  }
-void fetch_block_path(char *pathname, ino_t this_inode, long block_num)   /*Will copy the filename of the block file to pathname*/
+void fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*Will copy the filename of the block file to pathname*/
  {
   char tempname[400];
   int sub_dir;
@@ -38,7 +38,7 @@ void fetch_block_path(char *pathname, ino_t this_inode, long block_num)   /*Will
   sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/sub_%d/block%ld_%ld",BLOCKPATH,sub_dir,this_inode,block_num);
+  sprintf(tempname,"%s/sub_%d/block%lld_%lld",BLOCKPATH,sub_dir,this_inode,block_num);
   strcpy(pathname,tempname);
   return;
  }

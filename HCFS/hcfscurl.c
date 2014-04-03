@@ -8,13 +8,13 @@
 
 typedef struct {
     FILE *fptr;
-    long object_size;
-    long remaining_size;
+    off_t object_size;
+    off_t remaining_size;
  } object_put_control;
 
 size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
  {
-  long total_size;
+  size_t total_size;
 
   total_size=fwrite(ptr,size,nmemb,fstream);
 
@@ -107,7 +107,7 @@ void dump_list_body(FILE *fptr)
     ret_val = fscanf(fptr,"%s\n",temp_string);
     if (ret_val < 1)
      break;
-//    printf("%s\n",temp_string);
+    //printf("%s\n",temp_string);
    }
   return;
  }
@@ -221,7 +221,7 @@ void hcfs_destroy_swift_backend(CURL *curl)
 size_t read_file_function(void *ptr, size_t size, size_t nmemb, void *put_control1)
  {
   /*TODO: Consider if it is possible for the actual file size to be smaller than object size due to truncating*/
-  long total_size;
+  size_t total_size;
   FILE *fptr;
   size_t actual_to_read;
   object_put_control *put_control;
@@ -282,7 +282,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, swift_list_body_fptr);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
-  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
 
@@ -315,7 +315,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
  {
   struct curl_slist *chunk=NULL;
-  long objsize;
+  off_t objsize;
   object_put_control put_control;
   CURLcode res;
   char container_string[200];
@@ -341,8 +341,8 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   put_control.object_size = objsize;
   put_control.remaining_size = objsize;
 
-  printf("Debug swift_put_object: object size is %ld\n",objsize);
-  printf("Put to %s, auth %s\n",container_string,swift_auth_string);
+  //printf("Debug swift_put_object: object size is %ld\n",objsize);
+  //printf("Put to %s, auth %s\n",container_string,swift_auth_string);
 
   if (objsize < 0)
    {
@@ -358,7 +358,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
   curl_easy_setopt(curl, CURLOPT_PUT, 1L);
   curl_easy_setopt(curl, CURLOPT_READDATA, (void *) &put_control);
-  curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE, objsize);
+  curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
@@ -390,7 +390,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
  {
   struct curl_slist *chunk=NULL;
-  long objsize;
+  off_t objsize;
   CURLcode res;
   char container_string[200];
 
@@ -454,7 +454,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
  {
   struct curl_slist *chunk=NULL;
-  long objsize;
+  off_t objsize;
   CURLcode res;
   char container_string[200];
   char delete_command[10];
@@ -464,7 +464,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
   char header_filename[100];
   int ret_val;
 
-  printf("Debug swift_delete_object: object is %s\n",objname);
+  //printf("Debug swift_delete_object: object is %s\n",objname);
 
   sprintf(header_filename,"/run/shm/swiftdeletehead%s.tmp",curl_handle->id);
   curl = curl_handle->curl;

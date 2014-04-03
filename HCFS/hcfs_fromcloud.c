@@ -2,14 +2,14 @@
 #include "hcfscurl.h"
 #include "fuseop.h"
 
-void fetch_from_cloud(FILE *fptr, ino_t this_inode, long block_no)
+void fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
  {
   char objname[1000];
   int status;
   int which_curl_handle;
   char idname[256];
 
-  sprintf(objname,"data_%ld_%ld",this_inode,block_no);
+  sprintf(objname,"data_%lld_%lld",this_inode,block_no);
   while(1==1)
    {
     sem_wait(&download_curl_sem);

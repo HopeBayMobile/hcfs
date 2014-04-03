@@ -20,7 +20,7 @@
 /*TODO: A file-handle table manager that dynamically allocate extra block pointers and recycle them if not in use (but file not closed). Number of block pointers that can be allocated can be a variable of available process-wide opened files*/
 
 
-long check_file_size(const char *path)
+off_t check_file_size(const char *path)
  {
   struct stat block_stat;
 
@@ -44,7 +44,7 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
     if (ret_code < 0)
      return -ENOENT;
     memcpy(inode_stat,&(tempentry.inode_stat),sizeof(struct stat));
-    printf("getattr %ld\n",inode_stat->st_ino);
+    printf("getattr %lld\n",inode_stat->st_ino);
     return 0;
    }
   else
@@ -258,7 +258,7 @@ int hfuse_rmdir(const char *path)
   DIR_META_TYPE tempmeta;
   FILE *todeletefptr;
   char filebuf[5000];
-  long read_size;
+  size_t read_size;
 
   this_inode = lookup_pathname(path);
   if (this_inode < 1)
@@ -428,7 +428,7 @@ int hfuse_chmod(const char *path, mode_t mode)
    return -ENOENT;
 
   fetch_meta_path(thismetapath,this_inode);
-  printf("%ld %s\n",this_inode,thismetapath);
+  printf("%lld %s\n",this_inode,thismetapath);
   fptr = fopen(thismetapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
@@ -549,14 +549,14 @@ int hfuse_truncate(const char *path, off_t offset)
   char thismetapath[1024];
   char thisblockpath[1024];
   FILE *fptr,*blockfptr;
-  long last_block,last_page, old_last_block;
-  long current_page;
-  long nextfilepos, prevfilepos, currentfilepos;
+  long long last_block,last_page, old_last_block;
+  long long current_page;
+  off_t nextfilepos, prevfilepos, currentfilepos;
   BLOCK_ENTRY_PAGE temppage;
   int last_entry_index;
-  long old_block_size,new_block_size;
+  off_t old_block_size,new_block_size;
   int block_count;
-  long temp_block_index;
+  long long temp_block_index;
   struct stat tempstat;
 
   this_inode = lookup_pathname(path);
@@ -587,6 +587,13 @@ int hfuse_truncate(const char *path, off_t offset)
     if (tempfilemeta.thisstat.st_size < offset)
      {
       /*If need to extend, only need to change st_size*/
+
+      sem_wait(&(hcfs_system->access_sem));
+      hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta
+.thisstat.st_size);
+      sync_hcfs_system_data(FALSE);
+      sem_post(&(hcfs_system->access_sem));           
+
       tempfilemeta.thisstat.st_size = offset;
      }
     else
@@ -616,6 +623,10 @@ int hfuse_truncate(const char *path, off_t offset)
        {
         if (nextfilepos == 0) /*Data after offset does not actually exists. Just change file size */
          {
+          sem_wait(&(hcfs_system->access_sem));
+          hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta.thisstat.st_size);
+          sync_hcfs_system_data(FALSE);
+          sem_post(&(hcfs_system->access_sem));
           tempfilemeta.thisstat.st_size = offset;
           break;
          }
@@ -789,6 +800,10 @@ int hfuse_truncate(const char *path, off_t offset)
           fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
           fflush(fptr);
 
+          sem_wait(&(hcfs_system->access_sem));
+          hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta.thisstat.st_size);
+          sync_hcfs_system_data(FALSE);
+          sem_post(&(hcfs_system->access_sem));   
           tempfilemeta.thisstat.st_size = offset;
           break;
          }
@@ -872,7 +887,7 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
  {
   /*TODO: Need to check permission here*/
   ino_t thisinode;
-  long fh;
+  long long fh;
 
   thisinode = lookup_pathname(path);
   if (thisinode < 1)
@@ -890,12 +905,12 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
 int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struct fuse_file_info *file_info)
  {
   FH_ENTRY *fh_ptr;
-  long start_block, end_block, current_block;
-  long start_page, end_page, current_page;
-  long nextfilepos, prevfilepos, currentfilepos;
+  long long start_block, end_block, current_block;
+  long long start_page, end_page, current_page;
+  off_t nextfilepos, prevfilepos, currentfilepos;
   BLOCK_ENTRY_PAGE temppage;
-  long entry_index;
-  long block_index;
+  long long entry_index;
+  long long block_index;
   char thisblockpath[400];
   int total_bytes_read;
   int this_bytes_read;
@@ -906,7 +921,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
   struct stat tempstat;
   PREFETCH_STRUCT_TYPE *temp_prefetch;
   pthread_t prefetch_thread;
-  long this_page_fpos;
+  off_t this_page_fpos;
 
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
@@ -1173,20 +1188,20 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *file_info)
  {
   FH_ENTRY *fh_ptr;
-  long start_block, end_block, current_block;
-  long start_page, end_page, current_page;
-  long nextfilepos, prevfilepos, currentfilepos;
+  long long start_block, end_block, current_block;
+  long long start_page, end_page, current_page;
+  off_t nextfilepos, prevfilepos, currentfilepos;
   BLOCK_ENTRY_PAGE temppage;
-  long entry_index;
-  long block_index;
+  long long entry_index;
+  long long block_index;
   char thisblockpath[400];
-  int total_bytes_written;
-  int this_bytes_written;
+  size_t total_bytes_written;
+  size_t this_bytes_written;
   off_t current_offset;
-  int target_bytes_written;
-  long old_cache_size, new_cache_size;
+  size_t target_bytes_written;
+  off_t old_cache_size, new_cache_size;
   struct stat tempstat;
-  long this_page_fpos;
+  off_t this_page_fpos;
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
 
@@ -1406,7 +1421,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   if ((fh_ptr->cached_meta).thisstat.st_size < (offset + total_bytes_written))
    {
     sem_wait(&(hcfs_system->access_sem));
-    hcfs_system->systemdata.system_size += (offset + total_bytes_written) - (fh_ptr->cached_meta).thisstat.st_size;
+    hcfs_system->systemdata.system_size += (long long) ((offset + total_bytes_written) - (fh_ptr->cached_meta).thisstat.st_size);
     sync_hcfs_system_data(FALSE);
     sem_post(&(hcfs_system->access_sem));           
 
@@ -1437,7 +1452,7 @@ int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linu
   if (hcfs_system->systemdata.system_size > (50*powl(1024,3)))
    buf->f_blocks = (2*hcfs_system->systemdata.system_size) / 4096;
   else
-   buf->f_blocks = (100*powl(1024,3)) / 4096;
+   buf->f_blocks = (25*powl(1024,2));
 
   buf->f_bfree = buf->f_blocks - ((hcfs_system->systemdata.system_size) / 4096);
   if (buf->f_bfree < 0)
@@ -1505,7 +1520,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   char pathname[400];
   FILE *fptr;
   int count;
-  long thisfile_pos;
+  off_t thisfile_pos;
   DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
   struct stat tempstat;

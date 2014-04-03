@@ -300,14 +300,14 @@ static int compino(const void *firstino,const void *secondino)
 
 int super_inode_reclaim()
  {
-  long total_inodes_reclaimed;
+  long long total_inodes_reclaimed;
   int ret_val;
   SUPER_INODE_ENTRY tempentry;
-  long count;
-  long thisfilepos;
+  long long count;
+  off_t thisfilepos;
   ino_t last_reclaimed,new_last_reclaimed;
   ino_t *unclaimed_list;
-  long num_unclaimed_in_list;
+  long long num_unclaimed_in_list;
 
   last_reclaimed = 0;
 
@@ -367,11 +367,11 @@ int super_inode_reclaim()
 
 int super_inode_reclaim_fullscan()
  {
-  long total_inodes_reclaimed;
+  long long total_inodes_reclaimed;
   int ret_val,ret_items;
   SUPER_INODE_ENTRY tempentry;
-  long count;
-  long thisfilepos;
+  long long count;
+  off_t thisfilepos;
   ino_t last_reclaimed,first_reclaimed,old_last_reclaimed;
 
   last_reclaimed = 0;

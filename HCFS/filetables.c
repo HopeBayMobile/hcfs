@@ -2,7 +2,7 @@
 
 int init_system_fh_table()
  {
-  long count;
+  long long count;
 
   memset(&system_fh_table,0,sizeof(FH_TABLE_TYPE));
 
@@ -21,9 +21,9 @@ int init_system_fh_table()
   return 0;
  }
 
-long open_fh(ino_t thisinode)
+long long open_fh(ino_t thisinode)
  {
-  long index;
+  long long index;
   char thismetapath[400];
 
   sem_wait(&(system_fh_table.fh_table_sem));
@@ -61,7 +61,7 @@ long open_fh(ino_t thisinode)
   return index;
  }
 
-int close_fh(long index)
+int close_fh(long long index)
  {
   /*TODO: should not have dirty page and meta in this fh entry, but could add routine to check*/
   sem_wait(&(system_fh_table.fh_table_sem));
@@ -85,10 +85,10 @@ int close_fh(long index)
   return 0;
  }
 
-int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page)
+int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page)
  {
-  long current_page;
-  long nextfilepos, prevfilepos, currentfilepos;
+  long long current_page;
+  off_t nextfilepos, prevfilepos, currentfilepos;
   BLOCK_ENTRY_PAGE temppage;
 
 
@@ -144,10 +144,10 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page)
   return 0;
  }
 
-long advance_block(FILE *fptr, long thisfilepos,long *entry_index)
+long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index)
  {
-  long temp_index;
-  long nextfilepos;
+  long long temp_index;
+  off_t nextfilepos;
   BLOCK_ENTRY_PAGE temppage;
   /*First handle the case that nothing needs to be changed, just add entry_index*/
 

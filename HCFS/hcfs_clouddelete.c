@@ -147,8 +147,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
   FILE_META_TYPE tempfilemeta;
   BLOCK_ENTRY_PAGE temppage;
   int which_curl;
-  long page_pos,block_no, current_entry_index;
-  long count, block_count;
+  long long block_no, current_entry_index;
+  long long page_pos;
+  long long count, block_count;
   unsigned char block_status;
   char delete_done;
   char in_sync;
@@ -335,9 +336,9 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
   char objname[1000];
   int ret_val;
 
-  sprintf(objname,"meta_%ld",this_inode);
-  printf("Debug meta deletion: objname %s, inode %ld\n",objname,this_inode);
-  sprintf(curl_handle->id,"delete_meta_%ld",this_inode);
+  sprintf(objname,"meta_%lld",this_inode);
+  printf("Debug meta deletion: objname %s, inode %lld\n",objname,this_inode);
+  sprintf(curl_handle->id,"delete_meta_%lld",this_inode);
   ret_val = hcfs_swift_delete_object(objname, curl_handle);
   while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
    {

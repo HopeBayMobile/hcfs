@@ -7,8 +7,8 @@
 
 typedef struct usage_node_template {
     ino_t this_inode;
-    long clean_cache_size;
-    long dirty_cache_size;
+    long long clean_cache_size;
+    long long dirty_cache_size;
     time_t last_access_time;
     time_t last_mod_time;
     struct usage_node_template *next_node;

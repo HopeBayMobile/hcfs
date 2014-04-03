@@ -38,35 +38,35 @@ typedef struct {
 
 typedef struct {
     struct stat thisstat;
-    long total_children;   /*Total children not including "." and "..*/
-    long next_subdir_page;
-    long next_file_page;
-    long next_xattr_page;
+    long long total_children;   /*Total children not including "." and "..*/
+    long long next_subdir_page;
+    long long next_file_page;
+    long long next_xattr_page;
   } DIR_META_TYPE;
 
 typedef struct {
     struct stat thisstat;
-    long next_block_page;
-    long next_xattr_page;
+    long long next_block_page;
+    long long next_xattr_page;
   } FILE_META_TYPE;
 
 typedef struct {
     int num_entries;
     DIR_ENTRY dir_entries[MAX_DIR_ENTRIES_PER_PAGE];
-    long next_page;
+    long long next_page;
   } DIR_ENTRY_PAGE;
 
 typedef struct {
     int num_entries;
     BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
-    long next_page;
+    long long next_page;
   } BLOCK_ENTRY_PAGE;
 
 /*END META definition*/
 
 /*BEGIN string utility definition*/
 void fetch_meta_path(char *pathname, ino_t this_inode);   /*Will copy the filename of the meta file to pathname*/
-void fetch_block_path(char *pathname, ino_t this_inode, long block_num);   /*Will copy the filename of the block file to pathname*/
+void fetch_block_path(char *pathname, ino_t this_inode, long long block_num);   /*Will copy the filename of the block file to pathname*/
 void parse_parent_self(const char *pathname, char *parentname, char *selfname);
 void fetch_todelete_path(char *pathname, ino_t this_inode);   /*Will copy the filename of the meta file in todelete folder to pathname*/
 
@@ -88,38 +88,38 @@ typedef struct {
     ino_t thisinode;
     FILE *metafptr;   /*TODO: use flockfile function to lock these ptrs between threads*/
     FILE *blockfptr;
-    long opened_block;
+    long long opened_block;
     FILE_META_TYPE cached_meta;
 //    BLOCK_ENTRY_PAGE cached_page;
-    long cached_page_index;
-    long cached_page_start_fpos;
+    long long cached_page_index;
+    off_t cached_page_start_fpos;
     sem_t block_sem;
   } FH_ENTRY;
 
 typedef struct {
-    long num_opened_files;
+    long long num_opened_files;
     char *entry_table_flags;
     FH_ENTRY *entry_table;
-    long last_available_index;
+    long long last_available_index;
     sem_t fh_table_sem;
   } FH_TABLE_TYPE;
 
 FH_TABLE_TYPE system_fh_table;
 
 int init_system_fh_table();
-long open_fh(ino_t thisinode);
-int close_fh(long index);
-int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long target_page);
-long advance_block(FILE *fptr, long thisfilepos,long *entry_index); /*In advance block, need to write back dirty page if change page */
+long long open_fh(ino_t thisinode);
+int close_fh(long long index);
+int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page);
+long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index); /*In advance block, need to write back dirty page if change page */
 
 /*END definition of file handle */
 
 
 typedef struct {
-    long system_size;
-    long dirty_size;
-    long cache_size;
-    long cache_blocks;
+    long long system_size;
+    long long dirty_size;
+    long long cache_size;
+    long long cache_blocks;
   } SYSTEM_DATA_TYPE;
 
 typedef struct {
@@ -137,5 +137,5 @@ FILE *logfptr;
 
 int init_hcfs_system_data();
 int sync_hcfs_system_data(char need_lock);
-long check_file_size(const char *path);
+off_t check_file_size(const char *path);
 

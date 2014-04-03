@@ -13,7 +13,7 @@ typedef struct {
   } SUPER_INODE_ENTRY;
 
 typedef struct {
-    long num_inode_reclaimed;
+    long long num_inode_reclaimed;
     ino_t first_reclaimed_inode;
     ino_t last_reclaimed_inode;
     ino_t first_dirty_inode;
@@ -23,14 +23,14 @@ typedef struct {
     ino_t first_block_cached_inode;
     ino_t last_block_cached_inode;
 
-    long num_to_be_reclaimed;
-    long num_to_be_deleted;
-    long num_dirty;
-    long num_block_cached;
+    long long num_to_be_reclaimed;
+    long long num_to_be_deleted;
+    long long num_dirty;
+    long long num_block_cached;
 
-    long num_total_inodes;    /*This defines the total number of inode numbers allocated, including in use and deleted but to be reclaimed*/
-    long num_active_inodes;   /*This defines the number of inodes that are currently being used*/
-    long total_system_size;
+    long long num_total_inodes;    /*This defines the total number of inode numbers allocated, including in use and deleted but to be reclaimed*/
+    long long num_active_inodes;   /*This defines the number of inodes that are currently being used*/
+    long long total_system_size;
   } SUPER_INODE_HEAD;
 
 typedef struct {

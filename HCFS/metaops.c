@@ -10,7 +10,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
-  long nextfilepos,oldfilepos;
+  off_t nextfilepos,oldfilepos;
 
   fetch_meta_path(parent_meta_name,parent_inode);
 
@@ -182,7 +182,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
-  long nextfilepos,oldfilepos;
+  off_t nextfilepos,oldfilepos;
   int count;
 
   fetch_meta_path(parent_meta_name,parent_inode);
@@ -302,7 +302,7 @@ int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char 
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
-  long nextfilepos,oldfilepos;
+  off_t nextfilepos,oldfilepos;
   int count;
 
   fetch_meta_path(parent_meta_name,parent_inode);
@@ -474,10 +474,10 @@ int decrease_nlink_inode_file(ino_t this_inode)
   FILE *metafptr;
   FILE *todeletefptr;
   int ret_val;
-  long count;
-  long total_blocks;
-  long cache_block_size;
-  long read_size;
+  long long count;
+  long long total_blocks;
+  off_t cache_block_size;
+  size_t read_size;
 
   fetch_meta_path(thismetapath,this_inode);
 
@@ -537,7 +537,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
         cache_block_size = check_file_size(thisblockpath);
         unlink(thisblockpath);
         sem_wait(&(hcfs_system->access_sem));
-        hcfs_system->systemdata.cache_size -= cache_block_size;
+        hcfs_system->systemdata.cache_size -= (long long) cache_block_size;
         hcfs_system->systemdata.cache_blocks -=1;
         sem_post(&(hcfs_system->access_sem));           
        }
