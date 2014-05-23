@@ -1,0 +1,21 @@
+#Dependency (method 1)
+apt-get install python-pycryptopp
+apt-get install libsqlite3-dev
+apt-get install sqlite3
+apt-get install python-apsw
+apt-get install python-lzma
+apt-get install libfuse-dev 
+apt-get install libattr1-dev
+apt-get install python-all-dev
+apt-get install python-sphinx
+apt-get install build-essential 
+apt-get install python-profiler
+dpkg -i debsrc/python-llfuse_0.37.1-2_amd64.deb 
+dpkg -i debsrc/cython_0.15.1-2_amd64.deb 
+dpkg -i debsrc/smartmontools_5.39.1+svn3124-2_amd64.deb
+
+#Installation steps
+python setup build_cython
+python setup build
+python setup install
+

@@ -1,0 +1,4 @@
+# import public key of Delta's Ubuntu apt server
+# sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 35F30F8B &
+# FIXME: install s3ql in /usr/local/bin in debian packaging (if it's required)
+cp -rs /usr/bin/*s3ql* /usr/local/bin/
