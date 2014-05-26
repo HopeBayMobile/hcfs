@@ -114,7 +114,7 @@ class Bucket(AbstractBucket):
         be manually restarted if applicable.
         '''
 
-        if isinstance(exc, (InternalError, BadDigest, IncompleteBody, RequestTimeout,
+        if isinstance(exc, (InternalError, BadDigest, IncompleteBody, OperationTimedOut,
                             OperationAborted, SlowDown, RequestTimeTooSkewed,
                             httplib.IncompleteRead, socket.timeout, ssl.SSLError)):
             return True
@@ -424,7 +424,7 @@ class Bucket(AbstractBucket):
         if not content_type or not XML_CONTENT_RE.match(content_type):
             raise HTTPError(resp.status, resp.reason, resp.getheaders(), resp.read())
 
-        log.debug('Azure encountered error, status is %d\n' % resp.status)
+        log.debug('Azure backend encountered error, status is %d\n' % resp.status)
 
         # Error
         tree = ElementTree.parse(resp).getroot()
@@ -434,7 +434,7 @@ class Bucket(AbstractBucket):
             if resp.status == 400:
                 raise get_S3Error('BadDigest',None)
             if resp.status == 403:
-                raise get_S3Error('AccessDenied',None)
+                raise get_S3Error('InsufficientAccountPermissions',None)
             if resp.status == 409:
                 raise get_S3Error('OperationAborted',None)
             if resp.status == 500:
@@ -747,15 +747,15 @@ class S3Error(Exception):
         return '%s: %s' % (self.code, self.msg)
 
 class BlobNotFound(S3Error): pass
-class AccessDenied(S3Error, AuthorizationError): pass
+class InsufficientAccountPermissions(S3Error, AuthorizationError): pass
 class BadDigest(S3Error): pass
 class IncompleteBody(S3Error): pass
 class InternalError(S3Error): pass
-class InvalidAccessKeyId(S3Error, AuthenticationError): pass
-class InvalidSecurity(S3Error, AuthenticationError): pass
+class InvalidAuthenticationInfo(S3Error, AuthenticationError): pass
+class AuthenticationFailed(S3Error, AuthenticationError): pass
 class SignatureDoesNotMatch(S3Error, AuthenticationError): pass
 class OperationAborted(S3Error): pass
-class RequestTimeout(S3Error): pass
+class OperationTimedOut(S3Error): pass
 class SlowDown(S3Error): pass
 class RequestTimeTooSkewed(S3Error): pass
-class NoSuchBucket(S3Error, NoSuchBucket_common): pass
+class ContainerNotFound(S3Error, NoSuchBucket_common): pass
