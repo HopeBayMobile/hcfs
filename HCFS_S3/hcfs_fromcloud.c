@@ -28,27 +28,17 @@ void fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
     printf("Debug: downloading using curl handle %d\n",which_curl_handle);
     sprintf(idname,"download_thread_%d",which_curl_handle);
     strcpy(download_curl_handles[which_curl_handle].id,idname);
-    status=hcfs_swift_get_object(fptr,objname,&(download_curl_handles[which_curl_handle]));
+    status=hcfs_get_object(fptr,objname,&(download_curl_handles[which_curl_handle]));
 
-    if ((status< 200) || (status > 299))
-     {
-      while ((status< 200) || (status > 299))
-        status = hcfs_swift_reauth(&(download_curl_handles[which_curl_handle]));
-      printf("Reauth\n");
+    sem_wait(&download_curl_control_sem);
+    curl_handle_mask[which_curl_handle] = FALSE;
+    sem_post(&download_curl_sem);
+    sem_post(&download_curl_control_sem);
 
-      sem_wait(&download_curl_control_sem);
-      curl_handle_mask[which_curl_handle] = FALSE;
-      sem_post(&download_curl_sem);
-      sem_post(&download_curl_control_sem);
-     }
-    else
-     {
-      sem_wait(&download_curl_control_sem);
-      curl_handle_mask[which_curl_handle] = FALSE;
-      sem_post(&download_curl_sem);
-      sem_post(&download_curl_control_sem);
-      break;
-     }
+/* TODO: Fix handling in retrying. Now will retry for any HTTP error*/
+
+    if ((status >= 200) && (status <= 299))
+     break;
    }
 
   fflush(fptr);

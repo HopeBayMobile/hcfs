@@ -1,9 +1,10 @@
 #include <semaphore.h>
 #include <curl/curl.h>
 
-#define S3_BACKEND 1
-#define SWIFT_BACKEND 0
+#define S3 1
+#define SWIFT 0
 
+#define CURRENT_BACKEND S3
 
 #define MY_ACCOUNT "jiahong"
 #define MY_USER "jiahong"
@@ -13,8 +14,8 @@
 #define S3_ACCESS "SE41NTAxMzIwNDEzOTQ1Mjk5NTkwNzI"
 #define S3_SECRET "NWUzOTdjNjRjOGI1NDM2ZmI4MzFlOTgxMjdkNmMyNWM"
 #define S3_URL "https://s3.hicloud.net.tw"
-#define S3_BUCKET "arkexpresstest"
-#define S3_BUCKET_URL "https://arkexpresstest.s3.hicloud.net.tw"
+#define S3_BUCKET "testgateway"
+#define S3_BUCKET_URL "https://testgateway.s3.hicloud.net.tw"
 
  
 #define MAX_DOWNLOAD_CURL_HANDLE 16
@@ -49,10 +50,17 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
 int hcfs_init_S3_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_S3_backend(CURL *curl);
 int hcfs_S3_list_container(CURL_HANDLE *curl_handle);
-//int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
-//int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
-//int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle);
+int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
+int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
+int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle);
 
+/* Generic */
+int hcfs_init_backend(CURL_HANDLE *curl_handle);
+void hcfs_destroy_backend(CURL *curl);
+int hcfs_list_container(CURL_HANDLE *curl_handle);
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
+int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
 
 /* Not backend-specific */
 

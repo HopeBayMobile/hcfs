@@ -1,5 +1,6 @@
 /*
 TODO: Will need to check mod time of meta file and not upload meta for every block status change.
+TODO: Check if meta objects will be deleted with the deletion of files/dirs
 */
 
 #include "hcfs_tocloud.h"
@@ -174,13 +175,7 @@ void init_upload_control()
   memset(&upload_curl_handles,0,sizeof(CURL_HANDLE)*MAX_UPLOAD_CONCURRENCY);
   for(count=0;count<MAX_UPLOAD_CONCURRENCY;count++)
    {
-    ret_val = hcfs_init_swift_backend(&(upload_curl_handles[count]));
-    while ((ret_val < 200) || (ret_val > 299))
-     {
-      if (upload_curl_handles[count].curl !=NULL)
-       hcfs_destroy_swift_backend(upload_curl_handles[count].curl);
-      ret_val = hcfs_init_swift_backend(&(upload_curl_handles[count]));
-     }
+    ret_val = hcfs_init_backend(&(upload_curl_handles[count]));
 
    }
 
@@ -448,16 +443,7 @@ void do_block_sync(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handl
   printf("Debug datasync: objname %s, inode %lld, block %lld\n",objname,this_inode,block_no);
   sprintf(curl_handle->id,"upload_blk_%lld_%lld",this_inode,block_no);
   fptr=fopen(filename,"r");
-  ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
-  while ((ret_val < 200) || (ret_val > 299))
-   {
-    ret_val = hcfs_swift_reauth(curl_handle);
-    if ((ret_val >= 200) && (ret_val <=299))
-     {
-      fseek(fptr,0,SEEK_SET);
-      ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
-     }
-   }
+  ret_val = hcfs_put_object(fptr,objname, curl_handle);
   fclose(fptr);
   return;
  }
@@ -470,15 +456,7 @@ void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_han
   sprintf(objname,"data_%lld_%lld",this_inode,block_no);
   printf("Debug delete object: objname %s, inode %lld, block %lld\n",objname,this_inode,block_no);
   sprintf(curl_handle->id,"delete_blk_%lld_%lld",this_inode,block_no);
-  ret_val = hcfs_swift_delete_object(objname, curl_handle);
-  while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
-   {
-    ret_val = hcfs_swift_reauth(curl_handle);
-    if ((ret_val >= 200) && (ret_val <=299))
-     {
-      ret_val = hcfs_swift_delete_object(objname, curl_handle);
-     }
-   }
+  ret_val = hcfs_delete_object(objname, curl_handle);
   return;
  }
 
@@ -492,16 +470,7 @@ void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
   printf("Debug datasync: objname %s, inode %lld\n",objname,this_inode);
   sprintf(curl_handle->id,"upload_meta_%lld",this_inode);
   fptr=fopen(filename,"r");
-  ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
-  while ((ret_val < 200) || (ret_val > 299))
-   {
-    ret_val = hcfs_swift_reauth(curl_handle);
-    if ((ret_val >= 200) && (ret_val <=299))
-     {
-      fseek(fptr,0,SEEK_SET);
-      ret_val = hcfs_swift_put_object(fptr,objname, curl_handle);
-     }
-   }
+  ret_val = hcfs_put_object(fptr,objname, curl_handle);
   fclose(fptr);
   return;
  }

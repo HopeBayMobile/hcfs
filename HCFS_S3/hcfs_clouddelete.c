@@ -117,12 +117,12 @@ void init_delete_control()
   memset(&delete_curl_handles,0,sizeof(CURL_HANDLE)*MAX_DELETE_CONCURRENCY);
   for(count=0;count<MAX_DELETE_CONCURRENCY;count++)
    {
-    ret_val = hcfs_init_swift_backend(&(delete_curl_handles[count]));
+    ret_val = hcfs_init_backend(&(delete_curl_handles[count]));
     while ((ret_val < 200) || (ret_val > 299))
      {
       if (delete_curl_handles[count].curl !=NULL)
-       hcfs_destroy_swift_backend(delete_curl_handles[count].curl);
-      ret_val = hcfs_init_swift_backend(&(delete_curl_handles[count]));
+       hcfs_destroy_backend(delete_curl_handles[count].curl);
+      ret_val = hcfs_init_backend(&(delete_curl_handles[count]));
      }
 
    }
@@ -339,15 +339,7 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
   sprintf(objname,"meta_%lld",this_inode);
   printf("Debug meta deletion: objname %s, inode %lld\n",objname,this_inode);
   sprintf(curl_handle->id,"delete_meta_%lld",this_inode);
-  ret_val = hcfs_swift_delete_object(objname, curl_handle);
-  while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
-   {
-    ret_val = hcfs_swift_reauth(curl_handle);
-    if ((ret_val >= 200) && (ret_val <=299))
-     {
-      ret_val = hcfs_swift_delete_object(objname, curl_handle);
-     }
-   }
+  ret_val = hcfs_delete_object(objname, curl_handle);
   return;
  }
 

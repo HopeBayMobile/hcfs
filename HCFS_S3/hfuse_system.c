@@ -154,27 +154,22 @@ int main(int argc, char **argv)
   
   ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
   sprintf(curl_handle.id,"main");
-//  ret_val = hcfs_init_swift_backend(&curl_handle);
-  ret_val = hcfs_init_S3_backend(&curl_handle);
+  ret_val = hcfs_init_backend(&curl_handle);
   if ((ret_val < 200) || (ret_val > 299))
    {
     printf("error in connecting to backend\n");
     exit(0);
    }
 
-//  printf("%s\n %s\n %d\n",swift_auth_string,swift_url_string,ret_val);
-//  ret_val = hcfs_swift_list_container(&curl_handle);
-  ret_val = hcfs_S3_list_container(&curl_handle);
+  ret_val = hcfs_list_container(&curl_handle);
   if ((ret_val < 200) || (ret_val > 299))
    {
     printf("error in connecting to backend\n");
     exit(0);
    }
   printf("ret code %d\n",ret_val);
-//  hcfs_destroy_swift_backend(curl_handle.curl);
-  hcfs_destroy_S3_backend(curl_handle.curl);
 
-  return;
+  hcfs_destroy_backend(curl_handle.curl);
 
   init_hfuse();
   this_pid = fork();
@@ -183,9 +178,9 @@ int main(int argc, char **argv)
     this_pid1 = fork();
     if (this_pid1 == 0)
      {
-      logfptr=fopen("swift_upload_log","a+");
-      fprintf(logfptr,"\nStart logging swift upload\n");
-      printf("Redirecting to swift log\n");
+      logfptr=fopen("backend_upload_log","a+");
+      fprintf(logfptr,"\nStart logging backend upload\n");
+      printf("Redirecting to backend log\n");
       dup2(fileno(logfptr),fileno(stdout));
       dup2(fileno(logfptr),fileno(stderr));
       pthread_create(&delete_loop_thread,NULL,(void *)&delete_loop,NULL);
@@ -217,13 +212,14 @@ int main(int argc, char **argv)
     for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
      {
       curl_handle_mask[download_handle_count]=FALSE;
-      ret_val = hcfs_init_swift_backend(&(download_curl_handles[download_handle_count]));
+      ret_val = hcfs_init_backend(&(download_curl_handles[download_handle_count]));
+
       while ((ret_val < 200) || (ret_val > 299))
        {
-        printf("error in connecting to swift\n");
+        printf("error in connecting to backend\n");
         if (download_curl_handles[download_handle_count].curl !=NULL)
-         hcfs_destroy_swift_backend(download_curl_handles[download_handle_count].curl);
-        ret_val = hcfs_init_swift_backend(&(download_curl_handles[download_handle_count]));
+         hcfs_destroy_backend(download_curl_handles[download_handle_count].curl);
+        ret_val = hcfs_init_backend(&(download_curl_handles[download_handle_count]));
 
        }
      }

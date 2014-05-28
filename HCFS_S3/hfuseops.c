@@ -1600,7 +1600,7 @@ void hfuse_destroy(void *private_data)
 
   for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
    {
-    hcfs_destroy_swift_backend(download_curl_handles[download_handle_count].curl);
+    hcfs_destroy_backend(download_curl_handles[download_handle_count].curl);
    }
   fclose(logfptr);
 
