@@ -5,7 +5,7 @@
 
 unsigned char base64_codes[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outlen)
+void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outlen, int inputlen)
  {
   unsigned char *tmpstr;
   int count,input_index,output_index;
@@ -14,10 +14,10 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
   unsigned long tmp_index;
   
 
-  origin_str_len = strlen(inputstr);
+  origin_str_len = inputlen;
   tmpstr=malloc(1+((origin_str_len+2)/3)*3);
 
-  strncpy(tmpstr,inputstr,origin_str_len);
+  memcpy(tmpstr,inputstr,origin_str_len);
 
   for(count=origin_str_len;count<(1+((origin_str_len+2)/3)*3);count++)
    tmpstr[count]=0;

@@ -1,5 +1,6 @@
 /* Implemented routines to parse http return code to distinguish errors from normal ops*/
 /*TODO: Need to implement retry mechanisms and also http timeout */
+/*TODO: Continue to test S3 deletion problem */
 
 #include "hcfscurl.h"
 #include <stdio.h>
@@ -179,6 +180,7 @@ int hcfs_get_auth_swift(char *swift_user,char *swift_pass, char *swift_url, CURL
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, fptr);
   curl_easy_setopt(curl,CURLOPT_URL, auth_url);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
 
   res = curl_easy_perform(curl);
@@ -336,6 +338,7 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
   curl_easy_setopt(curl,CURLOPT_URL, container_string);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
 
@@ -414,6 +417,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
 
@@ -482,6 +486,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) fptr);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
 
@@ -584,7 +589,7 @@ void convert_currenttime(unsigned char *date_string)
   return;
  }
 
-void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str, unsigned char *key)
+void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str, unsigned char *key, int *outputlen)
  {
   unsigned char finalhash[4096];
   int len_finalhash;
@@ -601,8 +606,9 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str, unsi
   HMAC_Final(&myctx, finalhash, &len_finalhash);
   HMAC_CTX_cleanup(&myctx);
 
-  strncpy(output_str,finalhash,len_finalhash);
+  memcpy(output_str,finalhash,len_finalhash);
   output_str[len_finalhash]=0;
+  *outputlen=len_finalhash;
 
   for(count=0;count<len_finalhash;count++)
    printf("%02X",finalhash[count]);
@@ -613,14 +619,16 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str, unsi
 void generate_S3_sig(char *method, char *date_string, char *sig_string, char *resource_string)
  {
   unsigned char sig_temp1[4096],sig_temp2[4096];
-  int len_signature;
+  int len_signature,hashlen;
 
   convert_currenttime(date_string);
   sprintf(sig_temp1,"%s\n\n\n%s\n/%s",method,date_string,resource_string);
   printf("sig temp1: %s\n",sig_temp1);
-  compute_hmac_sha1(sig_temp1,sig_temp2,S3_SECRET);
+  compute_hmac_sha1(sig_temp1,sig_temp2,S3_SECRET,&hashlen);
   printf("sig temp2: %s\n",sig_temp2);
-  b64encode_str(sig_temp2,sig_string,&len_signature);
+  b64encode_str(sig_temp2,sig_string,&len_signature,hashlen);
+
+  printf("final sig: %s, %d\n",sig_string,hashlen);
 
   return;
  }
@@ -673,6 +681,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, S3_list_body_fptr);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
   curl_easy_setopt(curl,CURLOPT_URL, S3_BUCKET_URL);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
   curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
   res = curl_easy_perform(curl);
@@ -932,6 +941,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 
@@ -960,12 +970,158 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
  }
 int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
  {
+  struct curl_slist *chunk=NULL;
+  off_t objsize;
+  CURLcode res;
+  char container_string[200];
 
-  return 0;
+  FILE *S3_list_header_fptr;
+  CURL *curl;
+  char header_filename[100];
+  int ret_val;
+
+  unsigned char date_string[100];
+  char date_string_header[100];
+  unsigned char AWS_auth_string[200];
+  unsigned char S3_signature[200];
+  unsigned char resource[200];
+
+  sprintf(header_filename,"/run/shm/s3gethead%s.tmp",curl_handle->id);
+
+  sprintf(resource,"%s/%s",S3_BUCKET,objname);
+
+  curl = curl_handle->curl;
+
+  S3_list_header_fptr=fopen(header_filename,"w+");
+
+  generate_S3_sig("GET", date_string,S3_signature,resource);
+  sprintf(date_string_header, "date: %s", date_string);
+  sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS, S3_signature);
+
+  printf("%s\n",AWS_auth_string);
+
+  chunk=NULL;
+
+  sprintf(container_string,"%s/%s",S3_BUCKET_URL,objname);
+  chunk=curl_slist_append(chunk, "Expect:");
+  chunk=curl_slist_append(chunk, date_string_header);
+  chunk=curl_slist_append(chunk, AWS_auth_string);
+
+
+  fseek(fptr,0,SEEK_END);
+  objsize=ftell(fptr);
+  fseek(fptr,0,SEEK_SET);
+  if (objsize < 0)
+   {
+    fclose(S3_list_header_fptr);
+    unlink(header_filename);
+    curl_slist_free_all(chunk);
+
+    return -1;
+   }
+
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+  curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+  curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
+  curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) fptr);
+  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+  curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
+
+  curl_easy_setopt(curl,CURLOPT_URL, container_string);
+  curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
+  res = curl_easy_perform(curl);
+  if (res!=CURLE_OK)
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    fclose(S3_list_header_fptr);
+    unlink(header_filename);
+    curl_slist_free_all(chunk);
+    return -1;
+   }
+ 
+  curl_slist_free_all(chunk);
+  ret_val = parse_http_header_retcode(S3_list_header_fptr);
+  fclose(S3_list_header_fptr);
+  unlink(header_filename);
+
+  return ret_val;
  }
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
  {
+  struct curl_slist *chunk=NULL;
+  off_t objsize;
+  CURLcode res;
+  char container_string[200];
+  char delete_command[10];
 
-  return 0;
+  FILE *S3_list_header_fptr;
+  CURL *curl;
+  char header_filename[100];
+  int ret_val;
+
+  unsigned char date_string[100];
+  char date_string_header[100];
+  unsigned char AWS_auth_string[200];
+  unsigned char S3_signature[200];
+  unsigned char resource[200];
+
+
+  //printf("Debug S3_delete_object: object is %s\n",objname);
+
+  sprintf(header_filename,"/run/shm/s3deletehead%s.tmp",curl_handle->id);
+
+  sprintf(resource,"%s/%s",S3_BUCKET,objname);
+
+  curl = curl_handle->curl;
+
+  S3_list_header_fptr=fopen(header_filename,"w+");
+  strcpy(delete_command,"DELETE");
+
+  generate_S3_sig("DELETE", date_string,S3_signature,resource);
+  sprintf(date_string_header, "date: %s", date_string);
+  sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS, S3_signature);
+
+  printf("%s\n",AWS_auth_string);
+
+  chunk=NULL;
+
+  sprintf(container_string,"%s/%s",S3_BUCKET_URL,objname);
+  chunk=curl_slist_append(chunk, "Expect:");
+  chunk=curl_slist_append(chunk, date_string_header);
+  chunk=curl_slist_append(chunk, AWS_auth_string);
+
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+  curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+  curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+  curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+  curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
+  curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
+  curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+  curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
+
+  curl_easy_setopt(curl,CURLOPT_URL, container_string);
+  curl_easy_setopt(curl,CURLOPT_HTTPHEADER, chunk);
+  res = curl_easy_perform(curl);
+  if (res!=CURLE_OK)
+   {
+    fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
+    fclose(S3_list_header_fptr);
+    unlink(header_filename);
+    curl_slist_free_all(chunk);
+    return -1;
+   }
+
+  curl_slist_free_all(chunk);
+  ret_val = parse_http_header_retcode(S3_list_header_fptr);
+  fclose(S3_list_header_fptr);
+  unlink(header_filename);
+
+  return ret_val;
  }
 

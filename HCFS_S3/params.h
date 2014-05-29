@@ -12,7 +12,7 @@
 #define CACHE_HARD_LIMIT ((long long)1024*1024*1024)
 #define CACHE_DELTA 10485760
 
-#define MAX_BLOCK_SIZE 131072
+#define MAX_BLOCK_SIZE 1048576
 
 #define NO_LL 0
 #define IS_DIRTY 1

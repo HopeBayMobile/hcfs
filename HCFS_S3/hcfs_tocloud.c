@@ -1,6 +1,7 @@
 /*
 TODO: Will need to check mod time of meta file and not upload meta for every block status change.
 TODO: Check if meta objects will be deleted with the deletion of files/dirs
+TODO: error handling for HTTP exceptions
 */
 
 #include "hcfs_tocloud.h"
