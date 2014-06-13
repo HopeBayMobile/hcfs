@@ -5,6 +5,7 @@ TODO: error handling for HTTP exceptions
 */
 
 #include "hcfs_tocloud.h"
+#include "hcfs_clouddelete.h"
 #include "params.h"
 #include "hcfscurl.h"
 #include "super_inode.h"
@@ -54,7 +55,8 @@ void collect_finished_sync_threads(void *ptr)
 
 void collect_finished_upload_threads(void *ptr)
  {
-  int count;
+  int count,count2;
+  int which_curl;
   int ret_val;
   FILE *metafptr;
   char thismetapath[400];
@@ -125,20 +127,40 @@ void collect_finished_upload_threads(void *ptr)
                  }
                 /*TODO: Check if status is ST_NONE. If so, the block is removed due to truncating. Need to schedule block for deletion due to truncating*/
                }
-
-          /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
-          /*TODO: This must be before the usage flag is cleared*/
-
               flock(fileno(metafptr),LOCK_UN);
               fclose(metafptr);
              }
-
-          /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
-          /*TODO: This must be before the usage flag is cleared*/
-
            }
           /*TODO: If metafile is deleted already, schedule the block to be deleted.*/
           /*TODO: This must be before the usage flag is cleared*/
+
+          if (access(thismetapath,F_OK)==-1)  /*If file is deleted*/
+           {
+            sem_wait(&(delete_thread_control.delete_queue_sem));
+            sem_wait(&(delete_thread_control.delete_op_sem));
+            which_curl = -1;
+            for(count2=0;count2<MAX_DELETE_CONCURRENCY;count2++)
+             {
+              if (delete_thread_control.delete_threads_in_use[count2] == FALSE)
+               {
+                delete_thread_control.delete_threads_in_use[count2] = TRUE;
+                delete_thread_control.delete_threads_created[count2] = FALSE;
+                delete_thread_control.delete_threads[count2].is_block = TRUE;
+                delete_thread_control.delete_threads[count2].inode = this_inode;
+                delete_thread_control.delete_threads[count2].blockno = blockno;
+                delete_thread_control.delete_threads[count2].which_curl = count2;
+
+                delete_thread_control.total_active_delete_threads++;
+                which_curl = count2;
+                break;
+               }
+             }
+            sem_post(&(delete_thread_control.delete_op_sem));
+            pthread_create(&(delete_thread_control.delete_threads_no[which_curl]),NULL, (void *)&con_object_dsync,(void *)&(delete_thread_control.delete_threads[which_curl]));
+            delete_thread_control.delete_threads_created[which_curl]=TRUE;
+           }
+
+
 
           upload_thread_control.upload_threads_in_use[count]=FALSE;
           upload_thread_control.upload_threads_created[count]=FALSE;

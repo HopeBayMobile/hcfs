@@ -1,6 +1,7 @@
 /* Implemented routines to parse http return code to distinguish errors from normal ops*/
 /*TODO: Need to implement retry mechanisms and also http timeout */
 /*TODO: Continue to test S3 deletion problem */
+/*TODO: Retry mechanism if HTTP operations failed due to timeout */
 
 #include "hcfscurl.h"
 #include <stdio.h>
@@ -261,6 +262,16 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
     return ret_code;
    }
   return -1;
+ }
+int hcfs_S3_reauth(CURL_HANDLE *curl_handle)
+ {
+  char account_user_string[1000];
+  int ret_code;
+
+  if (curl_handle->curl != NULL)
+   hcfs_destroy_swift_backend(curl_handle->curl);
+
+  return hcfs_init_S3_backend(curl_handle);
  }
 void hcfs_destroy_swift_backend(CURL *curl)
  {
@@ -567,16 +578,19 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 void convert_currenttime(unsigned char *date_string)
  {
-  char current_time[100];
-  char wday[5];
-  char month[5];
-  char mday[5];
-  char timestr[20];
-  char year[6];
+  unsigned char current_time[100];
+  unsigned char wday[5];
+  unsigned char month[5];
+  unsigned char mday[5];
+  unsigned char timestr[20];
+  unsigned char year[6];
+  struct tm tmp_gmtime;
   time_t tmptime;
 
   tmptime=time(NULL);
-  strcpy(current_time, asctime(gmtime(&tmptime)));
+  gmtime_r(&tmptime,&tmp_gmtime);
+  asctime_r(&tmp_gmtime,current_time);
+//  strcpy(current_time, asctime_r(gmtime_r(&tmptime)));
 
   printf("current time %s\n",current_time);
 
@@ -616,7 +630,7 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str, unsi
 
   return;
  }
-void generate_S3_sig(char *method, char *date_string, char *sig_string, char *resource_string)
+void generate_S3_sig(unsigned char *method, unsigned char *date_string, unsigned char *sig_string, unsigned char *resource_string)
  {
   unsigned char sig_temp1[4096],sig_temp2[4096];
   int len_signature,hashlen;
@@ -868,6 +882,14 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
      break;
     case S3:
      ret_val = hcfs_S3_delete_object(objname, curl_handle);
+     while (((ret_val < 200) || (ret_val > 299)) && (ret_val !=404))
+      {
+       ret_val = hcfs_S3_reauth(curl_handle);
+       if ((ret_val >= 200) && (ret_val <=299))
+        {
+         ret_val = hcfs_S3_delete_object(objname, curl_handle);
+        }
+      }
      break;
     default:
      ret_val = -1;
@@ -941,6 +963,8 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_INFILESIZE, objsize);
   curl_easy_setopt(curl, CURLOPT_READFUNCTION, read_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
@@ -1028,6 +1052,8 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) fptr);
   curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
@@ -1101,6 +1127,8 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
   curl_easy_setopt(curl, CURLOPT_PUT, 0L);
   curl_easy_setopt(curl, CURLOPT_HTTPGET, 0L);
   curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+  curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+  curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
   curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
   curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
   curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);

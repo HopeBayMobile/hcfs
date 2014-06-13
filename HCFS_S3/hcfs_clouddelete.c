@@ -2,6 +2,8 @@
 
 /*TODO: before actually moving the inode from to_be_deleted to deleted, must first check the upload threads and sync threads to find out if there are any pending uploads. It must wait until those are cleared. It must then wait for any additional pending meta or block deletion for this inode to finish.*/
 
+/*TODO: Current issue: If delete file when objects of that file is still being uploaded, objects for that file won't be deleted completely.*/
+
 /*TODO: Need to run super inode reclaim after moving inode from to_delete to deleted*/
 
 

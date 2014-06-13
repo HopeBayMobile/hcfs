@@ -53,6 +53,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle);
 int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle);
+int hcfs_S3_reauth(CURL_HANDLE *curl_handle);
 
 /* Generic */
 int hcfs_init_backend(CURL_HANDLE *curl_handle);
