@@ -90,13 +90,16 @@ ino_t check_cached_path(const char *path)
   return return_val;
  }
 
+/* TODO: resolving pathname may result in EACCES */
 
-ino_t lookup_pathname(const char *path)
+ino_t lookup_pathname(const char *path, int *errcode)
  {
   int strptr;
   unsigned long long index;
   char tempdir[MAX_PATHNAME+10];
   ino_t cached_inode;
+
+  *errcode = -ENOENT;
 
   if (strcmp(path,"/")==0)  /*Root of the FUSE system has inode 1. */
    return 1;
@@ -125,15 +128,15 @@ ino_t lookup_pathname(const char *path)
           tempdir[strptr-1]=0;
           cached_inode = check_cached_path(tempdir);
           if (cached_inode > 0)
-           return lookup_pathname_recursive(cached_inode, strptr-1, &path[strptr-1],path);
+           return lookup_pathname_recursive(cached_inode, strptr-1, &path[strptr-1],path, errcode);
           strptr--;
          }
        }
      }
    }
-  return lookup_pathname_recursive(1, 0, path,path);
+  return lookup_pathname_recursive(1, 0, path,path, errcode);
  }
-ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath)
+ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath, int *errcode)
  {
   FILE *fptr;
   int count;
@@ -169,6 +172,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   if (search_subdir_only)
    {
+    fseek(fptr,sizeof(struct stat), SEEK_SET);
     fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
     thisfile_pos = tempmeta.next_subdir_page;
 
@@ -190,21 +194,24 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
            }
           flock(fileno(fptr),LOCK_UN);
           fclose(fptr);
-          return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath);
+          return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath, errcode);
          }
        }
       thisfile_pos = temp_page.next_page;
      }
     flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
+    *errcode = -ENOENT;
     return 0;   /*Cannot find this entry*/
    }
 
   strcpy(target_entry_name,&(partialpath[1]));
 
+  fseek(fptr,sizeof(struct stat), SEEK_SET);
   ret_val=fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
   if (ret_val < 1)
    {
+    *errcode = -EACCES;
     flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
     return 0;
@@ -217,6 +224,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
     ret_val = fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
     if (ret_val < 1)
      {
+      *errcode = -EACCES;
       flock(fileno(fptr),LOCK_UN);
       fclose(fptr);
       return 0;
@@ -266,6 +274,8 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
      }
     thisfile_pos = temp_page.next_page;
    }
+
+  *errcode = -ENOENT;
 
   flock(fileno(fptr),LOCK_UN);
   fclose(fptr);

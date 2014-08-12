@@ -93,14 +93,16 @@ void init_hfuse()
     /*TODO: put error handling here if root_inode is not 1 (cannot initialize system)*/
 
     this_stat.st_ino = 1;
-    memcpy(&(this_meta.thisstat),&this_stat,sizeof(struct stat));
 
     metafptr = fopen(rootmetapath,"w");
+
+    ret_val = fwrite(&this_stat,sizeof(struct stat),1,metafptr);
+
 
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
     this_meta.next_subdir_page = ftell(metafptr);
-    fseek(metafptr,0,SEEK_SET);
+    fseek(metafptr,sizeof(struct stat),SEEK_SET);
 
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 

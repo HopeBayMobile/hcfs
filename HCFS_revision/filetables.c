@@ -1,6 +1,7 @@
 #include "fuseop.h"
 #include "params.h"
 #include "global.h"
+#include "filetables.h"
 
 int init_system_fh_table()
  {
@@ -51,6 +52,7 @@ long long open_fh(ino_t thisinode)
   system_fh_table.entry_table[index].metafptr = fopen(thismetapath, "r+");
 
   setbuf(system_fh_table.entry_table[index].metafptr,NULL);
+  fread(&(system_fh_table.entry_table[index].cached_stat),sizeof(struct stat),1,system_fh_table.entry_table[index].metafptr);
   fread(&(system_fh_table.entry_table[index].cached_meta),sizeof(FILE_META_TYPE),1,system_fh_table.entry_table[index].metafptr);
   fseek(system_fh_table.entry_table[index].metafptr,0,SEEK_SET);
 
@@ -111,7 +113,7 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page)
         fh_ptr->cached_meta.next_block_page = prevfilepos;
         memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
         fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
-        fseek(fptr,0,SEEK_SET);
+        fseek(fptr,sizeof(struct stat),SEEK_SET);
         fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fptr);
        }
       else

@@ -17,14 +17,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
   SUPER_INODE_ENTRY tempentry;
   int ret_code;
 
-  /*TODO : inode caching? How? */
+  /*TODO : inode stat caching? How? */
   if (this_inode > 0)
    {
     ret_code =super_inode_read(this_inode, &tempentry);    
 
     if (ret_code < 0)
      {
-      ret_code = inode_stat_from_meta(this_inode, inode_stat);
+      /* TODO: For performance reason, may not want to try meta files. System could only test if some file really does not exist */
+      /* TODO: This option should only be turned on if system is in some sort of recovery mode. In this case, should even try backend meta backups */
+
+      //ret_code = inode_stat_from_meta(this_inode, inode_stat);
       /* TODO: Perhaps missing from super inode (inode caching?). Fill it in? */
      }
     else
@@ -44,4 +47,6 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 
   return 0;
  }
+
+//int inode_stat_from_meta(ino_t this_inode, struct stat *inode_stat)
 

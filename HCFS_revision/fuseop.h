@@ -34,7 +34,6 @@ typedef struct {
   } BLOCK_ENTRY;
 
 typedef struct {
-    struct stat thisstat;
     long long total_children;   /*Total children not including "." and "..*/
     long long next_subdir_page;
     long long next_file_page;
@@ -42,7 +41,6 @@ typedef struct {
   } DIR_META_TYPE;
 
 typedef struct {
-    struct stat thisstat;
     long long next_block_page;
     long long next_xattr_page;
   } FILE_META_TYPE;
@@ -76,40 +74,6 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inod
 int decrease_nlink_inode_file(ino_t this_inode);
 
 void init_hfuse();
-
-/*BEGIN definition of file handle */
-
-#define MAX_OPEN_FILE_ENTRIES 65536
-
-typedef struct {
-    ino_t thisinode;
-    FILE *metafptr;
-    FILE *blockfptr;
-    long long opened_block;
-    FILE_META_TYPE cached_meta;
-//    BLOCK_ENTRY_PAGE cached_page;
-    long long cached_page_index;
-    off_t cached_page_start_fpos;
-    sem_t block_sem;
-  } FH_ENTRY;
-
-typedef struct {
-    long long num_opened_files;
-    char *entry_table_flags;
-    FH_ENTRY *entry_table;
-    long long last_available_index;
-    sem_t fh_table_sem;
-  } FH_TABLE_TYPE;
-
-FH_TABLE_TYPE system_fh_table;
-
-int init_system_fh_table();
-long long open_fh(ino_t thisinode);
-int close_fh(long long index);
-int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page);
-long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index); /*In advance block, need to write back dirty page if change page */
-
-/*END definition of file handle */
 
 
 typedef struct {

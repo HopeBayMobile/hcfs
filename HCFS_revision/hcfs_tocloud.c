@@ -220,6 +220,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   char thismetapath[METAPATHLEN];
   ino_t this_inode;
   FILE *metafptr;
+  struct stat tempfilestat;
   FILE_META_TYPE tempfilemeta;
   BLOCK_ENTRY_PAGE temppage;
   int which_curl;
@@ -250,13 +251,14 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   if ((ptr->this_mode) & S_IFREG)
    {
     flock(fileno(metafptr),LOCK_EX);
+    fread(&tempfilestat,sizeof(struct stat),1,metafptr);
     fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,metafptr);
     page_pos=tempfilemeta.next_block_page;
     current_entry_index = 0;
-    if (tempfilemeta.thisstat.st_size == 0)
+    if (tempfilestat.st_size == 0)
      total_blocks = 0;
     else
-     total_blocks = ((tempfilemeta.thisstat.st_size - 1) / MAX_BLOCK_SIZE) + 1;
+     total_blocks = ((tempfilestat.st_size - 1) / MAX_BLOCK_SIZE) + 1;
 
     if (total_blocks ==0)
      total_pages = 0;

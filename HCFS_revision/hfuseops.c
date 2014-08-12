@@ -12,9 +12,11 @@
 #include <sys/statvfs.h>
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
+#include "filetables.h"
 
 
 /* TODO: Need to go over the access rights problem for the ops */
+/* TODO: Access time may not be changed for file accesses, if noatime is specified in file opening or mounting. */
 /*TODO: Need to revisit the error handling in all operations */
 /*TODO: Will need to implement rollback or error marking when ops failed*/
 /*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
@@ -29,22 +31,20 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
   ino_t hit_inode;
   int ret_code;
 
-  hit_inode = lookup_pathname(path);
+  hit_inode = lookup_pathname(path, &ret_code);
 
   if (hit_inode > 0)
    {
     ret_code = fetch_inode_stat(hit_inode, inode_stat);
-    if (ret_code < 0)
-     return -ENOENT;
 
     #if DEBUG >= 5
-    printf("getattr %lld\n",inode_stat->st_ino);
+    printf("getattr %lld, returns %d\n",inode_stat->st_ino,ret_code);
     #endif  /* DEBUG */
 
-    return 0;
+    return ret_code;
    }
   else
-   return -ENOENT;
+   return ret_code;
  }
 
 //int hfuse_readlink(const char *path, char *buf, size_t buf_size);
@@ -61,15 +61,16 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   FILE *metafptr;
   int ret_val;
   struct fuse_context *temp_context;
+  int ret_code;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
 
-  parent_inode = lookup_pathname(parentname);
+  parent_inode = lookup_pathname(parentname, &ret_code);
 
   free(parentname);
   if (parent_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   memset(&this_stat,0,sizeof(struct stat));
   memset(&this_meta,0,sizeof(FILE_META_TYPE));
@@ -92,7 +93,6 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   if (self_inode < 1)
    return -EACCES;
   this_stat.st_ino = self_inode;
-  memcpy(&(this_meta.thisstat),&this_stat,sizeof(struct stat));
 
   fetch_meta_path(thismetapath,self_inode);
 
@@ -101,14 +101,28 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   if (metafptr == NULL)
    return -EACCES;
 
+  ret_val = fwrite(&this_stat,sizeof(struct stat),1,metafptr);
+  if (ret_val < 1)
+   {
+    fclose(metafptr);
+    unlink(thismetapath);
+    return -EACCES;
+   }
+
   ret_val = fwrite(&this_meta,sizeof(FILE_META_TYPE),1,metafptr);
   fclose(metafptr);
   if (ret_val < 1)
-   return -EACCES;
+   {
+    unlink(thismetapath);
+    return -EACCES;
+   }
 
   ret_val = dir_add_entry(parent_inode, self_inode, selfname,self_mode);
   if (ret_val < 0)
-   return -EACCES;
+   {
+    unlink(thismetapath);
+    return -EACCES;
+   }
 
   super_inode_mark_dirty(self_inode);
 
@@ -127,15 +141,16 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   FILE *metafptr;
   int ret_val;
   struct fuse_context *temp_context;
+  int ret_code;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
 
-  parent_inode = lookup_pathname(parentname);
+  parent_inode = lookup_pathname(parentname, &ret_code);
 
   free(parentname);
   if (parent_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   memset(&this_stat,0,sizeof(struct stat));
   memset(&this_meta,0,sizeof(DIR_META_TYPE));
@@ -159,7 +174,6 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   if (self_inode < 1)
    return -EACCES;
   this_stat.st_ino = self_inode;
-  memcpy(&(this_meta.thisstat),&this_stat,sizeof(struct stat));
 
   fetch_meta_path(thismetapath,self_inode);
 
@@ -168,21 +182,32 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   if (metafptr == NULL)
    return -EACCES;
 
-  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
+  ret_val = fwrite(&this_stat,sizeof(struct stat),1,metafptr);
   if (ret_val < 1)
    {
     fclose(metafptr);
+    unlink(thismetapath);
     return -EACCES;
    }
+
+  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
+  if (ret_val < 1)
+   {
+    fclose(metafptr);
+    unlink(thismetapath);
+    return -EACCES;
+   }
+
   this_meta.next_subdir_page = ftell(metafptr);
-  fseek(metafptr,0,SEEK_SET);
+  fseek(metafptr,sizeof(struct stat),SEEK_SET);
 
   ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
   if (ret_val < 1)
    {
     fclose(metafptr);
+    unlink(thismetapath);
     return -EACCES;
    }
   temppage.num_entries = 2;
@@ -195,11 +220,17 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   fclose(metafptr);
 
   if (ret_val < 1)
-   return -EACCES;
+   {
+    unlink(thismetapath);
+    return -EACCES;
+   }
 
   ret_val = dir_add_entry(parent_inode, self_inode, selfname,self_mode);
   if (ret_val < 0)
-   return -EACCES;
+   {
+    unlink(thismetapath);
+    return -EACCES;
+   }
 
   super_inode_mark_dirty(self_inode);
 
@@ -214,21 +245,22 @@ int hfuse_unlink(const char *path)
   char thismetapath[METAPATHLEN];
   ino_t this_inode, parent_inode;
   int ret_val;
+  int ret_code;
 
-  this_inode = lookup_pathname(path);
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
 
-  parent_inode = lookup_pathname(parentname);
+  parent_inode = lookup_pathname(parentname, &ret_code);
 
   parse_parent_self(path,parentname,selfname);
 
   free(parentname);
   if (parent_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   invalidate_cache_entry(path);
 
@@ -255,15 +287,14 @@ int hfuse_rmdir(const char *path)
   FILE *todeletefptr;
   char filebuf[5000];
   size_t read_size;
+  int ret_code;
 
-  this_inode = lookup_pathname(path);
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
-
-  parent_inode = lookup_pathname(parentname);
 
   parse_parent_self(path,parentname,selfname);
 
@@ -273,8 +304,10 @@ int hfuse_rmdir(const char *path)
   if (!strcmp(selfname,".."))
    return -ENOTEMPTY;
 
+  parent_inode = lookup_pathname(parentname, &ret_code);
+
   if (parent_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   invalidate_cache_entry(path);
 
@@ -286,6 +319,7 @@ int hfuse_rmdir(const char *path)
    return -EACCES;
   setbuf(metafptr,NULL);
   flock(fileno(metafptr),LOCK_EX);
+  fseek(metafptr,sizeof(struct stat),SEEK_SET);
   fread(&tempmeta,sizeof(DIR_META_TYPE),1,metafptr);
   printf("TOTAL CHILDREN is now %ld\n",tempmeta.total_children);
 
@@ -349,14 +383,15 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   int ret_val;
   SUPER_INODE_ENTRY tempentry;
   mode_t self_mode;
+  int ret_code, ret_code2;
 
-  self_inode = lookup_pathname(oldpath);
+  self_inode = lookup_pathname(oldpath, &ret_code);
   if (self_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   invalidate_cache_entry(oldpath);
 
-  if (lookup_pathname(newpath) > 0)
+  if (lookup_pathname(newpath, &ret_code) > 0)
    return -EACCES;
 
   ret_val =super_inode_read(self_inode, &tempentry);    
@@ -371,14 +406,18 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   parse_parent_self(oldpath,parentname1,selfname1);
   parse_parent_self(newpath,parentname2,selfname2);
 
-  parent_inode1 = lookup_pathname(parentname1);
-  parent_inode2 = lookup_pathname(parentname2);
+  parent_inode1 = lookup_pathname(parentname1, &ret_code);
+
+  parent_inode2 = lookup_pathname(parentname2, &ret_code2);
 
   free(parentname1);
   free(parentname2);
-  if ((parent_inode1 < 1) || (parent_inode2 < 1))
-   return -ENOENT;
-  
+
+  if (parent_inode1 < 1)
+   return ret_code;
+
+  if (parent_inode2 < 1)
+   return ret_code2;
 
   if (parent_inode1 == parent_inode2)
    {
@@ -411,17 +450,17 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 int hfuse_chmod(const char *path, mode_t mode)
  {
   SUPER_INODE_ENTRY tempentry;
-  FILE_META_TYPE tempfilemeta;
-  DIR_META_TYPE tempdirmeta;
+  struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
   char thismetapath[METAPATHLEN];
   FILE *fptr;
+  int ret_code;
 
   printf("Debug chmod\n");
-  this_inode = lookup_pathname(path);
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   fetch_meta_path(thismetapath,this_inode);
   printf("%lld %s\n",this_inode,thismetapath);
@@ -430,103 +469,54 @@ int hfuse_chmod(const char *path, mode_t mode)
    return -ENOENT;
   setbuf(fptr,NULL);
   
-  super_inode_read(this_inode, &tempentry);
-
   flock(fileno(fptr),LOCK_EX);
-  if (tempentry.inode_stat.st_mode & S_IFREG)
-   {
-    fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    tempfilemeta.thisstat.st_mode = mode;
-    tempfilemeta.thisstat.st_ctime = time(NULL);
-    fseek(fptr,0,SEEK_SET);
-    fwrite(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    memcpy(&(tempentry.inode_stat),&(tempfilemeta.thisstat),sizeof(struct stat));
-    flock(fileno(fptr),LOCK_UN);
-    fclose(fptr);
-    super_inode_write(this_inode, &tempentry);
-   }  
-  else
-   {
-    if (tempentry.inode_stat.st_mode & S_IFDIR)
-     {
-      fread(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      tempdirmeta.thisstat.st_mode = mode;
-      tempdirmeta.thisstat.st_ctime = time(NULL);
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      memcpy(&(tempentry.inode_stat),&(tempdirmeta.thisstat),sizeof(struct stat));
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-      super_inode_write(this_inode, &tempentry);
-     } 
-    else
-     {
-      /*TODO: Handle symlink in the future */
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-     }
-   }
+  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  temp_inode_stat.st_mode = mode;
+  temp_inode_stat.st_ctime = time(NULL);
+  fseek(fptr,0,SEEK_SET);
+  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
+  flock(fileno(fptr),LOCK_UN);
+  fclose(fptr);
+  super_inode_write(this_inode, &tempentry);
+
   return 0;
  }
 
 int hfuse_chown(const char *path, uid_t owner, gid_t group)
  {
   SUPER_INODE_ENTRY tempentry;
-  FILE_META_TYPE tempfilemeta;
-  DIR_META_TYPE tempdirmeta;
+  struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
   char thismetapath[METAPATHLEN];
   FILE *fptr;
+  int ret_code;
 
-  this_inode = lookup_pathname(path);
+  printf("Debug chmod\n");
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   fetch_meta_path(thismetapath,this_inode);
+  printf("%lld %s\n",this_inode,thismetapath);
   fptr = fopen(thismetapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
   setbuf(fptr,NULL);
   
-  super_inode_read(this_inode, &tempentry);
-
   flock(fileno(fptr),LOCK_EX);
-  if (tempentry.inode_stat.st_mode & S_IFREG)
-   {
-    fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    tempfilemeta.thisstat.st_uid = owner;
-    tempfilemeta.thisstat.st_gid = group;
-    tempfilemeta.thisstat.st_ctime = time(NULL);
-    fseek(fptr,0,SEEK_SET);
-    fwrite(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    memcpy(&(tempentry.inode_stat),&(tempfilemeta.thisstat),sizeof(struct stat));
-    flock(fileno(fptr),LOCK_UN);
-    fclose(fptr);
-    super_inode_write(this_inode, &tempentry);
-   }  
-  else
-   {
-    if (tempentry.inode_stat.st_mode & S_IFDIR)
-     {
-      fread(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      tempdirmeta.thisstat.st_uid = owner;
-      tempdirmeta.thisstat.st_gid = group;
-      tempdirmeta.thisstat.st_ctime = time(NULL);
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      memcpy(&(tempentry.inode_stat),&(tempdirmeta.thisstat),sizeof(struct stat));
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-      super_inode_write(this_inode, &tempentry);
-     } 
-    else
-     {
-      /*TODO: Handle symlink in the future */
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-     }
-   }
+  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  temp_inode_stat.st_uid = owner;
+  temp_inode_stat.st_gid = group;
+  temp_inode_stat.st_ctime = time(NULL);
+  fseek(fptr,0,SEEK_SET);
+  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
+  flock(fileno(fptr),LOCK_UN);
+  fclose(fptr);
+  super_inode_write(this_inode, &tempentry);
+
   return 0;
  }
 
@@ -539,6 +529,7 @@ int hfuse_truncate(const char *path, off_t offset)
 
 
   SUPER_INODE_ENTRY tempentry;
+  struct stat tempfilestat;
   FILE_META_TYPE tempfilemeta;
   int ret_val;
   ino_t this_inode;
@@ -554,10 +545,11 @@ int hfuse_truncate(const char *path, off_t offset)
   int block_count;
   long long temp_block_index;
   struct stat tempstat;
+  int ret_code;
 
-  this_inode = lookup_pathname(path);
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   fetch_meta_path(thismetapath,this_inode);
   fptr = fopen(thismetapath,"r+");
@@ -570,8 +562,9 @@ int hfuse_truncate(const char *path, off_t offset)
   flock(fileno(fptr),LOCK_EX);
   if (tempentry.inode_stat.st_mode & S_IFREG)
    {
+    fread(&tempfilestat,sizeof(struct stat),1,fptr);
     fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    if (tempfilemeta.thisstat.st_size == offset)
+    if (tempfilestat.st_size == offset)
      {
       /*Do nothing if no change needed */
       printf("Debug truncate: no size change. Nothing changed.\n");
@@ -580,17 +573,16 @@ int hfuse_truncate(const char *path, off_t offset)
       return 0;
      }
 
-    if (tempfilemeta.thisstat.st_size < offset)
+    if (tempfilestat.st_size < offset)
      {
       /*If need to extend, only need to change st_size*/
 
       sem_wait(&(hcfs_system->access_sem));
-      hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta
-.thisstat.st_size);
+      hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
       sync_hcfs_system_data(FALSE);
       sem_post(&(hcfs_system->access_sem));           
 
-      tempfilemeta.thisstat.st_size = offset;
+      tempfilestat.st_size = offset;
      }
     else
      {
@@ -606,7 +598,7 @@ int hfuse_truncate(const char *path, off_t offset)
         last_page = last_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
        }
 
-      old_last_block = ((tempfilemeta.thisstat.st_size - 1) / MAX_BLOCK_SIZE);
+      old_last_block = ((tempfilestat.st_size - 1) / MAX_BLOCK_SIZE);
       nextfilepos = tempfilemeta.next_block_page;
 
       current_page = 0;
@@ -620,10 +612,10 @@ int hfuse_truncate(const char *path, off_t offset)
         if (nextfilepos == 0) /*Data after offset does not actually exists. Just change file size */
          {
           sem_wait(&(hcfs_system->access_sem));
-          hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta.thisstat.st_size);
+          hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
           sync_hcfs_system_data(FALSE);
           sem_post(&(hcfs_system->access_sem));
-          tempfilemeta.thisstat.st_size = offset;
+          tempfilestat.st_size = offset;
           break;
          }
         else
@@ -653,6 +645,7 @@ int hfuse_truncate(const char *path, off_t offset)
               /*Re-read status*/
                 flock(fileno(fptr),LOCK_EX);
                 fseek(fptr,0,SEEK_SET);
+                fread(&tempfilestat,sizeof(struct stat),1,fptr);
                 fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
                 fseek(fptr,currentfilepos,SEEK_SET);
                 fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
@@ -661,7 +654,7 @@ int hfuse_truncate(const char *path, off_t offset)
                break;
              }
 
-            fetch_block_path(thisblockpath,(tempfilemeta).thisstat.st_ino,last_block);
+            fetch_block_path(thisblockpath,tempfilestat.st_ino,last_block);
 
             if (((temppage).block_entries[last_entry_index].status == ST_CLOUD) ||
                    ((temppage).block_entries[last_entry_index].status == ST_CtoL))
@@ -685,7 +678,7 @@ int hfuse_truncate(const char *path, off_t offset)
                   fflush(fptr);
                  }
                 flock(fileno(fptr),LOCK_UN);
-                fetch_from_cloud(blockfptr,(tempfilemeta).thisstat.st_ino,last_block);
+                fetch_from_cloud(blockfptr,tempfilestat.st_ino,last_block);
 
                 /*Re-read status*/
                 flock(fileno(fptr),LOCK_EX);
@@ -772,7 +765,7 @@ int hfuse_truncate(const char *path, off_t offset)
               case ST_TODELETE:
                   break;
               case ST_LDISK:
-                  fetch_block_path(thisblockpath,(tempfilemeta).thisstat.st_ino,temp_block_index);
+                  fetch_block_path(thisblockpath,tempfilestat.st_ino,temp_block_index);
                   unlink(thisblockpath);
                   (temppage).block_entries[block_count].status = ST_NONE;
                   break;
@@ -782,7 +775,7 @@ int hfuse_truncate(const char *path, off_t offset)
               case ST_BOTH:
               case ST_LtoC:
               case ST_CtoL:
-                  fetch_block_path(thisblockpath,(tempfilemeta).thisstat.st_ino,temp_block_index);
+                  fetch_block_path(thisblockpath,tempfilestat.st_ino,temp_block_index);
                   if (access(thisblockpath,F_OK)==0)
                    unlink(thisblockpath);
                   (temppage).block_entries[block_count].status = ST_TODELETE;
@@ -797,10 +790,10 @@ int hfuse_truncate(const char *path, off_t offset)
           fflush(fptr);
 
           sem_wait(&(hcfs_system->access_sem));
-          hcfs_system->systemdata.system_size += (long long)(offset - tempfilemeta.thisstat.st_size);
+          hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
           sync_hcfs_system_data(FALSE);
           sem_post(&(hcfs_system->access_sem));   
-          tempfilemeta.thisstat.st_size = offset;
+          tempfilestat.st_size = offset;
           break;
          }
         else
@@ -824,7 +817,7 @@ int hfuse_truncate(const char *path, off_t offset)
             case ST_TODELETE:
                 break;
             case ST_LDISK:
-                fetch_block_path(thisblockpath,(tempfilemeta).thisstat.st_ino,temp_block_index);
+                fetch_block_path(thisblockpath,tempfilestat.st_ino,temp_block_index);
                 unlink(thisblockpath);
                 (temppage).block_entries[block_count].status = ST_NONE;
                 break;
@@ -834,7 +827,7 @@ int hfuse_truncate(const char *path, off_t offset)
             case ST_BOTH:
             case ST_LtoC:
             case ST_CtoL:
-                fetch_block_path(thisblockpath,(tempfilemeta).thisstat.st_ino,temp_block_index);
+                fetch_block_path(thisblockpath,tempfilestat.st_ino,temp_block_index);
                 if (access(thisblockpath,F_OK)==0)
                  unlink(thisblockpath);
                 (temppage).block_entries[block_count].status = ST_TODELETE;
@@ -852,10 +845,11 @@ int hfuse_truncate(const char *path, off_t offset)
      }
 
 
-    tempfilemeta.thisstat.st_mtime = time(NULL);
+    tempfilestat.st_mtime = time(NULL);
     fseek(fptr,0,SEEK_SET);
+    fwrite(&tempfilestat,sizeof(struct stat),1,fptr);
     fwrite(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    memcpy(&(tempentry.inode_stat),&(tempfilemeta.thisstat),sizeof(struct stat));
+    memcpy(&(tempentry.inode_stat),&(tempfilestat),sizeof(struct stat));
     flock(fileno(fptr),LOCK_UN);
     fclose(fptr);
     super_inode_write(this_inode, &tempentry);
@@ -876,7 +870,6 @@ int hfuse_truncate(const char *path, off_t offset)
      }
    }
 
-
   return 0;
  }
 int hfuse_open(const char *path, struct fuse_file_info *file_info)
@@ -884,10 +877,11 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
   /*TODO: Need to check permission here*/
   ino_t thisinode;
   long long fh;
+  int ret_code;
 
-  thisinode = lookup_pathname(path);
+  thisinode = lookup_pathname(path, &ret_code);
   if (thisinode < 1)
-   return -ENOENT;
+   return ret_code;
 
   fh = open_fh(thisinode);
   if (fh < 0)
@@ -929,12 +923,12 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
   flockfile(fh_ptr-> metafptr);
   fseek(fh_ptr->metafptr,0,SEEK_SET);
-  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+  fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
   funlockfile(fh_ptr-> metafptr);
 
 
-  if ((fh_ptr->cached_meta).thisstat.st_size < (offset+size_org))
-   size = ((fh_ptr->cached_meta).thisstat.st_size - offset);
+  if ((fh_ptr->cached_stat).st_size < (offset+size_org))
+   size = ((fh_ptr->cached_stat).st_size - offset);
   else
    size = size_org;
 
@@ -955,7 +949,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
    {
     flock(fileno(fh_ptr-> metafptr),LOCK_EX);
     fseek(fh_ptr->metafptr,0,SEEK_SET);
-    fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+    fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
 
     if (fh_ptr->cached_page_index != start_page)  /*Check if other threads have already done the work*/
      seek_page(fh_ptr-> metafptr,fh_ptr, start_page);
@@ -1008,7 +1002,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
             ((temppage).block_entries[entry_index+1].status == ST_CtoL))
          {
           temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
-          temp_prefetch -> this_inode = (fh_ptr->cached_meta).thisstat.st_ino;
+          temp_prefetch -> this_inode = (fh_ptr->cached_stat).st_ino;
           temp_prefetch -> block_no = block_index + 1;
           temp_prefetch -> page_start_fpos = this_page_fpos;
           temp_prefetch -> entry_index = entry_index + 1;
@@ -1030,7 +1024,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
         case ST_CLOUD:
         case ST_CtoL:        
             /*Download from backend */
-            fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+            fetch_block_path(thisblockpath,(fh_ptr->cached_stat).st_ino,block_index);
             fh_ptr->blockfptr = fopen(thisblockpath,"a+");
             fclose(fh_ptr->blockfptr);
             fh_ptr->blockfptr = fopen(thisblockpath,"r+");
@@ -1051,7 +1045,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
                 fflush(fh_ptr->metafptr);
                }
               flock(fileno(fh_ptr->metafptr),LOCK_UN);
-              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_stat).st_ino,block_index);
               /*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
               flock(fileno(fh_ptr->metafptr),LOCK_EX);
               fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
@@ -1086,7 +1080,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
       if ((fill_zeros != TRUE) && (fh_ptr->opened_block != block_index))
        {
-        fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+        fetch_block_path(thisblockpath,(fh_ptr->cached_stat).st_ino,block_index);
 
         fh_ptr->blockfptr=fopen(thisblockpath,"r+");
         if (fh_ptr->blockfptr != NULL)
@@ -1163,16 +1157,16 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
     /*Update and flush file meta*/
 
     fseek(fh_ptr->metafptr,0,SEEK_SET);
-    fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+    fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
 
 
     if (total_bytes_read > 0)
-     (fh_ptr->cached_meta).thisstat.st_atime = time(NULL);
+     (fh_ptr->cached_stat).st_atime = time(NULL);
 
     fseek(fh_ptr->metafptr,0,SEEK_SET);
-    fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+    fwrite(&(fh_ptr->cached_stat), sizeof(struct stat),1,fh_ptr->metafptr);
 
-    super_inode_update_stat((fh_ptr->cached_meta).thisstat.st_ino, &((fh_ptr->cached_meta).thisstat));
+    super_inode_update_stat((fh_ptr->cached_stat).st_ino, &((fh_ptr->cached_stat)));
 
     flock(fileno(fh_ptr-> metafptr),LOCK_UN);
     funlockfile(fh_ptr-> metafptr);
@@ -1224,7 +1218,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   flock(fileno(fh_ptr-> metafptr),LOCK_EX);
 
   fseek(fh_ptr->metafptr,0,SEEK_SET);
-  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+  fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
 
 
   if (fh_ptr->cached_page_index != start_page)
@@ -1236,7 +1230,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
   for(block_index = start_block; block_index <= end_block; block_index++)
    {
-    fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+    fetch_block_path(thisblockpath,(fh_ptr->cached_stat).st_ino,block_index);
     sem_wait(&(fh_ptr->block_sem));
     if (fh_ptr->opened_block != block_index)
      {
@@ -1263,7 +1257,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
           flock(fileno(fh_ptr-> metafptr),LOCK_EX);
           sem_wait(&(fh_ptr->block_sem));
           fseek(fh_ptr->metafptr,0,SEEK_SET);
-          fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+          fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
           fseek(fh_ptr->metafptr, this_page_fpos,SEEK_SET);
           fread(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fh_ptr->metafptr);
          }
@@ -1300,7 +1294,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
         case ST_CLOUD:
         case ST_CtoL:        
             /*Download from backend */
-            fetch_block_path(thisblockpath,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+            fetch_block_path(thisblockpath,(fh_ptr->cached_stat).st_ino,block_index);
             fh_ptr->blockfptr = fopen(thisblockpath,"a+");
             fclose(fh_ptr->blockfptr);
             fh_ptr->blockfptr = fopen(thisblockpath,"r+");
@@ -1319,7 +1313,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
                 fflush(fh_ptr->metafptr);
                }
               flock(fileno(fh_ptr-> metafptr),LOCK_UN);
-              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_meta).thisstat.st_ino,block_index);
+              fetch_from_cloud(fh_ptr->blockfptr,(fh_ptr->cached_stat).st_ino,block_index);
               /*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
 
               /*Re-read status*/
@@ -1409,26 +1403,26 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
   /*Update and flush file meta*/
 
   fseek(fh_ptr->metafptr,0,SEEK_SET);
-  fread(&(fh_ptr->cached_meta),sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+  fread(&(fh_ptr->cached_stat),sizeof(struct stat),1,fh_ptr->metafptr);
 
-  if ((fh_ptr->cached_meta).thisstat.st_size < (offset + total_bytes_written))
+  if ((fh_ptr->cached_stat).st_size < (offset + total_bytes_written))
    {
     sem_wait(&(hcfs_system->access_sem));
-    hcfs_system->systemdata.system_size += (long long) ((offset + total_bytes_written) - (fh_ptr->cached_meta).thisstat.st_size);
+    hcfs_system->systemdata.system_size += (long long) ((offset + total_bytes_written) - (fh_ptr->cached_stat).st_size);
     sync_hcfs_system_data(FALSE);
     sem_post(&(hcfs_system->access_sem));           
 
-    (fh_ptr->cached_meta).thisstat.st_size = (offset + total_bytes_written);
-    (fh_ptr->cached_meta).thisstat.st_blocks = ((fh_ptr->cached_meta).thisstat.st_size +511) / 512;
+    (fh_ptr->cached_stat).st_size = (offset + total_bytes_written);
+    (fh_ptr->cached_stat).st_blocks = ((fh_ptr->cached_stat).st_size +511) / 512;
    }
 
   if (total_bytes_written > 0)
-   (fh_ptr->cached_meta).thisstat.st_mtime = time(NULL);
+   (fh_ptr->cached_stat).st_mtime = time(NULL);
 
   fseek(fh_ptr->metafptr,0,SEEK_SET);
-  fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fh_ptr->metafptr);
+  fwrite(&(fh_ptr->cached_stat), sizeof(struct stat),1,fh_ptr->metafptr);
 
-  super_inode_update_stat((fh_ptr->cached_meta).thisstat.st_ino, &((fh_ptr->cached_meta).thisstat));
+  super_inode_update_stat((fh_ptr->cached_stat).st_ino, &((fh_ptr->cached_stat)));
 
   flock(fileno(fh_ptr-> metafptr),LOCK_UN);
   funlockfile(fh_ptr-> metafptr);
@@ -1475,8 +1469,9 @@ int hfuse_flush(const char *path, struct fuse_file_info *file_info)
 int hfuse_release(const char *path, struct fuse_file_info *file_info)
  {
   ino_t thisinode;
+  int ret_code;
 
-  thisinode = lookup_pathname(path);
+  thisinode = lookup_pathname(path, &ret_code);
   if (file_info->fh < 0)
    return -EBADF;
 
@@ -1517,21 +1512,23 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
   struct stat tempstat;
+  int ret_code;
 
 /*TODO: Need to include symlinks*/
 /*TODO: Will need to test the boundary of the operation. When will buf run out of space?*/
   fprintf(stderr,"DEBUG readdir entering readdir\n");
 
-  this_inode = lookup_pathname(path);
+  this_inode = lookup_pathname(path, &ret_code);
 
   if (this_inode == 0)
-   return -ENOENT;
+   return ret_code;
 
   fetch_meta_path(pathname,this_inode);
   fptr = fopen(pathname,"r");
   setbuf(fptr,NULL);
   flock(fileno(fptr),LOCK_SH);
 
+  fseek(fptr,sizeof(struct stat),SEEK_SET);
   fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
   thisfile_pos = tempmeta.next_subdir_page;
 
@@ -1609,59 +1606,36 @@ static int hfuse_access(const char *path, int mode)
 static int hfuse_utimens(const char *path, const struct timespec tv[2])
  {
   SUPER_INODE_ENTRY tempentry;
-  FILE_META_TYPE tempfilemeta;
-  DIR_META_TYPE tempdirmeta;
+  struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
   char thismetapath[METAPATHLEN];
   FILE *fptr;
+  int ret_code;
 
-  this_inode = lookup_pathname(path);
+  printf("Debug chmod\n");
+  this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
-   return -ENOENT;
+   return ret_code;
 
   fetch_meta_path(thismetapath,this_inode);
+  printf("%lld %s\n",this_inode,thismetapath);
   fptr = fopen(thismetapath,"r+");
   if (fptr==NULL)
    return -ENOENT;
   setbuf(fptr,NULL);
   
-  super_inode_read(this_inode, &tempentry);
-
   flock(fileno(fptr),LOCK_EX);
-  if (tempentry.inode_stat.st_mode & S_IFREG)
-   {
-    fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    tempfilemeta.thisstat.st_atime = (time_t)(tv[0].tv_sec);
-    tempfilemeta.thisstat.st_mtime = (time_t)(tv[1].tv_sec);
-    fseek(fptr,0,SEEK_SET);
-    fwrite(&tempfilemeta,sizeof(FILE_META_TYPE),1,fptr);
-    memcpy(&(tempentry.inode_stat),&(tempfilemeta.thisstat),sizeof(struct stat));
-    flock(fileno(fptr),LOCK_UN);
-    fclose(fptr);
-    super_inode_write(this_inode, &tempentry);
-   }  
-  else
-   {
-    if (tempentry.inode_stat.st_mode & S_IFDIR)
-     {
-      fread(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      tempdirmeta.thisstat.st_atime = (time_t)(tv[0].tv_sec);
-      tempdirmeta.thisstat.st_mtime = (time_t)(tv[1].tv_sec);
-      fseek(fptr,0,SEEK_SET);
-      fwrite(&tempdirmeta,sizeof(DIR_META_TYPE),1,fptr);
-      memcpy(&(tempentry.inode_stat),&(tempdirmeta.thisstat),sizeof(struct stat));
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-      super_inode_write(this_inode, &tempentry);
-     } 
-    else
-     {
-      /*TODO: Handle symlink in the future */
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-     }
-   }
+  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
+  temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
+  fseek(fptr,0,SEEK_SET);
+  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
+  flock(fileno(fptr),LOCK_UN);
+  fclose(fptr);
+  super_inode_write(this_inode, &tempentry);
+
   return 0;
  }
 

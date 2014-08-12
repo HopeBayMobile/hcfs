@@ -177,6 +177,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
   if ((ptr->this_mode) & S_IFREG)
    {
     flock(fileno(metafptr),LOCK_EX);
+    fseek(metafptr,sizeof(struct stat),SEEK_SET);
     fread(&tempfilemeta,sizeof(FILE_META_TYPE),1,metafptr);
     page_pos=tempfilemeta.next_block_page;
     current_entry_index = 0;

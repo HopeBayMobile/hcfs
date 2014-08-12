@@ -13,8 +13,8 @@ typedef struct {
 
 PATHNAME_CACHE_ENTRY pathname_cache[PATHNAME_CACHE_ENTRY_NUM];
 
-ino_t lookup_pathname(const char *path);
-ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath);
+ino_t lookup_pathname(const char *path, int *errcode);
+ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath, int *errcode);
 unsigned long long compute_hash(const char *path);
 void init_pathname_cache();
 void replace_pathname_cache(long long index, char *path, ino_t inode_number);

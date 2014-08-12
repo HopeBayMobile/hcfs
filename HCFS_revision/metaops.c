@@ -5,14 +5,17 @@
 #include "file_present.h"
 #include "params.h"
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
+/* TODO: Need to consider directory access rights here or in fuseop */
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode)
  {
   FILE *parent_meta;
   char parent_meta_name[METAPATHLEN];
+  struct stat parent_meta_stat;
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
+  int ret_val;
   off_t nextfilepos,oldfilepos;
 
   fetch_meta_path(parent_meta_name,parent_inode);
@@ -22,6 +25,14 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
    return -1;
   setbuf(parent_meta,NULL);
   flock(fileno(parent_meta),LOCK_EX);
+  ret_items = fread(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
+  if (ret_items <1)
+   {
+    flock(fileno(parent_meta),LOCK_UN);
+    fclose(parent_meta);
+    return -1;
+   }
+
   ret_items = fread(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
   if (ret_items <1)
    {
@@ -79,13 +90,28 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
 
       if (child_mode & S_IFDIR)
        {
-        parent_meta_head.thisstat.st_nlink++;
+        parent_meta_stat.st_nlink++;
        }
 
       parent_meta_head.total_children++;
       printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
 
-      fseek(parent_meta,0,SEEK_SET);
+      ret_val = fseek(parent_meta,0,SEEK_SET);
+      if (ret_val!=0)
+       {
+        flock(fileno(parent_meta),LOCK_UN);
+        fclose(parent_meta);
+        return -1;
+       }
+
+      /* TODO: how to revert to original version if one of the two fwrite fails*/
+      ret_items = fwrite(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
+      if (ret_items <1)
+       {
+        flock(fileno(parent_meta),LOCK_UN);
+        fclose(parent_meta);
+        return -1;
+       }
       ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
       if (ret_items <1)
        {
@@ -125,7 +151,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
      }
     if (child_mode & S_IFDIR)
      {
-      parent_meta_head.thisstat.st_nlink++;
+      parent_meta_stat.st_nlink++;
      }
    }
   else
@@ -139,7 +165,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
       if (child_mode & S_IFDIR)
        {
         parent_meta_head.next_subdir_page=nextfilepos;
-        parent_meta_head.thisstat.st_nlink++;
+        parent_meta_stat.st_nlink++;
        }
      }
    }
@@ -160,6 +186,16 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
 
   fseek(parent_meta,0,SEEK_SET);
+
+  /* TODO: how to revert to original version if one of the two fwrite fails*/
+  ret_items = fwrite(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
+  if (ret_items <1)
+   {
+    flock(fileno(parent_meta),LOCK_UN);
+    fclose(parent_meta);
+    return -1;
+   }
+
   ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
   if (ret_items <1)
    {
@@ -182,6 +218,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
  {
   FILE *parent_meta;
   char parent_meta_name[METAPATHLEN];
+  struct stat parent_meta_stat;
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
@@ -195,6 +232,15 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
    return -1;
   setbuf(parent_meta,NULL);
   flock(fileno(parent_meta),LOCK_EX);
+
+  ret_items = fread(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
+  if (ret_items <1)
+   {
+    flock(fileno(parent_meta),LOCK_UN);
+    fclose(parent_meta);
+    return -1;
+   }
+
   ret_items = fread(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
   if (ret_items <1)
    {
@@ -258,9 +304,9 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
 
         if (child_mode & S_IFDIR)
          {
-          parent_meta_head.thisstat.st_nlink--;
+          parent_meta_stat.st_nlink--;
           fseek(parent_meta,0,SEEK_SET);
-          ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
+          ret_items = fwrite(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
           if (ret_items <1)
            {
             flock(fileno(parent_meta),LOCK_UN);
@@ -271,7 +317,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
  
         parent_meta_head.total_children--;
         printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
-        fseek(parent_meta,0,SEEK_SET);
+        fseek(parent_meta,sizeof(struct stat),SEEK_SET);
         ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
         if (ret_items <1)
          {
@@ -315,6 +361,7 @@ int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char 
    return -1;
   setbuf(parent_meta,NULL);
   flock(fileno(parent_meta),LOCK_EX);
+  fseek(parent_meta,sizeof(struct stat),SEEK_SET);
   ret_items = fread(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
   if (ret_items <1)
    {
@@ -405,6 +452,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inod
    return -1;
   setbuf(self_meta,NULL);
   flock(fileno(self_meta),LOCK_EX);
+  fseek(self_meta,sizeof(struct stat),SEEK_SET);
   ret_items = fread(&self_meta_head,sizeof(DIR_META_TYPE),1,self_meta);
   if (ret_items <1)
    {
@@ -473,7 +521,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   char todelete_metapath[400];
   char thisblockpath[400];
   char filebuf[5000];
-  FILE_META_TYPE this_meta;
+  struct stat this_inode_stat;
   FILE *metafptr;
   FILE *todeletefptr;
   int ret_val;
@@ -490,7 +538,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   setbuf(metafptr,NULL);
   flock(fileno(metafptr),LOCK_EX);
 
-  ret_val = fread(&this_meta,sizeof(FILE_META_TYPE),1,metafptr);
+  ret_val = fread(&this_inode_stat,sizeof(struct stat),1,metafptr);
   if (ret_val < 1)
    {
     flock(fileno(metafptr),LOCK_UN);
@@ -498,7 +546,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
     return -EACCES;
    }
 
-  if (this_meta.thisstat.st_nlink<=1)
+  if (this_inode_stat.st_nlink<=1)
    {
     /*Need to delete the inode*/
     super_inode_to_delete(this_inode);
@@ -528,10 +576,10 @@ int decrease_nlink_inode_file(ino_t this_inode)
 
     /*Need to delete blocks as well*/
     /*TODO: Perhaps can move the actual block deletion to the deletion loop as well*/
-    if (this_meta.thisstat.st_size == 0)
+    if (this_inode_stat.st_size == 0)
      total_blocks = 0;
     else
-     total_blocks = ((this_meta.thisstat.st_size-1) / MAX_BLOCK_SIZE) + 1;
+     total_blocks = ((this_inode_stat.st_size-1) / MAX_BLOCK_SIZE) + 1;
     for(count = 0;count<total_blocks;count++)
      {
       fetch_block_path(thisblockpath,this_inode,count);
@@ -546,7 +594,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
        }
      }
     sem_wait(&(hcfs_system->access_sem));
-    hcfs_system->systemdata.system_size -= this_meta.thisstat.st_size;
+    hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
     sync_hcfs_system_data(FALSE);
     sem_post(&(hcfs_system->access_sem));           
 
@@ -556,16 +604,16 @@ int decrease_nlink_inode_file(ino_t this_inode)
    }
   else
    {
-    this_meta.thisstat.st_nlink--; 
+    this_inode_stat.st_nlink--; 
     fseek(metafptr,0,SEEK_SET);
-    ret_val = fwrite(&this_meta,sizeof(FILE_META_TYPE),1,metafptr);
+    ret_val = fwrite(&this_inode_stat,sizeof(struct stat),1,metafptr);
     if (ret_val < 1)
      {
       flock(fileno(metafptr),LOCK_UN);
       fclose(metafptr);
       return -EACCES;
      }
-    super_inode_update_stat(this_inode, &(this_meta.thisstat));
+    super_inode_update_stat(this_inode, &(this_inode_stat));
     flock(fileno(metafptr),LOCK_UN);
 
     super_inode_mark_dirty(this_inode);

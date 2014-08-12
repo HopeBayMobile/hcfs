@@ -20,6 +20,7 @@ void run_cache_loop()
   FILE *metafptr;
   BLOCK_ENTRY_PAGE temppage;
   int ret_val, current_page_index;
+  struct stat temphead_stat;
   FILE_META_TYPE temphead;
   struct stat tempstat;
   struct timeval builttime,currenttime;
@@ -124,9 +125,10 @@ void run_cache_loop()
 
         current_block = 0;
 
+        fread(&temphead_stat,sizeof(struct stat),1,metafptr);
         fread(&temphead,sizeof(FILE_META_TYPE),1,metafptr);
         nextpagepos = temphead.next_block_page;
-        total_blocks = (temphead.thisstat.st_size + (MAX_BLOCK_SIZE -1)) / MAX_BLOCK_SIZE;
+        total_blocks = (temphead_stat.st_size + (MAX_BLOCK_SIZE -1)) / MAX_BLOCK_SIZE;
 
         current_page_index = MAX_BLOCK_ENTRIES_PER_PAGE;
 
