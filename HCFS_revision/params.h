@@ -28,6 +28,7 @@ SYSTEM_CONF_STRUCT system_config;
 #define MAX_BLOCK_SIZE system_config.max_block_size
 
 #define METAPATHLEN 400
+#define MAX_FILE_NAME_LEN 400
 
 #define NUMSUBDIR 1000
 

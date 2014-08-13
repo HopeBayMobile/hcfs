@@ -24,7 +24,8 @@
 
 /*TODO: A file-handle table manager that dynamically allocate extra block pointers and recycle them if not in use (but file not closed). Number of block pointers that can be allocated can be a variable of available process-wide opened files*/
 
-
+/* TODO: Need to be able to perform actual operations according to type of folders (cached, non-cached, local) */
+/* TODO: Push actual operations to other source files, especially no actual file handling in this file */
 
 static int hfuse_getattr(const char *path, struct stat *inode_stat)
  {
@@ -52,13 +53,10 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
 static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
  {
   char *parentname;
-  char selfname[400];
-  char thismetapath[METAPATHLEN];
+  char selfname[MAX_FILE_NAME_LEN];
   ino_t self_inode, parent_inode;
   struct stat this_stat;
-  FILE_META_TYPE this_meta;
   mode_t self_mode;
-  FILE *metafptr;
   int ret_val;
   struct fuse_context *temp_context;
   int ret_code;
@@ -73,7 +71,6 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
    return ret_code;
 
   memset(&this_stat,0,sizeof(struct stat));
-  memset(&this_meta,0,sizeof(FILE_META_TYPE));
   temp_context = fuse_get_context();
 
   self_mode = mode | S_IFREG;
@@ -94,35 +91,10 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
    return -EACCES;
   this_stat.st_ino = self_inode;
 
-  fetch_meta_path(thismetapath,self_inode);
+  ret_code = mknod_update_meta(self_inode, parent_inode, selfname, &this_stat);
 
-  metafptr = fopen(thismetapath,"w");
-
-  if (metafptr == NULL)
-   return -EACCES;
-
-  ret_val = fwrite(&this_stat,sizeof(struct stat),1,metafptr);
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = fwrite(&this_meta,sizeof(FILE_META_TYPE),1,metafptr);
-  fclose(metafptr);
-  if (ret_val < 1)
-   {
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = dir_add_entry(parent_inode, self_inode, selfname,self_mode);
-  if (ret_val < 0)
-   {
-    unlink(thismetapath);
-    return -EACCES;
-   }
+  if (ret_code < 0)
+   return ret_code;
 
   super_inode_mark_dirty(self_inode);
 
@@ -132,13 +104,9 @@ static int hfuse_mkdir(const char *path, mode_t mode)
  {
   char *parentname;
   char selfname[400];
-  char thismetapath[METAPATHLEN];
   ino_t self_inode, parent_inode;
   struct stat this_stat;
-  DIR_META_TYPE this_meta;
-  DIR_ENTRY_PAGE temppage;
   mode_t self_mode;
-  FILE *metafptr;
   int ret_val;
   struct fuse_context *temp_context;
   int ret_code;
@@ -153,8 +121,6 @@ static int hfuse_mkdir(const char *path, mode_t mode)
    return ret_code;
 
   memset(&this_stat,0,sizeof(struct stat));
-  memset(&this_meta,0,sizeof(DIR_META_TYPE));
-  memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
   temp_context = fuse_get_context();
 
   self_mode = mode | S_IFDIR;
@@ -175,62 +141,10 @@ static int hfuse_mkdir(const char *path, mode_t mode)
    return -EACCES;
   this_stat.st_ino = self_inode;
 
-  fetch_meta_path(thismetapath,self_inode);
+  ret_code = mkdir_update_meta(self_inode, parent_inode, selfname, &this_stat);
 
-  metafptr = fopen(thismetapath,"w");
-
-  if (metafptr == NULL)
-   return -EACCES;
-
-
-  ret_val = fwrite(&this_stat,sizeof(struct stat),1,metafptr);
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  this_meta.next_subdir_page = ftell(metafptr);
-  fseek(metafptr,sizeof(struct stat),SEEK_SET);
-
-  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
-
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-  temppage.num_entries = 2;
-  temppage.dir_entries[0].d_ino = self_inode;
-  temppage.dir_entries[1].d_ino = parent_inode;
-  strcpy(temppage.dir_entries[0].d_name,".");
-  strcpy(temppage.dir_entries[1].d_name,"..");
-
-  ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
-  fclose(metafptr);
-
-  if (ret_val < 1)
-   {
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = dir_add_entry(parent_inode, self_inode, selfname,self_mode);
-  if (ret_val < 0)
-   {
-    unlink(thismetapath);
-    return -EACCES;
-   }
+  if (ret_code < 0)
+   return ret_code;
 
   super_inode_mark_dirty(self_inode);
 
@@ -253,26 +167,20 @@ int hfuse_unlink(const char *path)
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
-
   parent_inode = lookup_pathname(parentname, &ret_code);
-
-  parse_parent_self(path,parentname,selfname);
 
   free(parentname);
   if (parent_inode < 1)
    return ret_code;
 
-  invalidate_cache_entry(path);
+  invalidate_pathname_cache_entry(path);
 
-  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFREG);
-  if (ret_val < 0)
-   return -EACCES;
-
-  ret_val = decrease_nlink_inode_file(this_inode);
+  ret_val = unlink_update_meta(parent_inode,this_inode,selfname);
 
   return ret_val;
  }
 
+/* TODO: Push out meta update details starts here*/
 
 int hfuse_rmdir(const char *path)
  {
@@ -296,20 +204,24 @@ int hfuse_rmdir(const char *path)
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
 
-  parse_parent_self(path,parentname,selfname);
-
-  free(parentname);
   if (!strcmp(selfname,"."))
-   return -EINVAL;
+   {
+    free(parentname);
+    return -EINVAL;
+   }
   if (!strcmp(selfname,".."))
-   return -ENOTEMPTY;
+   {
+    free(parentname);
+    return -ENOTEMPTY;
+   }
 
   parent_inode = lookup_pathname(parentname, &ret_code);
+  free(parentname);
 
   if (parent_inode < 1)
    return ret_code;
 
-  invalidate_cache_entry(path);
+  invalidate_pathname_cache_entry(path);
 
   fetch_meta_path(thismetapath,this_inode);
 
@@ -389,7 +301,7 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   if (self_inode < 1)
    return ret_code;
 
-  invalidate_cache_entry(oldpath);
+  invalidate_pathname_cache_entry(oldpath);
 
   if (lookup_pathname(newpath, &ret_code) > 0)
    return -EACCES;

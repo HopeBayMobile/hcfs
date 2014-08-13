@@ -18,5 +18,5 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 unsigned long long compute_hash(const char *path);
 void init_pathname_cache();
 void replace_pathname_cache(long long index, char *path, ino_t inode_number);
-void invalidate_cache_entry(const char *path);  /* If a dir or file is removed or changed, by e.g. rename, move, rm, rmdir, this function has to be called */
+void invalidate_pathname_cache_entry(const char *path);  /* If a dir or file is removed or changed, by e.g. rename, move, rm, rmdir, this function has to be called */
 ino_t check_cached_path(const char *path);
