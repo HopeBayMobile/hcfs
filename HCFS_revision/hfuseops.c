@@ -828,6 +828,9 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
 /*TODO: Fixme: cached page pointer and file offset may be changed during the operation, so cannot be used as a reliable source for seeking and read/write meta */
+/* TODO: A global meta cache and a block data cache in memory. All reads / writes go through the caches, and a parameter controls when to write dirty cache entries back to files (could be write through or several seconds).*/
+/* TODO: Each inode can only occupy at most one meta cache entry (all threads accessing that inode share the same entry). Each data block in each inode can only occupy at most one data cache entry.*/
+
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
 
