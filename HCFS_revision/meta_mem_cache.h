@@ -12,16 +12,14 @@
 
 Each meta cache entry keeps
 1. Struct stat
-2. Up to two file page entry
-3. Up to two dir page entry
-4. Up to two block page entry
-5. Up to two xattr page entry
-6. Struct DIR_META_TYPE or FILE_META_TYPE
-8. Number of opened handles to the inode
-9. Semaphore to the entry
-10. Last access time
-11. Dirty or clean status for items 1 to 6
-12. 
+2. Struct DIR_META_TYPE or FILE_META_TYPE
+3. Up to two dir entry pages cached
+4. Up to two block entry pages cached
+5. Up to two xattr pages cached
+6. Number of opened handles to the inode
+7. Semaphore to the entry
+8. Last access time
+9. Dirty or clean status for items 1 to 5
 
 Lookup of cache entry:
 
@@ -40,4 +38,39 @@ should release header lock and sleep for a short time, or skip to other entries.
 
 typedef struct {
   struct stat this_stat;
-  DIR_META_TYPE 
+  char stat_dirty;
+  mode_t inode_mode;
+  DIR_META_TYPE dir_meta;    /* Only used if inode is a dir */
+  FILE_META_TYPE file_meta;  /* Only used if inode is a reg file */
+  char meta_dirty;
+  DIR_ENTRY_PAGE (*dir_entry_cache)[2];      /*Zero if not pointed to any page*/
+  long dir_entry_cache_pos[2];               /* TODO: How to flush cached pages due to cache full: index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
+  char dir_entry_cache_dirty[2];
+  BLOCK_ENTRY_PAGE (*block_entry_cache)[2];
+  long block_entry_cache_pos[2];
+  char block_entry_cache_dirty[2];
+/* TODO: Add xattr page cached here */
+  int opened_handles_to_inode;
+  sem_t access_sem;
+  struct timeval last_access_time;  /*TODO: Need to think whether system clock change could affect the involved operations*/
+ } META_CACHE_ENTRY_STRUCT;
+
+struct meta_cache_lookup_struct {
+  META_CACHE_ENTRY_STRUCT cache_entry_body;
+  ino_t inode_num;
+  int opened_handles_to_inode;
+  char something_dirty;
+  struct meta_cache_lookup_struct *next;
+  struct meta_cache_lookup_struct *prev;
+ };
+
+typedef struct meta_cache_lookup_struct META_CACHE_LOOKUP_ENTRY_STRUCT;
+
+typedef struct {
+  META_CACHE_LOOKUP_ENTRY_STRUCT *meta_cache_entries;
+  sem_t header_sem;
+  int num_entries;
+ } META_CACHE_HEADER_STRUCT;
+
+int init_meta_cache_headers();
+int release_meta_cache_headers();

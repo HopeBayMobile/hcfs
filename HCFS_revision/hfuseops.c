@@ -361,7 +361,6 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 //int hfuse_link(const char *oldpath, const char *newpath);
 int hfuse_chmod(const char *path, mode_t mode)
  {
-  SUPER_INODE_ENTRY tempentry;
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
@@ -387,17 +386,15 @@ int hfuse_chmod(const char *path, mode_t mode)
   temp_inode_stat.st_ctime = time(NULL);
   fseek(fptr,0,SEEK_SET);
   fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
   flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
-  super_inode_write(this_inode, &tempentry);
+  super_inode_update_stat(this_inode, &temp_inode_stat);
 
   return 0;
  }
 
 int hfuse_chown(const char *path, uid_t owner, gid_t group)
  {
-  SUPER_INODE_ENTRY tempentry;
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
@@ -424,10 +421,9 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
   temp_inode_stat.st_ctime = time(NULL);
   fseek(fptr,0,SEEK_SET);
   fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
   flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
-  super_inode_write(this_inode, &tempentry);
+  super_inode_update_stat(this_inode, &temp_inode_stat);
 
   return 0;
  }
@@ -1520,7 +1516,6 @@ static int hfuse_access(const char *path, int mode)
 
 static int hfuse_utimens(const char *path, const struct timespec tv[2])
  {
-  SUPER_INODE_ENTRY tempentry;
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
@@ -1546,10 +1541,9 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
   temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
   fseek(fptr,0,SEEK_SET);
   fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  memcpy(&(tempentry.inode_stat),&temp_inode_stat,sizeof(struct stat));
   flock(fileno(fptr),LOCK_UN);
   fclose(fptr);
-  super_inode_write(this_inode, &tempentry);
+  super_inode_update_stat(this_inode, &temp_inode_stat);
 
   return 0;
  }

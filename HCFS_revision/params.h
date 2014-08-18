@@ -27,6 +27,9 @@ SYSTEM_CONF_STRUCT system_config;
 
 #define MAX_BLOCK_SIZE system_config.max_block_size
 
+#define NUM_META_MEM_CACHE_ENTRIES 65536
+#define NUM_META_MEM_CACHE_HEADERS 65536
+
 #define METAPATHLEN 400
 #define MAX_FILE_NAME_LEN 400
 
