@@ -1,4 +1,11 @@
 #define FUSE_USE_VERSION 26
+
+#include <fuse.h>
+#include <time.h>
+#include <math.h>
+#include <sys/statvfs.h>
+#include <unistd.h>
+
 #include "fuseop.h"
 #include "global.h"
 #include "file_present.h"
@@ -6,13 +13,10 @@
 #include "dir_lookup.h"
 #include "super_inode.h"
 #include "params.h"
-#include <fuse.h>
-#include <time.h>
-#include <math.h>
-#include <sys/statvfs.h>
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
 #include "filetables.h"
+#include "meta_mem_cache.h"
 
 
 /* TODO: Need to go over the access rights problem for the ops */
@@ -1493,12 +1497,15 @@ void* hfuse_init(struct fuse_conn_info *conn)
  {
   pthread_attr_init(&prefetch_thread_attr);
   pthread_attr_setdetachstate(&prefetch_thread_attr,PTHREAD_CREATE_DETACHED);
+  init_meta_cache_headers();
   return ((void*) sys_super_inode);
  }
 void hfuse_destroy(void *private_data)
  {
   int download_handle_count;
 
+  release_meta_cache_headers();
+  sync();
   for(download_handle_count=0;download_handle_count<MAX_DOWNLOAD_CURL_HANDLE;download_handle_count++)
    {
     hcfs_destroy_backend(download_curl_handles[download_handle_count].curl);

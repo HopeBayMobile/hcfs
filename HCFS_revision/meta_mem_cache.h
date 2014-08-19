@@ -40,8 +40,8 @@ typedef struct {
   struct stat this_stat;
   char stat_dirty;
   mode_t inode_mode;
-  DIR_META_TYPE dir_meta;    /* Only used if inode is a dir */
-  FILE_META_TYPE file_meta;  /* Only used if inode is a reg file */
+  DIR_META_TYPE *dir_meta;    /* Only used if inode is a dir */
+  FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
   char meta_dirty;
   DIR_ENTRY_PAGE (*dir_entry_cache)[2];      /*Zero if not pointed to any page*/
   long dir_entry_cache_pos[2];               /* TODO: How to flush cached pages due to cache full: index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
@@ -61,7 +61,6 @@ struct meta_cache_lookup_struct {
   int opened_handles_to_inode;
   char something_dirty;
   struct meta_cache_lookup_struct *next;
-  struct meta_cache_lookup_struct *prev;
  };
 
 typedef struct meta_cache_lookup_struct META_CACHE_LOOKUP_ENTRY_STRUCT;
@@ -74,3 +73,9 @@ typedef struct {
 
 int init_meta_cache_headers();
 int release_meta_cache_headers();
+int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
+int flush_clean_all_meta_cache();
+int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
+int meta_cache_lookup_stat(ino_t this_inode, struct stat *returned_stat);
+int meta_cache_fill_stat(ino_t this_inode, struct stat *updated_stat, char stat_dirty); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+

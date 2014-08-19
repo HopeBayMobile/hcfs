@@ -12,16 +12,25 @@
 #include "fuseop.h"
 #include "params.h"
 
-
+#include "meta_mem_cache.h"
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
  {
   SUPER_INODE_ENTRY tempentry;
+  struct stat returned_stat;
   int ret_code;
 
-  /*TODO : inode stat caching? How? */
+  /*First will try to lookup meta cache*/
   if (this_inode > 0)
    {
+    ret_code = meta_cache_lookup_stat(this_inode, &returned_stat);
+
+    if (ret_code == 0)
+     {
+      memcpy(inode_stat, &returned_stat,sizeof(struct stat));
+      return 0;
+     }
+
     ret_code =super_inode_read(this_inode, &tempentry);    
 
     if (ret_code < 0)
@@ -41,6 +50,9 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
   else
    return -ENOENT;
 
+  ret_code = meta_cache_fill_stat(this_inode, inode_stat, FALSE);
+
+/*TODO: What to do if cannot create new meta cache entry? */
 
   #if DEBUG >= 5
   printf("fetch_inode_stat %lld\n",inode_stat->st_ino);
