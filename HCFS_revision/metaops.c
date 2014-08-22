@@ -18,6 +18,9 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   int ret_val;
   off_t nextfilepos,oldfilepos;
 
+  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat);
+
+
   fetch_meta_path(parent_meta_name,parent_inode);
 
   parent_meta =fopen(parent_meta_name,"r+");

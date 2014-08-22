@@ -43,10 +43,10 @@ typedef struct {
   DIR_META_TYPE *dir_meta;    /* Only used if inode is a dir */
   FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
   char meta_dirty;
-  DIR_ENTRY_PAGE (*dir_entry_cache)[2];      /*Zero if not pointed to any page*/
+  DIR_ENTRY_PAGE *dir_entry_cache[2];      /*Zero if not pointed to any page*/
   long dir_entry_cache_pos[2];               /* TODO: How to flush cached pages due to cache full: index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
   char dir_entry_cache_dirty[2];
-  BLOCK_ENTRY_PAGE (*block_entry_cache)[2];
+  BLOCK_ENTRY_PAGE *block_entry_cache[2];
   long block_entry_cache_pos[2];
   char block_entry_cache_dirty[2];
 /* TODO: Add xattr page cached here */
@@ -74,8 +74,11 @@ typedef struct {
 int init_meta_cache_headers();
 int release_meta_cache_headers();
 int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
+int meta_cache_flush_block_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
 int flush_clean_all_meta_cache();
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
-int meta_cache_lookup_stat(ino_t this_inode, struct stat *returned_stat);
-int meta_cache_fill_stat(ino_t this_inode, struct stat *updated_stat, char stat_dirty); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos);
+int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos);
 

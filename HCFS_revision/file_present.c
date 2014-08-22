@@ -16,22 +16,20 @@
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
  {
-  SUPER_INODE_ENTRY tempentry;
   struct stat returned_stat;
   int ret_code;
 
   /*First will try to lookup meta cache*/
   if (this_inode > 0)
    {
-    ret_code = meta_cache_lookup_stat(this_inode, &returned_stat);
+    /*Only fetch inode stat, so does not matter if inode is reg file or dir here*/
+    ret_code = meta_cache_lookup_file_data(this_inode, &returned_stat, NULL, NULL, 0);
 
     if (ret_code == 0)
      {
       memcpy(inode_stat, &returned_stat,sizeof(struct stat));
       return 0;
      }
-
-    ret_code =super_inode_read(this_inode, &tempentry);    
 
     if (ret_code < 0)
      {
@@ -41,16 +39,12 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
       //ret_code = inode_stat_from_meta(this_inode, inode_stat);
       /* TODO: Perhaps missing from super inode (inode caching?). Fill it in? */
      }
-    else
-     memcpy(inode_stat,&(tempentry.inode_stat),sizeof(struct stat));
 
     if (ret_code < 0)
      return -ENOENT;
    }
   else
    return -ENOENT;
-
-  ret_code = meta_cache_fill_stat(this_inode, inode_stat, FALSE);
 
 /*TODO: What to do if cannot create new meta cache entry? */
 
@@ -66,40 +60,21 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, struct stat *this_stat)
  {
-  char thismetapath[METAPATHLEN];
-  FILE *metafptr;
   int ret_val;
   FILE_META_TYPE this_meta;
 
   memset(&this_meta,0,sizeof(FILE_META_TYPE));
 
-  fetch_meta_path(thismetapath,self_inode);
+  ret_val = meta_cache_update_file_data(self_inode,this_stat, &this_meta,NULL, 0);
 
-  metafptr = fopen(thismetapath,"w");
-
-  if (metafptr == NULL)
-   return -EACCES;
-
-  ret_val = fwrite(this_stat,sizeof(struct stat),1,metafptr);
   if (ret_val < 1)
    {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = fwrite(&this_meta,sizeof(FILE_META_TYPE),1,metafptr);
-  fclose(metafptr);
-  if (ret_val < 1)
-   {
-    unlink(thismetapath);
     return -EACCES;
    }
 
   ret_val = dir_add_entry(parent_inode, self_inode, selfname,this_stat->st_mode);
   if (ret_val < 0)
    {
-    unlink(thismetapath);
     return -EACCES;
    }
 

@@ -98,11 +98,9 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   ret_code = mknod_update_meta(self_inode, parent_inode, selfname, &this_stat);
 
   if (ret_code < 0)
-   return ret_code;
+   mknod_forget_inode(self_inode); /*TODO: Need to delete meta file if any and remove entry from super inode */
 
-  super_inode_mark_dirty(self_inode);
-
-  return 0;
+  return ret_code;
  }
 static int hfuse_mkdir(const char *path, mode_t mode)
  {
@@ -368,7 +366,6 @@ int hfuse_chmod(const char *path, mode_t mode)
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
-  char thismetapath[METAPATHLEN];
   FILE *fptr;
   int ret_code;
 
@@ -377,22 +374,15 @@ int hfuse_chmod(const char *path, mode_t mode)
   if (this_inode < 1)
    return ret_code;
 
-  fetch_meta_path(thismetapath,this_inode);
-  printf("%lld %s\n",this_inode,thismetapath);
-  fptr = fopen(thismetapath,"r+");
-  if (fptr==NULL)
-   return -ENOENT;
-  setbuf(fptr,NULL);
-  
-  flock(fileno(fptr),LOCK_EX);
-  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+
+  if (ret_val < 0) /* Cannot fetch any meta*/
+   ret_val = 
+
   temp_inode_stat.st_mode = mode;
   temp_inode_stat.st_ctime = time(NULL);
-  fseek(fptr,0,SEEK_SET);
-  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
-  super_inode_update_stat(this_inode, &temp_inode_stat);
+
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
 
   return 0;
  }

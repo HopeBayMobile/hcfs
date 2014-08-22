@@ -4,12 +4,12 @@
 #define S3 1
 #define SWIFT 0
 
-#define CURRENT_BACKEND S3
+#define CURRENT_BACKEND SWIFT
 
-#define MY_ACCOUNT "jiahong"
-#define MY_USER "jiahong"
-#define MY_PASS "oGb8MeL6Up1F"
-#define MY_URL "https://arkflex:8080"
+#define MY_ACCOUNT "hopebay"
+#define MY_USER "hopebay"
+#define MY_PASS "hopebaycloud"
+#define MY_URL "https://192.168.70.31:8080"
 
 #define S3_ACCESS "SE41NTAxMzIwNDEzOTQ1Mjk5NTkwNzI"
 #define S3_SECRET "NWUzOTdjNjRjOGI1NDM2ZmI4MzFlOTgxMjdkNmMyNWM"

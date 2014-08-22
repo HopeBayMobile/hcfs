@@ -71,16 +71,22 @@ int parse_list_header(FILE *fptr)
   if ((retcodenum<200) || (retcodenum>299))
    return retcodenum;
 
-  ret_val = fscanf(fptr,"X-Container-Object-Count: %s\n",temp_string);
+  while(!feof(fptr))
+   {
+    ret_val = fgets(temp_string,1000,fptr);
+    if (!strncmp(temp_string,"X-Container-Object-Count",sizeof("X-Container-Object-Count")-1))
+     {
+      ret_val = sscanf(temp_string,"X-Container-Object-Count: %s\n",temp_string2);
+      total_objs = atoi(temp_string2);
 
-  if (ret_val<1)
-   return -1;
+      printf("total objects %d\n",total_objs);
+
+      return retcodenum;
+     }
+    memset(temp_string,0,1000);
+   }
+  return -1;
   
-  total_objs = atoi(temp_string);
-
-  printf("total objects %d\n",total_objs);
-
-  return retcodenum;
  }
 int parse_S3_list_header(FILE *fptr)
  {
