@@ -10,210 +10,36 @@
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode)
  {
   FILE *parent_meta;
-  char parent_meta_name[METAPATHLEN];
   struct stat parent_meta_stat;
   DIR_META_TYPE parent_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
   int ret_val;
-  off_t nextfilepos,oldfilepos;
+  long page_pos;
 
-  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat);
+  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,NULL,0);
 
+  ret_val = meta_cache_seek_empty_dir_entry(parent_inode,&temppage,&page_pos);
 
-  fetch_meta_path(parent_meta_name,parent_inode);
+  entry_index = temppage.num_entries;
+  temppage.num_entries++;
 
-  parent_meta =fopen(parent_meta_name,"r+");
-  if (parent_meta==NULL)
-   return -1;
-  setbuf(parent_meta,NULL);
-  flock(fileno(parent_meta),LOCK_EX);
-  ret_items = fread(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
-  if (ret_items <1)
+  temppage.dir_entries[temppage.num_entries].d_ino = child_inode;
+  strcpy(temppage.dir_entries[temppage.num_entries].d_name,childname);
+
+  /*If the new entry is a subdir, increase the hard link of the parent*/
+
+  if (child_mode & S_IFDIR)
    {
-    flock(fileno(parent_meta),LOCK_UN);
-    fclose(parent_meta);
-    return -1;
-   }
-
-  ret_items = fread(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
-  if (ret_items <1)
-   {
-    flock(fileno(parent_meta),LOCK_UN);
-    fclose(parent_meta);
-    return -1;
-   }
-
-  if (child_mode & S_IFREG)
-   {
-    nextfilepos=parent_meta_head.next_file_page;
-   }
-  else
-   {
-    if (child_mode & S_IFDIR)
-     nextfilepos=parent_meta_head.next_subdir_page;
-   }
-  memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
-  while(nextfilepos!=0)
-   {
-    fseek(parent_meta,nextfilepos,SEEK_SET);
-    if (ftell(parent_meta)!=nextfilepos)
-     {
-      flock(fileno(parent_meta),LOCK_UN);
-      fclose(parent_meta);
-      return -1;
-     }
-    ret_items = fread(&temppage,sizeof(DIR_ENTRY_PAGE),1,parent_meta);
-    if (ret_items <1)
-     {
-      flock(fileno(parent_meta),LOCK_UN);
-      fclose(parent_meta);
-      return -1;
-     }
-    if (temppage.num_entries < MAX_DIR_ENTRIES_PER_PAGE)
-     {   /*This page has empty dir entry. Fill it.*/
-      temppage.dir_entries[temppage.num_entries].d_ino = child_inode;
-      strcpy(temppage.dir_entries[temppage.num_entries].d_name,childname);
-      temppage.num_entries++;
-      fseek(parent_meta,nextfilepos,SEEK_SET);
-      if (ftell(parent_meta)!=nextfilepos)
-       {
-        flock(fileno(parent_meta),LOCK_UN);
-        fclose(parent_meta);
-        return -1;
-       }
-      ret_items = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,parent_meta);
-      if (ret_items <1)
-       {
-        flock(fileno(parent_meta),LOCK_UN);
-        fclose(parent_meta);
-        return -1;
-       }
-      /*If the new entry is a subdir, increase the hard link of the parent*/
-
-      if (child_mode & S_IFDIR)
-       {
-        parent_meta_stat.st_nlink++;
-       }
-
-      parent_meta_head.total_children++;
-      printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
-
-      ret_val = fseek(parent_meta,0,SEEK_SET);
-      if (ret_val!=0)
-       {
-        flock(fileno(parent_meta),LOCK_UN);
-        fclose(parent_meta);
-        return -1;
-       }
-
-      /* TODO: how to revert to original version if one of the two fwrite fails*/
-      ret_items = fwrite(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
-      if (ret_items <1)
-       {
-        flock(fileno(parent_meta),LOCK_UN);
-        fclose(parent_meta);
-        return -1;
-       }
-      ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
-      if (ret_items <1)
-       {
-        flock(fileno(parent_meta),LOCK_UN);
-        fclose(parent_meta);
-        return -1;
-       }
-
- 
-      flock(fileno(parent_meta),LOCK_UN);
-      fclose(parent_meta);
-
-      super_inode_mark_dirty(parent_inode);
-      return 0;
-     }
-    if (temppage.next_page == 0)
-     break;
-    nextfilepos = temppage.next_page;
-   }
-
-  /*Will need to allocate a new page*/
-  oldfilepos = nextfilepos;
-
-  fseek(parent_meta,0,SEEK_END);
-  nextfilepos=ftell(parent_meta);
-
-  if (oldfilepos!=0)
-   {
-    temppage.next_page = nextfilepos;
-    fseek(parent_meta,oldfilepos,SEEK_SET);
-    ret_items = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,parent_meta);
-    if (ret_items <1)
-     {
-      flock(fileno(parent_meta),LOCK_UN);
-      fclose(parent_meta);
-      return -1;
-     }
-    if (child_mode & S_IFDIR)
-     {
-      parent_meta_stat.st_nlink++;
-     }
-   }
-  else
-   {
-    if (child_mode & S_IFREG)
-     {
-      parent_meta_head.next_file_page=nextfilepos;
-     }
-    else
-     {
-      if (child_mode & S_IFDIR)
-       {
-        parent_meta_head.next_subdir_page=nextfilepos;
-        parent_meta_stat.st_nlink++;
-       }
-     }
-   }
-  fseek(parent_meta,nextfilepos,SEEK_SET);
-  memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
-  temppage.num_entries=1;
-  temppage.dir_entries[0].d_ino = child_inode;
-  strcpy(temppage.dir_entries[0].d_name,childname);
-  ret_items = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,parent_meta);
-  if (ret_items <1)
-   {
-    flock(fileno(parent_meta),LOCK_UN);
-    fclose(parent_meta);
-    return -1;
+    parent_meta_stat.st_nlink++;
    }
 
   parent_meta_head.total_children++;
   printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
 
-  fseek(parent_meta,0,SEEK_SET);
+  ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,&temppage,page_pos);
 
-  /* TODO: how to revert to original version if one of the two fwrite fails*/
-  ret_items = fwrite(&parent_meta_stat,sizeof(struct stat),1,parent_meta);
-  if (ret_items <1)
-   {
-    flock(fileno(parent_meta),LOCK_UN);
-    fclose(parent_meta);
-    return -1;
-   }
-
-  ret_items = fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,parent_meta);
-  if (ret_items <1)
-   {
-    flock(fileno(parent_meta),LOCK_UN);
-    fclose(parent_meta);
-    return -1;
-   }
-
-
-  flock(fileno(parent_meta),LOCK_UN);
-  fclose(parent_meta);
-
-  super_inode_mark_dirty(parent_inode);
-
-  return 0;
+  return ret_val;
  }
 
 

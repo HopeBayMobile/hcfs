@@ -14,6 +14,22 @@
 
 #include "meta_mem_cache.h"
 
+int meta_forget_inode(ino_t self_inode)
+ {
+  char thismetapath[METAPATHLEN];
+
+  fetch_meta_path(thismetapath,self_inode);
+
+  if (access(thismetapath,F_OK)==0)
+   {
+    unlink(thismetapath);
+   }
+
+ /*TODO: Need to remove entry from super inode if needed */
+
+  return 0;
+ }
+
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
  {
   struct stat returned_stat;
@@ -93,59 +109,24 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
   memset(&this_meta,0,sizeof(DIR_META_TYPE));
   memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
 
-  fetch_meta_path(thismetapath,self_inode);
+  this_meta.next_subdir_page = sizeof(struct stat)+sizeof(DIR_ENTRY_PAGE);
 
-  metafptr = fopen(thismetapath,"w");
-
-  if (metafptr == NULL)
-   return -EACCES;
-
-  ret_val = fwrite(this_stat,sizeof(struct stat),1,metafptr);
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
-
-  this_meta.next_subdir_page = ftell(metafptr);
-  fseek(metafptr,sizeof(struct stat),SEEK_SET);
-
-  ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
-
-  if (ret_val < 1)
-   {
-    fclose(metafptr);
-    unlink(thismetapath);
-    return -EACCES;
-   }
   temppage.num_entries = 2;
   temppage.dir_entries[0].d_ino = self_inode;
   temppage.dir_entries[1].d_ino = parent_inode;
   strcpy(temppage.dir_entries[0].d_name,".");
   strcpy(temppage.dir_entries[1].d_name,"..");
 
-  ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
-  fclose(metafptr);
+  ret_val = meta_cache_update_dir_data(self_inode,this_stat, &this_meta,&temppage, this_meta.next_subdir_page);
 
   if (ret_val < 1)
    {
-    unlink(thismetapath);
     return -EACCES;
    }
 
   ret_val = dir_add_entry(parent_inode, self_inode, selfname,this_stat->st_mode);
   if (ret_val < 0)
    {
-    unlink(thismetapath);
     return -EACCES;
    }
 

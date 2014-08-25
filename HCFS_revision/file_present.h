@@ -7,3 +7,5 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, struct stat *this_stat);
 int unlink_update_meta(ino_t parent_inode, ino_t this_inode,char *selfname);
 
+int meta_forget_inode(ino_t self_inode);
+

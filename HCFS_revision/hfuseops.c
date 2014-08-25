@@ -98,7 +98,7 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   ret_code = mknod_update_meta(self_inode, parent_inode, selfname, &this_stat);
 
   if (ret_code < 0)
-   mknod_forget_inode(self_inode); /*TODO: Need to delete meta file if any and remove entry from super inode */
+   meta_forget_inode(self_inode);
 
   return ret_code;
  }
@@ -146,11 +146,9 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   ret_code = mkdir_update_meta(self_inode, parent_inode, selfname, &this_stat);
 
   if (ret_code < 0)
-   return ret_code;
+   meta_forget_inode(self_inode);
 
-  super_inode_mark_dirty(self_inode);
-
-  return 0;
+  return ret_code;
  }
 
 
