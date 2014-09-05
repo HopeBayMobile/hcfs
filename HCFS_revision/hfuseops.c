@@ -180,22 +180,12 @@ int hfuse_unlink(const char *path)
   return ret_val;
  }
 
-/* TODO: Push out meta update details starts here*/
-
 int hfuse_rmdir(const char *path)
  {
   char *parentname;
   char selfname[400];
-  char thismetapath[METAPATHLEN];
-  char todelete_metapath[400];
   ino_t this_inode, parent_inode;
-  int ret_val;
-  FILE *metafptr;
-  DIR_META_TYPE tempmeta;
-  FILE *todeletefptr;
-  char filebuf[5000];
-  size_t read_size;
-  int ret_code;
+  int ret_val,ret_code;
 
   this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
@@ -223,67 +213,12 @@ int hfuse_rmdir(const char *path)
 
   invalidate_pathname_cache_entry(path);
 
-  fetch_meta_path(thismetapath,this_inode);
-
-  metafptr = fopen(thismetapath,"r+");
-
-  if (metafptr == NULL)
-   return -EACCES;
-  setbuf(metafptr,NULL);
-  flock(fileno(metafptr),LOCK_EX);
-  fseek(metafptr,sizeof(struct stat),SEEK_SET);
-  fread(&tempmeta,sizeof(DIR_META_TYPE),1,metafptr);
-  printf("TOTAL CHILDREN is now %ld\n",tempmeta.total_children);
-
-  if (tempmeta.total_children > 0)
-   {
-    flock(fileno(metafptr),LOCK_UN);
-    fclose(metafptr);
-    return -ENOTEMPTY;
-   }
-
-  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFDIR);
-  if (ret_val < 0)
-   {
-    flock(fileno(metafptr),LOCK_UN);
-    fclose(metafptr);
-    return -EACCES;
-   }
-
-  /*Need to delete the inode*/
-  super_inode_to_delete(this_inode);
-  fetch_todelete_path(todelete_metapath,this_inode);
-  /*Try a rename first*/
-  ret_val = rename(thismetapath,todelete_metapath);
-  if (ret_val < 0)
-   {
-    /*If not successful, copy the meta*/
-    unlink(todelete_metapath);
-    todeletefptr = fopen(todelete_metapath,"w");
-    fseek(metafptr,0,SEEK_SET);
-    while(!feof(metafptr))
-     {
-      read_size = fread(filebuf,1,4096,metafptr);
-      if (read_size > 0)
-       {
-        fwrite(filebuf,1,read_size,todeletefptr);
-       }
-      else
-       break;
-     }
-    fclose(todeletefptr);
-
-    unlink(thismetapath);
-   }
-     
-  flock(fileno(metafptr),LOCK_UN);
-  fclose(metafptr);
+  ret_val = rmdir_update_meta(parent_inode,this_inode,selfname);
 
   return ret_val;
  }
 
 //int hfuse_symlink(const char *oldpath, const char *newpath);
-
 
 static int hfuse_rename(const char *oldpath, const char *newpath)
  {
@@ -293,7 +228,7 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   char selfname2[400];
   ino_t parent_inode1,parent_inode2,self_inode;
   int ret_val;
-  SUPER_INODE_ENTRY tempentry;
+  struct stat tempstat;
   mode_t self_mode;
   int ret_code, ret_code2;
 
@@ -306,11 +241,12 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   if (lookup_pathname(newpath, &ret_code) > 0)
    return -EACCES;
 
-  ret_val =super_inode_read(self_inode, &tempentry);    
+  ret_val = meta_cache_lookup_file_data(self_inode, &tempstat, NULL, NULL, 0);
+
   if (ret_val < 0)
    return -ENOENT;
 
-  self_mode = tempentry.inode_stat.st_mode;
+  self_mode = tempstat.st_mode;
 
   /*TODO: Will now only handle simple types (that the target is empty and no symlinks)*/
   parentname1 = malloc(strlen(oldpath)*sizeof(char));
@@ -359,12 +295,12 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
  }
 
 //int hfuse_link(const char *oldpath, const char *newpath);
+
 int hfuse_chmod(const char *path, mode_t mode)
  {
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
-  FILE *fptr;
   int ret_code;
 
   printf("Debug chmod\n");
@@ -375,7 +311,7 @@ int hfuse_chmod(const char *path, mode_t mode)
   ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
 
   if (ret_val < 0) /* Cannot fetch any meta*/
-   ret_val = 
+   return -EACCES;
 
   temp_inode_stat.st_mode = mode;
   temp_inode_stat.st_ctime = time(NULL);
@@ -390,41 +326,34 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
   struct stat temp_inode_stat;
   int ret_val;
   ino_t this_inode;
-  char thismetapath[METAPATHLEN];
-  FILE *fptr;
   int ret_code;
 
-  printf("Debug chmod\n");
+  printf("Debug chown\n");
+
   this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
    return ret_code;
 
-  fetch_meta_path(thismetapath,this_inode);
-  printf("%lld %s\n",this_inode,thismetapath);
-  fptr = fopen(thismetapath,"r+");
-  if (fptr==NULL)
-   return -ENOENT;
-  setbuf(fptr,NULL);
-  
-  flock(fileno(fptr),LOCK_EX);
-  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+
+  if (ret_val < 0) /* Cannot fetch any meta*/
+   return -EACCES;
+
   temp_inode_stat.st_uid = owner;
   temp_inode_stat.st_gid = group;
   temp_inode_stat.st_ctime = time(NULL);
-  fseek(fptr,0,SEEK_SET);
-  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
-  super_inode_update_stat(this_inode, &temp_inode_stat);
+
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
 
   return 0;
  }
 
+/* TODO: Push out meta update details starts here*/
 
 int hfuse_truncate(const char *path, off_t offset)
  {
-/*TODO: If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_TODELETE (which will be changed to ST_NONE once object deleted)*/
-/*TODO: Add ST_TODELETE as a new block status. In truncate, if need to throw away a block, set the status to ST_TODELETE and upload process will handle the actual deletion.*/
+/* If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_TODELETE (which will be changed to ST_NONE once object deleted)*/
+/* Add ST_TODELETE as a new block status. In truncate, if need to throw away a block, set the status to ST_TODELETE and upload process will handle the actual deletion.*/
 /*If need to truncate some block that's ST_CtoL or ST_CLOUD, download it first, mod it, then set to ST_LDISK*/
 
 
@@ -527,7 +456,7 @@ int hfuse_truncate(const char *path, off_t offset)
          }
         if (current_page == last_page)
          {
-          /* TODO: Do the actual handling here*/
+          /* Do the actual handling here*/
           currentfilepos = prevfilepos;
           last_entry_index = last_block % MAX_BLOCK_ENTRIES_PER_PAGE;
           if ((offset % MAX_BLOCK_SIZE) != 0)

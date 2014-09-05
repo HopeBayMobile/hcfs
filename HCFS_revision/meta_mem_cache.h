@@ -83,5 +83,8 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_
 int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos); /*If entry exists, replace stat value with new one. Else create a new entry.*/
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos);
 
-int meta_cache_seek_empty_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *temppage,long *page_pos);
+int meta_cache_seek_empty_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, mode_t child_mode);
 
+int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, int *entry_index, ino_t child_inode, char *childname, mode_t child_mode);
+
+int meta_cache_remove(ino_t this_inode);

@@ -9,3 +9,4 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,char *selfname);
 
 int meta_forget_inode(ino_t self_inode);
 
+int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname);

@@ -146,3 +146,60 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,char *selfname)
   return ret_val;
  }
 
+int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+ {
+  DIR_META_TYPE tempmeta;
+  char thismetapath[METAPATHLEN];
+  char todelete_metapath[METAPATHLEN];
+  int ret_val;
+  FILE *todeletefptr, *metafptr;
+  char filebuf[5000];
+  size_t read_size;
+
+  ret_val = meta_cache_lookup_file_data(this_inode, NULL, &tempmeta, NULL, 0);
+
+  printf("TOTAL CHILDREN is now %ld\n",tempmeta.total_children);
+
+  if (tempmeta.total_children > 0)
+   return -ENOTEMPTY;
+
+  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFDIR);
+  if (ret_val < 0)
+   return -EACCES;
+
+  /*Need to delete the inode*/
+  super_inode_to_delete(this_inode);
+  fetch_todelete_path(todelete_metapath,this_inode);
+  /*Try a rename first*/
+  ret_val = rename(thismetapath,todelete_metapath);
+  if (ret_val < 0)
+   {
+    /*If not successful, copy the meta*/
+    unlink(todelete_metapath);
+    todeletefptr = fopen(todelete_metapath,"w");
+    metafptr = fopen(thismetapath,"r");
+    setbuf(metafptr,NULL); 
+    flock(fileno(metafptr),LOCK_EX);
+    setbuf(todeletefptr,NULL);
+    fseek(metafptr,0,SEEK_SET);
+
+    while(!feof(metafptr))
+     {
+      read_size = fread(filebuf,1,4096,metafptr);
+      if (read_size > 0)
+       {
+        fwrite(filebuf,1,read_size,todeletefptr);
+       }
+      else
+       break;
+     }
+    fclose(todeletefptr);
+
+    unlink(thismetapath);
+    flock(fileno(metafptr),LOCK_UN);
+    fclose(metafptr);
+    ret_val = meta_cache_remove(this_inode);
+   }
+
+  return ret_val;
+ }
