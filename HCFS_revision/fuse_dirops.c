@@ -2,6 +2,7 @@
 #include "global.h"
 #include "dir_lookup.h"
 #include "params.h"
+#include "meta_mem_cache.h"
 /*TODO: need to modify pathname lookup to handle symlink*/
 
 void init_pathname_cache()
@@ -138,7 +139,6 @@ ino_t lookup_pathname(const char *path, int *errcode)
  }
 ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath, int *errcode)
  {
-  FILE *fptr;
   int count;
   int new_prepath_length;
   char search_subdir_only;
@@ -164,120 +164,72 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
      break;
     }
 
-  fetch_meta_path(metapathname, subroot);
-
-  fptr = fopen(metapathname,"r");
-  setbuf(fptr,NULL);
-  flock(fileno(fptr),LOCK_SH);
-
   if (search_subdir_only)
    {
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
-    fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
-    thisfile_pos = tempmeta.next_subdir_page;
-
-    while(thisfile_pos != 0)
+    ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFDIR);
+    if ((ret_val == 0) && (count>=0))
      {
-      fseek(fptr, thisfile_pos, SEEK_SET);
-      fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
-      for (count=0;count<temp_page.num_entries;count++)
+      hit_inode = temp_page.dir_entries[count].d_ino;
+      if ((prepath_length+strlen(target_entry_name))<256)
        {
-        if (strcmp(temp_page.dir_entries[count].d_name,target_entry_name)==0)
-         {
-          hit_inode = temp_page.dir_entries[count].d_ino;
-          if ((prepath_length+strlen(target_entry_name))<256)
-           {
-            new_prepath_length = prepath_length+1+strlen(target_entry_name);
-            strncpy(tempname,fullpath,new_prepath_length);
-            tempname[new_prepath_length]=0;
-            replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
-           }
-          flock(fileno(fptr),LOCK_UN);
-          fclose(fptr);
-          return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath, errcode);
-         }
+        new_prepath_length = prepath_length+1+strlen(target_entry_name);
+        strncpy(tempname,fullpath,new_prepath_length);
+        tempname[new_prepath_length]=0;
+        replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
        }
-      thisfile_pos = temp_page.next_page;
+      return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath, errcode);
      }
-    flock(fileno(fptr),LOCK_UN);
-    fclose(fptr);
-    *errcode = -ENOENT;
+    if ((ret_val == 0) && (count<0))
+     {
+      *errcode = -ENOENT;
+      return 0;
+     }
+    *errcode = ret_val;
     return 0;   /*Cannot find this entry*/
    }
 
   strcpy(target_entry_name,&(partialpath[1]));
 
-  fseek(fptr,sizeof(struct stat), SEEK_SET);
-  ret_val=fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
-  if (ret_val < 1)
+  ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFDIR);
+
+  if (ret_val < 0)
    {
-    *errcode = -EACCES;
-    flock(fileno(fptr),LOCK_UN);
-    fclose(fptr);
+    *errcode = ret_val;
     return 0;
    }
-  thisfile_pos = tempmeta.next_subdir_page;
-
-  while(thisfile_pos != 0)
+  if ((ret_val == 0) && (count >=0))
    {
-    fseek(fptr, thisfile_pos, SEEK_SET);
-    ret_val = fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
-    if (ret_val < 1)
+    hit_inode = temp_page.dir_entries[count].d_ino;
+    if ((prepath_length+strlen(target_entry_name))<256)
      {
-      *errcode = -EACCES;
-      flock(fileno(fptr),LOCK_UN);
-      fclose(fptr);
-      return 0;
+      new_prepath_length = prepath_length+1+strlen(target_entry_name);
+      strncpy(tempname,fullpath,new_prepath_length);
+      tempname[new_prepath_length]=0;
+      replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
      }
-
-    for (count=0;count<temp_page.num_entries;count++)
-     {
-      if (strcmp(temp_page.dir_entries[count].d_name,target_entry_name)==0)
-       {
-        hit_inode = temp_page.dir_entries[count].d_ino;
-        if ((prepath_length+strlen(target_entry_name))<256)
-         {
-          new_prepath_length = prepath_length+1+strlen(target_entry_name);
-          strncpy(tempname,fullpath,new_prepath_length);
-          tempname[new_prepath_length]=0;
-          replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
-         }
-        flock(fileno(fptr),LOCK_UN);
-        fclose(fptr);
-        return hit_inode;
-       }
-     }
-    thisfile_pos = temp_page.next_page;
+    return hit_inode;
    }
 
-  thisfile_pos = tempmeta.next_file_page;
-  while(thisfile_pos != 0)
+  ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFREG);
+  if (ret_val < 0)
    {
-    fseek(fptr, thisfile_pos, SEEK_SET);
-    fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
-    for (count=0;count<temp_page.num_entries;count++)
+    *errcode = ret_val;
+    return 0;
+   }
+
+  if ((ret_val == 0) && (count >=0))
+   {
+    hit_inode = temp_page.dir_entries[count].d_ino;
+    if ((prepath_length+strlen(target_entry_name))<256)
      {
-      if (strcmp(temp_page.dir_entries[count].d_name,target_entry_name)==0)
-       {
-        hit_inode = temp_page.dir_entries[count].d_ino;
-        if ((prepath_length+strlen(target_entry_name))<256)
-         {
-          new_prepath_length = prepath_length+1+strlen(target_entry_name);
-          strncpy(tempname,fullpath,new_prepath_length);
-          tempname[new_prepath_length]=0;
-          replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
-         }
-        flock(fileno(fptr),LOCK_UN);
-        fclose(fptr);
-        return hit_inode;
-       }
+      new_prepath_length = prepath_length+1+strlen(target_entry_name);
+      strncpy(tempname,fullpath,new_prepath_length);
+      tempname[new_prepath_length]=0;
+      replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
      }
-    thisfile_pos = temp_page.next_page;
+    return hit_inode;
    }
 
   *errcode = -ENOENT;
-
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
   return 0;
  }

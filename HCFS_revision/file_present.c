@@ -83,7 +83,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
 
   ret_val = meta_cache_update_file_data(self_inode,this_stat, &this_meta,NULL, 0);
 
-  if (ret_val < 1)
+  if (ret_val < 0)
    {
     return -EACCES;
    }
@@ -109,7 +109,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
   memset(&this_meta,0,sizeof(DIR_META_TYPE));
   memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
 
-  this_meta.next_subdir_page = sizeof(struct stat)+sizeof(DIR_ENTRY_PAGE);
+  this_meta.next_subdir_page = sizeof(struct stat)+sizeof(DIR_META_TYPE);
 
   temppage.num_entries = 2;
   temppage.dir_entries[0].d_ino = self_inode;
@@ -117,9 +117,9 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
   strcpy(temppage.dir_entries[0].d_name,".");
   strcpy(temppage.dir_entries[1].d_name,"..");
 
-  ret_val = meta_cache_update_dir_data(self_inode,this_stat, &this_meta,&temppage, this_meta.next_subdir_page);
+  ret_val = meta_cache_update_dir_data(self_inode,this_stat, &this_meta,&temppage, this_meta.next_subdir_page,this_stat->st_mode);
 
-  if (ret_val < 1)
+  if (ret_val < 0)
    {
     return -EACCES;
    }
@@ -177,6 +177,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
     /*If not successful, copy the meta*/
     unlink(todelete_metapath);
     todeletefptr = fopen(todelete_metapath,"w");
+    fetch_meta_path(thismetapath,this_inode);
     metafptr = fopen(thismetapath,"r");
     setbuf(metafptr,NULL); 
     flock(fileno(metafptr),LOCK_EX);

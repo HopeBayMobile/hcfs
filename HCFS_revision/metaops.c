@@ -17,9 +17,11 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   long page_pos;
   int entry_index;
 
-  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, NULL,0);
+  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, NULL,0,0);
 
-  ret_val = meta_cache_seek_empty_dir_entry(parent_inode,&temppage,&page_pos,child_mode);
+  ret_val = meta_cache_seek_empty_dir_entry(parent_inode,&temppage,&page_pos,child_mode, &parent_meta_head);
+
+  printf("debug dir_add_entry page_pos 1 %ld\n",page_pos);
 
   entry_index = temppage.num_entries;
   temppage.num_entries++;
@@ -37,7 +39,9 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   parent_meta_head.total_children++;
   printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
 
-  ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, &temppage,page_pos);
+  ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, &temppage,page_pos,child_mode);
+
+  printf("debug dir_add_entry page_pos 2 %ld\n",page_pos);
 
   return ret_val;
  }
@@ -53,11 +57,11 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   long page_pos;
   int count,ret_val;
 
-  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,NULL,0);
+  ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,NULL,0,child_mode);
 
-  ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, child_inode, childname, child_mode);
+  ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, childname, child_mode);
 
-  if (ret_val ==0)
+  if ((ret_val ==0) && (count>=0))
    {
     /*Found the entry. Delete it*/
     if (count!=(temppage.num_entries-1))
@@ -72,7 +76,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
  
     parent_meta_head.total_children--;
     printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
-    ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, &temppage,page_pos);
+    ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, &temppage,page_pos,child_mode);
     return 0;
    }
 
@@ -88,13 +92,13 @@ int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char 
   long page_pos;
   int count, ret_val;
 
-  ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, child_inode, oldname, child_mode);
+  ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, oldname, child_mode);
 
-  if (ret_val ==0)
+  if ((ret_val ==0) && (count>=0))
    {
     /*Found the entry. Replace it*/
     strcpy(temppage.dir_entries[count].d_name,newname);
-    ret_val = meta_cache_update_dir_data(parent_inode, NULL, NULL, &temppage,page_pos);
+    ret_val = meta_cache_update_dir_data(parent_inode, NULL, NULL, &temppage,page_pos,child_mode);
     return 0;
    }
 
@@ -110,15 +114,15 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inod
   int count;
   int ret_val;
 
-  ret_val = meta_cache_lookup_dir_data(self_inode, NULL,&self_meta_head,NULL,0);
+  ret_val = meta_cache_lookup_dir_data(self_inode, NULL,&self_meta_head,NULL,0,0);
 
-  ret_val = meta_cache_seek_dir_entry(self_inode,&temppage,&page_pos, &count, parent_inode1, "..", S_IFDIR);
+  ret_val = meta_cache_seek_dir_entry(self_inode,&temppage,&page_pos, &count, "..", S_IFDIR);
 
-  if (ret_val ==0)
+  if ((ret_val ==0) && (count>=0))
    {
     /*Found the entry. Change parent inode*/
     temppage.dir_entries[count].d_ino = parent_inode2;
-    ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL, &temppage,page_pos);
+    ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL, &temppage,page_pos, S_IFDIR);
     return 0;
    }
 
@@ -139,7 +143,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   off_t cache_block_size;
   size_t read_size;
 
-  ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,NULL,NULL,0);
+  ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,NULL,NULL,0,0);
 
   if (this_inode_stat.st_nlink<=1)
    {
@@ -205,7 +209,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
   else
    {
     this_inode_stat.st_nlink--; 
-    ret_val = meta_cache_update_dir_data(this_inode, &this_inode_stat, NULL, NULL,0);
+    ret_val = meta_cache_update_dir_data(this_inode, &this_inode_stat, NULL, NULL,0,0);
    }
 
   return 0;
