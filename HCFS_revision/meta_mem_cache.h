@@ -38,13 +38,13 @@ should release header lock and sleep for a short time, or skip to other entries.
 
 typedef struct {
   struct stat this_stat;
+  ino_t inode_num;
   char stat_dirty;
   DIR_META_TYPE *dir_meta;    /* Only used if inode is a dir */
   FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
   char meta_dirty;
   DIR_ENTRY_PAGE *dir_entry_cache[2];      /*Zero if not pointed to any page*/
-  long dir_entry_cache_pos[2];               /* TODO: How to flush cached pages due to cache full: index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
-  mode_t dir_entry_cache_mode[2];
+/*index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
   char dir_entry_cache_dirty[2];
   BLOCK_ENTRY_PAGE *block_entry_cache[2];
   long block_entry_cache_pos[2];
@@ -52,14 +52,15 @@ typedef struct {
 /* TODO: Add xattr page cached here */
   int opened_handles_to_inode;
   sem_t access_sem;
+  char something_dirty;
+  char meta_opened;
+  FILE *fptr;
   struct timeval last_access_time;  /*TODO: Need to think whether system clock change could affect the involved operations*/
  } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
   META_CACHE_ENTRY_STRUCT cache_entry_body;
   ino_t inode_num;
-  int opened_handles_to_inode;
-  char something_dirty;
   struct meta_cache_lookup_struct *next;
  };
 
@@ -73,19 +74,25 @@ typedef struct {
 
 int init_meta_cache_headers();
 int release_meta_cache_headers();
-int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
+int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_flush_block_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
 int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
 int flush_clean_all_meta_cache();
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
+
+/*TODO: Still need to fix starts here*/
+
 int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos); /*If entry exists, replace stat value with new one. Else create a new entry.*/
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos);
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos, mode_t child_mode); /*If entry exists, replace stat value with new one. Else create a new entry.*/
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos, mode_t child_mode);
 
-int meta_cache_seek_empty_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, mode_t child_mode, DIR_META_TYPE *result_meta);
+int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page);
+/*TODO: Still need to fix ends here*/
 
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, int *entry_index, char *childname, mode_t child_mode);
+int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY *result_entry, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_remove(ino_t this_inode);
-int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, long pagepos, mode_t child_mode, DIR_ENTRY_PAGE *temppage);
+int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *temppage);
+
+int meta_cache_lock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *result_ptr);
+int meta_cache_unlock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *target_ptr);

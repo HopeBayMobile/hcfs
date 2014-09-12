@@ -145,11 +145,10 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
   char metapathname[METAPATHLEN];
   char target_entry_name[400];
   char tempname[400];
-  off_t thisfile_pos;
   ino_t hit_inode;
-  DIR_META_TYPE tempmeta;
-  DIR_ENTRY_PAGE temp_page;
+  DIR_ENTRY temp_entry;
   int ret_val;
+  META_CACHE_ENTRY_STRUCT *cache_entry;
 
   if ((partialpath[0]=='/') && (strlen(partialpath)==1))
    return subroot;
@@ -166,10 +165,12 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   if (search_subdir_only)
    {
-    ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFDIR);
-    if ((ret_val == 0) && (count>=0))
+    meta_cache_lock_entry(subroot, cache_entry);
+    ret_val = meta_cache_seek_dir_entry(subroot,&temp_entry,target_entry_name, cache_entry);
+    meta_cache_unlock_entry(subroot, cache_entry);
+    if ((ret_val == 0) && (temp_entry.d_ino > 0))
      {
-      hit_inode = temp_page.dir_entries[count].d_ino;
+      hit_inode = temp_entry.d_ino;
       if ((prepath_length+strlen(target_entry_name))<256)
        {
         new_prepath_length = prepath_length+1+strlen(target_entry_name);
@@ -179,7 +180,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
        }
       return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath, errcode);
      }
-    if ((ret_val == 0) && (count<0))
+    if ((ret_val == 0) && (temp_entry.d_ino == 0))
      {
       *errcode = -ENOENT;
       return 0;
@@ -190,16 +191,18 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   strcpy(target_entry_name,&(partialpath[1]));
 
-  ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFDIR);
+  meta_cache_lock_entry(subroot, cache_entry);
+  ret_val = meta_cache_seek_dir_entry(subroot,&temp_entry,target_entry_name, cache_entry);
+  meta_cache_unlock_entry(subroot, cache_entry);
 
   if (ret_val < 0)
    {
     *errcode = ret_val;
     return 0;
    }
-  if ((ret_val == 0) && (count >=0))
+  if ((ret_val == 0) && (temp_entry.d_ino > 0))
    {
-    hit_inode = temp_page.dir_entries[count].d_ino;
+    hit_inode = temp_entry.d_ino;
     if ((prepath_length+strlen(target_entry_name))<256)
      {
       new_prepath_length = prepath_length+1+strlen(target_entry_name);
@@ -210,26 +213,11 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
     return hit_inode;
    }
 
-  ret_val = meta_cache_seek_dir_entry(subroot,&temp_page,&thisfile_pos,&count,target_entry_name,S_IFREG);
-  if (ret_val < 0)
+  if ((ret_val == 0) && (temp_entry.d_ino == 0))
    {
-    *errcode = ret_val;
+    *errcode = -ENOENT;
     return 0;
    }
-
-  if ((ret_val == 0) && (count >=0))
-   {
-    hit_inode = temp_page.dir_entries[count].d_ino;
-    if ((prepath_length+strlen(target_entry_name))<256)
-     {
-      new_prepath_length = prepath_length+1+strlen(target_entry_name);
-      strncpy(tempname,fullpath,new_prepath_length);
-      tempname[new_prepath_length]=0;
-      replace_pathname_cache(compute_hash(tempname),tempname,hit_inode);
-     }
-    return hit_inode;
-   }
-
-  *errcode = -ENOENT;
+  *errcode = ret_val;
   return 0;
  }

@@ -7,6 +7,7 @@
 #include "fuseop.h"
 #include "super_inode.h"
 #include "meta_mem_cache.h"
+#include "dir_entry_btree.h"
 
 /* TODO: cache meta file pointer and close only after some idle interval */
 
@@ -49,7 +50,7 @@ int release_meta_cache_headers()
   free(meta_mem_cache);
   return 0;
  }
-int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, long nextfilepos, mode_t child_mode, DIR_ENTRY_PAGE *temppage)
+int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *temppage)
  {
   int ret_val;
 
@@ -57,38 +58,28 @@ int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, long nextfilepos
    {
     body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
     memcpy((body_ptr->dir_entry_cache[0]), temppage,sizeof(DIR_ENTRY_PAGE));
-    body_ptr->dir_entry_cache_pos[0] = nextfilepos;
     body_ptr->dir_entry_cache_dirty[0] = TRUE;
-    body_ptr->dir_entry_cache_mode[0] = child_mode;
    }
   else
    {
     if (body_ptr->dir_entry_cache[1]==NULL)
      {
-      body_ptr->dir_entry_cache_pos[1] = body_ptr->dir_entry_cache_pos[0];
       body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
       body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-      body_ptr->dir_entry_cache_mode[1] = body_ptr->dir_entry_cache_mode[0];
       body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
       memcpy((body_ptr->dir_entry_cache[0]), temppage,sizeof(DIR_ENTRY_PAGE));
-      body_ptr->dir_entry_cache_pos[0] = nextfilepos;
       body_ptr->dir_entry_cache_dirty[0] = TRUE;
-      body_ptr->dir_entry_cache_mode[0] = child_mode;
      }
     else
      {
       /* Need to flush first */
       ret_val = meta_cache_flush_dir_cache(body_ptr,1);
       free(body_ptr->dir_entry_cache[1]);
-      body_ptr->dir_entry_cache_pos[1] = body_ptr->dir_entry_cache_pos[0];
       body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
       body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-      body_ptr->dir_entry_cache_mode[1] = body_ptr->dir_entry_cache_mode[0];
       body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
       memcpy((body_ptr->dir_entry_cache[0]), temppage,sizeof(DIR_ENTRY_PAGE));
-      body_ptr->dir_entry_cache_pos[0] = nextfilepos;
       body_ptr->dir_entry_cache_dirty[0] = TRUE;
-      body_ptr->dir_entry_cache_mode[0] = child_mode;
      }
    }
   return 0;
@@ -133,27 +124,35 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_inde
   char thismetapath[METAPATHLEN];
   FILE *fptr;
 
-  fetch_meta_path(thismetapath,(body_ptr->this_stat).st_ino);
-
-  fptr = fopen(thismetapath,"r+");
-  if (fptr==NULL)
+  if (body_fptr->fptr==NULL)
    {
-    if (access(thismetapath,F_OK)<0)
-     fptr = fopen(thismetapath,"w+");  /*File may not exist*/
-    if (fptr == NULL)
+    fetch_meta_path(thismetapath,(body_ptr->this_stat).st_ino);
+
+    fptr = fopen(thismetapath,"r+");
+    if (fptr==NULL)
      {
-      return -1;
+      if (access(thismetapath,F_OK)<0)
+       fptr = fopen(thismetapath,"w+");  /*File may not exist*/
+      if (fptr == NULL)
+       {
+        return -1;
+       }
      }
-   }
-  setbuf(fptr,NULL);
+    setbuf(fptr,NULL);
   
-  flock(fileno(fptr),LOCK_EX);
+    flock(fileno(fptr),LOCK_EX);
+   }
+  else
+   fptr = body_fptr->fptr;
 
   fseek(fptr,body_ptr->dir_entry_cache_pos[entry_index],SEEK_SET);
   fwrite(body_ptr->dir_entry_cache[entry_index],sizeof(DIR_ENTRY_PAGE),1,fptr);
 
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
+  if (body_fptr->fptr == NULL)
+   {
+    flock(fileno(fptr),LOCK_UN);
+    fclose(fptr);
+   }
 
   super_inode_mark_dirty((body_ptr->this_stat).st_ino);
 
@@ -161,24 +160,26 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_inde
  }
 
 
-int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
+int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
  {
   SUPER_INODE_ENTRY tempentry;
   int ret_val;
   char thismetapath[METAPATHLEN];
   FILE *fptr;
   int ret_code;
-  META_CACHE_ENTRY_STRUCT *body_ptr;
+  int sem_val;
 
-  sem_wait(&((entry_ptr->cache_entry_body).access_sem));
-
-  if (entry_ptr->something_dirty == FALSE)
+  sem_getvalue(&(body_ptr->access_sem), &sem_val);
+  if (sem_val > 0)
    {
-    sem_post(&((entry_ptr->cache_entry_body).access_sem));
-    return 0;
+    /*Not locked, return -1*/
+    return -1;
    }
 
-  body_ptr = &(entry_ptr->cache_entry_body);
+  if (body_ptr->something_dirty == FALSE)
+   {
+    return 0;
+   }
 
   fetch_meta_path(thismetapath,entry_ptr->inode_num);
 
@@ -189,7 +190,6 @@ int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
      fptr = fopen(thismetapath,"w+");  /*File may not exist*/
     if (fptr == NULL)
      {
-      sem_post(&((entry_ptr->cache_entry_body).access_sem));
       return -ENOENT;
      }
    }
@@ -257,7 +257,6 @@ int flush_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
   super_inode_update_stat(entry_ptr->inode_num, &(body_ptr->this_stat));
 
   entry_ptr->something_dirty = FALSE;
-  sem_post(&((entry_ptr->cache_entry_body).access_sem));
 
   return 0;
  }
@@ -274,13 +273,15 @@ int flush_clean_all_meta_cache() /* Flush all dirty entries and free memory usag
       current_ptr = meta_mem_cache[count].meta_cache_entries;
       while(current_ptr!=NULL)
        {
+        sem_wait(&((current_ptr->cache_entry_body).access_sem));
         if (current_ptr->something_dirty == TRUE)
          {
-          flush_single_meta_cache_entry(current_ptr);
+          flush_single_meta_cache_entry(&(current_ptr->cache_entry_body));
          }
         free_single_meta_cache_entry(current_ptr);
         old_ptr = current_ptr;
         current_ptr = current_ptr->next;
+        sem_wait(&((old_ptr->cache_entry_body).access_sem));
         free(old_ptr);
        }
      }
@@ -436,13 +437,15 @@ of the two, flush the older page entry first before processing the new one */
    }
 
   gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-  sem_post(&((current_ptr->cache_entry_body).access_sem));
 
   if (current_ptr->something_dirty == FALSE)
    current_ptr->something_dirty = TRUE;
 
   if (META_CACHE_FLUSH_NOW == TRUE)
    ret_val = flush_single_meta_cache_entry(current_ptr);
+
+  sem_post(&((current_ptr->cache_entry_body).access_sem));
+
 
   sem_post(&(meta_mem_cache[index].header_sem));
   return 0;
@@ -651,6 +654,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_
             fseek(fptr,body_ptr->block_entry_cache_pos[1],SEEK_SET);
             fwrite(body_ptr->block_entry_cache[1],sizeof(BLOCK_ENTRY_PAGE),1,fptr);
             free(body_ptr->block_entry_cache[1]);
+            super_inode_mark_dirty((body_ptr->this_stat).st_ino);
 
             body_ptr->block_entry_cache_pos[1] = body_ptr->block_entry_cache_pos[0];
             body_ptr->block_entry_cache_dirty[1] = body_ptr->block_entry_cache_dirty[0];
@@ -695,7 +699,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
   SUPER_INODE_ENTRY tempentry;
   int ret_code;
 
-  printf("Debug meta cache lookup dir data page_pos %ld, dir_page %d\n",page_pos, dir_page);
+  printf("Debug meta cache lookup dir data page_pos %ld, dir_page %ld\n",page_pos, dir_page);
 
   index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
@@ -832,7 +836,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
           fread((body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE),1,fptr);
 
           body_ptr->dir_entry_cache_pos[0] = page_pos;
-          body_ptr->dir_entry_cache_mode[0] = child_mode;
           memcpy(dir_page, (body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE));
          }
         else
@@ -842,7 +845,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
             body_ptr->dir_entry_cache_pos[1] = body_ptr->dir_entry_cache_pos[0];
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
             body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-            body_ptr->dir_entry_cache_mode[1] = body_ptr->dir_entry_cache_mode[0];
 
 
             body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
@@ -867,7 +869,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
             fread((body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE),1,fptr);
 
             body_ptr->dir_entry_cache_pos[0] = page_pos;
-            body_ptr->dir_entry_cache_mode[0] = child_mode;
             memcpy(dir_page, (body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE));
            }
           else
@@ -892,6 +893,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
             fseek(fptr,body_ptr->dir_entry_cache_pos[1],SEEK_SET);
             fwrite(body_ptr->dir_entry_cache[1],sizeof(DIR_ENTRY_PAGE),1,fptr);
             free(body_ptr->dir_entry_cache[1]);
+            super_inode_mark_dirty((body_ptr->this_stat).st_ino);
 
             body_ptr->dir_entry_cache_pos[1] = body_ptr->dir_entry_cache_pos[0];
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
@@ -903,7 +905,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
             fread((body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE),1,fptr);
 
             body_ptr->dir_entry_cache_pos[0] = page_pos;
-            body_ptr->dir_entry_cache_mode[0] = child_mode;
             memcpy(dir_page, (body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE));
            }
          }
@@ -927,7 +928,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
   return 0;
  }
 
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, long page_pos, mode_t child_mode)
+int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page)
  {
   /*Always change dirty status to TRUE here as we always update*/
 /*For dir entry page lookup or update, only allow one lookup/update at a time,
@@ -1009,13 +1010,13 @@ of the two, flush the older page entry first before processing the new one */
       else
        {
         /* Cannot find the requested page in cache */
-        meta_cache_push_dir_page(body_ptr,page_pos,child_mode,dir_page);
+        meta_cache_push_dir_page(body_ptr,page_pos,child_mode,dir_page,NULL);
        }
      }
    }
 
   gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-  sem_post(&((current_ptr->cache_entry_body).access_sem));
+
 
   if (current_ptr->something_dirty == FALSE)
    current_ptr->something_dirty = TRUE;
@@ -1025,615 +1026,141 @@ of the two, flush the older page entry first before processing the new one */
 
   printf("Debug meta cache update dir data cached pos %ld\n",body_ptr->dir_entry_cache_pos[0]);
 
+  sem_post(&((current_ptr->cache_entry_body).access_sem));
+
   sem_post(&(meta_mem_cache[index].header_sem));
   return 0;
  }
 
-int meta_cache_seek_empty_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, mode_t child_mode, DIR_META_TYPE *result_meta)
- {
-  FILE *fptr;
-  char thismetapath[METAPATHLEN];
-  struct stat inode_stat;
-  DIR_META_TYPE dir_meta;
-  DIR_ENTRY_PAGE temppage;
-  int ret_items;
-  int ret_val;
-  long nextfilepos,oldfilepos;
-  int index;
-  META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
-  META_CACHE_ENTRY_STRUCT *body_ptr;
-  char need_new,meta_opened;
-  int can_use_index;
 
-  index = hash_inode_to_meta_cache(this_inode);
-/*First lock corresponding header*/
-  sem_wait(&(meta_mem_cache[index].header_sem));
-
-  current_ptr = meta_mem_cache[index].meta_cache_entries;
-  need_new = TRUE;
-  while(current_ptr!=NULL)
-   {
-    if (current_ptr->inode_num == this_inode) /* A hit */
-     {
-      need_new = FALSE;
-      break;
-     }
-    current_ptr = current_ptr->next;
-   }
-
-  if (need_new == TRUE)
-   {
-    current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
-    if (current_ptr==NULL)
-     return -1;
-    memset(current_ptr,0,sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
-  
-    current_ptr->next = meta_mem_cache[index].meta_cache_entries;
-    meta_mem_cache[index].meta_cache_entries = current_ptr;
-    current_ptr->inode_num = this_inode;
-    sem_init(&((current_ptr->cache_entry_body).access_sem),0,1);
-    meta_mem_cache[index].num_entries++;
-   }
-/*Lock body*/
-/*TODO: May need to add checkpoint here so that long sem wait will free all locks*/
-
-  sem_wait(&((current_ptr->cache_entry_body).access_sem));
-
-  body_ptr = &(current_ptr->cache_entry_body);
-
-  meta_opened = FALSE;
-
-/*First check if any of the two cached page entries contains empty entry and return
-the one with smaller file pos */
-
-  if (need_new == FALSE)
-   {
-    can_use_index = -1;
-    if (body_ptr->dir_entry_cache[0]!=NULL)
-     {
-      if (((S_ISREG(body_ptr->dir_entry_cache_mode[0]) == TRUE) && (S_ISREG(child_mode) == TRUE)) ||
-          ((S_ISDIR(body_ptr->dir_entry_cache_mode[0]) == TRUE) && (S_ISDIR(child_mode) == TRUE)))
-       {
-        if ((body_ptr->dir_entry_cache[0])->num_entries < MAX_DIR_ENTRIES_PER_PAGE)
-         {
-          *page_pos = body_ptr->dir_entry_cache_pos[0];
-          can_use_index = 0;
-         }
-       }
-     }
-    if (body_ptr->dir_entry_cache[1]!=NULL)
-     {
-      if (((S_ISREG(body_ptr->dir_entry_cache_mode[1]) == TRUE) && (S_ISREG(child_mode) == TRUE)) ||
-          ((S_ISDIR(body_ptr->dir_entry_cache_mode[1]) == TRUE) && (S_ISDIR(child_mode) == TRUE)))
-       {
-        if ((body_ptr->dir_entry_cache[1])->num_entries < MAX_DIR_ENTRIES_PER_PAGE)
-         {
-          if (((can_use_index >=0) && ((*page_pos) > body_ptr->dir_entry_cache_pos[1]))
-            || (can_use_index < 0))
-           {
-            *page_pos = body_ptr->dir_entry_cache_pos[1];
-            can_use_index = 1;
-           }
-         }
-       }
-     }
-
-    if (can_use_index >=0)
-     {
-      memcpy(result_page,(body_ptr->dir_entry_cache[can_use_index]),sizeof(DIR_ENTRY_PAGE));
-
-      gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-
-      sem_post(&((current_ptr->cache_entry_body).access_sem));
-      sem_post(&(meta_mem_cache[index].header_sem));
-
-      return 0;
-     }
-   }
-
-/* Cannot find the empty dir entry in any of the two cached page entries. Proceed to search from meta file */
-
-  if (need_new == TRUE)
-   {
-    /*Open meta file and fetch stat from super inode*/
-    fetch_meta_path(thismetapath,current_ptr->inode_num);
-
-    fptr = fopen(thismetapath,"r+");
-    if (fptr==NULL)
-     goto file_exception;
-
-    setbuf(fptr,NULL); 
-    flock(fileno(fptr),LOCK_EX);
-    meta_opened = TRUE;
-    fseek(fptr,0,SEEK_SET);
-    fread(&(body_ptr->this_stat),sizeof(struct stat),1,fptr);
-   }
-
-  if (body_ptr->dir_meta == NULL)
-   {
-    body_ptr->dir_meta = malloc(sizeof(DIR_META_TYPE));
-
-    if (meta_opened == FALSE)
-     {
-      fetch_meta_path(thismetapath,current_ptr->inode_num);
-
-      fptr = fopen(thismetapath,"r+");
-      if (fptr==NULL)
-       goto file_exception;
-
-      setbuf(fptr,NULL); 
-      flock(fileno(fptr),LOCK_EX);
-      meta_opened = TRUE;
-     }
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
-    fread(body_ptr->dir_meta,sizeof(DIR_META_TYPE),1,fptr);
-   }
-
-  memcpy(&(dir_meta),body_ptr->dir_meta,sizeof(DIR_META_TYPE));
-
-  if (child_mode & S_IFREG)
-   {
-    nextfilepos=dir_meta.next_file_page;
-   }
-  else
-   {
-    if (child_mode & S_IFDIR)
-     nextfilepos=dir_meta.next_subdir_page;
-   }
-  memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
-
-  while(nextfilepos!=0)
-   {
-    /*First check if the page is in the cache*/
-
-    if ((body_ptr->dir_entry_cache[0]!=NULL) && (body_ptr->dir_entry_cache_pos[0] == nextfilepos))
-     {
-      /* Pretty sure there is no empty entry here, otherwise should have returned it */
-      if ((body_ptr->dir_entry_cache[0])->next_page == 0)
-       break;
-      nextfilepos = (body_ptr->dir_entry_cache[0])->next_page;
-     }
-    else
-     {
-      if ((body_ptr->dir_entry_cache[1]!=NULL) && (body_ptr->dir_entry_cache_pos[1] == nextfilepos))
-       {
-        /* Pretty sure there is no empty entry here, otherwise should have returned it */
-        if ((body_ptr->dir_entry_cache[1])->next_page == 0)
-         break;
-        nextfilepos = (body_ptr->dir_entry_cache[1])->next_page;
-       }
-      else
-       {
-        if (meta_opened == FALSE)
-         {
-          fetch_meta_path(thismetapath,current_ptr->inode_num);
-
-          fptr = fopen(thismetapath,"r+");
-          if (fptr==NULL)
-           goto file_exception;
-
-          setbuf(fptr,NULL); 
-          flock(fileno(fptr),LOCK_EX);
-          meta_opened = TRUE;
-         }
-
-        fseek(fptr,nextfilepos,SEEK_SET);
-        if (ftell(fptr)!=nextfilepos)
-         goto file_exception;
-        ret_items = fread(&temppage,sizeof(DIR_ENTRY_PAGE),1,fptr);
-        if (ret_items <1)
-         goto file_exception;
-
-        if (temppage.num_entries < MAX_DIR_ENTRIES_PER_PAGE)
-         {   /*This page has empty dir entry. Fill it.*/
-          /*TODO: First should allocate a page entry in cache for this*/
-
-        /* Cannot find the requested page in cache */
-          meta_cache_push_dir_page(body_ptr,nextfilepos,child_mode, &temppage);
-
-          *page_pos = nextfilepos;
-          memcpy(result_page,&temppage,sizeof(DIR_ENTRY_PAGE));
-
-          if (meta_opened == TRUE)
-           {
-            flock(fptr,LOCK_UN);
-            fclose(fptr);
-           }
-
-          gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-
-          sem_post(&((current_ptr->cache_entry_body).access_sem));
-
-          if (current_ptr->something_dirty == FALSE)
-           current_ptr->something_dirty = TRUE;
-
-          if (META_CACHE_FLUSH_NOW == TRUE)
-           ret_val = flush_single_meta_cache_entry(current_ptr);
-
-          sem_post(&(meta_mem_cache[index].header_sem));
-
-          return 0;
-         }
-       }
-     }
-
-    if (temppage.next_page == 0)
-     break;
-    nextfilepos = temppage.next_page;
-   }
-
-  /*Allocate a new page*/
-
-  if (meta_opened == FALSE)
-   {
-    fetch_meta_path(thismetapath,current_ptr->inode_num);
-
-    fptr = fopen(thismetapath,"r+");
-    if (fptr==NULL)
-     goto file_exception;
-
-    setbuf(fptr,NULL); 
-    flock(fileno(fptr),LOCK_EX);
-    meta_opened = TRUE;
-   }
-
-  oldfilepos = nextfilepos;
-
-  fseek(fptr,0,SEEK_END);
-  nextfilepos=ftell(fptr);
-
-  if (oldfilepos!=0)
-   {
-    if ((body_ptr->dir_entry_cache[0]!=NULL) && (body_ptr->dir_entry_cache_pos[0] == oldfilepos))
-     {
-      /* Pretty sure there is no empty entry here, otherwise should have returned it */
-      (body_ptr->dir_entry_cache[0])->next_page = nextfilepos;
-      body_ptr->dir_entry_cache_dirty[0] = TRUE;
-     }
-    else
-     {
-      if ((body_ptr->dir_entry_cache[1]!=NULL) && (body_ptr->dir_entry_cache_pos[1] == oldfilepos))
-       {
-        (body_ptr->dir_entry_cache[1])->next_page = nextfilepos;
-        body_ptr->dir_entry_cache_dirty[1] = TRUE;
-       }
-      else
-       {
-        temppage.next_page = nextfilepos;
-        fseek(fptr,oldfilepos,SEEK_SET);
-        ret_items = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,fptr);
-        if (ret_items <1)
-         goto file_exception;
-       }
-     }
-   }
-  else
-   {
-    if (child_mode & S_IFREG)
-     {
-      (body_ptr->dir_meta)->next_file_page=nextfilepos;
-     }
-    else
-     {
-      if (child_mode & S_IFDIR)
-       {
-        (body_ptr->dir_meta)->next_subdir_page=nextfilepos;
-       }
-     }
-    body_ptr->meta_dirty = TRUE;
-   }
-
-  fseek(fptr,nextfilepos,SEEK_SET);
-  memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
-  temppage.num_entries=0;
-  temppage.next_page=0;
-  fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,fptr);
-
-  meta_cache_push_dir_page(body_ptr,nextfilepos,child_mode,&temppage);
-
-  *page_pos = nextfilepos;
-  memcpy(result_page,&temppage,sizeof(DIR_ENTRY_PAGE));
-  memcpy(result_meta,body_ptr->dir_meta,sizeof(DIR_META_TYPE));
-
-  if (meta_opened == TRUE)
-   {
-    flock(fptr,LOCK_UN);
-    fclose(fptr);
-   }
-
-  gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-
-  sem_post(&((current_ptr->cache_entry_body).access_sem));
-
-  if (current_ptr->something_dirty == FALSE)
-   current_ptr->something_dirty = TRUE;
-
-  if (META_CACHE_FLUSH_NOW == TRUE)
-   ret_val = flush_single_meta_cache_entry(current_ptr);
-
-  sem_post(&(meta_mem_cache[index].header_sem));
-  return 0;
-
-/* Exception handling from here */
-file_exception:
-
-  sem_post(&((current_ptr->cache_entry_body).access_sem));
-  sem_post(&(meta_mem_cache[index].header_sem));
-  if (meta_opened == TRUE)
-   {
-    flock(fptr,LOCK_UN);
-    fclose(fptr);
-   }
-  return -1;
-
-
- }
-
-/*Returns 0 and negative entry_index if not found. Returns negative numbers if
+/*Returns 0 and result entry with d_ino = 0 if not found. Returns negative numbers if
 exception.*/
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,long *page_pos, int *entry_index, char *childname, mode_t child_mode)
+int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY *result_entry, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
  {
   FILE *fptr;
   char thismetapath[METAPATHLEN];
   struct stat inode_stat;
   DIR_META_TYPE dir_meta;
-  DIR_ENTRY_PAGE temppage;
+  DIR_ENTRY_PAGE temppage, rootpage;
   DIR_ENTRY_PAGE *tmp_page_ptr;
   int ret_items;
   int ret_val;
   long nextfilepos,oldfilepos;
   int index;
   META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
-  META_CACHE_ENTRY_STRUCT *body_ptr;
-  char need_new,meta_opened;
   int can_use_index;
-  int count;
+  int count, sem_val;
+  DIR_ENTRY tmp_entry;
+  int tmp_index;
 
-  index = hash_inode_to_meta_cache(this_inode);
-/*First lock corresponding header*/
-  sem_wait(&(meta_mem_cache[index].header_sem));
-
-  current_ptr = meta_mem_cache[index].meta_cache_entries;
-  need_new = TRUE;
-  while(current_ptr!=NULL)
+  sem_getvalue(&(body_ptr->access_sem), &sem_val);
+  if (sem_val > 0)
    {
-    if (current_ptr->inode_num == this_inode) /* A hit */
-     {
-      need_new = FALSE;
-      break;
-     }
-    current_ptr = current_ptr->next;
+    /*Not locked, return -1*/
+    return -1;
    }
 
-  if (need_new == TRUE)
-   {
-    current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
-    if (current_ptr==NULL)
-     return -EACCES;
-    memset(current_ptr,0,sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
-  
-    current_ptr->next = meta_mem_cache[index].meta_cache_entries;
-    meta_mem_cache[index].meta_cache_entries = current_ptr;
-    current_ptr->inode_num = this_inode;
-    sem_init(&((current_ptr->cache_entry_body).access_sem),0,1);
-    meta_mem_cache[index].num_entries++;
-   }
-/*Lock body*/
-/*TODO: May need to add checkpoint here so that long sem wait will free all locks*/
-
-  sem_wait(&((current_ptr->cache_entry_body).access_sem));
-
-  body_ptr = &(current_ptr->cache_entry_body);
-
-  meta_opened = FALSE;
+  result_entry->d_ino = 0;
 
 /*First check if any of the two cached page entries contains the target entry*/
 
-  if (need_new == FALSE)
+  strcpy(&(tmp_entry.d_name), childname);
+
+  can_use_index = -1;
+  if (body_ptr->dir_entry_cache[0]!=NULL)
    {
-    can_use_index = -1;
-    if (body_ptr->dir_entry_cache[0]!=NULL)
+    tmp_page_ptr = body_ptr->dir_entry_cache[0];
+    ret_val = dentry_binary_search(tmp_page_ptr->dir_entries, tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
+    if (ret_val >=0)
      {
-      if (((S_ISREG(body_ptr->dir_entry_cache_mode[0]) == TRUE) && (S_ISREG(child_mode) == TRUE)) ||
-          ((S_ISDIR(body_ptr->dir_entry_cache_mode[0]) == TRUE) && (S_ISDIR(child_mode) == TRUE)))
-       {
-        tmp_page_ptr = body_ptr->dir_entry_cache[0];
-        for(count=0;count<tmp_page_ptr->num_entries;count++)
-         {
-          if (strcmp(tmp_page_ptr->dir_entries[count].d_name,childname)==0)
-           {
-            *entry_index=count;
-            *page_pos = body_ptr->dir_entry_cache_pos[0];
-            can_use_index = 0;
-           }
-         }
-       }
+      memcpy(result_entry,tmp_page_ptr->dir_entries[ret_val],sizeof(DIR_ENTRY);
+      can_use_index = 0;
      }
+   }
 
-    if ((can_use_index < 0) && (body_ptr->dir_entry_cache[1]!=NULL))
+  if ((can_use_index < 0) && (body_ptr->dir_entry_cache[1]!=NULL))
+   {
+    tmp_page_ptr = body_ptr->dir_entry_cache[1];
+    ret_val = dentry_binary_search(tmp_page_ptr->dir_entries, tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
+    if (ret_val >=0)
      {
-      if (((S_ISREG(body_ptr->dir_entry_cache_mode[1]) == TRUE) && (S_ISREG(child_mode) == TRUE)) ||
-          ((S_ISDIR(body_ptr->dir_entry_cache_mode[1]) == TRUE) && (S_ISDIR(child_mode) == TRUE)))
-       {
-        tmp_page_ptr = body_ptr->dir_entry_cache[1];
-        for(count=0;count<tmp_page_ptr->num_entries;count++)
-         {
-          if (strcmp(tmp_page_ptr->dir_entries[count].d_name,childname)==0)
-           {
-            *entry_index=count;
-            *page_pos = body_ptr->dir_entry_cache_pos[1];
-            can_use_index = 1;
-           }
-         }
-       }
+      memcpy(result_entry,tmp_page_ptr->dir_entries[ret_val],sizeof(DIR_ENTRY);
+      can_use_index = 1;
      }
+   }
 
-    if (can_use_index >=0)
-     {
-      memcpy(result_page,(body_ptr->dir_entry_cache[can_use_index]),sizeof(DIR_ENTRY_PAGE));
+  if (can_use_index >=0)
+   {
+    gettimeofday(&(body_ptr->last_access_time),NULL);
 
-      gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-
-      sem_post(&((current_ptr->cache_entry_body).access_sem));
-      sem_post(&(meta_mem_cache[index].header_sem));
-
-      return 0;
-     }
+    return 0;
    }
 
 /* Cannot find the empty dir entry in any of the two cached page entries. Proceed to search from meta file */
-
-  if (need_new == TRUE)
-   {
-    /*Open meta file and fetch stat from super inode*/
-    fetch_meta_path(thismetapath,current_ptr->inode_num);
-
-    fptr = fopen(thismetapath,"r+");
-    if (fptr==NULL)
-     goto file_exception;
-
-    setbuf(fptr,NULL); 
-    flock(fileno(fptr),LOCK_EX);
-    meta_opened = TRUE;
-    fseek(fptr,0,SEEK_SET);
-    fread(&(body_ptr->this_stat),sizeof(struct stat),1,fptr);
-   }
 
   if (body_ptr->dir_meta == NULL)
    {
     body_ptr->dir_meta = malloc(sizeof(DIR_META_TYPE));
 
-    if (meta_opened == FALSE)
+    if (body_ptr->meta_opened == FALSE)
      {
-      fetch_meta_path(thismetapath,current_ptr->inode_num);
+      fetch_meta_path(thismetapath,body_ptr->inode_num);
 
-      fptr = fopen(thismetapath,"r+");
-      if (fptr==NULL)
+      body_ptr->fptr = fopen(thismetapath,"r+");
+      if (body_ptr->fptr==NULL)
        goto file_exception;
 
-      setbuf(fptr,NULL); 
-      flock(fileno(fptr),LOCK_EX);
-      meta_opened = TRUE;
+      setbuf(body_ptr->fptr,NULL); 
+      flock(fileno(body_ptr->fptr),LOCK_EX);
+      body_ptr->meta_opened = TRUE;
      }
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
-    fread(body_ptr->dir_meta,sizeof(DIR_META_TYPE),1,fptr);
+    fseek(body_ptr->fptr,sizeof(struct stat), SEEK_SET);
+    fread(body_ptr->dir_meta,sizeof(DIR_META_TYPE),1,body_ptr->fptr);
    }
 
   memcpy(&(dir_meta),body_ptr->dir_meta,sizeof(DIR_META_TYPE));
 
-  if (child_mode & S_IFREG)
+  nextfilepos=dir_meta.root_entry_page;
+  if (nextfilepos <= 0)
    {
-    nextfilepos=dir_meta.next_file_page;
+    /* Nothing in the dir. Return 0 */
+    return 0;
    }
-  else
-   {
-    if (child_mode & S_IFDIR)
-     nextfilepos=dir_meta.next_subdir_page;
-   }
+
   memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
+  memset(&rootpage,0,sizeof(DIR_ENTRY_PAGE));
 
-  while(nextfilepos!=0)
+  if (body_ptr->meta_opened == FALSE)
    {
-    /*First check if the page is in the cache*/
+    fetch_meta_path(thismetapath,body_ptr->inode_num);
 
-    if ((body_ptr->dir_entry_cache[0]!=NULL) && (body_ptr->dir_entry_cache_pos[0] == nextfilepos))
-     {
-      /* Pretty sure there is no such entry here, otherwise should have returned it */
-      if ((body_ptr->dir_entry_cache[0])->next_page == 0)
-       break;
-      nextfilepos = (body_ptr->dir_entry_cache[0])->next_page;
-     }
-    else
-     {
-      if ((body_ptr->dir_entry_cache[1]!=NULL) && (body_ptr->dir_entry_cache_pos[1] == nextfilepos))
-       {
-        /* Pretty sure there is no such entry here, otherwise should have returned it */
-        if ((body_ptr->dir_entry_cache[1])->next_page == 0)
-         break;
-        nextfilepos = (body_ptr->dir_entry_cache[1])->next_page;
-       }
-      else
-       {
-        if (meta_opened == FALSE)
-         {
-          fetch_meta_path(thismetapath,current_ptr->inode_num);
+    body_ptr->fptr = fopen(thismetapath,"r+");
+    if (body_ptr->fptr==NULL)
+     goto file_exception;
 
-          fptr = fopen(thismetapath,"r+");
-          if (fptr==NULL)
-           goto file_exception;
-
-          setbuf(fptr,NULL); 
-          flock(fileno(fptr),LOCK_EX);
-          meta_opened = TRUE;
-         }
-
-        fseek(fptr,nextfilepos,SEEK_SET);
-        if (ftell(fptr)!=nextfilepos)
-         goto file_exception;
-        ret_items = fread(&temppage,sizeof(DIR_ENTRY_PAGE),1,fptr);
-        if (ret_items <1)
-         goto file_exception;
-
-        for(count=0;count<temppage.num_entries;count++)
-         {
-          if (strcmp(temppage.dir_entries[count].d_name,childname)==0)
-           {
-            /*Found the entry */
-            meta_cache_push_dir_page(body_ptr,nextfilepos,child_mode,&temppage);
-
-            *page_pos = nextfilepos;
-            memcpy(result_page,&temppage,sizeof(DIR_ENTRY_PAGE));
-            *entry_index = count;
-
-            if (meta_opened == TRUE)
-             {
-              flock(fptr,LOCK_UN);
-              fclose(fptr);
-             }
-
-            gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
-
-            sem_post(&((current_ptr->cache_entry_body).access_sem));
-
-            if (current_ptr->something_dirty == FALSE)
-             current_ptr->something_dirty = TRUE;
-
-            if (META_CACHE_FLUSH_NOW == TRUE)
-             ret_val = flush_single_meta_cache_entry(current_ptr);
-
-            sem_post(&(meta_mem_cache[index].header_sem));
-
-            return 0;
-           }
-         }
-       }
-     }
-
-    if (temppage.next_page == 0)
-     break;
-    nextfilepos = temppage.next_page;
+    setbuf(body_ptr->fptr,NULL); 
+    flock(fileno(body_ptr->fptr),LOCK_EX);
+    body_ptr->meta_opened = TRUE;
    }
+  fseek(body_ptr->fptr,nextfilepos, SEEK_SET);
+  fread(&rootpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr); /*Read the root node*/
 
-  /*Entry not found. Do nothing and return false*/
+  ret_val = search_dir_entry_btree(childname, &rootpage, body_ptr->fptr, &tmpentry, &resultpage);
 
-  if (meta_opened == TRUE)
+  gettimeofday(&(body_ptr->last_access_time),NULL);
+
+  if (body_ptr->something_dirty == FALSE)
+   body_ptr->something_dirty = TRUE;
+
+  if (ret_val < 0) /*Not found*/
    {
-    flock(fptr,LOCK_UN);
-    fclose(fptr);
+    return 0;
    }
+  /*Found the entry */
+  meta_cache_push_dir_page(body_ptr,&resultpage);
 
-  gettimeofday(&((current_ptr->cache_entry_body).last_access_time),NULL);
+  memcpy(result_entry,&tmpentry,sizeof(DIR_ENTRY));
 
-  sem_post(&((current_ptr->cache_entry_body).access_sem));
-
-  if (current_ptr->something_dirty == FALSE)
-   current_ptr->something_dirty = TRUE;
-
-  if (META_CACHE_FLUSH_NOW == TRUE)
-   ret_val = flush_single_meta_cache_entry(current_ptr);
-
-  sem_post(&(meta_mem_cache[index].header_sem));
-  *entry_index = -1;
   return 0;
 
 /* Exception handling from here */
@@ -1649,7 +1176,6 @@ file_exception:
   return -1;
 
  }
-
 
 int meta_cache_remove(ino_t this_inode)
  {
@@ -1728,6 +1254,96 @@ int meta_cache_remove(ino_t this_inode)
   free(current_ptr);
 
   sem_post(&(meta_mem_cache[index].header_sem));
+
+  return 0;
+ }
+
+int meta_cache_lock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *result_ptr)
+ {
+  int ret_val;
+  int index;
+  META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  char need_new;
+  int can_use_index;
+  int count;
+  SUPER_INODE_ENTRY tempentry;
+
+  index = hash_inode_to_meta_cache(this_inode);
+/*First lock corresponding header*/
+  sem_wait(&(meta_mem_cache[index].header_sem));
+
+  current_ptr = meta_mem_cache[index].meta_cache_entries;
+  need_new = TRUE;
+  while(current_ptr!=NULL)
+   {
+    if (current_ptr->inode_num == this_inode) /* A hit */
+     {
+      need_new = FALSE;
+      break;
+     }
+    current_ptr = current_ptr->next;
+   }
+
+  if (need_new == TRUE)
+   {
+    current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+    if (current_ptr==NULL)
+     return -EACCES;
+    memset(current_ptr,0,sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+  
+    current_ptr->next = meta_mem_cache[index].meta_cache_entries;
+    meta_mem_cache[index].meta_cache_entries = current_ptr;
+    current_ptr->inode_num = this_inode;
+    sem_init(&((current_ptr->cache_entry_body).access_sem),0,1);
+    meta_mem_cache[index].num_entries++;
+    ret_val =super_inode_read(this_inode, &tempentry);
+    (current_ptr->cache_entry_body).inode_num = this_inode;
+    memcpy(&((current_ptr->cache_entry_body).this_stat),&(tempentry.inode_stat),sizeof(struct stat));
+
+   }
+/*Lock body*/
+/*TODO: May need to add checkpoint here so that long sem wait will free all locks*/
+
+  sem_wait(&((current_ptr->cache_entry_body).access_sem));
+  sem_post(&(meta_mem_cache[index].header_sem));
+
+  return 0;
+ }
+
+int meta_cache_unlock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *target_ptr)
+ {
+  int ret_val;
+  int index;
+  META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  int sem_val;
+
+  sem_getvalue(&(target_ptr->access_sem), &sem_val);
+  if (sem_val > 0)
+   {
+    /*Not locked, return -1*/
+    return -1;
+   }
+
+  index = hash_inode_to_meta_cache(this_inode);
+
+  if (target_ptr->meta_opened == TRUE)
+   {
+    flock(target_ptr->fptr,LOCK_UN);
+    fclose(target_ptr->fptr);
+    target_ptr->meta_opened = FALSE;
+   }
+
+  gettimeofday(&(target_ptr->last_access_time),NULL);
+
+  if (target_ptr->something_dirty == FALSE)
+   target_ptr->something_dirty = TRUE;
+
+  if (META_CACHE_FLUSH_NOW == TRUE)
+   ret_val = flush_single_meta_cache_entry(target_ptr);
+
+  sem_post(&(target_ptr->access_sem));
 
   return 0;
  }

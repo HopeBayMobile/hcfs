@@ -35,8 +35,15 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
  {
   ino_t hit_inode;
   int ret_code;
+  struct timeval tmp_time1, tmp_time2;
 
+  gettimeofday(&tmp_time1,NULL);
   hit_inode = lookup_pathname(path, &ret_code);
+
+  gettimeofday(&tmp_time2,NULL);
+
+  printf("getattr lookup_pathname elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+
 
   if (hit_inode > 0)
    {
@@ -46,10 +53,20 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
     printf("getattr %lld, returns %d\n",inode_stat->st_ino,ret_code);
     #endif  /* DEBUG */
 
+    gettimeofday(&tmp_time2,NULL);
+
+    printf("getattr elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+
     return ret_code;
    }
   else
-   return ret_code;
+   {
+    gettimeofday(&tmp_time2,NULL);
+
+    printf("getattr elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+
+   }
+  return ret_code;
  }
 
 //int hfuse_readlink(const char *path, char *buf, size_t buf_size);
@@ -64,6 +81,10 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   int ret_val;
   struct fuse_context *temp_context;
   int ret_code;
+  struct timeval tmp_time1, tmp_time2;
+
+  gettimeofday(&tmp_time1,NULL);
+
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
@@ -100,6 +121,10 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   if (ret_code < 0)
    meta_forget_inode(self_inode);
 
+  gettimeofday(&tmp_time2,NULL);
+
+  printf("mknod elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+
   return ret_code;
  }
 static int hfuse_mkdir(const char *path, mode_t mode)
@@ -112,6 +137,9 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   int ret_val;
   struct fuse_context *temp_context;
   int ret_code;
+  struct timeval tmp_time1, tmp_time2;
+
+  gettimeofday(&tmp_time1,NULL);
 
   parentname = malloc(strlen(path)*sizeof(char));
   parse_parent_self(path,parentname,selfname);
@@ -147,6 +175,10 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 
   if (ret_code < 0)
    meta_forget_inode(self_inode);
+
+  gettimeofday(&tmp_time2,NULL);
+
+  printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
   return ret_code;
  }
@@ -267,14 +299,6 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   if (parent_inode2 < 1)
    return ret_code2;
 
-  if (parent_inode1 == parent_inode2)
-   {
-    ret_val = dir_replace_name(parent_inode1, self_inode, selfname1, selfname2, self_mode);
-    if (ret_val < 0)
-     return -EACCES;
-    return 0;
-   }
-
   ret_val = dir_remove_entry(parent_inode1,self_inode,selfname1,self_mode);
   if (ret_val < 0)
    return -EACCES;
@@ -318,7 +342,7 @@ int hfuse_chmod(const char *path, mode_t mode)
 
   ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
 
-  return 0;
+  return ret_val;
  }
 
 int hfuse_chown(const char *path, uid_t owner, gid_t group)
@@ -345,10 +369,35 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
 
   ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
 
-  return 0;
+  return ret_val;
  }
 
-/* TODO: Push out meta update details starts here*/
+static int hfuse_utimens(const char *path, const struct timespec tv[2])
+ {
+  struct stat temp_inode_stat;
+  int ret_val;
+  ino_t this_inode;
+  int ret_code;
+
+  printf("Debug utimens\n");
+  this_inode = lookup_pathname(path, &ret_code);
+  if (this_inode < 1)
+   return ret_code;
+
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+
+  if (ret_val < 0) /* Cannot fetch any meta*/
+   return -EACCES;
+
+  temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
+  temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
+
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
+
+  return ret_val;
+ }
+
+/* TODO: Push out meta update details starts here (truncate, read, write)*/
 
 int hfuse_truncate(const char *path, off_t offset)
  {
@@ -1337,14 +1386,15 @@ static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
 static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info)
  {
   ino_t this_inode;
-  char pathname[400];
-  FILE *fptr;
   int count;
   off_t thisfile_pos;
   DIR_META_TYPE tempmeta;
   DIR_ENTRY_PAGE temp_page;
   struct stat tempstat;
   int ret_code;
+  struct timeval tmp_time1, tmp_time2;
+
+  gettimeofday(&tmp_time1,NULL);
 
 /*TODO: Need to include symlinks*/
 /*TODO: Will need to test the boundary of the operation. When will buf run out of space?*/
@@ -1355,54 +1405,33 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   if (this_inode == 0)
    return ret_code;
 
-  fetch_meta_path(pathname,this_inode);
-  fptr = fopen(pathname,"r");
-  setbuf(fptr,NULL);
-  flock(fileno(fptr),LOCK_SH);
+  meta_cache_lookup_dir_data(this_inode, &tempstat,&tempmeta,NULL,0,0);
 
-  fseek(fptr,sizeof(struct stat),SEEK_SET);
-  fread(&tempmeta,sizeof(DIR_META_TYPE),1,fptr);
-  thisfile_pos = tempmeta.next_subdir_page;
+  thisfile_pos = tempmeta.root_entry_page;
 
   while(thisfile_pos != 0)
    {
-    fseek(fptr, thisfile_pos, SEEK_SET);
-    fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
+    meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, thisfile_pos);
 
     for(count=0;count<temp_page.num_entries;count++)
      {
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
-      tempstat.st_mode = S_IFDIR;
+      if (temp_page.dir_entries[count].d_type == D_ISDIR)
+       tempstat.st_mode = S_IFDIR;
+      if (temp_page.dir_entries[count].d_type == D_ISREG)
+       tempstat.st_mode = S_IFREG;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
        {
-        flock(fileno(fptr),LOCK_UN);
-        fclose(fptr);
         return 0;
        }
      }
     thisfile_pos = temp_page.next_page;
    }
 
-  thisfile_pos = tempmeta.next_file_page;
-  while(thisfile_pos != 0)
-   {
-    fseek(fptr, thisfile_pos, SEEK_SET);
-    fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
-    for (count=0;count<temp_page.num_entries;count++)
-     {
-      tempstat.st_ino = temp_page.dir_entries[count].d_ino;
-      tempstat.st_mode = S_IFREG;
-      if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
-       {
-        flock(fileno(fptr),LOCK_UN);
-        fclose(fptr);
-        return 0;
-       }
-     }
-    thisfile_pos = temp_page.next_page;
-   }
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
+  gettimeofday(&tmp_time2,NULL);
+
+  printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+
   return 0;
  }
 
@@ -1437,41 +1466,6 @@ static int hfuse_access(const char *path, int mode)
   /*TODO: finish this*/
   return 0;
  }
-
-static int hfuse_utimens(const char *path, const struct timespec tv[2])
- {
-  struct stat temp_inode_stat;
-  int ret_val;
-  ino_t this_inode;
-  char thismetapath[METAPATHLEN];
-  FILE *fptr;
-  int ret_code;
-
-  printf("Debug chmod\n");
-  this_inode = lookup_pathname(path, &ret_code);
-  if (this_inode < 1)
-   return ret_code;
-
-  fetch_meta_path(thismetapath,this_inode);
-  printf("%lld %s\n",this_inode,thismetapath);
-  fptr = fopen(thismetapath,"r+");
-  if (fptr==NULL)
-   return -ENOENT;
-  setbuf(fptr,NULL);
-  
-  flock(fileno(fptr),LOCK_EX);
-  fread(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
-  temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
-  fseek(fptr,0,SEEK_SET);
-  fwrite(&temp_inode_stat,sizeof(struct stat),1,fptr);
-  flock(fileno(fptr),LOCK_UN);
-  fclose(fptr);
-  super_inode_update_stat(this_inode, &temp_inode_stat);
-
-  return 0;
- }
-
 
 static struct fuse_operations hfuse_ops = {
     .getattr = hfuse_getattr,

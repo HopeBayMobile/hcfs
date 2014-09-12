@@ -6,6 +6,23 @@
 #include "params.h"
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
 /* TODO: Need to consider directory access rights here or in fuseop */
+/* TODO: Consider the need to lock meta cache entry between related cache lookup and updates */
+
+int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos)
+ {
+  memset(temppage,0,sizeof(DIR_ENTRY_PAGE));
+
+  temppage->num_entries = 2;
+  (temppage->dir_entries[0]).d_ino = self_inode;
+  strcpy((temppage->dir_entries[0]).d_name,".");
+  (temppage->dir_entries[0]).d_type = D_ISDIR;
+
+  (temppage->dir_entries[1]).d_ino = parent_inode;
+  strcpy((temppage->dir_entries[1]).d_name,"..");
+  (temppage->dir_entries[1]).d_type = D_ISDIR;
+  temp_page->this_page_pos = this_page_pos;
+  return 0;
+ }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode)
  {
@@ -16,6 +33,10 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   int ret_val;
   long page_pos;
   int entry_index;
+
+/* Replace with b-tree insertion*/
+  /* TODO: Drop all cached pages first before inserting or deleting*/
+  /* TODO: Future changes could remove this limitation if can update cache with each node change in b-tree*/
 
   ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, NULL,0,0);
 
@@ -58,6 +79,9 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   int count,ret_val;
 
   ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,NULL,0,child_mode);
+/* TODO: Replace with btree delete routine */
+  /* TODO: Drop all cached pages first before inserting or deleting*/
+  /* TODO: Future changes could remove this limitation if can update cache with each node change in b-tree*/
 
   ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, childname, child_mode);
 
@@ -83,46 +107,26 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   return -1;
  }
 
-int dir_replace_name(ino_t parent_inode, ino_t child_inode, char *oldname, char *newname, mode_t child_mode)
- {
-  DIR_META_TYPE parent_meta_head;
-  DIR_ENTRY_PAGE temppage;
-  int ret_items;
-  off_t nextfilepos,oldfilepos;
-  long page_pos;
-  int count, ret_val;
-
-  ret_val = meta_cache_seek_dir_entry(parent_inode,&temppage,&page_pos, &count, oldname, child_mode);
-
-  if ((ret_val ==0) && (count>=0))
-   {
-    /*Found the entry. Replace it*/
-    strcpy(temppage.dir_entries[count].d_name,newname);
-    ret_val = meta_cache_update_dir_data(parent_inode, NULL, NULL, &temppage,page_pos,child_mode);
-    return 0;
-   }
-
-  return -1;
- }
 
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2)
  {
   DIR_META_TYPE self_meta_head;
   DIR_ENTRY_PAGE temppage;
   int ret_items;
-  long page_pos;
   int count;
   int ret_val;
 
-  ret_val = meta_cache_lookup_dir_data(self_inode, NULL,&self_meta_head,NULL,0,0);
+/* TODO: Use b-tree search + replace for this */
+  /* TODO: Drop all cached pages first before inserting or deleting*/
+  /* TODO: Future changes could remove this limitation if can update cache with each node change in b-tree*/
 
-  ret_val = meta_cache_seek_dir_entry(self_inode,&temppage,&page_pos, &count, "..", S_IFDIR);
+  ret_val = meta_cache_seek_dir_entry(self_inode,&temppage, &count, "..", S_IFDIR);
 
   if ((ret_val ==0) && (count>=0))
    {
     /*Found the entry. Change parent inode*/
     temppage.dir_entries[count].d_ino = parent_inode2;
-    ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL, &temppage,page_pos, S_IFDIR);
+    ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL, &temppage, S_IFDIR);
     return 0;
    }
 

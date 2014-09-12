@@ -1,11 +1,3 @@
-#include "fuseop.h"
-#include "global.h"
-#include "super_inode.h"
-#include "dir_lookup.h"
-#include "hcfscurl.h"
-#include "hcfs_tocloud.h"
-#include "hcfs_clouddelete.h"
-#include "params.h"
 #include <fuse.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -15,6 +7,14 @@
 #include <attr/xattr.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
+#include "fuseop.h"
+#include "global.h"
+#include "super_inode.h"
+#include "dir_lookup.h"
+#include "hcfscurl.h"
+#include "hcfs_tocloud.h"
+#include "hcfs_clouddelete.h"
+#include "params.h"
 
 
 int init_hcfs_system_data()
@@ -101,16 +101,12 @@ void init_hfuse()
 
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
-    this_meta.next_subdir_page = ftell(metafptr);
+    this_meta.root_entry_page = ftell(metafptr);
     fseek(metafptr,sizeof(struct stat),SEEK_SET);
 
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
-    temppage.num_entries = 2;
-    temppage.dir_entries[0].d_ino = 1;
-    temppage.dir_entries[1].d_ino = 0;
-    strcpy(temppage.dir_entries[0].d_name,".");
-    strcpy(temppage.dir_entries[1].d_name,"..");
+    init_dir_page(&temppage, 1, 0, this_meta.root_entry_page);
 
     ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
     fclose(metafptr);
