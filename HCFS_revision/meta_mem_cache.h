@@ -80,19 +80,29 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_inde
 int flush_clean_all_meta_cache();
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
-/*TODO: Still need to fix starts here*/
 
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos); /*If entry exists, replace stat value with new one. Else create a new entry.*/
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos);
+int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
 
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page); /*If entry exists, replace stat value with new one. Else create a new entry.*/
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page);
-/*TODO: Still need to fix ends here*/
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY *result_entry, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+
+int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE 
+*dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page, int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_remove(ino_t this_inode);
 int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *temppage);
 
-int meta_cache_lock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *result_ptr);
+META_CACHE_ENTRY_STRUCT * meta_cache_lock_entry(ino_t this_inode);
 int meta_cache_unlock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *target_ptr);
+int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
+
+int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
+int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
+int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
+int decrease_nlink_inode_file(ino_t this_inode);
+int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos);
+

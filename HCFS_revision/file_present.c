@@ -34,26 +34,20 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
  {
   struct stat returned_stat;
   int ret_code;
+  META_CACHE_ENTRY_STRUCT *temp_entry;
 
   /*First will try to lookup meta cache*/
   if (this_inode > 0)
    {
+    temp_entry = meta_cache_lock_entry(this_inode);
     /*Only fetch inode stat, so does not matter if inode is reg file or dir here*/
-    ret_code = meta_cache_lookup_file_data(this_inode, &returned_stat, NULL, NULL, 0);
+    ret_code = meta_cache_lookup_file_data(this_inode, &returned_stat, NULL, NULL, 0, temp_entry);
+    ret_code = meta_cache_unlock_entry(this_inode, temp_entry);
 
     if (ret_code == 0)
      {
       memcpy(inode_stat, &returned_stat,sizeof(struct stat));
       return 0;
-     }
-
-    if (ret_code < 0)
-     {
-      /* TODO: For performance reason, may not want to try meta files. System could only test if some file really does not exist */
-      /* TODO: This option should only be turned on if system is in some sort of recovery mode. In this case, should even try backend meta backups */
-
-      //ret_code = inode_stat_from_meta(this_inode, inode_stat);
-      /* TODO: Perhaps missing from super inode (inode caching?). Fill it in? */
      }
 
     if (ret_code < 0)
@@ -78,17 +72,21 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
  {
   int ret_val;
   FILE_META_TYPE this_meta;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   memset(&this_meta,0,sizeof(FILE_META_TYPE));
 
-  ret_val = meta_cache_update_file_data(self_inode,this_stat, &this_meta,NULL, 0);
+  body_ptr = meta_cache_lock_entry(self_inode);
+  ret_val = meta_cache_update_file_data(self_inode,this_stat, &this_meta,NULL, 0, body_ptr);
+  meta_cache_unlock_entry(self_inode, body_ptr);
 
   if (ret_val < 0)
    {
     return -EACCES;
    }
-
-  ret_val = dir_add_entry(parent_inode, self_inode, selfname,this_stat->st_mode);
+  body_ptr = meta_cache_lock_entry(parent_inode);
+  ret_val = dir_add_entry(parent_inode, self_inode, selfname,this_stat->st_mode, body_ptr);
+  meta_cache_unlock_entry(parent_inode, body_ptr);
   if (ret_val < 0)
    {
     return -EACCES;
@@ -105,21 +103,29 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
   DIR_ENTRY_PAGE temppage;
   FILE *metafptr;
   int ret_val;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   memset(&this_meta,0,sizeof(DIR_META_TYPE));
   memset(&temppage,0,sizeof(DIR_ENTRY_PAGE));
 
   this_meta.root_entry_page = sizeof(struct stat)+sizeof(DIR_META_TYPE);
+  this_meta.tree_walk_list_head = this_meta.root_entry_page;
   init_dir_page(&temppage, self_inode, parent_inode, this_meta.root_entry_page);
 
-  ret_val = meta_cache_update_dir_data(self_inode,this_stat, &this_meta,&temppage, this_meta.root_entry_page);
+  body_ptr = meta_cache_lock_entry(self_inode);
+
+  ret_val = meta_cache_update_dir_data(self_inode,this_stat, &this_meta,&temppage, body_ptr);
+
+  meta_cache_unlock_entry(self_inode, body_ptr);
 
   if (ret_val < 0)
    {
     return -EACCES;
    }
+  body_ptr = meta_cache_lock_entry(parent_inode);
+  ret_val = dir_add_entry(parent_inode, self_inode, selfname, this_stat->st_mode, body_ptr);
+  meta_cache_unlock_entry(parent_inode, body_ptr);
 
-  ret_val = dir_add_entry(parent_inode, self_inode, selfname, this_stat->st_mode);
   if (ret_val < 0)
    {
     return -EACCES;
@@ -131,8 +137,11 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
 int unlink_update_meta(ino_t parent_inode, ino_t this_inode,char *selfname)
  {
   int ret_val;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
-  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFREG);
+  body_ptr = meta_cache_lock_entry(parent_inode);
+  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFREG, body_ptr);
+  meta_cache_unlock_entry(parent_inode, body_ptr);
   if (ret_val < 0)
    return -EACCES;
 
@@ -150,15 +159,21 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
   FILE *todeletefptr, *metafptr;
   char filebuf[5000];
   size_t read_size;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
-  ret_val = meta_cache_lookup_dir_data(this_inode, NULL, &tempmeta, NULL, 0);
+  body_ptr = meta_cache_lock_entry(this_inode);
+  ret_val = meta_cache_lookup_dir_data(this_inode, NULL, &tempmeta, NULL, body_ptr);
+  meta_cache_unlock_entry(this_inode, body_ptr);
 
   printf("TOTAL CHILDREN is now %ld\n",tempmeta.total_children);
 
   if (tempmeta.total_children > 0)
    return -ENOTEMPTY;
 
-  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFDIR);
+  body_ptr = meta_cache_lock_entry(parent_inode);
+  ret_val = dir_remove_entry(parent_inode,this_inode,selfname,S_IFDIR, body_ptr);
+  meta_cache_unlock_entry(parent_inode, body_ptr);
+
   if (ret_val < 0)
    return -EACCES;
 

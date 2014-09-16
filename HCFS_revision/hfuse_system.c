@@ -8,6 +8,7 @@
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
 #include "fuseop.h"
+#include "meta_mem_cache.h"
 #include "global.h"
 #include "super_inode.h"
 #include "dir_lookup.h"
@@ -102,6 +103,7 @@ void init_hfuse()
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);
 
     this_meta.root_entry_page = ftell(metafptr);
+    this_meta.tree_walk_list_head = this_meta.root_entry_page;
     fseek(metafptr,sizeof(struct stat),SEEK_SET);
 
     ret_val = fwrite(&this_meta,sizeof(DIR_META_TYPE),1,metafptr);

@@ -146,7 +146,8 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
   char target_entry_name[400];
   char tempname[400];
   ino_t hit_inode;
-  DIR_ENTRY temp_entry;
+  DIR_ENTRY_PAGE temp_page;
+  int temp_index;
   int ret_val;
   META_CACHE_ENTRY_STRUCT *cache_entry;
 
@@ -165,12 +166,19 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   if (search_subdir_only)
    {
-    meta_cache_lock_entry(subroot, cache_entry);
-    ret_val = meta_cache_seek_dir_entry(subroot,&temp_entry,target_entry_name, cache_entry);
+    cache_entry = meta_cache_lock_entry(subroot);
+    ret_val = meta_cache_seek_dir_entry(subroot,&temp_page, &temp_index,target_entry_name, cache_entry);
     meta_cache_unlock_entry(subroot, cache_entry);
-    if ((ret_val == 0) && (temp_entry.d_ino > 0))
+
+    if ((ret_val ==0) && (temp_index < 0))
      {
-      hit_inode = temp_entry.d_ino;
+      *errcode = -ENOENT;
+      return 0;
+     }
+
+    if ((ret_val == 0) && (temp_page.dir_entries[temp_index].d_ino > 0))
+     {
+      hit_inode = temp_page.dir_entries[temp_index].d_ino;
       if ((prepath_length+strlen(target_entry_name))<256)
        {
         new_prepath_length = prepath_length+1+strlen(target_entry_name);
@@ -180,7 +188,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
        }
       return lookup_pathname_recursive(hit_inode, new_prepath_length,&(fullpath[new_prepath_length]),fullpath, errcode);
      }
-    if ((ret_val == 0) && (temp_entry.d_ino == 0))
+    if ((ret_val == 0) && (temp_page.dir_entries[temp_index].d_ino == 0))
      {
       *errcode = -ENOENT;
       return 0;
@@ -191,8 +199,8 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   strcpy(target_entry_name,&(partialpath[1]));
 
-  meta_cache_lock_entry(subroot, cache_entry);
-  ret_val = meta_cache_seek_dir_entry(subroot,&temp_entry,target_entry_name, cache_entry);
+  cache_entry = meta_cache_lock_entry(subroot);
+  ret_val = meta_cache_seek_dir_entry(subroot,&temp_page, &temp_index,target_entry_name, cache_entry);
   meta_cache_unlock_entry(subroot, cache_entry);
 
   if (ret_val < 0)
@@ -200,9 +208,15 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
     *errcode = ret_val;
     return 0;
    }
-  if ((ret_val == 0) && (temp_entry.d_ino > 0))
+  if (temp_index < 0)
    {
-    hit_inode = temp_entry.d_ino;
+    *errcode = -ENOENT;
+    return 0;
+   }
+
+  if ((ret_val == 0) && (temp_page.dir_entries[temp_index].d_ino > 0))
+   {
+    hit_inode = temp_page.dir_entries[temp_index].d_ino;
     if ((prepath_length+strlen(target_entry_name))<256)
      {
       new_prepath_length = prepath_length+1+strlen(target_entry_name);
@@ -213,7 +227,7 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
     return hit_inode;
    }
 
-  if ((ret_val == 0) && (temp_entry.d_ino == 0))
+  if ((ret_val == 0) && (temp_page.dir_entries[temp_index].d_ino == 0))
    {
     *errcode = -ENOENT;
     return 0;

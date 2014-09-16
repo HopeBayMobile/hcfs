@@ -41,6 +41,7 @@ typedef struct {
     long long root_entry_page;
     long long next_xattr_page;
     long long entry_page_gc_list;
+    long long tree_walk_list_head;
   } DIR_META_TYPE;
 
 typedef struct {
@@ -50,6 +51,8 @@ typedef struct {
     long long child_page_pos[MAX_DIR_ENTRIES_PER_PAGE+1]; /* File pos of child pages for this node, b-tree style */
     long long parent_page_pos; /*File pos of parent. If this is the root, the value is 0 */
     long long gc_list_next; /*File pos of the next gc entry if on gc list*/
+    long long tree_walk_next;
+    long long tree_walk_prev;
   } DIR_ENTRY_PAGE;
 
 /* Structures for regular files */
@@ -79,11 +82,6 @@ void fetch_todelete_path(char *pathname, ino_t this_inode);   /*Will copy the fi
 
 /*END string utility definition*/
 
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode);
-int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2);
-int decrease_nlink_inode_file(ino_t this_inode);
-int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos);
 
 void init_hfuse();
 

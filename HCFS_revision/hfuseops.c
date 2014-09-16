@@ -263,6 +263,7 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   struct stat tempstat;
   mode_t self_mode;
   int ret_code, ret_code2;
+  META_CACHE_ENTRY_STRUCT *body_ptr, *parent_ptr;
 
   self_inode = lookup_pathname(oldpath, &ret_code);
   if (self_inode < 1)
@@ -273,10 +274,15 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   if (lookup_pathname(newpath, &ret_code) > 0)
    return -EACCES;
 
-  ret_val = meta_cache_lookup_file_data(self_inode, &tempstat, NULL, NULL, 0);
+  body_ptr = meta_cache_lock_entry(self_inode);
+  ret_val = meta_cache_lookup_file_data(self_inode, &tempstat, NULL, NULL, 0,body_ptr);
 
   if (ret_val < 0)
-   return -ENOENT;
+   {
+    meta_cache_unlock_entry(self_inode, body_ptr);
+    meta_cache_remove(self_inode);
+    return -ENOENT;
+   }
 
   self_mode = tempstat.st_mode;
 
@@ -294,27 +300,59 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
   free(parentname2);
 
   if (parent_inode1 < 1)
-   return ret_code;
+   {
+    meta_cache_unlock_entry(self_inode, body_ptr);
+    meta_cache_remove(self_inode);
+    return ret_code;
+   }
 
   if (parent_inode2 < 1)
-   return ret_code2;
+   {
+    meta_cache_unlock_entry(self_inode, body_ptr);
+    meta_cache_remove(self_inode);
+    return ret_code2;
+   }
 
-  ret_val = dir_remove_entry(parent_inode1,self_inode,selfname1,self_mode);
+  parent_ptr = meta_cache_lock_entry(parent_inode1);
+
+  ret_val = dir_remove_entry(parent_inode1,self_inode,selfname1,self_mode, parent_ptr);
   if (ret_val < 0)
-   return -EACCES;
+   {
+    meta_cache_unlock_entry(parent_inode1, parent_ptr);
+    meta_cache_unlock_entry(self_inode, body_ptr);
+    meta_cache_remove(self_inode);
+    return -EACCES;
+   }
 
-  ret_val = dir_add_entry(parent_inode2,self_inode,selfname2,self_mode);
+  if (parent_inode1 != parent_inode2)
+   {
+    meta_cache_unlock_entry(parent_inode1, parent_ptr);
+    parent_ptr = meta_cache_lock_entry(parent_inode2);
+   }
+
+  ret_val = dir_add_entry(parent_inode2,self_inode,selfname2,self_mode, parent_ptr);
 
   if (ret_val < 0)
-   return -EACCES;
+   {
+    meta_cache_unlock_entry(parent_inode2, parent_ptr);
+    meta_cache_unlock_entry(self_inode, body_ptr);
+    meta_cache_remove(self_inode);
+    return -EACCES;
+   }
 
+  meta_cache_unlock_entry(parent_inode2, parent_ptr);
 
   if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2))
    {
-    ret_val = change_parent_inode(self_inode, parent_inode1, parent_inode2);
+    ret_val = change_parent_inode(self_inode, parent_inode1, parent_inode2, body_ptr);
     if (ret_val < 0)
-     return -EACCES;
+     {
+      meta_cache_unlock_entry(self_inode, body_ptr);
+      meta_cache_remove(self_inode);
+      return -EACCES;
+     }
    }
+  meta_cache_unlock_entry(self_inode, body_ptr);
   return 0;
  }
 
@@ -326,21 +364,28 @@ int hfuse_chmod(const char *path, mode_t mode)
   int ret_val;
   ino_t this_inode;
   int ret_code;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   printf("Debug chmod\n");
   this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
    return ret_code;
 
-  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+  body_ptr = meta_cache_lock_entry(this_inode);
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0, body_ptr);
 
   if (ret_val < 0) /* Cannot fetch any meta*/
-   return -EACCES;
+   {
+    meta_cache_unlock_entry(this_inode, body_ptr);
+    meta_cache_remove(this_inode);
+    return -EACCES;
+   }
 
   temp_inode_stat.st_mode = mode;
   temp_inode_stat.st_ctime = time(NULL);
 
-  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0, body_ptr);
+  meta_cache_unlock_entry(this_inode, body_ptr);
 
   return ret_val;
  }
@@ -351,6 +396,7 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
   int ret_val;
   ino_t this_inode;
   int ret_code;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   printf("Debug chown\n");
 
@@ -358,16 +404,22 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
   if (this_inode < 1)
    return ret_code;
 
-  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+  body_ptr = meta_cache_lock_entry(this_inode);
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0, body_ptr);
 
   if (ret_val < 0) /* Cannot fetch any meta*/
-   return -EACCES;
+   {
+    meta_cache_unlock_entry(this_inode, body_ptr);
+    meta_cache_remove(this_inode);
+    return -EACCES;
+   }
 
   temp_inode_stat.st_uid = owner;
   temp_inode_stat.st_gid = group;
   temp_inode_stat.st_ctime = time(NULL);
 
-  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0, body_ptr);
+  meta_cache_unlock_entry(this_inode, body_ptr);
 
   return ret_val;
  }
@@ -378,21 +430,28 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
   int ret_val;
   ino_t this_inode;
   int ret_code;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   printf("Debug utimens\n");
   this_inode = lookup_pathname(path, &ret_code);
   if (this_inode < 1)
    return ret_code;
 
-  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0);
+  body_ptr = meta_cache_lock_entry(this_inode);
+  ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,NULL,NULL,0, body_ptr);
 
   if (ret_val < 0) /* Cannot fetch any meta*/
-   return -EACCES;
+   {
+    meta_cache_unlock_entry(this_inode, body_ptr);
+    meta_cache_remove(this_inode);
+    return -EACCES;
+   }
 
   temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
   temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
 
-  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0);
+  ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL,NULL,0, body_ptr);
+  meta_cache_unlock_entry(this_inode, body_ptr);
 
   return ret_val;
  }
@@ -1393,6 +1452,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   struct stat tempstat;
   int ret_code;
   struct timeval tmp_time1, tmp_time2;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
 
   gettimeofday(&tmp_time1,NULL);
 
@@ -1400,18 +1460,23 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 /*TODO: Will need to test the boundary of the operation. When will buf run out of space?*/
   fprintf(stderr,"DEBUG readdir entering readdir\n");
 
+/*TODO: Need to revise this function to use tree walk */
+
   this_inode = lookup_pathname(path, &ret_code);
 
   if (this_inode == 0)
    return ret_code;
 
-  meta_cache_lookup_dir_data(this_inode, &tempstat,&tempmeta,NULL,0,0);
+  body_ptr = meta_cache_lock_entry(this_inode);
+  meta_cache_lookup_dir_data(this_inode, &tempstat,&tempmeta,NULL,body_ptr);
 
-  thisfile_pos = tempmeta.root_entry_page;
+  thisfile_pos = tempmeta.tree_walk_list_head;
 
   while(thisfile_pos != 0)
    {
-    meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, thisfile_pos);
+    memset(&temp_page,0,sizeof(DIR_ENTRY_PAGE));
+    temp_page.this_page_pos = thisfile_pos;
+    meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, body_ptr);
 
     for(count=0;count<temp_page.num_entries;count++)
      {
@@ -1422,12 +1487,13 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
        tempstat.st_mode = S_IFREG;
       if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
        {
+        meta_cache_unlock_entry(this_inode, body_ptr);
         return 0;
        }
      }
-    thisfile_pos = temp_page.next_page;
+    thisfile_pos = temp_page.tree_walk_next;
    }
-
+  meta_cache_unlock_entry(this_inode, body_ptr);
   gettimeofday(&tmp_time2,NULL);
 
   printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
