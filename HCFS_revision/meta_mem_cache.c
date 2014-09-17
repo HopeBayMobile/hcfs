@@ -10,6 +10,7 @@
 #include "dir_entry_btree.h"
 
 /* TODO: cache meta file pointer and close only after some idle interval */
+/* TODO: memory management for cache */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
 

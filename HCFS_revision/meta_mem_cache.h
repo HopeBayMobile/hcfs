@@ -36,6 +36,8 @@ should release header lock and sleep for a short time, or skip to other entries.
 
 */
 
+/* TODO: memory management for cache */
+
 typedef struct {
   struct stat this_stat;
   ino_t inode_num;

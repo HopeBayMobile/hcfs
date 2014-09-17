@@ -206,6 +206,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     /* If function return contains a median, insert to the current node */
     if (current_node->num_entries < MAX_DIR_ENTRIES_PER_PAGE)
      {
+      printf("overflow up path a %s\n",tmp_overflow_median.d_name);
       /*Can add new entry to this node*/
       /*First shift the elements to the right of the point to insert*/
       if (selected_index < current_node->num_entries)
@@ -226,11 +227,12 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
       fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
       return 0; /*Insertion completed*/
      }
+    printf("overflow up path b %s\n",tmp_overflow_median.d_name);
 
     /*Need to split*/
     if (selected_index > 0)
      memcpy(temp_dir_entries, current_node->dir_entries,sizeof(DIR_ENTRY)*selected_index);
-    memcpy(&(temp_dir_entries[selected_index]),new_entry,sizeof(DIR_ENTRY));
+    memcpy(&(temp_dir_entries[selected_index]),&tmp_overflow_median,sizeof(DIR_ENTRY));
     if (selected_index < current_node->num_entries)
      memcpy(&(temp_dir_entries[selected_index+1]), &(current_node->dir_entries[selected_index]), sizeof(DIR_ENTRY)*(current_node->num_entries - selected_index));
 
@@ -295,9 +297,132 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
 
     /* Pass the median and the file pos of the new node to the parent*/
     *overflow_new_page = newpage.this_page_pos;
+    printf("overflow %s\n",overflow_median->d_name);
 
     return 1;
    }
 
   return 0;
  }
+
+int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta)
+ {
+  int selected_index, ret_val, entry_to_delete;
+  DIR_ENTRY temp_dir_entries[MAX_DIR_ENTRIES_PER_PAGE+2];
+  long long temp_child_page_pos[MAX_DIR_ENTRIES_PER_PAGE+3];
+  DIR_ENTRY_PAGE temppage;
+  DIR_ENTRY extracted_child;
+  int temp_total;
+
+  /*First search for the index to insert or traverse*/
+  entry_to_delete = dentry_binary_search(current_node->dir_entries,current_node->num_entries, to_delete_entry, &selected_index);
+
+  if (entry_to_delete >=0)
+   {
+    /* We found the element. Delete it. */
+
+    if (current_node->child_page_pos[entry_to_delete] == 0)
+     {
+      /*We are now at the leaf node*/
+      /* Just delete and return. Won't need to handle underflow here */
+      memcpy(&(temp_dir_entries[0]), &(current_node->dir_entries[entry_to_delete+1]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
+        memcpy(&(current_node->dir_entries[entry_to_delete]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
+      current_node->num_entries--;
+
+      fseek(fptr, current_node->this_page_pos, SEEK_SET);
+      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+      return 0;
+     }
+    else
+     {
+      /*Select and remove the largest element from the left subtree of entry_to_delete*/
+      /* Conduct rebalancing all the way down */
+
+      /* First make sure the selected child is balanced */
+
+      ret_val = rebalance_btree(current_node, fptr, this_meta, entry_to_delete);
+
+  /* If rebalanced, recheck by calling this function with the same parameters, else read the child node and go down the tree */
+      if (ret_val > 0)
+       {
+        if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
+         {
+          fseek(fptr, this_meta->root_entry_page, SEEK_SET);
+          fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+          return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta);
+         }
+        else
+         return delete_dir_entry_btree(to_delete_entry, current_node, fptr, this_meta);
+       }
+
+      if (ret_val < 0)
+       return ret_val;
+       
+      fseek(fptr, current_node->child_page_pos[entry_to_delete], SEEK_SET);
+      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+
+      ret_val = extract_largest_child(&temppage,fptr,this_meta, &extracted_child);
+      /* Replace the entry_to_delete with the largest element from the left subtree */
+      if (ret_val < 0)
+       return ret_val;
+
+      memcpy(&(current_node->dir_entries[entry_to_delete]), &extracted_child, sizeof(DIR_ENTRY));
+
+      fseek(fptr, current_node->this_page_pos, SEEK_SET);
+      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      
+      return 0;
+     }
+   }
+
+  if (current_node->child_page_pos[selected_index] == 0)
+   return -1;  /*Cannot find the item to delete. Return. */
+
+  /* Rebalance the selected child with its right sibling (or left if the rightmost) if needed */
+  ret_val = rebalance_btree(current_node, fptr, this_meta, selected_index);
+
+  /* If rebalanced, recheck by calling this function with the same parameters, else read the child node and go down the tree */
+  if (ret_val > 0)
+   {
+    if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
+     {
+      fseek(fptr, this_meta->root_entry_page, SEEK_SET);
+      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+      return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta);
+     }
+    else
+     return delete_dir_entry_btree(to_delete_entry, current_node, fptr, this_meta);
+   }
+
+  if (ret_val < 0)
+   return ret_val;
+       
+  fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
+  fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+  
+  return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta);
+ }
+
+int rebalance_btree(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta, int selected_child)
+ {
+  /* How to rebalance: if num_entries of child <= MIN_DIR_ENTRIES_PER_PAGE, check if its right (or left) sibling contains child <= MAX_DIR_ENTRIES_PER_PAGE / 2. If so, just merge the two children and the parent item in between (parent node lost one element). If the current node is the root and has only one element, make the merged node the new root and put the old root to the gc list.
+   If the sibling contains child > MAX_DIR_ENTRIES_PER_PAGE / 2, pool the elements from
+the two nodes, plus the parent item in between, and split the pooled elements into two,
+using the median as the new parent item. */
+
+  /* Returns 1 if rebalance is conducted, and no new root is created. 
+             2 if rebalance is conducted, and there is a new root. The current_node of the caller should be reloaded in this case.
+             0 if no rebalancing is needed.
+             -1 if an error occurred. */
+aaa
+ }
+
+int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child)
+ {
+  /*Select and remove the largest element from the left subtree of entry_to_delete*/
+  /* Conduct rebalancing all the way down, using rebalance_btree function */
+  /* Return the largest element using extracted_child pointer */
+bbb
+ }
+

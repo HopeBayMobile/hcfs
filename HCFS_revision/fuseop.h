@@ -15,6 +15,7 @@
 
 #define MAX_DIR_ENTRIES_PER_PAGE 99 /*Max number of children per node is 100, min is 50, so at least 49 elements in each node (except the root) */
 #define MAX_BLOCK_ENTRIES_PER_PAGE 100
+#define MIN_DIR_ENTRIES_PER_PAGE 30 /* Minimum number of entries before an underflow */
 
 #define ST_NONE 0   /* Not stored on any media or storage. Value should be zero.*/
 #define ST_LDISK 1  /* Stored only on local cache */
@@ -24,7 +25,6 @@
 #define ST_CtoL 5   /* In transition from cloud storage to local cache */
 #define ST_TODELETE 6 /* Block to be deleted in backend */
 
-/* TODO: Merge all dir entries to the same page pool, and use b-tree to maintain dir page structure */
 #define D_ISDIR 0
 #define D_ISREG 1
 #define D_ISLNK 2
