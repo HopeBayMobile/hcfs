@@ -16,6 +16,7 @@
 #define MAX_DIR_ENTRIES_PER_PAGE 99 /*Max number of children per node is 100, min is 50, so at least 49 elements in each node (except the root) */
 #define MAX_BLOCK_ENTRIES_PER_PAGE 100
 #define MIN_DIR_ENTRIES_PER_PAGE 30 /* Minimum number of entries before an underflow */
+/* WARNING: MIN_DIR_ENTRIES_PER_PAGE must be smaller than MAX_DIR_ENTRIES_PER_PAGE/2 */
 
 #define ST_NONE 0   /* Not stored on any media or storage. Value should be zero.*/
 #define ST_LDISK 1  /* Stored only on local cache */
