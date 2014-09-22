@@ -12,6 +12,8 @@
 /* TODO: cache meta file pointer and close only after some idle interval */
 /* TODO: memory management for cache */
 
+/* TODO: remove unnecessary malloc and free so that memory won't go out quickly and won't crash*/
+
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
@@ -88,9 +90,9 @@ int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *
    {
     if (body_ptr->dir_entry_cache[1]==NULL)
      {
+      body_ptr->dir_entry_cache[1] = malloc(sizeof(DIR_ENTRY_PAGE));
       body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
-      body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-      body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
+      memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
       memcpy((body_ptr->dir_entry_cache[0]), temppage,sizeof(DIR_ENTRY_PAGE));
       body_ptr->dir_entry_cache_dirty[0] = TRUE;
      }
@@ -98,10 +100,8 @@ int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *
      {
       /* Need to flush first */
       ret_val = meta_cache_flush_dir_cache(body_ptr,1);
-      free(body_ptr->dir_entry_cache[1]);
       body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
-      body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-      body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
+      memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
       memcpy((body_ptr->dir_entry_cache[0]), temppage,sizeof(DIR_ENTRY_PAGE));
       body_ptr->dir_entry_cache_dirty[0] = TRUE;
      }
@@ -606,10 +606,10 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
          {
           if (body_ptr->dir_entry_cache[1]==NULL)
            {
+            body_ptr->dir_entry_cache[1] = malloc(sizeof(DIR_ENTRY_PAGE));
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
-            body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
+            memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
 
-            body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
             if (body_ptr->meta_opened == FALSE)
              {
               ret_val = meta_cache_open_file(body_ptr);
@@ -632,14 +632,17 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
              }
 
            /* Need to flush first */
-            fseek(body_ptr->fptr,(body_ptr->dir_entry_cache[1])->this_page_pos,SEEK_SET);
-            fwrite(body_ptr->dir_entry_cache[1],sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
-            free(body_ptr->dir_entry_cache[1]);
-            super_inode_mark_dirty((body_ptr->this_stat).st_ino);
+            if (body_ptr->dir_entry_cache_dirty[1] == TRUE)
+             {
+              fseek(body_ptr->fptr,(body_ptr->dir_entry_cache[1])->this_page_pos,SEEK_SET);
+              fwrite(body_ptr->dir_entry_cache[1],sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
+              super_inode_mark_dirty((body_ptr->this_stat).st_ino);
+             }
+/* TODO: Rewrite this part so that memory allocation is not so frequent */
 
+            memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
-            body_ptr->dir_entry_cache[1] = body_ptr->dir_entry_cache[0];
-            body_ptr->dir_entry_cache[0] = malloc(sizeof(DIR_ENTRY_PAGE));
+            memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
 
             fseek(body_ptr->fptr,dir_page->this_page_pos,SEEK_SET);
             fread((body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
@@ -922,6 +925,8 @@ int meta_cache_remove(ino_t this_inode)
   current_ptr->inode_num = 0;
 
   sem_post(&((current_ptr->cache_entry_body).access_sem));
+
+  memset(body_ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 
   if (prev_ptr !=NULL)
    {

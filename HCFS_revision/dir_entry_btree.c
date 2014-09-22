@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "global.h"
+#include "params.h"
 #include "fuseop.h"
 
 /* TODO: How to integrate dir page reading / updating with mem cache? */
@@ -326,7 +328,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
       /*We are now at the leaf node*/
       /* Just delete and return. Won't need to handle underflow here */
       memcpy(&(temp_dir_entries[0]), &(current_node->dir_entries[entry_to_delete+1]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
-        memcpy(&(current_node->dir_entries[entry_to_delete]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
+      memcpy(&(current_node->dir_entries[entry_to_delete]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
       current_node->num_entries--;
 
       fseek(fptr, current_node->this_page_pos, SEEK_SET);
@@ -357,15 +359,21 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
        }
 
       if (ret_val < 0)
-       return ret_val;
-       
+       {
+        printf ("debug dtree error in/after rebalancing\n");
+        return ret_val;
+       }
+      
       fseek(fptr, current_node->child_page_pos[entry_to_delete], SEEK_SET);
       fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
 
       ret_val = extract_largest_child(&temppage,fptr,this_meta, &extracted_child);
       /* Replace the entry_to_delete with the largest element from the left subtree */
       if (ret_val < 0)
-       return ret_val;
+       {
+        printf("debug error in finding largest child\n");
+        return ret_val;
+       }
 
       memcpy(&(current_node->dir_entries[entry_to_delete]), &extracted_child, sizeof(DIR_ENTRY));
 
@@ -377,7 +385,10 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
    }
 
   if (current_node->child_page_pos[selected_index] == 0)
-   return -1;  /*Cannot find the item to delete. Return. */
+   {
+    printf("debug dtree cannot find the item\n");
+    return -1;  /*Cannot find the item to delete. Return. */
+   }
 
   /* Rebalance the selected child with its right sibling (or left if the rightmost) if needed */
   ret_val = rebalance_btree(current_node, fptr, this_meta, selected_index);
@@ -396,7 +407,10 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
    }
 
   if (ret_val < 0)
-   return ret_val;
+   {
+    printf ("debug dtree error in/after rebalancing\n");
+    return ret_val;
+   }
        
   fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
   fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
@@ -491,8 +505,8 @@ using the median as the new parent item. */
     fseek(fptr, temp_page.this_page_pos, SEEK_SET);
     fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 
-    if (this->meta->tree_walk_list_head == right_page.this_page_pos)
-     this->meta->tree_walk_list_head = right_page.tree_walk_next;
+    if (this_meta->tree_walk_list_head == right_page.this_page_pos)
+     this_meta->tree_walk_list_head = right_page.tree_walk_next;
 
     if (right_page.tree_walk_next!=0)
      {
@@ -522,8 +536,8 @@ using the median as the new parent item. */
       fseek(fptr, temp_page.this_page_pos, SEEK_SET);
       fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
 
-      if (this->meta->tree_walk_list_head == current_node->this_page_pos)
-       this->meta->tree_walk_list_head = current_node->tree_walk_next;
+      if (this_meta->tree_walk_list_head == current_node->this_page_pos)
+       this_meta->tree_walk_list_head = current_node->tree_walk_next;
 
       if (current_node->tree_walk_next!=0)
        {
@@ -550,10 +564,10 @@ using the median as the new parent item. */
       to_return = 1;
       /* Just drop the item merged to the left node from current_node */
       memcpy(&(temp_dir_entries[0]), &(current_node->dir_entries[left_node+1]), sizeof(DIR_ENTRY)*(current_node->num_entries - (left_node+1)));
-        memcpy(&(current_node->dir_entries[left_node+2]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*(current_node->num_entries - (left_node+1)));
+        memcpy(&(current_node->dir_entries[left_node]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*(current_node->num_entries - (left_node+1)));
 
       memcpy(&(temp_child_page_pos[0]), &(current_node->child_page_pos[left_node+2]), sizeof(long long)*(current_node->num_entries - (left_node+1)));
-      memcpy(&(current_node->child_page_pos[eft_node+2]), &(temp_child_page_pos[0]), sizeof(long long)*(current_node->num_entries - (left_node+1)));
+      memcpy(&(current_node->child_page_pos[left_node+1]), &(temp_child_page_pos[0]), sizeof(long long)*(current_node->num_entries - (left_node+1)));
       current_node->num_entries--;
 
       fseek(fptr, current_node->this_page_pos, SEEK_SET);
@@ -604,6 +618,48 @@ int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYP
   /*Select and remove the largest element from the left subtree of entry_to_delete*/
   /* Conduct rebalancing all the way down, using rebalance_btree function */
   /* Return the largest element using extracted_child pointer */
-bbb
+
+  int selected_index, ret_val, entry_to_delete;
+  DIR_ENTRY_PAGE temppage;
+  int temp_total;
+
+  selected_index = current_node->num_entries;
+  if (current_node->child_page_pos[selected_index] == 0)
+   {
+    /*We are now at the leaf node*/
+    /* Just delete and return. Won't need to handle underflow here */
+    memcpy(extracted_child, &(current_node->dir_entries[selected_index-1]), sizeof(DIR_ENTRY));
+    current_node->num_entries--;
+
+    fseek(fptr, current_node->this_page_pos, SEEK_SET);
+    fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+    return 0;
+   }
+
+  /* Conduct rebalancing all the way down */
+
+  ret_val = rebalance_btree(current_node, fptr, this_meta, selected_index);
+
+  /* If rebalanced, recheck by calling this function with the same parameters, else read the child node and go down the tree */
+  if (ret_val > 0)
+   {
+    if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
+     {
+      fseek(fptr, this_meta->root_entry_page, SEEK_SET);
+      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+      return extract_largest_child(&temppage, fptr, this_meta, extracted_child);
+     }
+    else
+     return extract_largest_child(current_node, fptr, this_meta, extracted_child);
+   }
+
+  if (ret_val < 0)
+   return ret_val;
+       
+  fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
+  fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+
+  return extract_largest_child(&temppage,fptr,this_meta, extracted_child);
  }
 

@@ -149,6 +149,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   long page_pos;
   int count,ret_val;
   int sem_val;
+  DIR_ENTRY temp_entry;
 
   sem_getvalue(&(body_ptr->access_sem), &sem_val);
   if (sem_val > 0)
@@ -156,6 +157,15 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
     /*Not locked, return -1*/
     return -1;
    }
+
+  memset(&temp_entry, 0, sizeof(DIR_ENTRY));
+
+  temp_entry.d_ino = child_inode;
+  strcpy(temp_entry.d_name, childname);
+  if (S_ISREG(child_mode))
+   temp_entry.d_type = D_ISREG;
+  if (S_ISDIR(child_mode))
+   temp_entry.d_type = D_ISDIR;
 
   ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_meta_stat,&parent_meta_head,NULL,body_ptr);
 
@@ -166,14 +176,15 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   fseek(body_ptr->fptr, parent_meta_head.root_entry_page, SEEK_SET);
   fread(&temppage, sizeof(DIR_ENTRY_PAGE),1, body_ptr->fptr);
 
-  /* Drop all cached pages first before inserting */
+  /* Drop all cached pages first before deleting */
   /* TODO: Future changes could remove this limitation if can update cache with each node change in b-tree*/
 
   ret_val = meta_cache_drop_pages(body_ptr);
 
-/* B-tree insertion*/
+/* B-tree deletion*/
   ret_val = delete_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &parent_meta_head);
 
+  printf("delete dir entry returns %d\n", ret_val);
   /* temppage might be invalid after calling delete_dir_entry_btree */
 
   if (ret_val ==0)
@@ -185,7 +196,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
  
     parent_meta_head.total_children--;
     printf("TOTAL CHILDREN is now %ld\n",parent_meta_head.total_children);
-    ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, body_ptr);
+    ret_val = meta_cache_update_dir_data(parent_inode, &parent_meta_stat, &parent_meta_head, NULL, body_ptr);
     return 0;
    }
 
