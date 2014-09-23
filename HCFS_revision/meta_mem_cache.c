@@ -20,22 +20,25 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
  {
   char thismetapath[METAPATHLEN];
 
-  fetch_meta_path(thismetapath,body_ptr->inode_num);
-
-  body_ptr->fptr = fopen(thismetapath,"r+");
-  if (body_ptr->fptr==NULL)
+  if (body_ptr->meta_opened == FALSE)
    {
-    if (access(thismetapath,F_OK)<0)
-     body_ptr->fptr = fopen(thismetapath,"w+");  /*File may not exist*/
-    if (body_ptr->fptr == NULL)
-     {
-      return -1;
-     }
-   }
+    fetch_meta_path(thismetapath,body_ptr->inode_num);
 
-  setbuf(body_ptr->fptr,NULL); 
-  flock(fileno(body_ptr->fptr),LOCK_EX);
-  body_ptr->meta_opened = TRUE;
+    body_ptr->fptr = fopen(thismetapath,"r+");
+    if (body_ptr->fptr==NULL)
+     {
+      if (access(thismetapath,F_OK)<0)
+       body_ptr->fptr = fopen(thismetapath,"w+");  /*File may not exist*/
+      if (body_ptr->fptr == NULL)
+       {
+        return -1;
+       }
+     }
+
+    setbuf(body_ptr->fptr,NULL); 
+    flock(fileno(body_ptr->fptr),LOCK_EX);
+    body_ptr->meta_opened = TRUE;
+   }
   return 0;
  }
 
@@ -642,7 +645,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
 
             memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];
-            memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
 
             fseek(body_ptr->fptr,dir_page->this_page_pos,SEEK_SET);
             fread((body_ptr->dir_entry_cache[0]),sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);

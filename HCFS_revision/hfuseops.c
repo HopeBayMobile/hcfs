@@ -1453,6 +1453,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   int ret_code;
   struct timeval tmp_time1, tmp_time2;
   META_CACHE_ENTRY_STRUCT *body_ptr;
+  long countn;
 
   gettimeofday(&tmp_time1,NULL);
 
@@ -1472,11 +1473,27 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 
   thisfile_pos = tempmeta.tree_walk_list_head;
 
+  if (tempmeta.total_children > (MAX_DIR_ENTRIES_PER_PAGE-2))
+   {
+    if (body_ptr->meta_opened == FALSE)
+     meta_cache_open_file(body_ptr);
+    meta_cache_drop_pages(body_ptr);
+   }
+
+  countn = 0;
   while(thisfile_pos != 0)
    {
+    printf("Now %dth iteration\n",countn);
+    countn++;
     memset(&temp_page,0,sizeof(DIR_ENTRY_PAGE));
     temp_page.this_page_pos = thisfile_pos;
-    meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, body_ptr);
+    if (tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2))
+     meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, body_ptr);
+    else
+     {
+      fseek(body_ptr->fptr,thisfile_pos, SEEK_SET);
+      fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
+     }
 
     for(count=0;count<temp_page.num_entries;count++)
      {

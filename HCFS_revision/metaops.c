@@ -38,6 +38,11 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   long page_pos;
   int entry_index;
   int sem_val;
+  char no_need_rewrite;
+
+  DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
+  long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
+
 
   sem_getvalue(&(body_ptr->access_sem), &sem_val);
   if (sem_val > 0)
@@ -71,13 +76,17 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   ret_val = meta_cache_drop_pages(body_ptr);
 
 /* B-tree insertion*/
-  ret_val = insert_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &overflow_entry, &overflow_new_page, &parent_meta_head);
+  ret_val = insert_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &overflow_entry, &overflow_new_page, &parent_meta_head, temp_dir_entries, temp_child_page_pos);
 
   if (ret_val < 0)
    return ret_val;
 
   if (ret_val == 1)
    {
+    /* Reload old root */
+    fseek(body_ptr->fptr, parent_meta_head.root_entry_page, SEEK_SET);
+    fread(&temppage, sizeof(DIR_ENTRY_PAGE),1, body_ptr->fptr);
+
     /*Need to create a new root page and write to disk*/
     if (parent_meta_head.entry_page_gc_list != 0)
      {
@@ -97,14 +106,29 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
     new_root.gc_list_next = 0;
     new_root.tree_walk_next = parent_meta_head.tree_walk_list_head;
     new_root.tree_walk_prev = 0;
-    fseek(body_ptr->fptr, parent_meta_head.tree_walk_list_head, SEEK_SET);
-    fread(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-    temp_page2.tree_walk_prev = new_root.this_page_pos;
-    fseek(body_ptr->fptr, parent_meta_head.tree_walk_list_head, SEEK_SET);
-    fwrite(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+
+    no_need_rewrite = FALSE;
+    if (parent_meta_head.tree_walk_list_head == temppage.this_page_pos)
+     {
+      temppage.tree_walk_prev = new_root.this_page_pos;
+     }
+    else
+     {
+      fseek(body_ptr->fptr, parent_meta_head.tree_walk_list_head, SEEK_SET);
+      fread(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+      temp_page2.tree_walk_prev = new_root.this_page_pos;
+      if (temp_page2.this_page_pos == overflow_new_page)
+       {
+        temp_page2.parent_page_pos = new_root.this_page_pos;
+        no_need_rewrite = TRUE;
+       }
+      fseek(body_ptr->fptr, parent_meta_head.tree_walk_list_head, SEEK_SET);
+      fwrite(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+     }
+
+
     parent_meta_head.tree_walk_list_head = new_root.this_page_pos;
 
-    /* Parent of new node is the same as the parent of the old node*/
     new_root.parent_page_pos = 0;
     memset(new_root.child_page_pos,0,sizeof(long long)*(MAX_DIR_ENTRIES_PER_PAGE+1));
     new_root.num_entries = 1;
@@ -116,6 +140,21 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
     /* Write to disk after finishing */
     fseek(body_ptr->fptr, new_root.this_page_pos, SEEK_SET);
     fwrite(&new_root,sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
+
+    /*Write new parent to the two children*/
+    temppage.parent_page_pos = new_root.this_page_pos;
+    fseek(body_ptr->fptr, temppage.this_page_pos, SEEK_SET);
+    fwrite(&temppage, sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
+
+    if (no_need_rewrite == FALSE)
+     {
+      fseek(body_ptr->fptr, overflow_new_page, SEEK_SET);
+      fread(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+      temp_page2.parent_page_pos = new_root.this_page_pos;
+      fseek(body_ptr->fptr, overflow_new_page, SEEK_SET);
+      fwrite(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+     }
+
     fseek(body_ptr->fptr,sizeof(struct stat), SEEK_SET);
     fwrite(&parent_meta_head,sizeof(DIR_META_TYPE),1,body_ptr->fptr);
    }
@@ -151,6 +190,9 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   int sem_val;
   DIR_ENTRY temp_entry;
 
+  DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
+  long long temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
+
   sem_getvalue(&(body_ptr->access_sem), &sem_val);
   if (sem_val > 0)
    {
@@ -182,7 +224,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   ret_val = meta_cache_drop_pages(body_ptr);
 
 /* B-tree deletion*/
-  ret_val = delete_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &parent_meta_head);
+  ret_val = delete_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &parent_meta_head, temp_dir_entries, temp_child_page_pos);
 
   printf("delete dir entry returns %d\n", ret_val);
   /* temppage might be invalid after calling delete_dir_entry_btree */
