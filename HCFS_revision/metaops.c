@@ -287,7 +287,8 @@ int decrease_nlink_inode_file(ino_t this_inode)
 
   if (this_inode_stat.st_nlink<=1)
    {
-    ret_val = meta_cache_unlock_entry(this_inode, body_ptr);
+    meta_cache_close_file(body_ptr);
+    ret_val = meta_cache_unlock_entry(body_ptr);
 
     /*Need to delete the inode*/
     super_inode_to_delete(this_inode);
@@ -352,7 +353,8 @@ int decrease_nlink_inode_file(ino_t this_inode)
    {
     this_inode_stat.st_nlink--; 
     ret_val = meta_cache_update_dir_data(this_inode, &this_inode_stat, NULL, NULL,body_ptr);
-    ret_val = meta_cache_unlock_entry(this_inode, body_ptr);
+    meta_cache_close_file(body_ptr);
+    ret_val = meta_cache_unlock_entry(body_ptr);
    }
 
   return 0;

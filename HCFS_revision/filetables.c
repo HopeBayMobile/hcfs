@@ -1,6 +1,7 @@
 #include "fuseop.h"
 #include "params.h"
 #include "global.h"
+#include "meta_mem_cache.h"
 #include "filetables.h"
 
 int init_system_fh_table()
@@ -44,22 +45,15 @@ long long open_fh(ino_t thisinode)
     index = index % MAX_OPEN_FILE_ENTRIES;
    }
 
-  fetch_meta_path(thismetapath,thisinode);
-
   system_fh_table.entry_table_flags[index]=TRUE;
+  system_fh_table.entry_table[index].meta_cache_ptr = NULL;
+  system_fh_table.entry_table[index].meta_cache_locked = FALSE;
   system_fh_table.entry_table[index].thisinode = thisinode;
-  system_fh_table.entry_table[index].metafptr = NULL;
-  system_fh_table.entry_table[index].metafptr = fopen(thismetapath, "r+");
-
-  setbuf(system_fh_table.entry_table[index].metafptr,NULL);
-  fread(&(system_fh_table.entry_table[index].cached_stat),sizeof(struct stat),1,system_fh_table.entry_table[index].metafptr);
-  fread(&(system_fh_table.entry_table[index].cached_meta),sizeof(FILE_META_TYPE),1,system_fh_table.entry_table[index].metafptr);
-  fseek(system_fh_table.entry_table[index].metafptr,0,SEEK_SET);
 
   system_fh_table.entry_table[index].blockfptr = NULL;
   system_fh_table.entry_table[index].opened_block = -1;
   system_fh_table.entry_table[index].cached_page_index = -1;
-  system_fh_table.entry_table[index].cached_page_start_fpos = 0;
+  system_fh_table.entry_table[index].cached_filepos = -1;
   sem_init(&(system_fh_table.entry_table[index].block_sem),0,1);
 
   sem_post(&(system_fh_table.fh_table_sem));
@@ -68,19 +62,27 @@ long long open_fh(ino_t thisinode)
 
 int close_fh(long long index)
  {
-  /*TODO: should not have dirty page and meta in this fh entry, but could add routine to check*/
   sem_wait(&(system_fh_table.fh_table_sem));
 
   if (system_fh_table.entry_table_flags[index]==TRUE)
    {
+    if (system_fh_table.entry_table[index].meta_cache_locked == FALSE)
+     {
+      system_fh_table.entry_table[index].meta_cache_ptr = meta_cache_lock_entry(system_fh_table.entry_table[index].thisinode);
+      system_fh_table.entry_table[index].meta_cache_locked = TRUE;
+     }
+    meta_cache_close_file(system_fh_table.entry_table[index].meta_cache_ptr);
+
+    system_fh_table.entry_table[index].meta_cache_locked = FALSE;
+    meta_cache_unlock_entry(system_fh_table.entry_table[index].meta_cache_ptr);
+
     system_fh_table.entry_table_flags[index]=FALSE;
     system_fh_table.entry_table[index].thisinode = 0;
-    if (system_fh_table.entry_table[index].metafptr!=NULL)
-     fclose(system_fh_table.entry_table[index].metafptr);
+
     if ((system_fh_table.entry_table[index].blockfptr!=NULL) && (system_fh_table.entry_table[index].opened_block>=0))
      fclose(system_fh_table.entry_table[index].blockfptr);
 
-    system_fh_table.entry_table[index].metafptr = NULL;
+    system_fh_table.entry_table[index].meta_cache_ptr = NULL;
     system_fh_table.entry_table[index].blockfptr = NULL;
     system_fh_table.entry_table[index].opened_block = -1;
     sem_destroy(&(system_fh_table.entry_table[index].block_sem));
@@ -90,16 +92,33 @@ int close_fh(long long index)
   return 0;
  }
 
-int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page)
+int seek_page(FH_ENTRY *fh_ptr,long long target_page)
  {
   long long current_page;
   off_t nextfilepos, prevfilepos, currentfilepos;
   BLOCK_ENTRY_PAGE temppage;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  int sem_val;
+  FILE_META_TYPE temp_meta;
 
+  /* First check if meta cache is locked */
 
-  nextfilepos=fh_ptr->cached_meta.next_block_page;
+  body_ptr = fh_ptr->meta_cache_ptr;
+
+  sem_getvalue(&(body_ptr->access_sem), &sem_val);
+  if (sem_val > 0)
+   {
+    /*Not locked, return -1*/
+    return -1;
+   }
+
+  meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, &temp_meta, NULL, 0, body_ptr);
+
+  nextfilepos=temp_meta.next_block_page;
   current_page = 0;
   prevfilepos = 0;
+
+  meta_cache_open_file(body_ptr);
 
   /*TODO: put error handling for the read/write ops here*/
   while(current_page <= target_page)
@@ -108,35 +127,31 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page)
      {
       if (prevfilepos == 0) /* If not even the first page is generated */
        {
-        fseek(fptr, 0, SEEK_END);
-        prevfilepos = ftell(fptr);
-        fh_ptr->cached_meta.next_block_page = prevfilepos;
+        fseek(body_ptr->fptr, 0, SEEK_END);
+        prevfilepos = ftell(body_ptr->fptr);
+        temp_meta.next_block_page = prevfilepos;
         memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
-        fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
-        fseek(fptr,sizeof(struct stat),SEEK_SET);
-        fwrite(&(fh_ptr->cached_meta), sizeof(FILE_META_TYPE),1,fptr);
+        meta_cache_update_file_data(fh_ptr->thisinode, NULL, &temp_meta, &temppage, prevfilepos, body_ptr);
        }
       else
        {
-        fseek(fptr, 0, SEEK_END);
-        currentfilepos = ftell(fptr);
-        fseek(fptr, prevfilepos, SEEK_SET);
-        fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+        fseek(body_ptr->fptr, 0, SEEK_END);
+        currentfilepos = ftell(body_ptr->fptr);
+        meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, prevfilepos, body_ptr);
         temppage.next_page = currentfilepos;
-        fseek(fptr, prevfilepos, SEEK_SET);
-        fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+        meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, prevfilepos, body_ptr);
 
-        fseek(fptr, currentfilepos, SEEK_SET);
         memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
-        fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+        meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, currentfilepos, body_ptr);
+
         prevfilepos = currentfilepos;
        }
      }
     else
      {
-      fseek(fptr, nextfilepos, SEEK_SET);
+      meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, nextfilepos, body_ptr);
+
       prevfilepos = nextfilepos;
-      fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
       nextfilepos = temppage.next_page;
      }
     if (current_page == target_page)
@@ -145,15 +160,17 @@ int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page)
      current_page++;
    }
   fh_ptr->cached_page_index = target_page;
-  fh_ptr->cached_page_start_fpos = prevfilepos;
+  fh_ptr->cached_filepos = prevfilepos;
+
   return 0;
  }
 
-long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index)
+long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,long long *entry_index)
  {
   long long temp_index;
   off_t nextfilepos;
   BLOCK_ENTRY_PAGE temppage;
+  int ret_val;
   /*First handle the case that nothing needs to be changed, just add entry_index*/
 
   temp_index = *entry_index;
@@ -166,20 +183,22 @@ long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index)
 
   /*We need to change to another page*/
 
-  fseek(fptr,thisfilepos,SEEK_SET);
-  fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+  ret_val = meta_cache_open_file(body_ptr);
+
+  fseek(body_ptr->fptr,thisfilepos,SEEK_SET);
+  fread(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,body_ptr->fptr);
   nextfilepos = temppage.next_page;
 
   if (nextfilepos == 0)   /*Need to allocate a new page*/
    {
-    fseek(fptr,0,SEEK_END);
-    nextfilepos = ftell(fptr);
+    fseek(body_ptr->fptr,0,SEEK_END);
+    nextfilepos = ftell(body_ptr->fptr);
     temppage.next_page = nextfilepos;
-    fseek(fptr, thisfilepos,SEEK_SET);
-    fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,fptr);
-    fseek(fptr,nextfilepos,SEEK_SET);
+    fseek(body_ptr->fptr, thisfilepos,SEEK_SET);
+    fwrite(&(temppage),sizeof(BLOCK_ENTRY_PAGE),1,body_ptr->fptr);
+    fseek(body_ptr->fptr,nextfilepos,SEEK_SET);
     memset(&temppage,0,sizeof(BLOCK_ENTRY_PAGE));
-    fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,fptr);
+    fwrite(&temppage,sizeof(BLOCK_ENTRY_PAGE),1,body_ptr->fptr);
    }
 
   *entry_index = 0;

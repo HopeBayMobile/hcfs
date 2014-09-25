@@ -48,11 +48,7 @@ typedef struct {
   DIR_ENTRY_PAGE *dir_entry_cache[2];      /*Zero if not pointed to any page*/
 /*index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
   char dir_entry_cache_dirty[2];
-  BLOCK_ENTRY_PAGE *block_entry_cache[2];
-  long block_entry_cache_pos[2];
-  char block_entry_cache_dirty[2];
 /* TODO: Add xattr page cached here */
-  int opened_handles_to_inode;
   sem_t access_sem;
   char something_dirty;
   char meta_opened;
@@ -77,15 +73,14 @@ typedef struct {
 int init_meta_cache_headers();
 int release_meta_cache_headers();
 int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
-int meta_cache_flush_block_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
 int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
 int flush_clean_all_meta_cache();
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
 
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
 
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
 
@@ -97,9 +92,10 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page, int
 int meta_cache_remove(ino_t this_inode);
 int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *temppage);
 
-META_CACHE_ENTRY_STRUCT * meta_cache_lock_entry(ino_t this_inode);
-int meta_cache_unlock_entry(ino_t this_inode, META_CACHE_ENTRY_STRUCT *target_ptr);
+META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode);
+int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr);
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);

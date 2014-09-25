@@ -168,7 +168,8 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
    {
     cache_entry = meta_cache_lock_entry(subroot);
     ret_val = meta_cache_seek_dir_entry(subroot,&temp_page, &temp_index,target_entry_name, cache_entry);
-    meta_cache_unlock_entry(subroot, cache_entry);
+    meta_cache_close_file(cache_entry);
+    meta_cache_unlock_entry(cache_entry);
 
     if ((ret_val ==0) && (temp_index < 0))
      {
@@ -201,7 +202,8 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *p
 
   cache_entry = meta_cache_lock_entry(subroot);
   ret_val = meta_cache_seek_dir_entry(subroot,&temp_page, &temp_index,target_entry_name, cache_entry);
-  meta_cache_unlock_entry(subroot, cache_entry);
+  meta_cache_close_file(cache_entry);
+  meta_cache_unlock_entry(cache_entry);
 
   if (ret_val < 0)
    {

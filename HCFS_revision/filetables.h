@@ -4,14 +4,13 @@
 
 typedef struct {
     ino_t thisinode;
-    FILE *metafptr;
+    META_CACHE_ENTRY_STRUCT *meta_cache_ptr;
+    char meta_cache_locked;
     FILE *blockfptr;
     long long opened_block;
-    struct stat cached_stat;
-    FILE_META_TYPE cached_meta;
-//    BLOCK_ENTRY_PAGE cached_page;
     long long cached_page_index;
-    off_t cached_page_start_fpos;
+    long long cached_filepos;
+//    BLOCK_ENTRY_PAGE cached_page;
     sem_t block_sem;
   } FH_ENTRY;
 
@@ -28,8 +27,8 @@ FH_TABLE_TYPE system_fh_table;
 int init_system_fh_table();
 long long open_fh(ino_t thisinode);
 int close_fh(long long index);
-int seek_page(FILE *fptr, FH_ENTRY *fh_ptr,long long target_page);
-long long advance_block(FILE *fptr, off_t thisfilepos,long long *entry_index); /*In advance block, need to write back dirty page if change page */
+int seek_page(FH_ENTRY *fh_ptr,long long target_page);
+long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,long long *entry_index); /*In advance block, need to write back dirty page if change page */
 
 /*END definition of file handle */
 
