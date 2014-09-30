@@ -184,7 +184,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
     flock(fileno(metafptr),LOCK_UN);
 
-    for(block_count=0;;block_count++)
+    for(block_count=0;page_pos!=0;block_count++)
      {
       flock(fileno(metafptr),LOCK_EX);
 

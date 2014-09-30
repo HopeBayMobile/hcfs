@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "global.h"
 #include "params.h"
@@ -14,6 +15,8 @@
 /* TODO: delayed write to disk */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
+sem_t num_entry_sem;
+long current_meta_mem_cache_entries;
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
  {
@@ -53,9 +56,13 @@ int init_meta_cache_headers()
 
   memset(meta_mem_cache,0,sizeof(META_CACHE_HEADER_STRUCT)*NUM_META_MEM_CACHE_HEADERS);
 
+  current_meta_mem_cache_entries = 0;
+
+  sem_init(&num_entry_sem,0,1);
   for(count=0;count<NUM_META_MEM_CACHE_HEADERS;count++)
    {
     ret_val = sem_init(&(meta_mem_cache[count].header_sem),0,1);
+    meta_mem_cache[count].last_entry = NULL;
     if (ret_val < 0)
      {
       free(meta_mem_cache);
@@ -74,6 +81,8 @@ int release_meta_cache_headers()
    return -1;
 
   ret_val = flush_clean_all_meta_cache();  
+
+  current_meta_mem_cache_entries = 0;
 
   free(meta_mem_cache);
   return 0;
@@ -237,7 +246,13 @@ int flush_clean_all_meta_cache() /* Flush all dirty entries and free memory usag
         current_ptr = current_ptr->next;
         sem_post(&((old_ptr->cache_entry_body).access_sem));
         free(old_ptr);
+        sem_wait(&num_entry_sem);
+        current_meta_mem_cache_entries--;
+        sem_post(&num_entry_sem);
        }
+      meta_mem_cache[count].meta_cache_entries = NULL;
+      meta_mem_cache[count].num_entries = 0;
+      meta_mem_cache[count].last_entry = NULL;
      }
     sem_post(&(meta_mem_cache[count].header_sem));
    }
@@ -731,7 +746,7 @@ int meta_cache_remove(ino_t this_inode)
   int index;
   META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr, *prev_ptr;
   META_CACHE_ENTRY_STRUCT *body_ptr;
-  char need_new,meta_opened;
+  char found_entry,meta_opened;
   int can_use_index;
 
   index = hash_inode_to_meta_cache(this_inode);
@@ -740,19 +755,19 @@ int meta_cache_remove(ino_t this_inode)
 
   current_ptr = meta_mem_cache[index].meta_cache_entries;
   prev_ptr = NULL;
-  need_new = TRUE;
+  found_entry = FALSE;
   while(current_ptr!=NULL)
    {
     if (current_ptr->inode_num == this_inode) /* A hit */
      {
-      need_new = FALSE;
+      found_entry = TRUE;
       break;
      }
     prev_ptr = current_ptr;
     current_ptr = current_ptr->next;
    }
 
-  if (need_new == TRUE) /*If did not find cache entry*/
+  if (found_entry == FALSE) /*If did not find cache entry*/
    {
     sem_post(&(meta_mem_cache[index].header_sem));
     return 0;
@@ -784,6 +799,12 @@ int meta_cache_remove(ino_t this_inode)
 
   memset(body_ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 
+  if (current_ptr->next != NULL)
+   current_ptr->next->prev = prev_ptr;
+
+  if (meta_mem_cache[index].last_entry == current_ptr)
+   meta_mem_cache[index].last_entry = prev_ptr;
+
   if (prev_ptr !=NULL)
    {
     prev_ptr->next = current_ptr->next;
@@ -796,10 +817,92 @@ int meta_cache_remove(ino_t this_inode)
   meta_mem_cache[index].num_entries--;
 
   free(current_ptr);
+  
+  sem_wait(&num_entry_sem);
+  current_meta_mem_cache_entries--;
+  sem_post(&num_entry_sem);
 
   sem_post(&(meta_mem_cache[index].header_sem));
 
   return 0;
+ }
+
+int expire_meta_mem_cache_entry()
+ {
+  /* Returns 0 if successfully expired one entry, -1 if not*/
+  /* How to expire:
+     Starting from some random header index, check from last_entry to find out if can
+     lock some entry. If so, expire it if last_access_time > 0.5 sec. 
+     Move to the next index if cannot expire anything, wrap back to 0 if overflow. */
+
+  int start_index, current_index, ret_val;
+  struct timeval current_time, *access_time_ptr;
+  char expired;
+  META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
+  META_CACHE_ENTRY_STRUCT *body_ptr;
+  double float_current_time, float_access_time;
+
+  gettimeofday(&current_time, NULL);
+  srandom((unsigned int)(current_time.tv_usec));
+  start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
+
+  current_index = start_index;
+
+  expired = FALSE;
+  while (expired == FALSE)
+   {
+    sem_wait(&(meta_mem_cache[current_index].header_sem));
+    current_ptr = meta_mem_cache[current_index].last_entry;
+    while(current_ptr!=NULL)
+     {
+      ret_val = sem_trywait(&(current_ptr->cache_entry_body).access_sem);
+      if (ret_val == 0)
+       {
+        gettimeofday(&current_time, NULL);
+        float_current_time= (current_time.tv_sec * 1.0) + (current_time.tv_usec * 0.000001);
+        access_time_ptr = &((current_ptr->cache_entry_body).last_access_time);
+        float_access_time = (access_time_ptr->tv_sec * 1.0) + (access_time_ptr->tv_usec * 0.000001);
+        if (float_current_time - float_access_time > 0.5)
+         {
+          /* Expire the entry */
+          flush_single_meta_cache_entry(&(current_ptr->cache_entry_body));
+          free_single_meta_cache_entry(current_ptr);
+          if (current_ptr->next != NULL)
+           current_ptr->next->prev = current_ptr->prev;
+          if (current_ptr->prev != NULL)
+           current_ptr->prev->next = current_ptr->next;
+          if (meta_mem_cache[current_index].last_entry == current_ptr);
+           meta_mem_cache[current_index].last_entry = current_ptr->prev;
+          if (meta_mem_cache[current_index].meta_cache_entries == current_ptr);
+           meta_mem_cache[current_index].meta_cache_entries = current_ptr->next;
+          meta_mem_cache[current_index].num_entries--;
+          sem_post(&(current_ptr->cache_entry_body).access_sem);
+          free(current_ptr);
+          sem_wait(&num_entry_sem);
+          current_meta_mem_cache_entries--;
+          sem_post(&num_entry_sem);
+          sem_post(&(meta_mem_cache[current_index].header_sem));
+          return 0;
+         }
+        else
+         {
+  /* If find that current_time < last_access_time, fix last_access_time to be current_time */
+          if (float_current_time < float_access_time)
+           gettimeofday(access_time_ptr);
+         }
+        sem_post(&(current_ptr->cache_entry_body).access_sem);
+       }
+      current_ptr = current_ptr->prev;
+     }
+
+    sem_post(&(meta_mem_cache[current_index].header_sem));
+
+    current_index = ((current_index + 1) % NUM_META_MEM_CACHE_HEADERS);
+    if (current_index == start_index)
+     break;
+   }
+
+  return -1;
  }
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
@@ -808,45 +911,87 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
   int index;
   META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
   META_CACHE_ENTRY_STRUCT *body_ptr;
-  char need_new;
+  char need_new, expire_done;
   int can_use_index;
   int count;
   SUPER_INODE_ENTRY tempentry;
-  META_CACHE_ENTRY_STRUCT *result_ptr;
+  META_CACHE_ENTRY_STRUCT *result_ptr, *prev_ptr;
+  struct timespec time_to_sleep;
+
+  time_to_sleep.tv_sec = 0;
+  time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
   index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
   sem_wait(&(meta_mem_cache[index].header_sem));
 
-  current_ptr = meta_mem_cache[index].meta_cache_entries;
   need_new = TRUE;
-  while(current_ptr!=NULL)
-   {
-    if (current_ptr->inode_num == this_inode) /* A hit */
-     {
-      need_new = FALSE;
-      break;
-     }
-    current_ptr = current_ptr->next;
-   }
 
-  if (need_new == TRUE)
+  while (need_new == TRUE)
    {
+    current_ptr = meta_mem_cache[index].meta_cache_entries;
+    while(current_ptr!=NULL)
+     {
+      if (current_ptr->inode_num == this_inode) /* A hit */
+       {
+        need_new = FALSE;
+        break;
+       }
+      current_ptr = current_ptr->next;
+     }
+    if (need_new == FALSE)
+     break;
+
+    /*Probe whether entries full and expire some entry if full */
+    sem_wait(&num_entry_sem);
+    if (current_meta_mem_cache_entries > MAX_META_MEM_CACHE_ENTRIES)
+     {
+      sem_post(&num_entry_sem);
+
+      /* Will need to release current header_sem, then reaquire after */
+      sem_post(&(meta_mem_cache[index].header_sem));
+      expire_done = FALSE;
+      while(expire_done == FALSE)
+       {
+        ret_val = expire_meta_mem_cache_entry(index);
+        if (ret_val < 0)
+         {
+          /* Sleep if cannot find one, then retry */
+          nanosleep(&time_to_sleep,NULL);
+         }
+        else
+         expire_done = TRUE;
+       }
+      sem_wait(&(meta_mem_cache[index].header_sem));
+      continue;  /* Try again. Some other thread may have add in this entry */
+     }
+    else
+     sem_post(&num_entry_sem);
+
     current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
     if (current_ptr==NULL)
      return -EACCES;
     memset(current_ptr,0,sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
   
     current_ptr->next = meta_mem_cache[index].meta_cache_entries;
+    if (meta_mem_cache[index].meta_cache_entries!=NULL)
+     meta_mem_cache[index].meta_cache_entries->prev = current_ptr;
     meta_mem_cache[index].meta_cache_entries = current_ptr;
+    if (meta_mem_cache[index].last_entry == NULL)
+     meta_mem_cache[index].last_entry = current_ptr;
     current_ptr->inode_num = this_inode;
     sem_init(&((current_ptr->cache_entry_body).access_sem),0,1);
     meta_mem_cache[index].num_entries++;
+    sem_wait(&num_entry_sem);
+    current_meta_mem_cache_entries++;
+    sem_post(&num_entry_sem);
+
     ret_val =super_inode_read(this_inode, &tempentry);
     (current_ptr->cache_entry_body).inode_num = this_inode;
     (current_ptr->cache_entry_body).meta_opened = FALSE;
     memcpy(&((current_ptr->cache_entry_body).this_stat),&(tempentry.inode_stat),sizeof(struct stat));
-
+    need_new = FALSE;
+    break;
    }
 /*Lock body*/
 /*TODO: May need to add checkpoint here so that long sem wait will free all locks*/
@@ -946,3 +1091,4 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 
   return 0;
  }
+

@@ -36,7 +36,6 @@ should release header lock and sleep for a short time, or skip to other entries.
 
 */
 
-/* TODO: memory management for cache */
 
 typedef struct {
   struct stat this_stat;
@@ -60,6 +59,7 @@ struct meta_cache_lookup_struct {
   META_CACHE_ENTRY_STRUCT cache_entry_body;
   ino_t inode_num;
   struct meta_cache_lookup_struct *next;
+  struct meta_cache_lookup_struct *prev;
  };
 
 typedef struct meta_cache_lookup_struct META_CACHE_LOOKUP_ENTRY_STRUCT;
@@ -68,6 +68,7 @@ typedef struct {
   META_CACHE_LOOKUP_ENTRY_STRUCT *meta_cache_entries;
   sem_t header_sem;
   int num_entries;
+  META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
  } META_CACHE_HEADER_STRUCT;
 
 int init_meta_cache_headers();
@@ -103,4 +104,4 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
 int decrease_nlink_inode_file(ino_t this_inode);
 int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos);
-
+int expire_meta_mem_cache_entry();
