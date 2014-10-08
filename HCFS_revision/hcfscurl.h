@@ -4,16 +4,16 @@
 
 #define CURRENT_BACKEND SWIFT
 
-#define MY_ACCOUNT "hopebay"
-#define MY_USER "hopebay"
-#define MY_PASS "hopebaycloud"
-#define MY_URL "https://192.168.70.31:8080"
+#define MY_ACCOUNT ""
+#define MY_USER ""
+#define MY_PASS ""
+#define MY_URL "https://:8080"
 
-#define S3_ACCESS "SE41NTAxMzIwNDEzOTQ1Mjk5NTkwNzI"
-#define S3_SECRET "NWUzOTdjNjRjOGI1NDM2ZmI4MzFlOTgxMjdkNmMyNWM"
+#define S3_ACCESS ""
+#define S3_SECRET ""
 #define S3_URL "https://s3.hicloud.net.tw"
-#define S3_BUCKET "testgateway"
-#define S3_BUCKET_URL "https://testgateway.s3.hicloud.net.tw"
+#define S3_BUCKET "xxxxxxx"
+#define S3_BUCKET_URL "https://xxxxxxx.s3.hicloud.net.tw"
 
  
 #define MAX_DOWNLOAD_CURL_HANDLE 16
