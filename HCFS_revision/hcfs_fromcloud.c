@@ -1,6 +1,9 @@
 /*
 TODO: error handling for HTTP exceptions
 */
+#include <semaphore.h>
+#include <curl/curl.h>
+
 #include "params.h"
 #include "hcfscurl.h"
 #include "fuseop.h"

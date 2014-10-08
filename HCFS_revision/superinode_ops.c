@@ -1,12 +1,17 @@
 /*TODO: Consider to convert super inode to multiple files and use striping for efficiency*/
 /*TODO: Consider using multiple FILE handles for super inode IO.*/
 
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "fuseop.h"
 #include "global.h"
 #include "super_inode.h"
 #include "params.h"
-#include <sys/ipc.h>
-#include <sys/shm.h>
+
 
 int write_super_inode_head()
  {

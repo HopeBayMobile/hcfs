@@ -7,6 +7,9 @@
 #include <attr/xattr.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
+#include <semaphore.h>
+#include <curl/curl.h>
+
 #include "fuseop.h"
 #include "meta_mem_cache.h"
 #include "global.h"
@@ -17,6 +20,9 @@
 #include "hcfs_clouddelete.h"
 #include "params.h"
 
+/* TODO: A monitor thread to write system info periodically to a special directory in /dev/shm */
+/* TODO: For some operations that require outside script to interact with HCFS without restarting, and if can be considered to directly modifies or reads part of the FUSE meta/data,
+use setxattr or getxattr on root of HCFS (or some special file under root). If the operation is system monitoring related, will need to bypass FUSE interface */
 
 int init_hcfs_system_data()
  {
@@ -168,6 +174,7 @@ int main(int argc, char **argv)
     if (this_pid1 == 0)
      {
       logfptr=fopen("backend_upload_log","a+");
+      setbuf(logfptr,NULL);
       fprintf(logfptr,"\nStart logging backend upload\n");
       printf("Redirecting to backend log\n");
       dup2(fileno(logfptr),fileno(stdout));
@@ -179,6 +186,7 @@ int main(int argc, char **argv)
     else
      {
       logfptr=fopen("cache_maintain_log","a+");
+      setbuf(logfptr,NULL);
       fprintf(logfptr,"\nStart logging cache cleanup\n");
       printf("Redirecting to cache log\n");
       dup2(fileno(logfptr),fileno(stdout));
@@ -191,6 +199,7 @@ int main(int argc, char **argv)
   else
    {
     logfptr=fopen("fuse_log","a+");
+    setbuf(logfptr,NULL);
     fprintf(logfptr,"\nStart logging fuse\n");
     printf("Redirecting to fuse log\n");
     dup2(fileno(logfptr),fileno(stdout));

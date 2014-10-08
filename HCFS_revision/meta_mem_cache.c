@@ -11,8 +11,8 @@
 #include "dir_entry_btree.h"
 
 /* TODO: cache meta file pointer and close only after some idle interval */
-/* TODO: memory management for cache */
 /* TODO: delayed write to disk */
+/* TODO: Convert meta IO here and other files to allow segmented meta files */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
 sem_t num_entry_sem;

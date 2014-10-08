@@ -1,13 +1,16 @@
 /* Implemented routines to parse http return code to distinguish errors from normal ops*/
 /*TODO: Retry mechanism if HTTP operations failed due to timeout */
 
-#include "hcfscurl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
+#include <semaphore.h>
+#include <curl/curl.h>
+
+#include "hcfscurl.h"
 
 typedef struct {
     FILE *fptr;

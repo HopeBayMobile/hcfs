@@ -1,7 +1,3 @@
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 typedef struct {
     struct stat inode_stat;
     ino_t util_ll_next;

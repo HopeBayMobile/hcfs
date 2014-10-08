@@ -1,5 +1,3 @@
-#include <semaphore.h>
-#include <curl/curl.h>
 
 #define S3 1
 #define SWIFT 0

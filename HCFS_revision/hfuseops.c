@@ -5,6 +5,9 @@
 #include <math.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <curl/curl.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -30,6 +33,7 @@
 
 /* TODO: Need to be able to perform actual operations according to type of folders (cached, non-cached, local) */
 /* TODO: Push actual operations to other source files, especially no actual file handling in this file */
+/* TODO: Multiple paths for read / write / other ops for different folder policies. Policies to be determined at file or dir open. */
 
 static int hfuse_getattr(const char *path, struct stat *inode_stat)
  {
@@ -109,7 +113,7 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   this_stat.st_gid = temp_context->gid;
   this_stat.st_atime = time(NULL);
   this_stat.st_mtime = this_stat.st_atime;
-  this_stat.st_ctime = this_stat.st_ctime;
+  this_stat.st_ctime = this_stat.st_atime;
 
   self_inode = super_inode_new_inode(&this_stat);
   if (self_inode < 1)
@@ -161,7 +165,7 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 
   this_stat.st_atime = time(NULL);
   this_stat.st_mtime = this_stat.st_atime;
-  this_stat.st_ctime = this_stat.st_ctime;
+  this_stat.st_ctime = this_stat.st_atime;
   this_stat.st_size = 0;
   this_stat.st_blksize = MAX_BLOCK_SIZE;
   this_stat.st_blocks = 0;
@@ -188,7 +192,6 @@ int hfuse_unlink(const char *path)
  {
   char *parentname;
   char selfname[400];
-  char thismetapath[METAPATHLEN];
   ino_t this_inode, parent_inode;
   int ret_val;
   int ret_code;
@@ -254,6 +257,7 @@ int hfuse_rmdir(const char *path)
 
 static int hfuse_rename(const char *oldpath, const char *newpath)
  {
+  /* TODO: Check how to make this operation atomic */
   char *parentname1;
   char selfname1[400];
   char *parentname2;

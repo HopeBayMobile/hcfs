@@ -1,6 +1,3 @@
-#include <curl/curl.h>
-#include <semaphore.h>
-#include <pthread.h>
 
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16

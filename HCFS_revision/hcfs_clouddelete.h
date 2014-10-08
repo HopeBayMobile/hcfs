@@ -1,6 +1,3 @@
-#include <curl/curl.h>
-#include <semaphore.h>
-#include <pthread.h>
 
 #define MAX_DELETE_CONCURRENCY 16
 #define MAX_DSYNC_CONCURRENCY 16
@@ -46,7 +43,7 @@ DSYNC_THREAD_CONTROL dsync_thread_control;
 
 void init_delete_control();
 void init_dsync_control();
-void dsync_single_inode(DSYNC_THREAD_TYPE *ptr); /*TODO*/
+void dsync_single_inode(DSYNC_THREAD_TYPE *ptr);
 void collect_finished_dsync_threads(void *ptr);
 void collect_finished_delete_threads(void *ptr);
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr);

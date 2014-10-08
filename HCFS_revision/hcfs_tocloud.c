@@ -4,6 +4,14 @@ TODO: Check if meta objects will be deleted with the deletion of files/dirs
 TODO: error handling for HTTP exceptions
 */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <time.h>
+#include <curl/curl.h>
+#include <semaphore.h>
+#include <pthread.h>
+
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -11,7 +19,6 @@ TODO: error handling for HTTP exceptions
 #include "hcfscurl.h"
 #include "super_inode.h"
 #include "fuseop.h"
-#include <time.h>
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
