@@ -21,6 +21,8 @@ int init_system_fh_table()
 
   memset(system_fh_table.entry_table,0,sizeof(FH_ENTRY) * MAX_OPEN_FILE_ENTRIES);
 
+  system_fh_table.last_available_index = 0;
+
   sem_init(&(system_fh_table.fh_table_sem),0,1);
   return 0;
  }
@@ -38,7 +40,7 @@ long long open_fh(ino_t thisinode)
     return -1;   /*Not able to allocate any more fh entry as table is full.*/
    }
 
-  index = system_fh_table.last_available_index;
+  index = system_fh_table.last_available_index % MAX_OPEN_FILE_ENTRIES;
   while(system_fh_table.entry_table_flags[index]==TRUE)
    {
     index++;
@@ -86,6 +88,7 @@ int close_fh(long long index)
     system_fh_table.entry_table[index].blockfptr = NULL;
     system_fh_table.entry_table[index].opened_block = -1;
     sem_destroy(&(system_fh_table.entry_table[index].block_sem));
+    system_fh_table.last_available_index = index;
    }
 
   sem_post(&(system_fh_table.fh_table_sem));
