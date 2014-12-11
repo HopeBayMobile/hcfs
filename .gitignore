@@ -1,8 +1,39 @@
-*.pyc
-*.pyo
-*.swp
-*.swo
-*.log
-*.db
-.DS_Store
-/DCloudGfs/src/scripts/log
+*.py[cod]
+
+# C extensions
+*.o
+*.so
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+lib
+lib64
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+
+# Virtualenv
+.venv
+
+# Translations
+*.mo
+
+# DEB package
+*.deb
+
+# Mr Developer
+.project
+.pydevproject

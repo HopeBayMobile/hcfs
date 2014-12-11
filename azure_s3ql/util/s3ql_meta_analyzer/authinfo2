@@ -1,6 +1,0 @@
-[CloudStorageGateway]
-storage-url = swift://10.1.0.95:443
-backend-login = wt006:wt006
-backend-password = 123456123456
-bucket-passphrase = 111111
-
