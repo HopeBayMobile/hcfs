@@ -1,3 +1,5 @@
+#include <fuse.h>
+
 #include "fuseop.h"
 #include "global.h"
 #include "dir_lookup.h"

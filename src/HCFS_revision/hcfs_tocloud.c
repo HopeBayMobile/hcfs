@@ -17,7 +17,7 @@ TODO: error handling for HTTP exceptions
 #include "params.h"
 #include "global.h"
 #include "hcfscurl.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "fuseop.h"
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
@@ -249,7 +249,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
   metafptr=fopen(thismetapath,"r+");
   if (metafptr == NULL)
    {
-    super_inode_update_transit(ptr->inode,FALSE);
+    super_block_update_transit(ptr->inode,FALSE);
     return;
    }
 
@@ -446,7 +446,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
     sem_post(&(upload_thread_control.upload_op_sem));
     sem_post(&(upload_thread_control.upload_queue_sem));
 
-    super_inode_update_transit(ptr->inode,FALSE);
+    super_block_update_transit(ptr->inode,FALSE);
 
    }
   else
@@ -653,7 +653,7 @@ void upload_loop()
  {
   ino_t inode_to_sync, inode_to_check;
   SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   int count,sleep_count;
   char in_sync;
   int ret_val;
@@ -679,15 +679,15 @@ void upload_loop()
     while(TRUE)
      {
       sem_wait(&(sync_thread_control.sync_queue_sem));
-      sem_wait(&(sys_super_inode->io_sem));
+      super_block_exclusive_locking();
       if (inode_to_check == 0)
-       inode_to_check = sys_super_inode->head.first_dirty_inode;
+       inode_to_check = sys_super_block->head.first_dirty_inode;
       inode_to_sync = 0;
       if (inode_to_check !=0)
        {
         inode_to_sync = inode_to_check;
 
-        ret_val = read_super_inode_entry(inode_to_sync,&tempentry);
+        ret_val = read_super_block_entry(inode_to_sync,&tempentry);
 
         if ((ret_val < 0) || (tempentry.status!=IS_DIRTY))
          {
@@ -705,11 +705,11 @@ void upload_loop()
             tempentry.in_transit = TRUE;
             tempentry.mod_after_in_transit = FALSE;
             inode_to_check = tempentry.util_ll_next;
-            write_super_inode_entry(inode_to_sync, &tempentry);
+            write_super_block_entry(inode_to_sync, &tempentry);
            }
          }
        }
-      sem_post(&(sys_super_inode->io_sem));
+      super_block_exclusive_release();
       
       if (inode_to_sync!=0)
        {

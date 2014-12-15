@@ -22,11 +22,16 @@ void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filenam
 void fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
  {
   char tempname[400];
+  int sub_dir;
 
+  sub_dir = this_inode % NUMSUBDIR;
   sprintf(tempname,"%s/todelete",METAPATH);
   if (access(tempname,F_OK)==-1)
    mkdir(tempname,0700);
-  sprintf(tempname,"%s/todelete/meta%lld",METAPATH,this_inode);
+  sprintf(tempname,"%s/todelete/sub_%d",METAPATH,sub_dir);
+  if (access(tempname,F_OK)==-1)
+   mkdir(tempname,0700);
+  sprintf(tempname,"%s/todelete/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
   return;
  }
@@ -137,10 +142,10 @@ int read_system_config(char *config_path)
       strcpy(BLOCKPATH,argval);
       continue;
      }
-    if (strcasecmp(argname,"superinode")==0)
+    if (strcasecmp(argname,"superblock")==0)
      {
-      SUPERINODE=malloc(strlen(argval)+10);
-      strcpy(SUPERINODE,argval);
+      SUPERBLOCK=malloc(strlen(argval)+10);
+      strcpy(SUPERBLOCK,argval);
       continue;
      }
     if (strcasecmp(argname,"unclaimedfile")==0)
@@ -189,7 +194,7 @@ int validate_system_config()
   char tempval[10];
   int ret_val;
 
-  printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH,BLOCKPATH, SUPERINODE, UNCLAIMEDFILE, HCFSSYSTEM);
+  printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH,BLOCKPATH, SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
   printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT, CACHE_DELTA, MAX_BLOCK_SIZE);
 
   sprintf(pathname,"%s/testfile",BLOCKPATH);

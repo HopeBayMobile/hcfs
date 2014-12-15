@@ -8,7 +8,7 @@
 
 #include "global.h"
 #include "file_present.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "fuseop.h"
 #include "params.h"
 
@@ -104,7 +104,6 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname, stru
   char thismetapath[METAPATHLEN];
   DIR_META_TYPE this_meta;
   DIR_ENTRY_PAGE temppage;
-  FILE *metafptr;
   int ret_val;
   META_CACHE_ENTRY_STRUCT *body_ptr;
 
@@ -186,7 +185,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
    return -EACCES;
 
   /*Need to delete the inode*/
-  super_inode_to_delete(this_inode);
+  super_block_to_delete(this_inode);
   fetch_todelete_path(todelete_metapath,this_inode);
   /*Try a rename first*/
   ret_val = rename(thismetapath,todelete_metapath);

@@ -1,7 +1,7 @@
 #include "hcfs_cache.h"
 #include "params.h"
 #include "fuseop.h"
-#include "super_inode.h"
+#include "super_block.h"
 
 void cache_usage_hash_init()
  {

@@ -14,7 +14,7 @@
 #include "hcfs_tocloud.h"
 #include "params.h"
 #include "hcfscurl.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "fuseop.h"
 #include "global.h"
 
@@ -330,8 +330,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
      break;
    }
   unlink(thismetapath);
-  super_inode_delete(this_inode);
-  super_inode_reclaim();
+  super_block_delete(this_inode);
+  super_block_reclaim();
 
   return;
  }
@@ -367,7 +367,7 @@ void delete_loop()
  {
   ino_t inode_to_dsync, inode_to_check;
   DSYNC_THREAD_TYPE dsync_threads[MAX_DSYNC_CONCURRENCY];
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   int count,sleep_count;
   char in_dsync;
   int ret_val;
@@ -384,15 +384,15 @@ void delete_loop()
     while(TRUE)
      {
       sem_wait(&(dsync_thread_control.dsync_queue_sem));
-      sem_wait(&(sys_super_inode->io_sem));
+      super_block_share_locking();
       if (inode_to_check == 0)
-       inode_to_check = sys_super_inode->head.first_to_delete_inode;
+       inode_to_check = sys_super_block->head.first_to_delete_inode;
       inode_to_dsync = 0;
       if (inode_to_check !=0)
        {
         inode_to_dsync = inode_to_check;
 
-        ret_val = read_super_inode_entry(inode_to_dsync,&tempentry);
+        ret_val = read_super_block_entry(inode_to_dsync,&tempentry);
 
         if ((ret_val < 0) || (tempentry.status!=TO_BE_DELETED))
          {
@@ -404,7 +404,7 @@ void delete_loop()
           inode_to_check = tempentry.util_ll_next;
          }
        }
-      sem_post(&(sys_super_inode->io_sem));
+      super_block_share_release();
       
       if (inode_to_dsync!=0)
        {

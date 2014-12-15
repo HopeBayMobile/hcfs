@@ -76,7 +76,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t
   ret_val = meta_cache_drop_pages(body_ptr);
 
 /* B-tree insertion*/
-  ret_val = insert_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &overflow_entry, &overflow_new_page, &parent_meta_head, temp_dir_entries, temp_child_page_pos);
+  ret_val = insert_dir_entry_btree(&temp_entry, &temppage, fileno(body_ptr->fptr), &overflow_entry, &overflow_new_page, &parent_meta_head, temp_dir_entries, temp_child_page_pos);
 
   if (ret_val < 0)
    return ret_val;
@@ -224,7 +224,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mod
   ret_val = meta_cache_drop_pages(body_ptr);
 
 /* B-tree deletion*/
-  ret_val = delete_dir_entry_btree(&temp_entry, &temppage, body_ptr->fptr, &parent_meta_head, temp_dir_entries, temp_child_page_pos);
+  ret_val = delete_dir_entry_btree(&temp_entry, &temppage, fileno(body_ptr->fptr), &parent_meta_head, temp_dir_entries, temp_child_page_pos);
 
   printf("delete dir entry returns %d\n", ret_val);
   /* temppage might be invalid after calling delete_dir_entry_btree */
@@ -291,7 +291,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
     ret_val = meta_cache_unlock_entry(body_ptr);
 
     /*Need to delete the inode*/
-    super_inode_to_delete(this_inode);
+    super_block_to_delete(this_inode);
     fetch_todelete_path(todelete_metapath,this_inode);
     fetch_meta_path(thismetapath,this_inode);
     /*Try a rename first*/

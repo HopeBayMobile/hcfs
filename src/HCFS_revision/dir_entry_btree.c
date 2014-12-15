@@ -1,6 +1,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "global.h"
 #include "params.h"
@@ -54,7 +58,7 @@ int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries, DIR_ENTRY *new
   return -1;  /*Not found. Returns where to insert the new entry*/
  }
 
-int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *current_node, FILE *fptr, int *result_index, DIR_ENTRY_PAGE *result_node)
+int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *current_node, int fptr, int *result_index, DIR_ENTRY_PAGE *result_node)
  {
   DIR_ENTRY temp_entry;
   int selected_index, ret_val;
@@ -79,8 +83,7 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *current_node, FILE
    }
 
   /*Load child node*/
-  fseek(fptr,current_node->child_page_pos[selected_index],SEEK_SET);
-  fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,fptr);
+  pread(fptr, &temp_page,sizeof(DIR_ENTRY_PAGE), current_node->child_page_pos[selected_index]);
 
   return search_dir_entry_btree(target_name, &temp_page, fptr, result_index, result_node);
  }
@@ -92,7 +95,7 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *current_node, FILE
  -1: Not completed as entry already exists
 */
 /* if returns 1, then there is an entry to be added to the parent */
-int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_ENTRY *overflow_median, long long *overflow_new_page, DIR_META_TYPE *this_meta, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
+int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, int fptr, DIR_ENTRY *overflow_median, long long *overflow_new_page, DIR_META_TYPE *this_meta, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
  {
   int selected_index, ret_val, median_entry;
   DIR_ENTRY_PAGE newpage,temppage, temp_page2;
@@ -122,8 +125,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
       memcpy(&(current_node->dir_entries[selected_index]),new_entry,sizeof(DIR_ENTRY));
 
       (current_node->num_entries)++;
-      fseek(fptr, current_node->this_page_pos, SEEK_SET);
-      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
       return 0; /*Insertion completed*/
      }
 
@@ -149,16 +151,14 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     if (this_meta->entry_page_gc_list != 0)
      {
       /*Reclaim node from gc list first*/
-      fseek(fptr, this_meta->entry_page_gc_list, SEEK_SET);
-      fread(&newpage,sizeof(DIR_ENTRY_PAGE),1,fptr);
+      pread(fptr,&newpage,sizeof(DIR_ENTRY_PAGE),this_meta->entry_page_gc_list);
       newpage.this_page_pos = this_meta->entry_page_gc_list;
       this_meta->entry_page_gc_list = newpage.gc_list_next;
      }
     else
      {
       memset(&newpage,0,sizeof(DIR_ENTRY_PAGE));
-      fseek(fptr,0,SEEK_END);
-      newpage.this_page_pos = ftell(fptr);
+      newpage.this_page_pos = lseek(fptr,0,SEEK_END);
      }
     newpage.gc_list_next = 0;
     newpage.tree_walk_next = this_meta->tree_walk_list_head;
@@ -170,20 +170,16 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
      }
     else
      {
-      fseek(fptr, this_meta->tree_walk_list_head, SEEK_SET);
-      fread(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pread(fptr,&temp_page2, sizeof(DIR_ENTRY_PAGE), this_meta->tree_walk_list_head);
       temp_page2.tree_walk_prev = newpage.this_page_pos;
-      fseek(fptr, this_meta->tree_walk_list_head, SEEK_SET);
-      fwrite(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, &temp_page2, sizeof(DIR_ENTRY_PAGE), this_meta->tree_walk_list_head);
      }
 
     /*Write current node to disk*/
-    fseek(fptr,current_node->this_page_pos,SEEK_SET);
-    fwrite(current_node, sizeof(DIR_ENTRY_PAGE),1,fptr);
+    pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE),current_node->this_page_pos);
 
     this_meta->tree_walk_list_head = newpage.this_page_pos;
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
-    fwrite(this_meta,sizeof(DIR_META_TYPE),1,fptr);
+    pwrite(fptr, this_meta,sizeof(DIR_META_TYPE),sizeof(struct stat));
 
     /* Parent of new node is the same as the parent of the old node*/
     newpage.parent_page_pos = current_node->parent_page_pos;
@@ -191,8 +187,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     newpage.num_entries = temp_total - median_entry - 1;
     memcpy(newpage.dir_entries,&(temp_dir_entries[median_entry+1]), sizeof(DIR_ENTRY)*newpage.num_entries);
     /* Write to disk after finishing */
-    fseek(fptr, newpage.this_page_pos, SEEK_SET);
-    fwrite(&newpage,sizeof(DIR_ENTRY_PAGE),1,fptr);
+    pwrite(fptr, &newpage,sizeof(DIR_ENTRY_PAGE),newpage.this_page_pos);
 
     /* Pass the median and the file pos of the new node to the parent*/
     *overflow_new_page = newpage.this_page_pos;
@@ -203,8 +198,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
   else
    {
     /* Internal node. Prepare to go deeper */
-    fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
-    fread(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE), current_node->child_page_pos[selected_index]);
     ret_val = insert_dir_entry_btree(new_entry, &temppage, fptr, &tmp_overflow_median, &tmp_overflow_new_page, this_meta, temp_dir_entries, temp_child_page_pos);
     if (ret_val < 1)
      {
@@ -214,8 +208,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     printf("overflow up %s\n",tmp_overflow_median.d_name);
 
     /* Reload current node */
-    fseek(fptr, current_node->this_page_pos, SEEK_SET);
-    fread(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
 
     /* If function return contains a median, insert to the current node */
     if (current_node->num_entries < MAX_DIR_ENTRIES_PER_PAGE)
@@ -237,8 +230,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
       current_node->child_page_pos[selected_index+1] = tmp_overflow_new_page;
 
       (current_node->num_entries)++;
-      fseek(fptr, current_node->this_page_pos, SEEK_SET);
-      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr,current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
       return 0; /*Insertion completed*/
      }
     printf("overflow up path b %s\n",tmp_overflow_median.d_name);
@@ -272,16 +264,14 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     if (this_meta->entry_page_gc_list != 0)
      {
       /*Reclaim node from gc list first*/
-      fseek(fptr, this_meta->entry_page_gc_list, SEEK_SET);
-      fread(&newpage,sizeof(DIR_ENTRY_PAGE),1,fptr);
+      pread(fptr, &newpage,sizeof(DIR_ENTRY_PAGE),this_meta->entry_page_gc_list);
       newpage.this_page_pos = this_meta->entry_page_gc_list;
       this_meta->entry_page_gc_list = newpage.gc_list_next;
      }
     else
      {
       memset(&newpage,0,sizeof(DIR_ENTRY_PAGE));
-      fseek(fptr,0,SEEK_END);
-      newpage.this_page_pos = ftell(fptr);
+      newpage.this_page_pos = lseek(fptr,0,SEEK_END);
      }
     newpage.gc_list_next = 0;
     newpage.tree_walk_next = this_meta->tree_walk_list_head;
@@ -293,20 +283,16 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
      }
     else
      {
-      fseek(fptr, this_meta->tree_walk_list_head, SEEK_SET);
-      fread(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pread(fptr, &temp_page2, sizeof(DIR_ENTRY_PAGE), this_meta->tree_walk_list_head);
       temp_page2.tree_walk_prev = newpage.this_page_pos;
-      fseek(fptr, this_meta->tree_walk_list_head, SEEK_SET);
-      fwrite(&temp_page2, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, &temp_page2, sizeof(DIR_ENTRY_PAGE), this_meta->tree_walk_list_head);
      }
 
     /*Write current node to disk*/
-    fseek(fptr,current_node->this_page_pos,SEEK_SET);
-    fwrite(current_node, sizeof(DIR_ENTRY_PAGE),1,fptr);
+    pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE),current_node->this_page_pos);
 
     this_meta->tree_walk_list_head = newpage.this_page_pos;
-    fseek(fptr,sizeof(struct stat), SEEK_SET);
-    fwrite(this_meta,sizeof(DIR_META_TYPE),1,fptr);
+    pwrite(fptr, this_meta,sizeof(DIR_META_TYPE),sizeof(struct stat));
 
     /* Parent of new node is the same as the parent of the old node*/
     newpage.parent_page_pos = current_node->parent_page_pos;
@@ -316,8 +302,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
     memcpy(newpage.child_page_pos, &(temp_child_page_pos[median_entry+1]), sizeof(long long)*(newpage.num_entries+1));
 
     /* Write to disk after finishing */
-    fseek(fptr, newpage.this_page_pos, SEEK_SET);
-    fwrite(&newpage,sizeof(DIR_ENTRY_PAGE),1,fptr);
+    pwrite(fptr, &newpage,sizeof(DIR_ENTRY_PAGE),newpage.this_page_pos);
 
     /* Pass the median and the file pos of the new node to the parent*/
     *overflow_new_page = newpage.this_page_pos;
@@ -329,7 +314,7 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *current_node, F
   return 0;
  }
 
-int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
+int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_node, int fptr, DIR_META_TYPE *this_meta, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
  {
   int selected_index, ret_val, entry_to_delete;
   DIR_ENTRY_PAGE temppage;
@@ -351,8 +336,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
       memcpy(&(current_node->dir_entries[entry_to_delete]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY)*((current_node->num_entries - entry_to_delete)-1));
       current_node->num_entries--;
 
-      fseek(fptr, current_node->this_page_pos, SEEK_SET);
-      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
 
       return 0;
      }
@@ -370,8 +354,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
        {
         if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
          {
-          fseek(fptr, this_meta->root_entry_page, SEEK_SET);
-          fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+          pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),this_meta->root_entry_page);
           return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta, temp_dir_entries, temp_child_page_pos);
          }
         else
@@ -384,8 +367,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
         return ret_val;
        }
       
-      fseek(fptr, current_node->child_page_pos[entry_to_delete], SEEK_SET);
-      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+      pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),current_node->child_page_pos[entry_to_delete]);
 
       ret_val = extract_largest_child(&temppage,fptr,this_meta, &extracted_child, temp_dir_entries, temp_child_page_pos);
       /* Replace the entry_to_delete with the largest element from the left subtree */
@@ -397,8 +379,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
 
       memcpy(&(current_node->dir_entries[entry_to_delete]), &extracted_child, sizeof(DIR_ENTRY));
 
-      fseek(fptr, current_node->this_page_pos, SEEK_SET);
-      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
       
       return 0;
      }
@@ -418,8 +399,7 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
    {
     if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
      {
-      fseek(fptr, this_meta->root_entry_page, SEEK_SET);
-      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+      pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),this_meta->root_entry_page);
       return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta, temp_dir_entries, temp_child_page_pos);
      }
     else
@@ -432,13 +412,12 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *current_n
     return ret_val;
    }
        
-  fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
-  fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+  pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),current_node->child_page_pos[selected_index]);
   
   return delete_dir_entry_btree(to_delete_entry, &temppage, fptr, this_meta, temp_dir_entries, temp_child_page_pos);
  }
 
-int rebalance_btree(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta, int selected_child, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
+int rebalance_btree(DIR_ENTRY_PAGE *current_node, int fptr, DIR_META_TYPE *this_meta, int selected_child, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
  {
   /* How to rebalance: if num_entries of child <= MIN_DIR_ENTRIES_PER_PAGE, check if its right (or left) sibling contains child < MAX_DIR_ENTRIES_PER_PAGE / 2. If so, just merge the two children and the parent item in between (parent node lost one element). If the current node is the root and has only one element, make the merged node the new root and put the old root to the gc list.
 If merging occurs, the dropped page goes to the gc list. Tree walk pointers are also updated
@@ -463,8 +442,7 @@ using the median as the new parent item. */
   if (selected_child == current_node->num_entries)
    {
     /* If selected child is the rightmost one, sibling is the one to the left */
-    fseek(fptr, current_node->child_page_pos[selected_child], SEEK_SET);
-    fread(&right_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, &right_page, sizeof(DIR_ENTRY_PAGE),current_node->child_page_pos[selected_child]);
 
     if (right_page.num_entries > MIN_DIR_ENTRIES_PER_PAGE)
      return 0;    /* No rebalancing needed */
@@ -472,8 +450,7 @@ using the median as the new parent item. */
     selected_sibling = selected_child - 1;
     left_node = selected_sibling;
     right_node = selected_child;
-    fseek(fptr, current_node->child_page_pos[selected_sibling], SEEK_SET);
-    fread(&left_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, &left_page, sizeof(DIR_ENTRY_PAGE), current_node->child_page_pos[selected_sibling]);
     if (left_page.num_entries < MAX_DIR_ENTRIES_PER_PAGE / 2)
      merging = TRUE;
     else
@@ -481,8 +458,7 @@ using the median as the new parent item. */
    }
   else
    {
-    fseek(fptr, current_node->child_page_pos[selected_child], SEEK_SET);
-    fread(&left_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, &left_page, sizeof(DIR_ENTRY_PAGE), current_node->child_page_pos[selected_child]);
 
     if (left_page.num_entries > MIN_DIR_ENTRIES_PER_PAGE)
      return 0;    /* No rebalancing needed */
@@ -490,8 +466,7 @@ using the median as the new parent item. */
     selected_sibling = selected_child + 1;
     left_node = selected_child;
     right_node = selected_sibling;
-    fseek(fptr, current_node->child_page_pos[selected_sibling], SEEK_SET);
-    fread(&right_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pread(fptr, &right_page, sizeof(DIR_ENTRY_PAGE), current_node->child_page_pos[selected_sibling]);
     if (right_page.num_entries < MAX_DIR_ENTRIES_PER_PAGE / 2)
      merging = TRUE;
     else
@@ -520,8 +495,7 @@ using the median as the new parent item. */
     temp_page.this_page_pos = right_page.this_page_pos;
     temp_page.gc_list_next = this_meta->entry_page_gc_list;
     this_meta->entry_page_gc_list = temp_page.this_page_pos;
-    fseek(fptr, temp_page.this_page_pos, SEEK_SET);
-    fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), temp_page.this_page_pos);
 
     if (this_meta->tree_walk_list_head == right_page.this_page_pos)
      this_meta->tree_walk_list_head = right_page.tree_walk_next;
@@ -540,11 +514,9 @@ using the median as the new parent item. */
          }
         else
          {
-          fseek(fptr, right_page.tree_walk_next, SEEK_SET);
-          fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pread(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), right_page.tree_walk_next);
           temp_page.tree_walk_prev = right_page.tree_walk_prev;
-          fseek(fptr, right_page.tree_walk_next, SEEK_SET);
-          fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), right_page.tree_walk_next);
          }
        }
      }
@@ -562,11 +534,9 @@ using the median as the new parent item. */
          }
         else
          {
-          fseek(fptr, right_page.tree_walk_prev, SEEK_SET);
-          fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pread(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), right_page.tree_walk_prev);
           temp_page.tree_walk_next = right_page.tree_walk_next;
-          fseek(fptr, right_page.tree_walk_prev, SEEK_SET);
-          fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), right_page.tree_walk_prev);
          }
        }
      }
@@ -579,8 +549,7 @@ using the median as the new parent item. */
       temp_page.this_page_pos = current_node->this_page_pos;
       temp_page.gc_list_next = this_meta->entry_page_gc_list;
       this_meta->entry_page_gc_list = temp_page.this_page_pos;
-      fseek(fptr, temp_page.this_page_pos, SEEK_SET);
-      fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), temp_page.this_page_pos);
 
       if (this_meta->tree_walk_list_head == current_node->this_page_pos)
        this_meta->tree_walk_list_head = current_node->tree_walk_next;
@@ -593,11 +562,9 @@ using the median as the new parent item. */
        {
         if (current_node->tree_walk_next!=0)
          {
-          fseek(fptr, current_node->tree_walk_next, SEEK_SET);
-          fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pread(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), current_node->tree_walk_next);
           temp_page.tree_walk_prev = current_node->tree_walk_prev;
-          fseek(fptr, current_node->tree_walk_next, SEEK_SET);
-          fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), current_node->tree_walk_next);
          }
        }
       if (current_node->tree_walk_prev == left_page.this_page_pos)
@@ -608,11 +575,9 @@ using the median as the new parent item. */
        {
         if (current_node->tree_walk_prev!=0)
          {
-          fseek(fptr, current_node->tree_walk_prev, SEEK_SET);
-          fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pread(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), current_node->tree_walk_prev);
           temp_page.tree_walk_next = current_node->tree_walk_next;
-          fseek(fptr, current_node->tree_walk_prev, SEEK_SET);
-          fwrite(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+          pwrite(fptr, &temp_page, sizeof(DIR_ENTRY_PAGE), current_node->tree_walk_prev);
          }
        }
       this_meta->root_entry_page = left_page.this_page_pos;
@@ -630,16 +595,13 @@ using the median as the new parent item. */
       memcpy(&(current_node->child_page_pos[left_node+1]), &(temp_child_page_pos[0]), sizeof(long long)*(current_node->num_entries - (left_node+1)));
       current_node->num_entries--;
 
-      fseek(fptr, current_node->this_page_pos, SEEK_SET);
-      fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+      pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
      }
 
     /* Write changes to left node and meta to disk and return */
-    fseek(fptr, sizeof(struct stat), SEEK_SET);
-    fwrite(this_meta, sizeof(DIR_META_TYPE), 1, fptr);
+    pwrite(fptr, this_meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 
-    fseek(fptr, left_page.this_page_pos, SEEK_SET);
-    fwrite(&left_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, &left_page, sizeof(DIR_ENTRY_PAGE), left_page.this_page_pos);
 
     return to_return;
    }
@@ -652,20 +614,17 @@ using the median as the new parent item. */
     memcpy(&(left_page.dir_entries[0]), &(temp_dir_entries[0]), sizeof(DIR_ENTRY) * median_entry);
     memcpy(&(left_page.child_page_pos[0]), &(temp_child_page_pos[0]), sizeof(long long) * (median_entry + 1));
     left_page.num_entries = median_entry;
-    fseek(fptr, left_page.this_page_pos, SEEK_SET);
-    fwrite(&left_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, &left_page, sizeof(DIR_ENTRY_PAGE), left_page.this_page_pos);
 
     /* Copy items to the right of the median to the right page and write to disk */
     memcpy(&(right_page.dir_entries[0]), &(temp_dir_entries[median_entry+1]), sizeof(DIR_ENTRY) * ((temp_total - median_entry)-1));
     memcpy(&(right_page.child_page_pos[0]), &(temp_child_page_pos[median_entry+1]), sizeof(long long) * (temp_total - median_entry));
     right_page.num_entries = (temp_total - median_entry)-1;
-    fseek(fptr, right_page.this_page_pos, SEEK_SET);
-    fwrite(&right_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, &right_page, sizeof(DIR_ENTRY_PAGE), right_page.this_page_pos);
 
     /* Write median to the current node and write to disk */
     memcpy(&(current_node->dir_entries[left_node]), &(temp_dir_entries[median_entry]), sizeof(DIR_ENTRY));
-    fseek(fptr, current_node->this_page_pos, SEEK_SET);
-    fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
     
     return 1;
    }
@@ -673,7 +632,7 @@ using the median as the new parent item. */
   return 0;
  }
 
-int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
+int extract_largest_child(DIR_ENTRY_PAGE *current_node, int fptr, DIR_META_TYPE *this_meta, DIR_ENTRY *extracted_child, DIR_ENTRY *temp_dir_entries, long long *temp_child_page_pos)
  {
   /*Select and remove the largest element from the left subtree of entry_to_delete*/
   /* Conduct rebalancing all the way down, using rebalance_btree function */
@@ -691,8 +650,7 @@ int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYP
     memcpy(extracted_child, &(current_node->dir_entries[selected_index-1]), sizeof(DIR_ENTRY));
     current_node->num_entries--;
 
-    fseek(fptr, current_node->this_page_pos, SEEK_SET);
-    fwrite(current_node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+    pwrite(fptr, current_node, sizeof(DIR_ENTRY_PAGE), current_node->this_page_pos);
 
     return 0;
    }
@@ -706,8 +664,7 @@ int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYP
    {
     if (ret_val == 2) /* Need to reload current_node. Old one is deleted */
      {
-      fseek(fptr, this_meta->root_entry_page, SEEK_SET);
-      fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+      pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),this_meta->root_entry_page);
       return extract_largest_child(&temppage, fptr, this_meta, extracted_child, temp_dir_entries, temp_child_page_pos);
      }
     else
@@ -717,8 +674,7 @@ int extract_largest_child(DIR_ENTRY_PAGE *current_node, FILE *fptr, DIR_META_TYP
   if (ret_val < 0)
    return ret_val;
        
-  fseek(fptr, current_node->child_page_pos[selected_index], SEEK_SET);
-  fread(&temppage, sizeof(DIR_ENTRY_PAGE),1,fptr);
+  pread(fptr, &temppage, sizeof(DIR_ENTRY_PAGE),current_node->child_page_pos[selected_index]);
 
   return extract_largest_child(&temppage,fptr,this_meta, extracted_child, temp_dir_entries, temp_child_page_pos);
  }

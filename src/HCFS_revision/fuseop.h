@@ -85,6 +85,7 @@ void fetch_todelete_path(char *pathname, ino_t this_inode);   /*Will copy the fi
 
 
 void init_hfuse();
+pthread_t reporter_thread;
 
 
 typedef struct {

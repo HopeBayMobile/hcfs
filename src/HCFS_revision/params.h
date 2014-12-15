@@ -4,7 +4,7 @@
 typedef struct {
   char *metapath;
   char *blockpath;
-  char *superinode_name;
+  char *superblock_name;
   char *unclaimed_name;
   char *hcfssystem_name;
   long long cache_soft_limit;
@@ -17,7 +17,7 @@ SYSTEM_CONF_STRUCT system_config;
 
 #define METAPATH system_config.metapath
 #define BLOCKPATH system_config.blockpath
-#define SUPERINODE system_config.superinode_name
+#define SUPERBLOCK system_config.superblock_name
 #define UNCLAIMEDFILE system_config.unclaimed_name
 #define HCFSSYSTEM system_config.hcfssystem_name
 

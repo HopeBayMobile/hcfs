@@ -8,13 +8,17 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <curl/curl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/uio.h>
 
 #include "fuseop.h"
 #include "global.h"
 #include "file_present.h"
 #include "utils.h"
 #include "dir_lookup.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "params.h"
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
@@ -40,6 +44,11 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
   ino_t hit_inode;
   int ret_code;
   struct timeval tmp_time1, tmp_time2;
+  struct fuse_context *temp_context;
+
+  temp_context = fuse_get_context();
+
+  printf("Data passed in is %s\n",(char *) temp_context->private_data);  
 
   gettimeofday(&tmp_time1,NULL);
   hit_inode = lookup_pathname(path, &ret_code);
@@ -115,7 +124,7 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
   this_stat.st_mtime = this_stat.st_atime;
   this_stat.st_ctime = this_stat.st_atime;
 
-  self_inode = super_inode_new_inode(&this_stat);
+  self_inode = super_block_new_inode(&this_stat);
   if (self_inode < 1)
    return -EACCES;
   this_stat.st_ino = self_inode;
@@ -170,7 +179,7 @@ static int hfuse_mkdir(const char *path, mode_t mode)
   this_stat.st_blksize = MAX_BLOCK_SIZE;
   this_stat.st_blocks = 0;
 
-  self_inode = super_inode_new_inode(&this_stat);
+  self_inode = super_block_new_inode(&this_stat);
   if (self_inode < 1)
    return -EACCES;
   this_stat.st_ino = self_inode;
@@ -841,6 +850,10 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 /* TODO: A global meta cache and a block data cache in memory. All reads / writes go through the caches, and a parameter controls when to write dirty cache entries back to files (could be write through or several seconds).*/
 /* TODO: Each inode can only occupy at most one meta cache entry (all threads accessing that inode share the same entry). Each data block in each inode can only occupy at most one data cache entry.*/
 
+/* TODO: Could arrange file table entry to add extra block file descriptors (to handle accessing multiple blocks in a time span), and use pread/pwrite for the same block to lift
+block sem restriction. Extra block file decriptors could be in a small table (5 entries perhaps) and if not in use, keep only the most recently opened one opened. If run out of
+entries, could force new comers to wait, or use linked list to add more entries.*/
+
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
 
@@ -1349,17 +1362,17 @@ int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linu
   buf->f_bavail = buf->f_bfree;
   sem_post(&(hcfs_system->access_sem));  
 
-  sem_wait(&(sys_super_inode->io_sem));
-  if (sys_super_inode->head.num_active_inodes > 1000000)
-   buf->f_files = (sys_super_inode->head.num_active_inodes * 2);
+  super_block_share_locking();
+  if (sys_super_block->head.num_active_inodes > 1000000)
+   buf->f_files = (sys_super_block->head.num_active_inodes * 2);
   else
    buf->f_files = 2000000;
 
-  buf->f_ffree = buf->f_files - sys_super_inode->head.num_active_inodes;
+  buf->f_ffree = buf->f_files - sys_super_block->head.num_active_inodes;
   if (buf->f_ffree < 0)
    buf->f_ffree = 0;
   buf->f_favail = buf->f_ffree;
-  sem_post(&(sys_super_inode->io_sem));
+  super_block_share_release();
   buf->f_namemax = 256;
 
   return 0;
@@ -1406,6 +1419,7 @@ static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
  }
 static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info)
  {
+  /* Now will read partial entries and deal with others later */
   ino_t this_inode;
   int count;
   off_t thisfile_pos;
@@ -1416,13 +1430,15 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   struct timeval tmp_time1, tmp_time2;
   META_CACHE_ENTRY_STRUCT *body_ptr;
   long countn;
+  off_t nextentry_pos;
+  int page_start;
 
   gettimeofday(&tmp_time1,NULL);
 
 /*TODO: Need to include symlinks*/
-/*TODO: Will need to test the boundary of the operation. When will buf run out of space?*/
   fprintf(stderr,"DEBUG readdir entering readdir\n");
 
+/* TODO: the following can be skipped if we can use some file handle from file_info input */
   this_inode = lookup_pathname(path, &ret_code);
 
   if (this_inode == 0)
@@ -1431,13 +1447,26 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
   body_ptr = meta_cache_lock_entry(this_inode);
   meta_cache_lookup_dir_data(this_inode, &tempstat,&tempmeta,NULL,body_ptr);
 
-  thisfile_pos = tempmeta.tree_walk_list_head;
-
-  if (tempmeta.total_children > (MAX_DIR_ENTRIES_PER_PAGE-2))
+  page_start = 0;
+  if (offset >= MAX_DIR_ENTRIES_PER_PAGE)
    {
+    thisfile_pos = offset / (MAX_DIR_ENTRIES_PER_PAGE + 1);
+    page_start = offset % (MAX_DIR_ENTRIES_PER_PAGE + 1);
+    printf("readdir starts at offset %ld, entry number %d\n",thisfile_pos, page_start);
     if (body_ptr->meta_opened == FALSE)
      meta_cache_open_file(body_ptr);
     meta_cache_drop_pages(body_ptr);
+   }
+  else
+   {
+    thisfile_pos = tempmeta.tree_walk_list_head;
+
+    if (tempmeta.total_children > (MAX_DIR_ENTRIES_PER_PAGE-2))
+     {
+      if (body_ptr->meta_opened == FALSE)
+       meta_cache_open_file(body_ptr);
+      meta_cache_drop_pages(body_ptr);
+     }
    }
 
   countn = 0;
@@ -1447,7 +1476,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
     countn++;
     memset(&temp_page,0,sizeof(DIR_ENTRY_PAGE));
     temp_page.this_page_pos = thisfile_pos;
-    if (tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2))
+    if ((tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2)) && (page_start == 0))
      meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, body_ptr);
     else
      {
@@ -1455,20 +1484,22 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
       fread(&temp_page,sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
      }
 
-    for(count=0;count<temp_page.num_entries;count++)
+    for(count=page_start;count<temp_page.num_entries;count++)
      {
       tempstat.st_ino = temp_page.dir_entries[count].d_ino;
       if (temp_page.dir_entries[count].d_type == D_ISDIR)
        tempstat.st_mode = S_IFDIR;
       if (temp_page.dir_entries[count].d_type == D_ISREG)
        tempstat.st_mode = S_IFREG;
-      if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,0))
+      nextentry_pos = temp_page.this_page_pos * (MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
+      if (filler(buf,temp_page.dir_entries[count].d_name, &tempstat,nextentry_pos))
        {
-        meta_cache_close_file(body_ptr);
         meta_cache_unlock_entry(body_ptr);
+        printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n",nextentry_pos,temp_page.this_page_pos, (count+1));
         return 0;
        }
      }
+    page_start = 0;
     thisfile_pos = temp_page.tree_walk_next;
    }
   meta_cache_close_file(body_ptr);
@@ -1484,12 +1515,63 @@ int hfuse_releasedir(const char *path, struct fuse_file_info *file_info)
  {
   return 0;
  }
+void reporter_module()
+ {
+  int fd,fd1,size_msg,msg_len;
+  struct sockaddr_un addr;
+  char buf[4096];
+
+  addr.sun_family = AF_UNIX;
+  strcpy(addr.sun_path, "/dev/shm/hcfs_reporter");
+  unlink(addr.sun_path);
+  fd=socket(AF_UNIX, SOCK_STREAM,0);
+  bind(fd,&addr,sizeof(struct sockaddr_un));
+
+  listen(fd,10);
+  while (1==1)
+   {
+    fd1=accept(fd,NULL,NULL);
+    msg_len = 0;
+    while(1==1)
+     {
+      size_msg=recv(fd1,&buf[msg_len],512,0);
+      if (size_msg <=0)
+       break;
+      msg_len+=size_msg;
+      if (msg_len>3000)
+       break;
+      if (buf[msg_len-1] == 0)
+       break;
+     }
+    buf[msg_len]=0;
+    if (strcmp(buf,"terminate")==0)
+     break;
+    if (strcmp(buf,"stat")==0)
+     {
+      buf[0]=0;
+      sem_wait(&(hcfs_system->access_sem));
+      sprintf(buf,"%lld %lld %lld %lld",hcfs_system->systemdata.system_size, hcfs_system->systemdata.dirty_size, hcfs_system->systemdata.cache_size, hcfs_system->systemdata.cache_blocks);
+      sem_post(&(hcfs_system->access_sem));
+      printf("debug stat hcfs %s\n",buf);
+      send(fd1,buf,strlen(buf)+1,0);
+     }
+   }
+  return;
+ }
 void* hfuse_init(struct fuse_conn_info *conn)
  {
+  struct fuse_context *temp_context;
+
+  temp_context = fuse_get_context();
+
+  printf("Data passed in is %s\n",(char *) temp_context->private_data);
+
   pthread_attr_init(&prefetch_thread_attr);
   pthread_attr_setdetachstate(&prefetch_thread_attr,PTHREAD_CREATE_DETACHED);
+  pthread_create(&reporter_thread, NULL, (void *)reporter_module,NULL);
   init_meta_cache_headers();
-  return ((void*) sys_super_inode);
+//  return ((void*) sys_super_block);
+  return temp_context->private_data;
  }
 void hfuse_destroy(void *private_data)
  {
@@ -1537,8 +1619,35 @@ static struct fuse_operations hfuse_ops = {
     .rmdir = hfuse_rmdir,
     .statfs = hfuse_statfs,
  };
-
+/*
+char **argv_alt;
+int argc_alt;
+pthread_t alt_mount;
+void run_alt(void)
+ {
+  fuse_main(argc_alt,argv_alt, &hfuse_ops, (void *)argv_alt[1]);
+  return;
+ }
+*/
 int hook_fuse(int argc, char **argv)
  {
+/*
+  int count;
+  int ret_val;
+
+  argv_alt=malloc(sizeof(char *)*argc);
+  argc_alt = argc;
+  for(count=0;count<argc;count++)
+   { 
+    argv_alt[count] = malloc(strlen(argv[count])+10);
+    strcpy(argv_alt[count],argv[count]);
+    if (count==1)
+     strcat(argv_alt[count],"_alt");
+   }
+  pthread_create(&alt_mount,NULL,(void *) run_alt,NULL);
+  ret_val = fuse_main(argc,argv, &hfuse_ops, (void *)argv[1]);
+
+  return ret_val;
+*/    
   return fuse_main(argc,argv, &hfuse_ops, NULL);
  }

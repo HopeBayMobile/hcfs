@@ -6,7 +6,7 @@
 #include "global.h"
 #include "params.h"
 #include "fuseop.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "meta_mem_cache.h"
 #include "dir_entry_btree.h"
 
@@ -135,7 +135,7 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_inde
   fseek(body_ptr->fptr,(body_ptr->dir_entry_cache[entry_index])->this_page_pos,SEEK_SET);
   fwrite(body_ptr->dir_entry_cache[entry_index],sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
 
-  super_inode_mark_dirty((body_ptr->this_stat).st_ino);
+  super_block_mark_dirty((body_ptr->this_stat).st_ino);
 
   return 0;
  }
@@ -143,7 +143,7 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_inde
 
 int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
  {
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   int ret_val;
   int ret_code;
   int sem_val;
@@ -210,7 +210,7 @@ int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
   /*Update stat info in super inode no matter what so that meta file get pushed to cloud*/
   /*TODO: May need to simply this so that only dirty status in super inode is updated */
-  super_inode_update_stat(body_ptr->inode_num, &(body_ptr->this_stat));
+  super_block_update_stat(body_ptr->inode_num, &(body_ptr->this_stat));
 
   body_ptr->something_dirty = FALSE;
 
@@ -327,7 +327,7 @@ of the two, flush the older page entry first before processing the new one */
     fseek(body_ptr->fptr,page_pos,SEEK_SET);
     fwrite(block_page,sizeof(BLOCK_ENTRY_PAGE),1,body_ptr->fptr);
 
-    super_inode_mark_dirty((body_ptr->this_stat).st_ino);
+    super_block_mark_dirty((body_ptr->this_stat).st_ino);
    }
 
   gettimeofday(&(body_ptr->last_access_time),NULL);
@@ -350,7 +350,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_
  {
   int index;
   char thismetapath[METAPATHLEN];
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   int ret_code, ret_val, sem_val;
 
   sem_getvalue(&(body_ptr->access_sem), &sem_val);
@@ -412,7 +412,7 @@ file_exception:
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr)
  {
   int index;
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   int ret_code, ret_val, sem_val;
 
   sem_getvalue(&(body_ptr->access_sem), &sem_val);
@@ -510,7 +510,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
              {
               fseek(body_ptr->fptr,(body_ptr->dir_entry_cache[1])->this_page_pos,SEEK_SET);
               fwrite(body_ptr->dir_entry_cache[1],sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
-              super_inode_mark_dirty((body_ptr->this_stat).st_ino);
+              super_block_mark_dirty((body_ptr->this_stat).st_ino);
              }
 /* TODO: Rewrite this part so that memory allocation is not so frequent */
 
@@ -714,7 +714,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page, int
   fseek(body_ptr->fptr,nextfilepos, SEEK_SET);
   fread(&rootpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr); /*Read the root node*/
 
-  ret_val = search_dir_entry_btree(childname, &rootpage, body_ptr->fptr, &tmp_index, &tmp_resultpage);
+  ret_val = search_dir_entry_btree(childname, &rootpage, fileno(body_ptr->fptr), &tmp_index, &tmp_resultpage);
 
   gettimeofday(&(body_ptr->last_access_time),NULL);
 
@@ -914,7 +914,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
   char need_new, expire_done;
   int can_use_index;
   int count;
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   META_CACHE_ENTRY_STRUCT *result_ptr, *prev_ptr;
   struct timespec time_to_sleep;
 
@@ -986,7 +986,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
     current_meta_mem_cache_entries++;
     sem_post(&num_entry_sem);
 
-    ret_val =super_inode_read(this_inode, &tempentry);
+    ret_val =super_block_read(this_inode, &tempentry);
     (current_ptr->cache_entry_body).inode_num = this_inode;
     (current_ptr->cache_entry_body).meta_opened = FALSE;
     memcpy(&((current_ptr->cache_entry_body).this_stat),&(tempentry.inode_stat),sizeof(struct stat));

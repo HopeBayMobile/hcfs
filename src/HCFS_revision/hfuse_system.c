@@ -13,7 +13,7 @@
 #include "fuseop.h"
 #include "meta_mem_cache.h"
 #include "global.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "dir_lookup.h"
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
@@ -74,7 +74,7 @@ void init_hfuse()
   mode_t self_mode;
   FILE *metafptr;
 
-  ret_val = super_inode_init();
+  ret_val = super_block_init();
   init_pathname_cache();
   ret_val = init_system_fh_table();
   init_hcfs_system_data();
@@ -96,7 +96,7 @@ void init_hfuse()
     this_stat.st_mtime = this_stat.st_atime;
     this_stat.st_ctime = this_stat.st_ctime;
 
-    root_inode = super_inode_new_inode(&this_stat);
+    root_inode = super_block_new_inode(&this_stat);
     /*TODO: put error handling here if root_inode is not 1 (cannot initialize system)*/
 
     this_stat.st_ino = 1;
@@ -118,7 +118,7 @@ void init_hfuse()
 
     ret_val = fwrite(&temppage,sizeof(DIR_ENTRY_PAGE),1,metafptr);
     fclose(metafptr);
-    super_inode_mark_dirty(1);
+    super_block_mark_dirty(1);
    }
   return;
  }

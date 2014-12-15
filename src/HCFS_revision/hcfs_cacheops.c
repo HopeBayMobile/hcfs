@@ -1,7 +1,7 @@
 #include "hcfs_cache.h"
 #include "params.h"
 #include "fuseop.h"
-#include "super_inode.h"
+#include "super_block.h"
 #include "global.h"
 
 /*TODO: For scanning caches, only need to check one block subfolder a time, and scan for mtime
@@ -14,7 +14,7 @@ void run_cache_loop()
  {
   ino_t this_inode;
   long long count,count2,current_block, total_blocks, pagepos, nextpagepos;
-  SUPER_INODE_ENTRY tempentry;
+  SUPER_BLOCK_ENTRY tempentry;
   char thismetapath[METAPATHLEN];
   char thisblockpath[400];
   FILE *metafptr;
@@ -101,7 +101,7 @@ void run_cache_loop()
       free(this_cache_node);
       current_entry_index++;
 
-      super_inode_read(this_inode, &tempentry);
+      super_block_read(this_inode, &tempentry);
 
       /* If inode is not dirty or in transit, or if cache is already full, check if can replace uploaded blocks */
 
@@ -167,7 +167,7 @@ void run_cache_loop()
             unlink(thisblockpath);
             sync_hcfs_system_data(FALSE);
             sem_post(&(hcfs_system->access_sem));           
-            super_inode_mark_dirty(this_inode);
+            super_block_mark_dirty(this_inode);
            }
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
           if (hcfs_system->systemdata.cache_size < (CACHE_HARD_LIMIT - CACHE_DELTA))
