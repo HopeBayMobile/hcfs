@@ -4,6 +4,12 @@
 #### **Dependency**
 
 ```preinstall
+CURL
+OPENSSL
+FUSE
+
+
+
 Python Package
 
 Debian Package
