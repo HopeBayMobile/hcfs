@@ -58,3 +58,11 @@ TODO: Move the configuration to the config file as well.
  
 Please use different bucket for each HCFS, as prefix in bucket is not implemented now.
 
+
+Required packages
+-----------------
+
+FUSE
+CURL
+OPENSSL
+
