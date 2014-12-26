@@ -1,17 +1,11 @@
 #define MAX_PATHNAME 256
 #define PATHNAME_CACHE_ENTRY_NUM 65536
-#include <stdio.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <semaphore.h>
 
 typedef struct {
     char pathname[MAX_PATHNAME+10];
     ino_t inode_number;
     sem_t cache_entry_sem;
   } PATHNAME_CACHE_ENTRY;
-
-PATHNAME_CACHE_ENTRY pathname_cache[PATHNAME_CACHE_ENTRY_NUM];
 
 ino_t lookup_pathname(const char *path, int *errcode);
 ino_t lookup_pathname_recursive(ino_t subroot, int prepath_length, const char *partialpath, const char *fullpath, int *errcode);

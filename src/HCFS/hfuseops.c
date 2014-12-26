@@ -12,6 +12,16 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/uio.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+
 
 #include "fuseop.h"
 #include "global.h"
@@ -24,6 +34,8 @@
 #include "hcfs_tocloud.h"
 #include "meta_mem_cache.h"
 #include "filetables.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 
 /* TODO: Need to go over the access rights problem for the ops */

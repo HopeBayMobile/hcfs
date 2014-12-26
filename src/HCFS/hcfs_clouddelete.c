@@ -4,11 +4,20 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <time.h>
 #include <curl/curl.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+
 
 #include "hcfs_clouddelete.h"
 #include "hcfs_tocloud.h"
@@ -17,6 +26,8 @@
 #include "super_block.h"
 #include "fuseop.h"
 #include "global.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 CURL_HANDLE delete_curl_handles[MAX_DELETE_CONCURRENCY];
 
@@ -363,7 +374,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 
 
 
-void delete_loop()
+void *delete_loop(void *arg)
  {
   ino_t inode_to_dsync, inode_to_check;
   DSYNC_THREAD_TYPE dsync_threads[MAX_DSYNC_CONCURRENCY];

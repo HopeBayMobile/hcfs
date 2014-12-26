@@ -1,8 +1,25 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/file.h>
+#include <time.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+
 #include "hcfs_cache.h"
 #include "params.h"
 #include "fuseop.h"
 #include "super_block.h"
 #include "global.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /*TODO: For scanning caches, only need to check one block subfolder a time, and scan for mtime
 greater than the last update time for uploads, and scan for atime for cache replacement*/

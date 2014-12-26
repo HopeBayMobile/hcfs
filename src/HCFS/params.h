@@ -13,8 +13,6 @@ typedef struct {
   long long max_block_size;
  } SYSTEM_CONF_STRUCT;
 
-SYSTEM_CONF_STRUCT system_config;
-
 #define METAPATH system_config.metapath
 #define BLOCKPATH system_config.blockpath
 #define SUPERBLOCK system_config.superblock_name
@@ -45,7 +43,4 @@ SYSTEM_CONF_STRUCT system_config;
 #define RECLAIMED 4
 
 #define DEFAULT_CONFIG_PATH "/etc/hcfs.conf"
-
-int read_system_config(char *config_path);
-int validate_system_config();
 

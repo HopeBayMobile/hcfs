@@ -1,4 +1,16 @@
 #include <fuse.h>
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <semaphore.h>
+#include <sys/mman.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -6,6 +18,8 @@
 #include "params.h"
 #include "meta_mem_cache.h"
 /*TODO: need to modify pathname lookup to handle symlink*/
+
+PATHNAME_CACHE_ENTRY pathname_cache[PATHNAME_CACHE_ENTRY_NUM];
 
 void init_pathname_cache()
  {

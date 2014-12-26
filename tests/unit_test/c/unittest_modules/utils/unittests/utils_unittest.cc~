@@ -1,4 +1,7 @@
-#include <string.h>
+#include <unistd.h>
+#include <strings.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include "utils.h"
 #include "gtest/gtest.h"
 
@@ -12,9 +15,8 @@ TEST(check_file_size, Nonexist) {
   EXPECT_EQ(-1, check_file_size(temp));
 }
 
-/*
-TEST(filelength, TestLength) {
+TEST(check_file_size, TestLength) {
 
-  EXPECT_EQ(8,filelength("length8"));
+  EXPECT_EQ(8,check_file_size("testpatterns/size8bytes"));
 }
-*/
+

@@ -1,7 +1,25 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/file.h>
+#include <unistd.h>
+#include <time.h>
+#include <curl/curl.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+
 #include "hcfs_cache.h"
 #include "params.h"
 #include "fuseop.h"
 #include "super_block.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 void cache_usage_hash_init()
  {

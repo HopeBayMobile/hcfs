@@ -1,7 +1,19 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/file.h>
+#include <unistd.h>
+#include <time.h>
+#include <curl/curl.h>
+#include <semaphore.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <errno.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 #include "global.h"
 #include "params.h"
@@ -888,7 +900,7 @@ int expire_meta_mem_cache_entry()
          {
   /* If find that current_time < last_access_time, fix last_access_time to be current_time */
           if (float_current_time < float_access_time)
-           gettimeofday(access_time_ptr);
+           gettimeofday(access_time_ptr, NULL);
          }
         sem_post(&(current_ptr->cache_entry_body).access_sem);
        }

@@ -1,11 +1,18 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
 #include <unistd.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attr/xattr.h>
 
+#include "utils.h"
 #include "global.h"
 #include "fuseop.h"
 #include "params.h"
+
+SYSTEM_CONF_STRUCT system_config;
 
 void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
  {

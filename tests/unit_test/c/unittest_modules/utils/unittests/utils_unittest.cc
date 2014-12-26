@@ -1,8 +1,10 @@
 #include <unistd.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+extern "C" {
 #include "utils.h"
+}
 #include "gtest/gtest.h"
 
 // Tests non-existing file
@@ -15,9 +17,8 @@ TEST(check_file_size, Nonexist) {
   EXPECT_EQ(-1, check_file_size(temp));
 }
 
-/*
-TEST(filelength, TestLength) {
+TEST(check_file_size, Test_8_bytes) {
 
-  EXPECT_EQ(8,filelength("length8"));
+  EXPECT_EQ(8,check_file_size("testpatterns/size8bytes"));
 }
-*/
+
