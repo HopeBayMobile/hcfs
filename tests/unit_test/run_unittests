@@ -1,0 +1,8 @@
+#!/bin/bash
+
+CURPATH=$PWD
+cd c/unittest_modules/utils/
+make
+./utils_unittest
+gcov utils
+cd $CURPATH

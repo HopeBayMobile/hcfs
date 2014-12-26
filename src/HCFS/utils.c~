@@ -132,31 +132,31 @@ int read_system_config(char *config_path)
     /*Match param name with required params*/
     if (strcasecmp(argname,"metapath")==0)
      {
-      METAPATH=malloc(strlen(argval)+10);
+      METAPATH= (char *) malloc(strlen(argval)+10);
       strcpy(METAPATH,argval);
       continue;
      }
     if (strcasecmp(argname,"blockpath")==0)
      {
-      BLOCKPATH=malloc(strlen(argval)+10);
+      BLOCKPATH= (char *) malloc(strlen(argval)+10);
       strcpy(BLOCKPATH,argval);
       continue;
      }
     if (strcasecmp(argname,"superblock")==0)
      {
-      SUPERBLOCK=malloc(strlen(argval)+10);
+      SUPERBLOCK= (char *) malloc(strlen(argval)+10);
       strcpy(SUPERBLOCK,argval);
       continue;
      }
     if (strcasecmp(argname,"unclaimedfile")==0)
      {
-      UNCLAIMEDFILE=malloc(strlen(argval)+10);
+      UNCLAIMEDFILE= (char *) malloc(strlen(argval)+10);
       strcpy(UNCLAIMEDFILE,argval);
       continue;
      }
     if (strcasecmp(argname,"hcfssystem")==0)
      {
-      HCFSSYSTEM=malloc(strlen(argval)+10);
+      HCFSSYSTEM= (char *) malloc(strlen(argval)+10);
       strcpy(HCFSSYSTEM,argval);
       continue;
      }
