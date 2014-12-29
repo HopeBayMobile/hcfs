@@ -50,35 +50,14 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the file
  {
   char tempname[400];
   int sub_dir;
-  int ret_code=0;
-
-  if (METAPATH == NULL)
-   return -1;
-
-  if (access(METAPATH,F_OK)==-1)
-   {
-    ret_code = mkdir(METAPATH,0700);
-    if (ret_code < 0)
-     return ret_code;
-   }
 
   sub_dir = this_inode % NUMSUBDIR;
   sprintf(tempname,"%s/todelete",METAPATH);
   if (access(tempname,F_OK)==-1)
-   {
-    ret_code = mkdir(tempname,0700);
-
-    if (ret_code < 0)
-     return ret_code;
-   }
+   mkdir(tempname,0700);
   sprintf(tempname,"%s/todelete/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
-   {
-    ret_code = mkdir(tempname,0700);
-
-    if (ret_code < 0)
-     return ret_code;
-   }  
+   mkdir(tempname,0700);
   sprintf(tempname,"%s/todelete/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
   return 0;

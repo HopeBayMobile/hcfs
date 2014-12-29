@@ -2,8 +2,11 @@
 
 CURPATH=$PWD
 cd c/unittest_modules/utils/
+rm *.gcda
+rm *.gcov
+rm *.gcno
 make clean
 make
 ./utils_unittest
-gcov utils
 cd $CURPATH
+gcovr -r ../../src/HCFS/
