@@ -5,12 +5,15 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <sys/file.h>
+#include <unistd.h>
 
 #include "global.h"
 #include "file_present.h"
 #include "super_block.h"
 #include "fuseop.h"
 #include "params.h"
+#include "utils.h"
 
 #include "meta_mem_cache.h"
 

@@ -9,6 +9,9 @@
 #include <openssl/engine.h>
 #include <semaphore.h>
 #include <curl/curl.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <string.h>
 
 #include "fuseop.h"
 #include "meta_mem_cache.h"
@@ -18,7 +21,12 @@
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
+#include "hcfs_cache.h"
 #include "params.h"
+#include "utils.h"
+#include "filetables.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /* TODO: A monitor thread to write system info periodically to a special directory in /dev/shm */
 /* TODO: For some operations that require outside script to interact with HCFS without restarting, and if can be considered to directly modifies or reads part of the FUSE meta/data,
@@ -29,7 +37,7 @@ int init_hcfs_system_data()
   int shm_key;
 
   shm_key = shmget(2345,sizeof(SYSTEM_DATA_HEAD), IPC_CREAT| 0666);
-  hcfs_system = shmat(shm_key, NULL, 0);
+  hcfs_system = (SYSTEM_DATA_HEAD *)shmat(shm_key, NULL, 0);
 
   memset(hcfs_system,0,sizeof(SYSTEM_DATA_HEAD));
   sem_init(&(hcfs_system->access_sem),1,1);
@@ -179,7 +187,7 @@ int main(int argc, char **argv)
       printf("Redirecting to backend log\n");
       dup2(fileno(logfptr),fileno(stdout));
       dup2(fileno(logfptr),fileno(stderr));
-      pthread_create(&delete_loop_thread,NULL,(void *)&delete_loop,NULL);
+      pthread_create(&delete_loop_thread,NULL,&delete_loop,NULL);
       upload_loop();
       fclose(logfptr);
      }
@@ -222,7 +230,7 @@ int main(int argc, char **argv)
        }
      }
     hook_fuse(argc,argv);
-    return;
+    return 0;
    }
-  return;
+  return 0;
  }

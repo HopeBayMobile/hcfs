@@ -1,13 +1,28 @@
 /*
 TODO: error handling for HTTP exceptions
 */
-#include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
 #include <curl/curl.h>
+#include <semaphore.h>
+#include <pthread.h>
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
 
 #include "params.h"
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 void fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
  {

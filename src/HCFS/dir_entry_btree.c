@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <semaphore.h>
 
 #include "global.h"
 #include "params.h"

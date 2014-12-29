@@ -1,42 +1,89 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
 #include <unistd.h>
-#include <strings.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <attr/xattr.h>
 
+#include "utils.h"
 #include "global.h"
 #include "fuseop.h"
 #include "params.h"
 
-void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
+SYSTEM_CONF_STRUCT system_config;
+
+int fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
  {
   char tempname[METAPATHLEN];
   int sub_dir;
+  int ret_code=0;
+
+  if (METAPATH == NULL)
+   return -1;
+
+  if (access(METAPATH,F_OK)==-1)
+   {
+    ret_code = mkdir(METAPATH,0700);
+    if (ret_code < 0)
+     return ret_code;
+   }
 
   sub_dir = this_inode % NUMSUBDIR;
   sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
-   mkdir(tempname,0700);
+   {
+    ret_code = mkdir(tempname,0700);
+
+    if (ret_code < 0)
+     return ret_code;
+   }
+
   sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
-  return;
+
+  ret_code = 0;
+  return ret_code;
  }
-void fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
+int fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
  {
   char tempname[400];
   int sub_dir;
+  int ret_code=0;
+
+  if (METAPATH == NULL)
+   return -1;
+
+  if (access(METAPATH,F_OK)==-1)
+   {
+    ret_code = mkdir(METAPATH,0700);
+    if (ret_code < 0)
+     return ret_code;
+   }
 
   sub_dir = this_inode % NUMSUBDIR;
   sprintf(tempname,"%s/todelete",METAPATH);
   if (access(tempname,F_OK)==-1)
-   mkdir(tempname,0700);
+   {
+    ret_code = mkdir(tempname,0700);
+
+    if (ret_code < 0)
+     return ret_code;
+   }
   sprintf(tempname,"%s/todelete/sub_%d",METAPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
-   mkdir(tempname,0700);
+   {
+    ret_code = mkdir(tempname,0700);
+
+    if (ret_code < 0)
+     return ret_code;
+   }  
   sprintf(tempname,"%s/todelete/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
-  return;
+  return 0;
  }
-void fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*Will copy the filename of the block file to pathname*/
+int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*Will copy the filename of the block file to pathname*/
  {
   char tempname[400];
   int sub_dir;
@@ -47,10 +94,10 @@ void fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /
    mkdir(tempname,0700);
   sprintf(tempname,"%s/sub_%d/block%lld_%lld",BLOCKPATH,sub_dir,this_inode,block_num);
   strcpy(pathname,tempname);
-  return;
+  return 0;
  }
 
-void parse_parent_self(const char *pathname, char *parentname, char *selfname)
+int parse_parent_self(const char *pathname, char *parentname, char *selfname)
  {
   int count;
 
@@ -70,7 +117,7 @@ void parse_parent_self(const char *pathname, char *parentname, char *selfname)
     parentname[count]=0;
     strcpy(selfname,&(pathname[count+1]));
    }
-  return;
+  return 0;
  }
 
 int read_system_config(char *config_path)

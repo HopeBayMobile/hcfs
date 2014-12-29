@@ -1,18 +1,24 @@
 /*TODO: Consider to convert super inode to multiple files and use striping for efficiency*/
 /*TODO: Consider using multiple FILE handles for super inode IO.*/
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "fuseop.h"
 #include "global.h"
 #include "super_block.h"
 #include "params.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
 
 int write_super_block_head()
  {
@@ -49,7 +55,7 @@ int super_block_init()
   int shm_key;
 
   shm_key = shmget(1234,sizeof(SUPER_BLOCK_CONTROL), IPC_CREAT| 0666);
-  sys_super_block = shmat(shm_key, NULL, 0);
+  sys_super_block = (SUPER_BLOCK_CONTROL *)shmat(shm_key, NULL, 0);
 
   memset(sys_super_block,0,sizeof(SUPER_BLOCK_CONTROL));
   sem_init(&(sys_super_block->exclusive_lock_sem),1,1);
@@ -323,7 +329,7 @@ int super_block_reclaim()
   fseek(sys_super_block->unclaimed_list_fptr,0,SEEK_END);
   num_unclaimed_in_list = (ftell(sys_super_block->unclaimed_list_fptr))/(sizeof(ino_t));
 
-  unclaimed_list = malloc(sizeof(ino_t)*num_unclaimed_in_list);
+  unclaimed_list = (ino_t *) malloc(sizeof(ino_t)*num_unclaimed_in_list);
   fseek(sys_super_block->unclaimed_list_fptr,0,SEEK_SET);
 
   num_unclaimed_in_list = fread(unclaimed_list,sizeof(ino_t),num_unclaimed_in_list,sys_super_block->unclaimed_list_fptr);

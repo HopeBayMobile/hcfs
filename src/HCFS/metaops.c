@@ -1,4 +1,18 @@
 #include <sys/file.h>
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <semaphore.h>
+#include <sys/mman.h>
+
+
 #include "global.h"
 #include "utils.h"
 #include "fuseop.h"
@@ -6,6 +20,10 @@
 #include "params.h"
 #include "dir_entry_btree.h"
 #include "meta_mem_cache.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
+
+
 /*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
 /* TODO: Need to consider directory access rights here or in fuseop */
 /* TODO: Consider the need to lock meta cache entry between related cache lookup and updates */

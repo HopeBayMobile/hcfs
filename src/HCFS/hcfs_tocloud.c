@@ -11,6 +11,16 @@ TODO: error handling for HTTP exceptions
 #include <curl/curl.h>
 #include <semaphore.h>
 #include <pthread.h>
+#include <fuse.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <attr/xattr.h>
+#include <sys/mman.h>
+
 
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
@@ -19,6 +29,8 @@ TODO: error handling for HTTP exceptions
 #include "hcfscurl.h"
 #include "super_block.h"
 #include "fuseop.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
