@@ -2,6 +2,7 @@
 
 CURPATH=$PWD
 cd c/unittest_modules/utils/
+make clean
 make
 ./utils_unittest
 gcov utils

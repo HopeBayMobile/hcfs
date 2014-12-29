@@ -19,230 +19,249 @@
         -:   14:
         -:   15:SYSTEM_CONF_STRUCT system_config;
         -:   16:
-    #####:   17:void fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
+        6:   17:int fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
         -:   18: {
         -:   19:  char tempname[METAPATHLEN];
         -:   20:  int sub_dir;
-        -:   21:
-    #####:   22:  sub_dir = this_inode % NUMSUBDIR;
-    #####:   23:  sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
-    #####:   24:  if (access(tempname,F_OK)==-1)
-    #####:   25:   mkdir(tempname,0700);
-    #####:   26:  sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
-    #####:   27:  strcpy(pathname,tempname);
-    #####:   28:  return;
-        -:   29: }
-    #####:   30:void fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
-        -:   31: {
-        -:   32:  char tempname[400];
-        -:   33:  int sub_dir;
-        -:   34:
-    #####:   35:  sub_dir = this_inode % NUMSUBDIR;
-    #####:   36:  sprintf(tempname,"%s/todelete",METAPATH);
-    #####:   37:  if (access(tempname,F_OK)==-1)
-    #####:   38:   mkdir(tempname,0700);
-    #####:   39:  sprintf(tempname,"%s/todelete/sub_%d",METAPATH,sub_dir);
-    #####:   40:  if (access(tempname,F_OK)==-1)
-    #####:   41:   mkdir(tempname,0700);
-    #####:   42:  sprintf(tempname,"%s/todelete/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
-    #####:   43:  strcpy(pathname,tempname);
-    #####:   44:  return;
-        -:   45: }
-    #####:   46:void fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*Will copy the filename of the block file to pathname*/
-        -:   47: {
-        -:   48:  char tempname[400];
-        -:   49:  int sub_dir;
-        -:   50:
-    #####:   51:  sub_dir = (this_inode + block_num) % NUMSUBDIR;
-    #####:   52:  sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
-    #####:   53:  if (access(tempname,F_OK)==-1)
-    #####:   54:   mkdir(tempname,0700);
-    #####:   55:  sprintf(tempname,"%s/sub_%d/block%lld_%lld",BLOCKPATH,sub_dir,this_inode,block_num);
-    #####:   56:  strcpy(pathname,tempname);
-    #####:   57:  return;
-        -:   58: }
-        -:   59:
-    #####:   60:void parse_parent_self(const char *pathname, char *parentname, char *selfname)
-        -:   61: {
-        -:   62:  int count;
-        -:   63:
-    #####:   64:  for(count = strlen(pathname)-1;count>=0;count--)
-        -:   65:   {
-    #####:   66:    if ((pathname[count]=='/') && (count < (strlen(pathname)-1)))
-    #####:   67:     break;
-        -:   68:   }
-    #####:   69:  if (count ==0)
-        -:   70:   {
-    #####:   71:    strcpy(parentname,"/");
-    #####:   72:    strcpy(selfname,&(pathname[1]));
-        -:   73:   }
-        -:   74:  else
-        -:   75:   {
-    #####:   76:    strncpy(parentname,pathname,count);
-    #####:   77:    parentname[count]=0;
-    #####:   78:    strcpy(selfname,&(pathname[count+1]));
-        -:   79:   }
-    #####:   80:  return;
-        -:   81: }
+        6:   21:  int ret_code=0;
+        -:   22:
+        6:   23:  if (METAPATH == NULL)
+        1:   24:   return -1;
+        -:   25:
+        5:   26:  if (access(METAPATH,F_OK)==-1)
+        -:   27:   {
+        3:   28:    ret_code = mkdir(METAPATH,0700);
+        3:   29:    if (ret_code < 0)
+        1:   30:     return ret_code;
+        -:   31:   }
+        -:   32:
+        4:   33:  sub_dir = this_inode % NUMSUBDIR;
+        4:   34:  sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
+        4:   35:  if (access(tempname,F_OK)==-1)
+        -:   36:   {
+        4:   37:    ret_code = mkdir(tempname,0700);
+        -:   38:
+        4:   39:    if (ret_code < 0)
+        1:   40:     return ret_code;
+        -:   41:   }
+        -:   42:
+        3:   43:  sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
+        3:   44:  strcpy(pathname,tempname);
+        -:   45:
+        3:   46:  ret_code = 0;
+        3:   47:  return ret_code;
+        -:   48: }
+    #####:   49:int fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
+        -:   50: {
+        -:   51:  char tempname[400];
+        -:   52:  int sub_dir;
+        -:   53:
+    #####:   54:  sub_dir = this_inode % NUMSUBDIR;
+    #####:   55:  sprintf(tempname,"%s/todelete",METAPATH);
+    #####:   56:  if (access(tempname,F_OK)==-1)
+    #####:   57:   mkdir(tempname,0700);
+    #####:   58:  sprintf(tempname,"%s/todelete/sub_%d",METAPATH,sub_dir);
+    #####:   59:  if (access(tempname,F_OK)==-1)
+    #####:   60:   mkdir(tempname,0700);
+    #####:   61:  sprintf(tempname,"%s/todelete/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
+    #####:   62:  strcpy(pathname,tempname);
+    #####:   63:  return 0;
+        -:   64: }
+    #####:   65:int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*Will copy the filename of the block file to pathname*/
+        -:   66: {
+        -:   67:  char tempname[400];
+        -:   68:  int sub_dir;
+        -:   69:
+    #####:   70:  sub_dir = (this_inode + block_num) % NUMSUBDIR;
+    #####:   71:  sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
+    #####:   72:  if (access(tempname,F_OK)==-1)
+    #####:   73:   mkdir(tempname,0700);
+    #####:   74:  sprintf(tempname,"%s/sub_%d/block%lld_%lld",BLOCKPATH,sub_dir,this_inode,block_num);
+    #####:   75:  strcpy(pathname,tempname);
+    #####:   76:  return 0;
+        -:   77: }
+        -:   78:
+    #####:   79:int parse_parent_self(const char *pathname, char *parentname, char *selfname)
+        -:   80: {
+        -:   81:  int count;
         -:   82:
-    #####:   83:int read_system_config(char *config_path)
-        -:   84: {
-        -:   85:  FILE *fptr;
-        -:   86:  char tempbuf[200],*ret_ptr;
-        -:   87:  char argname[200],argval[200],*tokptr1,*tokptr2, *toktmp, *strptr;
-        -:   88:
-    #####:   89:  fptr=fopen(config_path,"r");
-        -:   90:
-    #####:   91:  if (fptr==NULL)
-        -:   92:   {
-    #####:   93:    printf("Cannot open config file (%s) for reading\n",config_path);
-    #####:   94:    exit(-1);
-        -:   95:   }
-        -:   96:
-    #####:   97:  while(!feof(fptr))
-        -:   98:   {
-    #####:   99:    ret_ptr = fgets(tempbuf,180,fptr);
-    #####:  100:    if (ret_ptr == NULL)
-    #####:  101:     break;
-        -:  102:    
-    #####:  103:    if (strlen(tempbuf) > 170)
-        -:  104:     {
-    #####:  105:      printf("Length of option value exceeds limit (170 chars). Exiting.\n");
-    #####:  106:      exit(-1);
-        -:  107:     }
-    #####:  108:    if (tempbuf[strlen(tempbuf)-1]=='\n')
-    #####:  109:     tempbuf[strlen(tempbuf)-1]=0;
-        -:  110:
-        -:  111:    /*Now decompose the option line into param name and value*/
-        -:  112:    
-    #####:  113:    toktmp=strtok_r(tempbuf,"=",&tokptr1);
-        -:  114:
-    #####:  115:    if (toktmp==NULL)
-    #####:  116:     continue;
-        -:  117:
-        -:  118:    /*Get rid of the leading and trailing space chars*/
-        -:  119:
-    #####:  120:    strptr=toktmp;
-    #####:  121:    while(*strptr==' ')
-    #####:  122:     strptr=strptr+sizeof(char);
-        -:  123:
-    #####:  124:    strcpy(argname,strptr);
-    #####:  125:    while(argname[strlen(argname)-1]==' ')
-    #####:  126:     argname[strlen(argname)-1]=0;
-        -:  127:
-        -:  128:    /*Continue with the param value*/
-    #####:  129:    toktmp=strtok_r(NULL,"=",&tokptr1);
-    #####:  130:    if (toktmp==NULL)
-    #####:  131:     continue;
-        -:  132:
-    #####:  133:    strptr=toktmp;
-    #####:  134:    while(*strptr==' ')
-    #####:  135:     strptr=strptr+sizeof(char);
-    #####:  136:    strcpy(argval,strptr);
-    #####:  137:    while(argval[strlen(argval)-1]==' ')
-    #####:  138:     argval[strlen(argval)-1]=0;
-        -:  139:
-        -:  140:    /*Match param name with required params*/
-    #####:  141:    if (strcasecmp(argname,"metapath")==0)
-        -:  142:     {
-    #####:  143:      METAPATH= (char *) malloc(strlen(argval)+10);
-    #####:  144:      strcpy(METAPATH,argval);
-    #####:  145:      continue;
-        -:  146:     }
-    #####:  147:    if (strcasecmp(argname,"blockpath")==0)
-        -:  148:     {
-    #####:  149:      BLOCKPATH= (char *) malloc(strlen(argval)+10);
-    #####:  150:      strcpy(BLOCKPATH,argval);
-    #####:  151:      continue;
-        -:  152:     }
-    #####:  153:    if (strcasecmp(argname,"superblock")==0)
-        -:  154:     {
-    #####:  155:      SUPERBLOCK= (char *) malloc(strlen(argval)+10);
-    #####:  156:      strcpy(SUPERBLOCK,argval);
-    #####:  157:      continue;
-        -:  158:     }
-    #####:  159:    if (strcasecmp(argname,"unclaimedfile")==0)
-        -:  160:     {
-    #####:  161:      UNCLAIMEDFILE= (char *) malloc(strlen(argval)+10);
-    #####:  162:      strcpy(UNCLAIMEDFILE,argval);
-    #####:  163:      continue;
-        -:  164:     }
-    #####:  165:    if (strcasecmp(argname,"hcfssystem")==0)
-        -:  166:     {
-    #####:  167:      HCFSSYSTEM= (char *) malloc(strlen(argval)+10);
-    #####:  168:      strcpy(HCFSSYSTEM,argval);
-    #####:  169:      continue;
-        -:  170:     }
-    #####:  171:    if (strcasecmp(argname,"cache_soft_limit")==0)
-        -:  172:     {
-    #####:  173:      CACHE_SOFT_LIMIT=atoll(argval);
-    #####:  174:      continue;
-        -:  175:     }
-    #####:  176:    if (strcasecmp(argname,"cache_hard_limit")==0)
-        -:  177:     {
-    #####:  178:      CACHE_HARD_LIMIT=atoll(argval);
-    #####:  179:      continue;
-        -:  180:     }
-    #####:  181:    if (strcasecmp(argname,"cache_delta")==0)
-        -:  182:     {
-    #####:  183:      CACHE_DELTA=atoll(argval);
-    #####:  184:      continue;
-        -:  185:     }
-    #####:  186:    if (strcasecmp(argname,"max_block_size")==0)
-        -:  187:     {
-    #####:  188:      MAX_BLOCK_SIZE=atoll(argval);
-    #####:  189:      continue;
-        -:  190:     }
-        -:  191:    
-        -:  192:   }
-    #####:  193:  fclose(fptr);
-        -:  194:  
-    #####:  195:  return 0;
-        -:  196: }
-        -:  197:
-    #####:  198:int validate_system_config()
-        -:  199: {
-        -:  200:  FILE *fptr;
-        -:  201:  char pathname[400];
-        -:  202:  char tempval[10];
-        -:  203:  int ret_val;
-        -:  204:
-    #####:  205:  printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH,BLOCKPATH, SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
-    #####:  206:  printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT, CACHE_DELTA, MAX_BLOCK_SIZE);
-        -:  207:
-    #####:  208:  sprintf(pathname,"%s/testfile",BLOCKPATH);
-        -:  209:
-    #####:  210:  fptr=fopen(pathname,"w");
-    #####:  211:  fprintf(fptr,"test\n");
+    #####:   83:  for(count = strlen(pathname)-1;count>=0;count--)
+        -:   84:   {
+    #####:   85:    if ((pathname[count]=='/') && (count < (strlen(pathname)-1)))
+    #####:   86:     break;
+        -:   87:   }
+    #####:   88:  if (count ==0)
+        -:   89:   {
+    #####:   90:    strcpy(parentname,"/");
+    #####:   91:    strcpy(selfname,&(pathname[1]));
+        -:   92:   }
+        -:   93:  else
+        -:   94:   {
+    #####:   95:    strncpy(parentname,pathname,count);
+    #####:   96:    parentname[count]=0;
+    #####:   97:    strcpy(selfname,&(pathname[count+1]));
+        -:   98:   }
+    #####:   99:  return 0;
+        -:  100: }
+        -:  101:
+    #####:  102:int read_system_config(char *config_path)
+        -:  103: {
+        -:  104:  FILE *fptr;
+        -:  105:  char tempbuf[200],*ret_ptr;
+        -:  106:  char argname[200],argval[200],*tokptr1,*tokptr2, *toktmp, *strptr;
+        -:  107:
+    #####:  108:  fptr=fopen(config_path,"r");
+        -:  109:
+    #####:  110:  if (fptr==NULL)
+        -:  111:   {
+    #####:  112:    printf("Cannot open config file (%s) for reading\n",config_path);
+    #####:  113:    exit(-1);
+        -:  114:   }
+        -:  115:
+    #####:  116:  while(!feof(fptr))
+        -:  117:   {
+    #####:  118:    ret_ptr = fgets(tempbuf,180,fptr);
+    #####:  119:    if (ret_ptr == NULL)
+    #####:  120:     break;
+        -:  121:    
+    #####:  122:    if (strlen(tempbuf) > 170)
+        -:  123:     {
+    #####:  124:      printf("Length of option value exceeds limit (170 chars). Exiting.\n");
+    #####:  125:      exit(-1);
+        -:  126:     }
+    #####:  127:    if (tempbuf[strlen(tempbuf)-1]=='\n')
+    #####:  128:     tempbuf[strlen(tempbuf)-1]=0;
+        -:  129:
+        -:  130:    /*Now decompose the option line into param name and value*/
+        -:  131:    
+    #####:  132:    toktmp=strtok_r(tempbuf,"=",&tokptr1);
+        -:  133:
+    #####:  134:    if (toktmp==NULL)
+    #####:  135:     continue;
+        -:  136:
+        -:  137:    /*Get rid of the leading and trailing space chars*/
+        -:  138:
+    #####:  139:    strptr=toktmp;
+    #####:  140:    while(*strptr==' ')
+    #####:  141:     strptr=strptr+sizeof(char);
+        -:  142:
+    #####:  143:    strcpy(argname,strptr);
+    #####:  144:    while(argname[strlen(argname)-1]==' ')
+    #####:  145:     argname[strlen(argname)-1]=0;
+        -:  146:
+        -:  147:    /*Continue with the param value*/
+    #####:  148:    toktmp=strtok_r(NULL,"=",&tokptr1);
+    #####:  149:    if (toktmp==NULL)
+    #####:  150:     continue;
+        -:  151:
+    #####:  152:    strptr=toktmp;
+    #####:  153:    while(*strptr==' ')
+    #####:  154:     strptr=strptr+sizeof(char);
+    #####:  155:    strcpy(argval,strptr);
+    #####:  156:    while(argval[strlen(argval)-1]==' ')
+    #####:  157:     argval[strlen(argval)-1]=0;
+        -:  158:
+        -:  159:    /*Match param name with required params*/
+    #####:  160:    if (strcasecmp(argname,"metapath")==0)
+        -:  161:     {
+    #####:  162:      METAPATH= (char *) malloc(strlen(argval)+10);
+    #####:  163:      strcpy(METAPATH,argval);
+    #####:  164:      continue;
+        -:  165:     }
+    #####:  166:    if (strcasecmp(argname,"blockpath")==0)
+        -:  167:     {
+    #####:  168:      BLOCKPATH= (char *) malloc(strlen(argval)+10);
+    #####:  169:      strcpy(BLOCKPATH,argval);
+    #####:  170:      continue;
+        -:  171:     }
+    #####:  172:    if (strcasecmp(argname,"superblock")==0)
+        -:  173:     {
+    #####:  174:      SUPERBLOCK= (char *) malloc(strlen(argval)+10);
+    #####:  175:      strcpy(SUPERBLOCK,argval);
+    #####:  176:      continue;
+        -:  177:     }
+    #####:  178:    if (strcasecmp(argname,"unclaimedfile")==0)
+        -:  179:     {
+    #####:  180:      UNCLAIMEDFILE= (char *) malloc(strlen(argval)+10);
+    #####:  181:      strcpy(UNCLAIMEDFILE,argval);
+    #####:  182:      continue;
+        -:  183:     }
+    #####:  184:    if (strcasecmp(argname,"hcfssystem")==0)
+        -:  185:     {
+    #####:  186:      HCFSSYSTEM= (char *) malloc(strlen(argval)+10);
+    #####:  187:      strcpy(HCFSSYSTEM,argval);
+    #####:  188:      continue;
+        -:  189:     }
+    #####:  190:    if (strcasecmp(argname,"cache_soft_limit")==0)
+        -:  191:     {
+    #####:  192:      CACHE_SOFT_LIMIT=atoll(argval);
+    #####:  193:      continue;
+        -:  194:     }
+    #####:  195:    if (strcasecmp(argname,"cache_hard_limit")==0)
+        -:  196:     {
+    #####:  197:      CACHE_HARD_LIMIT=atoll(argval);
+    #####:  198:      continue;
+        -:  199:     }
+    #####:  200:    if (strcasecmp(argname,"cache_delta")==0)
+        -:  201:     {
+    #####:  202:      CACHE_DELTA=atoll(argval);
+    #####:  203:      continue;
+        -:  204:     }
+    #####:  205:    if (strcasecmp(argname,"max_block_size")==0)
+        -:  206:     {
+    #####:  207:      MAX_BLOCK_SIZE=atoll(argval);
+    #####:  208:      continue;
+        -:  209:     }
+        -:  210:    
+        -:  211:   }
     #####:  212:  fclose(fptr);
-        -:  213:
-    #####:  214:  ret_val = setxattr(pathname,"user.dirty","T",1,0);
-    #####:  215:  if (ret_val < 0)
-        -:  216:   {
-    #####:  217:    printf("Needs support for extended attributes, error no: %d\n",errno);
-    #####:  218:    exit(-1);
-        -:  219:   }
-        -:  220:
-    #####:  221:  tempval[0]=0;
-    #####:  222:  getxattr(pathname,"user.dirty",(void *)tempval,1);
-    #####:  223:  printf("test value is: %s, %d\n",tempval,strncmp(tempval,"T",1));
-    #####:  224:  unlink(pathname);
-        -:  225:
+        -:  213:  
+    #####:  214:  return 0;
+        -:  215: }
+        -:  216:
+    #####:  217:int validate_system_config()
+        -:  218: {
+        -:  219:  FILE *fptr;
+        -:  220:  char pathname[400];
+        -:  221:  char tempval[10];
+        -:  222:  int ret_val;
+        -:  223:
+    #####:  224:  printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH,BLOCKPATH, SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
+    #####:  225:  printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT, CACHE_DELTA, MAX_BLOCK_SIZE);
         -:  226:
-        -:  227:
-    #####:  228:  return 0;
-        -:  229: }
-        -:  230:
-        -:  231:
+    #####:  227:  sprintf(pathname,"%s/testfile",BLOCKPATH);
+        -:  228:
+    #####:  229:  fptr=fopen(pathname,"w");
+    #####:  230:  fprintf(fptr,"test\n");
+    #####:  231:  fclose(fptr);
         -:  232:
-        2:  233:off_t check_file_size(const char *path)
-        -:  234: {
-        -:  235:  struct stat block_stat;
-        -:  236:
-        2:  237:  if (stat(path,&block_stat)==0)
-        1:  238:   return block_stat.st_size;
-        -:  239:  else
-        1:  240:   return -1;
-        -:  241: }
-        -:  242:
-        -:  243:
+    #####:  233:  ret_val = setxattr(pathname,"user.dirty","T",1,0);
+    #####:  234:  if (ret_val < 0)
+        -:  235:   {
+    #####:  236:    printf("Needs support for extended attributes, error no: %d\n",errno);
+    #####:  237:    exit(-1);
+        -:  238:   }
+        -:  239:
+    #####:  240:  tempval[0]=0;
+    #####:  241:  getxattr(pathname,"user.dirty",(void *)tempval,1);
+    #####:  242:  printf("test value is: %s, %d\n",tempval,strncmp(tempval,"T",1));
+    #####:  243:  unlink(pathname);
+        -:  244:
+        -:  245:
+        -:  246:
+    #####:  247:  return 0;
+        -:  248: }
+        -:  249:
+        -:  250:
+        -:  251:
+        2:  252:off_t check_file_size(const char *path)
+        -:  253: {
+        -:  254:  struct stat block_stat;
+        -:  255:
+        2:  256:  if (stat(path,&block_stat)==0)
+        1:  257:   return block_stat.st_size;
+        -:  258:  else
+        1:  259:   return -1;
+        -:  260: }
+        -:  261:
+        -:  262:
