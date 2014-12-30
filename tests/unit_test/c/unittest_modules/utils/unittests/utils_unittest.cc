@@ -277,3 +277,193 @@ TEST_F(fetch_todelete_pathTest, SubDirMod) {
 
 /* End of the test case for the function fetch_todelete_path */
 
+
+/* Begin of the test case for the function fetch_block_path */
+
+class fetch_block_pathTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    BLOCKPATH = (char *)malloc(METAPATHLEN);
+    mkdir("/tmp/testmeta",0700);
+    strcpy(BLOCKPATH, "/tmp/testmeta/blockpath");
+   }
+
+  virtual void TearDown() {
+    rmdir("/tmp/testmeta");
+    free(BLOCKPATH);
+   }
+
+ };
+
+TEST_F(fetch_block_pathTest, NullBlockPath) {
+  char *tempptr;
+  char pathname[METAPATHLEN];
+
+  tempptr = BLOCKPATH;
+  BLOCKPATH = NULL;
+
+  EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
+
+  BLOCKPATH = tempptr;
+ }
+TEST_F(fetch_block_pathTest, BlockPathNotCreatable) {
+  char pathname[METAPATHLEN];
+  int ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)==0)
+   {
+    ret_code = rmdir(BLOCKPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod("/tmp/testmeta", 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
+
+  chmod("/tmp/testmeta",0700);
+  rmdir(BLOCKPATH);
+ }
+TEST_F(fetch_block_pathTest, BlockPathNotAccessible) {
+  char pathname[METAPATHLEN];
+  int ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)<0)
+   {
+    ret_code = mkdir(BLOCKPATH, 0400);
+    ASSERT_EQ(0,ret_code);
+   }
+  ret_code = chmod(BLOCKPATH, 0400);
+
+  ASSERT_EQ(ret_code,0);
+
+  EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
+
+  rmdir(BLOCKPATH);
+ }
+TEST_F(fetch_block_pathTest, MkBlockPathSuccess) {
+  char pathname[METAPATHLEN];
+  int ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
+  ret_code = 0;
+  if (access(BLOCKPATH,F_OK)==0)
+   {
+    ret_code = rmdir(BLOCKPATH);
+    ASSERT_EQ(0,ret_code);
+   }
+
+  ASSERT_EQ(0,fetch_block_path(pathname,0,0));
+
+  EXPECT_STREQ("/tmp/testmeta/blockpath/sub_0/block0_0",pathname);
+
+  rmdir("/tmp/testmeta/blockpath/sub_0");
+  rmdir(BLOCKPATH);
+ }
+TEST_F(fetch_block_pathTest, SubDirMod) {
+  char pathname[METAPATHLEN];
+  char expected_pathname[METAPATHLEN];
+  int ret_code;
+
+  ASSERT_STREQ("/tmp/testmeta/blockpath", BLOCKPATH);
+
+  ASSERT_EQ(0,fetch_block_path(pathname,NUMSUBDIR,0));
+
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_0/block%lld_0", NUMSUBDIR);
+  EXPECT_STREQ(expected_pathname,pathname);
+
+  ASSERT_EQ(0,fetch_block_path(pathname, 0, (2*NUMSUBDIR)-1));
+
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%lld/block0_%lld", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
+
+  EXPECT_STREQ(expected_pathname,pathname);
+
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%lld", NUMSUBDIR-1);
+  rmdir(expected_pathname);
+  rmdir("/tmp/testmeta/blockpath/sub_0");
+  rmdir(BLOCKPATH);
+ }
+
+/* End of the test case for the function fetch_meta_path */
+
+/* Begin of the test case for the function parse_parent_self */
+class parse_parent_selfTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+     pathname=(char *)malloc(400);
+     parentname=(char *)malloc(400);
+     selfname=(char *)malloc(400);
+   }
+
+  virtual void TearDown() {
+     free(pathname);
+     free(parentname);
+     free(selfname);
+   }
+  char *pathname;
+  char *parentname;
+  char *selfname;
+ };
+TEST_F(parse_parent_selfTest, NullPointers) {
+  char *temp;
+
+  temp=pathname;
+  pathname=NULL;
+  ASSERT_EQ(-1,parse_parent_self(pathname,parentname,selfname));
+  pathname=temp;
+
+  temp=parentname;
+  parentname=NULL;
+  ASSERT_EQ(-1,parse_parent_self(pathname,parentname,selfname));
+  parentname=temp;
+
+  temp=selfname;
+  selfname=NULL;
+  ASSERT_EQ(-1,parse_parent_self(pathname,parentname,selfname));
+  selfname=temp;
+
+ }
+TEST_F(parse_parent_selfTest, InvalidPath) {
+  strcpy(pathname,"relativepath");
+  ASSERT_EQ(-1,parse_parent_self(pathname,parentname,selfname));
+
+  strcpy(pathname,"/");
+  ASSERT_EQ(-1,parse_parent_self(pathname,parentname,selfname));
+ }
+TEST_F(parse_parent_selfTest, ObjectsUnderRoot) {
+  strcpy(pathname,"/testfile");
+
+  ASSERT_EQ(0,parse_parent_self(pathname,parentname,selfname));
+
+  EXPECT_STREQ("/",parentname);
+  EXPECT_STREQ("testfile",selfname);
+
+  strcpy(pathname,"/testfolder/");
+
+  ASSERT_EQ(0,parse_parent_self(pathname,parentname,selfname));
+
+  EXPECT_STREQ("/",parentname);
+  EXPECT_STREQ("testfolder",selfname);
+ }
+
+TEST_F(parse_parent_selfTest, ObjectsNotUnderRoot) {
+  strcpy(pathname,"/testdir/testfile");
+
+  ASSERT_EQ(0,parse_parent_self(pathname,parentname,selfname));
+
+  EXPECT_STREQ("/testdir",parentname);
+  EXPECT_STREQ("testfile",selfname);
+  strcpy(pathname,"/testdir/testsubdir/");
+
+  ASSERT_EQ(0,parse_parent_self(pathname,parentname,selfname));
+
+  EXPECT_STREQ("/testdir",parentname);
+  EXPECT_STREQ("testsubdir",selfname);
+ }
+
+/* End of the test case for the function parse_parent_self */
+
