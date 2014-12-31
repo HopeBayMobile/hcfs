@@ -467,3 +467,41 @@ TEST_F(parse_parent_selfTest, ObjectsNotUnderRoot) {
 
 /* End of the test case for the function parse_parent_self */
 
+/* Start of the test case for the function read_system_config */
+
+TEST(read_system_configTest, PathNotExist) {
+  EXPECT_EQ(-1,read_system_config("EmptyFile"));
+ }
+
+TEST(read_system_configTest, GoodConfig) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  EXPECT_STREQ(METAPATH, "/testHCFS/metastorage");
+  EXPECT_STREQ(BLOCKPATH, "/testHCFS/blockstorage");
+  EXPECT_STREQ(SUPERBLOCK, "/testHCFS/metastorage/superblock");
+  EXPECT_STREQ(UNCLAIMEDFILE, "/testHCFS/metastorage/unclaimedlist");
+  EXPECT_STREQ(HCFSSYSTEM, "/testHCFS/metastorage/hcfssystemfile");
+  EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+  EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+  EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+ }
+TEST(read_system_configTest, WrongNumbersConfig) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_wrong_soft_limit_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(-1,read_system_config(pathname));
+
+ }
+
+/* End of the test case for the function read_system_config */
+

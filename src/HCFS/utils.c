@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "utils.h"
 #include "global.h"
@@ -166,15 +168,16 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 int read_system_config(char *config_path)
  {
   FILE *fptr;
-  char tempbuf[200],*ret_ptr;
+  char tempbuf[200],*ret_ptr, *num_check_ptr;
   char argname[200],argval[200],*tokptr1,*tokptr2, *toktmp, *strptr;
+  long long temp_val;
 
   fptr=fopen(config_path,"r");
 
   if (fptr==NULL)
    {
     printf("Cannot open config file (%s) for reading\n",config_path);
-    exit(-1);
+    return -1;
    }
 
   while(!feof(fptr))
@@ -186,7 +189,7 @@ int read_system_config(char *config_path)
     if (strlen(tempbuf) > 170)
      {
       printf("Length of option value exceeds limit (170 chars). Exiting.\n");
-      exit(-1);
+      return -1;
      }
     if (tempbuf[strlen(tempbuf)-1]=='\n')
      tempbuf[strlen(tempbuf)-1]=0;
@@ -253,22 +256,54 @@ int read_system_config(char *config_path)
      }
     if (strcasecmp(argname,"cache_soft_limit")==0)
      {
-      CACHE_SOFT_LIMIT=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_SOFT_LIMIT=temp_val;
       continue;
      }
     if (strcasecmp(argname,"cache_hard_limit")==0)
      {
-      CACHE_HARD_LIMIT=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_HARD_LIMIT=temp_val;
       continue;
      }
     if (strcasecmp(argname,"cache_delta")==0)
      {
-      CACHE_DELTA=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_DELTA=temp_val;
       continue;
      }
     if (strcasecmp(argname,"max_block_size")==0)
      {
-      MAX_BLOCK_SIZE=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      MAX_BLOCK_SIZE=temp_val;
       continue;
      }
     
