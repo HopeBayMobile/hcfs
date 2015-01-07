@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <attr/xattr.h>
+#include <errno.h>
+#include <limits.h>
 
 #include "utils.h"
 #include "global.h"
@@ -43,8 +45,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename
   sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
   strcpy(pathname,tempname);
 
-  ret_code = 0;
-  return ret_code;
+  return 0;
  }
 int fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
  {
@@ -87,19 +88,51 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)   /*
  {
   char tempname[400];
   int sub_dir;
+  int ret_code=0;
+
+  if (BLOCKPATH == NULL)
+   return -1;
+
+  if (access(BLOCKPATH,F_OK)==-1)
+   {
+    ret_code = mkdir(BLOCKPATH,0700);
+    if (ret_code < 0)
+     return ret_code;
+   }
 
   sub_dir = (this_inode + block_num) % NUMSUBDIR;
   sprintf(tempname,"%s/sub_%d",BLOCKPATH,sub_dir);
   if (access(tempname,F_OK)==-1)
-   mkdir(tempname,0700);
+   {
+    ret_code = mkdir(tempname,0700);
+
+    if (ret_code < 0)
+     return ret_code;
+   }  
   sprintf(tempname,"%s/sub_%d/block%lld_%lld",BLOCKPATH,sub_dir,this_inode,block_num);
   strcpy(pathname,tempname);
   return 0;
  }
 
+/* Inputs to parse_parent_self need to properly allocate memory */
 int parse_parent_self(const char *pathname, char *parentname, char *selfname)
  {
   int count;
+
+  if (pathname == NULL)
+   return -1;
+
+  if (parentname == NULL)
+   return -1;
+
+  if (selfname == NULL)
+   return -1;
+
+  if (pathname[0]!='/')  /* Does not handle relative path */
+   return -1;
+
+  if (strlen(pathname)<=1)  /*This is the root, so no parent*/
+   return -1;
 
   for(count = strlen(pathname)-1;count>=0;count--)
    {
@@ -109,13 +142,25 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
   if (count ==0)
    {
     strcpy(parentname,"/");
-    strcpy(selfname,&(pathname[1]));
+    if (pathname[strlen(pathname)-1]=='/')
+     {
+      strncpy(selfname,&(pathname[1]),strlen(pathname)-2);
+      selfname[strlen(pathname)-2]=0;
+     }
+    else
+     strcpy(selfname,&(pathname[1]));
    }
   else
    {
     strncpy(parentname,pathname,count);
     parentname[count]=0;
-    strcpy(selfname,&(pathname[count+1]));
+    if (pathname[strlen(pathname)-1]=='/')
+     {
+      strncpy(selfname,&(pathname[count+1]),strlen(pathname)-count-2);
+      selfname[strlen(pathname)-count-2]=0;
+     }
+    else
+     strcpy(selfname,&(pathname[count+1]));
    }
   return 0;
  }
@@ -123,15 +168,16 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 int read_system_config(char *config_path)
  {
   FILE *fptr;
-  char tempbuf[200],*ret_ptr;
+  char tempbuf[200],*ret_ptr, *num_check_ptr;
   char argname[200],argval[200],*tokptr1,*tokptr2, *toktmp, *strptr;
+  long long temp_val;
 
   fptr=fopen(config_path,"r");
 
   if (fptr==NULL)
    {
     printf("Cannot open config file (%s) for reading\n",config_path);
-    exit(-1);
+    return -1;
    }
 
   while(!feof(fptr))
@@ -143,7 +189,7 @@ int read_system_config(char *config_path)
     if (strlen(tempbuf) > 170)
      {
       printf("Length of option value exceeds limit (170 chars). Exiting.\n");
-      exit(-1);
+      return -1;
      }
     if (tempbuf[strlen(tempbuf)-1]=='\n')
      tempbuf[strlen(tempbuf)-1]=0;
@@ -210,22 +256,54 @@ int read_system_config(char *config_path)
      }
     if (strcasecmp(argname,"cache_soft_limit")==0)
      {
-      CACHE_SOFT_LIMIT=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_SOFT_LIMIT=temp_val;
       continue;
      }
     if (strcasecmp(argname,"cache_hard_limit")==0)
      {
-      CACHE_HARD_LIMIT=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_HARD_LIMIT=temp_val;
       continue;
      }
     if (strcasecmp(argname,"cache_delta")==0)
      {
-      CACHE_DELTA=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      CACHE_DELTA=temp_val;
       continue;
      }
     if (strcasecmp(argname,"max_block_size")==0)
      {
-      MAX_BLOCK_SIZE=atoll(argval);
+      errno = 0;
+      temp_val=strtoll(argval, &num_check_ptr,10);
+      if ((errno!=0) || (*num_check_ptr != '\0'))
+       {
+        fclose(fptr);
+        printf("Number conversion error\n");
+        return -1;
+       }
+      MAX_BLOCK_SIZE=temp_val;
       continue;
      }
     
