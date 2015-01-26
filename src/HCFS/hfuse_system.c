@@ -29,8 +29,6 @@
 extern SYSTEM_CONF_STRUCT system_config;
 
 /* TODO: A monitor thread to write system info periodically to a special directory in /dev/shm */
-/* TODO: For some operations that require outside script to interact with HCFS without restarting, and if can be considered to directly modifies or reads part of the FUSE meta/data,
-use setxattr or getxattr on root of HCFS (or some special file under root). If the operation is system monitoring related, will need to bypass FUSE interface */
 
 int init_hcfs_system_data()
  {

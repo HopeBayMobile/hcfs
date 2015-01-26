@@ -23,11 +23,6 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
-
-/*TODO: Will need to check if need to explicitly change st_atime, st_mtime*/
-/* TODO: Need to consider directory access rights here or in fuseop */
-/* TODO: Consider the need to lock meta cache entry between related cache lookup and updates */
-
 int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos)
  {
   memset(temppage,0,sizeof(DIR_ENTRY_PAGE));

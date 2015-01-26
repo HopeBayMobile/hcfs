@@ -1,5 +1,5 @@
-/* TODO: A global meta cache and a block data cache in memory. All reads / writes go through the caches, and a parameter controls when to write dirty cache entries back to files (could be write through or after several seconds).*/
-/* TODO: Each inode can only occupy at most one meta cache entry (all threads accessing that inode share the same entry). Each data block in each inode can only occupy at most one data cache entry.*/
+/* A global meta cache (Done) and a block data cache (TODO) in memory. All reads / writes go through the caches, and a parameter (TODO) controls when to write dirty cache entries back to files (could be write through or after several seconds).*/
+/* TODO: Each data block in each inode can only occupy at most one data cache entry.*/
 
 /* A hard limit defines the upper bound on the number of entries (or mem used?) */
 /* Dynamically allocate memory and release memory when not being used for a long time (controlled by a parameter) */
@@ -14,8 +14,8 @@ Each meta cache entry keeps
 1. Struct stat
 2. Struct DIR_META_TYPE or FILE_META_TYPE
 3. Up to two dir entry pages cached
-4. Up to two block entry pages cached
-5. Up to two xattr pages cached
+4. Up to two block entry pages cached  (deleted)
+5. Up to two xattr pages cached (pending)
 6. Number of opened handles to the inode
 7. Semaphore to the entry
 8. Last access time

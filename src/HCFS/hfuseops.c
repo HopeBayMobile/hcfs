@@ -39,13 +39,15 @@ extern SYSTEM_CONF_STRUCT system_config;
 
 
 /* TODO: Need to go over the access rights problem for the ops */
-/* TODO: Access time may not be changed for file accesses, if noatime is specified in file opening or mounting. */
-/*TODO: Need to revisit the error handling in all operations */
-/*TODO: Will need to implement rollback or error marking when ops failed*/
-/*TODO: Should consider using multiple FILE handler/pointer in one opened file. Could be used for multiple blocks or for a single block for multiple read ops*/
-/*TODO: Should handle updating number of blocks and other uncovered info in an inode*/
+/* TODO: Need to revisit the following problem for all ops: access rights, timestamp change (a_time, m_time, c_time), and error handling */
+/* TODO: For access rights, need to check file permission and/or system acl. System acl is set in extended attributes. */
+/* TODO: The FUSE option "default_permission" should be turned on if there is no actual file permission check, or turned off
+if we are checking system acl. */
 
-/*TODO: A file-handle table manager that dynamically allocate extra block pointers and recycle them if not in use (but file not closed). Number of block pointers that can be allocated can be a variable of available process-wide opened files*/
+/* TODO: Access time may not be changed for file accesses, if noatime is specified in file opening or mounting. */
+/*TODO: Will need to implement rollback or error marking when ops failed*/
+
+/* TODO: Pending design for a single cache device, and use pread/pwrite to allow multiple threads to access cache concurrently without the need for file handles */
 
 /* TODO: Need to be able to perform actual operations according to type of folders (cached, non-cached, local) */
 /* TODO: Push actual operations to other source files, especially no actual file handling in this file */
@@ -858,13 +860,6 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 
 /*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
-
-/* TODO: A global meta cache and a block data cache in memory. All reads / writes go through the caches, and a parameter controls when to write dirty cache entries back to files (could be write through or several seconds).*/
-/* TODO: Each inode can only occupy at most one meta cache entry (all threads accessing that inode share the same entry). Each data block in each inode can only occupy at most one data cache entry.*/
-
-/* TODO: Could arrange file table entry to add extra block file descriptors (to handle accessing multiple blocks in a time span), and use pread/pwrite for the same block to lift
-block sem restriction. Extra block file decriptors could be in a small table (5 entries perhaps) and if not in use, keep only the most recently opened one opened. If run out of
-entries, could force new comers to wait, or use linked list to add more entries.*/
 
   if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
    return 0;
