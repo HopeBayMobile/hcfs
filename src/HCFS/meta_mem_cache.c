@@ -524,7 +524,6 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_ME
               fwrite(body_ptr->dir_entry_cache[1],sizeof(DIR_ENTRY_PAGE),1,body_ptr->fptr);
               super_block_mark_dirty((body_ptr->this_stat).st_ino);
              }
-/* TODO: Rewrite this part so that memory allocation is not so frequent */
 
             memcpy(body_ptr->dir_entry_cache[1], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE));
             body_ptr->dir_entry_cache_dirty[1] = body_ptr->dir_entry_cache_dirty[0];

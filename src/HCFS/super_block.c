@@ -1,5 +1,4 @@
 /*TODO: Consider to convert super inode to multiple files and use striping for efficiency*/
-/*TODO: Consider using multiple FILE handles for super inode IO.*/
 
 #include <stdio.h>
 #include <stdlib.h>
