@@ -1,3 +1,21 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: utils.c
+* Abstract: The c source code file for the utility functions for HCFS
+*
+* Revision History
+* 2015/1/27 Jiahong added header for this file, and comment headers for
+*           the functions.
+* 2015/1/27 Jiahong revised the coding format for coding style check.
+*
+**************************************************************************/
+
+/* TODO: Use fuse_context to check for what FS the function is called from */
+
+#include "utils.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -9,45 +27,74 @@
 #include <errno.h>
 #include <limits.h>
 
-#include "utils.h"
 #include "global.h"
 #include "fuseop.h"
 #include "params.h"
 
 SYSTEM_CONF_STRUCT system_config;
 
-int fetch_meta_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file to pathname*/
- {
-  char tempname[METAPATHLEN];
-  int sub_dir;
-  int ret_code=0;
+/************************************************************************
+*
+* Function name: fetch_meta_path
+*        Inputs: char *pathname, ino_t this_inode
+*        Output: Integer
+*       Summary: Given the inode number this_inode, checks fuse_context
+*                for what filesystem the function is called from, and
+*                copy the filename to the meta file to the space pointed
+*                by pathname.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int fetch_meta_path(char *pathname, ino_t this_inode)
+{
+	char tempname[METAPATHLEN];
+	int sub_dir;
+	int ret_code = 0;
 
-  if (METAPATH == NULL)
-   return -1;
+	if (METAPATH == NULL)
+		return -1;
 
-  if (access(METAPATH,F_OK)==-1)
-   {
-    ret_code = mkdir(METAPATH,0700);
-    if (ret_code < 0)
-     return ret_code;
-   }
+	/* Creates meta path if it does not exist */
+	if (access(METAPATH, F_OK) == -1) {
+		ret_code = mkdir(METAPATH, 0700);
+		if (ret_code < 0)
+			return ret_code;
+	}
 
-  sub_dir = this_inode % NUMSUBDIR;
-  sprintf(tempname,"%s/sub_%d",METAPATH,sub_dir);
-  if (access(tempname,F_OK)==-1)
-   {
-    ret_code = mkdir(tempname,0700);
+	sub_dir = this_inode % NUMSUBDIR;
+	sprintf(tempname, "%s/sub_%d", METAPATH, sub_dir);
 
-    if (ret_code < 0)
-     return ret_code;
-   }
+	/* Creates meta path for meta subfolder if it does not exist */
+	if (access(tempname, F_OK) == -1) {
+		ret_code = mkdir(tempname, 0700);
 
-  sprintf(tempname,"%s/sub_%d/meta%lld",METAPATH,sub_dir,this_inode);
-  strcpy(pathname,tempname);
+		if (ret_code < 0)
+			return ret_code;
+	}
 
-  return 0;
- }
-int fetch_todelete_path(char *pathname, ino_t this_inode)   /*Will copy the filename of the meta file in todelete folder to pathname*/
+	sprintf(tempname, "%s/sub_%d/meta%lld", METAPATH, sub_dir,
+		this_inode);
+	strcpy(pathname, tempname);
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: fetch_todelete_path
+*        Inputs: char *pathname, ino_t this_inode
+*        Output: Integer
+*       Summary: Given the inode number this_inode, checks fuse_context
+*                for what filesystem the function is called from, and
+*                copy the filename to the meta file in todelete folder
+*                to the space pointed by pathname.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*          Note: This function is used for post-deletion handling of meta.
+*
+*************************************************************************/
+int fetch_todelete_path(char *pathname, ino_t this_inode) 
  {
   char tempname[400];
   int sub_dir;
