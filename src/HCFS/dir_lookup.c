@@ -17,7 +17,9 @@
 #include "dir_lookup.h"
 #include "params.h"
 #include "meta_mem_cache.h"
+
 /*TODO: need to modify pathname lookup to handle symlink*/
+/* TODO: need to check for search permissions for the node encountered on the path, and to check for depth of recursive */
 
 PATHNAME_CACHE_ENTRY pathname_cache[PATHNAME_CACHE_ENTRY_NUM];
 
