@@ -17,8 +17,8 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
 	unsigned char *tmpstr;
 	int count, input_index, output_index;
 	int origin_str_len;
-	unsigned long tmp;
-	unsigned long tmp_index;
+	unsigned long long tmp;
+	unsigned long long tmp_index;
 
 	origin_str_len = inputlen;
 	tmpstr = malloc(1+((origin_str_len+2)/3)*3);
@@ -33,10 +33,10 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
 
 	for (input_index = 0; input_index < ((origin_str_len+2)/3)*3;
 			input_index += 3) {
-		tmp = (unsigned long) tmpstr[input_index];
+		tmp = (unsigned long long) tmpstr[input_index];
 		tmp = tmp << 16;
-		tmp = tmp + (((unsigned long) tmpstr[input_index+1]) << 8);
-		tmp = tmp + ((unsigned long) tmpstr[input_index+2]);
+		tmp = tmp + (((unsigned long long) tmpstr[input_index+1]) << 8);
+		tmp = tmp + ((unsigned long long) tmpstr[input_index+2]);
 
 		tmp_index = (tmp & 0xFC0000) >> 18;
 		outputstr[output_index] = base64_codes[tmp_index];
