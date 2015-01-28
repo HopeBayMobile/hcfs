@@ -13,6 +13,8 @@
 #ifndef GW20_SRC_UTILS_H_
 #define GW20_SRC_UTILS_H_
 
+#include <sys/types.h>
+
 /*BEGIN string utility definition*/
 int fetch_meta_path(char *pathname, ino_t this_inode);   /*Will copy the filename of the meta file to pathname*/
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num);   /*Will copy the filename of the block file to pathname*/
