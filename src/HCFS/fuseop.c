@@ -53,20 +53,40 @@
 extern SYSTEM_CONF_STRUCT system_config;
 
 /* TODO: Need to go over the access rights problem for the ops */
-/* TODO: Need to revisit the following problem for all ops: access rights, timestamp change (a_time, m_time, c_time), and error handling */
-/* TODO: For access rights, need to check file permission and/or system acl. System acl is set in extended attributes. */
-/* TODO: The FUSE option "default_permission" should be turned on if there is no actual file permission check, or turned off
-if we are checking system acl. */
+/* TODO: Need to revisit the following problem for all ops: access rights, 
+/*   timestamp change (a_time, m_time, c_time), and error handling */
+/* TODO: For access rights, need to check file permission and/or system acl.
+/*   System acl is set in extended attributes. */
+/* TODO: The FUSE option "default_permission" should be turned on if there 
+/*   is no actual file permission check, or turned off if we are checking 
+/*   system acl. */
 
-/* TODO: Access time may not be changed for file accesses, if noatime is specified in file opening or mounting. */
-/*TODO: Will need to implement rollback or error marking when ops failed*/
+/* TODO: Access time may not be changed for file accesses, if noatime is 
+/*   specified in file opening or mounting. */
+/* TODO: Will need to implement rollback or error marking when ops failed*/
 
-/* TODO: Pending design for a single cache device, and use pread/pwrite to allow multiple threads to access cache concurrently without the need for file handles */
+/* TODO: Pending design for a single cache device, and use pread/pwrite to 
+/*   allow multiple threads to access cache concurrently without the need for 
+/*   file handles */
 
-/* TODO: Need to be able to perform actual operations according to type of folders (cached, non-cached, local) */
-/* TODO: Push actual operations to other source files, especially no actual file handling in this file */
-/* TODO: Multiple paths for read / write / other ops for different folder policies. Policies to be determined at file or dir open. */
+/* TODO: Need to be able to perform actual operations according to type of 
+/*   folders (cached, non-cached, local) */
+/* TODO: Push actual operations to other source files, especially no actual
+/*   file handling in this file */
+/* TODO: Multiple paths for read / write / other ops for different folder 
+/*   policies. Policies to be determined at file or dir open. */
 
+/************************************************************************
+*
+* Function name: hfuse_getattr
+*        Inputs: char *pathname, struct stat *inode_stat
+*       Summary: Given the string "path", read the stat of this
+*                filesystem object into inode_stat, and return to the
+*                caller.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_getattr(const char *path, struct stat *inode_stat)
 {
 	ino_t hit_inode;
@@ -83,29 +103,47 @@ static int hfuse_getattr(const char *path, struct stat *inode_stat)
 
 	gettimeofday(&tmp_time2, NULL);
 
-	printf("getattr lookup_pathname elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+	printf("getattr lookup_pathname elapse %f\n",
+		(tmp_time2.tv_sec - tmp_time1.tv_sec)
+		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 
 	if (hit_inode > 0) {
 		ret_code = fetch_inode_stat(hit_inode, inode_stat);
 
 		#if DEBUG >= 5
-		printf("getattr %lld, returns %d\n", inode_stat->st_ino, ret_code);
+		printf("getattr %lld, returns %d\n", inode_stat->st_ino,
+			ret_code);
 		#endif  /* DEBUG */
 
 		gettimeofday(&tmp_time2, NULL);
 
-		printf("getattr elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+		printf("getattr elapse %f\n",
+			(tmp_time2.tv_sec - tmp_time1.tv_sec)
+			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 		return ret_code;
 	 } else {
 		gettimeofday(&tmp_time2, NULL);
 
-		printf("getattr elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+		printf("getattr elapse %f\n",
+			(tmp_time2.tv_sec - tmp_time1.tv_sec)
+			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 	 }
 	return ret_code;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_mknod
+*        Inputs: const char *path, mode_t mode, dev_t dev
+*       Summary: Given the string "path", create a regular file with the
+*                permission specified by mode. "dev" is ignored as only
+*                regular file will be created.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 {
 	char *parentname;
@@ -133,6 +171,8 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 	memset(&this_stat, 0, sizeof(struct stat));
 	temp_context = fuse_get_context();
 
+/* TODO: May need to reject special file creation here */
+
 	self_mode = mode | S_IFREG;
 	this_stat.st_mode = self_mode;
 	this_stat.st_size = 0;
@@ -140,8 +180,12 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
-	this_stat.st_uid = temp_context->uid; /*Use the uid and gid of the fuse caller*/
+
+	/*Use the uid and gid of the fuse caller*/
+	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
+
+	/* Use the current time for timestamps */
 	this_stat.st_atime = time(NULL);
 	this_stat.st_mtime = this_stat.st_atime;
 	this_stat.st_ctime = this_stat.st_atime;
@@ -151,17 +195,30 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 		return -EACCES;
 	this_stat.st_ino = self_inode;
 
-	ret_code = mknod_update_meta(self_inode, parent_inode, selfname, &this_stat);
+	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
+			&this_stat);
 
 	if (ret_code < 0)
 		meta_forget_inode(self_inode);
 
 	gettimeofday(&tmp_time2, NULL);
 
-	printf("mknod elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+	printf("mknod elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	return ret_code;
 }
+
+/************************************************************************
+*
+* Function name: hfuse_mkdir
+*        Inputs: const char *path, mode_t mode
+*       Summary: Given the string "path", create a subdirectory with the
+*                permission specified by mode.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_mkdir(const char *path, mode_t mode)
 {
 	char *parentname;
@@ -190,8 +247,10 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 
 	self_mode = mode | S_IFDIR;
 	this_stat.st_mode = self_mode;
-	this_stat.st_nlink = 2;   /*One pointed by the parent, another by self*/
-	this_stat.st_uid = temp_context->uid;  /*Use the uid and gid of the fuse caller*/
+	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
+
+	/*Use the uid and gid of the fuse caller*/
+	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
 
 	this_stat.st_atime = time(NULL);
@@ -206,18 +265,29 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 		return -EACCES;
 	this_stat.st_ino = self_inode;
 
-	ret_code = mkdir_update_meta(self_inode, parent_inode, selfname, &this_stat);
+	ret_code = mkdir_update_meta(self_inode, parent_inode,
+			selfname, &this_stat);
 
 	if (ret_code < 0)
 		meta_forget_inode(self_inode);
 
 	gettimeofday(&tmp_time2, NULL);
 
-	printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+	printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	return ret_code;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_unlink
+*        Inputs: const char *path
+*       Summary: Delete the regular file specified by the string "path".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_unlink(const char *path)
 {
 	char *parentname;
@@ -245,6 +315,15 @@ int hfuse_unlink(const char *path)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_rmdir
+*        Inputs: const char *path
+*       Summary: Delete the directory specified by the string "path".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_rmdir(const char *path)
 {
 	char *parentname;
