@@ -4,6 +4,10 @@
 .cc~
 *.h~
 *.conf~
+.a
+.gcda
+.gcdo
+
 
 # C extensions
 *.o
