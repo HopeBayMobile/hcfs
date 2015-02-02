@@ -6,8 +6,8 @@
 * Abstract: The c source code file for the main FUSE operations for HCFS
 *
 * Revision History
-* 2015/2/2 Jiahong added header for this file, and comment headers for
-*           the functions. File is renamed from hfuseops.c to fuseop.c
+* 2015/2/2 Jiahong added header for this file, and revising coding style.
+*          File is renamed from hfuseops.c to fuseop.c
 *
 **************************************************************************/
 
