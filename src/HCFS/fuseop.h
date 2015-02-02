@@ -1,3 +1,23 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: fuseop.h
+* Abstract: The header file for FUSE definition
+*
+* Revision History
+* 2015/2/2 Jiahong added header for this file.
+*
+**************************************************************************/
+
+#ifndef GW20_SRC_FUSEOP_H_
+#define GW20_SRC_FUSEOP_H_
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
+
 /*BEGIN META definition*/
 
 #define MAX_DIR_ENTRIES_PER_PAGE 99 /*Max number of children per node is 100, min is 50, so at least 49 elements in each node (except the root) */
@@ -90,3 +110,5 @@ int init_hcfs_system_data();
 int sync_hcfs_system_data(char need_lock);
 
 int hook_fuse(int argc, char **argv);
+
+#endif  /* GW20_SRC_FUSEOP_H_ */

@@ -248,7 +248,7 @@ int flush_clean_all_meta_cache() /* Flush all dirty entries and free memory usag
          }
         if ((current_ptr->cache_entry_body).meta_opened == TRUE)
          {
-          flock((current_ptr->cache_entry_body).fptr,LOCK_UN);
+          flock(fileno((current_ptr->cache_entry_body).fptr),LOCK_UN);
           fclose((current_ptr->cache_entry_body).fptr);
           (current_ptr->cache_entry_body).meta_opened = FALSE;
          }
@@ -981,7 +981,10 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 
     current_ptr = malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
     if (current_ptr==NULL)
-     return -EACCES;
+     return NULL;
+/* TODO: Should return errno as well if needed */
+/* return -EACCES; */
+
     memset(current_ptr,0,sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
   
     current_ptr->next = meta_mem_cache[index].meta_cache_entries;
@@ -1060,7 +1063,7 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 
   if (target_ptr->meta_opened == TRUE)
    {
-    flock(target_ptr->fptr,LOCK_UN);
+    flock(fileno(target_ptr->fptr),LOCK_UN);
     fclose(target_ptr->fptr);
     target_ptr->meta_opened = FALSE;
    }
