@@ -88,7 +88,6 @@ pthread_t reporter_thread;
 
 typedef struct {
     long long system_size;
-    long long dirty_size;
     long long cache_size;
     long long cache_blocks;
   } SYSTEM_DATA_TYPE;

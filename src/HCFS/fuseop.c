@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/2 Jiahong added header for this file, and revising coding style.
 *          File is renamed from hfuseops.c to fuseop.c
+* 2015/2/3 (Jiahong) Restructure hfuse_truncate function
 *
 **************************************************************************/
 
@@ -53,27 +54,27 @@
 extern SYSTEM_CONF_STRUCT system_config;
 
 /* TODO: Need to go over the access rights problem for the ops */
-/* TODO: Need to revisit the following problem for all ops: access rights, 
+/* TODO: Need to revisit the following problem for all ops: access rights,
 /*   timestamp change (a_time, m_time, c_time), and error handling */
 /* TODO: For access rights, need to check file permission and/or system acl.
 /*   System acl is set in extended attributes. */
-/* TODO: The FUSE option "default_permission" should be turned on if there 
-/*   is no actual file permission check, or turned off if we are checking 
+/* TODO: The FUSE option "default_permission" should be turned on if there
+/*   is no actual file permission check, or turned off if we are checking
 /*   system acl. */
 
-/* TODO: Access time may not be changed for file accesses, if noatime is 
+/* TODO: Access time may not be changed for file accesses, if noatime is
 /*   specified in file opening or mounting. */
 /* TODO: Will need to implement rollback or error marking when ops failed*/
 
-/* TODO: Pending design for a single cache device, and use pread/pwrite to 
-/*   allow multiple threads to access cache concurrently without the need for 
+/* TODO: Pending design for a single cache device, and use pread/pwrite to
+/*   allow multiple threads to access cache concurrently without the need for
 /*   file handles */
 
-/* TODO: Need to be able to perform actual operations according to type of 
+/* TODO: Need to be able to perform actual operations according to type of
 /*   folders (cached, non-cached, local) */
 /* TODO: Push actual operations to other source files, especially no actual
 /*   file handling in this file */
-/* TODO: Multiple paths for read / write / other ops for different folder 
+/* TODO: Multiple paths for read / write / other ops for different folder
 /*   policies. Policies to be determined at file or dir open. */
 
 /************************************************************************
@@ -360,6 +361,20 @@ int hfuse_rmdir(const char *path)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_rename
+*        Inputs: const char *oldpath, const char *newpath
+*       Summary: Rename / move the filesystem object "oldpath" to
+*                "newpath", replacing the original object in "newpath" if
+*                necessary.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*    Limitation: Current implementation only supports the case when the
+*                target does not exist before the operation, and no symlink
+*
+*************************************************************************/
 static int hfuse_rename(const char *oldpath, const char *newpath)
 {
 	/* TODO: Check how to make this operation atomic */
@@ -384,7 +399,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 		return -EACCES;
 
 	body_ptr = meta_cache_lock_entry(self_inode);
-	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
+			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
@@ -395,7 +411,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 
 	self_mode = tempstat.st_mode;
 
-	/*TODO: Will now only handle simple types (that the target is empty and no symlinks)*/
+	/*TODO: Will now only handle simple types (that the target is
+		empty and no symlinks)*/
 	parentname1 = malloc(strlen(oldpath)*sizeof(char));
 	parentname2 = malloc(strlen(newpath)*sizeof(char));
 	parse_parent_self(oldpath, parentname1, selfname1);
@@ -424,7 +441,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 
 	parent_ptr = meta_cache_lock_entry(parent_inode1);
 
-	ret_val = dir_remove_entry(parent_inode1, self_inode, selfname1, self_mode, parent_ptr);
+	ret_val = dir_remove_entry(parent_inode1, self_inode,
+			selfname1, self_mode, parent_ptr);
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
 		meta_cache_close_file(parent_ptr);
@@ -440,7 +458,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 		parent_ptr = meta_cache_lock_entry(parent_inode2);
 	}
 
-	ret_val = dir_add_entry(parent_inode2, self_inode, selfname2, self_mode, parent_ptr);
+	ret_val = dir_add_entry(parent_inode2, self_inode,
+			selfname2, self_mode, parent_ptr);
 
 	if (ret_val < 0) {
 		meta_cache_close_file(body_ptr);
@@ -455,7 +474,8 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 	meta_cache_unlock_entry(parent_ptr);
 
 	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
-		ret_val = change_parent_inode(self_inode, parent_inode1, parent_inode2, body_ptr);
+		ret_val = change_parent_inode(self_inode, parent_inode1,
+				parent_inode2, body_ptr);
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
@@ -468,6 +488,16 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_chmod
+*        Inputs: const char *path, mode_t mode
+*       Summary: Change the permission of the filesystem object pointed
+*                by "path" to "mode".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_chmod(const char *path, mode_t mode)
 {
 	struct stat temp_inode_stat;
@@ -482,7 +512,8 @@ int hfuse_chmod(const char *path, mode_t mode)
 		return ret_code;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {  /* Cannot fetch any meta*/
 		meta_cache_close_file(body_ptr);
@@ -494,13 +525,24 @@ int hfuse_chmod(const char *path, mode_t mode)
 	temp_inode_stat.st_mode = mode;
 	temp_inode_stat.st_ctime = time(NULL);
 
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_chown
+*        Inputs: const char *path, uid_t owner, gid_t group
+*       Summary: Change the owner/group of the filesystem object pointed
+*                by "path" to "owner" and "group".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_chown(const char *path, uid_t owner, gid_t group)
 {
 	struct stat temp_inode_stat;
@@ -516,7 +558,8 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
 		return ret_code;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {  /* Cannot fetch any meta*/
 		meta_cache_close_file(body_ptr);
@@ -529,13 +572,24 @@ int hfuse_chown(const char *path, uid_t owner, gid_t group)
 	temp_inode_stat.st_gid = group;
 	temp_inode_stat.st_ctime = time(NULL);
 
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_utimens
+*        Inputs: const char *path, const struct timespec tv[2]
+*       Summary: Change the access / modification time of the filesystem
+*                object pointed by "path" to "tv".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_utimens(const char *path, const struct timespec tv[2])
 {
 	struct stat temp_inode_stat;
@@ -550,7 +604,8 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 		return ret_code;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {  /* Cannot fetch any meta*/
 		meta_cache_close_file(body_ptr);
@@ -562,34 +617,230 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 	temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
 	temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
 
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
+			NULL, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
 }
 
+/* Helper function for waiting on full cache in the truncate function */
+int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
+	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+	long long page_pos, META_CACHE_ENTRY_STRUCT **body_ptr,
+	int entry_index)
+{
+	while (((block_page)->block_entries[entry_index].status == ST_CLOUD) ||
+		((block_page)->block_entries[entry_index].status == ST_CtoL)) {
+		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			/*Sleep if cache already full*/
+			printf("debug truncate waiting on full cache\n");
+			meta_cache_close_file(*body_ptr);
+			meta_cache_unlock_entry(*body_ptr);
+			sleep_on_cache_full();
+
+			/*Re-read status*/
+			*body_ptr = meta_cache_lock_entry(this_inode);
+			meta_cache_lookup_file_data(this_inode, inode_stat,
+				file_meta_ptr, block_page, page_pos, *body_ptr);
+		} else {
+			break;
+		}
+	}
+	return 0;
+}
+
+/* Helper function for truncate operation. Will delete all blocks in the page
+*  pointed by temppage starting from "start_index". Block index is tracked
+*  globally using "temp_block_index. "old_last_block" indicates the last block
+*  index before the truncate operation (hence we can ignore the blocks after
+*  "old_last_block". "inode_index" is the inode number of the file being
+*  truncated. */
+int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
+			long long *temp_block_index, long long old_last_block,
+			ino_t inode_index)
+{
+	int block_count;
+	char thisblockpath[1024];
+
+	for (block_count = start_index; block_count
+		< MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
+		if ((*temp_block_index) > old_last_block)
+			break;
+		switch ((temppage->block_entries[block_count]).status) {
+		case ST_NONE:
+		case ST_TODELETE:
+			break;
+		case ST_LDISK:
+			fetch_block_path(thisblockpath, inode_index,
+				*temp_block_index);
+			unlink(thisblockpath);
+			(temppage->block_entries[block_count]).status =
+				ST_NONE;
+			break;
+		case ST_CLOUD:
+			(temppage->block_entries[block_count]).status =
+				ST_TODELETE;
+			break;
+		case ST_BOTH:
+		case ST_LtoC:
+		case ST_CtoL:
+			fetch_block_path(thisblockpath, inode_index,
+				*temp_block_index);
+			if (access(thisblockpath, F_OK) == 0)
+				unlink(thisblockpath);
+			(temppage->block_entries[block_count]).status =
+				ST_TODELETE;
+			break;
+		default:
+			break;
+		}
+		(*temp_block_index)++;
+	}
+	return 0;
+}
+
+/* Helper function for hfuse_truncate. This will truncate the last block
+*  that remains after the truncate operation so that the size of this block
+*  fits (offset % MAX_BLOCK_SIZE) */
+int truncate_truncate(ino_t this_inode, struct stat *filestat,
+	FILE_META_TYPE *tempfilemeta, BLOCK_ENTRY_PAGE *temppage,
+	long long currentfilepos, META_CACHE_ENTRY_STRUCT **body_ptr,
+	int last_index, long long last_block, off_t offset)
+
+{
+	char thisblockpath[1024];
+	FILE *blockfptr;
+	struct stat tempstat;
+	off_t old_block_size, new_block_size;
+
+	/*Offset not on the boundary of the block. Will need to truncate the
+	last block*/
+	truncate_wait_full_cache(this_inode, filestat, tempfilemeta,
+			temppage, currentfilepos, body_ptr, last_index);
+
+	fetch_block_path(thisblockpath, filestat->st_ino, last_block);
+
+	if (((temppage->block_entries[last_index]).status == ST_CLOUD) ||
+		((temppage->block_entries[last_index]).status == ST_CtoL)) {
+		/*Download from backend */
+		blockfptr = fopen(thisblockpath, "a+");
+		fclose(blockfptr);
+		blockfptr = fopen(thisblockpath, "r+");
+		setbuf(blockfptr, NULL);
+		flock(fileno(blockfptr), LOCK_EX);
+
+		meta_cache_lookup_file_data(this_inode, NULL, NULL, temppage,
+			currentfilepos, *body_ptr);
+
+		if (((temppage->block_entries[last_index]).status ==
+			 ST_CLOUD) ||
+			((temppage->block_entries[last_index]).status ==
+				ST_CtoL)) {
+			if ((temppage->block_entries[last_index]).status ==
+				ST_CLOUD) {
+				(temppage->block_entries[last_index]).status =
+					ST_CtoL;
+				meta_cache_update_file_data(this_inode, NULL,
+					NULL, temppage, currentfilepos,
+					*body_ptr);
+			}
+			meta_cache_close_file(*body_ptr);
+			meta_cache_unlock_entry(*body_ptr);
+
+			fetch_from_cloud(blockfptr, filestat->st_ino,
+				last_block);
+
+			/*Re-read status*/
+			*body_ptr = meta_cache_lock_entry(this_inode);
+			meta_cache_lookup_file_data(this_inode, NULL, NULL,
+				temppage, currentfilepos, *body_ptr);
+
+			if (stat(thisblockpath, &tempstat) == 0) {
+				(temppage->block_entries[last_index]).status =
+					ST_LDISK;
+				setxattr(thisblockpath, "user.dirty", "T",
+					1, 0);
+				meta_cache_update_file_data(this_inode, NULL,
+					NULL, temppage, currentfilepos,
+					*body_ptr);
+
+				change_system_meta(0, tempstat.st_size, 1);
+			}
+		} else {
+			if (stat(thisblockpath, &tempstat) == 0) {
+				(temppage->block_entries[last_index]).status =
+					ST_LDISK;
+				setxattr(thisblockpath, "user.dirty", "T",
+					1, 0);
+				meta_cache_update_file_data(this_inode, NULL,
+					NULL, temppage, currentfilepos,
+					*body_ptr);
+			}
+		}
+		old_block_size = check_file_size(thisblockpath);
+		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
+		new_block_size = check_file_size(thisblockpath);
+
+		change_system_meta(0, new_block_size - old_block_size, 1);
+
+		flock(fileno(blockfptr), LOCK_UN);
+		fclose(blockfptr);
+	} else {
+		blockfptr = fopen(thisblockpath, "r+");
+		setbuf(blockfptr, NULL);
+		flock(fileno(blockfptr), LOCK_EX);
+
+		if (stat(thisblockpath, &tempstat) == 0) {
+			(temppage->block_entries[last_index]).status = ST_LDISK;
+			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			meta_cache_update_file_data(this_inode, NULL, NULL,
+				temppage, currentfilepos, *body_ptr);
+		}
+
+		old_block_size = check_file_size(thisblockpath);
+		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
+		new_block_size = check_file_size(thisblockpath);
+
+		change_system_meta(0, new_block_size - old_block_size, 1);
+
+		flock(fileno(blockfptr), LOCK_UN);
+		fclose(blockfptr);
+	}
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_truncate
+*        Inputs: const char *path, off_t offset
+*       Summary: Truncate the regular file pointed by "path to size "offset".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_truncate(const char *path, off_t offset)
 {
-/* If truncate file smaller, do not truncate metafile, but instead set the affected entries to ST_TODELETE (which will be changed to ST_NONE once object deleted)*/
-/* Add ST_TODELETE as a new block status. In truncate, if need to throw away a block, set the status to ST_TODELETE and upload process will handle the actual deletion.*/
-/*If need to truncate some block that's ST_CtoL or ST_CLOUD, download it first, mod it, then set to ST_LDISK*/
+/* If truncate file smaller, do not truncate metafile, but instead set the
+*  affected entries to ST_TODELETE (which will be changed to ST_NONE once
+*  object deleted)*/
+/* Add ST_TODELETE as a new block status. In truncate, if need to throw away
+*  a block, set the status to ST_TODELETE and upload process will handle the
+*  actual deletion.*/
+/* If need to truncate some block that's ST_CtoL or ST_CLOUD, download it
+*  first, mod it, then set to ST_LDISK*/
 
-	struct stat tempfilestat;
+	struct stat filestat;
 	FILE_META_TYPE tempfilemeta;
 	int ret_val;
 	ino_t this_inode;
-	char thisblockpath[1024];
-	FILE *blockfptr;
 	long long last_block, last_page, old_last_block;
 	long long current_page;
 	off_t nextfilepos, prevfilepos, currentfilepos;
 	BLOCK_ENTRY_PAGE temppage;
-	int last_entry_index;
-	off_t old_block_size, new_block_size;
-	int block_count;
+	int last_index;
 	long long temp_block_index;
-	struct stat tempstat;
 	int ret_code;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
@@ -599,21 +850,24 @@ int hfuse_truncate(const char *path, off_t offset)
 
 	body_ptr = meta_cache_lock_entry(this_inode);
 
-	ret_val = meta_cache_lookup_file_data(this_inode, &tempfilestat, NULL, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(this_inode, &filestat,
+			NULL, NULL, 0, body_ptr);
 
-	if (tempfilestat.st_mode & S_IFREG == FALSE) {
+	/* If the filesystem object is not a regular file, return error */
+	if (filestat.st_mode & S_IFREG == FALSE) {
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 
-		if (tempfilestat.st_mode & S_IFDIR)
+		if (filestat.st_mode & S_IFDIR)
 			return -EISDIR;
 		else
 			return -EACCES;
 	}
 
-	ret_val = meta_cache_lookup_file_data(this_inode, NULL, &tempfilemeta, NULL, 0, body_ptr);
+	ret_val = meta_cache_lookup_file_data(this_inode, NULL, &tempfilemeta,
+			NULL, 0, body_ptr);
 
-	if (tempfilestat.st_size == offset) {
+	if (filestat.st_size == offset) {
 		/*Do nothing if no change needed */
 		printf("Debug truncate: no size change. Nothing changed.\n");
 		meta_cache_close_file(body_ptr);
@@ -621,26 +875,25 @@ int hfuse_truncate(const char *path, off_t offset)
 		return 0;
 	}
 
-	if (tempfilestat.st_size < offset) {
+	if (filestat.st_size < offset) {
 		/*If need to extend, only need to change st_size*/
+		change_system_meta((long long)(offset - filestat.st_size),
+			0, 0);
 
-		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
-		sync_hcfs_system_data(FALSE);
-		sem_post(&(hcfs_system->access_sem));
-
-		tempfilestat.st_size = offset;
+		filestat.st_size = offset;
 	} else {
 		if (offset == 0) {
 			last_block = -1;
 			last_page = -1;
 		} else {
-			last_block = ((offset-1) / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
+			/* Block indexing starts at zero */
+			last_block = ((offset-1) / MAX_BLOCK_SIZE);
 
-			last_page = last_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
+			/*Page indexing starts at zero*/
+			last_page = last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 		}
 
-		old_last_block = ((tempfilestat.st_size - 1) / MAX_BLOCK_SIZE);
+		old_last_block = ((filestat.st_size - 1) / MAX_BLOCK_SIZE);
 		nextfilepos = tempfilemeta.next_block_page;
 
 		current_page = 0;
@@ -650,205 +903,77 @@ int hfuse_truncate(const char *path, off_t offset)
 
 		/*TODO: put error handling for the read/write ops here*/
 		while (current_page <= last_page) {
-			if (nextfilepos == 0) {  /*Data after offset does not actually exists. Just change file size */
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
-				sync_hcfs_system_data(FALSE);
-				sem_post(&(hcfs_system->access_sem));
-				tempfilestat.st_size = offset;
+			if (nextfilepos == 0) {
+				/*Data after offset does not actually exists.
+				Just change file size */
+				change_system_meta((long long)(offset -
+					filestat.st_size), 0, 0);
+				filestat.st_size = offset;
 				break;
-			} else {
-				meta_cache_lookup_file_data(this_inode, NULL, NULL, &temppage, nextfilepos, body_ptr);
-				prevfilepos = nextfilepos;
-				nextfilepos = temppage.next_page;
 			}
+
+			meta_cache_lookup_file_data(this_inode, NULL,
+				NULL, &temppage, nextfilepos,
+				body_ptr);
+			prevfilepos = nextfilepos;
+			nextfilepos = temppage.next_page;
+
 			if (current_page == last_page) {
 				/* Do the actual handling here*/
 				currentfilepos = prevfilepos;
-				last_entry_index = last_block % MAX_BLOCK_ENTRIES_PER_PAGE;
-				if ((offset % MAX_BLOCK_SIZE) != 0) {
-					/*Offset not on the boundary of the block. Will need to truncate the last block*/
-					while (((temppage).block_entries[last_entry_index].status == ST_CLOUD) ||
-						((temppage).block_entries[last_entry_index].status == ST_CtoL)) {
-						if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {  /*Sleep if cache already full*/
-							printf("debug truncate waiting on full cache\n");
-							meta_cache_close_file(body_ptr);
-							meta_cache_unlock_entry(body_ptr);
-							sleep_on_cache_full();
+				last_index = last_block %
+					MAX_BLOCK_ENTRIES_PER_PAGE;
+				if ((offset % MAX_BLOCK_SIZE) != 0)
+					/* Truncate the last block that remains
+					   after the truncate operation */
+					truncate_truncate(this_inode, &filestat,
+						&tempfilemeta,
+						&temppage, currentfilepos,
+						&body_ptr, last_index,
+						last_block, offset);
 
-							/*Re-read status*/
-							body_ptr = meta_cache_lock_entry(this_inode);
-							meta_cache_lookup_file_data(this_inode, &tempfilestat, &tempfilemeta, &temppage, currentfilepos, body_ptr);
-						} else {
-							break;
-						}
-					}
+				/*Delete the rest of blocks in this same page
+				as well*/
+				truncate_delete_block(&temppage, last_index+1,
+					&temp_block_index, old_last_block,
+					filestat.st_ino);
 
-					fetch_block_path(thisblockpath, tempfilestat.st_ino, last_block);
-
-					if (((temppage).block_entries[last_entry_index].status == ST_CLOUD) ||
-						((temppage).block_entries[last_entry_index].status == ST_CtoL)) {
-						/*Download from backend */
-						blockfptr = fopen(thisblockpath, "a+");
-						fclose(blockfptr);
-						blockfptr = fopen(thisblockpath, "r+");
-						setbuf(blockfptr, NULL);
-						flock(fileno(blockfptr), LOCK_EX);
-
-						meta_cache_lookup_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-						if (((temppage).block_entries[last_entry_index].status == ST_CLOUD) ||
-							((temppage).block_entries[last_entry_index].status == ST_CtoL)) {
-							if ((temppage).block_entries[last_entry_index].status == ST_CLOUD) {
-								(temppage).block_entries[last_entry_index].status = ST_CtoL;
-								meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-							}
-							meta_cache_close_file(body_ptr);
-							meta_cache_unlock_entry(body_ptr);
-
-							fetch_from_cloud(blockfptr, tempfilestat.st_ino, last_block);
-
-							/*Re-read status*/
-							body_ptr = meta_cache_lock_entry(this_inode);
-							meta_cache_lookup_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-
-							if (stat(thisblockpath, &tempstat) == 0) {
-								(temppage).block_entries[last_entry_index].status = ST_LDISK;
-								setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-								meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-
-								sem_wait(&(hcfs_system->access_sem));
-								hcfs_system->systemdata.cache_size += tempstat.st_size;
-								hcfs_system->systemdata.cache_blocks++;
-								sync_hcfs_system_data(FALSE);
-								sem_post(&(hcfs_system->access_sem));
-							}
-						} else {
-							if (stat(thisblockpath, &tempstat) == 0) {
-								(temppage).block_entries[last_entry_index].status = ST_LDISK;
-								setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-								meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-							}
-						}
-						old_block_size = check_file_size(thisblockpath);
-						ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
-						new_block_size = check_file_size(thisblockpath);
-
-						sem_wait(&(hcfs_system->access_sem));
-						hcfs_system->systemdata.cache_size += new_block_size - old_block_size;
-						hcfs_system->systemdata.cache_blocks++;
-						sync_hcfs_system_data(FALSE);
-						sem_post(&(hcfs_system->access_sem));
-
-						flock(fileno(blockfptr), LOCK_UN);
-						fclose(blockfptr);
-					} else {
-						blockfptr = fopen(thisblockpath, "r+");
-						setbuf(blockfptr, NULL);
-						flock(fileno(blockfptr), LOCK_EX);
-
-						if (stat(thisblockpath, &tempstat) == 0) {
-							(temppage).block_entries[last_entry_index].status = ST_LDISK;
-							setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-							meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
-						}
-
-						old_block_size = check_file_size(thisblockpath);
-						ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
-						new_block_size = check_file_size(thisblockpath);
-
-						sem_wait(&(hcfs_system->access_sem));
-						hcfs_system->systemdata.cache_size += new_block_size - old_block_size;
-						hcfs_system->systemdata.cache_blocks++;
-						sync_hcfs_system_data(FALSE);
-						sem_post(&(hcfs_system->access_sem));
-
-						flock(fileno(blockfptr), LOCK_UN);
-						fclose(blockfptr);
-					}
-				}
-
-				/*Clean up the rest of blocks in this same page as well*/
-				for (block_count = last_entry_index + 1; block_count < MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
-					if (temp_block_index > old_last_block)
-						break;
-					switch ((temppage).block_entries[block_count].status) {
-					case ST_NONE:
-					case ST_TODELETE:
-						break;
-					case ST_LDISK:
-						fetch_block_path(thisblockpath, tempfilestat.st_ino, temp_block_index);
-						unlink(thisblockpath);
-						(temppage).block_entries[block_count].status = ST_NONE;
-						break;
-					case ST_CLOUD:
-						(temppage).block_entries[block_count].status = ST_TODELETE;
-						break;
-					case ST_BOTH:
-					case ST_LtoC:
-					case ST_CtoL:
-						fetch_block_path(thisblockpath, tempfilestat.st_ino, temp_block_index);
-						if (access(thisblockpath, F_OK) == 0)
-							unlink(thisblockpath);
-						(temppage).block_entries[block_count].status = ST_TODELETE;
-						break;
-					default:
-						break;
-					 }
-					temp_block_index++;
-				 }
-				meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
+				meta_cache_update_file_data(this_inode, NULL,
+					NULL, &temppage, currentfilepos,
+					body_ptr);
 
 				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.system_size += (long long)(offset - tempfilestat.st_size);
+				hcfs_system->systemdata.system_size +=
+					(long long)(offset - filestat.st_size);
 				sync_hcfs_system_data(FALSE);
 				sem_post(&(hcfs_system->access_sem));
-				tempfilestat.st_size = offset;
+				filestat.st_size = offset;
 				break;
-			} else {
-				current_page++;
 			}
+
+			current_page++;
 		}
-		/*Clean up the rest of the block status pages if any*/
+
+		/*Delete the blocks in the rest of the block status pages*/
 
 		while (nextfilepos != 0) {
 			currentfilepos = nextfilepos;
-			meta_cache_lookup_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
+			meta_cache_lookup_file_data(this_inode, NULL, NULL,
+				&temppage, currentfilepos, body_ptr);
 
 			nextfilepos = temppage.next_page;
-			for (block_count = 0; block_count < MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
-				if (temp_block_index > old_last_block)
-					break;
-				switch ((temppage).block_entries[block_count].status) {
-				case ST_NONE:
-				case ST_TODELETE:
-					break;
-				case ST_LDISK:
-					fetch_block_path(thisblockpath, tempfilestat.st_ino, temp_block_index);
-					unlink(thisblockpath);
-					(temppage).block_entries[block_count].status = ST_NONE;
-					break;
-				case ST_CLOUD:
-					(temppage).block_entries[block_count].status = ST_TODELETE;
-					break;
-				case ST_BOTH:
-				case ST_LtoC:
-				case ST_CtoL:
-					fetch_block_path(thisblockpath, tempfilestat.st_ino, temp_block_index);
-					if (access(thisblockpath, F_OK) == 0)
-						unlink(thisblockpath);
-					(temppage).block_entries[block_count].status = ST_TODELETE;
-					break;
-				default:
-					break;
-				}
-				temp_block_index++;
-			}
-			meta_cache_update_file_data(this_inode, NULL, NULL, &temppage, currentfilepos, body_ptr);
+
+			truncate_delete_block(&temppage, 0,
+				&temp_block_index, old_last_block,
+				filestat.st_ino);
+
+			meta_cache_update_file_data(this_inode, NULL, NULL,
+				&temppage, currentfilepos, body_ptr);
 		}
 	}
 
-	tempfilestat.st_mtime = time(NULL);
-	ret_val = meta_cache_update_file_data(this_inode, &tempfilestat, &tempfilemeta, NULL, 0, body_ptr);
+	filestat.st_mtime = time(NULL);
+	ret_val = meta_cache_update_file_data(this_inode, &filestat, &tempfilemeta, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
@@ -1550,7 +1675,7 @@ void reporter_module(void)
 		if (strcmp(buf, "stat") == 0) {
 			buf[0] = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			sprintf(buf, "%lld %lld %lld %lld", hcfs_system->systemdata.system_size, hcfs_system->systemdata.dirty_size, hcfs_system->systemdata.cache_size, hcfs_system->systemdata.cache_blocks);
+			sprintf(buf, "%lld %lld %lld", hcfs_system->systemdata.system_size, hcfs_system->systemdata.cache_size, hcfs_system->systemdata.cache_blocks);
 			sem_post(&(hcfs_system->access_sem));
 			printf("debug stat hcfs %s\n", buf);
 			send(fd1, buf, strlen(buf)+1, 0);
