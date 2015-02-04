@@ -942,11 +942,8 @@ int hfuse_truncate(const char *path, off_t offset)
 					NULL, &temppage, currentfilepos,
 					body_ptr);
 
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.system_size +=
-					(long long)(offset - filestat.st_size);
-				sync_hcfs_system_data(FALSE);
-				sem_post(&(hcfs_system->access_sem));
+				change_system_meta((long long)(offset -
+						filestat.st_size), 0, 0);
 				filestat.st_size = offset;
 				break;
 			}
@@ -973,13 +970,24 @@ int hfuse_truncate(const char *path, off_t offset)
 	}
 
 	filestat.st_mtime = time(NULL);
-	ret_val = meta_cache_update_file_data(this_inode, &filestat, &tempfilemeta, NULL, 0, body_ptr);
+	ret_val = meta_cache_update_file_data(this_inode, &filestat,
+			&tempfilemeta, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_open
+*        Inputs: const char *path, struct fuse_file_info *file_info
+*       Summary: Open the regular file pointed by "path", and put file
+*                handle info to the structure pointed by "file_info".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_open(const char *path, struct fuse_file_info *file_info)
 {
 	/*TODO: Need to check permission here*/
@@ -1000,7 +1008,162 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
 	return 0;
 }
 
-int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struct fuse_file_info *file_info)
+/* Helper function for read operation. Will load file object meta from
+*  meta cache or meta file. */
+int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage, 
+		off_t this_page_fpos)
+{
+	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
+	fh_ptr->meta_cache_locked = TRUE;
+	meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, temppage,
+			this_page_fpos, fh_ptr->meta_cache_ptr);
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+	return 0;
+}
+
+/* Helper function for read operation. Will wait on cache full and wait
+*  until cache is not full. */
+int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
+		FH_ENTRY *fh_ptr, off_t this_page_fpos)
+{
+	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			/*Sleep if cache already full*/
+			sem_post(&(fh_ptr->block_sem));
+			printf("debug read waiting on full cache\n");
+			sleep_on_cache_full();
+			sem_wait(&(fh_ptr->block_sem));
+			/*Re-read status*/
+			read_lookup_meta(fh_ptr, temppage, this_page_fpos);
+		} else {
+			break;
+		}
+	}
+	return 0;
+}
+
+/* Helper function for read operation. Will prefetch a block from backend for
+*  reading. */
+int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
+		ino_t this_inode, long long block_index, off_t this_page_fpos)
+{
+	PREFETCH_STRUCT_TYPE *temp_prefetch;
+	pthread_t prefetch_thread;
+
+	if ((eindex+1) < MAX_BLOCK_ENTRIES_PER_PAGE) {
+		if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
+			((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
+			temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
+			temp_prefetch->this_inode = this_inode;
+			temp_prefetch->block_no = block_index + 1;
+			temp_prefetch->page_start_fpos = this_page_fpos;
+			temp_prefetch->entry_index = eindex + 1;
+			pthread_create(&(prefetch_thread),
+				&prefetch_thread_attr, (void *)&prefetch_block,
+				((void *)temp_prefetch));
+		}
+	}
+	return 0;
+}
+
+/* Helper function for read operation. Will fetch a block from backend for
+*  reading. */
+int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
+		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
+{
+	char thisblockpath[400];
+	struct stat tempstat2;
+
+	fetch_block_path(thisblockpath, this_inode, bindex);
+	fh_ptr->blockfptr = fopen(thisblockpath, "a+");
+	fclose(fh_ptr->blockfptr);
+	fh_ptr->blockfptr = fopen(thisblockpath, "r+");
+	setbuf(fh_ptr->blockfptr, NULL);
+	flock(fileno(fh_ptr->blockfptr), LOCK_EX);
+
+	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
+	fh_ptr->meta_cache_locked = TRUE;
+	meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, tpage,
+			page_fpos, fh_ptr->meta_cache_ptr);
+
+	if (((tpage->block_entries[eindex]).status == ST_CLOUD) ||
+			((tpage->block_entries[eindex]).status == ST_CtoL)) {
+		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
+			(tpage->block_entries[eindex]).status = ST_CtoL;
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+					NULL, tpage, page_fpos,
+					fh_ptr->meta_cache_ptr);
+		}
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		/* Do not process cache update and stored_where change if block
+		*  is actually deleted by other ops such as truncate*/
+
+		fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+		fh_ptr->meta_cache_locked = TRUE;
+		meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL,
+				tpage, page_fpos, fh_ptr->meta_cache_ptr);
+
+		if (stat(thisblockpath, &tempstat2) == 0) {
+			(tpage->block_entries[eindex]).status = ST_BOTH;
+			fsetxattr(fileno(fh_ptr->blockfptr), "user.dirty",
+					"F", 1, 0);
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+					NULL, tpage, page_fpos,
+					fh_ptr->meta_cache_ptr);
+
+			/* Update system meta to reflect correct cache size */
+			change_system_meta(0, tempstat2.st_size, 1);
+		}
+	}
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+	setbuf(fh_ptr->blockfptr, NULL);
+	fh_ptr->opened_block = bindex;
+
+	return 0;
+}
+
+/* Helper function for read operation. Will advance to the next block. */
+int read_advance_block(long long *entry_index, FH_ENTRY *fh_ptr,
+				off_t *this_page_fpos)
+{
+	if (((*entry_index)+1) >= MAX_BLOCK_ENTRIES_PER_PAGE) {
+		/*If may need to change meta, lock*/
+		fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+		fh_ptr->meta_cache_locked = TRUE;
+
+		*this_page_fpos = advance_block(fh_ptr->meta_cache_ptr,
+						*this_page_fpos, entry_index);
+
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+	} else {
+		(*entry_index)++;
+	}
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_read
+*        Inputs: const char *path, char *buf, size_t size_org, off_t offset,
+*                struct fuse_file_info *file_info
+*       Summary: Read "size_org" bytes from the file "path", starting from
+*                "offset", into the buffer pointed by "buf". File handle
+*                is provided by the structure in "file_info".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
+	struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block, current_block;
@@ -1016,14 +1179,12 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 	int target_bytes_read;
 	size_t size;
 	char fill_zeros;
-	struct stat tempstat2;
-	PREFETCH_STRUCT_TYPE *temp_prefetch;
-	pthread_t prefetch_thread;
 	off_t this_page_fpos;
 	struct stat temp_stat;
 
 
-/*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
+/* TODO: Perhaps should do proof-checking on the inode number using pathname
+*  lookup and from file_info*/
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
 		return 0;
@@ -1032,8 +1193,12 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
-	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL,
+			0, fh_ptr->meta_cache_ptr);
 
+	/* Decide the true maximum bytes to read */
+	/* If read request will exceed the size of the file, need to
+	*  reduce the size of request */
 	if (temp_stat.st_size < (offset+size_org))
 		size = (temp_stat.st_size - offset);
 	else
@@ -1047,12 +1212,19 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 	total_bytes_read = 0;
 
-	start_block = (offset / MAX_BLOCK_SIZE);  /* Block indexing starts at zero */
+	/* Decide the block indices for the first byte and last byte of
+	*  the read */
+	/* Block indexing starts at zero */
+	start_block = (offset / MAX_BLOCK_SIZE);
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
-	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
+	/* Decide the page indices for the first byte and last byte of
+	*  the read */
+	/*Page indexing starts at zero*/
+	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 	end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
+	/* Will need to change the entry page if it is not the current one */
 	if (fh_ptr->cached_page_index != start_page)
 		seek_page(fh_ptr, start_page);
 
@@ -1062,7 +1234,9 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 	entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
-	for (block_index = start_block; block_index <= end_block; block_index++) {
+	/* Read data from each block involved */
+	for (block_index = start_block; block_index <= end_block;
+				block_index++) {
 		sem_wait(&(fh_ptr->block_sem));
 		fill_zeros = FALSE;
 		while (fh_ptr->opened_block != block_index) {
@@ -1071,41 +1245,13 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 				fh_ptr->opened_block = -1;
 			}
 
-			fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-			fh_ptr->meta_cache_locked = TRUE;
-			meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-			fh_ptr->meta_cache_locked = FALSE;
-			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
 
-			while (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
-				((temppage).block_entries[entry_index].status == ST_CtoL)) {
-				if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {  /*Sleep if cache already full*/
-					sem_post(&(fh_ptr->block_sem));
-					printf("debug read waiting on full cache\n");
-					sleep_on_cache_full();
-					sem_wait(&(fh_ptr->block_sem));
-					/*Re-read status*/
-					fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-					fh_ptr->meta_cache_locked = TRUE;
-					meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-					fh_ptr->meta_cache_locked = FALSE;
-					meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-				} else {
-					break;
-				}
-			}
+			read_wait_full_cache(&temppage, entry_index, fh_ptr,
+				this_page_fpos);
 
-			if ((entry_index+1) < MAX_BLOCK_ENTRIES_PER_PAGE) {
-				if (((temppage).block_entries[entry_index+1].status == ST_CLOUD) ||
-					((temppage).block_entries[entry_index+1].status == ST_CtoL)) {
-					temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
-					temp_prefetch->this_inode = temp_stat.st_ino;
-					temp_prefetch->block_no = block_index + 1;
-					temp_prefetch->page_start_fpos = this_page_fpos;
-					temp_prefetch->entry_index = entry_index + 1;
-					pthread_create(&(prefetch_thread), &prefetch_thread_attr, (void *)&prefetch_block, ((void *)temp_prefetch));
-				}
-			}
+			read_prefetch_cache(&temppage, entry_index,
+				temp_stat.st_ino, block_index, this_page_fpos);
 
 			switch ((temppage).block_entries[entry_index].status) {
 			case ST_NONE:
@@ -1120,48 +1266,9 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 			case ST_CLOUD:
 			case ST_CtoL:
 				/*Download from backend */
-				fetch_block_path(thisblockpath, temp_stat.st_ino, block_index);
-				fh_ptr->blockfptr = fopen(thisblockpath, "a+");
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->blockfptr = fopen(thisblockpath, "r+");
-				setbuf(fh_ptr->blockfptr, NULL);
-				flock(fileno(fh_ptr->blockfptr), LOCK_EX);
-
-				fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-				fh_ptr->meta_cache_locked = TRUE;
-				meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-				if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
-						((temppage).block_entries[entry_index].status == ST_CtoL)) {
-					if ((temppage).block_entries[entry_index].status == ST_CLOUD) {
-						(temppage).block_entries[entry_index].status = ST_CtoL;
-						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-					}
-					fh_ptr->meta_cache_locked = FALSE;
-					meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-					fetch_from_cloud(fh_ptr->blockfptr, temp_stat.st_ino, block_index);
-					/*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
-
-					fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-					fh_ptr->meta_cache_locked = TRUE;
-					meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-					if (stat(thisblockpath, &tempstat2) == 0) {
-						(temppage).block_entries[entry_index].status = ST_BOTH;
-						fsetxattr(fileno(fh_ptr->blockfptr), "user.dirty", "F", 1, 0);
-						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-						sem_wait(&(hcfs_system->access_sem));
-						hcfs_system->systemdata.cache_size += tempstat2.st_size;
-						hcfs_system->systemdata.cache_blocks++;
-						sync_hcfs_system_data(FALSE);
-						sem_post(&(hcfs_system->access_sem));
-					}
-				}
-				fh_ptr->meta_cache_locked = FALSE;
-				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-				setbuf(fh_ptr->blockfptr, NULL);
-				fh_ptr->opened_block = block_index;
+				read_fetch_backend(temp_stat.st_ino,
+					block_index, fh_ptr, &temppage,
+					this_page_fpos, entry_index);
 
 				fill_zeros = FALSE;
 				break;
@@ -1169,15 +1276,18 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 				break;
 			}
 
-			if ((fill_zeros != TRUE) && (fh_ptr->opened_block != block_index)) {
-				fetch_block_path(thisblockpath, temp_stat.st_ino, block_index);
+			if ((fill_zeros != TRUE) && (fh_ptr->opened_block !=
+					block_index)) {
+				fetch_block_path(thisblockpath,
+						temp_stat.st_ino, block_index);
 
 				fh_ptr->blockfptr = fopen(thisblockpath, "r+");
 				if (fh_ptr->blockfptr != NULL) {
 					setbuf(fh_ptr->blockfptr, NULL);
 					fh_ptr->opened_block = block_index;
 				} else {
-				/*Some exception that block file is deleted in the middle of the status check*/
+				/* Some exception that block file is deleted in
+				*  the middle of the status check*/
 					printf("Debug read: cannot open block file. Perhaps replaced?\n");
 					fh_ptr->opened_block = -1;
 				}
@@ -1191,22 +1301,32 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 		current_offset = (offset+total_bytes_read) % MAX_BLOCK_SIZE;
 		target_bytes_read = MAX_BLOCK_SIZE - current_offset;
-		if ((size - total_bytes_read) < target_bytes_read) /*Do not need to read that much*/
-		 target_bytes_read = size - total_bytes_read;
+
+		/*Do not need to read that much*/
+		if ((size - total_bytes_read) < target_bytes_read)
+			target_bytes_read = size - total_bytes_read;
 
 		if (fill_zeros != TRUE) {
 			fseek(fh_ptr->blockfptr, current_offset, SEEK_SET);
-			this_bytes_read = fread(&buf[total_bytes_read], sizeof(char), target_bytes_read, fh_ptr->blockfptr);
+			this_bytes_read = fread(&buf[total_bytes_read],
+					sizeof(char), target_bytes_read,
+							fh_ptr->blockfptr);
 			if (this_bytes_read < target_bytes_read) {
 				/*Need to pad zeros*/
-				printf("Short reading? %ld %d\n", current_offset, total_bytes_read + this_bytes_read);
-				memset(&buf[total_bytes_read + this_bytes_read], 0, sizeof(char) * (target_bytes_read - this_bytes_read));
+				printf("Short reading? %ld %d\n",
+					current_offset, total_bytes_read +
+							this_bytes_read);
+				memset(&buf[total_bytes_read + this_bytes_read],
+					 0, sizeof(char) *
+					(target_bytes_read - this_bytes_read));
 				this_bytes_read = target_bytes_read;
 			}
 		} else {
-			printf("Padding zeros? %ld %d\n", current_offset, total_bytes_read);
+			printf("Padding zeros? %ld %d\n", current_offset,
+					total_bytes_read);
 			this_bytes_read = target_bytes_read;
-			memset(&buf[total_bytes_read], 0, sizeof(char) * target_bytes_read);
+			memset(&buf[total_bytes_read], 0, sizeof(char) *
+							target_bytes_read);
 		}
 
 		total_bytes_read += this_bytes_read;
@@ -1216,36 +1336,31 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 
 		sem_post(&(fh_ptr->block_sem));
 
-		if (this_bytes_read < target_bytes_read) /*Terminate if cannot write as much as we want*/
+		/*Terminate if cannot write as much as we want*/
+		if (this_bytes_read < target_bytes_read)
 			break;
 
-		if (block_index < end_block) {  /*If this is not the last block, need to advance one more*/
-			if ((entry_index+1) >= MAX_BLOCK_ENTRIES_PER_PAGE) {  /*If may need to change meta, lock*/
-				fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-				fh_ptr->meta_cache_locked = TRUE;
-
-				this_page_fpos = advance_block(fh_ptr->meta_cache_ptr, this_page_fpos, &entry_index);
-
-				fh_ptr->meta_cache_locked = FALSE;
-				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-			} else {
-				entry_index++;
-			}
-		}
+		if (block_index < end_block)
+		/*If this is not the last block, need to advance one more*/
+			read_advance_block(&entry_index, fh_ptr,
+						&this_page_fpos);
 	}
 
 	if (total_bytes_read > 0) {
-		fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
+		fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
 		fh_ptr->meta_cache_locked = TRUE;
 
 		/*Update and flush file meta*/
 
-		meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+		meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
 
 		if (total_bytes_read > 0)
 			temp_stat.st_atime = time(NULL);
 
-		meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+		meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat,
+					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
 
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
@@ -1254,7 +1369,52 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset, struc
 	return total_bytes_read;
 }
 
-int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *file_info)
+/* Helper function for write operation. Will wait on cache full and wait
+*  until cache is not full. */
+int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
+		FH_ENTRY *fh_ptr, off_t this_page_fpos, struct stat *temp_stat)
+{
+	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			/*Sleep if cache already full*/
+			sem_post(&(fh_ptr->block_sem));
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+			printf("debug write waiting on full cache\n");
+			sleep_on_cache_full();
+			/*Re-read status*/
+			fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+			fh_ptr->meta_cache_locked = TRUE;
+
+			sem_wait(&(fh_ptr->block_sem));
+			meta_cache_lookup_file_data(fh_ptr->thisinode,
+				temp_stat, NULL, temppage, this_page_fpos,
+				fh_ptr->meta_cache_ptr);
+		} else {
+			break;
+		}
+	}
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_write
+*        Inputs: const char *path, char *buf, size_t size, off_t offset,
+*                struct fuse_file_info *file_info
+*       Summary: Write "size" bytes to the file "path", starting from
+*                "offset", from the buffer pointed by "buf". File handle
+*                is provided by the structure in "file_info".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
+			struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block, current_block;
@@ -1273,7 +1433,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 	off_t this_page_fpos;
 	struct stat temp_stat;
 
-/*TODO: Perhaps should do proof-checking on the inode number using pathname lookup and from file_info*/
+/* TODO: Perhaps should do proof-checking on the inode number using pathname
+*  lookup and from file_info*/
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
 		return 0;
@@ -1281,22 +1442,30 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 	if (size <= 0)
 		return 0;
 
-	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) /*Sleep if cache already full*/
+	/*Sleep if cache already full*/
+	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
 		sleep_on_cache_full();
 
 	total_bytes_written = 0;
 
-	start_block = (offset / MAX_BLOCK_SIZE); /* Block indexing starts at zero */
+	/* Decide the block indices for the first byte and last byte of
+	*  the write */
+	/* Block indexing starts at zero */
+	start_block = (offset / MAX_BLOCK_SIZE);
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
-	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE; /*Page indexing starts at zero*/
+	/* Decide the page indices for the first byte and last byte of
+	*  the write */
+	/*Page indexing starts at zero*/
+	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 	end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
-	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL,
+			NULL, 0, fh_ptr->meta_cache_ptr);
 
 	if (fh_ptr->cached_page_index != start_page)
 		seek_page(fh_ptr, start_page);
@@ -1305,7 +1474,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
 	entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
-	for (block_index = start_block; block_index <= end_block; block_index++) {
+	for (block_index = start_block; block_index <= end_block;
+							block_index++) {
 		fetch_block_path(thisblockpath, temp_stat.st_ino, block_index);
 		sem_wait(&(fh_ptr->block_sem));
 		if (fh_ptr->opened_block != block_index) {
@@ -1313,28 +1483,12 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 				fclose(fh_ptr->blockfptr);
 				fh_ptr->opened_block = -1;
 			}
-			meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
+			meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
+				NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
 
-			while (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
-				((temppage).block_entries[entry_index].status == ST_CtoL)) {
-				if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {  /*Sleep if cache already full*/
-					sem_post(&(fh_ptr->block_sem));
-					fh_ptr->meta_cache_locked = FALSE;
-					meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-
-					printf("debug read waiting on full cache\n");
-					sleep_on_cache_full();
-					/*Re-read status*/
-					fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-					fh_ptr->meta_cache_locked = TRUE;
-
-					sem_wait(&(fh_ptr->block_sem));
-					meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-				} else {
-					break;
-				}
-			}
-
+			write_wait_full_cache(&temppage, entry_index, fh_ptr,
+						this_page_fpos, &temp_stat);
 
 			switch ((temppage).block_entries[entry_index].status) {
 			case ST_NONE:
@@ -1345,10 +1499,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 				(temppage).block_entries[entry_index].status = ST_LDISK;
 				setxattr(thisblockpath, "user.dirty", "T", 1, 0);
 				meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_blocks++;
-				sync_hcfs_system_data(FALSE);
-				sem_post(&(hcfs_system->access_sem));
+
+				change_system_meta(0, 0, 1);
 				break;
 			case ST_LDISK:
 				break;
@@ -1391,11 +1543,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 						setxattr(thisblockpath, "user.dirty", "T", 1, 0);
 						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
 
-						sem_wait(&(hcfs_system->access_sem));
-						hcfs_system->systemdata.cache_size += tempstat2.st_size;
-						hcfs_system->systemdata.cache_blocks++;
-						sync_hcfs_system_data(FALSE);
-						sem_post(&(hcfs_system->access_sem));
+						change_system_meta(0, tempstat2.st_size, 1);
 					}
 				} else {
 					if (stat(thisblockpath, &tempstat2) == 0) {
@@ -1436,14 +1584,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
 		new_cache_size = check_file_size(thisblockpath);
 
-		if (old_cache_size != new_cache_size) {
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.cache_size += new_cache_size - old_cache_size;
-			if (hcfs_system->systemdata.cache_size < 0)
-				hcfs_system->systemdata.cache_size = 0;
-			sync_hcfs_system_data(FALSE);
-			sem_post(&(hcfs_system->access_sem));
-		}
+		if (old_cache_size != new_cache_size)
+			change_system_meta(0, new_cache_size - old_cache_size, 0);
 
 		flock(fileno(fh_ptr->blockfptr), LOCK_UN);
 		sem_post(&(fh_ptr->block_sem));
@@ -1457,13 +1599,12 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 
 	/*Update and flush file meta*/
 
-	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL,
+						0, fh_ptr->meta_cache_ptr);
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
-		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.system_size += (long long) ((offset + total_bytes_written) - temp_stat.st_size);
-		sync_hcfs_system_data(FALSE);
-		sem_post(&(hcfs_system->access_sem));
+		change_system_meta((long long) ((offset + total_bytes_written)
+						- temp_stat.st_size), 0, 0);
 
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
@@ -1472,7 +1613,8 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset, st
 	if (total_bytes_written > 0)
 		temp_stat.st_mtime = time(NULL);
 
-	meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL, 0, fh_ptr->meta_cache_ptr);
+	meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL,
+						0, fh_ptr->meta_cache_ptr);
 
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);

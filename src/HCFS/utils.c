@@ -396,22 +396,28 @@ int validate_system_config()
 
 
 off_t check_file_size(const char *path)
- {
-  struct stat block_stat;
+{
+	struct stat block_stat;
 
-  if (stat(path,&block_stat)==0)
-   return block_stat.st_size;
-  else
-   return -1;
- }
+	if (stat(path,&block_stat)==0)
+		return block_stat.st_size;
+	else
+		return -1;
+}
 
 int change_system_meta(long long system_size_delta,
 	long long cache_size_delta, long long cache_blocks_delta)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.system_size += system_size_delta;
+	if (hcfs_system->systemdata.system_size < 0)
+		hcfs_system->systemdata.system_size = 0;
 	hcfs_system->systemdata.cache_size += cache_size_delta;
+	if (hcfs_system->systemdata.cache_size < 0)
+		hcfs_system->systemdata.cache_size = 0;
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
+	if (hcfs_system->systemdata.cache_blocks < 0)
+		hcfs_system->systemdata.cache_blocks = 0;
 	sync_hcfs_system_data(FALSE);
 	sem_post(&(hcfs_system->access_sem));
 
