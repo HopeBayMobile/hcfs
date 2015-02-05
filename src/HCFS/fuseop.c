@@ -31,7 +31,6 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
@@ -1010,7 +1009,7 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
 
 /* Helper function for read operation. Will load file object meta from
 *  meta cache or meta file. */
-int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage, 
+int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 		off_t this_page_fpos)
 {
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
@@ -1166,8 +1165,8 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
-	long long start_block, end_block, current_block;
-	long long start_page, end_page, current_page;
+	long long start_block, end_block;
+	long long start_page, current_page;
 	off_t nextfilepos, prevfilepos, currentfilepos;
 	BLOCK_ENTRY_PAGE temppage;
 	long long entry_index;
@@ -1222,7 +1221,6 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	*  the read */
 	/*Page indexing starts at zero*/
 	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
-	end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	/* Will need to change the entry page if it is not the current one */
 	if (fh_ptr->cached_page_index != start_page)
@@ -1340,8 +1338,8 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 		if (this_bytes_read < target_bytes_read)
 			break;
 
-		if (block_index < end_block)
 		/*If this is not the last block, need to advance one more*/
+		if (block_index < end_block)
 			read_advance_block(&entry_index, fh_ptr,
 						&this_page_fpos);
 	}
@@ -1372,7 +1370,7 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 /* Helper function for write operation. Will wait on cache full and wait
 *  until cache is not full. */
 int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
-		FH_ENTRY *fh_ptr, off_t this_page_fpos, struct stat *temp_stat)
+		FH_ENTRY *fh_ptr, off_t this_page_fpos)
 {
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
@@ -1391,7 +1389,7 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 			sem_wait(&(fh_ptr->block_sem));
 			meta_cache_lookup_file_data(fh_ptr->thisinode,
-				temp_stat, NULL, temppage, this_page_fpos,
+				NULL, NULL, temppage, this_page_fpos,
 				fh_ptr->meta_cache_ptr);
 		} else {
 			break;
@@ -1399,6 +1397,170 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 	}
 
 	return 0;
+}
+
+/* Helper function for the write operation. Will fetch a block from backend. */
+int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
+		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
+{
+	char thisblockpath[400];
+	struct stat tempstat2;
+
+	fetch_block_path(thisblockpath, this_inode, bindex);
+	fh_ptr->blockfptr = fopen(thisblockpath, "a+");
+	fclose(fh_ptr->blockfptr);
+	fh_ptr->blockfptr = fopen(thisblockpath, "r+");
+	setbuf(fh_ptr->blockfptr, NULL);
+	flock(fileno(fh_ptr->blockfptr), LOCK_EX);
+	meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, tpage,
+					page_fpos, fh_ptr->meta_cache_ptr);
+
+	if (((tpage->block_entries[eindex]).status == ST_CLOUD) ||
+		((tpage->block_entries[eindex]).status == ST_CtoL)) {
+		if ((tpage->block_entries[eindex]).status == ST_CLOUD) {
+			(tpage->block_entries[eindex]).status = ST_CtoL;
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+				NULL, tpage, page_fpos, fh_ptr->meta_cache_ptr);
+		}
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+		fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		/*Do not process cache update and stored_where change if block
+		* is actually deleted by other ops such as truncate*/
+
+		/*Re-read status*/
+		fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+		fh_ptr->meta_cache_locked = TRUE;
+		meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL,
+				tpage, page_fpos, fh_ptr->meta_cache_ptr);
+
+		if (stat(thisblockpath, &tempstat2) == 0) {
+			(tpage->block_entries[eindex]).status = ST_LDISK;
+			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+				NULL, tpage, page_fpos, fh_ptr->meta_cache_ptr);
+
+			change_system_meta(0, tempstat2.st_size, 1);
+		}
+	} else {
+		if (stat(thisblockpath, &tempstat2) == 0) {
+			(tpage->block_entries[eindex]).status = ST_LDISK;
+			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+				NULL, tpage, page_fpos, fh_ptr->meta_cache_ptr);
+		}
+	}
+	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
+	fclose(fh_ptr->blockfptr);
+
+	return 0;
+}
+
+/* Function for writing to a single block for write operation. Will fetch
+*  block from backend if needed. */
+size_t _write_block(const char *buf, size_t size, long long bindex,
+			off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode)
+{
+	long long current_page;
+	char thisblockpath[400];
+	BLOCK_ENTRY_PAGE temppage;
+	off_t this_page_fpos;
+	off_t old_cache_size, new_cache_size;
+	size_t this_bytes_written;
+	off_t nextfilepos, prevfilepos;
+	long long entry_index;
+
+
+	/* Decide the page index for block "bindex" */
+	/*Page indexing starts at zero*/
+	current_page = bindex / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	/* Find the offset of the page if it is not cached */
+	if (fh_ptr->cached_page_index != current_page)
+		seek_page(fh_ptr, current_page);
+
+	this_page_fpos = fh_ptr->cached_filepos;
+
+	entry_index = bindex % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	fetch_block_path(thisblockpath, this_inode, bindex);
+	sem_wait(&(fh_ptr->block_sem));
+
+	/* Check if we can reuse cached block */
+	if (fh_ptr->opened_block != bindex) {
+		/* If the cached block is not the one we are writing to,
+		*  close the one already opened. */
+		if (fh_ptr->opened_block != -1) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+		meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
+			NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
+
+		write_wait_full_cache(&temppage, entry_index, fh_ptr,
+							this_page_fpos);
+
+		switch ((temppage).block_entries[entry_index].status) {
+		case ST_NONE:
+		case ST_TODELETE:
+			 /*If not stored anywhere, make it on local disk*/
+			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
+			fclose(fh_ptr->blockfptr);
+			(temppage).block_entries[entry_index].status = ST_LDISK;
+			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+					NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
+
+			change_system_meta(0, 0, 1);
+			break;
+		case ST_LDISK:
+			break;
+		case ST_BOTH:
+		case ST_LtoC:
+			(temppage).block_entries[entry_index].status = ST_LDISK;
+			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			meta_cache_update_file_data(fh_ptr->thisinode, NULL,
+					NULL, &temppage, this_page_fpos,
+						fh_ptr->meta_cache_ptr);
+			break;
+		case ST_CLOUD:
+		case ST_CtoL:
+			/*Download from backend */
+			_write_fetch_backend(this_inode, bindex, fh_ptr,
+					&temppage, this_page_fpos, entry_index);
+			break;
+		default:
+			break;
+		}
+
+		fh_ptr->blockfptr = fopen(thisblockpath, "r+");
+		setbuf(fh_ptr->blockfptr, NULL);
+		fh_ptr->opened_block = bindex;
+	}
+	flock(fileno(fh_ptr->blockfptr), LOCK_EX);
+
+	old_cache_size = check_file_size(thisblockpath);
+	if (offset > old_cache_size) {
+		printf("Debug write: cache block size smaller than starting offset. Extending\n");
+		ftruncate(fileno(fh_ptr->blockfptr), offset);
+	}
+
+	fseek(fh_ptr->blockfptr, offset, SEEK_SET);
+	this_bytes_written = fwrite(buf, sizeof(char), size, fh_ptr->blockfptr);
+
+	new_cache_size = check_file_size(thisblockpath);
+
+	if (old_cache_size != new_cache_size)
+		change_system_meta(0, new_cache_size - old_cache_size, 0);
+
+	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
+	sem_post(&(fh_ptr->block_sem));
+
+	return this_bytes_written;
 }
 
 /************************************************************************
@@ -1417,20 +1579,12 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 			struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
-	long long start_block, end_block, current_block;
-	long long start_page, end_page, current_page;
-	off_t nextfilepos, prevfilepos, currentfilepos;
-	BLOCK_ENTRY_PAGE temppage;
-	long long entry_index;
+	long long start_block, end_block;
 	long long block_index;
-	char thisblockpath[400];
 	size_t total_bytes_written;
 	size_t this_bytes_written;
 	off_t current_offset;
 	size_t target_bytes_written;
-	off_t old_cache_size, new_cache_size;
-	struct stat tempstat2;
-	off_t this_page_fpos;
 	struct stat temp_stat;
 
 /* TODO: Perhaps should do proof-checking on the inode number using pathname
@@ -1454,147 +1608,30 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 	start_block = (offset / MAX_BLOCK_SIZE);
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
-	/* Decide the page indices for the first byte and last byte of
-	*  the write */
-	/*Page indexing starts at zero*/
-	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
-	end_page = end_block / MAX_BLOCK_ENTRIES_PER_PAGE;
-
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
-	meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL,
-			NULL, 0, fh_ptr->meta_cache_ptr);
-
-	if (fh_ptr->cached_page_index != start_page)
-		seek_page(fh_ptr, start_page);
-
-	this_page_fpos = fh_ptr->cached_filepos;
-
-	entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	for (block_index = start_block; block_index <= end_block;
 							block_index++) {
-		fetch_block_path(thisblockpath, temp_stat.st_ino, block_index);
-		sem_wait(&(fh_ptr->block_sem));
-		if (fh_ptr->opened_block != block_index) {
-			if (fh_ptr->opened_block != -1) {
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->opened_block = -1;
-			}
-			meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
-				NULL, &temppage, this_page_fpos,
-						fh_ptr->meta_cache_ptr);
-
-			write_wait_full_cache(&temppage, entry_index, fh_ptr,
-						this_page_fpos, &temp_stat);
-
-			switch ((temppage).block_entries[entry_index].status) {
-			case ST_NONE:
-			case ST_TODELETE:
-				 /*If not stored anywhere, make it on local disk*/
-				fh_ptr->blockfptr = fopen(thisblockpath, "a+");
-				fclose(fh_ptr->blockfptr);
-				(temppage).block_entries[entry_index].status = ST_LDISK;
-				setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-				meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-				change_system_meta(0, 0, 1);
-				break;
-			case ST_LDISK:
-				break;
-			case ST_BOTH:
-			case ST_LtoC:
-				(temppage).block_entries[entry_index].status = ST_LDISK;
-				setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-				meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-				break;
-			case ST_CLOUD:
-			case ST_CtoL:
-				/*Download from backend */
-				fetch_block_path(thisblockpath, temp_stat.st_ino, block_index);
-				fh_ptr->blockfptr = fopen(thisblockpath, "a+");
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->blockfptr = fopen(thisblockpath, "r+");
-				setbuf(fh_ptr->blockfptr, NULL);
-				flock(fileno(fh_ptr->blockfptr), LOCK_EX);
-				meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-				if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
-						((temppage).block_entries[entry_index].status == ST_CtoL)) {
-					if ((temppage).block_entries[entry_index].status == ST_CLOUD) {
-						(temppage).block_entries[entry_index].status = ST_CtoL;
-						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-					}
-					fh_ptr->meta_cache_locked = FALSE;
-					meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-
-					fetch_from_cloud(fh_ptr->blockfptr, temp_stat.st_ino, block_index);
-					/*Do not process cache update and stored_where change if block is actually deleted by other ops such as truncate*/
-
-					/*Re-read status*/
-					fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
-					fh_ptr->meta_cache_locked = TRUE;
-					meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-					if (stat(thisblockpath, &tempstat2) == 0) {
-						(temppage).block_entries[entry_index].status = ST_LDISK;
-						setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-
-						change_system_meta(0, tempstat2.st_size, 1);
-					}
-				} else {
-					if (stat(thisblockpath, &tempstat2) == 0) {
-						(temppage).block_entries[entry_index].status = ST_LDISK;
-						setxattr(thisblockpath, "user.dirty", "T", 1, 0);
-						meta_cache_update_file_data(fh_ptr->thisinode, NULL, NULL, &temppage, this_page_fpos, fh_ptr->meta_cache_ptr);
-					}
-				}
-				flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-				fclose(fh_ptr->blockfptr);
-				break;
-			default:
-				break;
-			}
-
-			fh_ptr->blockfptr = fopen(thisblockpath, "r+");
-			setbuf(fh_ptr->blockfptr, NULL);
-			fh_ptr->opened_block = block_index;
-		}
-		flock(fileno(fh_ptr->blockfptr), LOCK_EX);
-
 		current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
 
-		old_cache_size = check_file_size(thisblockpath);
-		if (current_offset > old_cache_size) {
-			printf("Debug write: cache block size smaller than starting offset. Extending\n");
-			ftruncate(fileno(fh_ptr->blockfptr), current_offset);
-		}
-
 		target_bytes_written = MAX_BLOCK_SIZE - current_offset;
-		if ((size - total_bytes_written) < target_bytes_written) /*Do not need to write that much*/
+
+		/* If do not need to write that much */
+		if ((size - total_bytes_written) < target_bytes_written)
 			target_bytes_written = size - total_bytes_written;
 
-		fseek(fh_ptr->blockfptr, current_offset, SEEK_SET);
-		this_bytes_written = fwrite(&buf[total_bytes_written], sizeof(char), target_bytes_written, fh_ptr->blockfptr);
+		this_bytes_written = _write_block(&buf[total_bytes_written],
+				target_bytes_written, block_index,
+				current_offset, fh_ptr, fh_ptr->thisinode);
 
 		total_bytes_written += this_bytes_written;
 
-		new_cache_size = check_file_size(thisblockpath);
-
-		if (old_cache_size != new_cache_size)
-			change_system_meta(0, new_cache_size - old_cache_size, 0);
-
-		flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-		sem_post(&(fh_ptr->block_sem));
-
-		if (this_bytes_written < target_bytes_written) /*Terminate if cannot write as much as we want*/
+		/*Terminate if cannot write as much as we want*/
+		if (this_bytes_written < target_bytes_written)
 			break;
-
-		if (block_index < end_block)  /*If this is not the last block, need to advance one more*/
-			this_page_fpos = advance_block(fh_ptr->meta_cache_ptr, this_page_fpos, &entry_index);
 	}
 
 	/*Update and flush file meta*/
@@ -1622,9 +1659,18 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 	return total_bytes_written;
 }
 
-int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linux statvfs call*/
+/************************************************************************
+*
+* Function name: hfuse_statfs
+*        Inputs: const char *path, struct statvfs *buf
+*       Summary: Lookup the filesystem status. "path" is not used now.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int hfuse_statfs(const char *path, struct statvfs *buf)
 {
-
+	/*Prototype is linux statvfs call*/
 	sem_wait(&(hcfs_system->access_sem));
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
@@ -1633,7 +1679,8 @@ int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linu
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
-	buf->f_bfree = buf->f_blocks - ((hcfs_system->systemdata.system_size) / 4096);
+	buf->f_bfree = buf->f_blocks -
+				((hcfs_system->systemdata.system_size) / 4096);
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
@@ -1655,11 +1702,30 @@ int hfuse_statfs(const char *path, struct statvfs *buf)      /*Prototype is linu
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_flush
+*        Inputs: const char *path, struct fuse_file_info *file_info
+*       Summary: Flush the file content. Not used now as cache mode is not
+*                write back.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_flush(const char *path, struct fuse_file_info *file_info)
 {
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_release
+*        Inputs: const char *path, struct fuse_file_info *file_info
+*       Summary: Close the file handle pointed by "file_info".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_release(const char *path, struct fuse_file_info *file_info)
 {
 	ino_t thisinode;
@@ -1682,18 +1748,51 @@ int hfuse_release(const char *path, struct fuse_file_info *file_info)
 	return 0;
 }
 
-int hfuse_fsync(const char *path, int isdatasync, struct fuse_file_info *file_info)
+/************************************************************************
+*
+* Function name: hfuse_fsync
+*        Inputs: const char *path, int isdatasync,
+*                struct fuse_file_info *file_info
+*       Summary: Conduct "fsync". Do nothing now (see hfuse_flush).
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int hfuse_fsync(const char *path, int isdatasync,
+					struct fuse_file_info *file_info)
 {
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_opendir
+*        Inputs: const char *path, struct fuse_file_info *file_info
+*       Summary: Check permission and open directory for access.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
 {
 	/*TODO: Need to check for access rights */
 	return 0;
 }
 
-static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t offset, struct fuse_file_info *file_info)
+/************************************************************************
+*
+* Function name: hfuse_readdir
+*        Inputs: const char *path, void *buf, fuse_fill_dir_t filler,
+*                off_t offset, struct fuse_file_info *file_info
+*       Summary: Read directory content starting from "offset". This
+*                implementation can return partial results and continue
+*                reading in follow-up calls.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+				off_t offset, struct fuse_file_info *file_info)
 {
 	/* Now will read partial entries and deal with others later */
 	ino_t this_inode;
@@ -1714,20 +1813,23 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 /*TODO: Need to include symlinks*/
 	fprintf(stderr, "DEBUG readdir entering readdir\n");
 
-/* TODO: the following can be skipped if we can use some file handle from file_info input */
+/* TODO: the following can be skipped if we can use some file handle from
+*  file_info input */
 	this_inode = lookup_pathname(path, &ret_code);
 
 	if (this_inode == 0)
 		return ret_code;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	meta_cache_lookup_dir_data(this_inode, &tempstat, &tempmeta, NULL, body_ptr);
+	meta_cache_lookup_dir_data(this_inode, &tempstat, &tempmeta, NULL,
+								body_ptr);
 
 	page_start = 0;
 	if (offset >= MAX_DIR_ENTRIES_PER_PAGE) {
 		thisfile_pos = offset / (MAX_DIR_ENTRIES_PER_PAGE + 1);
 		page_start = offset % (MAX_DIR_ENTRIES_PER_PAGE + 1);
-		printf("readdir starts at offset %ld, entry number %d\n", thisfile_pos, page_start);
+		printf("readdir starts at offset %ld, entry number %d\n",
+						thisfile_pos, page_start);
 		if (body_ptr->meta_opened == FALSE)
 			meta_cache_open_file(body_ptr);
 		meta_cache_drop_pages(body_ptr);
@@ -1747,21 +1849,27 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 		countn++;
 		memset(&temp_page, 0, sizeof(DIR_ENTRY_PAGE));
 		temp_page.this_page_pos = thisfile_pos;
-		if ((tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2)) && (page_start == 0)) {
-			meta_cache_lookup_dir_data(this_inode, NULL, NULL, &temp_page, body_ptr);
+		if ((tempmeta.total_children <= (MAX_DIR_ENTRIES_PER_PAGE-2))
+							&& (page_start == 0)) {
+			meta_cache_lookup_dir_data(this_inode, NULL, NULL,
+							&temp_page, body_ptr);
 		} else {
 			fseek(body_ptr->fptr, thisfile_pos, SEEK_SET);
-			fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+			fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
+								body_ptr->fptr);
 		}
 
-		for (count = page_start; count < temp_page.num_entries; count++) {
+		for (count = page_start; count < temp_page.num_entries;
+								count++) {
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
 			if (temp_page.dir_entries[count].d_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
-			nextentry_pos = temp_page.this_page_pos * (MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
-			if (filler(buf, temp_page.dir_entries[count].d_name, &tempstat, nextentry_pos)) {
+			nextentry_pos = temp_page.this_page_pos *
+				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
+			if (filler(buf, temp_page.dir_entries[count].d_name,
+						&tempstat, nextentry_pos)) {
 				meta_cache_unlock_entry(body_ptr);
 				printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n", nextentry_pos, temp_page.this_page_pos, (count+1));
 				return 0;
@@ -1779,6 +1887,15 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler, of
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_releasedir
+*        Inputs: const char *path, struct fuse_file_info *file_info
+*       Summary: Close opened directory. Do nothing now.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int hfuse_releasedir(const char *path, struct fuse_file_info *file_info)
 {
 	return 0;
@@ -1817,7 +1934,10 @@ void reporter_module(void)
 		if (strcmp(buf, "stat") == 0) {
 			buf[0] = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			sprintf(buf, "%lld %lld %lld", hcfs_system->systemdata.system_size, hcfs_system->systemdata.cache_size, hcfs_system->systemdata.cache_blocks);
+			sprintf(buf, "%lld %lld %lld",
+				hcfs_system->systemdata.system_size,
+				hcfs_system->systemdata.cache_size,
+				hcfs_system->systemdata.cache_blocks);
 			sem_post(&(hcfs_system->access_sem));
 			printf("debug stat hcfs %s\n", buf);
 			send(fd1, buf, strlen(buf)+1, 0);
@@ -1826,6 +1946,14 @@ void reporter_module(void)
 	return;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_init
+*        Inputs: struct fuse_file_info *file_info
+*       Summary: Initiate a FUSE mount
+*  Return value: Pointer to the user data of this mount.
+*
+*************************************************************************/
 void *hfuse_init(struct fuse_conn_info *conn)
 {
 	struct fuse_context *temp_context;
@@ -1835,33 +1963,52 @@ void *hfuse_init(struct fuse_conn_info *conn)
 	printf("Data passed in is %s\n", (char *) temp_context->private_data);
 
 	pthread_attr_init(&prefetch_thread_attr);
-	pthread_attr_setdetachstate(&prefetch_thread_attr, PTHREAD_CREATE_DETACHED);
+	pthread_attr_setdetachstate(&prefetch_thread_attr,
+						PTHREAD_CREATE_DETACHED);
 	pthread_create(&reporter_thread, NULL, (void *)reporter_module, NULL);
 	init_meta_cache_headers();
 	/* return ((void*) sys_super_block); */
 	return temp_context->private_data;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_destroy
+*        Inputs: void *private_data
+*       Summary: Destroy a FUSE mount
+*  Return value: None
+*
+*************************************************************************/
 void hfuse_destroy(void *private_data)
 {
-	int download_handle_count;
+	int dl_count;
 
 	release_meta_cache_headers();
 	sync();
-	for (download_handle_count = 0; download_handle_count < MAX_DOWNLOAD_CURL_HANDLE; download_handle_count++)
-		hcfs_destroy_backend(download_curl_handles[download_handle_count].curl);
+	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
+		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
 
 	fclose(logfptr);
 
 	return;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_access
+*        Inputs: const char *path, int mode
+*       Summary: Checks the permission for object "path" against "mode".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 static int hfuse_access(const char *path, int mode)
 {
 	/*TODO: finish this*/
 	return 0;
 }
 
+/* Specify the functions used for the FUSE operations */
 static struct fuse_operations hfuse_ops = {
 	.getattr = hfuse_getattr,
 	.mknod = hfuse_mknod,
@@ -1899,6 +2046,7 @@ void run_alt(void)
  }
 */
 
+/* Initiate FUSE */
 int hook_fuse(int argc, char **argv)
 {
 /*
@@ -1922,13 +2070,16 @@ int hook_fuse(int argc, char **argv)
 	return fuse_main(argc, argv, &hfuse_ops, NULL);
 }
 
-/*
+/* Operations to implement
 int hfuse_readlink(const char *path, char *buf, size_t buf_size);
 int hfuse_symlink(const char *oldpath, const char *newpath);
 int hfuse_link(const char *oldpath, const char *newpath);
-int hfuse_setxattr(const char *path, const char *name, const char *value, size_t size, int flags);
-int hfuse_getxattr(const char *path, const char *name, char *value, size_t size);
+int hfuse_setxattr(const char *path, const char *name, const char *value,
+						size_t size, int flags);
+int hfuse_getxattr(const char *path, const char *name, char *value,
+							size_t size);
 int hfuse_listxattr(const char *path, char *list, size_t size);
 int hfuse_removexattr(const char *path, const char *name);
-int hfuse_create(const char *path, mode_t mode, struct fuse_file_info *file_info);
+int hfuse_create(const char *path, mode_t mode,
+					struct fuse_file_info *file_info);
 */
