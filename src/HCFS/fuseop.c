@@ -8,7 +8,8 @@
 * Revision History
 * 2015/2/2 Jiahong added header for this file, and revising coding style.
 *          File is renamed from hfuseops.c to fuseop.c
-* 2015/2/3 (Jiahong) Restructure hfuse_truncate function
+* 2015/2/3~2/5 (Jiahong) Restructure hfuse_truncate, hfuse_write, hfuse_read
+*              functions
 *
 **************************************************************************/
 
