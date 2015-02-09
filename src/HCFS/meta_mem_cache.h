@@ -36,6 +36,13 @@ should release header lock and sleep for a short time, or skip to other entries.
 
 */
 
+#include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "fuseop.h"
 
 typedef struct {
   struct stat this_stat;
@@ -56,7 +63,7 @@ typedef struct {
  } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
-  META_CACHE_ENTRY_STRUCT cache_entry_body;
+  META_CACHE_ENTRY_STRUCT body;
   ino_t inode_num;
   struct meta_cache_lookup_struct *next;
   struct meta_cache_lookup_struct *prev;
@@ -71,11 +78,11 @@ typedef struct {
   META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
  } META_CACHE_HEADER_STRUCT;
 
-int init_meta_cache_headers();
-int release_meta_cache_headers();
-int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
+int init_meta_cache_headers(void);
+int release_meta_cache_headers(void);
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
-int flush_clean_all_meta_cache();
+int flush_clean_all_meta_cache(void);
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
 
@@ -99,4 +106,4 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int expire_meta_mem_cache_entry();
+int expire_meta_mem_cache_entry(void);

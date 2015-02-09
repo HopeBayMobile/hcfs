@@ -885,6 +885,14 @@ int super_block_exclusive_locking(void)
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: super_block_exclusive_release
+*        Inputs: None
+*       Summary: Releases the exclusive lock for the super block.
+*  Return value: 0 if successful. Otherwise returns -1.
+*
+*************************************************************************/
 int super_block_exclusive_release(void)
 {
 	sem_post(&(sys_super_block->share_lock_sem));
