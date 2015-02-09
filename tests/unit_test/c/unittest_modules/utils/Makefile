@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest
+TESTS = utils_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -87,3 +87,5 @@ utils_unittest.o : $(UNITTEST_DIR)/utils_unittest.cc \
 
 utils_unittest : utils.o utils_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
