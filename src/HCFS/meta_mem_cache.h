@@ -1,10 +1,32 @@
-/* A global meta cache (Done) and a block data cache (TODO) in memory. All reads / writes go through the caches, and a parameter (TODO) controls when to write dirty cache entries back to files (could be write through or after several seconds).*/
-/* TODO: Each data block in each inode can only occupy at most one data cache entry.*/
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: meta_mem_cache.c
+* Abstract: The c header file for meta cache operations in HCFS.
+*
+* Revision History
+* 2015/2/9 Jiahong added header for this file, and revising coding style.
+*
+**************************************************************************/
 
-/* A hard limit defines the upper bound on the number of entries (or mem used?) */
-/* Dynamically allocate memory and release memory when not being used for a long time (controlled by a parameter) */
+#ifndef GW20_HCFS_META_MEM_CACHE_H_
+#define GW20_HCFS_META_MEM_CACHE_H_
 
-/* Will keep cache entry even after file is closed, until expired or need to be replaced */
+/* A global meta cache (Done) and a block data cache (TODO) in memory.
+All reads / writes go through the caches, and a parameter (TODO) controls
+when to write dirty cache entries back to files (could be write through or
+after several seconds). */
+/* TODO: Each data block in each inode can only occupy at most one data
+	cache entry. */
+
+/* A hard limit defines the upper bound on the number of entries
+	(or mem used?) */
+/* Dynamically allocate memory and release memory when not being used
+	for a long time (controlled by a parameter) */
+
+/* Will keep cache entry even after file is closed, until expired or need
+	to be replaced */
 
 /* Cannot open more file if all meta cache entry is occupied by opened files */
 
@@ -23,75 +45,96 @@ Each meta cache entry keeps
 
 Lookup of cache entry:
 
-inode => hashtable lookup (hash table with doubly linked list) => return pointer to the entry
-Each lookup entry contains the doubly linked list structure, plus number of opened handles to the inode and the inode number. Finally, the pointer to the actual
-cache entry is stored.
+inode => hashtable lookup (hash table with doubly linked list) =>
+		return pointer to the entry
+Each lookup entry contains the doubly linked list structure, plus number
+of opened handles to the inode and the inode number. Finally, the pointer
+to the actual cache entry is stored.
 
-
-Each entry in the hashtable (the header of each linked list) contains a semaphore to this list. If two accesses collide at the same time, one
-has to wait for the completion of the other. This is to ensure the atomic completion of adding and deleting cache entries.
-If deleting cache entry, will need to acquire both the header lock and the entry lock before proceeding. If cache entry lock cannot be acquired immediately,
-should release header lock and sleep for a short time, or skip to other entries.
-
-
+Each entry in the hashtable (the header of each linked list) contains a
+semaphore to this list. If two accesses collide at the same time, one
+has to wait for the completion of the other. This is to ensure the
+atomic completion of adding and deleting cache entries.
+If deleting cache entry, will need to acquire both the header lock and
+the entry lock before proceeding. If cache entry lock cannot be acquired
+immediately, should release header lock and sleep for a short time, or skip
+to other entries.
 */
 
 
 typedef struct {
-  struct stat this_stat;
-  ino_t inode_num;
-  char stat_dirty;
-  DIR_META_TYPE *dir_meta;    /* Only used if inode is a dir */
-  FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
-  char meta_dirty;
-  DIR_ENTRY_PAGE *dir_entry_cache[2];      /*Zero if not pointed to any page*/
-/*index 0 means newer entry, index 1 means older. Always first flush index 1, copy index 0 to 1, then put new page to index 0 */
-  char dir_entry_cache_dirty[2];
-/* TODO: Add xattr page cached here */
-  sem_t access_sem;
-  char something_dirty;
-  char meta_opened;
-  FILE *fptr;
-  struct timeval last_access_time;  /*TODO: Need to think whether system clock change could affect the involved operations*/
- } META_CACHE_ENTRY_STRUCT;
+	struct stat this_stat;
+	ino_t inode_num;
+	char stat_dirty;
+	DIR_META_TYPE *dir_meta;  /* Only used if inode is a dir */
+	FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
+	char meta_dirty;
+
+	/*index 0 means newer entry, index 1 means older.
+	Always first flush index 1, copy index 0 to 1,
+	then put new page to index 0 */
+
+	/*Zero if not pointed to any page*/
+	DIR_ENTRY_PAGE * dir_entry_cache[2];
+	char dir_entry_cache_dirty[2];
+	/* TODO: Add xattr page cached here */
+
+	sem_t access_sem;
+	char something_dirty;
+	char meta_opened;
+	FILE *fptr;
+
+	/*TODO: Need to think whether system clock change could affect the
+	involved operations*/
+	struct timeval last_access_time;
+} META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {
-  META_CACHE_ENTRY_STRUCT cache_entry_body;
-  ino_t inode_num;
-  struct meta_cache_lookup_struct *next;
-  struct meta_cache_lookup_struct *prev;
- };
+	META_CACHE_ENTRY_STRUCT body;
+	ino_t inode_num;
+	struct meta_cache_lookup_struct *next;
+	struct meta_cache_lookup_struct *prev;
+};
 
 typedef struct meta_cache_lookup_struct META_CACHE_LOOKUP_ENTRY_STRUCT;
 
 typedef struct {
-  META_CACHE_LOOKUP_ENTRY_STRUCT *meta_cache_entries;
-  sem_t header_sem;
-  int num_entries;
-  META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
- } META_CACHE_HEADER_STRUCT;
+	META_CACHE_LOOKUP_ENTRY_STRUCT *meta_cache_entries;
+	sem_t header_sem;
+	int num_entries;
+	META_CACHE_LOOKUP_ENTRY_STRUCT *last_entry;
+} META_CACHE_HEADER_STRUCT;
 
-int init_meta_cache_headers();
-int release_meta_cache_headers();
-int flush_single_meta_cache_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
-int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr, int entry_index);
-int flush_clean_all_meta_cache();
+int init_meta_cache_headers(void);
+int release_meta_cache_headers(void);
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr,
+							int entry_index);
+int flush_clean_all_meta_cache(void);
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
+int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat,
+	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat, FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page, long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat,
+	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+	META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr); /*If entry exists, replace stat value with new one. Else create a new entry.*/
+int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
+	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+	META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat, DIR_META_TYPE 
-*dir_meta_ptr, DIR_ENTRY_PAGE *dir_page, META_CACHE_ENTRY_STRUCT *body_ptr);
-
-int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page, int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
+	int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_remove(ino_t this_inode);
-int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr, DIR_ENTRY_PAGE *temppage);
+int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
+					DIR_ENTRY_PAGE *temppage);
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode);
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr);
@@ -99,9 +142,6 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr);
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname, mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
-int change_parent_inode(ino_t self_inode, ino_t parent_inode1, ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
-int decrease_nlink_inode_file(ino_t this_inode);
-int init_dir_page(DIR_ENTRY_PAGE *temppage, ino_t self_inode, ino_t parent_inode, long long this_page_pos);
-int expire_meta_mem_cache_entry();
+int expire_meta_mem_cache_entry(void);
+
+#endif  /* GW20_HCFS_META_MEM_CACHE_H_ */
