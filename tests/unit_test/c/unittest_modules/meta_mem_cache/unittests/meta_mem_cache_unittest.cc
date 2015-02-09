@@ -22,6 +22,7 @@ extern "C" {
 	Unit testing for meta_cache_open_file() 
  */
 
+extern META_CACHE_HEADER_STRUCT *meta_mem_cache;
 class meta_cache_open_fileTest : public ::testing::Test {
 	protected:
 		virtual void SetUp() 
@@ -72,6 +73,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathNotExist)
 	/* Test whether it created meta file. */
 	EXPECT_EQ(0, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, TRUE);
+	EXPECT_EQ(0, access(TMP_META_FILE_PATH, F_OK));
 	/* Delete meta file and dir */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
 	ASSERT_EQ(0, rmdir(TMP_META_DIR));
@@ -105,4 +107,22 @@ TEST_F(meta_cache_open_fileTest, OpenMetaPathSuccess)
 
 /* 
 	End of unit testing for meta_cache_open_file() 
+ */
+
+/*
+	Unit testing for init_meta_cache_headers()
+ */
+TEST(init_meta_cache_headersTest, InitMetaCacheHeadersSuccess)
+{
+	int value;
+	EXPECT_EQ(0, init_meta_cache_headers());
+	for(int count=0 ; count<NUM_META_MEM_CACHE_HEADERS ; count++){
+		ASSERT_EQ(NULL, meta_mem_cache[count].last_entry);
+		ASSERT_EQ(0, sem_getvalue(&(meta_mem_cache[count].header_sem), &value));
+		ASSERT_EQ(1, value);
+	}
+
+}
+/*
+	End of unit testing for init_meta_cache_headers()
  */
