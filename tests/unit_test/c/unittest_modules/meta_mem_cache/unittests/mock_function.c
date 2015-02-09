@@ -4,14 +4,21 @@
 #include "super_block.h"
 #include "fuseop.h"
 #include "mock_tool.h"
+
+/*
+	Mock fetch_meta_path() function
+ */
 int fetch_meta_path(char *path, ino_t inode)
 {
 	switch(inode){
 	case FETCH_META_PATH_FAIL:
+		path[0] = '\0';
 		return -1;
 	case FETCH_META_PATH_SUCCESS:
-		strcpy(path, "/tmp/tmp_meta_path");
-		return 0;	
+		strcpy(path, TMP_META_FILE_PATH);
+		return 0;
+	default:
+		return -1;	
 	}
 }
 
