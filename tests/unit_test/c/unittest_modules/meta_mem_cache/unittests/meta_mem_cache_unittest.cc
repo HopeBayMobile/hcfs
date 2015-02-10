@@ -41,7 +41,19 @@ TEST_F(meta_cache_open_fileTest, FetchMetaPathFail)
 {
 	/* Create a situation that fetch_meta_path fails. */
 	body_ptr->meta_opened = FALSE;
-	body_ptr->inode_num = FETCH_META_PATH_FAIL; 
+	body_ptr->inode_num = INO__FETCH_META_PATH_FAIL; 
+	/* Test */
+	EXPECT_EQ(-1, meta_cache_open_file(body_ptr));
+	EXPECT_EQ(body_ptr->meta_opened, FALSE);
+}
+
+
+
+TEST_F(meta_cache_open_fileTest, FetchMetaPathError)
+{
+	/* Create a situation that fetch_meta_path error. */
+	body_ptr->meta_opened = FALSE;
+	body_ptr->inode_num = INO__FETCH_META_PATH_ERR; 
 	/* Test */
 	EXPECT_EQ(-1, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
@@ -54,7 +66,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathCannotAccess)
 	mkdir(TMP_META_DIR, 0700);
 	mknod(TMP_META_FILE_PATH, 0400, S_IFREG);
 	body_ptr->meta_opened = FALSE;
-	body_ptr->inode_num = FETCH_META_PATH_SUCCESS; 
+	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS; 
 	/* Test */
 	EXPECT_EQ(-1, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
@@ -69,7 +81,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathNotExist)
 	/* Create an empty meta dir. */
 	mkdir(TMP_META_DIR, 0700);
 	body_ptr->meta_opened = FALSE;
-	body_ptr->inode_num = FETCH_META_PATH_SUCCESS; 
+	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS; 
 	/* Test whether it created meta file. */
 	EXPECT_EQ(0, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, TRUE);
@@ -96,7 +108,7 @@ TEST_F(meta_cache_open_fileTest, OpenMetaPathSuccess)
 	mkdir(TMP_META_DIR, 0700);
 	mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
 	body_ptr->meta_opened = FALSE;
-	body_ptr->inode_num = FETCH_META_PATH_SUCCESS; 
+	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS; 
 	/* Test */
 	EXPECT_EQ(0, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, TRUE);

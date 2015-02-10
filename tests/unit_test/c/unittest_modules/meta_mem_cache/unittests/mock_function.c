@@ -11,11 +11,12 @@
 int fetch_meta_path(char *path, ino_t inode)
 {
 	switch(inode){
-	case FETCH_META_PATH_FAIL:
-		path[0] = '\0';
+	case INO__FETCH_META_PATH_FAIL:
 		return -1;
-	case FETCH_META_PATH_SUCCESS:
+	case INO__FETCH_META_PATH_SUCCESS:
 		strcpy(path, TMP_META_FILE_PATH);
+		return 0;
+	case INO__FETCH_META_PATH_ERR:
 		return 0;
 	default:
 		return -1;	
