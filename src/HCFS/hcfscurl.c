@@ -11,6 +11,7 @@
 #include <curl/curl.h>
 
 #include "hcfscurl.h"
+#include "b64encode.h"
 
 typedef struct {
     FILE *fptr;

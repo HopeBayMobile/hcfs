@@ -79,5 +79,3 @@ typedef struct {
 
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-
-void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outlen, int inputlen);
