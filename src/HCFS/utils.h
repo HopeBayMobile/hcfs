@@ -28,4 +28,8 @@ int read_system_config(char *config_path);
 int validate_system_config();
 
 off_t check_file_size(const char *path);
+
+int change_system_meta(long long system_size_delta,
+	long long cache_size_delta, long long cache_blocks_delta);
+
 #endif  /* GW20_SRC_UTILS_H_ */

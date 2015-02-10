@@ -76,7 +76,7 @@ int parse_list_header(FILE *fptr)
 
   while(!feof(fptr))
    {
-    ret_val = fgets(temp_string,1000,fptr);
+    fgets(temp_string,1000,fptr);
     if (!strncmp(temp_string,"X-Container-Object-Count",sizeof("X-Container-Object-Count")-1))
      {
       ret_val = sscanf(temp_string,"X-Container-Object-Count: %s\n",temp_string2);

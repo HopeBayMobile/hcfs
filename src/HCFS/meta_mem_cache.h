@@ -61,6 +61,13 @@ immediately, should release header lock and sleep for a short time, or skip
 to other entries.
 */
 
+#include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "fuseop.h"
 
 typedef struct {
 	struct stat this_stat;
