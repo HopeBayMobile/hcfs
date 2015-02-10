@@ -1,3 +1,21 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: filetables.h
+* Abstract: The c header file for file table managing.
+*
+* Revision History
+* 2015/2/10 Jiahong added header for this file, and revising coding style.
+*
+**************************************************************************/
+
+#include <semaphore.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "meta_mem_cache.h"
+
 /*BEGIN definition of file handle */
 
 #define MAX_OPEN_FILE_ENTRIES 65536
@@ -24,7 +42,7 @@ typedef struct {
 
 FH_TABLE_TYPE system_fh_table;
 
-int init_system_fh_table();
+int init_system_fh_table(void);
 long long open_fh(ino_t thisinode);
 int close_fh(long long index);
 int seek_page(FH_ENTRY *fh_ptr,long long target_page);
