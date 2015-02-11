@@ -210,6 +210,14 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 /*
 	Unit testing for meta_cache_drop_pages()
  */
+TEST(meta_cache_drop_pagesTest, CacheNotLocked)
+{
+	META_CACHE_ENTRY_STRUCT *body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	sem_init(&(body_ptr->access_sem), 0, 2);
+	EXPECT_EQ(-1, meta_cache_drop_pages(body_ptr));
+	free(body_ptr);
+}
+
 TEST(meta_cache_drop_pagesTest, SuccessDropAllPages)
 {
 	META_CACHE_ENTRY_STRUCT *body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));

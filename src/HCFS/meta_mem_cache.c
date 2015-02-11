@@ -1243,13 +1243,8 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	int sem_val;
-
-	sem_getvalue(&(target_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
@@ -1277,14 +1272,9 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret_val;
-	//int sem_val;
-
-	//sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	///* If cache lock not locked, return -1*/
-	//if (sem_val > 0)
-	//	return -1;
+	
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
 	gettimeofday(&(body_ptr->last_access_time), NULL);
 
 	if (body_ptr->dir_entry_cache[0] != NULL) {
