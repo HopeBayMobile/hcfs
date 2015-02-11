@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/11 Jiahong added header for this file, and revising coding style.
+*           Also changed inclusion of hcfs_cache.h to hcfs_cacheops.h.
 *
 **************************************************************************/
 #include "hfuse_system.h"
@@ -34,7 +35,7 @@
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
-#include "hcfs_cache.h"
+#include "hcfs_cacheops.h"
 #include "params.h"
 #include "utils.h"
 #include "filetables.h"

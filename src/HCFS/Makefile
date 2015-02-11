@@ -43,10 +43,10 @@ hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
 	$(CC) $(CFLAGS) -c hcfs_fromcloud.c
 
-hcfs_cacheops.o: hcfs_cacheops.c hcfs_cache.h params.h fuseop.h super_block.h
+hcfs_cacheops.o: hcfs_cacheops.c hcfs_cacheops.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cacheops.c
 
-hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cache.h params.h fuseop.h super_block.h
+hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cachebuild.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cachebuild.c
 
 hcfs_clouddelete.o: hcfs_clouddelete.c hcfs_clouddelete.h hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
