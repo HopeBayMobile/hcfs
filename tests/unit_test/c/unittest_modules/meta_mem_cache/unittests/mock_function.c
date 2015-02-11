@@ -4,7 +4,7 @@
 #include "super_block.h"
 #include "fuseop.h"
 #include "mock_tool.h"
-
+#include "meta_mem_cache.h"
 /*
 	Mock fetch_meta_path() function
  */
@@ -49,3 +49,5 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	return 0;
 }
+
+
