@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/2 Jiahong added header for this file.
+* 2015/2/11 Jiahong moved some functions to hfuse_system.h.
 *
 **************************************************************************/
 
@@ -127,9 +128,6 @@ FILE *logfptr;  /* File pointer to logs */
 pthread_t reporter_thread;  /* Used by utility prototype */
 
 /* Functions for initializing HCFS */
-void init_hfuse();
-int init_hcfs_system_data();
-int sync_hcfs_system_data(char need_lock);
 int hook_fuse(int argc, char **argv);
 
 #endif  /* GW20_HCFS_FUSEOP_H_ */

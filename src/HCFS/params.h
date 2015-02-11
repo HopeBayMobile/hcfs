@@ -1,17 +1,29 @@
-/* Finish the system config struct, then point the macros to the system config struct obj */
-/* Will need a config parser function and a config validator function */
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: params.h
+* Abstract: The header file for handling system parameters for HCFS
+*
+* Revision History
+* 2015/2/11 Jiahong added header for this file and revised coding style.
+*
+**************************************************************************/
+
+#ifndef GW20_SRC_PARAMS_H_
+#define GW20_SRC_PARAMS_H_
 
 typedef struct {
-  char *metapath;
-  char *blockpath;
-  char *superblock_name;
-  char *unclaimed_name;
-  char *hcfssystem_name;
-  long long cache_soft_limit;
-  long long cache_hard_limit;
-  long long cache_update_delta;
-  long long max_block_size;
- } SYSTEM_CONF_STRUCT;
+	char *metapath;
+	char *blockpath;
+	char *superblock_name;
+	char *unclaimed_name;
+	char *hcfssystem_name;
+	long long cache_soft_limit;
+	long long cache_hard_limit;
+	long long cache_update_delta;
+	long long max_block_size;
+} SYSTEM_CONF_STRUCT;
 
 #define METAPATH system_config.metapath
 #define BLOCKPATH system_config.blockpath
@@ -44,3 +56,4 @@ typedef struct {
 
 #define DEFAULT_CONFIG_PATH "/etc/hcfs.conf"
 
+#endif  /* GW20_SRC_PARAMS_H_ */

@@ -18,6 +18,7 @@
 #include "fuseop.h"
 #include "super_block.h"
 #include "global.h"
+#include "hfuse_system.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

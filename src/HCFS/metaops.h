@@ -10,6 +10,7 @@
 * Revision History
 * 2015/2/5 Jiahong created this file by moving some definition from
 *          meta_mem_cache.h.
+* 2015/2/11  Jiahong moved "seek_page" and "advance_block" from filetables
 *
 **************************************************************************/
 #ifndef GW20_HCFS_METAOPS_H_
@@ -21,6 +22,7 @@
 
 #include "fuseop.h"
 #include "meta_mem_cache.h"
+#include "filetables.h"
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
@@ -31,5 +33,9 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 int decrease_nlink_inode_file(ino_t this_inode);
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
 						long long this_page_pos);
+int seek_page(FH_ENTRY *fh_ptr, long long target_page);
+/*In advance block, need to write back dirty page if change page */
+long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,
+						long long *entry_index);
 
 #endif /* GW20_HCFS_METAOPS_H_ */

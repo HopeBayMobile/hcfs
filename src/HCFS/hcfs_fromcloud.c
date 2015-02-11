@@ -21,6 +21,7 @@ TODO: error handling for HTTP exceptions
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
+#include "hfuse_system.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

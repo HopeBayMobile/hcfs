@@ -508,7 +508,8 @@ _line_length = 80
 
 # The allowed extensions for file names
 # This is set by --extensions flag.
-_valid_extensions = set(['cc', 'h', 'cpp', 'cu', 'cuh'])
+# Jiahong (2/5/2015): Adding "c" to the list of extensions
+_valid_extensions = set(['cc', 'h', 'cpp', 'cu', 'cuh', 'c'])
 
 def ParseNolintSuppressions(filename, raw_line, linenum, error):
   """Updates the global list of error-suppressions.
@@ -4676,9 +4677,11 @@ def CheckIncludeLine(filename, clean_lines, linenum, include_state, error):
   # We also make an exception for Lua headers, which follow google
   # naming convention but not the include convention.
   match = Match(r'#include\s*"([^/]+\.h)"', line)
-  if match and not _THIRD_PARTY_HEADERS_PATTERN.match(match.group(1)):
-    error(filename, linenum, 'build/include', 4,
-          'Include the directory when naming .h files')
+
+  # Jiahong (2/5/15): Commenting out this check.
+  # if match and not _THIRD_PARTY_HEADERS_PATTERN.match(match.group(1)):
+  #  error(filename, linenum, 'build/include', 4,
+  #        'Include the directory when naming .h files')
 
   # we shouldn't include a file more than once. actually, there are a
   # handful of instances where doing so is okay, but in general it's
@@ -4865,9 +4868,11 @@ def CheckLanguage(filename, clean_lines, linenum, file_extension,
             'Use "unsigned short" for ports, not "short"')
   else:
     match = Search(r'\b(short|long(?! +double)|long long)\b', line)
-    if match:
-      error(filename, linenum, 'runtime/int', 4,
-            'Use int16/int64/etc, rather than the C type %s' % match.group(1))
+
+    # Jiahong (2/5/2015): Commenting out this check
+    #if match:
+    #  error(filename, linenum, 'runtime/int', 4,
+    #        'Use int16/int64/etc, rather than the C type %s' % match.group(1))
 
   # Check if some verboten operator overloading is going on
   # TODO(unknown): catch out-of-line unary operator&:
@@ -5480,9 +5485,10 @@ def CheckCStyleCast(filename, clean_lines, linenum, cast_type, pattern, error):
     return True
 
   # At this point, all that should be left is actual casts.
-  error(filename, linenum, 'readability/casting', 4,
-        'Using C-style cast.  Use %s<%s>(...) instead' %
-        (cast_type, match.group(1)))
+  # Jiahong (2/5/2015): Commenting out this check
+  #error(filename, linenum, 'readability/casting', 4,
+  #      'Using C-style cast.  Use %s<%s>(...) instead' %
+  #      (cast_type, match.group(1)))
 
   return True
 
