@@ -26,6 +26,13 @@
 #include "super_block.h"
 #include "dir_entry_btree.h"
 
+/* If cache lock not locked, return -1*/ 
+#define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
+	int sem_val; \
+	sem_getvalue((ptr_sem), &sem_val); \
+	if (sem_val > 0) \
+		return -1; 
+	
 /* TODO: cache meta file pointer and close only after some idle interval */
 /* TODO: delayed write to disk */
 /* TODO: Convert meta IO here and other files to allow segmented meta files */
@@ -1270,14 +1277,14 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret_val;
-	int sem_val;
+	//int sem_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
+	//sem_getvalue(&(body_ptr->access_sem), &sem_val);
 
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
-
+	///* If cache lock not locked, return -1*/
+	//if (sem_val > 0)
+	//	return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 	gettimeofday(&(body_ptr->last_access_time), NULL);
 
 	if (body_ptr->dir_entry_cache[0] != NULL) {
