@@ -4,29 +4,21 @@ TODO: Check if meta objects will be deleted with the deletion of files/dirs
 TODO: error handling for HTTP exceptions
 */
 
-#include <sys/types.h>
-#include <sys/stat.h>
+#include "hcfs_tocloud.h"
+
 #include <unistd.h>
 #include <time.h>
-#include <curl/curl.h>
-#include <semaphore.h>
-#include <pthread.h>
-#include <fuse.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <sys/file.h>
 
-
-#include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "params.h"
 #include "global.h"
-#include "hcfscurl.h"
 #include "super_block.h"
 #include "fuseop.h"
 
@@ -156,28 +148,28 @@ void collect_finished_upload_threads(void *ptr)
 
           if (access(thismetapath,F_OK)==-1)  /*If file is deleted*/
            {
-            sem_wait(&(delete_thread_control.delete_queue_sem));
-            sem_wait(&(delete_thread_control.delete_op_sem));
+            sem_wait(&(delete_ctl.delete_queue_sem));
+            sem_wait(&(delete_ctl.delete_op_sem));
             which_curl = -1;
             for(count2=0;count2<MAX_DELETE_CONCURRENCY;count2++)
              {
-              if (delete_thread_control.delete_threads_in_use[count2] == FALSE)
+              if (delete_ctl.threads_in_use[count2] == FALSE)
                {
-                delete_thread_control.delete_threads_in_use[count2] = TRUE;
-                delete_thread_control.delete_threads_created[count2] = FALSE;
-                delete_thread_control.delete_threads[count2].is_block = TRUE;
-                delete_thread_control.delete_threads[count2].inode = this_inode;
-                delete_thread_control.delete_threads[count2].blockno = blockno;
-                delete_thread_control.delete_threads[count2].which_curl = count2;
+                delete_ctl.threads_in_use[count2] = TRUE;
+                delete_ctl.threads_created[count2] = FALSE;
+                delete_ctl.delete_threads[count2].is_block = TRUE;
+                delete_ctl.delete_threads[count2].inode = this_inode;
+                delete_ctl.delete_threads[count2].blockno = blockno;
+                delete_ctl.delete_threads[count2].which_curl = count2;
 
-                delete_thread_control.total_active_delete_threads++;
+                delete_ctl.total_active_delete_threads++;
                 which_curl = count2;
                 break;
                }
              }
-            sem_post(&(delete_thread_control.delete_op_sem));
-            pthread_create(&(delete_thread_control.delete_threads_no[which_curl]),NULL, (void *)&con_object_dsync,(void *)&(delete_thread_control.delete_threads[which_curl]));
-            delete_thread_control.delete_threads_created[which_curl]=TRUE;
+            sem_post(&(delete_ctl.delete_op_sem));
+            pthread_create(&(delete_ctl.threads_no[which_curl]),NULL, (void *)&con_object_dsync,(void *)&(delete_ctl.delete_threads[which_curl]));
+            delete_ctl.threads_created[which_curl]=TRUE;
            }
 
 

@@ -1,3 +1,5 @@
+#ifndef GW20_HCFS_HCFSCURL_H_
+#define GW20_HCFS_HCFSCURL_H_
 
 #define S3 1
 #define SWIFT 0
@@ -61,21 +63,4 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
 
-/* Not backend-specific */
-
-void do_block_sync(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle, char *filename);
-void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
-void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle);
-void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
-
-void fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no);
-
-typedef struct {
-    ino_t this_inode;
-    long long block_no;
-    off_t page_start_fpos;
-    int entry_index;
-  } PREFETCH_STRUCT_TYPE;
-
-pthread_attr_t prefetch_thread_attr;
-void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
+#endif  /* GW20_HCFS_HCFSCURL_H_ */

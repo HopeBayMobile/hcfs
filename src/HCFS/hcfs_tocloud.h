@@ -1,4 +1,14 @@
 
+#include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <curl/curl.h>
+
+#include "hcfscurl.h"
+
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16
 
@@ -44,6 +54,9 @@ typedef struct {
 
 UPLOAD_THREAD_CONTROL upload_thread_control;
 SYNC_THREAD_CONTROL sync_thread_control;
+
+void do_block_sync(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle, char *filename);
+void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control();
 void init_sync_control();

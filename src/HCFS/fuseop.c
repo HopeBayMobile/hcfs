@@ -11,6 +11,7 @@
 * 2015/2/3~2/5 (Jiahong) Restructure hfuse_truncate, hfuse_write, hfuse_read
 *              functions
 * 2015/2/11 Jiahong added inclusion of hcfs_cacheops.h
+* 2015/2/12 Jiahong added inclusion of hcfs_fromcloud.h
 *
 **************************************************************************/
 
@@ -52,6 +53,7 @@
 #include "meta_mem_cache.h"
 #include "filetables.h"
 #include "hcfs_cacheops.h"
+#include "hcfs_fromcloud.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

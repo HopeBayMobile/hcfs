@@ -6,7 +6,7 @@
 * Abstract: The c source code file for cache management operations.
 *
 * Revision History
-* 2015/2/11 Jiahong added header for this file, and revising coding style.
+* 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 *
 **************************************************************************/
 
