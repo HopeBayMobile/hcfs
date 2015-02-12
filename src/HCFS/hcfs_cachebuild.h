@@ -3,11 +3,11 @@
 * Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: hcfs_cachebuild.h
-* Abstract: The c header file for b64-encoding operations.
+* Abstract: The c header file for building structure for cache usage.
 *
 * Revision History
-* 2015/2/10 Jiahong created this file from part of hcfs_cache.h.
-* 2015/2/10 Jiahong added header for this file, and revising coding style.
+* 2015/2/11 Jiahong created this file from part of hcfs_cache.h.
+* 2015/2/11 Jiahong added header for this file, and revising coding style.
 *
 **************************************************************************/
 #ifndef GW20_HCFS_HCFS_CACHEBUILD_H_
