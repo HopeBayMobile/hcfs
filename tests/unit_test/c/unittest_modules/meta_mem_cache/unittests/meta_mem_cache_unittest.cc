@@ -415,3 +415,89 @@ TEST_F(meta_cache_unlock_entryTest, CacheIsLock)
 /*
 	End of unit testing for meta_cache_unlock_entry()
  */
+
+/*
+	Unit testing for meta_cache_remove()
+ */
+class meta_cache_removeTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			init_meta_cache_headers();
+			extern sem_t num_entry_sem; 
+		}
+
+		virtual void TearDown() 
+		{
+			free(meta_mem_cache);
+		}
+};
+
+TEST_F(meta_cache_removeTest, InodeNotFound)
+{
+	int index;
+	int ino;
+
+	for(int i=0 ; i<5 ; i++){
+		ino = i*9527; 
+		index = ino % NUM_META_MEM_CACHE_HEADERS;
+		EXPECT_EQ(0, meta_cache_remove(ino));
+		EXPECT_EQ(0, meta_mem_cache[index].num_entries);
+		EXPECT_EQ(NULL, meta_mem_cache[index].last_entry);
+		EXPECT_EQ(NULL, meta_mem_cache[index].meta_cache_entries);
+	}
+}
+
+TEST_F(meta_cache_removeTest, RemoveAll)
+{
+	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
+	int index_list[3] = {1, 5, 60}; /* push into meta_mem_cache[1/5/60] */
+	int num_entry = 3*50;  /* 50 is number of entry for linked list meta_mem_cache[1/5/60] */
+	int ino_list[num_entry];
+	bool is_removed[num_entry];
+
+	/* Generate mock data */
+	for(int i=0 ; i<num_entry ; i++){
+		ino_list[i] = index_list[i%3] + NUM_META_MEM_CACHE_HEADERS*(i/3); /* Generate inode number */
+		/* Init lptr */
+		lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+		sem_init(&(lptr->body.access_sem), 0, 1);
+		lptr->inode_num = ino_list[i];
+		lptr->next = NULL;
+		lptr->prev = NULL;
+		/* Push into list */
+		int index = ino_list[i] % NUM_META_MEM_CACHE_HEADERS;
+		if(meta_mem_cache[index].meta_cache_entries != NULL){
+			meta_mem_cache[index].meta_cache_entries->prev = lptr;
+			lptr->next = meta_mem_cache[index].meta_cache_entries;
+		}else{
+			meta_mem_cache[index].last_entry = lptr;
+			lptr->prev = NULL;
+		}
+		meta_mem_cache[index].meta_cache_entries = lptr;
+		is_removed[i] = false;
+	}
+
+	/* Test */
+	int random_i;
+	int lookup_index;
+	for(int i=0 ; i<num_entry ; i++){
+		random_i = (i+7) % num_entry;  /* Random start position */
+		EXPECT_EQ(0, meta_cache_remove(ino_list[random_i]));
+		is_removed[random_i] = true;
+		lookup_index = ino_list[random_i] % NUM_META_MEM_CACHE_HEADERS;
+		lptr = meta_mem_cache[lookup_index].last_entry;
+		for(int count=0 ; lptr!=NULL ; count++){
+			if(is_removed[count] == true || 
+			   ino_list[count] % NUM_META_MEM_CACHE_HEADERS != lookup_index)
+				continue;
+			/* Check inode number for remainder */
+			ASSERT_EQ(ino_list[count], lptr->inode_num);
+			lptr = lptr->prev;
+		}
+	}
+}
+/*
+	End of unit testing for meta_cache_remove()
+ */
+
