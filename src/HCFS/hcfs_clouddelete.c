@@ -7,7 +7,7 @@
 *           backend.
 *
 * Revision History
-* 2015/2/12 Jiahong added header for this file, and revising coding style.
+* 2015/2/12~13 Jiahong added header for this file, and revising coding style.
 *
 **************************************************************************/
 
@@ -44,9 +44,13 @@ static DSYNC_THREAD_TYPE dsync_thread_info[MAX_DSYNC_CONCURRENCY];
 
 CURL_HANDLE delete_curl_handles[MAX_DELETE_CONCURRENCY];
 
+/* Helper function for terminating threads in deleting backend objects */
+/* Dsync threads are the ones that find the objects to be deleted in
+	a single filesystem object. */
 static inline void _dsync_terminate_thread(int index)
 {
 	int ret;
+
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
 			(dsync_ctl.threads_created[index] == TRUE)) {
 		ret = pthread_tryjoin_np(dsync_ctl.inode_dsync_thread[index],
@@ -60,6 +64,16 @@ static inline void _dsync_terminate_thread(int index)
 	}
 }
 
+/************************************************************************
+*
+* Function name: collect_finished_dsync_threads
+*        Inputs: void *ptr
+*       Summary: Collect finished dsync threads and terminate them.
+*                Dsync threads are the ones that find the objects to
+*                be deleted in a single filesystem object.
+*  Return value: None
+*
+*************************************************************************/
 void collect_finished_dsync_threads(void *ptr)
 {
 	int count;
@@ -79,7 +93,7 @@ void collect_finished_dsync_threads(void *ptr)
 			nanosleep(&time_to_sleep, NULL);
 			continue;
 		}
-		for(count = 0; count< MAX_DSYNC_CONCURRENCY; count++)
+		for (count = 0; count < MAX_DSYNC_CONCURRENCY; count++)
 			_dsync_terminate_thread(count);
 
 		sem_post(&(dsync_ctl.dsync_op_sem));
@@ -88,10 +102,13 @@ void collect_finished_dsync_threads(void *ptr)
 	}
 }
 
+/* Helper function for terminating threads in deleting backend objects */
+/* Delete threads are the ones that delete a single backend object. */
 static inline void _delete_terminate_thread(int index)
 {
 	int ret;
-	if (((delete_ctl.threads_in_use[index]!=0) &&
+
+	if (((delete_ctl.threads_in_use[index] != 0) &&
 		(delete_ctl.delete_threads[index].is_block == TRUE)) &&
 				(delete_ctl.threads_created[index] == TRUE)) {
 		ret = pthread_tryjoin_np(delete_ctl.threads_no[index],
@@ -105,6 +122,16 @@ static inline void _delete_terminate_thread(int index)
 	}
 }
 
+/************************************************************************
+*
+* Function name: collect_finished_delete_threads
+*        Inputs: void *ptr
+*       Summary: Collect finished delete threads and terminate them.
+*                Delete threads are the ones that delete a single
+*                backend object.
+*  Return value: None
+*
+*************************************************************************/
 void collect_finished_delete_threads(void *ptr)
 {
 	int count;
@@ -128,12 +155,22 @@ void collect_finished_delete_threads(void *ptr)
 			_delete_terminate_thread(count);
 
 		sem_post(&(delete_ctl.delete_op_sem));
-		nanosleep(&time_to_sleep,NULL);
+		nanosleep(&time_to_sleep, NULL);
 		continue;
 	}
 }
 
-void init_dsync_control()
+/************************************************************************
+*
+* Function name: init_dsync_control
+*        Inputs: None
+*       Summary: Initialize control for dsync threads and create the threads.
+*                Dsync threads are the ones that find the objects to
+*                be deleted in a single filesystem object.
+*  Return value: None
+*
+*************************************************************************/
+void init_dsync_control(void)
 {
 	memset(&dsync_ctl, 0, sizeof(DSYNC_THREAD_CONTROL));
 	sem_init(&(dsync_ctl.dsync_op_sem), 0, 1);
@@ -148,9 +185,11 @@ void init_dsync_control()
 				(void *)&collect_finished_dsync_threads, NULL);
 }
 
+/* Helper for initializing curl handles for deleting backend objects */
 static inline int _init_delete_handle(int index)
 {
 	int ret_val;
+
 	ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
@@ -161,9 +200,19 @@ static inline int _init_delete_handle(int index)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: init_delete_control
+*        Inputs: None
+*       Summary: Initialize control for delete threads and create the threads.
+*                Delete threads are the ones that delete a single
+*                backend object.
+*  Return value: None
+*
+*************************************************************************/
 void init_delete_control(void)
 {
-	int count,ret_val;
+	int count, ret_val;
 
 	memset(&delete_ctl, 0, sizeof(DELETE_THREAD_CONTROL));
 	memset(&delete_curl_handles, 0,
@@ -181,10 +230,9 @@ void init_delete_control(void)
 
 	pthread_create(&(delete_ctl.delete_handler_thread), NULL,
 			(void *)&collect_finished_delete_threads, NULL);
-
-	return;
 }
 
+/* Helper function for marking a delete thread as in use */
 static inline int _use_delete_thread(int index, char is_blk_flag,
 				ino_t this_inode, long long blockno)
 {
@@ -204,6 +252,16 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: dsync_single_inode
+*        Inputs: DSYNC_THREAD_TYPE *ptr
+*       Summary: For the filesystem object marked in "ptr", scan the meta
+*                file to check if we need to schedule backend items for
+*                deletion.
+*  Return value: None
+*
+*************************************************************************/
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
 	char thismetapath[400];
@@ -354,20 +412,21 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	sem_post(&(delete_ctl.delete_op_sem));
 	sem_post(&(delete_ctl.delete_queue_sem));
 
-/*Wait for any upload to complete and change super inode from to_delete to deleted*/
+	/*Wait for any upload to complete and change super inode
+		from to_delete to deleted*/
 
 	while (TRUE) {
 		in_sync = FALSE;
-		sem_wait(&(sync_thread_control.sync_op_sem));
+		sem_wait(&(sync_ctl.sync_op_sem));
 		/*Check if this inode is being synced now*/
 		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
-			if (sync_thread_control.sync_threads_in_use[count] ==
+			if (sync_ctl.threads_in_use[count] ==
 					this_inode) {
-				 in_sync = TRUE;
-				 break;
+				in_sync = TRUE;
+				break;
 			}
 		}
-		sem_post(&(sync_thread_control.sync_op_sem));
+		sem_post(&(sync_ctl.sync_op_sem));
 		if (in_sync == TRUE)
 			sleep(10);
 		else
@@ -376,10 +435,17 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
-
-	return;
 }
 
+/************************************************************************
+*
+* Function name: do_meta_delete
+*        Inputs: ino_t this_inode, CURL_HANDLE *curl_handle
+*       Summary: Given curl handle "curl_handle", delete the meta object
+*                of inode number "this_inode" from backend.
+*  Return value: None
+*
+*************************************************************************/
 void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
@@ -390,12 +456,43 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 						objname, this_inode);
 	sprintf(curl_handle->id, "delete_meta_%lld", this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
-	return;
 }
 
+/************************************************************************
+*
+* Function name: do_block_delete
+*        Inputs: ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle
+*       Summary: Given curl handle "curl_handle", delete the block object
+*                of inode number "this_inode", block no "block_no" from backend.
+*  Return value: None
+*
+*************************************************************************/
+void do_block_delete(ino_t this_inode, long long block_no,
+						CURL_HANDLE *curl_handle)
+{
+	char objname[1000];
+	int ret_val;
+
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	printf("Debug delete object: objname %s, inode %lld, block %lld\n",
+					objname, this_inode, block_no);
+	sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+	ret_val = hcfs_delete_object(objname, curl_handle);
+}
+
+/************************************************************************
+*
+* Function name: con_object_dsync
+*        Inputs: DELETE_THREAD_TYPE *delete_thread_ptr
+*       Summary: For the info marked in delete thread "delete_thread_ptr",
+*                check whether this is a block object or meta object deletion.
+*  Return value: None
+*
+*************************************************************************/
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	int which_curl;
+
 	which_curl = delete_thread_ptr->which_curl;
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
@@ -404,8 +501,6 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	else
 		do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
-
-	return;
 }
 
 /* Helper for creating threads for deletion */
@@ -418,7 +513,8 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 	dsync_thread_info[index].inode = this_inode;
 	dsync_thread_info[index].this_mode = this_mode;
 	pthread_create(&(dsync_ctl.inode_dsync_thread[index]), NULL,
-		(void *)&dsync_single_inode, (void *)&(dsync_thread_info[index]));
+		(void *)&dsync_single_inode,
+				(void *)&(dsync_thread_info[index]));
 	dsync_ctl.threads_created[index] = TRUE;
 	dsync_ctl.total_active_dsync_threads++;
 	return 0;
@@ -437,7 +533,7 @@ void *delete_loop(void *arg)
 {
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;
-	int count,sleep_count;
+	int count, sleep_count;
 	char in_dsync;
 	int ret_val;
 
@@ -472,13 +568,14 @@ void *delete_loop(void *arg)
 			}
 		}
 		super_block_share_release();
-			
+
 		if (inode_to_dsync != 0) {
 			sem_wait(&(dsync_ctl.dsync_op_sem));
 			/*First check if this inode is actually being
 				dsynced now*/
 			in_dsync = FALSE;
-			for (count = 0; count<MAX_DSYNC_CONCURRENCY; count++) {
+			for (count = 0; count < MAX_DSYNC_CONCURRENCY;
+								count++) {
 				if (dsync_ctl.threads_in_use[count] ==
 							inode_to_dsync) {
 					in_dsync = TRUE;
@@ -499,7 +596,7 @@ void *delete_loop(void *arg)
 			} else {  /*If already dsyncing to cloud*/
 				sem_post(&(dsync_ctl.dsync_op_sem));
 				sem_post(&(dsync_ctl.dsync_queue_sem));
-			}				
+			}
 		} else {
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		}

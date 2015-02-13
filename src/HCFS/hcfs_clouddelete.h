@@ -1,3 +1,18 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: hcfs_clouddelete.h
+* Abstract: The c header file for deleting meta or data from
+*           backend.
+*
+* Revision History
+* 2015/2/13 Jiahong added header for this file, and revising coding style.
+*
+**************************************************************************/
+#ifndef GW20_HCFS_HCFS_CLOUDDELETE_H_
+#define GW20_HCFS_HCFS_CLOUDDELETE_H_
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <semaphore.h>
@@ -12,45 +27,48 @@
 #define MAX_DSYNC_CONCURRENCY 16
 
 typedef struct {
-    ino_t inode;
-    long long blockno;
-    char is_block;
-    int which_curl;
- } DELETE_THREAD_TYPE;
+	ino_t inode;
+	long long blockno;
+	char is_block;
+	int which_curl;
+} DELETE_THREAD_TYPE;
 
 typedef struct {
-    ino_t inode;
-    mode_t this_mode;
- } DSYNC_THREAD_TYPE;
+	ino_t inode;
+	mode_t this_mode;
+} DSYNC_THREAD_TYPE;
 
-typedef struct {
-    sem_t delete_queue_sem; /*Initialize this to MAX_DELETE_CONCURRENCY. Decrease when created a thread for deletion, and increase when a thread finished and is joined by the handler thread*/
-    sem_t delete_op_sem;
-    pthread_t delete_handler_thread;
-    DELETE_THREAD_TYPE delete_threads[MAX_DELETE_CONCURRENCY];
-    pthread_t threads_no[MAX_DELETE_CONCURRENCY];
-    char threads_in_use[MAX_DELETE_CONCURRENCY];
-    char threads_created[MAX_DELETE_CONCURRENCY];
-    int total_active_delete_threads;
 /*delete threads: used for deleting objects to backends*/
-
-  } DELETE_THREAD_CONTROL;
-
 typedef struct {
-    sem_t dsync_op_sem;
-    sem_t dsync_queue_sem; /*similar to delete_queue_sem*/
-    pthread_t dsync_handler_thread;
-    pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
-    ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
-    char threads_created[MAX_DSYNC_CONCURRENCY];
-    int total_active_dsync_threads;
+	/*Initialize this to MAX_DELETE_CONCURRENCY. Decrease when
+	created a thread for deletion, and increase when a thread
+	finished and is joined by the handler thread*/
+	sem_t delete_queue_sem;
+	sem_t delete_op_sem;
+	pthread_t delete_handler_thread;
+	DELETE_THREAD_TYPE delete_threads[MAX_DELETE_CONCURRENCY];
+	pthread_t threads_no[MAX_DELETE_CONCURRENCY];
+	char threads_in_use[MAX_DELETE_CONCURRENCY];
+	char threads_created[MAX_DELETE_CONCURRENCY];
+	int total_active_delete_threads;
+} DELETE_THREAD_CONTROL;
+
 /*dsync threads: used for dsyncing meta/block in a single inode*/
-  } DSYNC_THREAD_CONTROL;
+typedef struct {
+	sem_t dsync_op_sem;
+	sem_t dsync_queue_sem; /*similar to delete_queue_sem*/
+	pthread_t dsync_handler_thread;
+	pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
+	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
+	char threads_created[MAX_DSYNC_CONCURRENCY];
+	int total_active_dsync_threads;
+} DSYNC_THREAD_CONTROL;
 
 DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
-void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle);
+void do_block_delete(ino_t this_inode, long long block_no,
+					CURL_HANDLE *curl_handle);
 void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
 void init_delete_control(void);
@@ -61,3 +79,4 @@ void collect_finished_delete_threads(void *ptr);
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr);
 void *delete_loop(void *arg);
 
+#endif  /* GW20_HCFS_HCFS_CLOUDDELETE_H_ */
