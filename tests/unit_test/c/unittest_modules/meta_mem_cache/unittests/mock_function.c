@@ -45,9 +45,28 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *current_node, int 
 	return 0;
 }
 
+struct stat *get_test_stat(ino_t inode_num)
+{
+	struct stat *test_stat = (struct stat *)malloc(sizeof(struct stat));
+	memset(test_stat, 0, sizeof(struct stat));
+	test_stat->st_ino = inode_num;
+	test_stat->st_nlink = inode_num + 3;
+	test_stat->st_uid = inode_num + 6;
+	test_stat->st_gid = inode_num + 9;
+	test_stat->st_size = inode_num * 97;
+	return test_stat;
+
+}
+
 int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	if(inode_ptr == NULL)
+		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
+
+	memcpy(&(inode_ptr->inode_stat), get_test_stat(this_inode), sizeof(struct stat));
 	return 0;
 }
+
+
 
 

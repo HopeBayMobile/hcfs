@@ -90,10 +90,11 @@ meta_mem_cache.o : $(USER_DIR)/meta_mem_cache.c $(USER_DIR)/global.h $(USER_DIR)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/meta_mem_cache.c
 
 meta_mem_cache_unittest.o : $(UNITTEST_DIR)/meta_mem_cache_unittest.cc \
-                      $(USER_DIR)/meta_mem_cache.h $(USER_DIR)/meta_mem_cache.c $(GTEST_HEADERS)
+                      $(USER_DIR)/meta_mem_cache.h $(USER_DIR)/meta_mem_cache.c \
+		      $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/meta_mem_cache_unittest.cc
 
-mock_function.o : $(UNITTEST_DIR)/mock_function.c 
+mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_tool.h 
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
 
 meta_mem_cache_unittest : mock_function.o meta_mem_cache.o meta_mem_cache_unittest.o gtest_main.a

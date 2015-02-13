@@ -15,15 +15,16 @@ extern "C" {
 #include "dir_entry_btree.h"
 #include "super_block.h"
 #include "meta_mem_cache.h"
+#include "mock_tool.h"
 }
 #include "gtest/gtest.h"
-#include "mock_tool.h"
-
 /* 
 	Unit testing for meta_cache_open_file() 
  */
 
 extern META_CACHE_HEADER_STRUCT *meta_mem_cache;
+extern long current_meta_mem_cache_entries;
+
 class meta_cache_open_fileTest : public ::testing::Test {
 	protected:
 		virtual void SetUp() 
@@ -338,4 +339,79 @@ TEST_F(meta_cache_push_dir_pageTest, BothNonempty)
 }
 /*
 	End of unit testing for meta_cache_push_dir_page()
+ */
+
+/*
+	Unit testing for meta_cache_lock_entry()
+ */
+TEST(meta_cache_lock_entryTest, InsertMetaCache)
+{
+	init_meta_cache_headers();
+	META_CACHE_ENTRY_STRUCT *tmp_meta_entry;
+	struct stat *expected_stat;
+	for(int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++){
+		int ino = i*5;
+		int sem_val;
+		tmp_meta_entry = meta_cache_lock_entry(ino);
+		expected_stat = get_test_stat(ino);
+		sem_getvalue(&(tmp_meta_entry->access_sem), &sem_val);
+		/* Check lock, number of current cache entries, and stat content */
+		ASSERT_EQ(0, sem_val);
+		ASSERT_EQ(i+1, current_meta_mem_cache_entries);
+		ASSERT_EQ(0, memcmp(&(tmp_meta_entry->this_stat), expected_stat, sizeof(struct stat)));
+	}
+
+	/* For each bucket number i, check the linked list of meta_mem_cache[i] */
+	for(int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i+=5){
+		int ino = i;
+		META_CACHE_LOOKUP_ENTRY_STRUCT *current = meta_mem_cache[i].last_entry;
+		int count = 0;
+		while(current != NULL){
+			ino = i + NUM_META_MEM_CACHE_HEADERS*count;
+			ASSERT_EQ(ino, current->inode_num);
+			current = current->prev;
+			count++;
+		}
+	}
+	free(meta_mem_cache);
+}
+/*
+	End of unit testing for meta_cache_lock_entry()
+ */
+
+/*
+	Unit testing for meta_cache_unlock_entry()
+ */
+class meta_cache_unlock_entryTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
+		}
+
+		virtual void TearDown() 
+		{
+			free(body_ptr);
+		}
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+};
+
+TEST_F(meta_cache_unlock_entryTest, CacheIsUnlock)
+{
+	/* Test */
+	EXPECT_EQ(-1, meta_cache_unlock_entry(body_ptr));
+}
+
+TEST_F(meta_cache_unlock_entryTest, CacheIsLock)
+{
+	int sem_val;
+	sem_wait(&(body_ptr->access_sem));
+	/* Test */
+	EXPECT_EQ(0, meta_cache_unlock_entry(body_ptr));
+	sem_getvalue(&(body_ptr->access_sem), &sem_val);
+	EXPECT_EQ(1, sem_val);
+}
+/*
+	End of unit testing for meta_cache_unlock_entry()
  */

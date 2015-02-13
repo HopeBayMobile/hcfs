@@ -123,6 +123,7 @@ int init_meta_cache_headers(void)
 	sem_init(&num_entry_sem, 0, 1);
 	for (count = 0; count < NUM_META_MEM_CACHE_HEADERS; count++) {
 		ret_val = sem_init(&(meta_mem_cache[count].header_sem), 0, 1);
+		meta_mem_cache[count].meta_cache_entries = NULL;
 		meta_mem_cache[count].last_entry = NULL;
 		if (ret_val < 0) {
 			free(meta_mem_cache);
@@ -264,13 +265,8 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret_val;
 	int ret_code;
-	int sem_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock is not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (body_ptr->something_dirty == FALSE)
 		return 0;
@@ -1213,13 +1209,8 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	int sem_val;
-
-	sem_getvalue(&(target_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
