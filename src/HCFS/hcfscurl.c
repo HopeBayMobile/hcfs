@@ -416,6 +416,16 @@ void hcfs_destroy_S3_backend(CURL *curl)
 	curl_easy_cleanup(curl);
 }
 
+/************************************************************************
+*
+* Function name: read_file_function
+*        Inputs: void *ptr, size_t size, size_t nmemb, void *put_control1
+*       Summary: In put operations, read data from file stream pointed in
+*                "put_control1", update the remaining size after the read,
+*                and return the number of bytes read in this function call.
+*  Return value: Number of bytes read in this function call.
+*
+*************************************************************************/
 size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 							void *put_control1)
 {
@@ -443,6 +453,14 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 	return total_size;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_swift_list_container
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: For Swift backends, list the current container.
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 {
 	/*TODO: How to actually export the list of objects to other functions*/
@@ -510,6 +528,16 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_swift_put_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: For Swift backends, put to object "objname" by reading
+*                from opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -582,6 +610,16 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_swift_get_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: For Swift backends, get object "objname" and write to
+*                opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -649,6 +687,15 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_swift_delete_object
+*        Inputs: char *objname, CURL_HANDLE *curl_handle
+*       Summary: For Swift backends, delete object "objname", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -705,6 +752,15 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: convert_currenttime
+*        Inputs: unsigned char *date_string
+*       Summary: For S3 backend, convert the current time to a format that
+*                can be used for creating signature string.
+*  Return value: None.
+*
+*************************************************************************/
 void convert_currenttime(unsigned char *date_string)
 {
 	unsigned char current_time[100];
@@ -731,6 +787,15 @@ void convert_currenttime(unsigned char *date_string)
 	printf("converted string %s\n", date_string);
 }
 
+/************************************************************************
+*
+* Function name: compute_hmac_sha1
+*        Inputs: unsigned char *input_str, unsigned char *output_str,
+*                unsigned char *key, int *outputlen
+*       Summary: For S3 backend, compute HMAC-SHA1 string for signature use.
+*  Return value: None.
+*
+*************************************************************************/
 void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 					unsigned char *key, int *outputlen)
 {
@@ -758,6 +823,15 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	printf("\n");
 }
 
+/************************************************************************
+*
+* Function name: generate_S3_sig
+*        Inputs: unsigned char *method, unsigned char *date_string,
+*                unsigned char *sig_string, unsigned char *resource_string
+*       Summary: Compute the signature string for S3 backend.
+*  Return value: None.
+*
+*************************************************************************/
 void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 		unsigned char *sig_string, unsigned char *resource_string)
 {
@@ -775,6 +849,14 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 	printf("final sig: %s, %d\n", sig_string, hashlen);
 }
 
+/************************************************************************
+*
+* Function name: hcfs_S3_list_container
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: For S3 backends, list the current bucket.
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 {
 	/*TODO: How to actually export the list of objects
@@ -858,6 +940,14 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_init_backend
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: Initialize backend for curl handle "curl_handle"
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
 	int ret_val;
@@ -882,6 +972,14 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_destroy_backend
+*        Inputs: CURL *curl
+*       Summary: Cleanup the curl handle "curl"
+*  Return value: None.
+*
+*************************************************************************/
 void hcfs_destroy_backend(CURL *curl)
 {
 	switch (CURRENT_BACKEND) {
@@ -896,6 +994,14 @@ void hcfs_destroy_backend(CURL *curl)
 	}
 }
 
+/************************************************************************
+*
+* Function name: hcfs_S3_list_container
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: List the current container (Bucket).
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT. Now will try
 	to reauth for any HTTP error*/
 /* TODO: nothing is actually returned in list container. FIX THIS*/
@@ -923,6 +1029,16 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_put_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: Put to object "objname" by reading
+*                from opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT. Now will try to reauth for
 		any HTTP error*/
 int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
@@ -952,6 +1068,16 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_get_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: Get object "objname" and write to
+*                opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT.
 	Now will try to reauth for any HTTP error*/
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
@@ -975,6 +1101,15 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return status;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_delete_object
+*        Inputs: char *objname, CURL_HANDLE *curl_handle
+*       Summary: Delete object "objname", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT.
 	Now will try to reauth for any HTTP error*/
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
@@ -1009,6 +1144,16 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_S3_put_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: For S3 backends, put to object "objname" by reading
+*                from opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -1099,6 +1244,16 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_S3_get_object
+*        Inputs: FILE *fptr, char *objname, CURL_HANDLE *curl_handle
+*       Summary: For S3 backends, get object "objname" and write to
+*                opened file pointed by "fptr", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -1184,6 +1339,15 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: hcfs_S3_delete_object
+*        Inputs: char *objname, CURL_HANDLE *curl_handle
+*       Summary: For S3 backends, delete object "objname", using curl handle
+*                pointed by "curl_handle".
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
