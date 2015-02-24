@@ -1,0 +1,145 @@
+#include <sys/types.h>
+#include <string.h>
+#include <curl/curl.h>
+#include <fuse.h>
+
+#include "meta_mem_cache.h"
+#include "filetables.h"
+#include "hcfs_fromcloud.h"
+
+ino_t lookup_pathname(const char *path, int *errcode)
+{
+	return 1;
+}
+
+off_t check_file_size(const char *path)
+{
+	return 0;
+}
+
+int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
+{
+	strcpy(pathname,"test");
+	return 0;
+}
+
+int change_system_meta(long long system_size_delta,
+		long long cache_size_delta, long long cache_blocks_delta)
+{
+	return 0;
+}
+
+int parse_parent_self(const char *pathname, char *parentname, char *selfname)
+{
+	return 0;
+}
+
+long long open_fh(ino_t thisinode)
+{
+	return 1;
+}
+
+int close_fh(long long index)
+{
+	return 0;
+}
+
+int seek_page(FH_ENTRY *fh_ptr, long long target_page)
+{
+	return 0;
+}
+
+long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,
+						long long *entry_index)
+{
+	return 1;
+}
+
+void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
+{
+	return 0;
+}
+int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
+{
+	return 0;
+}
+
+void sleep_on_cache_full(void)
+{
+	return;
+}
+
+int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
+int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
+			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
+{
+	return 0;
+}
+
+int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
+						struct stat *this_stat)
+{
+	return 0;
+}
+
+int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
+						struct stat *this_stat)
+{
+	return 0;
+}
+
+int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+{
+	return 0;
+}
+
+int meta_forget_inode(ino_t self_inode)
+{
+	return 0;
+}
+
+int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+{
+	return 0;
+}
+
+ino_t super_block_new_inode(struct stat *in_stat)
+{
+	return 2;
+}
+
+int super_block_share_locking(void)
+{
+	return 0;
+}
+
+int super_block_share_release(void)
+{
+	return 0;
+}
+
+int invalidate_pathname_cache_entry(const char *path)
+{
+	return 0;
+}
+
+void hcfs_destroy_backend(CURL *curl)
+{
+	return;
+}
+
