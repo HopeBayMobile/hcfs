@@ -34,6 +34,8 @@ CXX = gcc
 
 CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
 
+CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
+
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
 TESTS = utils_unittest
@@ -82,7 +84,7 @@ utils.o : $(USER_DIR)/utils.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/utils.c
 
 utils_fakeftn.o : $(UNITTEST_DIR)/utils_fakeftn.c 
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(UNITTEST_DIR)/utils_fakeftn.c
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/utils_fakeftn.c
 
 utils_unittest.o : $(UNITTEST_DIR)/utils_unittest.cc \
                      $(USER_DIR)/utils.h $(GTEST_HEADERS)
