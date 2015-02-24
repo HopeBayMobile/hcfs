@@ -211,35 +211,42 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 /*
 	Unit testing for meta_cache_drop_pages()
  */
-TEST(meta_cache_drop_pagesTest, CacheNotLocked)
+class meta_cache_drop_pagesTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
+		}
+
+		virtual void TearDown() 
+		{
+			free(body_ptr);
+		}
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+};
+
+TEST_F(meta_cache_drop_pagesTest, CacheNotLocked)
 {
-	META_CACHE_ENTRY_STRUCT *body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-	sem_init(&(body_ptr->access_sem), 0, 2);
 	EXPECT_EQ(-1, meta_cache_drop_pages(body_ptr));
-	free(body_ptr);
 }
 
-TEST(meta_cache_drop_pagesTest, SuccessDropAllPages)
+TEST_F(meta_cache_drop_pagesTest, SuccessDropAllPages)
 {
-	META_CACHE_ENTRY_STRUCT *body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-	sem_init(&(body_ptr->access_sem), 0, 1);
-	sem_wait(&(body_ptr->access_sem));
-	body_ptr->meta_opened = TRUE;
+
+	body_ptr->meta_opened = FALSE;
 	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));	
 	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 	body_ptr->dir_entry_cache_dirty[0] = TRUE;	
 	body_ptr->dir_entry_cache_dirty[1] = TRUE;
 	/* Test */
+	sem_wait(&(body_ptr->access_sem));
 	EXPECT_EQ(0, meta_cache_drop_pages(body_ptr));
 	EXPECT_EQ(NULL, body_ptr->dir_entry_cache[0]);	
 	EXPECT_EQ(NULL, body_ptr->dir_entry_cache[1]);	
 	EXPECT_EQ(FALSE, body_ptr->dir_entry_cache_dirty[0]);	
 	EXPECT_EQ(FALSE, body_ptr->dir_entry_cache_dirty[1]);	
-	/* Free memory */
 	sem_post(&(body_ptr->access_sem));
-	free(body_ptr->dir_entry_cache[0]);
-	free(body_ptr->dir_entry_cache[1]);
-	free(body_ptr);
 }
 /*
 	End of unit testing for meta_cache_drop_pages()
@@ -452,7 +459,7 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 {
 	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
 	int index_list[3] = {1, 5, 60}; /* push into meta_mem_cache[1/5/60] */
-	int num_entry = 3*50;  /* 50 is number of entry for linked list meta_mem_cache[1/5/60] */
+	int num_entry = 3*50;  /* 50 is number of entry in bucket of linked list meta_mem_cache[1/5/60] */
 	int ino_list[num_entry];
 	bool is_removed[num_entry];
 
@@ -501,3 +508,42 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 	End of unit testing for meta_cache_remove()
  */
 
+/*
+	Unit testing for meta_cache_update_file_data()
+ */
+class meta_cache_update_file_dataTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
+		}
+
+		virtual void TearDown() 
+		{
+			sem_destroy(&(body_ptr->access_sem));
+			free(body_ptr);
+		}
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+};
+
+TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-1, meta_cache_update_file_data(0, NULL, NULL, NULL, 0, body_ptr));
+}
+
+TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
+{
+	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	FILE_META_TYPE test_file_meta = {5566, 7788};
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));
+	EXPECT_EQ(0, meta_cache_update_file_data(0, &test_stat, &test_file_meta, NULL, 0, body_ptr));
+	EXPECT_EQ(0, memcmp(&test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
+	sem_post(&(body_ptr->access_sem));
+}
+/*
+	End of unit testing for meta_cache_update_file_data()
+ */

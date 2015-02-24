@@ -413,9 +413,9 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -424,14 +424,10 @@ If does not match any of the two, flush the older page entry first before
 processing the new one */
 
 	int index;
-	int ret_val, sem_val;
+	int ret_val;
 	char need_new;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/*If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
 		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
