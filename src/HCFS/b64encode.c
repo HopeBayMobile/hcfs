@@ -1,18 +1,37 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: b64encode.c
+* Abstract: The c source code file for b64-encoding operations.
+*
+* Revision History
+* 2015/2/10 Jiahong added header for this file, and revising coding style.
+*
+**************************************************************************/
+
+#include "b64encode.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <semaphore.h>
-#include <curl/curl.h>
-
-#include "hcfscurl.h"
 
 unsigned char base64_codes[64] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-/* Function b64encode_str
-	Summary: b64-encode the input string to the output string
-*/
-void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outlen, int inputlen)
+
+/************************************************************************
+*
+* Function name: b64encode_str
+*        Inputs: unsigned char *inputstr, unsigned char *outputstr,
+*                int *outlen, int inputlen
+*       Summary: b64-encode input string "inputstr" (of length "inputlen")
+*                to output string "outputstr" (of length "*outlen").
+*  Return value: 0 if successful. Otherwise returns -1.
+*
+*************************************************************************/
+int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
+						int *outlen, int inputlen)
 {
 	unsigned char *tmpstr;
 	int count, input_index, output_index;
@@ -25,7 +44,8 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
 
 	memcpy(tmpstr, inputstr, origin_str_len);
 
-	for (count = origin_str_len; count < (1+((origin_str_len+2)/3)*3); count++)
+	for (count = origin_str_len; count < (1+((origin_str_len+2)/3)*3);
+								count++)
 		tmpstr[count] = 0;
 
 	output_index = 0;
@@ -55,7 +75,8 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
 				outputstr[output_index+3] = '=';
 			} else {
 				tmp_index = (tmp & 0x3F);
-				outputstr[output_index+3] = base64_codes[tmp_index];
+				outputstr[output_index+3] =
+						base64_codes[tmp_index];
 			}
 		}
 		output_index += 4;
@@ -67,5 +88,5 @@ void b64encode_str(unsigned char *inputstr, unsigned char *outputstr, int *outle
 
 	free(tmpstr);
 
-	return;
+	return 0;
 }
