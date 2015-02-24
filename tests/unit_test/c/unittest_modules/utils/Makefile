@@ -78,12 +78,15 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
-utils.o : $(USER_DIR)/utils.c $(USER_DIR)/fuseop.h $(USER_DIR)/params.h $(GTEST_HEADERS)
+utils.o : $(USER_DIR)/utils.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/utils.c
+
+utils_fakeftn.o : $(UNITTEST_DIR)/utils_fakeftn.c 
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(UNITTEST_DIR)/utils_fakeftn.c
 
 utils_unittest.o : $(UNITTEST_DIR)/utils_unittest.cc \
                      $(USER_DIR)/utils.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/utils_unittest.cc
 
-utils_unittest : utils.o utils_unittest.o gtest_main.a
+utils_unittest : utils.o utils_fakeftn.o utils_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

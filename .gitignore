@@ -1,7 +1,7 @@
 *.py[cod]
 *.swp
 *.c~
-.cc~
+*.cc~
 *.h~
 *.conf~
 .a
