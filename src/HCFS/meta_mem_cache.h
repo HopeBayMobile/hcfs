@@ -2,7 +2,7 @@
 *
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: meta_mem_cache.c
+* File Name: meta_mem_cache.h
 * Abstract: The c header file for meta cache operations in HCFS.
 *
 * Revision History

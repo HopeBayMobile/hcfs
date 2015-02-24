@@ -10,7 +10,7 @@
 extern "C" {
 #include "utils.h"
 #include "global.h"
-#include "fuseop.h"
+#include "hfuse_system.h"
 #include "params.h"
 }
 #include "gtest/gtest.h"

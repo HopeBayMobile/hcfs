@@ -9,6 +9,8 @@
 *
 * Revision History
 * 2015/2/5 Jiahong added header for this file, and revising coding style.
+* 2015/2/11 Jiahong moved "seek_page" and "advance_block" from filetables
+*           and add hfuse_system.h inclusion.
 *
 **************************************************************************/
 #include "metaops.h"
@@ -28,6 +30,7 @@
 #include "file_present.h"
 #include "params.h"
 #include "dir_entry_btree.h"
+#include "hfuse_system.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -475,3 +478,145 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: seek_page
+*        Inputs: FH_ENTRY *fh_ptr, long long target_page
+*       Summary: Given file table entry pointed by "fh_ptr", find the block
+*                entry page "target_page" and move the cached pos pointer
+*                in "fh_ptr" to the beginning of this page. If entry pages
+*                have not yet been created along the search, create them
+*                as well.
+*  Return value: 0 if successful. Otherwise returns -1.
+*
+*************************************************************************/
+int seek_page(FH_ENTRY *fh_ptr, long long target_page)
+{
+	long long current_page;
+	off_t nextfilepos, prevfilepos, currentfilepos;
+	BLOCK_ENTRY_PAGE temppage;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+	int sem_val;
+	FILE_META_TYPE temp_meta;
+
+	/* First check if meta cache is locked */
+
+	body_ptr = fh_ptr->meta_cache_ptr;
+
+	sem_getvalue(&(body_ptr->access_sem), &sem_val);
+
+	/*If meta cache lock is not locked, return -1*/
+	if (sem_val > 0)
+		return -1;
+
+	meta_cache_lookup_file_data(fh_ptr->thisinode, NULL, &temp_meta,
+							NULL, 0, body_ptr);
+
+	nextfilepos = temp_meta.next_block_page;
+	current_page = 0;
+	prevfilepos = 0;
+
+	meta_cache_open_file(body_ptr);
+
+	/*TODO: put error handling for the read/write ops here*/
+	while (current_page <= target_page) {
+		if (nextfilepos == 0) {
+			/*Need to append a new block entry page */
+			if (prevfilepos == 0) {
+				/* If not even the first page is generated */
+				fseek(body_ptr->fptr, 0, SEEK_END);
+				prevfilepos = ftell(body_ptr->fptr);
+				temp_meta.next_block_page = prevfilepos;
+				memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+				meta_cache_update_file_data(fh_ptr->thisinode,
+						NULL, &temp_meta, &temppage,
+						prevfilepos, body_ptr);
+			} else {
+				fseek(body_ptr->fptr, 0, SEEK_END);
+				currentfilepos = ftell(body_ptr->fptr);
+				meta_cache_lookup_file_data(fh_ptr->thisinode,
+						NULL, NULL, &temppage,
+							prevfilepos, body_ptr);
+				temppage.next_page = currentfilepos;
+				meta_cache_update_file_data(fh_ptr->thisinode,
+						NULL, NULL, &temppage,
+							prevfilepos, body_ptr);
+
+				memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+				meta_cache_update_file_data(fh_ptr->thisinode,
+						NULL, NULL, &temppage,
+						currentfilepos, body_ptr);
+
+				prevfilepos = currentfilepos;
+			}
+		} else {
+			meta_cache_lookup_file_data(fh_ptr->thisinode, NULL,
+					NULL, &temppage, nextfilepos, body_ptr);
+
+			prevfilepos = nextfilepos;
+			nextfilepos = temppage.next_page;
+		}
+		if (current_page == target_page)
+			break;
+		current_page++;
+	}
+	fh_ptr->cached_page_index = target_page;
+	fh_ptr->cached_filepos = prevfilepos;
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: advance_block
+*        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,
+*                long long *entry_index
+*       Summary: Given the file meta cache entry "body_ptr", the file offset
+*                of the current block status page in the meta file
+*                "thisfilepos", and the index of a block in this status page
+*                "*entry_index", return the next block index in "*entry_index"
+*                and the file offset of the page the next block is in.
+*  Return value: If successful, the file offset of the page that the next
+*                block is in. Otherwise returns -1.
+*
+*************************************************************************/
+long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,
+						long long *entry_index)
+{
+	long long temp_index;
+	off_t nextfilepos;
+	BLOCK_ENTRY_PAGE temppage;
+	int ret_val;
+	/*First handle the case that nothing needs to be changed,
+						just add entry_index*/
+
+	temp_index = *entry_index;
+	if ((temp_index+1) < MAX_BLOCK_ENTRIES_PER_PAGE) {
+		temp_index++;
+		*entry_index = temp_index;
+		return thisfilepos;
+	}
+
+	/*We need to change to another page*/
+
+	ret_val = meta_cache_open_file(body_ptr);
+
+	fseek(body_ptr->fptr, thisfilepos, SEEK_SET);
+	fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+	nextfilepos = temppage.next_page;
+
+	if (nextfilepos == 0) {  /*Need to allocate a new page*/
+		fseek(body_ptr->fptr, 0, SEEK_END);
+		nextfilepos = ftell(body_ptr->fptr);
+		temppage.next_page = nextfilepos;
+		fseek(body_ptr->fptr, thisfilepos, SEEK_SET);
+		fwrite(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
+							body_ptr->fptr);
+		fseek(body_ptr->fptr, nextfilepos, SEEK_SET);
+		memset(&temppage, 0, sizeof(BLOCK_ENTRY_PAGE));
+		fwrite(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+	}
+
+	*entry_index = 0;
+	return nextfilepos;
+}
