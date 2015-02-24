@@ -77,7 +77,7 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	thismetapath[0] = '\0';
 	if (body_ptr->meta_opened == FALSE) {
-		if(fetch_meta_path(thismetapath, body_ptr->inode_num))
+		if (fetch_meta_path(thismetapath, body_ptr->inode_num))
 			return -1;
 
 		body_ptr->fptr = fopen(thismetapath, "r+");

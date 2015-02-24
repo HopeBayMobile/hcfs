@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto
+CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto -Wunused-variable
 
 hcfs: file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
 	$(CC) -g -o hcfs file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
@@ -43,10 +43,10 @@ hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
 	$(CC) $(CFLAGS) -c hcfs_fromcloud.c
 
-hcfs_cacheops.o: hcfs_cacheops.c hcfs_cache.h params.h fuseop.h super_block.h
+hcfs_cacheops.o: hcfs_cacheops.c hcfs_cacheops.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cacheops.c
 
-hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cache.h params.h fuseop.h super_block.h
+hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cachebuild.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cachebuild.c
 
 hcfs_clouddelete.o: hcfs_clouddelete.c hcfs_clouddelete.h hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
