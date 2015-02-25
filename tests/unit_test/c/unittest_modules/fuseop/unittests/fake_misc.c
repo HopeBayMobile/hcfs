@@ -2,6 +2,7 @@
 #include <string.h>
 #include <curl/curl.h>
 #include <fuse.h>
+#include <errno.h>
 
 #include "meta_mem_cache.h"
 #include "filetables.h"
@@ -9,7 +10,15 @@
 
 ino_t lookup_pathname(const char *path, int *errcode)
 {
-	return 1;
+	*errcode = 0;
+	if (strcmp(path, "/") == 0)
+		return 1;
+	if (strcmp(path, "/does_not_exist") == 0) {
+		*errcode = -ENOENT;
+		return 0;
+	}
+	*errcode = -EACCES;
+	return 0;
 }
 
 off_t check_file_size(const char *path)
@@ -88,6 +97,15 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 {
+	switch (this_inode) {
+	case 1:
+		inode_stat->st_ino = 1;
+		inode_stat->st_mode = S_IFDIR | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	default:
+		break;
+	}
 	return 0;
 }
 
