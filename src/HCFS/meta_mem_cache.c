@@ -491,13 +491,9 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	int index;
 	char thismetapath[METAPATHLEN];
 	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val, sem_val;
+	int ret_code, ret_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/*If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
 		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
@@ -514,7 +510,6 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			fread(body_ptr->file_meta, sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
 		}
-
 		memcpy(file_meta_ptr, body_ptr->file_meta,
 						sizeof(FILE_META_TYPE));
 	}
@@ -601,13 +596,9 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 {
 	int index;
 	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val, sem_val;
+	int ret_code, ret_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1 */
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
 		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
@@ -672,8 +663,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /*Always change dirty status to TRUE here as we always update*/
@@ -683,16 +674,12 @@ not match any of the two, flush the older page entry first before processing
 the new one */
 
 	int index;
-	int ret_val, sem_val;
+	int ret_val;
 	char need_new;
 
 	printf("Debug meta cache update dir data\n");
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
 		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));

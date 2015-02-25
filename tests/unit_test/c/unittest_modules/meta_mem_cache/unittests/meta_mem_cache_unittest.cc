@@ -18,18 +18,20 @@ extern "C" {
 #include "mock_tool.h"
 }
 #include "gtest/gtest.h"
+
 /* 
-	Unit testing for meta_cache_open_file() 
+	Define base class to be derived and extern variable used later 
  */
 
 extern META_CACHE_HEADER_STRUCT *meta_mem_cache;
 extern long current_meta_mem_cache_entries;
 
-class meta_cache_open_fileTest : public ::testing::Test {
+class BaseClassWithMetaCacheEntry : public ::testing::Test {
 	protected:
 		virtual void SetUp() 
 		{
 			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
 		}
 
 		virtual void TearDown() 
@@ -37,6 +39,14 @@ class meta_cache_open_fileTest : public ::testing::Test {
 			free(body_ptr);
 		}
 		META_CACHE_ENTRY_STRUCT *body_ptr;
+};
+
+/* 
+	Unit testing for meta_cache_open_file() 
+ */
+
+class meta_cache_open_fileTest : public BaseClassWithMetaCacheEntry {
+
 };
 
 TEST_F(meta_cache_open_fileTest, FetchMetaPathFail)
@@ -137,18 +147,9 @@ TEST(init_meta_cache_headersTest, InitMetaCacheHeadersSuccess)
 /*
 	Unit testing for meta_cache_flush_dir_cache()
  */
-class meta_cache_flush_dir_cacheTest : public ::testing::Test {
-	protected:
-		virtual void SetUp() 
-		{
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-		}
 
-		virtual void TearDown() 
-		{
-			free(body_ptr);
-		}
-		META_CACHE_ENTRY_STRUCT *body_ptr;
+class meta_cache_flush_dir_cacheTest : public BaseClassWithMetaCacheEntry {
+
 };
 
 TEST_F(meta_cache_flush_dir_cacheTest, EntryCannotBeOpened)
@@ -211,19 +212,9 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 /*
 	Unit testing for meta_cache_drop_pages()
  */
-class meta_cache_drop_pagesTest : public ::testing::Test {
-	protected:
-		virtual void SetUp() 
-		{
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			sem_init(&(body_ptr->access_sem), 0, 1);
-		}
 
-		virtual void TearDown() 
-		{
-			free(body_ptr);
-		}
-		META_CACHE_ENTRY_STRUCT *body_ptr;
+class meta_cache_drop_pagesTest : public BaseClassWithMetaCacheEntry {
+
 };
 
 TEST_F(meta_cache_drop_pagesTest, CacheNotLocked)
@@ -418,6 +409,7 @@ TEST_F(meta_cache_unlock_entryTest, CacheIsLock)
 	EXPECT_EQ(0, meta_cache_unlock_entry(body_ptr));
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	EXPECT_EQ(1, sem_val);
+	sem_post(&(body_ptr->access_sem));
 }
 /*
 	End of unit testing for meta_cache_unlock_entry()
@@ -448,7 +440,7 @@ TEST_F(meta_cache_removeTest, InodeNotFound)
 	for(int i=0 ; i<5 ; i++){
 		ino = i*9527; 
 		index = ino % NUM_META_MEM_CACHE_HEADERS;
-		EXPECT_EQ(0, meta_cache_remove(ino));
+		ASSERT_EQ(0, meta_cache_remove(ino));
 		EXPECT_EQ(0, meta_mem_cache[index].num_entries);
 		EXPECT_EQ(NULL, meta_mem_cache[index].last_entry);
 		EXPECT_EQ(NULL, meta_mem_cache[index].meta_cache_entries);
@@ -458,14 +450,16 @@ TEST_F(meta_cache_removeTest, InodeNotFound)
 TEST_F(meta_cache_removeTest, RemoveAll)
 {
 	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
-	int index_list[3] = {1, 5, 60}; /* push into meta_mem_cache[1/5/60] */
-	int num_entry = 3*50;  /* 50 is number of entry in bucket of linked list meta_mem_cache[1/5/60] */
+	int num_test_buckets = 3;
+	int index_list[3] = {1, 5, 60}; /* push into meta_mem_cache[1/5/60], which is magic number. */
+	int num_entry = num_test_buckets*50;  /* 50 is number of entry in bucket of linked list meta_mem_cache[1/5/60] */
 	int ino_list[num_entry];
 	bool is_removed[num_entry];
 
 	/* Generate mock data */
 	for(int i=0 ; i<num_entry ; i++){
-		ino_list[i] = index_list[i%3] + NUM_META_MEM_CACHE_HEADERS*(i/3); /* Generate inode number */
+		ino_list[i] = index_list[i%num_test_buckets] + 
+				NUM_META_MEM_CACHE_HEADERS*(i/num_test_buckets); /* Generate inode number */
 		/* Init lptr */
 		lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 		sem_init(&(lptr->body.access_sem), 0, 1);
@@ -511,20 +505,9 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 /*
 	Unit testing for meta_cache_update_file_data()
  */
-class meta_cache_update_file_dataTest : public ::testing::Test {
-	protected:
-		virtual void SetUp() 
-		{
-			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			sem_init(&(body_ptr->access_sem), 0, 1);
-		}
 
-		virtual void TearDown() 
-		{
-			sem_destroy(&(body_ptr->access_sem));
-			free(body_ptr);
-		}
-		META_CACHE_ENTRY_STRUCT *body_ptr;
+class meta_cache_update_file_dataTest : public BaseClassWithMetaCacheEntry {	
+
 };
 
 TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
@@ -535,15 +518,180 @@ TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
 
 TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
 {
+	/* Mock data */
 	struct stat test_stat = {0, 10, 5, 6, 88, 91};
 	FILE_META_TYPE test_file_meta = {5566, 7788};
+	
+	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
-	EXPECT_EQ(0, meta_cache_update_file_data(0, &test_stat, &test_file_meta, NULL, 0, body_ptr));
+	ASSERT_EQ(0, meta_cache_update_file_data(0, &test_stat, &test_file_meta, NULL, 0, body_ptr));
 	EXPECT_EQ(0, memcmp(&test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
 	sem_post(&(body_ptr->access_sem));
 }
+
 /*
 	End of unit testing for meta_cache_update_file_data()
  */
+
+/*
+	Unit testing for meta_cache_lookup_file_data()
+ */
+
+class meta_cache_lookup_file_dataTest : public BaseClassWithMetaCacheEntry {
+
+};
+
+
+TEST_F(meta_cache_lookup_file_dataTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-1, meta_cache_lookup_file_data(0, NULL, NULL, NULL, 0, body_ptr));
+}
+
+TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
+{
+	struct stat test_stat = {0, 1, 5, 6, 8, 9};
+	FILE_META_TYPE test_file_meta = {5566, 7788};
+	struct stat *empty_stat = (struct stat *)malloc(sizeof(struct stat));
+	FILE_META_TYPE *empty_file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
+	/* Mock data */
+	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
+	memcpy(&(body_ptr->this_stat), &test_stat, sizeof(struct stat));
+	memcpy(body_ptr->file_meta, &test_file_meta, sizeof(FILE_META_TYPE));
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));	
+	ASSERT_EQ(0, meta_cache_lookup_file_data(0, empty_stat, empty_file_meta, NULL, 0, body_ptr));
+	EXPECT_EQ(0, memcmp(empty_stat, &test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(empty_file_meta, &test_file_meta, sizeof(FILE_META_TYPE)));
+	sem_post(&(body_ptr->access_sem));
+}
+
+/*
+	End of unit testing for meta_cache_lookup_file_data()
+ */
+
+/*
+	Unit testing for meta_cache_update_dir_data()
+ */
+
+class meta_cache_update_dir_dataTest : public BaseClassWithMetaCacheEntry {
+
+};
+
+TEST_F(meta_cache_update_dir_dataTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-1, meta_cache_update_dir_data(0, NULL, NULL, NULL, body_ptr));
+}
+
+TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
+{
+	/* Mock data */
+	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, meta_cache_update_dir_data(0, &test_stat, &test_dir_meta, NULL, body_ptr));	
+	EXPECT_EQ(0, memcmp(&test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&test_dir_meta, body_ptr->dir_meta, sizeof(DIR_META_TYPE)));
+	sem_post(&(body_ptr->access_sem));
+}
+
+TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE test_dir_entry_page = {66, {0}, 78, {0}, 93, 80, 41, 5};
+	
+	sem_wait(&(body_ptr->access_sem));
+	/* Hit cache[0] */
+	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	body_ptr->dir_entry_cache[1] = NULL;
+	body_ptr->dir_entry_cache[0]->this_page_pos = test_dir_entry_page.this_page_pos;
+	ASSERT_EQ(0, meta_cache_update_dir_data(0, NULL, NULL, &test_dir_entry_page, body_ptr));
+	EXPECT_EQ(0, memcmp(&test_dir_entry_page, body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_TRUE(body_ptr->dir_entry_cache[1] == NULL);
+	
+	/* Hit cache[1] */
+	free(body_ptr->dir_entry_cache[0]);
+	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	body_ptr->dir_entry_cache[0] = NULL;
+	body_ptr->dir_entry_cache[1]->this_page_pos = test_dir_entry_page.this_page_pos;
+	ASSERT_EQ(0, meta_cache_update_dir_data(0, NULL, NULL, &test_dir_entry_page, body_ptr));
+	EXPECT_EQ(0, memcmp(&test_dir_entry_page, body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_TRUE(body_ptr->dir_entry_cache[0] == NULL);
+	
+	sem_post(&(body_ptr->access_sem));
+}
+
+/*
+	End of unit testing for meta_cache_update_dir_data()
+ */
+
+/*
+	Unit testing for meta_cache_lookup_dir_data()
+ */
+
+class meta_cache_lookup_dir_dataTest : public BaseClassWithMetaCacheEntry {
+
+};
+
+TEST_F(meta_cache_lookup_dir_dataTest, CacheNotLocked)
+{
+	/* Test for non-locked cache */
+	EXPECT_EQ(-1, meta_cache_lookup_dir_data(0, NULL, NULL, NULL, body_ptr));
+}
+
+TEST_F(meta_cache_lookup_dir_dataTest, LookupSuccess)
+{
+	/* Mock data */
+	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
+	struct stat empty_stat;
+	DIR_META_TYPE empty_dir_meta;
+	
+	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
+	memcpy(&(body_ptr->this_stat), &test_stat, sizeof(struct stat));
+	memcpy(body_ptr->dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE));
+	sem_wait(&(body_ptr->access_sem));
+	/* Test */
+	ASSERT_EQ(0, meta_cache_lookup_dir_data(0, &empty_stat, &empty_dir_meta, NULL, body_ptr));
+	EXPECT_EQ(0, memcmp(&empty_stat, &test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&empty_dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE)));
+	
+	sem_post(&(body_ptr->access_sem));
+}
+
+TEST_F(meta_cache_lookup_dir_dataTest, UpdataOnlyDirPage)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE test_dir_entry_page = {66, {0}, 78, {0}, 93, 80, 41, 5};
+	DIR_ENTRY_PAGE empty_dir_entry_page;
+	
+	sem_wait(&(body_ptr->access_sem));
+	/* Mock data for cache[0] */
+	empty_dir_entry_page.this_page_pos = test_dir_entry_page.this_page_pos;
+	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	memcpy(body_ptr->dir_entry_cache[0], &test_dir_entry_page, sizeof(DIR_ENTRY_PAGE));
+	body_ptr->dir_entry_cache[1] = NULL;
+	/* Test cache[0] */
+	ASSERT_EQ(0, meta_cache_lookup_dir_data(0, NULL, NULL, &empty_dir_entry_page, body_ptr));
+	EXPECT_EQ(0, memcmp(&test_dir_entry_page, &empty_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_TRUE(body_ptr->dir_entry_cache[1] == NULL);
+	
+	/* Mock data for cache[1] */
+	free(body_ptr->dir_entry_cache[0]);
+	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	memcpy(body_ptr->dir_entry_cache[1], &test_dir_entry_page, sizeof(DIR_ENTRY_PAGE));
+	body_ptr->dir_entry_cache[0] = NULL;
+	/* Test cacahe[1] */
+	ASSERT_EQ(0, meta_cache_lookup_dir_data(0, NULL, NULL, &empty_dir_entry_page, body_ptr));
+	EXPECT_EQ(0, memcmp(&test_dir_entry_page, &empty_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_TRUE(body_ptr->dir_entry_cache[0] == NULL);
+	
+	sem_post(&(body_ptr->access_sem));
+}
+
+
+
