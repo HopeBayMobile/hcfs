@@ -693,5 +693,142 @@ TEST_F(meta_cache_lookup_dir_dataTest, UpdataOnlyDirPage)
 	sem_post(&(body_ptr->access_sem));
 }
 
+/*
+	Unit testing for flush_single_entry()
+ */
+
+class flush_single_entryTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			mkdir(TMP_META_DIR, 0700);
+			mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
+			body_ptr->fptr = fopen(TMP_META_FILE_PATH, "rw+");
+			body_ptr->meta_opened = TRUE;
+			body_ptr->something_dirty = TRUE;
+			sem_init(&(body_ptr->access_sem), 0, 1);
+			initialize_mock_meta();
+		}
+
+		virtual void TearDown() 
+		{
+			fclose(body_ptr->fptr);
+			unlink(TMP_META_FILE_PATH);
+			rmdir(TMP_META_DIR);			
+			free(body_ptr);
+		}
+
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+		DIR_META_TYPE test_dir_meta;
+		FILE_META_TYPE test_file_meta;
+		DIR_ENTRY_PAGE test_dir_entry[2];
+		struct stat test_file_stat;
+		struct stat test_dir_stat;
+	private:
+		void initialize_mock_meta()
+		{
+			DIR_META_TYPE dir_meta = {5566, 7788, 99, 77, 33};
+			FILE_META_TYPE file_meta = {93, 80};
+			DIR_ENTRY_PAGE dir_entry1 = {0, {0}, 1122, {0}, 66, 77, 76, 5};
+			DIR_ENTRY_PAGE dir_entry2 = {2, {0}, 4500, {0}, 55, 88, 97, 22};
+			
+			test_file_stat = {1, 2, 0, 3, 4, 5, 6};
+			test_dir_stat = {6, 7, 0, 8, 9, 10, 11};
+			test_file_stat.st_mode = S_IFREG;
+			test_dir_stat.st_mode = S_IFDIR;
+			test_file_meta = file_meta;
+			test_dir_meta = dir_meta;
+			test_dir_entry[0] = dir_entry1;
+			test_dir_entry[1] = dir_entry2;
+			test_dir_entry[0].this_page_pos = 4 * sizeof(DIR_ENTRY_PAGE);
+			test_dir_entry[1].this_page_pos = 9 * sizeof(DIR_ENTRY_PAGE);
+
+		}
+};
+
+TEST_F(flush_single_entryTest, CacheNotLock)
+{
+	EXPECT_EQ(-1, flush_single_entry(body_ptr));
+}
+
+TEST_F(flush_single_entryTest, FlushFileMeta)
+{
+	struct stat verified_stat;
+	FILE_META_TYPE verified_file_meta;
+	/* Mock data */	
+	body_ptr->stat_dirty = TRUE;
+	body_ptr->meta_dirty = TRUE;
+	body_ptr->something_dirty = TRUE;
+	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
+	memcpy(&(body_ptr->this_stat), &test_file_stat, sizeof(struct stat));
+	memcpy(body_ptr->file_meta, &test_file_meta, sizeof(FILE_META_TYPE));	
+	/* Run function and read file */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, flush_single_entry(body_ptr));
+	fseek(body_ptr->fptr, 0, SEEK_SET);
+	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_file_meta, sizeof(FILE_META_TYPE), 1, body_ptr->fptr);
+	/* Test */	
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
+	EXPECT_EQ(FALSE, body_ptr->stat_dirty);
+	EXPECT_EQ(FALSE, body_ptr->meta_dirty);
+	EXPECT_EQ(FALSE, body_ptr->something_dirty);
+	/* Free resource */	
+	sem_post(&(body_ptr->access_sem));
+	free(body_ptr->file_meta);
+}
+
+TEST_F(flush_single_entryTest, FlushDirMeta)
+{
+	struct stat verified_stat;
+	DIR_META_TYPE verified_dir_meta;
+	DIR_ENTRY_PAGE verified_dir_entry[2];
+	/* Mock data */
+	body_ptr->stat_dirty = TRUE;
+	body_ptr->meta_dirty = TRUE;
+	body_ptr->something_dirty = TRUE;
+	body_ptr->dir_entry_cache_dirty[0] = TRUE;
+	body_ptr->dir_entry_cache_dirty[1] = TRUE;
+	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
+	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	memcpy(&(body_ptr->this_stat), &test_dir_stat, sizeof(struct stat));
+	memcpy(body_ptr->dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE));
+	memcpy(body_ptr->dir_entry_cache[0], &test_dir_entry[0], sizeof(DIR_ENTRY_PAGE));
+	memcpy(body_ptr->dir_entry_cache[1], &test_dir_entry[1], sizeof(DIR_ENTRY_PAGE));
+	/* Run function and read file */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, flush_single_entry(body_ptr));
+	fseek(body_ptr->fptr, 0, SEEK_SET);
+	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_dir_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, body_ptr->dir_entry_cache[1]->this_page_pos, SEEK_SET);
+	fread(&verified_dir_entry[1], 1, sizeof(DIR_ENTRY_PAGE), body_ptr->fptr);
+	fseek(body_ptr->fptr, body_ptr->dir_entry_cache[0]->this_page_pos, SEEK_SET);
+	fread(&verified_dir_entry[0], 1, sizeof(DIR_ENTRY_PAGE), body_ptr->fptr);
+	/* Test */	
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_dir_meta, body_ptr->dir_meta, sizeof(DIR_META_TYPE)));
+	EXPECT_EQ(0, memcmp(&verified_dir_entry[0], body_ptr->dir_entry_cache[0], sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_EQ(0, memcmp(&verified_dir_entry[1], body_ptr->dir_entry_cache[1], sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_EQ(FALSE, body_ptr->stat_dirty);
+	EXPECT_EQ(FALSE, body_ptr->meta_dirty);
+	EXPECT_EQ(FALSE, body_ptr->something_dirty);
+	/* Free resource */	
+	sem_post(&(body_ptr->access_sem));
+	free(body_ptr->dir_meta);
+	free(body_ptr->dir_entry_cache[0]);
+	free(body_ptr->dir_entry_cache[1]);
+}
+
+/*
+	End of unit testing for flush_single_entry()
+ */
+
+
 
 
