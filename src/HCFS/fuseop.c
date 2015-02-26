@@ -163,7 +163,6 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 
 	gettimeofday(&tmp_time1, NULL);
 
-
 	parentname = malloc(strlen(path)*sizeof(char));
 	parse_parent_self(path, parentname, selfname);
 
@@ -196,13 +195,17 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 	this_stat.st_ctime = this_stat.st_atime;
 
 	self_inode = super_block_new_inode(&this_stat);
+
+	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1)
-		return -EACCES;
+		return -ENOSPC;
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat);
 
+	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0)
 		meta_forget_inode(self_inode);
 
@@ -267,7 +270,7 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 
 	self_inode = super_block_new_inode(&this_stat);
 	if (self_inode < 1)
-		return -EACCES;
+		return -ENOSPC;
 	this_stat.st_ino = self_inode;
 
 	ret_code = mkdir_update_meta(self_inode, parent_inode,

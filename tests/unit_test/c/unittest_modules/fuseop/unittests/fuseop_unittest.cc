@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
 extern "C" {
@@ -16,6 +17,8 @@ extern "C" {
 #include "params.h"
 }
 #include "gtest/gtest.h"
+
+#include "fake_misc.h"
 
 SYSTEM_CONF_STRUCT system_config;
 
@@ -102,4 +105,152 @@ TEST_F(hfuse_getattrTest, TestRoot) {
 }
 
 /* End of the test case for the function hfuse_getattr */
+
+/* Begin of the test case for the function hfuse_mknod */
+
+class hfuse_mknodTest : public ::testing::Test {
+ protected:
+  dev_t tmp_dev;
+  virtual void SetUp() {
+    fail_super_block_new_inode = FALSE;
+    fail_mknod_update_meta = FALSE;
+    before_mknod_created = TRUE;
+    tmp_dev = makedev(0, 0);
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_mknodTest, ParentNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mknod("/tmp/test_fuse/does_not_exist/test", 0700, tmp_dev);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_mknodTest, ParentNotDir) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mknod("/tmp/test_fuse/testfile/test", 0700, tmp_dev);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+TEST_F(hfuse_mknodTest, SuperBlockError) {
+  int ret_val;
+  int tmp_err;
+
+  fail_super_block_new_inode = TRUE;
+  ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
+  tmp_err = errno;
+
+  if (ret_val < 0)
+    printf("%s\n",strerror(tmp_err));
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOSPC);
+}
+TEST_F(hfuse_mknodTest, MknodUpdateError) {
+  int ret_val;
+  int tmp_err;
+
+  fail_mknod_update_meta = TRUE;
+  ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
+  tmp_err = errno;
+
+  if (ret_val < 0)
+    printf("%s\n",strerror(tmp_err));
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, 1);
+}
+TEST_F(hfuse_mknodTest, MknodOK) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mknod("/tmp/test_fuse/testcreate", 0700, tmp_dev);
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, 0);
+}
+
+/* End of the test case for the function hfuse_mknod */
+
+/* Begin of the test case for the function hfuse_mkdir */
+
+class hfuse_mkdirTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    fail_super_block_new_inode = FALSE;
+    fail_mkdir_update_meta = FALSE;
+    before_mkdir_created = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_mkdirTest, ParentNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mkdir("/tmp/test_fuse/does_not_exist/test", 0700);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_mkdirTest, ParentNotDir) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mkdir("/tmp/test_fuse/testfile/test", 0700);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+TEST_F(hfuse_mkdirTest, SuperBlockError) {
+  int ret_val;
+  int tmp_err;
+
+  fail_super_block_new_inode = TRUE;
+  ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
+  tmp_err = errno;
+
+  if (ret_val < 0)
+    printf("%s\n",strerror(tmp_err));
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOSPC);
+}
+TEST_F(hfuse_mkdirTest, MkdirUpdateError) {
+  int ret_val;
+  int tmp_err;
+
+  fail_mkdir_update_meta = TRUE;
+  ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
+  tmp_err = errno;
+
+  if (ret_val < 0)
+    printf("%s\n",strerror(tmp_err));
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, 1);
+}
+TEST_F(hfuse_mkdirTest, MkdirOK) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = mkdir("/tmp/test_fuse/testmkdir", 0700);
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, 0);
+}
+
+/* End of the test case for the function hfuse_mknod */
 
