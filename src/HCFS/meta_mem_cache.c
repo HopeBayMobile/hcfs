@@ -286,7 +286,8 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	/* Sync meta */
 	if (body_ptr->meta_dirty == TRUE) {
-		switch(body_ptr->this_stat.st_mode) {
+		
+		switch (body_ptr->this_stat.st_mode) {
 		case S_IFREG:
 			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			fwrite((body_ptr->file_meta), sizeof(FILE_META_TYPE),
@@ -383,7 +384,7 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 		free(entry_body->dir_meta);
 	if (entry_body->file_meta != NULL)
 		free(entry_body->file_meta);
-
+	
 	if (entry_body->dir_entry_cache[0] != NULL)
 		free(entry_body->dir_entry_cache[0]);
 	if (entry_body->dir_entry_cache[1] != NULL)

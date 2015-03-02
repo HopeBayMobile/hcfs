@@ -7,6 +7,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <time.h>
 extern "C" {
 #include "global.h"
@@ -351,7 +352,7 @@ TEST(meta_cache_lock_entryTest, InsertMetaCache)
 		int ino = i*5;
 		int sem_val;
 		tmp_meta_entry = meta_cache_lock_entry(ino);
-		expected_stat = get_test_stat(ino);
+		expected_stat = generate_test_stat(ino);
 		sem_getvalue(&(tmp_meta_entry->access_sem), &sem_val);
 		/* Check lock, number of current cache entries, and stat content */
 		ASSERT_EQ(0, sem_val);
@@ -829,6 +830,204 @@ TEST_F(flush_single_entryTest, FlushDirMeta)
 	End of unit testing for flush_single_entry()
  */
 
+/*
+	Unit testing for expire_meta_mem_cache_entry()
+ */
 
+class expire_meta_mem_cache_entryTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			init_meta_cache_headers();
+			extern sem_t num_entry_sem; 
+			META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
+			
+			for (int i=0 ; i<10000 ; i+=4){
+				lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+				int index = i % NUM_META_MEM_CACHE_HEADERS;
+				init_lookup_entry(lptr, i);
+				push_lookup_entry(lptr, index);
+			}
+		}
+
+		virtual void TearDown() 
+		{
+			for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++) {
+				META_CACHE_LOOKUP_ENTRY_STRUCT *now = meta_mem_cache[i].meta_cache_entries;
+				META_CACHE_LOOKUP_ENTRY_STRUCT *next;
+				while (now != NULL) {
+					next = now->next;
+					free(now);
+					now = next;
+				}
+			}
+			free(meta_mem_cache);
+		}
+	
+		void init_lookup_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr, const int ino_num)
+		{
+			lptr->body.something_dirty = FALSE;
+			lptr->inode_num = ino_num;
+			lptr->prev = NULL;
+			lptr->next = NULL;
+			lptr->body.dir_meta = NULL;
+			lptr->body.file_meta = NULL;
+			lptr->body.dir_entry_cache[0] = NULL;
+			lptr->body.dir_entry_cache[1] = NULL;
+			gettimeofday(&(lptr->body.last_access_time), NULL);
+			sem_init(&(lptr->body.access_sem), 0, 1);
+		}
+
+		void push_lookup_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr, const int index)
+		{
+			if (meta_mem_cache[index].meta_cache_entries != NULL) {
+				meta_mem_cache[index].meta_cache_entries->prev = lptr;
+				lptr->next = meta_mem_cache[index].meta_cache_entries;
+			} else {
+				meta_mem_cache[index].last_entry = lptr;					
+			}
+			meta_mem_cache[index].meta_cache_entries = lptr;
+		}
+};
+
+TEST_F(expire_meta_mem_cache_entryTest, ExpireNothing)
+{
+	/* Expire nothing because period time < 0.5 sec */
+	ASSERT_EQ(-1, expire_meta_mem_cache_entry());
+}
+
+TEST_F(expire_meta_mem_cache_entryTest, ExpireEntrySuccess)
+{
+	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
+	META_CACHE_LOOKUP_ENTRY_STRUCT *now;
+	unsigned expired_ino_num;
+	unsigned index;
+	/* Test the function for 10 times */
+	for (int test_times=0 ; test_times<10 ; test_times++) {	
+		/* Generate mock entry and push into meta_mem_cache[] */
+		lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+		srandom(time(NULL));
+		expired_ino_num = random()%5000 + 10000; /* An entry to be expired */
+		index = expired_ino_num % NUM_META_MEM_CACHE_HEADERS;
+		init_lookup_entry(lptr, expired_ino_num);
+		lptr->body.last_access_time.tv_sec -= 3;
+		push_lookup_entry(lptr, index);
+		/* Test whether the entry is really expired */
+		ASSERT_EQ(0, expire_meta_mem_cache_entry());
+		now = meta_mem_cache[index].meta_cache_entries;
+		while (now != NULL) {
+			ASSERT_TRUE(now->inode_num != expired_ino_num);
+			now = now->next;
+		}
+	}
+}
+
+/*
+	End of unit testing for expire_meta_mem_cache_entry()
+ */
+
+/*
+	Unit testing for meta_cache_seek_dir_entry()
+ */
+class meta_cache_seek_dir_entryTest : public ::testing::Test {
+	protected:
+		virtual void SetUp() 
+		{
+			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
+			/* Mock dir_entry_page */
+			test_dir_entry = DIR_ENTRY{10, "test_name", 0};
+			test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+			test_dir_entry_page->num_entries = 1;
+			test_dir_entry_page->dir_entries[0] = test_dir_entry; 
+			
+			test_dir_entry2 = DIR_ENTRY{20, "test_name2", 0};
+			test_dir_entry_page2 = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+			test_dir_entry_page2->num_entries = 1;
+			test_dir_entry_page2->dir_entries[0] = test_dir_entry2; 
+		}
+
+		virtual void TearDown() 
+		{
+			free(test_dir_entry_page);
+			free(test_dir_entry_page2);
+			free(body_ptr);
+		}
+
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+		DIR_ENTRY_PAGE *test_dir_entry_page, *test_dir_entry_page2;
+		DIR_ENTRY test_dir_entry, test_dir_entry2;
+};
+
+TEST_F(meta_cache_seek_dir_entryTest, CacheNotLocked)
+{
+	DIR_ENTRY_PAGE verified_dir_entry_page;
+	int verified_index;
+	ASSERT_EQ(-1, meta_cache_seek_dir_entry(0, &verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+}
+
+TEST_F(meta_cache_seek_dir_entryTest, Success_Found_In_Cache)
+{
+	DIR_ENTRY_PAGE *verified_dir_entry_page;
+	int verified_index;
+	/* Mock data is in cache[0] */
+	verified_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	verified_index = -1;
+	body_ptr->dir_entry_cache[0] = test_dir_entry_page;
+	body_ptr->dir_entry_cache[1] = NULL;
+	/* Test for successing found in cache[0] */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_EQ(0, verified_index);
+	
+	/* Mock data is in cache[1] */
+	verified_index = -1;
+	body_ptr->dir_entry_cache[1] = test_dir_entry_page2;
+	/* Test for successing found in cache[0] */
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name2", body_ptr));
+	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page2, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_NE(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_EQ(0, verified_index);
+	
+	sem_post(&(body_ptr->access_sem));
+	free(verified_dir_entry_page);
+
+}
+ 
+TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
+{	
+	DIR_ENTRY_PAGE *verified_dir_entry_page;
+	int verified_index;
+	
+	mkdir(TMP_META_DIR, 0700);
+	mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
+	body_ptr->fptr = fopen(TMP_META_FILE_PATH, "rw+");
+	ASSERT_TRUE(body_ptr->fptr != NULL);
+	fseek(body_ptr->fptr, 10, SEEK_SET);
+	fwrite(test_dir_entry_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	body_ptr->meta_opened = TRUE;
+	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
+	body_ptr->dir_meta->root_entry_page = 10;
+	body_ptr->dir_entry_cache[0] = NULL;
+	body_ptr->dir_entry_cache[1] = NULL;
+	verified_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+	verified_index = -1;
+
+	/* Test */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, meta_cache_seek_dir_entry(0, verified_dir_entry_page, &verified_index, "test_name", body_ptr));
+	EXPECT_EQ(0, memcmp(verified_dir_entry_page, test_dir_entry_page, sizeof(DIR_ENTRY_PAGE)));
+	EXPECT_EQ(0, verified_index);
+	sem_post(&(body_ptr->access_sem));
+
+	/* Free resource */
+	fclose(body_ptr->fptr);
+	unlink(TMP_META_FILE_PATH);
+	rmdir(TMP_META_DIR);
+	free(verified_dir_entry_page);
+	free(body_ptr->dir_meta);
+}
 
 

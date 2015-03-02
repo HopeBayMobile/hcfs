@@ -11,4 +11,4 @@ enum { INO__FETCH_META_PATH_FAIL,
 	INO__FETCH_META_PATH_SUCCESS, 
 	INO__FETCH_META_PATH_ERR};
 
-struct stat *get_test_stat(ino_t inode_num);
+struct stat *generate_test_stat(ino_t inode_num);
