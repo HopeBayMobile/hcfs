@@ -80,7 +80,28 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	return 0;
+	switch(this_inode) {
+        case INO_LOOKUP_FILE_DATA_OK:
+		if (file_meta_ptr != NULL) {
+			file_meta_ptr->next_block_page = 100;
+		}
+
+		if (block_page != NULL) {
+			if (block_page->next_page % 100 != 0) {
+				block_page->next_page = 200;
+			} else {
+				block_page->next_page += 100;
+			}
+		}
+		return 0;
+        case INO_LOOKUP_FILE_DATA_OK_NO_BLOCK_PAGE:
+		file_meta_ptr->next_block_page = 0;
+		return 0;
+	case INO_LOOKUP_FILE_DATA_FAIL:
+		return -1;
+	default:
+		return 0;
+	}
 }
 
 int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
