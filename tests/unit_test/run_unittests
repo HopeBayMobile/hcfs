@@ -17,4 +17,12 @@ make clean
 make
 ./meta_mem_cache_unittest
 cd $CURPATH
+cd c/unittest_modules/meta_processing/
+rm *.gcda
+rm *.gcov
+rm *.gcno
+make clean
+make
+./meta_processing_unittest
+cd $CURPATH
 gcovr -r ../../src/HCFS/

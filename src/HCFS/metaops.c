@@ -401,6 +401,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
+	/* Only fetch inode stat here. Can be replaced by meta_cache_lookup_file_data() */
 	ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,
 							NULL, NULL, body_ptr);
 

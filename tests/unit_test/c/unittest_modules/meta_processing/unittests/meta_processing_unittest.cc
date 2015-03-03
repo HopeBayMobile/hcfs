@@ -103,6 +103,60 @@ TEST_F(change_parent_inodeTest, ChangeFail) {
 }
 
 
+class decrease_nlink_inode_fileTest : public ::testing::Test {
+	protected:
+
+		virtual void SetUp() {
+		
+			hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
+			sem_init(&(hcfs_system->access_sem), 0, 1);
+			hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+			hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
+			hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
+
+		}
+
+		virtual void TearDown() {
+		
+		}
+};
+TEST_F(decrease_nlink_inode_fileTest, InodeStillReferenced) {
+	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
+}
+TEST_F(decrease_nlink_inode_fileTest, NoBlockFilesToDel) {
+	char metapath[METAPATHLEN];
+	char thisblockpath[400];
+
+	FILE *tmp_file;
+
+	fetch_meta_path(metapath, INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel);
+	tmp_file = fopen(metapath, "w");
+	fclose(tmp_file);
+	
+	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
+	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);
+}
+TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel) {
+	char metapath[METAPATHLEN];
+	char thisblockpath[400];
+
+	FILE *tmp_file;
+
+	fetch_meta_path(metapath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel);
+	tmp_file = fopen(metapath, "w");
+	fclose(tmp_file);
+	
+	for (int i=0; i<10; i++) {
+		fetch_block_path(thisblockpath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel, i);
+		tmp_file = fopen(thisblockpath, "w");
+		fclose(tmp_file);
+	}
+
+	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel));
+	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);
+}
+
+
 class seek_pageTest : public ::testing::Test {
 	protected:
 
@@ -129,6 +183,7 @@ class seek_pageTest : public ::testing::Test {
 		}
 
                 virtual void TearDown() {
+			fclose(body_ptr->fptr);
 			free(fh_ptr);
 			free(body_ptr);
 			remove(metapath);
@@ -144,15 +199,36 @@ TEST_F(seek_pageTest, LookupFileDataFailed) {
 	EXPECT_EQ(-1, seek_page(fh_ptr, target_page));
 	sem_post(&(body_ptr->access_sem));
 }
+TEST_F(seek_pageTest, UpdateFileDataFailed) {
+	fh_ptr->thisinode = INO_UPDATE_FILE_DATA_FAIL;
+	sem_wait(&(body_ptr->access_sem));
+
+	EXPECT_EQ(-1, seek_page(fh_ptr, target_page));
+	sem_post(&(body_ptr->access_sem));
+}
 TEST_F(seek_pageTest, TargetPageExisted) {
 	target_page = 5;
 
 	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
 	sem_wait(&(body_ptr->access_sem));
 
+	/* Test */
 	EXPECT_EQ(0, seek_page(fh_ptr, target_page));
 	EXPECT_EQ(target_page, fh_ptr->cached_page_index);
-	EXPECT_EQ(200+(target_page-1)*100, fh_ptr->cached_filepos);
+	/* Assume the position of first page is 0 */
+	EXPECT_EQ((target_page+1)*sizeof(BLOCK_ENTRY_PAGE), fh_ptr->cached_filepos);
+	sem_post(&(body_ptr->access_sem));
+}
+/* Test for target block page isn't generated */
+TEST_F(seek_pageTest, TargetPageNotExisted) {
+	target_page = 10;
+
+	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
+	sem_wait(&(body_ptr->access_sem));
+
+	EXPECT_EQ(0, seek_page(fh_ptr, target_page));
+	EXPECT_EQ(target_page, fh_ptr->cached_page_index);
+	EXPECT_EQ((target_page+1)*sizeof(BLOCK_ENTRY_PAGE), fh_ptr->cached_filepos);
 	sem_post(&(body_ptr->access_sem));
 }
 /* Test for first block page isn't generated */
@@ -210,6 +286,7 @@ class advance_blockTest : public ::testing::Test {
 		}
 
                 virtual void TearDown() {
+			fclose(body_ptr->fptr);
 			free(body_ptr);
 			free(testpage1);
 			free(testpage2);

@@ -12,7 +12,29 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	return 0;
+
+	switch(this_inode) {
+	case INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2:
+		if (inode_stat != NULL) {
+			inode_stat->st_nlink = this_inode + 1;
+			inode_stat->st_size = 0;
+		}
+		return 0;
+	case INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel:
+		if (inode_stat != NULL) {
+			inode_stat->st_nlink = 1;
+			inode_stat->st_size = 0;
+		}
+		return 0;
+	case INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel:
+		if (inode_stat != NULL) {
+			inode_stat->st_nlink = 1;
+			inode_stat->st_size = 0;
+		}
+		return 0;
+	default:
+		return 0;
+	}
 }
 
 int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
@@ -80,19 +102,28 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+
 	switch(this_inode) {
         case INO_LOOKUP_FILE_DATA_OK:
+        case INO_UPDATE_FILE_DATA_FAIL:
 		if (file_meta_ptr != NULL) {
-			file_meta_ptr->next_block_page = 100;
+			file_meta_ptr->next_block_page = sizeof(BLOCK_ENTRY_PAGE);
+
+			BLOCK_ENTRY_PAGE *tmp_page = (BLOCK_ENTRY_PAGE*)malloc(sizeof(BLOCK_ENTRY_PAGE));
+			fwrite(tmp_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
+			free(tmp_page);
 		}
 
 		if (block_page != NULL) {
-			if (block_page->next_page % 100 != 0) {
-				block_page->next_page = 200;
+			/* The offset of last page is 1000 */
+			if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*10) {
+				block_page->next_page = 0;
 			} else {
-				block_page->next_page += 100;
+				block_page->next_page = page_pos + sizeof(BLOCK_ENTRY_PAGE);
 			}
+			fwrite(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 		}
+		
 		return 0;
         case INO_LOOKUP_FILE_DATA_OK_NO_BLOCK_PAGE:
 		file_meta_ptr->next_block_page = 0;
@@ -108,7 +139,12 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
     const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
     const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	return 0;
+	switch(this_inode) {
+        case INO_UPDATE_FILE_DATA_FAIL:
+		return -1;
+	default:
+		return 0;
+	}
 }
 
 
@@ -153,17 +189,20 @@ off_t check_file_size(const char *path)
 
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
+	sprintf(pathname, "testpatterns/inode_%d_meta_file.todel", this_inode);
 	return 0;
 }
 
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
+	sprintf(pathname, "testpatterns/inode_%d_meta_file", this_inode);
 	return 0;
 }
 
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
+	sprintf(pathname, "testpatterns/inode_%d_block_%d", this_inode, block_num);
 	return 0;
 }

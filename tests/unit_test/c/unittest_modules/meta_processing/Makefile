@@ -80,7 +80,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
-metaops.o : $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
+metaops.o : $(USER_DIR)/metaops.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/metaops.c
 
 mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_param.h
