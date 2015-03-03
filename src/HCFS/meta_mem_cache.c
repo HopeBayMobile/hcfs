@@ -1021,47 +1021,42 @@ int expire_meta_mem_cache_entry(void)
 
 	gettimeofday(&current_time, NULL);
 	srandom((unsigned int)(current_time.tv_usec));
-	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
-
+	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);	
 	cindex = start_index;
-
-	expired = FALSE;
-	while (expired == FALSE) {
+	/* Go through meta_mem_cache[] */
+	do {
 		sem_wait(&(meta_mem_cache[cindex].header_sem));
 		lptr = meta_mem_cache[cindex].last_entry;
 		while (lptr != NULL) {
-			ret_val = sem_trywait(&(lptr->body).access_sem);
-			if (ret_val == 0) {
-				gettimeofday(&current_time, NULL);
-				float_current_time = (current_time.tv_sec * 1.0)
-					+ (current_time.tv_usec * 0.000001);
-				atime_ptr = &((lptr->body).last_access_time);
-				float_access_time = (atime_ptr->tv_sec * 1.0) +
-						(atime_ptr->tv_usec * 0.000001);
-				if (float_current_time -
-						float_access_time > 0.5) {
-					/* Expire the entry */
-					_expire_entry(lptr, cindex);
-
-					return 0;
-				}
-				/* If find that current_time < last_access_time,
-				fix last_access_time to be current_time */
-				if (float_current_time < float_access_time)
-					gettimeofday(atime_ptr, NULL);
-
-				sem_post(&(lptr->body).access_sem);
+			if (sem_trywait(&(lptr->body).access_sem) != 0) {
+				lptr = lptr->prev;
+				continue;
 			}
+			gettimeofday(&current_time, NULL);
+			float_current_time = (current_time.tv_sec * 1.0)
+				+ (current_time.tv_usec * 0.000001);
+			atime_ptr = &((lptr->body).last_access_time);
+			float_access_time = (atime_ptr->tv_sec * 1.0) +
+					(atime_ptr->tv_usec * 0.000001);
+			if (float_current_time - float_access_time > 0.5) {
+				/* Expire the entry */
+				_expire_entry(lptr, cindex);
+				return 0;
+			}
+			/* If find that current_time < last_access_time,
+				fix last_access_time to be current_time */
+			if (float_current_time < float_access_time)
+				gettimeofday(atime_ptr, NULL);
+
+			sem_post(&(lptr->body).access_sem);
 			lptr = lptr->prev;
 		}
 
 		sem_post(&(meta_mem_cache[cindex].header_sem));
-
 		cindex = ((cindex + 1) % NUM_META_MEM_CACHE_HEADERS);
-		if (cindex == start_index)
-			break;
-	}
-
+	} while (cindex != start_index);
+	
+	/* Nothing was expired */
 	return -1;
 }
 

@@ -919,6 +919,12 @@ TEST_F(expire_meta_mem_cache_entryTest, ExpireEntrySuccess)
 			ASSERT_TRUE(now->inode_num != expired_ino_num);
 			now = now->next;
 		}
+		/* Check lock */
+		for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++) {
+			int val = -1;
+			sem_getvalue(&(meta_mem_cache[i].header_sem), &val);
+			ASSERT_EQ(1, val);
+		}
 	}
 }
 
