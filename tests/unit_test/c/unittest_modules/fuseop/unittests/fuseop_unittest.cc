@@ -75,10 +75,11 @@ class fuseopEnvironment : public ::testing::Environment {
 class hfuse_getattrTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-   }
+    before_update_file_data = TRUE;
+  }
 
   virtual void TearDown() {
-   }
+  }
 };
 
 TEST_F(hfuse_getattrTest, EmptyTest) {
@@ -115,6 +116,7 @@ class hfuse_mknodTest : public ::testing::Test {
     fail_super_block_new_inode = FALSE;
     fail_mknod_update_meta = FALSE;
     before_mknod_created = TRUE;
+    before_update_file_data = TRUE;
     tmp_dev = makedev(0, 0);
   }
 
@@ -189,6 +191,7 @@ class hfuse_mkdirTest : public ::testing::Test {
     fail_super_block_new_inode = FALSE;
     fail_mkdir_update_meta = FALSE;
     before_mkdir_created = TRUE;
+    before_update_file_data = TRUE;
   }
 
   virtual void TearDown() {
@@ -261,6 +264,7 @@ class hfuse_unlinkTest : public ::testing::Test {
   virtual void SetUp() {
     before_mkdir_created = TRUE;
     before_mknod_created = TRUE;
+    before_update_file_data = TRUE;
   }
 
   virtual void TearDown() {
@@ -337,6 +341,7 @@ class hfuse_rmdirTest : public ::testing::Test {
   virtual void SetUp() {
     before_mkdir_created = TRUE;
     before_mknod_created = TRUE;
+    before_update_file_data = TRUE;
   }
 
   virtual void TearDown() {
@@ -429,3 +434,213 @@ TEST_F(hfuse_rmdirTest, DeleteSuccess) {
 
 /* End of the test case for the function hfuse_rmdir */
 
+/* Begin of the test case for the function hfuse_rename */
+
+class hfuse_renameTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_mkdir_created = TRUE;
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_renameTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/does_not_exist", "/tmp/test_fuse/test");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_renameTest, PrefixCheck) {
+  int ret_val;
+  int tmp_err;
+
+  before_mkdir_created = FALSE;
+  ret_val = rename("/tmp/test_fuse/testmkdir", "/tmp/test_fuse/testmkdir/test");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EINVAL);
+}
+
+TEST_F(hfuse_renameTest, Parent1NotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/does_not_exist/test2", "/tmp/test_fuse/test");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+TEST_F(hfuse_renameTest, Parent2NotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testfile",
+			"/tmp/test_fuse/does_not_exist/test2");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+TEST_F(hfuse_renameTest, SameFile) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testfile",
+			"/tmp/test_fuse/testsamefile");
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, 0);
+}
+TEST_F(hfuse_renameTest, SelfDirTargetFile) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testdir1",
+			"/tmp/test_fuse/testfile1");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+TEST_F(hfuse_renameTest, SelfFileTargetDir) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testfile2",
+			"/tmp/test_fuse/testdir2");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EISDIR);
+}
+TEST_F(hfuse_renameTest, TargetDirNotEmpty) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testdir1/",
+			"/tmp/test_fuse/testdir2/");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTEMPTY);
+}
+TEST_F(hfuse_renameTest, RenameFile) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rename("/tmp/test_fuse/testfile1",
+			"/tmp/test_fuse/testfile2");
+  tmp_err = errno;
+
+  EXPECT_EQ(ret_val, 0);
+}
+
+/* End of the test case for the function hfuse_rename */
+
+/* Begin of the test case for the function hfuse_chmod */
+class hfuse_chmodTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+TEST_F(hfuse_chmodTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = chmod("/tmp/test_fuse/does_not_exist", 0700);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_chmodTest, ChmodFile) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = chmod("/tmp/test_fuse/testfile1", 0444);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile1", &tempstat);
+  EXPECT_EQ(tempstat.st_mode, S_IFREG | 0444);
+}
+TEST_F(hfuse_chmodTest, ChmodDir) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = chmod("/tmp/test_fuse/testdir1", 0550);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testdir1", &tempstat);
+  EXPECT_EQ(tempstat.st_mode, S_IFDIR | 0550);
+}
+
+/* End of the test case for the function hfuse_chmod */
+
+/* Begin of the test case for the function hfuse_chown */
+class hfuse_chownTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+TEST_F(hfuse_chownTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = chown("/tmp/test_fuse/does_not_exist", 1002, 1003);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_chownTest, ChmodFile) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = chown("/tmp/test_fuse/testfile1", 1002, 1003);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile1", &tempstat);
+  EXPECT_EQ(tempstat.st_uid, 1002);
+  EXPECT_EQ(tempstat.st_gid, 1003);
+}
+TEST_F(hfuse_chownTest, ChmodDir) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = chown("/tmp/test_fuse/testdir1", 1, 1);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testdir1", &tempstat);
+  EXPECT_EQ(tempstat.st_uid, 1);
+  EXPECT_EQ(tempstat.st_gid, 1);
+}
+
+/* End of the test case for the function hfuse_chown */

@@ -23,6 +23,9 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testfile") == 0) {
 		return 2;
 	}
+	if (strcmp(path, "/testsamefile") == 0) {
+		return 2;
+	}
 	if (strcmp(path, "/testcreate") == 0) {
 		if (before_mknod_created == TRUE) {
 			*errcode = -ENOENT;
@@ -37,6 +40,23 @@ ino_t lookup_pathname(const char *path, int *errcode)
 		}
 		return 6;
 	}
+	if (strcmp(path, "/testmkdir/test") == 0) {
+		*errcode = -ENOENT;
+		return 0;
+	}
+	if (strcmp(path, "/testfile1") == 0) {
+		return 10;
+	}
+	if (strcmp(path, "/testfile2") == 0) {
+		return 11;
+	}
+	if (strcmp(path, "/testdir1") == 0) {
+		return 12;
+	}
+	if (strcmp(path, "/testdir2") == 0) {
+		return 13;
+	}
+
 	*errcode = -EACCES;
 	return 0;
 }
@@ -179,9 +199,36 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
 		break;	
+	case 10:
+		inode_stat->st_ino = 10;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 11:
+		inode_stat->st_ino = 11;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 12:
+		inode_stat->st_ino = 12;
+		inode_stat->st_mode = S_IFDIR | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 13:
+		inode_stat->st_ino = 13;
+		inode_stat->st_mode = S_IFDIR | 0700;
+		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}
+
+	if (before_update_file_data == FALSE) {
+		inode_stat->st_mode = updated_mode;
+		inode_stat->st_uid = updated_uid;
+		inode_stat->st_gid = updated_gid;
+	}
+
 	return 0;
 }
 

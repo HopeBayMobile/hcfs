@@ -12,6 +12,7 @@
 *              functions
 * 2015/2/11 Jiahong added inclusion of hcfs_cacheops.h
 * 2015/2/12 Jiahong added inclusion of hcfs_fromcloud.h
+* 2015/3/2~3 Jiahong revised rename function to allow existing file as target.
 *
 **************************************************************************/
 
@@ -492,14 +493,14 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 	if ((ret_val != 0) || (temp_index < 0)) {
 		_cleanup_rename(body_ptr, old_target_ptr,
 				parent1_ptr, parent2_ptr);
-		return ret_code;
+		return ret_val;
 	}
 	self_inode = temp_page.dir_entries[temp_index].d_ino;
 
 	if (self_inode < 1) {
 		_cleanup_rename(body_ptr, old_target_ptr,
 				parent1_ptr, parent2_ptr);
-		return ret_code;
+		return -ENOENT;
 	}
 
 	ret_val = meta_cache_seek_dir_entry(parent_inode2, &temp_page,
@@ -656,7 +657,7 @@ int hfuse_chmod(const char *path, mode_t mode)
 	int ret_code;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
-	printf("Debug chmod\n");
+	printf("Debug chmod %d\n", mode);
 	this_inode = lookup_pathname(path, &ret_code);
 	if (this_inode < 1)
 		return ret_code;
@@ -748,6 +749,8 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 	int ret_code;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
+	/* TODO: Check how to actually store the timestamp in nanosecond
+	precision */
 	printf("Debug utimens\n");
 	this_inode = lookup_pathname(path, &ret_code);
 	if (this_inode < 1)
