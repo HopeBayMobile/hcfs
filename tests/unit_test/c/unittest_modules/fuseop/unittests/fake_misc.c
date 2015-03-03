@@ -205,6 +205,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 
 int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 {
+	if (this_inode == 4)
+		before_mknod_created = TRUE;
 	return 0;
 }
 
@@ -215,6 +217,8 @@ int meta_forget_inode(ino_t self_inode)
 
 int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 {
+	if (this_inode == 6)
+		before_mkdir_created = TRUE;
 	return 0;
 }
 
@@ -244,4 +248,16 @@ void hcfs_destroy_backend(CURL *curl)
 {
 	return;
 }
-
+int change_dir_entry_inode(ino_t self_inode, char *targetname,
+		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+int decrease_nlink_inode_file(ino_t this_inode)
+{
+	return 0;
+}
+int delete_inode_meta(ino_t this_inode)
+{
+	return 0;
+}

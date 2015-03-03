@@ -252,5 +252,180 @@ TEST_F(hfuse_mkdirTest, MkdirOK) {
   EXPECT_EQ(ret_val, 0);
 }
 
-/* End of the test case for the function hfuse_mknod */
+/* End of the test case for the function hfuse_mkdir */
+
+/* Begin of the test case for the function hfuse_unlink */
+
+class hfuse_unlinkTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_mkdir_created = TRUE;
+    before_mknod_created = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_unlinkTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = unlink("/tmp/test_fuse/does_not_exist");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_unlinkTest, ParentNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = unlink("/tmp/test_fuse/does_not_exist/test");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_unlinkTest, NotRegFile) {
+  int ret_val;
+  int tmp_err;
+
+  before_mkdir_created = FALSE;
+  ret_val = unlink("/tmp/test_fuse/testmkdir");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EISDIR);
+}
+
+TEST_F(hfuse_unlinkTest, PathNotDir) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = unlink("/tmp/test_fuse/testfile/afile");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+
+TEST_F(hfuse_unlinkTest, DeleteSuccess) {
+  int ret_val;
+  int tmp_err;
+
+  before_mknod_created = FALSE;
+  ret_val = unlink("/tmp/test_fuse/testcreate");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  ret_val = access("/tmp/test_fuse/testcreate", F_OK);
+  tmp_err = errno;
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+
+/* End of the test case for the function hfuse_unlink */
+
+/* Begin of the test case for the function hfuse_rmdir */
+
+class hfuse_rmdirTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_mkdir_created = TRUE;
+    before_mknod_created = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_rmdirTest, DirNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rmdir("/tmp/test_fuse/does_not_exist");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_rmdirTest, ParentNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rmdir("/tmp/test_fuse/does_not_exist/test");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_rmdirTest, NotDir) {
+  int ret_val;
+  int tmp_err;
+
+  before_mknod_created = FALSE;
+  ret_val = rmdir("/tmp/test_fuse/testcreate");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+
+TEST_F(hfuse_rmdirTest, PathNotDir) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = rmdir("/tmp/test_fuse/testfile/adir");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTDIR);
+}
+
+TEST_F(hfuse_rmdirTest, DeleteSelf) {
+  int ret_val;
+  int tmp_err;
+
+  before_mkdir_created = FALSE;
+  ret_val = rmdir("/tmp/test_fuse/testmkdir/.");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EINVAL);
+}
+
+TEST_F(hfuse_rmdirTest, DeleteParent) {
+  int ret_val;
+  int tmp_err;
+
+  before_mkdir_created = FALSE;
+  ret_val = rmdir("/tmp/test_fuse/testmkdir/..");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOTEMPTY);
+}
+
+TEST_F(hfuse_rmdirTest, DeleteSuccess) {
+  int ret_val;
+  int tmp_err;
+
+  before_mkdir_created = FALSE;
+  ret_val = rmdir("/tmp/test_fuse/testmkdir");
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  ret_val = access("/tmp/test_fuse/testmkdir", F_OK);
+  tmp_err = errno;
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+/* End of the test case for the function hfuse_rmdir */
 

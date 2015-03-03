@@ -368,6 +368,51 @@ int hfuse_rmdir(const char *path)
 	return ret_val;
 }
 
+/* Helper function to compare if oldpath is the prefix path of newpath */
+int _check_path_prefix(const char *oldpath, const char *newpath)
+{
+	char *temppath;
+
+	if (strlen(oldpath) < strlen(newpath)) {
+		temppath = malloc(strlen(oldpath)+10);
+		if (temppath == NULL)
+			return -ENOMEM;
+		snprintf(temppath, strlen(oldpath)+5, "%s/", oldpath);
+		if (strncmp(newpath, oldpath, strlen(temppath)) == 0) {
+			free(temppath);
+			return -EINVAL;
+		}
+		free(temppath);
+	}
+	return 0;
+}
+
+/* Helper function for cleaning up after rename operation */
+static inline int _cleanup_rename(META_CACHE_ENTRY_STRUCT *body_ptr,
+				META_CACHE_ENTRY_STRUCT *old_target_ptr,
+				META_CACHE_ENTRY_STRUCT *parent1_ptr,
+				META_CACHE_ENTRY_STRUCT *parent2_ptr)
+{
+	if (parent1_ptr != NULL) {
+		meta_cache_close_file(parent1_ptr);
+		meta_cache_unlock_entry(parent1_ptr);
+	}
+	if ((parent2_ptr != NULL) && (parent2_ptr != parent1_ptr)) {
+		meta_cache_close_file(parent2_ptr);
+		meta_cache_unlock_entry(parent2_ptr);
+	}
+
+	if (body_ptr != NULL) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+	}
+	if (old_target_ptr != NULL) {
+		meta_cache_close_file(old_target_ptr);
+		meta_cache_unlock_entry(old_target_ptr);
+	}
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_rename
@@ -378,48 +423,42 @@ int hfuse_rmdir(const char *path)
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
-*    Limitation: Current implementation only supports the case when the
-*                target does not exist before the operation, and no symlink
+*    Limitation: Do no process symlink
 *
 *************************************************************************/
 static int hfuse_rename(const char *oldpath, const char *newpath)
 {
-	/* TODO: Check how to make this operation atomic */
+	/* How to make rename atomic:
+		1. Lookup the parents of oldpath and newpath.
+		2. Lock both parents of oldpath and newpath.
+		3. Lookup inode for oldpath and newpath.
+		4. Invalidate pathname cache for oldpath and newpath
+			(if needed).
+		5. Lock oldpath and newpath (if needed).
+		6. Process rename.
+	*/
 	char *parentname1;
 	char selfname1[400];
 	char *parentname2;
 	char selfname2[400];
-	ino_t parent_inode1, parent_inode2, self_inode;
+	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
 	int ret_val;
-	struct stat tempstat;
-	mode_t self_mode;
+	struct stat tempstat, old_target_stat;
+	mode_t self_mode, old_target_mode;
 	int ret_code, ret_code2;
-	META_CACHE_ENTRY_STRUCT *body_ptr, *parent_ptr;
+	DIR_META_TYPE tempmeta;
+	META_CACHE_ENTRY_STRUCT *body_ptr = NULL, *old_target_ptr = NULL;
+	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
+	DIR_ENTRY_PAGE temp_page;
+	int temp_index;
 
-	self_inode = lookup_pathname(oldpath, &ret_code);
-	if (self_inode < 1)
-		return ret_code;
+	/*TODO: To add symlink handling for rename*/
 
-	invalidate_pathname_cache_entry(oldpath);
+	/* First compare if oldpath is the prefix path of newpath */
+	ret_val = _check_path_prefix(oldpath, newpath);
+	if (ret_val < 0)
+		return ret_val;
 
-	if (lookup_pathname(newpath, &ret_code) > 0)
-		return -EACCES;
-
-	body_ptr = meta_cache_lock_entry(self_inode);
-	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
-			NULL, NULL, 0, body_ptr);
-
-	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return -ENOENT;
-	}
-
-	self_mode = tempstat.st_mode;
-
-	/*TODO: Will now only handle simple types (that the target is
-		empty and no symlinks)*/
 	parentname1 = malloc(strlen(oldpath)*sizeof(char));
 	parentname2 = malloc(strlen(newpath)*sizeof(char));
 	parse_parent_self(oldpath, parentname1, selfname1);
@@ -432,66 +471,170 @@ static int hfuse_rename(const char *oldpath, const char *newpath)
 	free(parentname1);
 	free(parentname2);
 
-	if (parent_inode1 < 1) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
+	if (parent_inode1 < 1)
+		return ret_code;
+
+	if (parent_inode2 < 1)
+		return ret_code2;
+
+	/* Lock parents */
+	parent1_ptr = meta_cache_lock_entry(parent_inode1);
+
+	if (parent_inode1 != parent_inode2)
+		parent2_ptr = meta_cache_lock_entry(parent_inode2);
+	else
+		parent2_ptr = parent1_ptr;
+
+	/* Check if oldpath and newpath exists already */
+	ret_val = meta_cache_seek_dir_entry(parent_inode1, &temp_page,
+			&temp_index, selfname1, parent1_ptr);
+
+	if ((ret_val != 0) || (temp_index < 0)) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		return ret_code;
+	}
+	self_inode = temp_page.dir_entries[temp_index].d_ino;
+
+	if (self_inode < 1) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
 		return ret_code;
 	}
 
-	if (parent_inode2 < 1) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return ret_code2;
+	ret_val = meta_cache_seek_dir_entry(parent_inode2, &temp_page,
+			&temp_index, selfname2, parent2_ptr);
+
+	if ((ret_val != 0) || (temp_index < 0))
+		old_target_inode = 0;
+	else
+		old_target_inode = temp_page.dir_entries[temp_index].d_ino;
+
+	/* If both newpath and oldpath refer to the same file, do nothing */
+	if (self_inode == old_target_inode) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		return 0;
 	}
 
-	parent_ptr = meta_cache_lock_entry(parent_inode1);
+	/* Invalidate pathname cache for oldpath and newpath */
+
+	invalidate_pathname_cache_entry(oldpath);
+
+	if (old_target_inode > 0)
+		invalidate_pathname_cache_entry(newpath);
+
+	body_ptr = meta_cache_lock_entry(self_inode);
+	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
+			NULL, NULL, 0, body_ptr);
+
+	if (ret_val < 0) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		meta_cache_remove(self_inode);
+		return -EACCES;
+	}
+
+	if (old_target_inode > 0) {
+		old_target_ptr = meta_cache_lock_entry(old_target_inode);
+		ret_val = meta_cache_lookup_file_data(old_target_inode,
+					&old_target_stat, NULL, NULL,
+						0, old_target_ptr);
+
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			meta_cache_remove(old_target_inode);
+
+			return -EACCES;
+		}
+	}
+
+	self_mode = tempstat.st_mode;
+
+	/* Start checking if the operation leads to an error */
+	if (old_target_inode > 0) {
+		old_target_mode = old_target_stat.st_mode;
+		if (S_ISDIR(self_mode) && (!S_ISDIR(old_target_mode))) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			return -ENOTDIR;
+		}
+		if ((!S_ISDIR(self_mode)) && (S_ISDIR(old_target_mode))) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			return -EISDIR;
+		}
+		if (S_ISDIR(old_target_mode)) {
+			ret_val = meta_cache_lookup_dir_data(old_target_inode,
+				NULL, &tempmeta, NULL, old_target_ptr);
+			if (tempmeta.total_children > 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				return -ENOTEMPTY;
+			}
+		}
+	}
+
+	/* If newpath exists, replace the entry and rmdir/unlink
+		the old target */
+	if (old_target_inode > 0) {
+		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
+					self_inode, parent2_ptr);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			return -EACCES;
+		}
+		meta_cache_close_file(old_target_ptr);
+		meta_cache_unlock_entry(old_target_ptr);
+
+		if (S_ISDIR(old_target_mode))
+			ret_val = delete_inode_meta(old_target_inode);
+		else
+			ret_val = decrease_nlink_inode_file(old_target_inode);
+		old_target_ptr = NULL;
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			return -EACCES;
+		}
+	} else {
+		/* If newpath does not exist, add the new entry */
+		ret_val = dir_add_entry(parent_inode2, self_inode,
+				selfname2, self_mode, parent2_ptr);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			return -EACCES;
+		}
+	}
 
 	ret_val = dir_remove_entry(parent_inode1, self_inode,
-			selfname1, self_mode, parent_ptr);
+			selfname1, self_mode, parent1_ptr);
 	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		meta_cache_unlock_entry(body_ptr);
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
 		meta_cache_remove(self_inode);
 		return -EACCES;
 	}
-
-	if (parent_inode1 != parent_inode2) {
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		parent_ptr = meta_cache_lock_entry(parent_inode2);
-	}
-
-	ret_val = dir_add_entry(parent_inode2, self_inode,
-			selfname2, self_mode, parent_ptr);
-
-	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return -EACCES;
-	}
-
-	meta_cache_close_file(parent_ptr);
-	meta_cache_unlock_entry(parent_ptr);
 
 	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
 				parent_inode2, body_ptr);
 		if (ret_val < 0) {
-			meta_cache_close_file(body_ptr);
-			meta_cache_unlock_entry(body_ptr);
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
 			meta_cache_remove(self_inode);
 			return -EACCES;
 		}
 	}
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	_cleanup_rename(body_ptr, old_target_ptr,
+			parent1_ptr, parent2_ptr);
+
 	return 0;
 }
 

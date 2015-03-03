@@ -270,35 +270,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 		return -EACCES;
 
 	/*Need to delete the inode by moving it to "todelete" path*/
-	super_block_to_delete(this_inode);
-	fetch_todelete_path(todelete_metapath, this_inode);
-	/*Try a rename first*/
-	ret_val = rename(thismetapath, todelete_metapath);
-	if (ret_val < 0) {
-		/*If not successful, copy the meta*/
-		unlink(todelete_metapath);
-		todeletefptr = fopen(todelete_metapath, "w");
-		fetch_meta_path(thismetapath, this_inode);
-		metafptr = fopen(thismetapath, "r");
-		setbuf(metafptr, NULL);
-		flock(fileno(metafptr), LOCK_EX);
-		setbuf(todeletefptr, NULL);
-		fseek(metafptr, 0, SEEK_SET);
-
-		while (!feof(metafptr)) {
-			read_size = fread(filebuf, 1, 4096, metafptr);
-			if (read_size > 0)
-				fwrite(filebuf, 1, read_size, todeletefptr);
-			else
-				break;
-		}
-		fclose(todeletefptr);
-
-		unlink(thismetapath);
-		flock(fileno(metafptr), LOCK_UN);
-		fclose(metafptr);
-		ret_val = meta_cache_remove(this_inode);
-	}
+	ret_val = delete_inode_meta(this_inode);
 
 	return ret_val;
 }
