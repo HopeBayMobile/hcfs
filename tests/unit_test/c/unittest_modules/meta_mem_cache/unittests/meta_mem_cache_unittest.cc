@@ -134,7 +134,7 @@ TEST(init_meta_cache_headersTest, InitMetaCacheHeadersSuccess)
 {
 	int value;
 	EXPECT_EQ(0, init_meta_cache_headers());
-	for(int count=0 ; count<NUM_META_MEM_CACHE_HEADERS ; count++){
+	for (int count=0 ; count<NUM_META_MEM_CACHE_HEADERS ; count++) {
 		ASSERT_EQ(NULL, meta_mem_cache[count].last_entry);
 		ASSERT_EQ(0, sem_getvalue(&(meta_mem_cache[count].header_sem), &value));
 		ASSERT_EQ(1, value);
@@ -178,7 +178,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS;
 	body_ptr->dir_entry_cache[eindex] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-	for(int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++){
+	for (int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 		char tmp_type;
 		char tmp_name[10];
 		tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
@@ -196,7 +196,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, FlushDirCacheSuccess)
 	/* Check meta file content */
 	fseek(body_ptr->fptr, page_pos, SEEK_SET);
 	fread(read_entry, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-	for(int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++){
+	for (int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 		char tmp_name[10];
 		sprintf(tmp_name, "mytest%d", i);
 		ASSERT_STREQ(body_ptr->dir_entry_cache[eindex]->dir_entries[i].d_name, tmp_name);
@@ -254,7 +254,7 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
 			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 			test_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 			reserved_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
-			for(int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++){
+			for (int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 				char tmp_type;
 				char tmp_name[10];
 				tmp_type = i % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
@@ -262,7 +262,7 @@ class meta_cache_push_dir_pageTest : public ::testing::Test {
 				test_dir_entry_page->dir_entries[i] = DIR_ENTRY{i, "", tmp_type};
 				strcpy(test_dir_entry_page->dir_entries[i].d_name, tmp_name);
 			}
-			for(int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++){
+			for (int i=0; i<MAX_DIR_ENTRIES_PER_PAGE ; i++) {
 				char tmp_type;
 				char tmp_name[20];
 				tmp_type = (i+1) % 3; /* D_ISDIR, D_ISREG, D_ISLNK */
@@ -348,7 +348,7 @@ TEST(meta_cache_lock_entryTest, InsertMetaCache)
 	init_meta_cache_headers();
 	META_CACHE_ENTRY_STRUCT *tmp_meta_entry;
 	struct stat *expected_stat;
-	for(int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++){
+	for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++) {
 		int ino = i*5;
 		int sem_val;
 		tmp_meta_entry = meta_cache_lock_entry(ino);
@@ -361,11 +361,11 @@ TEST(meta_cache_lock_entryTest, InsertMetaCache)
 	}
 
 	/* For each bucket number i, check the linked list of meta_mem_cache[i] */
-	for(int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i+=5){
+	for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i+=5) {
 		int ino = i;
 		META_CACHE_LOOKUP_ENTRY_STRUCT *current = meta_mem_cache[i].last_entry;
 		int count = 0;
-		while(current != NULL){
+		while (current != NULL) {
 			ino = i + NUM_META_MEM_CACHE_HEADERS*count;
 			ASSERT_EQ(ino, current->inode_num);
 			current = current->prev;
@@ -438,7 +438,7 @@ TEST_F(meta_cache_removeTest, InodeNotFound)
 	int index;
 	int ino;
 
-	for(int i=0 ; i<5 ; i++){
+	for (int i=0 ; i<5 ; i++) {
 		ino = i*9527; 
 		index = ino % NUM_META_MEM_CACHE_HEADERS;
 		ASSERT_EQ(0, meta_cache_remove(ino));
@@ -458,7 +458,7 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 	bool is_removed[num_entry];
 
 	/* Generate mock data */
-	for(int i=0 ; i<num_entry ; i++){
+	for (int i=0 ; i<num_entry ; i++) {
 		ino_list[i] = index_list[i%num_test_buckets] + 
 				NUM_META_MEM_CACHE_HEADERS*(i/num_test_buckets); /* Generate inode number */
 		/* Init lptr */
@@ -469,10 +469,10 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 		lptr->prev = NULL;
 		/* Push into list */
 		int index = ino_list[i] % NUM_META_MEM_CACHE_HEADERS;
-		if(meta_mem_cache[index].meta_cache_entries != NULL){
+		if (meta_mem_cache[index].meta_cache_entries != NULL) {
 			meta_mem_cache[index].meta_cache_entries->prev = lptr;
 			lptr->next = meta_mem_cache[index].meta_cache_entries;
-		}else{
+		} else {
 			meta_mem_cache[index].last_entry = lptr;
 			lptr->prev = NULL;
 		}
@@ -483,14 +483,14 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 	/* Test */
 	int random_i;
 	int lookup_index;
-	for(int i=0 ; i<num_entry ; i++){
+	for (int i=0 ; i<num_entry ; i++) {
 		random_i = (i+7) % num_entry;  /* Random start position */
 		EXPECT_EQ(0, meta_cache_remove(ino_list[random_i]));
 		is_removed[random_i] = true;
 		lookup_index = ino_list[random_i] % NUM_META_MEM_CACHE_HEADERS;
 		lptr = meta_mem_cache[lookup_index].last_entry;
-		for(int count=0 ; lptr!=NULL ; count++){
-			if(is_removed[count] == true || 
+		for (int count=0 ; lptr!=NULL ; count++) {
+			if (is_removed[count] == true || 
 			   ino_list[count] % NUM_META_MEM_CACHE_HEADERS != lookup_index)
 				continue;
 			/* Check inode number for remainder */
@@ -842,7 +842,7 @@ class expire_meta_mem_cache_entryTest : public ::testing::Test {
 			extern sem_t num_entry_sem; 
 			META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
 			
-			for (int i=0 ; i<10000 ; i+=4){
+			for (int i=0 ; i<10000 ; i+=4) {
 				lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
 				int index = i % NUM_META_MEM_CACHE_HEADERS;
 				init_lookup_entry(lptr, i);
