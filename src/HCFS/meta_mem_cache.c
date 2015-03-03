@@ -758,53 +758,37 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	long nextfilepos, oldfilepos;
 	int index;
 	int can_use_index;
-	int count, sem_val;
+	int count;
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
+	int cache_idx;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
-	/* If cache lock not locked, return -1 */
-	if (sem_val > 0)
-		return -1;
-
-/*First check if any of the two cached page entries contains the target entry*/
-
+	/* First check if any of the two cached page entries 
+	  contains the target entry */
 	strcpy(tmp_entry.d_name, childname);
-
 	can_use_index = -1;
-	if (body_ptr->dir_entry_cache[0] != NULL) {
-		tmp_page_ptr = body_ptr->dir_entry_cache[0];
+
+	for (cache_idx=0 ; cache_idx<=1 ; cache_idx++) {
+		if (body_ptr->dir_entry_cache[cache_idx] == NULL) 
+			continue;
+		
+		tmp_page_ptr = body_ptr->dir_entry_cache[cache_idx];
 		ret_val = dentry_binary_search(tmp_page_ptr->dir_entries,
 			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
 		if (ret_val >= 0) {
 			*result_index = ret_val;
-			memcpy(result_page, tmp_page_ptr,
-						sizeof(DIR_ENTRY_PAGE));
-			can_use_index = 0;
+			memcpy(result_page, tmp_page_ptr, 
+				sizeof(DIR_ENTRY_PAGE));
+			can_use_index = cache_idx;
+			gettimeofday(&(body_ptr->last_access_time), NULL);
+			return 0;
 		}
 	}
 
-	if ((can_use_index < 0) && (body_ptr->dir_entry_cache[1] != NULL)) {
-		tmp_page_ptr = body_ptr->dir_entry_cache[1];
-		ret_val = dentry_binary_search(tmp_page_ptr->dir_entries,
-			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
-		if (ret_val >= 0) {
-			*result_index = ret_val;
-			memcpy(result_page, tmp_page_ptr,
-						sizeof(DIR_ENTRY_PAGE));
-			can_use_index = 1;
-		}
-	}
-
-	if (can_use_index >= 0) {
-		gettimeofday(&(body_ptr->last_access_time), NULL);
-
-		return 0;
-	}
-
-/* Cannot find the empty dir entry in any of the two cached page entries.
-	Proceed to search from meta file */
+	/* Cannot find the empty dir entry in any of the two cached page entries.
+	   Proceed to search from meta file */
 
 	if (body_ptr->dir_meta == NULL) {
 		body_ptr->dir_meta = malloc(sizeof(DIR_META_TYPE));
