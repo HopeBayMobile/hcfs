@@ -1,15 +1,10 @@
 *.py[cod]
 *.swp
-*.c~
-*.cc~
-*.h~
-*.conf~
-.a
-.gcda
-.gcdo
+*~
 
 
 # C extensions
+*.a
 *.o
 *.so
 
