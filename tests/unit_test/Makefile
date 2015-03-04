@@ -9,12 +9,12 @@ $(BUILDDIRS):
 	$(MAKE) -C $(@:build-%=%)
 
 clean: $(CLEANDIRS)
-$(CLEANDIRS): 
+$(CLEANDIRS):
 	$(MAKE) -C $(@:clean-%=%) clean
 
 test: all $(TESTDIRS)
 	gcovr -r ../../src/HCFS/
-$(TESTDIRS): 
+$(TESTDIRS):
 	$(MAKE) -C $(@:test-%=%) test
 
 .PHONY: subdirs $(DIRS)
