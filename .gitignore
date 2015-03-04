@@ -30,6 +30,7 @@ pip-log.txt
 nosetests.xml
 *.gcda
 *.gcno
+/tests/unit_test/c/unittest_modules/*/*_unittest
 
 # Virtualenv
 .venv
