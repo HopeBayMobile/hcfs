@@ -1,7 +1,17 @@
 /* Parameters for mock functions */
+
+/* System statistics */
 #define MOCK_SYSTEM_SIZE 1048576
 #define MOCK_CACHE_SIZE 1048576
 #define MOCK_CACHE_BLOCKS 100
+
+#define MOCK_BLOCK_SIZE 1024
+
+/* User-defined parameters */
+#define PARAM_MAX_BLOCK_SIZE 1024
+
+/* decrease_nlink_inode_file() & seek_page() */
+#define NUM_BLOCKS 10
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

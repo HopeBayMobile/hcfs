@@ -6,7 +6,11 @@
 #include "meta_mem_cache.h"
 #include "params.h"
 
+/* Global vars*/
+int DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+
 SYSTEM_CONF_STRUCT system_config;
+
 /* mock functions - meta_mem_cache*/
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
@@ -23,7 +27,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	case INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel:
 		if (inode_stat != NULL) {
 			inode_stat->st_nlink = 1;
-			inode_stat->st_size = 0;
+			inode_stat->st_size = MOCK_BLOCK_SIZE * NUM_BLOCKS;
 		}
 		return 0;
 	case INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel:
@@ -94,6 +98,13 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 int meta_cache_remove(ino_t this_inode)
 {
+
+	char metapath[METAPATHLEN];
+
+	/* Remove todel file here */
+	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
+	unlink(metapath);
+
 	return 0;
 }
 
@@ -115,8 +126,8 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		}
 
 		if (block_page != NULL) {
-			/* The offset of last page is 1000 */
-			if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*10) {
+			/* Assume there are NUM_BLOCKS blocks */
+			if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*NUM_BLOCKS) {
 				block_page->next_page = 0;
 			} else {
 				block_page->next_page = page_pos + sizeof(BLOCK_ENTRY_PAGE);
@@ -162,7 +173,12 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 		int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
 		long long *temp_child_page_pos)
 {
-	return 0;
+
+	if (DELETE_DIR_ENTRY_BTREE_RESULT) {
+		return 0;
+	} else {
+		return -1;
+	}
 }
 
 
@@ -183,7 +199,7 @@ int sync_hcfs_system_data(char need_lock)
 /* mock functions - utils.c*/
 off_t check_file_size(const char *path)
 {
-	return 0;
+	return MOCK_BLOCK_SIZE;
 }
 
 

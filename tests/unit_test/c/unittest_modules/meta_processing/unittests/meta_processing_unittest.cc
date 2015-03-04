@@ -20,9 +20,12 @@ extern "C" {
 }
 #include "gtest/gtest.h"
 
-/* Common Vars  */
+/* Global vars  */
 static const ino_t self_inode = 10;
 static const ino_t parent_inode = 5;
+
+extern int DELETE_DIR_ENTRY_BTREE_RESULT;
+extern SYSTEM_CONF_STRUCT system_config;
 
 // Tests non-existing file
 TEST(init_dir_pageTest, InitOK) {
@@ -75,6 +78,63 @@ TEST_F(dir_add_entryTest, NoLockError) {
 /* To be continued... */
 
 
+class dir_remove_entryTest : public ::testing::Test {
+	protected:
+
+		char *self_name;
+		char *metapath;
+
+		DIR_ENTRY_PAGE *testpage;
+		META_CACHE_ENTRY_STRUCT *body_ptr;	
+
+		virtual void SetUp() {
+			FILE *fp;
+
+                        self_name = "selfname";
+			metapath = "testpatterns/dir_remove_entry_meta_file";
+
+			testpage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
+			/* Create mock meta file */
+			fp = fopen(metapath, "wb");
+			fwrite(testpage, sizeof(BLOCK_ENTRY_PAGE), 1, fp);
+			fclose(fp);
+
+			/* Init meta cache entry */
+			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			sem_init(&(body_ptr->access_sem), 0, 1);
+			body_ptr->fptr = fopen(metapath, "r+");
+			setbuf(body_ptr->fptr, NULL);
+			body_ptr->meta_opened = TRUE;
+                }
+
+                virtual void TearDown() {
+			fclose(body_ptr->fptr);
+			free(body_ptr);
+			free(testpage);
+                }
+};
+
+TEST_F(dir_remove_entryTest, NoLockError) {
+	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+}
+TEST_F(dir_remove_entryTest, BtreeDelOK) {
+
+	sem_wait(&(body_ptr->access_sem));
+	/* Force btree deletion failed */
+	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	sem_post(&(body_ptr->access_sem));
+}
+TEST_F(dir_remove_entryTest, BtreeDelFailed) {
+
+	sem_wait(&(body_ptr->access_sem));
+	/* Force btree deletion failed */
+	DELETE_DIR_ENTRY_BTREE_RESULT = 0;
+	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	sem_post(&(body_ptr->access_sem));
+}
+
+
 class change_parent_inodeTest : public ::testing::Test {
 	protected:
 
@@ -108,6 +168,10 @@ class decrease_nlink_inode_fileTest : public ::testing::Test {
 
 		virtual void SetUp() {
 		
+			/* Mock user-defined parameters */
+			MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
+
+			/* Mock system statistics */
 			hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
 			sem_init(&(hcfs_system->access_sem), 0, 1);
 			hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
@@ -140,21 +204,38 @@ TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel) {
 	char metapath[METAPATHLEN];
 	char thisblockpath[400];
 
-	FILE *tmp_file;
+	int block_file_existed = 0;
+
+	FILE *tmp_fp;
 
 	fetch_meta_path(metapath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel);
-	tmp_file = fopen(metapath, "w");
-	fclose(tmp_file);
+	tmp_fp = fopen(metapath, "w");
+	fclose(tmp_fp);
 	
 	for (int i=0; i<10; i++) {
 		fetch_block_path(thisblockpath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel, i);
-		tmp_file = fopen(thisblockpath, "w");
-		fclose(tmp_file);
+		tmp_fp = fopen(thisblockpath, "w");
+		fclose(tmp_fp);
 	}
 
+	/* Test  */
 	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel));
-	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);
+	EXPECT_EQ((MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS), hcfs_system->systemdata.system_size);
+	EXPECT_EQ((MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS), hcfs_system->systemdata.cache_size);
+	EXPECT_EQ((MOCK_CACHE_BLOCKS - NUM_BLOCKS), hcfs_system->systemdata.cache_blocks);
+
+	/* Test if block files are removed correctly */
+	for (int i=0; i<10; i++) {
+		fetch_block_path(thisblockpath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel, i);
+		tmp_fp = fopen(thisblockpath, "r");
+		if (tmp_fp) {
+			block_file_existed = 1;
+			fclose(tmp_fp);
+		}
+	}
+	EXPECT_EQ(0, block_file_existed);
 }
+/* TODO - Test for metafile rename failed case */
 
 
 class seek_pageTest : public ::testing::Test {
@@ -207,7 +288,7 @@ TEST_F(seek_pageTest, UpdateFileDataFailed) {
 	sem_post(&(body_ptr->access_sem));
 }
 TEST_F(seek_pageTest, TargetPageExisted) {
-	target_page = 5;
+	target_page = NUM_BLOCKS - 1;
 
 	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
 	sem_wait(&(body_ptr->access_sem));
@@ -221,7 +302,7 @@ TEST_F(seek_pageTest, TargetPageExisted) {
 }
 /* Test for target block page isn't generated */
 TEST_F(seek_pageTest, TargetPageNotExisted) {
-	target_page = 10;
+	target_page = NUM_BLOCKS;
 
 	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
 	sem_wait(&(body_ptr->access_sem));
