@@ -61,6 +61,8 @@ extern SYSTEM_CONF_STRUCT system_config;
 /* TODO: Need to go over the access rights problem for the ops */
 /* TODO: Need to revisit the following problem for all ops: access rights,
 /*   timestamp change (a_time, m_time, c_time), and error handling */
+/* TODO: For timestamp changes, write routine for making changes to also
+	timestamps with nanosecond precision */
 /* TODO: For access rights, need to check file permission and/or system acl.
 /*   System acl is set in extended attributes. */
 /* TODO: The FUSE option "default_permission" should be turned on if there
@@ -749,8 +751,6 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 	int ret_code;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
-	/* TODO: Check how to actually store the timestamp in nanosecond
-	precision */
 	printf("Debug utimens\n");
 	this_inode = lookup_pathname(path, &ret_code);
 	if (this_inode < 1)
@@ -769,6 +769,10 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 
 	temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
 	temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
+
+	/* Fill in timestamps with nanosecond precision */
+	memcpy(&(temp_inode_stat.st_atim), &(tv[0]), sizeof(struct timespec));
+	memcpy(&(temp_inode_stat.st_mtim), &(tv[1]), sizeof(struct timespec));
 
 	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
 			NULL, NULL, 0, body_ptr);
