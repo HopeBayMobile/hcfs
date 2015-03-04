@@ -343,16 +343,18 @@ TEST_F(meta_cache_push_dir_pageTest, BothNonempty)
 /*
 	Unit testing for meta_cache_lock_entry()
  */
-TEST(meta_cache_lock_entryTest, InsertMetaCache)
+TEST(meta_cache_lock_entryTest, InsertAndLockSuccess)
 {
 	init_meta_cache_headers();
 	META_CACHE_ENTRY_STRUCT *tmp_meta_entry;
 	struct stat *expected_stat;
+
+	/* Test for those inode that is not in cache */
 	for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++) {
-		int ino = i*5;
+		int ino = i*5; /* Only push into meta_mem_cache[5k] */
 		int sem_val;
 		tmp_meta_entry = meta_cache_lock_entry(ino);
-		expected_stat = generate_test_stat(ino);
+		expected_stat = generate_mock_stat(ino);
 		sem_getvalue(&(tmp_meta_entry->access_sem), &sem_val);
 		/* Check lock, number of current cache entries, and stat content */
 		ASSERT_EQ(0, sem_val);
@@ -360,10 +362,10 @@ TEST(meta_cache_lock_entryTest, InsertMetaCache)
 		ASSERT_EQ(0, memcmp(&(tmp_meta_entry->this_stat), expected_stat, sizeof(struct stat)));
 	}
 
-	/* For each bucket number i, check the linked list of meta_mem_cache[i] */
+	/* Check the linked list of meta_mem_cache[5k] */
 	for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i+=5) {
-		int ino = i;
 		META_CACHE_LOOKUP_ENTRY_STRUCT *current = meta_mem_cache[i].last_entry;
+		int ino = i;
 		int count = 0;
 		while (current != NULL) {
 			ino = i + NUM_META_MEM_CACHE_HEADERS*count;
@@ -520,14 +522,14 @@ TEST_F(meta_cache_update_file_dataTest, CacheNotLocked)
 TEST_F(meta_cache_update_file_dataTest, UpdateSuccess)
 {
 	/* Mock data */
-	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	struct stat *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE test_file_meta = {5566, 7788};
 	
 	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
-	ASSERT_EQ(0, meta_cache_update_file_data(0, &test_stat, &test_file_meta, NULL, 0, body_ptr));
-	EXPECT_EQ(0, memcmp(&test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	ASSERT_EQ(0, meta_cache_update_file_data(0, test_stat, &test_file_meta, NULL, 0, body_ptr));
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
 	EXPECT_EQ(0, memcmp(&test_file_meta, body_ptr->file_meta, sizeof(FILE_META_TYPE)));
 	sem_post(&(body_ptr->access_sem));
 }
@@ -553,18 +555,18 @@ TEST_F(meta_cache_lookup_file_dataTest, CacheNotLocked)
 
 TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
 {
-	struct stat test_stat = {0, 1, 5, 6, 8, 9};
+	struct stat *test_stat = generate_mock_stat(0);
 	FILE_META_TYPE test_file_meta = {5566, 7788};
 	struct stat *empty_stat = (struct stat *)malloc(sizeof(struct stat));
 	FILE_META_TYPE *empty_file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
 	/* Mock data */
 	body_ptr->file_meta = (FILE_META_TYPE *)malloc(sizeof(FILE_META_TYPE));
-	memcpy(&(body_ptr->this_stat), &test_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_stat, sizeof(struct stat));
 	memcpy(body_ptr->file_meta, &test_file_meta, sizeof(FILE_META_TYPE));
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));	
 	ASSERT_EQ(0, meta_cache_lookup_file_data(0, empty_stat, empty_file_meta, NULL, 0, body_ptr));
-	EXPECT_EQ(0, memcmp(empty_stat, &test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(empty_stat, test_stat, sizeof(struct stat)));
 	EXPECT_EQ(0, memcmp(empty_file_meta, &test_file_meta, sizeof(FILE_META_TYPE)));
 	sem_post(&(body_ptr->access_sem));
 }
@@ -590,12 +592,12 @@ TEST_F(meta_cache_update_dir_dataTest, CacheNotLocked)
 TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
 {
 	/* Mock data */
-	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	struct stat *test_stat = generate_mock_stat(0);
 	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
 	/* Test */
 	sem_wait(&(body_ptr->access_sem));
-	ASSERT_EQ(0, meta_cache_update_dir_data(0, &test_stat, &test_dir_meta, NULL, body_ptr));	
-	EXPECT_EQ(0, memcmp(&test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	ASSERT_EQ(0, meta_cache_update_dir_data(0, test_stat, &test_dir_meta, NULL, body_ptr));	
+	EXPECT_EQ(0, memcmp(test_stat, &(body_ptr->this_stat), sizeof(struct stat)));
 	EXPECT_EQ(0, memcmp(&test_dir_meta, body_ptr->dir_meta, sizeof(DIR_META_TYPE)));
 	sem_post(&(body_ptr->access_sem));
 }
@@ -647,18 +649,18 @@ TEST_F(meta_cache_lookup_dir_dataTest, CacheNotLocked)
 TEST_F(meta_cache_lookup_dir_dataTest, LookupSuccess)
 {
 	/* Mock data */
-	struct stat test_stat = {0, 10, 5, 6, 88, 91};
+	struct stat *test_stat = generate_mock_stat(0);
 	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
 	struct stat empty_stat;
 	DIR_META_TYPE empty_dir_meta;
 	
 	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
-	memcpy(&(body_ptr->this_stat), &test_stat, sizeof(struct stat));
+	memcpy(&(body_ptr->this_stat), test_stat, sizeof(struct stat));
 	memcpy(body_ptr->dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE));
 	sem_wait(&(body_ptr->access_sem));
 	/* Test */
 	ASSERT_EQ(0, meta_cache_lookup_dir_data(0, &empty_stat, &empty_dir_meta, NULL, body_ptr));
-	EXPECT_EQ(0, memcmp(&empty_stat, &test_stat, sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&empty_stat, test_stat, sizeof(struct stat)));
 	EXPECT_EQ(0, memcmp(&empty_dir_meta, &test_dir_meta, sizeof(DIR_META_TYPE)));
 	
 	sem_post(&(body_ptr->access_sem));
@@ -734,8 +736,8 @@ class flush_single_entryTest : public ::testing::Test {
 			DIR_ENTRY_PAGE dir_entry1 = {0, {0}, 1122, {0}, 66, 77, 76, 5};
 			DIR_ENTRY_PAGE dir_entry2 = {2, {0}, 4500, {0}, 55, 88, 97, 22};
 			
-			test_file_stat = {1, 2, 0, 3, 4, 5, 6};
-			test_dir_stat = {6, 7, 0, 8, 9, 10, 11};
+			test_file_stat = {0, 1, 3 ,5 ,6 ,7};
+			test_dir_stat = {4, 7, 5, 7, 9, 1};
 			test_file_stat.st_mode = S_IFREG;
 			test_dir_stat.st_mode = S_IFDIR;
 			test_file_meta = file_meta;
@@ -834,7 +836,7 @@ TEST_F(flush_single_entryTest, FlushDirMeta)
 	Unit testing for expire_meta_mem_cache_entry()
  */
 
-class expire_meta_mem_cache_entryTest : public ::testing::Test {
+class SomeEntryInMetaMemCacheArray : public ::testing::Test {
 	protected:
 		virtual void SetUp() 
 		{
@@ -867,6 +869,7 @@ class expire_meta_mem_cache_entryTest : public ::testing::Test {
 		void init_lookup_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr, const int ino_num)
 		{
 			lptr->body.something_dirty = FALSE;
+			lptr->body.meta_opened = FALSE;
 			lptr->inode_num = ino_num;
 			lptr->prev = NULL;
 			lptr->next = NULL;
@@ -887,7 +890,14 @@ class expire_meta_mem_cache_entryTest : public ::testing::Test {
 				meta_mem_cache[index].last_entry = lptr;					
 			}
 			meta_mem_cache[index].meta_cache_entries = lptr;
+
+			meta_mem_cache[index].num_entries++;
+			current_meta_mem_cache_entries++;
 		}
+};
+
+class expire_meta_mem_cache_entryTest : public SomeEntryInMetaMemCacheArray {
+
 };
 
 TEST_F(expire_meta_mem_cache_entryTest, ExpireNothing)
@@ -1006,16 +1016,17 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 {	
 	DIR_ENTRY_PAGE *verified_dir_entry_page;
 	int verified_index;
+	int root_entry_pos = 10;
 	
 	mkdir(TMP_META_DIR, 0700);
 	mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
 	body_ptr->fptr = fopen(TMP_META_FILE_PATH, "rw+");
 	ASSERT_TRUE(body_ptr->fptr != NULL);
-	fseek(body_ptr->fptr, 10, SEEK_SET);
+	fseek(body_ptr->fptr, root_entry_pos, SEEK_SET);
 	fwrite(test_dir_entry_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 	body_ptr->meta_opened = TRUE;
 	body_ptr->dir_meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
-	body_ptr->dir_meta->root_entry_page = 10;
+	body_ptr->dir_meta->root_entry_page = root_entry_pos;
 	body_ptr->dir_entry_cache[0] = NULL;
 	body_ptr->dir_entry_cache[1] = NULL;
 	verified_dir_entry_page = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
@@ -1036,4 +1047,29 @@ TEST_F(meta_cache_seek_dir_entryTest, Success_Found_From_Rootpage)
 	free(body_ptr->dir_meta);
 }
 
+/*
+	End of unit testing for meta_cache_seek_dir_entry()
+ */
+
+/*
+	Unit testing for flush_clean_all_meta_cache()
+ */
+
+class flush_clean_all_meta_cacheTest : public SomeEntryInMetaMemCacheArray {
+
+};
+
+TEST_F(flush_clean_all_meta_cacheTest, FlushSuccess)
+{
+	/* Test */
+	ASSERT_EQ(0, flush_clean_all_meta_cache());
+	for (int i=0 ; i<NUM_META_MEM_CACHE_HEADERS ; i++) {
+		EXPECT_EQ(0 ,meta_mem_cache[i].num_entries);
+		ASSERT_EQ(NULL, meta_mem_cache[i].meta_cache_entries);
+	}
+}
+
+/*
+	End of unit testing for flush_clean_all_meta_cache()
+ */
 
