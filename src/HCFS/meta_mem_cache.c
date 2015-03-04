@@ -26,6 +26,13 @@
 #include "super_block.h"
 #include "dir_entry_btree.h"
 
+/* If cache lock not locked, return -1*/ 
+#define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
+	int sem_val; \
+	sem_getvalue((ptr_sem), &sem_val); \
+	if (sem_val > 0) \
+		return -1; 
+	
 /* TODO: cache meta file pointer and close only after some idle interval */
 /* TODO: delayed write to disk */
 /* TODO: Convert meta IO here and other files to allow segmented meta files */
@@ -116,6 +123,7 @@ int init_meta_cache_headers(void)
 	sem_init(&num_entry_sem, 0, 1);
 	for (count = 0; count < NUM_META_MEM_CACHE_HEADERS; count++) {
 		ret_val = sem_init(&(meta_mem_cache[count].header_sem), 0, 1);
+		meta_mem_cache[count].meta_cache_entries = NULL;
 		meta_mem_cache[count].last_entry = NULL;
 		if (ret_val < 0) {
 			free(meta_mem_cache);
@@ -257,13 +265,8 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	SUPER_BLOCK_ENTRY tempentry;
 	int ret_val;
 	int ret_code;
-	int sem_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock is not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (body_ptr->something_dirty == FALSE)
 		return 0;
@@ -282,25 +285,26 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 
 	/* Sync meta */
-	if (S_ISREG((body_ptr->this_stat).st_mode) == TRUE) {
-		if (body_ptr->meta_dirty == TRUE) {
+	if (body_ptr->meta_dirty == TRUE) {
+		
+		switch (body_ptr->this_stat.st_mode) {
+		case S_IFREG:
 			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			fwrite((body_ptr->file_meta), sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
-			body_ptr->meta_dirty = FALSE;
-		}
-	}
-
-	if (S_ISDIR((body_ptr->this_stat).st_mode) == TRUE) {
-		if (body_ptr->meta_dirty == TRUE) {
+			break;
+		case S_IFDIR:
 			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			fwrite((body_ptr->dir_meta), sizeof(DIR_META_TYPE),
 							1, body_ptr->fptr);
-			body_ptr->meta_dirty = FALSE;
+			_cache_sync(body_ptr, 0);
+			_cache_sync(body_ptr, 1);
+			break;
+		default:
+			break;
 		}
 
-		_cache_sync(body_ptr, 0);
-		_cache_sync(body_ptr, 1);
+		body_ptr->meta_dirty = FALSE;
 	}
 
 	/*TODO: Add flush of xattr pages here */
@@ -380,7 +384,7 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 		free(entry_body->dir_meta);
 	if (entry_body->file_meta != NULL)
 		free(entry_body->file_meta);
-
+	
 	if (entry_body->dir_entry_cache[0] != NULL)
 		free(entry_body->dir_entry_cache[0]);
 	if (entry_body->dir_entry_cache[1] != NULL)
@@ -410,9 +414,9 @@ static inline int hash_inode_to_meta_cache(ino_t this_inode)
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /* Always change dirty status to TRUE here as we always update */
 /* For block entry page lookup or update, only allow one lookup/update at a
@@ -421,14 +425,10 @@ If does not match any of the two, flush the older page entry first before
 processing the new one */
 
 	int index;
-	int ret_val, sem_val;
+	int ret_val;
 	char need_new;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/*If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
 		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
@@ -492,13 +492,9 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	int index;
 	char thismetapath[METAPATHLEN];
 	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val, sem_val;
+	int ret_code, ret_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/*If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
 		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
@@ -515,7 +511,6 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			fread(body_ptr->file_meta, sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
 		}
-
 		memcpy(file_meta_ptr, body_ptr->file_meta,
 						sizeof(FILE_META_TYPE));
 	}
@@ -602,13 +597,9 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 {
 	int index;
 	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val, sem_val;
+	int ret_code, ret_val;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1 */
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
 		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
@@ -673,8 +664,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 /*Always change dirty status to TRUE here as we always update*/
@@ -684,16 +675,12 @@ not match any of the two, flush the older page entry first before processing
 the new one */
 
 	int index;
-	int ret_val, sem_val;
+	int ret_val;
 	char need_new;
 
 	printf("Debug meta cache update dir data\n");
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL) {
 		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
@@ -771,53 +758,37 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 	long nextfilepos, oldfilepos;
 	int index;
 	int can_use_index;
-	int count, sem_val;
+	int count;
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
+	int cache_idx;
 
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
-	/* If cache lock not locked, return -1 */
-	if (sem_val > 0)
-		return -1;
-
-/*First check if any of the two cached page entries contains the target entry*/
-
+	/* First check if any of the two cached page entries 
+	  contains the target entry */
 	strcpy(tmp_entry.d_name, childname);
-
 	can_use_index = -1;
-	if (body_ptr->dir_entry_cache[0] != NULL) {
-		tmp_page_ptr = body_ptr->dir_entry_cache[0];
+
+	for (cache_idx=0 ; cache_idx<=1 ; cache_idx++) {
+		if (body_ptr->dir_entry_cache[cache_idx] == NULL) 
+			continue;
+		
+		tmp_page_ptr = body_ptr->dir_entry_cache[cache_idx];
 		ret_val = dentry_binary_search(tmp_page_ptr->dir_entries,
 			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
 		if (ret_val >= 0) {
 			*result_index = ret_val;
-			memcpy(result_page, tmp_page_ptr,
-						sizeof(DIR_ENTRY_PAGE));
-			can_use_index = 0;
+			memcpy(result_page, tmp_page_ptr, 
+				sizeof(DIR_ENTRY_PAGE));
+			can_use_index = cache_idx;
+			gettimeofday(&(body_ptr->last_access_time), NULL);
+			return 0;
 		}
 	}
 
-	if ((can_use_index < 0) && (body_ptr->dir_entry_cache[1] != NULL)) {
-		tmp_page_ptr = body_ptr->dir_entry_cache[1];
-		ret_val = dentry_binary_search(tmp_page_ptr->dir_entries,
-			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
-		if (ret_val >= 0) {
-			*result_index = ret_val;
-			memcpy(result_page, tmp_page_ptr,
-						sizeof(DIR_ENTRY_PAGE));
-			can_use_index = 1;
-		}
-	}
-
-	if (can_use_index >= 0) {
-		gettimeofday(&(body_ptr->last_access_time), NULL);
-
-		return 0;
-	}
-
-/* Cannot find the empty dir entry in any of the two cached page entries.
-	Proceed to search from meta file */
+	/* Cannot find the empty dir entry in any of the two cached page entries.
+	   Proceed to search from meta file */
 
 	if (body_ptr->dir_meta == NULL) {
 		body_ptr->dir_meta = malloc(sizeof(DIR_META_TYPE));
@@ -1034,47 +1005,42 @@ int expire_meta_mem_cache_entry(void)
 
 	gettimeofday(&current_time, NULL);
 	srandom((unsigned int)(current_time.tv_usec));
-	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
-
+	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);	
 	cindex = start_index;
-
-	expired = FALSE;
-	while (expired == FALSE) {
+	/* Go through meta_mem_cache[] */
+	do {
 		sem_wait(&(meta_mem_cache[cindex].header_sem));
 		lptr = meta_mem_cache[cindex].last_entry;
 		while (lptr != NULL) {
-			ret_val = sem_trywait(&(lptr->body).access_sem);
-			if (ret_val == 0) {
-				gettimeofday(&current_time, NULL);
-				float_current_time = (current_time.tv_sec * 1.0)
-					+ (current_time.tv_usec * 0.000001);
-				atime_ptr = &((lptr->body).last_access_time);
-				float_access_time = (atime_ptr->tv_sec * 1.0) +
-						(atime_ptr->tv_usec * 0.000001);
-				if (float_current_time -
-						float_access_time > 0.5) {
-					/* Expire the entry */
-					_expire_entry(lptr, cindex);
-
-					return 0;
-				}
-				/* If find that current_time < last_access_time,
-				fix last_access_time to be current_time */
-				if (float_current_time < float_access_time)
-					gettimeofday(atime_ptr, NULL);
-
-				sem_post(&(lptr->body).access_sem);
+			if (sem_trywait(&(lptr->body).access_sem) != 0) {
+				lptr = lptr->prev;
+				continue;
 			}
+			gettimeofday(&current_time, NULL);
+			float_current_time = (current_time.tv_sec * 1.0)
+				+ (current_time.tv_usec * 0.000001);
+			atime_ptr = &((lptr->body).last_access_time);
+			float_access_time = (atime_ptr->tv_sec * 1.0) +
+					(atime_ptr->tv_usec * 0.000001);
+			if (float_current_time - float_access_time > 0.5) {
+				/* Expire the entry */
+				_expire_entry(lptr, cindex);
+				return 0;
+			}
+			/* If find that current_time < last_access_time,
+				fix last_access_time to be current_time */
+			if (float_current_time < float_access_time)
+				gettimeofday(atime_ptr, NULL);
+
+			sem_post(&(lptr->body).access_sem);
 			lptr = lptr->prev;
 		}
 
 		sem_post(&(meta_mem_cache[cindex].header_sem));
-
 		cindex = ((cindex + 1) % NUM_META_MEM_CACHE_HEADERS);
-		if (cindex == start_index)
-			break;
-	}
-
+	} while (cindex != start_index);
+	
+	/* Nothing was expired */
 	return -1;
 }
 
@@ -1206,13 +1172,8 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	int sem_val;
-
-	sem_getvalue(&(target_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
@@ -1236,13 +1197,8 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	int sem_val;
-
-	sem_getvalue(&(target_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
@@ -1270,13 +1226,8 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret_val;
-	int sem_val;
-
-	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
-	/* If cache lock not locked, return -1*/
-	if (sem_val > 0)
-		return -1;
+	
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
 
