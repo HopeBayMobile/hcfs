@@ -13,20 +13,17 @@ for P in $packages; do
 done
 [ -n "$packages_to_install" ] && sudo apt-get install -y $packages_to_install
 
-cd c/unittest_modules/utils/
-rm *.gcda
-rm *.gcov
-rm *.gcno
-make clean
-make
-./utils_unittest
-cd $CURPATH
-cd c/unittest_modules/meta_mem_cache/
-rm *.gcda
-rm *.gcov
-rm *.gcno
-make clean
-make
-./meta_mem_cache_unittest
+modules=""
+modules="$modules utils"
+modules="$modules meta_mem_cache"
+for module in $modules; do
+	pushd c/unittest_modules/$module
+	rm -f *.gcda *.gcov *.gcno
+	make clean
+	make
+	./${module}_unittest
+	popd
+done
+
 cd $CURPATH
 gcovr -r ../../src/HCFS/
