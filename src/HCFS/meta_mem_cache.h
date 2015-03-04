@@ -120,16 +120,16 @@ int meta_cache_flush_dir_cache(META_CACHE_ENTRY_STRUCT *body_ptr,
 int flush_clean_all_meta_cache(void);
 int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr);
 
-int meta_cache_update_file_data(ino_t this_inode, struct stat *inode_stat,
-	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
-	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
+int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr);
 
-int meta_cache_update_dir_data(ino_t this_inode, struct stat *inode_stat,
-	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
+int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
+	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
 	META_CACHE_ENTRY_STRUCT *body_ptr);
 
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
