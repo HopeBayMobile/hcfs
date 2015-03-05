@@ -175,6 +175,10 @@ TEST_F(build_cache_usageTest, Nothing_in_Directory)
 	EXPECT_EQ(0, nonempty_cache_hash_entries);
 }
 
+TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
+{
+
+}
 /*
 	End of unittest for build_cache_usage()
  */
