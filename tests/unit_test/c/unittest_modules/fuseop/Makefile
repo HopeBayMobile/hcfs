@@ -50,7 +50,10 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o
+	rm -f $(TESTS) gtest.a gtest_main.a *.o  *.gcda *.gcov *.gcno
+
+test :
+	./fuseop_unittest
 
 # Builds gtest.a and gtest_main.a.
 
