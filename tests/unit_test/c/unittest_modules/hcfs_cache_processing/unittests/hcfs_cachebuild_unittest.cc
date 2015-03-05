@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
+#include "params.h"
 extern "C" {
+#include "mock_tool.h"
 #include "hcfs_cachebuild.h"
 }
 
@@ -146,4 +148,33 @@ TEST(insert_cache_usage_nodeTest, InsertSuccess)
 
 /*
 	End of unittest for insert_usage_node()
+ */
+
+/*
+	Unittest for build_cache_usage()
+ */
+
+class build_cache_usageTest : public ::testing::Test {
+	protected:
+		virtual void SetUp()
+		{
+			init_mock_system_config();
+			ASSERT_EQ(0, mkdir(BLOCKPATH, 0700));
+		}
+		virtual void TearDown()
+		{
+			rmdir(BLOCKPATH);
+		}
+};
+
+TEST_F(build_cache_usageTest, Nothing_in_Directory)
+{
+	build_cache_usage();
+	for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i++)
+		ASSERT_EQ(NULL, inode_cache_usage_hash[i]);
+	EXPECT_EQ(0, nonempty_cache_hash_entries);
+}
+
+/*
+	End of unittest for build_cache_usage()
  */
