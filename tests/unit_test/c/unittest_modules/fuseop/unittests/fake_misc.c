@@ -3,6 +3,7 @@
 #include <curl/curl.h>
 #include <fuse.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "meta_mem_cache.h"
 #include "filetables.h"
@@ -126,11 +127,19 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 
 long long open_fh(ino_t thisinode)
 {
-	return 1;
+	long long index;
+
+	index = (long long) thisinode;
+	system_fh_table.entry_table_flags[index] = TRUE;
+	system_fh_table.entry_table[index].thisinode = thisinode;
+
+	return index;
 }
 
 int close_fh(long long index)
 {
+	system_fh_table.entry_table_flags[index] = FALSE;
+	system_fh_table.entry_table[index].thisinode = 0;
 	return 0;
 }
 
@@ -227,6 +236,12 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = updated_mode;
 		inode_stat->st_uid = updated_uid;
 		inode_stat->st_gid = updated_gid;
+		inode_stat->st_atime = updated_atime;
+		inode_stat->st_mtime = updated_mtime;
+		memcpy(&(inode_stat->st_atim), &updated_atim,
+				sizeof(struct timespec));
+		memcpy(&(inode_stat->st_mtim), &updated_mtim,
+				sizeof(struct timespec));
 	}
 
 	return 0;

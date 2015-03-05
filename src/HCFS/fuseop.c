@@ -1152,6 +1152,7 @@ int hfuse_open(const char *path, struct fuse_file_info *file_info)
 	long long fh;
 	int ret_code;
 
+	printf("Debug open %s\n", path);
 	thisinode = lookup_pathname(path, &ret_code);
 	if (thisinode < 1)
 		return ret_code;

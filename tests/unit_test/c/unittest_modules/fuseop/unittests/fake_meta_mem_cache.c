@@ -1,4 +1,6 @@
 #include <string.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "meta_mem_cache.h"
 #include "fake_misc.h"
@@ -25,6 +27,10 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	updated_mode = inode_stat->st_mode;
 	updated_uid = inode_stat->st_uid;
 	updated_gid = inode_stat->st_gid;
+	updated_atime = inode_stat->st_atime;
+	updated_mtime = inode_stat->st_mtime;
+	memcpy(&updated_atim, &(inode_stat->st_atim), sizeof(struct timespec));
+	memcpy(&updated_mtim, &(inode_stat->st_mtim), sizeof(struct timespec));
 	return 0;
 }
 
@@ -83,6 +89,12 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		inode_stat->st_mode = updated_mode;
 		inode_stat->st_uid = updated_uid;
 		inode_stat->st_gid = updated_gid;
+		inode_stat->st_atime = updated_atime;
+		inode_stat->st_mtime = updated_mtime;
+		memcpy(&(inode_stat->st_atim), &updated_atim,
+				sizeof(struct timespec));
+		memcpy(&(inode_stat->st_mtim), &updated_mtim,
+				sizeof(struct timespec));
 	}
 	return 0;
 }

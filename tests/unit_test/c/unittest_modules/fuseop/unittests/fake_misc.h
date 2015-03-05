@@ -11,3 +11,7 @@ int before_update_file_data;
 mode_t updated_mode;
 uid_t updated_uid;
 gid_t updated_gid;
+time_t updated_atime;
+time_t updated_mtime;
+struct timespec updated_atim;
+struct timespec updated_mtim;

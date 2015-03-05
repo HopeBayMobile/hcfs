@@ -11,10 +11,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
+#include <utime.h>
 extern "C" {
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
+#include "filetables.h"
 }
 #include "gtest/gtest.h"
 
@@ -46,6 +48,11 @@ class fuseopEnvironment : public ::testing::Environment {
 
   virtual void SetUp() {
 
+    system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);
+    memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
+    system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
+    memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
+
     logfptr = fopen("/tmp/test_fuse_log","a+");
     setbuf(logfptr, NULL);
 
@@ -65,6 +72,9 @@ class fuseopEnvironment : public ::testing::Environment {
     tmp_err = errno;
     printf("delete return %d\n",ret_val);
     unlink("/tmp/test_fuse_log");
+    free(system_fh_table.entry_table_flags);
+    free(system_fh_table.entry_table);
+
   }
 };
 
@@ -644,3 +654,131 @@ TEST_F(hfuse_chownTest, ChmodDir) {
 }
 
 /* End of the test case for the function hfuse_chown */
+
+/* Begin of the test case for the function hfuse_utimens */
+class hfuse_utimensTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+TEST_F(hfuse_utimensTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+  struct utimbuf target_time;
+
+  ret_val = utime("/tmp/test_fuse/does_not_exist", &target_time);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_utimensTest, UtimeTest) {
+  int ret_val;
+  int tmp_err;
+  struct utimbuf target_time;
+  struct stat tempstat;
+
+  target_time.actime = 123456;
+  target_time.modtime = 456789;
+  ret_val = utime("/tmp/test_fuse/testfile1", &target_time);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile1", &tempstat);
+  EXPECT_EQ(tempstat.st_atime, 123456);
+  EXPECT_EQ(tempstat.st_mtime, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
+  EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_nsec, 0);
+  EXPECT_EQ(tempstat.st_mtim.tv_nsec, 0);
+}
+TEST_F(hfuse_utimensTest, UtimensatTest) {
+  int ret_val;
+  int tmp_err;
+  struct timespec target_time[2];
+  struct stat tempstat;
+
+  target_time[0].tv_sec = 123456;
+  target_time[1].tv_sec = 456789;
+  target_time[0].tv_nsec = 2222;
+  target_time[1].tv_nsec = 12345678;
+  ret_val = utimensat(1, "/tmp/test_fuse/testfile1", target_time, 0);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile1", &tempstat);
+  EXPECT_EQ(tempstat.st_atime, 123456);
+  EXPECT_EQ(tempstat.st_mtime, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
+  EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
+  EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+}
+TEST_F(hfuse_utimensTest, FutimensTest) {
+  int ret_val;
+  int tmp_err;
+  int fd;
+  struct timespec target_time[2];
+  struct stat tempstat;
+
+  target_time[0].tv_sec = 123456;
+  target_time[1].tv_sec = 456789;
+  target_time[0].tv_nsec = 2222;
+  target_time[1].tv_nsec = 12345678;
+
+  fd = open("/tmp/test_fuse/testfile1", O_RDWR);
+  ret_val = futimens(fd, target_time);
+  tmp_err = errno;
+
+  close(fd);
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile1", &tempstat);
+  EXPECT_EQ(tempstat.st_atime, 123456);
+  EXPECT_EQ(tempstat.st_mtime, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
+  EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
+  EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
+  EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+}
+
+/* End of the test case for the function hfuse_utimens */
+
+/* Begin of the test case for the function hfuse_truncate */
+class hfuse_truncateTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+TEST_F(hfuse_truncateTest, FileNotExist) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = truncate("/tmp/test_fuse/does_not_exist", 100);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+TEST_F(hfuse_truncateTest, IsNotFile) {
+  int ret_val;
+  int tmp_err;
+
+  ret_val = truncate("/tmp/test_fuse/testdir1", 100);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EISDIR);
+}
+
+/* End of the test case for the function hfuse_truncate */
+
