@@ -36,7 +36,7 @@ int cache_usage_hash_init(void);
 
 /*Pops the entry from the linked list if found, else NULL is returned*/
 CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode);
-void insert_cache_usage_node(ino_t this_inode, CACHE_USAGE_NODE *this_node);
+void insert_cache_usage_node(CACHE_USAGE_NODE *this_node);
 
 /*For compare_cache_usage, returns a negative number (< 0) if the first node
 needs to be placed in front of the second node, returns zero if does not matter,

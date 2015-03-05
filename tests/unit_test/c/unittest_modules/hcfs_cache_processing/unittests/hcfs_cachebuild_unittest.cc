@@ -129,7 +129,7 @@ TEST(insert_cache_usage_nodeTest, InsertSuccess)
 		memset(node, 0, sizeof(CACHE_USAGE_NODE));
 		node->this_inode = node_id;
 		/* Insert */
-		insert_cache_usage_node(node_id, node);
+		insert_cache_usage_node(node);
 		/* Check whether the node is in the linked-list */
 		found_node = false;
 		now_node = inode_cache_usage_hash[node_id % CACHE_USAGE_NUM_ENTRIES];
