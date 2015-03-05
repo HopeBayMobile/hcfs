@@ -26,13 +26,13 @@
 #include "super_block.h"
 #include "dir_entry_btree.h"
 
-/* If cache lock not locked, return -1*/ 
+/* If cache lock not locked, return -1*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
 	int sem_val; \
 	sem_getvalue((ptr_sem), &sem_val); \
 	if (sem_val > 0) \
-		return -1; 
-	
+		return -1;
+
 /* TODO: cache meta file pointer and close only after some idle interval */
 /* TODO: delayed write to disk */
 /* TODO: Convert meta IO here and other files to allow segmented meta files */
@@ -67,7 +67,8 @@ static inline int _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 *
 * Function name: meta_cache_open_file
 *        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr
-*       Summary: Open the meta file for the cache entry pointed by "body_ptr".
+*       Summary: Open the meta file for the cache entry
+*                pointed by "body_ptr".
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
@@ -286,7 +287,6 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	/* Sync meta */
 	if (body_ptr->meta_dirty == TRUE) {
-		
 		switch (body_ptr->this_stat.st_mode) {
 		case S_IFREG:
 			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
@@ -384,7 +384,7 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 		free(entry_body->dir_meta);
 	if (entry_body->file_meta != NULL)
 		free(entry_body->file_meta);
-	
+
 	if (entry_body->dir_entry_cache[0] != NULL)
 		free(entry_body->dir_entry_cache[0]);
 	if (entry_body->dir_entry_cache[1] != NULL)
@@ -765,21 +765,21 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
-	/* First check if any of the two cached page entries 
+	/* First check if any of the two cached page entries
 	  contains the target entry */
 	strcpy(tmp_entry.d_name, childname);
 	can_use_index = -1;
 
-	for (cache_idx=0 ; cache_idx<=1 ; cache_idx++) {
-		if (body_ptr->dir_entry_cache[cache_idx] == NULL) 
+	for (cache_idx = 0; cache_idx <= 1; cache_idx++) {
+		if (body_ptr->dir_entry_cache[cache_idx] == NULL)
 			continue;
-		
+
 		tmp_page_ptr = body_ptr->dir_entry_cache[cache_idx];
 		ret_val = dentry_binary_search(tmp_page_ptr->dir_entries,
 			tmp_page_ptr->num_entries, &tmp_entry, &tmp_index);
 		if (ret_val >= 0) {
 			*result_index = ret_val;
-			memcpy(result_page, tmp_page_ptr, 
+			memcpy(result_page, tmp_page_ptr,
 				sizeof(DIR_ENTRY_PAGE));
 			can_use_index = cache_idx;
 			gettimeofday(&(body_ptr->last_access_time), NULL);
@@ -787,8 +787,8 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		}
 	}
 
-	/* Cannot find the empty dir entry in any of the two cached page entries.
-	   Proceed to search from meta file */
+	/* Cannot find the empty dir entry in any of the
+	two cached page entries. Proceed to search from meta file */
 
 	if (body_ptr->dir_meta == NULL) {
 		body_ptr->dir_meta = malloc(sizeof(DIR_META_TYPE));
@@ -1005,7 +1005,7 @@ int expire_meta_mem_cache_entry(void)
 
 	gettimeofday(&current_time, NULL);
 	srandom((unsigned int)(current_time.tv_usec));
-	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);	
+	start_index = (random() % NUM_META_MEM_CACHE_HEADERS);
 	cindex = start_index;
 	/* Go through meta_mem_cache[] */
 	do {
@@ -1039,7 +1039,7 @@ int expire_meta_mem_cache_entry(void)
 		sem_post(&(meta_mem_cache[cindex].header_sem));
 		cindex = ((cindex + 1) % NUM_META_MEM_CACHE_HEADERS);
 	} while (cindex != start_index);
-	
+
 	/* Nothing was expired */
 	return -1;
 }
@@ -1172,7 +1172,7 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	
+
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
@@ -1197,7 +1197,7 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	int ret_val;
-	
+
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
@@ -1226,7 +1226,7 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret_val;
-	
+
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
