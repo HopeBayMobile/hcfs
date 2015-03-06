@@ -35,7 +35,7 @@ static void * _mount_test_fuse(void *ptr) {
 
   snprintf(argv[0],90,"test_fuse");
   snprintf(argv[1],90,"/tmp/test_fuse");
-  snprintf(argv[2],90,"-f");
+  snprintf(argv[2],90,"-d");
   ret_val = mkdir("/tmp/test_fuse",0777);
   printf("created return %d\n",ret_val);
   hook_fuse(3,argv);
@@ -47,6 +47,7 @@ class fuseopEnvironment : public ::testing::Environment {
   pthread_t new_thread;
 
   virtual void SetUp() {
+    system_config.max_block_size = 2097152;
 
     system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);
     memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
@@ -754,6 +755,7 @@ class hfuse_truncateTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    fake_block_status = ST_NONE;
   }
 
   virtual void TearDown() {
@@ -778,6 +780,43 @@ TEST_F(hfuse_truncateTest, IsNotFile) {
 
   ASSERT_EQ(ret_val, -1);
   EXPECT_EQ(tmp_err, EISDIR);
+}
+TEST_F(hfuse_truncateTest, NoSizeChange) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = truncate("/tmp/test_fuse/testfile2", 1024);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 1024);
+}
+TEST_F(hfuse_truncateTest, ExtendSize) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  ret_val = truncate("/tmp/test_fuse/testfile2", 102400);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 102400);
+}
+TEST_F(hfuse_truncateTest, TruncateZeroNoBlock) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+
+  fake_block_status = ST_NONE;
+  ret_val = truncate("/tmp/test_fuse/testtruncate", 0);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  stat("/tmp/test_fuse/testfile2", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 0);
 }
 
 /* End of the test case for the function hfuse_truncate */

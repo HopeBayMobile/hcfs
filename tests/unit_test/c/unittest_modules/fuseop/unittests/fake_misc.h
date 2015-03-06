@@ -8,6 +8,9 @@ int fail_mkdir_update_meta;
 int before_mkdir_created;
 
 int before_update_file_data;
+unsigned char fake_block_status;
+
+struct stat updated_stat;
 mode_t updated_mode;
 uid_t updated_uid;
 gid_t updated_gid;

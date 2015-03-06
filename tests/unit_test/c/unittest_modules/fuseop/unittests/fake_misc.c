@@ -57,6 +57,9 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testdir2") == 0) {
 		return 13;
 	}
+	if (strcmp(path, "/testtruncate") == 0) {
+		return 14;
+	}
 
 	*errcode = -EACCES;
 	return 0;
@@ -69,7 +72,10 @@ off_t check_file_size(const char *path)
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	strcpy(pathname,"test");
+	if (access("/tmp/testblock", F_OK) != 0)
+		mkdir("/tmp/testblock", 0700);
+	snprintf(pathname, 100, "/tmp/testblock/block_%lld_%lld",
+		this_inode, block_num);
 	return 0;
 }
 
@@ -217,6 +223,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_ino = 11;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
+		inode_stat->st_size = 1024;
 		break;
 	case 12:
 		inode_stat->st_ino = 12;
@@ -228,21 +235,18 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 14:
+		inode_stat->st_ino = 14;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		inode_stat->st_size = 102400;
+		break;
 	default:
 		break;
 	}
 
-	if (before_update_file_data == FALSE) {
-		inode_stat->st_mode = updated_mode;
-		inode_stat->st_uid = updated_uid;
-		inode_stat->st_gid = updated_gid;
-		inode_stat->st_atime = updated_atime;
-		inode_stat->st_mtime = updated_mtime;
-		memcpy(&(inode_stat->st_atim), &updated_atim,
-				sizeof(struct timespec));
-		memcpy(&(inode_stat->st_mtim), &updated_mtim,
-				sizeof(struct timespec));
-	}
+	if (before_update_file_data == FALSE)
+		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
 
 	return 0;
 }
