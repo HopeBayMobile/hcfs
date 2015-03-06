@@ -1,5 +1,9 @@
 #include "gtest/gtest.h"
 #include "params.h"
+#include <vector>
+#include <attr/xattr.h>
+#include <dirent.h>
+#include <fcntl.h>
 extern "C" {
 #include "mock_tool.h"
 #include "hcfs_cachebuild.h"
@@ -163,8 +167,82 @@ class build_cache_usageTest : public ::testing::Test {
 		}
 		virtual void TearDown()
 		{
+			for (int i = 0 ; i < answer_node_list.size() ; i++)
+				free(answer_node_list[i]);
+			delete_mock_dir("/tmp/blockpath");
 			rmdir(BLOCKPATH);
 		}
+		void generate_mock_data() {
+			int num_node;	
+			srand(time(NULL));
+			num_node = rand() % 1000;
+			for (int times = 0 ; times < num_node ; times++) {
+				CACHE_USAGE_NODE *answer_node;
+				int num_block_per_node;
+				int node_id = times * 100 + rand() % 50;
+
+				srand(time(NULL));
+				num_block_per_node = rand() % 50;
+				answer_node = (CACHE_USAGE_NODE *)malloc(sizeof(CACHE_USAGE_NODE));
+				memset(answer_node, 0, sizeof(CACHE_USAGE_NODE));
+				answer_node->this_inode = node_id;
+				/* Generate a mock block data */
+				for (int block_id = 0 ; block_id < num_block_per_node ; block_id++) {
+					char path[500];
+					int rand_size;
+					int fd;
+					
+					fetch_block_path(path, node_id, block_id);
+					fd = creat(path, 0700);
+					rand_size = rand() % 100;
+					ftruncate(fd, rand_size);
+					if (block_id % 2) {
+						setxattr(path, "user.dirty", "T", 1, XATTR_CREATE);
+						answer_node->dirty_cache_size += rand_size;
+					} else {
+						setxattr(path, "user.dirty", "F", 1, XATTR_CREATE);
+						answer_node->clean_cache_size += rand_size;
+					}
+					if (block_id == num_block_per_node - 1) {
+						struct stat tmpstat;
+						stat(path, &tmpstat);
+						answer_node->last_access_time = tmpstat.st_atime;
+						answer_node->last_mod_time = tmpstat.st_mtime;
+					}
+					close(fd);
+				}
+				/* Record the answer */
+				answer_node_list.push_back(answer_node);
+			}
+		}
+		void delete_mock_dir(const char *path)
+		{
+			DIR *dirptr;
+			struct dirent tmp_dirent;
+			struct dirent *dirent_ptr;
+			
+			dirptr = opendir(path);
+			if(dirptr == NULL)
+				return;
+			readdir_r(dirptr, &tmp_dirent, &dirent_ptr);
+			while (dirent_ptr != NULL) {
+				char tmp_name[200];
+				if(strcmp(tmp_dirent.d_name, ".") == 0 || strcmp(tmp_dirent.d_name, "..") == 0) {
+					readdir_r(dirptr, &tmp_dirent, &dirent_ptr);
+					continue;
+				}
+				sprintf(tmp_name, "%s/%s", path, tmp_dirent.d_name);
+				if(tmp_dirent.d_type == DT_REG)
+					unlink(tmp_name);
+				else
+					delete_mock_dir(tmp_name);
+				readdir_r(dirptr, &tmp_dirent, &dirent_ptr);
+			}
+			closedir(dirptr);
+			rmdir(path);
+		}
+
+		std::vector<CACHE_USAGE_NODE *> answer_node_list;
 };
 
 TEST_F(build_cache_usageTest, Nothing_in_Directory)
@@ -177,8 +255,39 @@ TEST_F(build_cache_usageTest, Nothing_in_Directory)
 
 TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 {
+	/* generate mock data */
+	for (int i = 0 ; i < NUMSUBDIR ; i++) {
+		char tmp_path[100];
+		sprintf(tmp_path, "%s/sub_%d", BLOCKPATH, i);
+		ASSERT_EQ(0, mkdir(tmp_path, 0700));
+	}
+	generate_mock_data();
 
+	/* Run function to be tested */	
+	build_cache_usage();
+
+	/* Check answer */
+	for (int i = 0 ; i < answer_node_list.size() ; i++) {
+		CACHE_USAGE_NODE *ans_node = answer_node_list[i];
+		CACHE_USAGE_NODE *now_node;
+		ino_t node_id = ans_node->this_inode;
+		bool found_node = false;
+		now_node = inode_cache_usage_hash[node_id % CACHE_USAGE_NUM_ENTRIES];
+		while (now_node != NULL) {
+			if (now_node->this_inode == node_id) {
+				found_node = true;
+				break;
+			}
+			now_node = now_node->next_node;
+		}
+		ASSERT_EQ(true, found_node) << "inode = " << node_id;
+		ASSERT_EQ(now_node->clean_cache_size, ans_node->clean_cache_size);
+		ASSERT_EQ(now_node->dirty_cache_size, ans_node->dirty_cache_size);
+		ASSERT_EQ(now_node->last_access_time, ans_node->last_access_time);
+		ASSERT_EQ(now_node->last_mod_time, ans_node->last_mod_time);
+	}
 }
+
 /*
 	End of unittest for build_cache_usage()
  */
