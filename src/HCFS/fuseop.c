@@ -1032,13 +1032,8 @@ int hfuse_truncate(const char *path, off_t offset)
 		return 0;
 	}
 
-	if (filestat.st_size < offset) {
-		/*If need to extend, only need to change st_size*/
-		change_system_meta((long long)(offset - filestat.st_size),
-			0, 0);
-
-		filestat.st_size = offset;
-	} else {
+	/*If need to extend, only need to change st_size. Do that later.*/
+	if (filestat.st_size > offset) {
 		if (offset == 0) {
 			last_block = -1;
 			last_page = -1;
@@ -1060,14 +1055,10 @@ int hfuse_truncate(const char *path, off_t offset)
 
 		/*TODO: put error handling for the read/write ops here*/
 		while (current_page <= last_page) {
-			if (nextfilepos == 0) {
-				/*Data after offset does not actually exists.
-				Just change file size */
-				change_system_meta((long long)(offset -
-					filestat.st_size), 0, 0);
-				filestat.st_size = offset;
+			/*Data after offset does not actually exists.
+				Just change file size later*/
+			if (nextfilepos == 0)
 				break;
-			}
 
 			meta_cache_lookup_file_data(this_inode, NULL,
 				NULL, &temppage, nextfilepos,
@@ -1098,10 +1089,6 @@ int hfuse_truncate(const char *path, off_t offset)
 				meta_cache_update_file_data(this_inode, NULL,
 					NULL, &temppage, currentfilepos,
 					body_ptr);
-
-				change_system_meta((long long)(offset -
-						filestat.st_size), 0, 0);
-				filestat.st_size = offset;
 				break;
 			}
 
@@ -1126,7 +1113,11 @@ int hfuse_truncate(const char *path, off_t offset)
 		}
 	}
 
+	/* Update file and system meta here */
+	change_system_meta((long long)(offset - filestat.st_size), 0, 0);
+	filestat.st_size = offset;
 	filestat.st_mtime = time(NULL);
+
 	ret_val = meta_cache_update_file_data(this_inode, &filestat,
 			&tempfilemeta, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);

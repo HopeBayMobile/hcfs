@@ -82,6 +82,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 int change_system_meta(long long system_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta)
 {
+	hcfs_system->systemdata.system_size += system_size_delta;
 	return 0;
 }
 
