@@ -37,7 +37,7 @@
 extern SYSTEM_CONF_STRUCT system_config;
 
 /* Helper function for removing local cached block for blocks that
-are synced to backend already */
+has been synced to backend already */
 int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 							long *seconds_slept)
 {

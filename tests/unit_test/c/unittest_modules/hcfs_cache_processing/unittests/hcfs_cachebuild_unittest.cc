@@ -5,7 +5,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 extern "C" {
-#include "mock_tool.h"
+#include "mock_params.h"
 #include "hcfs_cachebuild.h"
 }
 
@@ -105,7 +105,7 @@ TEST_F(return_cache_usage_nodeTest, GetNodeSuccess)
 TEST_F(return_cache_usage_nodeTest, GetNodeFail)
 {
 	/* Generate mock data */
-	generate_mock_cache_node(10000);
+	generate_mock_cache_node(num_inode);
 	/* Test for inode_num > 100000 */
 	for (int times = 0 ; times < 500 ; times++) {
 		int node_id = rand() % 100000 + num_inode;

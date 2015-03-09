@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile. Remember to add new tests you
 # created to the list.
-TESTS = hcfs_cachebuild_unittest
+TESTS = hcfs_cachebuild_unittest hcfs_cacheops_unittest
 
 # All Google Test headers. Usually you shouldn't change this
 # definition.
@@ -49,6 +49,8 @@ all : $(TESTS)
 
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o
+	rm -f *.gcno
+	rm -f *.gcda
 
 # Builds gtest.a and gtest_main.a.
 
@@ -80,8 +82,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 
 
-# meta_mem_cache testing
-
+# hcfs_cachebuild testing
 
 hcfs_cachebuild.o : $(USER_DIR)/hcfs_cachebuild.c $(USER_DIR)/params.h \
 		$(USER_DIR)/fuseop.h $(USER_DIR)/super_block.h $(USER_DIR)/hcfs_cachebuild.h \
@@ -92,8 +93,30 @@ hcfs_cachebuild_unittest.o : $(UNITTEST_DIR)/hcfs_cachebuild_unittest.cc \
 		$(USER_DIR)/hcfs_cachebuild.h $(USER_DIR)/hcfs_cachebuild.c $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_cachebuild_unittest.cc
 
-mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_tool.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
+cachebuild_mock_function.o : $(UNITTEST_DIR)/cachebuild_mock_function.c $(UNITTEST_DIR)/mock_params.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/cachebuild_mock_function.c
 
-hcfs_cachebuild_unittest : mock_function.o hcfs_cachebuild.o hcfs_cachebuild_unittest.o gtest_main.a
+hcfs_cachebuild_unittest : cachebuild_mock_function.o hcfs_cachebuild.o hcfs_cachebuild_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
+
+# hcfs_cacheops testing
+
+hcfs_cacheops.o : $(USER_DIR)/hcfs_cacheops.c $(USER_DIR)/hcfs_cachebuild.h \
+		$(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_cacheops.c
+	
+hcfs_cacheops_unittest.o : $(UNITTEST_DIR)/hcfs_cacheops_unittest.cc \
+		$(USER_DIR)/hcfs_cacheops.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_cacheops_unittest.cc
+
+cacheops_mock_function.o : $(UNITTEST_DIR)/cacheops_mock_function.c $(UNITTEST_DIR)/mock_params.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/cacheops_mock_function.c
+
+hcfs_cacheops_unittest : hcfs_cacheops_unittest.o hcfs_cacheops.o cacheops_mock_function.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+
+
+
