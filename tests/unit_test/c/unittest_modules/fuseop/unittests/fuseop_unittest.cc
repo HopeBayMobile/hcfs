@@ -51,6 +51,8 @@ class fuseopEnvironment : public ::testing::Environment {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     system_config.max_block_size = 2097152;
     hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
 
     system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);
     memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
@@ -761,9 +763,16 @@ class hfuse_truncateTest : public ::testing::Test {
     before_update_file_data = TRUE;
     fake_block_status = ST_NONE;
     hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
   }
 
   virtual void TearDown() {
+    char temppath[1024];
+
+    fetch_block_path(temppath, 14, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
   }
 };
 TEST_F(hfuse_truncateTest, FileNotExist) {
@@ -859,6 +868,58 @@ TEST_F(hfuse_truncateTest, TruncateZeroBlockLdisk) {
   EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 102400);
   EXPECT_NE(access(temppath, F_OK), 0);
 }
+
+TEST_F(hfuse_truncateTest, TruncateHalfLdisk) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  int fd;
+
+  fetch_block_path(temppath, 14, 0);
+  fd = creat(temppath, 0700);
+  ftruncate(fd, 102400);
+  close(fd);
+  stat(temppath, &tempstat);
+  ASSERT_EQ(tempstat.st_size, 102400);
+  ASSERT_EQ(access(temppath, F_OK), 0);
+  fake_block_status = ST_LDISK;
+  ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  ASSERT_EQ(access(temppath, F_OK), 0);
+  stat("/tmp/test_fuse/testtruncate", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 51200);
+  stat(temppath, &tempstat);
+  EXPECT_EQ(tempstat.st_size, 51200);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 - 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
+}
+TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  int fd;
+
+  fetch_block_path(temppath, 14, 0);
+  if (access(temppath, F_OK) == 0)
+    unlink(temppath);
+  fake_block_status = ST_NONE;
+  ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  EXPECT_NE(access(temppath, F_OK), 0);
+  stat("/tmp/test_fuse/testtruncate", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 51200);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000);
+  EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
+}
+
 
 /* End of the test case for the function hfuse_truncate */
 

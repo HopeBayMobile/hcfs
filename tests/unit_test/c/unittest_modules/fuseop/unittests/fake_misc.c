@@ -67,7 +67,10 @@ ino_t lookup_pathname(const char *path, int *errcode)
 
 off_t check_file_size(const char *path)
 {
-	return 0;
+	struct stat tempstat;
+
+	stat(path, &tempstat);
+	return tempstat.st_size;
 }
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
@@ -83,6 +86,8 @@ int change_system_meta(long long system_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta)
 {
 	hcfs_system->systemdata.system_size += system_size_delta;
+	hcfs_system->systemdata.cache_size += cache_size_delta;
+	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	return 0;
 }
 

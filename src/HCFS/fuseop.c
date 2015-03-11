@@ -940,15 +940,22 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 1);
+		change_system_meta(0, new_block_size - old_block_size, 0);
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
 	} else {
+		if ((temppage->block_entries[last_index]).status == ST_NONE)
+			return 0;
+
+		/* TODO: Error handling here if block status is not ST_NONE
+			but cannot find block on local disk */
 		blockfptr = fopen(thisblockpath, "r+");
 		setbuf(blockfptr, NULL);
 		flock(fileno(blockfptr), LOCK_EX);
 
+		/* TODO: check if it is possible for a block to be deleted
+			when truncate is conducted (meta is locked) */
 		if (stat(thisblockpath, &tempstat) == 0) {
 			(temppage->block_entries[last_index]).status = ST_LDISK;
 			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
@@ -960,7 +967,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 1);
+		printf("Debug truncate old %lld, new %lld\n", old_block_size, new_block_size);
+		change_system_meta(0, new_block_size - old_block_size, 0);
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
