@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = filetable_unittest
+TESTS = filetable_unittest hfuse_system_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -94,4 +94,19 @@ filetable_mock_function.o : $(UNITTEST_DIR)/filetable_mock_function.c $(UNITTEST
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/filetable_mock_function.c
 
 filetable_unittest : filetable_mock_function.o filetables.o filetable_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# hfuse_system_unittesting
+
+#hfuse_system.o : $(USER_DIR)/hfuse_system.c $(USER_DIR)/hfuse_system.h  $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hfuse_system.c
+
+hfuse_system_unittest.o : $(UNITTEST_DIR)/hfuse_system_unittest.cc $(GTEST_HEADERS) \
+			$(USER_DIR)/hfuse_system.c $(USER_DIR)/hfuse_system.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hfuse_system_unittest.cc
+
+hfuse_system_mock_function.o : $(UNITTEST_DIR)/hfuse_system_mock_function.c $(UNITTEST_DIR)/mock_params.h 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hfuse_system_mock_function.c
+
+hfuse_system_unittest : hfuse_system_mock_function.o hfuse_system_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

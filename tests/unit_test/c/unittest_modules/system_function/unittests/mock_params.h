@@ -1,3 +1,7 @@
+#include "params.h"
+
+SYSTEM_CONF_STRUCT system_config;
+
 enum {
 	INO__META_CACHE_LOCK_ENTRY_FAIL = 1000000,
 	INO__META_CACHE_LOCK_ENTRY_SUCCESS
