@@ -21,6 +21,8 @@ int init_system_fh_table(void)
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
+	if (this_inode == 1)
+		strcpy(pathname, "/tmp/root_meta_path");
 	return 0;
 }
 
@@ -42,7 +44,10 @@ int super_block_mark_dirty(ino_t this_inode)
 
 int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
-	return 0;
+	if (hcfs_init_backend_success == TRUE)
+		return 200;
+	else
+		return 0;
 }
 
 void hcfs_destroy_backend(CURL *curl)
@@ -72,7 +77,10 @@ int validate_system_config(void)
 
 int hcfs_list_container(CURL_HANDLE *curl_handle)
 {
-	return 0;
+	if (hcfs_list_container_success == TRUE)
+		return 200;
+	else
+		return 0;
 }
 
 void *delete_loop(void *arg)
@@ -87,7 +95,7 @@ void upload_loop(void)
 
 void run_cache_loop(void)
 {
-	
+
 }
 
 int hook_fuse(int argc, char **argv)

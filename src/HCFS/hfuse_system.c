@@ -176,6 +176,7 @@ int init_hfuse(void)
 		fclose(metafptr);
 		super_block_mark_dirty(1);
 	}
+	return 0;
 }
 
 /* Helper function to initialize curl handles for downloading objects */
