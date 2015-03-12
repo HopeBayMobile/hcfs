@@ -60,6 +60,9 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testtruncate") == 0) {
 		return 14;
 	}
+	if (strcmp(path, "/testread") == 0) {
+		return 15;
+	}
 
 	*errcode = -EACCES;
 	return 0;
@@ -141,22 +144,44 @@ long long open_fh(ino_t thisinode)
 {
 	long long index;
 
+	if (fail_open_files)
+		return -1;
+
 	index = (long long) thisinode;
 	system_fh_table.entry_table_flags[index] = TRUE;
 	system_fh_table.entry_table[index].thisinode = thisinode;
+	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
+	system_fh_table.entry_table[index].meta_cache_locked = FALSE;
+
+	system_fh_table.entry_table[index].blockfptr = NULL;
+	system_fh_table.entry_table[index].opened_block = -1;
+	system_fh_table.entry_table[index].cached_page_index = -1;
+	system_fh_table.entry_table[index].cached_filepos = -1;
+	sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
 
 	return index;
 }
 
 int close_fh(long long index)
 {
+	FH_ENTRY *tmp_entry;
+
+	tmp_entry = &(system_fh_table.entry_table[index]);
+	tmp_entry->meta_cache_locked = FALSE;
 	system_fh_table.entry_table_flags[index] = FALSE;
-	system_fh_table.entry_table[index].thisinode = 0;
+	tmp_entry->thisinode = 0;
+
+	tmp_entry->meta_cache_ptr = NULL;
+	tmp_entry->blockfptr = NULL;
+	tmp_entry->opened_block = -1;
+	sem_destroy(&(tmp_entry->block_sem));
 	return 0;
 }
 
 int seek_page(FH_ENTRY *fh_ptr, long long target_page)
 {
+	fh_ptr->cached_page_index = target_page;
+	fh_ptr->cached_filepos = sizeof(struct stat);
 	return 0;
 }
 
@@ -172,6 +197,16 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 }
 int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 {
+	switch (this_inode) {
+	case 14:
+		ftruncate(fileno(fptr), 102400);
+		break;
+	case 15:
+		ftruncate(fileno(fptr), 204800);
+		break;
+	default:
+		break;
+	}
 	return 0;
 }
 
@@ -246,6 +281,12 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
 		inode_stat->st_size = 102400;
+		break;
+	case 15:
+		inode_stat->st_ino = 15;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		inode_stat->st_size = 204800;
 		break;
 	default:
 		break;

@@ -13,6 +13,7 @@
 * 2015/2/11 Jiahong added inclusion of hcfs_cacheops.h
 * 2015/2/12 Jiahong added inclusion of hcfs_fromcloud.h
 * 2015/3/2~3 Jiahong revised rename function to allow existing file as target.
+* 2015/3/12 Jiahong restructure hfuse_read
 *
 **************************************************************************/
 
@@ -967,7 +968,6 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		printf("Debug truncate old %lld, new %lld\n", old_block_size, new_block_size);
 		change_system_meta(0, new_block_size - old_block_size, 0);
 
 		flock(fileno(blockfptr), LOCK_UN);
@@ -1210,18 +1210,20 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 	PREFETCH_STRUCT_TYPE *temp_prefetch;
 	pthread_t prefetch_thread;
 
-	if ((eindex+1) < MAX_BLOCK_ENTRIES_PER_PAGE) {
-		if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
-			((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
-			temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
-			temp_prefetch->this_inode = this_inode;
-			temp_prefetch->block_no = block_index + 1;
-			temp_prefetch->page_start_fpos = this_page_fpos;
-			temp_prefetch->entry_index = eindex + 1;
-			pthread_create(&(prefetch_thread),
-				&prefetch_thread_attr, (void *)&prefetch_block,
-				((void *)temp_prefetch));
-		}
+	if ((eindex+1) >= MAX_BLOCK_ENTRIES_PER_PAGE)
+		return 0;
+	if (tpage->num_entries <= (eindex+1))
+		return 0;
+	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
+		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
+		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
+		temp_prefetch->this_inode = this_inode;
+		temp_prefetch->block_no = block_index + 1;
+		temp_prefetch->page_start_fpos = this_page_fpos;
+		temp_prefetch->entry_index = eindex + 1;
+		pthread_create(&(prefetch_thread),
+			&prefetch_thread_attr, (void *)&prefetch_block,
+			((void *)temp_prefetch));
 	}
 	return 0;
 }
@@ -1286,25 +1288,126 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	return 0;
 }
 
-/* Helper function for read operation. Will advance to the next block. */
-int read_advance_block(long long *entry_index, FH_ENTRY *fh_ptr,
-				off_t *this_page_fpos)
+/* Function for reading from a single block for read operation. Will fetch
+*  block from backend if needed. */
+size_t _read_block(const char *buf, size_t size, long long bindex,
+			off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode)
 {
-	if (((*entry_index)+1) >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-		/*If may need to change meta, lock*/
-		fh_ptr->meta_cache_ptr =
-				meta_cache_lock_entry(fh_ptr->thisinode);
-		fh_ptr->meta_cache_locked = TRUE;
+	long long current_page;
+	char thisblockpath[400];
+	BLOCK_ENTRY_PAGE temppage;
+	off_t this_page_fpos;
+	off_t old_cache_size, new_cache_size;
+	size_t this_bytes_read;
+	off_t nextfilepos, prevfilepos;
+	long long entry_index;
+	char fill_zeros;
 
-		*this_page_fpos = advance_block(fh_ptr->meta_cache_ptr,
-						*this_page_fpos, entry_index);
+	/* Decide the page index for block "bindex" */
+	/*Page indexing starts at zero*/
+	current_page = bindex / MAX_BLOCK_ENTRIES_PER_PAGE;
 
-		fh_ptr->meta_cache_locked = FALSE;
-		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-	} else {
-		(*entry_index)++;
+	/*If may need to change meta, lock*/
+	fh_ptr->meta_cache_ptr =
+			meta_cache_lock_entry(fh_ptr->thisinode);
+	fh_ptr->meta_cache_locked = TRUE;
+
+	/* Find the offset of the page if it is not cached */
+	if (fh_ptr->cached_page_index != current_page)
+		seek_page(fh_ptr, current_page);
+
+	this_page_fpos = fh_ptr->cached_filepos;
+
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+	entry_index = bindex % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	sem_wait(&(fh_ptr->block_sem));
+	fill_zeros = FALSE;
+	while (fh_ptr->opened_block != bindex) {
+		if (fh_ptr->opened_block != -1) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+
+		read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+
+		read_wait_full_cache(&temppage, entry_index, fh_ptr,
+			this_page_fpos);
+
+		read_prefetch_cache(&temppage, entry_index,
+			this_inode, bindex, this_page_fpos);
+
+		switch ((temppage).block_entries[entry_index].status) {
+		case ST_NONE:
+		case ST_TODELETE:
+			fill_zeros = TRUE;
+			break;
+		case ST_LDISK:
+		case ST_BOTH:
+		case ST_LtoC:
+			fill_zeros = FALSE;
+			break;
+		case ST_CLOUD:
+		case ST_CtoL:
+			/*Download from backend */
+			read_fetch_backend(this_inode,
+				bindex, fh_ptr, &temppage,
+				this_page_fpos, entry_index);
+
+			fill_zeros = FALSE;
+			break;
+		default:
+			break;
+		}
+
+		if ((fill_zeros != TRUE) && (fh_ptr->opened_block !=
+				bindex)) {
+			fetch_block_path(thisblockpath,
+					this_inode, bindex);
+
+			fh_ptr->blockfptr = fopen(thisblockpath, "r+");
+			if (fh_ptr->blockfptr != NULL) {
+				setbuf(fh_ptr->blockfptr, NULL);
+				fh_ptr->opened_block = bindex;
+			} else {
+			/* Some exception that block file is deleted in
+			*  the middle of the status check*/
+				printf("Debug read: cannot open block file. Perhaps replaced?\n");
+				fh_ptr->opened_block = -1;
+			}
+		} else {
+			break;
+		}
 	}
-	return 0;
+
+	if (fill_zeros != TRUE) {
+		flock(fileno(fh_ptr->blockfptr), LOCK_SH);
+		fseek(fh_ptr->blockfptr, offset, SEEK_SET);
+		this_bytes_read = fread(buf,
+				sizeof(char), size, fh_ptr->blockfptr);
+		if (this_bytes_read < size) {
+			/*Need to pad zeros*/
+			printf("Short reading? %ld %d\n",
+				offset, size + this_bytes_read);
+			memset(&buf[this_bytes_read],
+					 0, sizeof(char) *
+				(size - this_bytes_read));
+			this_bytes_read = size;
+		}
+
+		flock(fileno(fh_ptr->blockfptr), LOCK_UN);
+
+	} else {
+		printf("Padding zeros? %ld %d\n", offset, size);
+		this_bytes_read = size;
+		memset(buf, 0, sizeof(char) * size);
+	}
+
+	sem_post(&(fh_ptr->block_sem));
+
+	return this_bytes_read;
 }
 
 /************************************************************************
@@ -1324,21 +1427,13 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 {
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block;
-	long long start_page, current_page;
-	off_t nextfilepos, prevfilepos, currentfilepos;
-	BLOCK_ENTRY_PAGE temppage;
-	long long entry_index;
 	long long block_index;
-	char thisblockpath[400];
 	int total_bytes_read;
 	int this_bytes_read;
 	off_t current_offset;
 	int target_bytes_read;
-	size_t size;
-	char fill_zeros;
-	off_t this_page_fpos;
 	struct stat temp_stat;
-
+	size_t size;
 
 /* TODO: Perhaps should do proof-checking on the inode number using pathname
 *  lookup and from file_info*/
@@ -1375,86 +1470,13 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	start_block = (offset / MAX_BLOCK_SIZE);
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
-	/* Decide the page indices for the first byte and last byte of
-	*  the read */
-	/*Page indexing starts at zero*/
-	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
-
-	/* Will need to change the entry page if it is not the current one */
-	if (fh_ptr->cached_page_index != start_page)
-		seek_page(fh_ptr, start_page);
-
-	this_page_fpos = fh_ptr->cached_filepos;
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
-	entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	/* Read data from each block involved */
 	for (block_index = start_block; block_index <= end_block;
 				block_index++) {
-		sem_wait(&(fh_ptr->block_sem));
-		fill_zeros = FALSE;
-		while (fh_ptr->opened_block != block_index) {
-			if (fh_ptr->opened_block != -1) {
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->opened_block = -1;
-			}
-
-			read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
-
-			read_wait_full_cache(&temppage, entry_index, fh_ptr,
-				this_page_fpos);
-
-			read_prefetch_cache(&temppage, entry_index,
-				temp_stat.st_ino, block_index, this_page_fpos);
-
-			switch ((temppage).block_entries[entry_index].status) {
-			case ST_NONE:
-			case ST_TODELETE:
-				fill_zeros = TRUE;
-				break;
-			case ST_LDISK:
-			case ST_BOTH:
-			case ST_LtoC:
-				fill_zeros = FALSE;
-				break;
-			case ST_CLOUD:
-			case ST_CtoL:
-				/*Download from backend */
-				read_fetch_backend(temp_stat.st_ino,
-					block_index, fh_ptr, &temppage,
-					this_page_fpos, entry_index);
-
-				fill_zeros = FALSE;
-				break;
-			default:
-				break;
-			}
-
-			if ((fill_zeros != TRUE) && (fh_ptr->opened_block !=
-					block_index)) {
-				fetch_block_path(thisblockpath,
-						temp_stat.st_ino, block_index);
-
-				fh_ptr->blockfptr = fopen(thisblockpath, "r+");
-				if (fh_ptr->blockfptr != NULL) {
-					setbuf(fh_ptr->blockfptr, NULL);
-					fh_ptr->opened_block = block_index;
-				} else {
-				/* Some exception that block file is deleted in
-				*  the middle of the status check*/
-					printf("Debug read: cannot open block file. Perhaps replaced?\n");
-					fh_ptr->opened_block = -1;
-				}
-			} else {
-				break;
-			}
-		}
-
-		if (fill_zeros != TRUE)
-			flock(fileno(fh_ptr->blockfptr), LOCK_SH);
-
 		current_offset = (offset+total_bytes_read) % MAX_BLOCK_SIZE;
 		target_bytes_read = MAX_BLOCK_SIZE - current_offset;
 
@@ -1462,44 +1484,15 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 		if ((size - total_bytes_read) < target_bytes_read)
 			target_bytes_read = size - total_bytes_read;
 
-		if (fill_zeros != TRUE) {
-			fseek(fh_ptr->blockfptr, current_offset, SEEK_SET);
-			this_bytes_read = fread(&buf[total_bytes_read],
-					sizeof(char), target_bytes_read,
-							fh_ptr->blockfptr);
-			if (this_bytes_read < target_bytes_read) {
-				/*Need to pad zeros*/
-				printf("Short reading? %ld %d\n",
-					current_offset, total_bytes_read +
-							this_bytes_read);
-				memset(&buf[total_bytes_read + this_bytes_read],
-					 0, sizeof(char) *
-					(target_bytes_read - this_bytes_read));
-				this_bytes_read = target_bytes_read;
-			}
-		} else {
-			printf("Padding zeros? %ld %d\n", current_offset,
-					total_bytes_read);
-			this_bytes_read = target_bytes_read;
-			memset(&buf[total_bytes_read], 0, sizeof(char) *
-							target_bytes_read);
-		}
+		this_bytes_read = _read_block(&buf[total_bytes_read],
+				target_bytes_read, block_index,
+				current_offset, fh_ptr, fh_ptr->thisinode);
 
 		total_bytes_read += this_bytes_read;
-
-		if (fill_zeros != TRUE)
-			flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-
-		sem_post(&(fh_ptr->block_sem));
 
 		/*Terminate if cannot write as much as we want*/
 		if (this_bytes_read < target_bytes_read)
 			break;
-
-		/*If this is not the last block, need to advance one more*/
-		if (block_index < end_block)
-			read_advance_block(&entry_index, fh_ptr,
-						&this_page_fpos);
 	}
 
 	if (total_bytes_read > 0) {

@@ -83,6 +83,12 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			inode_stat->st_atime = 100000;
 			inode_stat->st_size = 102400;
 			break;
+		case 15:
+			inode_stat->st_ino = 15;
+			inode_stat->st_mode = S_IFREG | 0700;
+			inode_stat->st_atime = 100000;
+			inode_stat->st_size = 204800;
+			break;
 		default:
 			break;
 		}
@@ -96,6 +102,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		file_meta_ptr->next_block_page = 0;
 		switch (this_inode) {
 		case 14:
+		case 15:
 			file_meta_ptr->next_block_page = sizeof(struct stat);
 			break;
 		default:
@@ -107,6 +114,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		memset(block_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 		switch (this_inode) {
 		case 14:
+		case 15:
 			if (page_pos == sizeof(struct stat)) {
 				block_page->num_entries = 1;
 				block_page->block_entries[0].status

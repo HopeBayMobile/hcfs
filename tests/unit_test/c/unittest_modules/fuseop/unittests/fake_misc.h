@@ -10,6 +10,8 @@ int before_mkdir_created;
 int before_update_file_data;
 unsigned char fake_block_status;
 
+int fail_open_files;
+
 struct stat updated_stat;
 mode_t updated_mode;
 uid_t updated_uid;

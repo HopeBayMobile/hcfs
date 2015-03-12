@@ -50,9 +50,12 @@ class fuseopEnvironment : public ::testing::Environment {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     system_config.max_block_size = 2097152;
+    system_config.cache_hard_limit = 3200000;
+    system_config.cache_soft_limit = 3200000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    fail_open_files = FALSE;
 
     system_fh_table.entry_table_flags = (char *) malloc(sizeof(char) * 100);
     memset(system_fh_table.entry_table_flags, 0, sizeof(char) * 100);
@@ -919,7 +922,219 @@ TEST_F(hfuse_truncateTest, TruncateHalfNoblock) {
   EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000);
   EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 13);
 }
+TEST_F(hfuse_truncateTest, TruncateHalfCloud) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  int fd;
 
+  fetch_block_path(temppath, 14, 0);
+
+  fake_block_status = ST_CLOUD;
+  ret_val = truncate("/tmp/test_fuse/testtruncate", 51200);
+  tmp_err = errno;
+
+  ASSERT_EQ(ret_val, 0);
+  ASSERT_EQ(access(temppath, F_OK), 0);
+  stat("/tmp/test_fuse/testtruncate", &tempstat);
+  EXPECT_EQ(tempstat.st_size, 51200);
+  stat(temppath, &tempstat);
+  EXPECT_EQ(tempstat.st_size, 51200);
+  EXPECT_EQ(hcfs_system->systemdata.system_size, 12800000 - 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_size, 1200000 + 51200);
+  EXPECT_EQ(hcfs_system->systemdata.cache_blocks, 14);
+}
 
 /* End of the test case for the function hfuse_truncate */
+
+/* Begin of the test case for the function hfuse_open */
+class hfuse_openTest : public ::testing::Test {
+ protected:
+  FILE *fptr;
+
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+    fail_open_files = FALSE;
+    fptr = NULL;
+  }
+
+  virtual void TearDown() {
+    if (fptr != NULL)
+      fclose(fptr);
+    fail_open_files = FALSE;
+  }
+};
+TEST_F(hfuse_openTest, FileNotExist) {
+  int tmp_err;
+  int ret_val;
+
+  fptr = fopen("/tmp/test_fuse/does_not_exist", "r");
+  tmp_err = errno;
+  
+  ret_val = 0;
+  if (fptr == NULL)
+    ret_val = -1;
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENOENT);
+}
+
+TEST_F(hfuse_openTest, FailOpenFh) {
+  int tmp_err;
+  int ret_val;
+
+  fail_open_files = TRUE;
+  fptr = fopen("/tmp/test_fuse/testfile1", "r");
+  tmp_err = errno;
+  
+  ret_val = 0;
+  if (fptr == NULL)
+    ret_val = -1;
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, ENFILE);
+}
+
+TEST_F(hfuse_openTest, OpenFileOK) {
+  int tmp_err;
+  int ret_val;
+
+  fptr = fopen("/tmp/test_fuse/testfile1", "r");
+  tmp_err = errno;
+  
+  ret_val = 0;
+  if (fptr == NULL)
+    ret_val = -1;
+  ASSERT_EQ(ret_val, 0);
+  EXPECT_EQ(tmp_err, ENFILE);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+/* End of the test case for the function hfuse_open */
+
+/* Begin of the test case for the function hfuse_read */
+class hfuse_readTest : public ::testing::Test {
+ protected:
+  FILE *fptr;
+
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+    fake_block_status = ST_NONE;
+    hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
+    fptr = NULL;
+  }
+
+  virtual void TearDown() {
+    char temppath[1024];
+
+    if (fptr != NULL)
+      fclose(fptr);
+
+    fetch_block_path(temppath, 15, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+  }
+};
+
+TEST_F(hfuse_readTest, ReadZeroByte) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  int fd;
+  size_t ret_items;
+
+  fetch_block_path(temppath, 15, 0);
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 0, 0, fptr);
+  EXPECT_EQ(ret_items,0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_readTest, ReadPastEnd) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  int fd;
+  size_t ret_items;
+
+  fetch_block_path(temppath, 15, 0);
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 204900, SEEK_SET);
+  ret_items = fread(tempbuf, 1, 1, fptr);
+  EXPECT_EQ(ret_items,0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_readTest, ReadEmptyContent) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_NONE;
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  ret_val = 0;
+  for (count = 0; count < 100; count++) {
+    if (tempbuf[count] != 0) {
+      ret_val = 1;
+      break;
+    }
+  }
+  EXPECT_EQ(ret_val, 0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_readTest, ReadLocalContent) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+/* End of the test case for the function hfuse_read */
 
