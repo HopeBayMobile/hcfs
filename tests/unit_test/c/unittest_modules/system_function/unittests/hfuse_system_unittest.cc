@@ -172,22 +172,25 @@ TEST_F(init_hfuseTest, RootMetaPath)
 /*
 	Unittest of main function
  */
-class HCFSMainTest : public ::testing::Test {
+class mainTest : public ::testing::Test {
 	protected:
 		virtual	void SetUp()
 		{
+			::testing::FLAGS_gtest_death_test_style = "threadsafe";
 			tmp_argv = (char **)malloc(sizeof(char *) * 1);
 			tmp_argv[0] = (char *)malloc(sizeof(char) * 20);
 			strcpy(tmp_argv[0], "none");
+			HCFSSYSTEM = (char *)malloc(sizeof(char) * 100);
+			strcpy(HCFSSYSTEM, "/tmp/test_system_file");
 		}
 		virtual void TearDown()
 		{
-
+			free(HCFSSYSTEM);
 		}
 		char **tmp_argv;
 };
 
-TEST_F(HCFSMainTest, InitBackendFail)
+TEST_F(mainTest, InitBackendFail)
 {
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = FALSE;
@@ -195,7 +198,7 @@ TEST_F(HCFSMainTest, InitBackendFail)
 	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(0), "");
 }
 
-TEST_F(HCFSMainTest, ListContainerFail)
+TEST_F(mainTest, ListContainerFail)
 {
 	hcfs_list_container_success = FALSE;
 	hcfs_init_backend_success = TRUE;
@@ -203,31 +206,26 @@ TEST_F(HCFSMainTest, ListContainerFail)
 	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(0), "");
 }
 
-TEST_F(HCFSMainTest, MainFunctionSuccess)
+TEST_F(mainTest, MainFunctionSuccess)
 {
 	int saved_stdout = dup(fileno(stdout));
 	int saved_stderr = dup(fileno(stderr));
-	int pid = getpid();
 
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = TRUE;
 	/* Test */
 	ASSERT_EQ(0, main(1, tmp_argv));
-	if(getpid() == pid){
-		pid_t pid = wait(NULL);
-		if(pid!=-1)
-			kill(pid, SIGKILL);
-		pid = wait(NULL);
-		if(pid!=-1)
-			kill(pid, SIGKILL);
-	}
+	sleep(1); // Waiting for child process finishing their work
+	/* Check */
 	EXPECT_EQ(0, access("backend_upload_log", F_OK));
 	EXPECT_EQ(0, access("cache_maintain_log", F_OK));
 	EXPECT_EQ(0, access("fuse_log", F_OK));
 	/* Restore */
-	unlink("backend_upload_log");
-	unlink("cache_maintain_log");
-	unlink("fuse_log");
+	EXPECT_EQ(0, unlink("backend_upload_log"));
+	EXPECT_EQ(0, unlink("cache_maintain_log"));
+	EXPECT_EQ(0, unlink("fuse_log"));
+	unlink("/tmp/root_meta_path");
+	unlink(HCFSSYSTEM);
 	dup2(saved_stdout, fileno(stdout));
 	dup2(saved_stderr, fileno(stderr));
 }

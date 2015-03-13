@@ -90,12 +90,14 @@ void *delete_loop(void *arg)
 
 void upload_loop(void)
 {
-
+	/* kill child process */
+	exit(0);
 }
 
 void run_cache_loop(void)
 {
-
+	/* kill child process */
+	exit(0);
 }
 
 int hook_fuse(int argc, char **argv)
