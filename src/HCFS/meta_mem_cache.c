@@ -287,21 +287,20 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 
 	/* Sync meta */
 	if (body_ptr->meta_dirty == TRUE) {
-		switch (body_ptr->this_stat.st_mode) {
-		case S_IFREG:
+		if (S_ISREG(body_ptr->this_stat.st_mode)) {
 			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
 			fwrite((body_ptr->file_meta), sizeof(FILE_META_TYPE),
 							1, body_ptr->fptr);
-			break;
-		case S_IFDIR:
-			fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
-			fwrite((body_ptr->dir_meta), sizeof(DIR_META_TYPE),
+		} else {
+			if (S_ISDIR(body_ptr->this_stat.st_mode)) {
+				fseek(body_ptr->fptr, sizeof(struct stat),
+							SEEK_SET);
+				fwrite((body_ptr->dir_meta),
+						sizeof(DIR_META_TYPE),
 							1, body_ptr->fptr);
-			_cache_sync(body_ptr, 0);
-			_cache_sync(body_ptr, 1);
-			break;
-		default:
-			break;
+				_cache_sync(body_ptr, 0);
+				_cache_sync(body_ptr, 1);
+			}
 		}
 
 		body_ptr->meta_dirty = FALSE;
