@@ -97,9 +97,10 @@ unsigned long long compute_hash(const char *path)
 *************************************************************************/
 int replace_pathname_cache(long long index, char *path, ino_t inode_number)
 {
+	if (index < 0 || index >= PATHNAME_CACHE_ENTRY_NUM)
+		return -1;
 	if (strlen(path) > MAX_PATHNAME)
 		return -1;
-
 	sem_wait(&(pathname_cache[index].cache_entry_sem));
 	strcpy(pathname_cache[index].pathname, path);
 	pathname_cache[index].inode_number = inode_number;
