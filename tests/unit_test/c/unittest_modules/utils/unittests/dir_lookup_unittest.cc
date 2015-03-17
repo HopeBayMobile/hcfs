@@ -1,5 +1,5 @@
 #include "gtest/gtest.h"
-
+#include "dir_lookup_params.h"
 extern "C" {
 #include "dir_lookup.h"
 }
@@ -174,13 +174,6 @@ TEST(check_cached_pathTest, CheckCacheSuccess)
 	Unittest of lookup_pathname()
  */
 
-TEST(lookup_pathnameTest, ErrorPathname)
-{
-	int errcode;
-	EXPECT_EQ(0, lookup_pathname("error_path", &errcode));
-	EXPECT_EQ(0, lookup_pathname("error_path/no_root", &errcode));
-}
-
 TEST(lookup_pathnameTest, LookupRootPathSuccess)
 {
 	int errcode;
@@ -201,6 +194,56 @@ TEST(lookup_pathnameTest, PathFoundInCache)
 	pathname_cache[index].inode_number = test_inode;
 	/* Test */
 	EXPECT_EQ(test_inode, lookup_pathname(path, &errcode));
+}
+
+TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_1_Layer)
+{
+	int errcode;
+	unsigned long long index;
+	char complete_path[] = "/tmp/file1/file2/file3";
+	/* init and mock data */
+	ASSERT_EQ(0, init_pathname_cache());
+	index = compute_hash("/tmp/file1/file2");
+	strcpy(pathname_cache[index].pathname, "/tmp/file1/file2");
+	pathname_cache[index].inode_number = INO__FILE2_FOUND;
+	/* Test */
+	EXPECT_EQ(INO__FILE3_FOUND, lookup_pathname(complete_path, &errcode));
+}
+
+TEST(lookup_pathnameTest, PrefixPathFoundInCache_With_Recursion_MultiLayer)
+{
+	int errcode;
+	unsigned long long index;
+	char complete_path[] = "/tmp/file1/file2/file3/file4";
+	/* init and mock data */
+	ASSERT_EQ(0, init_pathname_cache());
+	index = compute_hash("/tmp/file1");
+	strcpy(pathname_cache[index].pathname, "/tmp/file1");
+	pathname_cache[index].inode_number = INO__FILE1_FOUND;
+	/* Test */
+	EXPECT_EQ(INO__FILE4_FOUND, lookup_pathname(complete_path, &errcode));
+}
+
+TEST(lookup_pathnameTest, PrefixPathNotFoundInCache)
+{
+	int errcode;
+	unsigned long long index;
+	char complete_path[] = "/file1/file2/file3/file4";
+	/* init and mock data */
+	ASSERT_EQ(0, init_pathname_cache());
+	/* Test */
+	EXPECT_EQ(INO__FILE4_FOUND, lookup_pathname(complete_path, &errcode));
+}
+
+TEST(lookup_pathnameTest, FailToFindPrefixPath)
+{
+	int errcode;
+	/* init and mock data */
+	ASSERT_EQ(0, init_pathname_cache());
+	/* Test */
+	EXPECT_EQ(0, lookup_pathname("/file1/file2/not_found", &errcode));
+	EXPECT_EQ(0, lookup_pathname("/file1/file2/not_found/file3/file4", &errcode));
+	EXPECT_EQ(0, lookup_pathname("/not_found/file1/file2/file3/file4", &errcode));
 }
 
 /*
