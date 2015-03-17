@@ -40,8 +40,8 @@
 *                element should be inserted.
 *
 *************************************************************************/
-int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries,
-				DIR_ENTRY *new_entry, int *index_to_insert)
+int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
+			const DIR_ENTRY *new_entry, int *index_to_insert)
 {
 	int compare_entry, compare_result;
 	int start_index, end_index;

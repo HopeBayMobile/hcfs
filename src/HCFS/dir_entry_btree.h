@@ -15,8 +15,8 @@
 
 #include "fuseop.h"
 
-int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries,
-		DIR_ENTRY *new_entry, int *index_to_insert);
+int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
+			const DIR_ENTRY *new_entry, int *index_to_insert);
 
 int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode,
 		int fh, int *result_index, DIR_ENTRY_PAGE *result_node);
