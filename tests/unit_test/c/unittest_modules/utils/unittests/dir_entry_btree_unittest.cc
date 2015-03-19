@@ -116,6 +116,8 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 			memset(&dir_stat, 0, sizeof(struct stat));
 			memset(&meta, 0, sizeof(DIR_META_TYPE));
 			memset(&node, 0, sizeof(DIR_ENTRY_PAGE));
+			overflow_median = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+			overflow_new_pos = (long long *)malloc(sizeof(long long));
 			// root entry
 			node.dir_entries[0].d_ino = 1;
 			strcpy(node.dir_entries[0].d_name, ".");
@@ -134,30 +136,125 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 			meta.tree_walk_list_head = 
 				sizeof(struct stat) + sizeof(DIR_META_TYPE);
 			// open file
-			fptr = fopen("/tmp/test_dir_meta", "a+");
-			ASSERT_TRUE(fptr != NULL);
-			fwrite(&dir_stat, sizeof(struct stat), 1, fptr);
-			fwrite(&meta, sizeof(DIR_META_TYPE), 1, fptr);
-			fwrite(&node, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+			fptr = fopen("/tmp/test_dir_meta", "wb+");
 			fh = fileno(fptr);
+			ASSERT_TRUE(fptr != NULL);
+			pwrite(fh, &dir_stat, sizeof(struct stat), 0);
+			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pwrite(fh, &node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat)+sizeof(DIR_META_TYPE));
 		}
 		virtual void TearDown()
 		{
+			if (overflow_median != NULL)
+				free(overflow_median);
+			if (overflow_new_pos != NULL)
+				free(overflow_new_pos);
 			close(fh);
 			unlink("/tmp/test_dir_meta");
 		}
+
+		/* Generate a new root if old root was splitted. */
+		void generate_new_root()
+		{
+			DIR_META_TYPE meta;
+			DIR_ENTRY_PAGE root;
+			DIR_ENTRY_PAGE new_root;
+
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+			/* create a new root */
+			if (meta.entry_page_gc_list != 0) {
+				pread(fh, &new_root, sizeof(DIR_ENTRY_PAGE), meta.entry_page_gc_list);
+				new_root.this_page_pos = meta.entry_page_gc_list;
+				meta.entry_page_gc_list = new_root.gc_list_next;
+			} else {
+				memset(&new_root, 0, sizeof(DIR_ENTRY_PAGE));
+				fseek(fptr, 0, SEEK_END);
+				new_root.this_page_pos = ftell(fptr);
+			}
+			/* Insert to head of tree_walk_list */
+			new_root.gc_list_next = 0;
+			new_root.tree_walk_prev = 0;
+			new_root.tree_walk_next = meta.tree_walk_list_head;
+			bool no_need_rewrite = false;
+			if (meta.tree_walk_list_head == root.this_page_pos) {
+				root.tree_walk_prev = new_root.this_page_pos;
+			} else {
+				DIR_ENTRY_PAGE tree_head;
+				pread(fh, &tree_head, sizeof(DIR_ENTRY_PAGE), meta.tree_walk_list_head);
+				tree_head.tree_walk_prev = new_root.this_page_pos;
+				if (tree_head.this_page_pos == *overflow_new_pos) {
+					tree_head.parent_page_pos = new_root.this_page_pos;
+					no_need_rewrite = true;
+				}
+				pwrite(fh, &tree_head, sizeof(DIR_ENTRY_PAGE), meta.tree_walk_list_head);
+			}
+			meta.tree_walk_list_head = new_root.this_page_pos;
+			/* Init new root */
+			new_root.parent_page_pos = 0;
+			new_root.num_entries = 1;
+			memset(new_root.child_page_pos, 0, sizeof(long long)*(MAX_DIR_ENTRIES_PER_PAGE+1));
+			memcpy(&(new_root.dir_entries[0]), overflow_median, sizeof(DIR_ENTRY));
+			// connect parent to 2 children
+			new_root.child_page_pos[0] = meta.root_entry_page;
+			new_root.child_page_pos[1] = *overflow_new_pos;
+			// modify root position im meta
+			meta.root_entry_page = new_root.this_page_pos;
+			pwrite(fh, &new_root, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+			// connect 2 children to parent
+			root.parent_page_pos = new_root.this_page_pos;
+			pwrite(fh, &root, sizeof(DIR_ENTRY_PAGE), root.this_page_pos);
+			if ( no_need_rewrite == false ) {
+				DIR_ENTRY_PAGE splitted_node;
+				pread(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
+				splitted_node.parent_page_pos = new_root.this_page_pos;
+				pwrite(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
+			}
+			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+		}
+		
+		/* An easy function to find a given entry so we can verify our insertion */
+		bool search_entry(DIR_ENTRY *entry)
+		{
+			DIR_META_TYPE *meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
+			DIR_ENTRY_PAGE *node = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
+			int index;
+
+			pread(fh, meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, node, sizeof(DIR_ENTRY_PAGE), meta->root_entry_page);
+			while (true) {
+				/* linear search */
+				for (int i = 0 ; i < node->num_entries ; i++)
+					if (strcpy(node->dir_entries[i].d_name, entry->d_name) >= 0) {
+						index = i;
+						break;
+					}
+				/* found or deeper */
+				if (compare(&(node->dir_entries[index]), entry) == 0) {
+					return true;
+				} else {
+					if (node->child_page_pos[index] == 0)
+						return false;
+					else
+						pread(fh, node, sizeof(DIR_ENTRY_PAGE), node->child_page_pos[index]);
+				}
+			}
+			free(meta);
+			free(node);
+		}
+
 		int fh;
 		FILE *fptr;
+		DIR_ENTRY *overflow_median;
+		long long *overflow_new_pos;
+		DIR_ENTRY tmp_entries[MAX_DIR_ENTRIES_PER_PAGE + 2];
+		long long tmp_child_pos[MAX_DIR_ENTRIES_PER_PAGE + 3];
 };
 
-TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Split)
+TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 {
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
-	DIR_ENTRY *overflow_median;
-	long long *overflow_new_pos;
-	DIR_ENTRY tmp_entries[MAX_DIR_ENTRIES_PER_PAGE + 2];
-	long long tmp_child_pos[MAX_DIR_ENTRIES_PER_PAGE + 3];
 			
 	fseek(fptr, sizeof(struct stat), SEEK_SET);
 	fread(&meta, sizeof(DIR_META_TYPE), 1, fptr);
@@ -166,7 +263,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Split)
 	overflow_new_pos = NULL;
 
 	/* Test for 97 times since max_entries_num==99 (97 + "." + "..") */
-	for (int times = 0 ; times < 97 ; times++) {
+	for (int times = 0 ; times < MAX_DIR_ENTRIES_PER_PAGE - 2 ; times++) {
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
 		sprintf(entry->d_name, "test%d", times);
 		entry->d_ino = (times + 5) * 3;
@@ -177,8 +274,88 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Split)
 		ASSERT_TRUE(overflow_median == NULL);
 		ASSERT_TRUE(overflow_new_pos == NULL);
 		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
+		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+		ASSERT_EQ(times + 2 + 1, root_node.num_entries);
+		free(entry);
 		// ASSERT_EQ(times + 1, meta.total_children); // Why not plus 1 in this function?
-		// Why not update meta to memory? 
+	}
+}
+
+TEST_F(insert_dir_entry_btreeTest, Insert_With_Splitting)
+{
+	int num_entries_insert = 30000;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+			
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+
+	/* Insert many entries and verified the robustness */
+	for (int times = 0 ; times < num_entries_insert ; times++) {
+		int ret;
+		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+		sprintf(entry->d_name, "test%d", times);
+		entry->d_ino = (times + 5) * 3;
+		entry->d_type = D_ISDIR;
+		ret = insert_dir_entry_btree(entry, &root_node, fh, 
+			overflow_median, overflow_new_pos, &meta, tmp_entries, 
+			tmp_child_pos);
+		ASSERT_NE(-1, ret);
+		if ( ret == 1 ) {
+			generate_new_root();
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+		}
+		free(entry);
+	}
+	/* Check those entry in the b-tree */
+	for (int times = 0 ; times < num_entries_insert ; times++) {
+		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+		sprintf(entry->d_name, "test%d", times);
+		ASSERT_EQ(true, search_entry(entry));
+		free(entry);
+	}
+
+}
+
+TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
+{
+	int num_entries_insert = 1000;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+			
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
+
+	/* Insert many entries */
+	for (int times = 0 ; times < num_entries_insert ; times++) {
+		int ret;
+		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+		sprintf(entry->d_name, "test%d", times);
+		entry->d_ino = (times + 5) * 3;
+		entry->d_type = D_ISDIR;
+		ret = insert_dir_entry_btree(entry, &root_node, fh, 
+			overflow_median, overflow_new_pos, &meta, tmp_entries, 
+			tmp_child_pos);
+		ASSERT_NE(-1, ret);
+		if ( ret == 1 ) {
+			generate_new_root();
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+		}
+		free(entry);
+	}
+
+	/* Check whether it failed to insert entry */
+	for (int times = 0 ; times < num_entries_insert ; times++) {
+		int ret;
+		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+		sprintf(entry->d_name, "test%d", times);
+		ret = insert_dir_entry_btree(entry, &root_node, fh, 
+			overflow_median, overflow_new_pos, &meta, tmp_entries, 
+			tmp_child_pos);
+		ASSERT_EQ(-1, ret);
+		free(entry);
 	}
 }
 
