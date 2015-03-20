@@ -105,6 +105,17 @@ TEST_F(dentry_binary_searchTest, FindEntrySuccess)
 	Unittest of insert_dir_entry_btree()
  */
 
+#define  _REDIRECT_STDOUT_TO_FILE_(reserved_stdout, filename) \
+	reserved_stdout = dup(fileno(stdout)); \
+	FILE *stdout_file = fopen(filename, "a+"); \
+	setbuf(stdout_file, NULL); \
+	dup2(fileno(stdout_file), fileno(stdout));
+
+
+#define _RESTORE_STDOUT_(reserved_stdout, filename) \
+	dup2(reserved_stdout, fileno(stdout)); \
+	unlink(filename);
+
 class insert_dir_entry_btreeTest : public ::testing::Test {
 	protected:
 		virtual void SetUp()
@@ -135,7 +146,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				sizeof(struct stat) + sizeof(DIR_META_TYPE);
 			meta.tree_walk_list_head = 
 				sizeof(struct stat) + sizeof(DIR_META_TYPE);
-			// open file
+			// open dir meta file
 			fptr = fopen("/tmp/test_dir_meta", "wb+");
 			fh = fileno(fptr);
 			ASSERT_TRUE(fptr != NULL);
@@ -152,7 +163,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 			close(fh);
 			unlink("/tmp/test_dir_meta");
 		}
-
+		
 		/* Generate a new root if old root was splitted. */
 		void generate_new_root()
 		{
@@ -211,36 +222,45 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				pwrite(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
 			}
 			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			std::cerr << "New root at position " << meta.root_entry_page << std::endl;
 		}
 		
-		/* An easy function to find a given entry so we can verify our insertion */
+		/* A simple function to find a given entry so that we can verify our insertion */
 		bool search_entry(DIR_ENTRY *entry)
 		{
 			DIR_META_TYPE *meta = (DIR_META_TYPE *)malloc(sizeof(DIR_META_TYPE));
 			DIR_ENTRY_PAGE *node = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 			int index;
+			bool found;
 
 			pread(fh, meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 			pread(fh, node, sizeof(DIR_ENTRY_PAGE), meta->root_entry_page);
-			while (true) {
+			found = false;
+			while (!found) {
+				int cmp_ret;
 				/* linear search */
-				for (int i = 0 ; i < node->num_entries ; i++)
-					if (strcpy(node->dir_entries[i].d_name, entry->d_name) >= 0) {
+				index = -1;
+				for (int i = 0 ; i < node->num_entries ; i++) {
+					cmp_ret = strcmp(node->dir_entries[i].d_name, entry->d_name);
+					if (cmp_ret >= 0) {
 						index = i;
 						break;
 					}
-				/* found or deeper */
-				if (compare(&(node->dir_entries[index]), entry) == 0) {
-					return true;
+				}
+				index = index < 0 ? node->num_entries : index; // index<0 means find nothing
+				/* found or go deeper */
+				if (cmp_ret == 0) { // Check the last comparison
+					found = true;
 				} else {
-					if (node->child_page_pos[index] == 0)
-						return false;
-					else
+					if (node->child_page_pos[index] == 0) // leaf node
+						found = false;
+					else // internal node
 						pread(fh, node, sizeof(DIR_ENTRY_PAGE), node->child_page_pos[index]);
 				}
 			}
 			free(meta);
 			free(node);
+			return found;
 		}
 
 		int fh;
@@ -281,8 +301,9 @@ TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
 	}
 }
 
-TEST_F(insert_dir_entry_btreeTest, Insert_With_Splitting)
+TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 {
+	int reserved_stdout;
 	int num_entries_insert = 30000;
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
@@ -290,13 +311,12 @@ TEST_F(insert_dir_entry_btreeTest, Insert_With_Splitting)
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
 
+	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	/* Insert many entries and verified the robustness */
 	for (int times = 0 ; times < num_entries_insert ; times++) {
 		int ret;
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
 		sprintf(entry->d_name, "test%d", times);
-		entry->d_ino = (times + 5) * 3;
-		entry->d_type = D_ISDIR;
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
@@ -308,6 +328,8 @@ TEST_F(insert_dir_entry_btreeTest, Insert_With_Splitting)
 		}
 		free(entry);
 	}
+	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
+
 	/* Check those entry in the b-tree */
 	for (int times = 0 ; times < num_entries_insert ; times++) {
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
@@ -320,6 +342,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_With_Splitting)
 
 TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 {
+	int reserved_stdout;
 	int num_entries_insert = 1000;
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
@@ -327,13 +350,12 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), sizeof(struct stat) + sizeof(DIR_META_TYPE));
 
+	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
 	/* Insert many entries */
 	for (int times = 0 ; times < num_entries_insert ; times++) {
 		int ret;
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
 		sprintf(entry->d_name, "test%d", times);
-		entry->d_ino = (times + 5) * 3;
-		entry->d_type = D_ISDIR;
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
@@ -345,8 +367,9 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		}
 		free(entry);
 	}
+	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 
-	/* Check whether it failed to insert entry */
+	/* Check whether it exactly failed to insert entry */
 	for (int times = 0 ; times < num_entries_insert ; times++) {
 		int ret;
 		DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
@@ -362,4 +385,117 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 /*
 	End of unittest of insert_dir_entry_btree()
  */
+
+/*
+	Unittest of search_dir_entry_btree
+ */
+
+/* Derive from insert_dir_entry_btreeTest because we can utilize function
+   insert_dir_entry_btree() to generate mock data after insert_dir_entry_btree()
+   passing unit testing. */
+
+class search_dir_entry_btreeTest : public insert_dir_entry_btreeTest {
+	protected:
+		void init_insert_many_entries(int min_num, int max_num, 
+					char *filename_prefix)
+		{
+			int reserved_stdout;
+			DIR_META_TYPE meta;
+			DIR_ENTRY_PAGE root_node;
+			
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), 
+				sizeof(struct stat) + sizeof(DIR_META_TYPE));
+
+			_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
+			/* Insert many entries */
+			for (int times = min_num ; times < max_num ; times++) {
+				int ret;
+				DIR_ENTRY *entry = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY));
+				sprintf(entry->d_name, "%s%d", filename_prefix, times);
+				ret = insert_dir_entry_btree(entry, &root_node, fh, 
+					overflow_median, overflow_new_pos, &meta, tmp_entries, 
+					tmp_child_pos);
+				ASSERT_NE(-1, ret);
+				if ( ret == 1 ) {
+					generate_new_root();
+					pread(fh, &meta, sizeof(DIR_META_TYPE), 
+						sizeof(struct stat));
+					pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), 
+						meta.root_entry_page);
+				}
+				free(entry);
+			}
+			_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
+		}
+};
+
+TEST_F(search_dir_entry_btreeTest, SearchEmptyBtree)
+{
+	int index;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE result_node;
+
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	for (int i = 0 ; i < 5000 ; i++) {
+		char filename[50];
+		sprintf(filename, "search_file_%d", i);
+		index = search_dir_entry_btree(filename, &root_node, 
+			fh, &index, &result_node);
+		EXPECT_EQ(-1, index);
+	}
+}
+
+TEST_F(search_dir_entry_btreeTest, EntryNotFound)
+{
+	int index;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE result_node;
+	/* Mock data */
+	init_insert_many_entries(4000, 6000, "test_file");
+	/* Search entries */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	for (int i = 0 ; i < 3000 ; i++) {
+		char filename[50];
+		sprintf(filename, "test_file_not_found%d", i);
+		index = search_dir_entry_btree(filename, &root_node, 
+			fh, &index, &result_node);
+		EXPECT_EQ(-1, index);
+	}
+}
+
+TEST_F(search_dir_entry_btreeTest, SearchEntrySuccess)
+{
+	int index;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE result_node;
+	/* Mock data */
+	init_insert_many_entries(0, 7000, "test_file");
+	/* Search entries */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	for (int i = 0 ; i < 7000 ; i++) {
+		char filename[50];
+		sprintf(filename, "test_file%d", i);
+		index = search_dir_entry_btree(filename, &root_node, 
+			fh, &index, &result_node);
+		EXPECT_TRUE(index >= 0);
+	}
+	/* Finally check "." and ".." */
+	index = search_dir_entry_btree(".", &root_node, 
+			fh, &index, &result_node);
+	EXPECT_TRUE(index >= 0);
+	index = search_dir_entry_btree("..", &root_node, 
+			fh, &index, &result_node);
+	EXPECT_TRUE(index >= 0);
+}
+
 
