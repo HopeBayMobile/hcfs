@@ -619,7 +619,10 @@ elements into two, using the median as the new parent item. */
 	int temp_total, median_entry;
 	char merging;
 	size_t tmp_size;
-
+	/* Index out of bound */	
+	if(selected_child > tnode->num_entries || selected_child < 0)
+		return -1;
+	/* Leaf node needs not rebalance */
 	if (tnode->child_page_pos[selected_child] <= 0)
 		return -1;
 

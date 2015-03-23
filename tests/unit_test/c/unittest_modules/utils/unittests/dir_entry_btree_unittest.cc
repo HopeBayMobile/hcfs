@@ -222,7 +222,7 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				pwrite(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
 			}
 			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-			std::cerr << "New root at position " << meta.root_entry_page << std::endl;
+			std::cerr << "\x1B[33mNew root at position " << meta.root_entry_page << std::endl;
 		}
 		
 		/* A simple function to find a given entry so that we can verify our insertion */
@@ -252,10 +252,12 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				if (cmp_ret == 0) { // Check the last comparison
 					found = true;
 				} else {
-					if (node->child_page_pos[index] == 0) // leaf node
+					if (node->child_page_pos[index] == 0) { // leaf node
 						found = false;
-					else // internal node
+						break;
+					} else { // internal node
 						pread(fh, node, sizeof(DIR_ENTRY_PAGE), node->child_page_pos[index]);
+					}
 				}
 			}
 			free(meta);
@@ -343,7 +345,7 @@ TEST_F(insert_dir_entry_btreeTest, Insert_Many_Entries_With_Splitting)
 TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 {
 	int reserved_stdout;
-	int num_entries_insert = 1000;
+	int num_entries_insert = 10000;
 	DIR_META_TYPE meta;
 	DIR_ENTRY_PAGE root_node;
 			
@@ -394,7 +396,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
    insert_dir_entry_btree() to generate mock data after insert_dir_entry_btree()
    passing unit testing. */
 
-class search_dir_entry_btreeTest : public insert_dir_entry_btreeTest {
+class BaseClassInsertBtreeEntryIsUsable : public insert_dir_entry_btreeTest {
 	protected:
 		void init_insert_many_entries(int min_num, int max_num, 
 					char *filename_prefix)
@@ -428,6 +430,10 @@ class search_dir_entry_btreeTest : public insert_dir_entry_btreeTest {
 			}
 			_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 		}
+};
+
+class search_dir_entry_btreeTest : public BaseClassInsertBtreeEntryIsUsable {
+
 };
 
 TEST_F(search_dir_entry_btreeTest, SearchEmptyBtree)
@@ -477,7 +483,7 @@ TEST_F(search_dir_entry_btreeTest, SearchEntrySuccess)
 	DIR_ENTRY_PAGE root_node;
 	DIR_ENTRY_PAGE result_node;
 	/* Mock data */
-	init_insert_many_entries(0, 7000, "test_file");
+	init_insert_many_entries(0, 10000, "test_file");
 	/* Search entries */
 	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
 	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
@@ -498,4 +504,303 @@ TEST_F(search_dir_entry_btreeTest, SearchEntrySuccess)
 	EXPECT_TRUE(index >= 0);
 }
 
+/*
+	End of unittest of search_dir_entry_btree()
+ */
 
+/*
+	Unittest of rebalance_btree()
+ */
+
+class rebalance_btreeTest : public BaseClassInsertBtreeEntryIsUsable {
+	
+};
+
+TEST_F(rebalance_btreeTest, ChildIndexOutofBound)
+{
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	/* A mock btree with only one page, which is root page. */
+	init_insert_many_entries(0, 10, "test_file");
+	/* Test */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+
+	for (int child_index = root_node.num_entries+1 ; 
+		child_index < root_node.num_entries+1000 ; child_index++) {
+		ASSERT_EQ(-1, rebalance_btree(&root_node, fh, &meta,
+			child_index, tmp_entries, tmp_child_pos));
+	}
+}
+
+TEST_F(rebalance_btreeTest, RebalanceBtreeWithOnlyRootPage)
+{
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	/* A mock btree with only one page, which is root. */
+	init_insert_many_entries(0, MAX_DIR_ENTRIES_PER_PAGE-2, "test_file");
+	/* Root node is leaf node, so it needs not rebalance */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+
+	for (int child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
+		ASSERT_EQ(-1, rebalance_btree(&root_node, fh, &meta,
+			child_index, tmp_entries, tmp_child_pos));
+	}
+}
+
+TEST_F(rebalance_btreeTest, CheckCase_NoRebalanceNeeded)
+{
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	/* A mock btree with depth = 2. There are root and some its children in btree.
+	   Number of entries > MAX_DIR_ENTRIES_PER_PAGE/2 > MIN_DIR_ENTRIES_PER_PAGE 
+	   for All the children, so it needs not rebalance. */
+	init_insert_many_entries(0, 4000, "test_file");
+	/* Leaf node needs not rebalance */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	for (int child_index = 0 ; child_index < root_node.num_entries+1 ; child_index++) {
+		ASSERT_EQ(0, rebalance_btree(&root_node, fh, &meta,
+			child_index, tmp_entries, tmp_child_pos));
+	}
+}
+
+TEST_F(rebalance_btreeTest, Merge_Without_NewRoot)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE * (MAX_DIR_ENTRIES_PER_PAGE/3);
+	int child_index;
+	int num_nodes; // The var is used to check tree_walk & gc_list
+	int gc_counter;
+	int walk_counter;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE now_node;
+	DIR_ENTRY *remaining_entries; // It is used to check testing result.
+	
+	/* A mock btree with depth = 2. For each child, let num of 
+	   entries < MIN_DIR_ENTRIES_PER_PAGE. */
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	num_nodes = root_node.num_entries + 1 + 1; // num of pages(nodes)
+	num_entries = 0;
+	for (int i = 0 ; i < root_node.num_entries+1 ; i++) {
+		DIR_ENTRY_PAGE child_node;
+		pread(fh, &child_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[i]);
+		ASSERT_TRUE(child_node.num_entries > MIN_DIR_ENTRIES_PER_PAGE);
+		child_node.num_entries = MIN_DIR_ENTRIES_PER_PAGE-1;
+		pwrite(fh, &child_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[i]);
+		num_entries += child_node.num_entries;
+	}
+	/* Aggregate the remaining entries in the tree. They are asserted that 
+	   all of them will be still in btree after rebalancing. */
+	remaining_entries = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY) * 
+			(num_entries + root_node.num_entries));
+	num_entries = 0;
+	for (int i = 0 ; i < root_node.num_entries + 1 ; i++) {
+		DIR_ENTRY_PAGE child_node;
+		pread(fh, &child_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[i]);
+		memcpy(remaining_entries + num_entries, child_node.dir_entries, 
+			sizeof(DIR_ENTRY) * child_node.num_entries);
+		num_entries += child_node.num_entries;
+	}
+	memcpy(remaining_entries + num_entries, root_node.dir_entries, 
+		sizeof(DIR_ENTRY) * root_node.num_entries);
+	num_entries += root_node.num_entries;
+	
+	/* Run function to test rebalancing */
+	child_index = 0;
+	while (child_index < root_node.num_entries + 1) {
+		int ret = rebalance_btree(&root_node, fh, &meta, 
+			child_index, tmp_entries, tmp_child_pos);
+		ASSERT_TRUE(ret == 1 || ret == 0);
+		if (ret == 1) { // Merging 
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+			child_index = 0;
+		} else { // No rebalancing 
+			child_index++;
+		}
+	}
+	
+	/* Check btree structure:
+	   1. For each child, num_entries > MIN_DIR_ENTRIES_PER_PAGE 
+	   2. All the remaining_entries are still in the btree
+	   3. Garbage collection is done
+	   4. Tree walking is ok. */
+	
+	/* 1. Check num_entries */
+	for (int i = 0 ; i < root_node.num_entries + 1 ; i++) {
+		DIR_ENTRY_PAGE child_node;
+		pread(fh, &child_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[i]);
+		ASSERT_TRUE(child_node.num_entries > MIN_DIR_ENTRIES_PER_PAGE);
+	}
+	/* 2. Check all the remaining_entries */
+	for(int i = 0 ; i < num_entries ; i++) 
+		ASSERT_EQ(true, search_entry(&remaining_entries[i]));
+	/* 3.4. Garbage is correctly collected & tree walking */
+	// Count num of gc list
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &now_node, sizeof(DIR_ENTRY_PAGE), meta.entry_page_gc_list);
+	gc_counter = 1;
+	while (now_node.gc_list_next != 0) {
+		pread(fh, &now_node, sizeof(DIR_ENTRY_PAGE), now_node.gc_list_next);
+		gc_counter++;
+	}
+	// Count num of tree walking list
+	pread(fh, &now_node, sizeof(DIR_ENTRY_PAGE), meta.tree_walk_list_head);
+	walk_counter = 1;
+	while (now_node.tree_walk_next != 0) {
+		pread(fh, &now_node, sizeof(DIR_ENTRY_PAGE), now_node.tree_walk_next);
+		walk_counter++;
+	}
+	// Check answer
+	EXPECT_EQ(root_node.num_entries + 1 + 1, walk_counter);
+	EXPECT_EQ(num_nodes, walk_counter + gc_counter);
+
+	/* Free resource */
+	free(remaining_entries);
+}
+
+TEST_F(rebalance_btreeTest, Merge_With_NewRoot)
+{	
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE + 2;
+	int gc_counter;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE tmp_node;
+	
+	/* Init mock btree */
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	ASSERT_EQ(1, root_node.num_entries);
+	num_entries = 0;
+	// left
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
+	tmp_node.num_entries = MIN_DIR_ENTRIES_PER_PAGE - 1;
+	num_entries += tmp_node.num_entries;
+	pwrite(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
+	// right
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[1]);
+	tmp_node.num_entries = MIN_DIR_ENTRIES_PER_PAGE - 1;
+	num_entries += tmp_node.num_entries;
+	pwrite(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[1]);
+	
+	/* Run rebalancing function */
+	ASSERT_EQ(2, rebalance_btree(&root_node, fh, &meta, 
+		0, tmp_entries, tmp_child_pos));
+
+	/* Check answer */	
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	EXPECT_EQ(num_entries + 1, root_node.num_entries);
+	
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), meta.entry_page_gc_list);
+	gc_counter = 1;
+	while (tmp_node.gc_list_next != 0) {
+		pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), tmp_node.gc_list_next);
+		gc_counter++;
+	}
+	ASSERT_EQ(2, gc_counter);
+}
+
+TEST_F(rebalance_btreeTest, NoMerge_SplitInto2Pages)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE + MAX_DIR_ENTRIES_PER_PAGE / 4;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY_PAGE tmp_node;
+	DIR_ENTRY *remaining_entries;
+	
+	/* Init mock btree */
+	remaining_entries = (DIR_ENTRY *)malloc(sizeof(DIR_ENTRY) * num_entries);
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	// Let num_entries of left node < MIN_DIR_ENTRIES_PER_PAGE
+	num_entries = 0;
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
+	tmp_node.num_entries = MIN_DIR_ENTRIES_PER_PAGE - 1;
+	pwrite(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
+	// Record entries in left node
+	memcpy(remaining_entries, tmp_node.dir_entries, 
+		sizeof(DIR_ENTRY) * tmp_node.num_entries);
+	num_entries += tmp_node.num_entries;
+	// Record entries in right node	
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[1]);
+	memcpy(remaining_entries + num_entries, tmp_node.dir_entries, 
+		sizeof(DIR_ENTRY) * tmp_node.num_entries);
+	num_entries += tmp_node.num_entries;
+
+	/* Run rebalancing function */
+	ASSERT_EQ(1, rebalance_btree(&root_node, fh, &meta, 
+		0, tmp_entries, tmp_child_pos));
+
+	/* Check answer */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[0]);
+	EXPECT_TRUE(tmp_node.num_entries > MIN_DIR_ENTRIES_PER_PAGE);
+	pread(fh, &tmp_node, sizeof(DIR_ENTRY_PAGE), root_node.child_page_pos[1]);
+	EXPECT_TRUE(tmp_node.num_entries > MIN_DIR_ENTRIES_PER_PAGE);
+	for(int i = 0 ; i < num_entries ; i++) 
+		ASSERT_EQ(true, search_entry(&remaining_entries[i]));
+	EXPECT_EQ(0, meta.entry_page_gc_list);
+
+	/* Free resource */
+	free(remaining_entries);
+}
+
+/*
+	End of unittest of rebalance_btree()
+ */
+
+/*
+	Unittest of extract_largest_child()
+ */
+
+class extract_largest_childTest : public BaseClassInsertBtreeEntryIsUsable {
+ 
+};
+
+TEST_F(extract_largest_childTest, ExtractEmptyDirectory)
+{
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY largest_child;
+	
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+
+	/* Run function */
+	ASSERT_EQ(0, extract_largest_child(&root_node, fh, &meta, 
+			&largest_child, tmp_entries, tmp_child_pos));
+}
+
+TEST_F(extract_largest_childTest, ExtractStartFromRootNode)
+{	
+	int num_entries = 20000;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	DIR_ENTRY largest_child;
+
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	
+	/* Run function */
+	ASSERT_EQ(0, extract_largest_child(&root_node, fh, &meta, 
+			&largest_child, tmp_entries, tmp_child_pos));
+
+	/* Check answer */
+	EXPECT_STREQ("test_file9999", largest_child.d_name) 
+		<< "largest name = " << largest_child.d_name;
+	EXPECT_EQ(false, search_entry(&largest_child));
+}
+
+/*
+	End of unittest of extract_largest_child()
+ */
