@@ -222,7 +222,8 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 				pwrite(fh, &splitted_node, sizeof(DIR_ENTRY_PAGE), *overflow_new_pos);
 			}
 			pwrite(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
-			std::cerr << "\x1B[33mNew root at position " << meta.root_entry_page << std::endl;
+			//std::cerr << "\x1B[33mNew root at position " << meta.root_entry_page << std::endl;
+			std::cerr << "New root at position " << meta.root_entry_page << std::endl;
 		}
 		
 		/* A simple function to find a given entry so that we can verify our insertion */
@@ -269,8 +270,8 @@ class insert_dir_entry_btreeTest : public ::testing::Test {
 		FILE *fptr;
 		DIR_ENTRY *overflow_median;
 		long long *overflow_new_pos;
-		DIR_ENTRY tmp_entries[MAX_DIR_ENTRIES_PER_PAGE + 2];
-		long long tmp_child_pos[MAX_DIR_ENTRIES_PER_PAGE + 3];
+		DIR_ENTRY tmp_entries[MAX_DIR_ENTRIES_PER_PAGE + MIN_DIR_ENTRIES_PER_PAGE];
+		long long tmp_child_pos[MAX_DIR_ENTRIES_PER_PAGE + MIN_DIR_ENTRIES_PER_PAGE + 1];
 };
 
 TEST_F(insert_dir_entry_btreeTest, Insert_To_Root_Without_Splitting)
@@ -803,4 +804,180 @@ TEST_F(extract_largest_childTest, ExtractStartFromRootNode)
 
 /*
 	End of unittest of extract_largest_child()
+ */
+
+/*
+	Unittest of delete_dir_entry_btree()
+ */
+
+class delete_dir_entry_btreeTest : public BaseClassInsertBtreeEntryIsUsable {
+
+};
+
+TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree)
+{
+	int reserved_stdout;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	int num_tests = 1000;
+	int ret[num_tests];
+		
+	/* Delete failure in empty dir btree */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
+	for (int i = 0 ; i < num_tests ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
+		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
+			fh, &meta, tmp_entries, tmp_child_pos);
+	}
+	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
+	for (int i = 0 ; i < num_tests ; i++)
+		ASSERT_EQ(-1, ret[i]);
+		
+}
+
+TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE * MAX_DIR_ENTRIES_PER_PAGE;
+	int reserved_stdout;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+	int num_tests = 1000;
+	int ret[num_tests];
+
+	/* Delete failure in nonempty dir btree */
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	_REDIRECT_STDOUT_TO_FILE_(reserved_stdout, "/tmp/tmpout");
+	for (int i = 0 ; i < num_tests ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "entry_not_found%d", i);
+		ret[i] = delete_dir_entry_btree(&tmp_entry, &root_node, 
+			fh, &meta, tmp_entries, tmp_child_pos);
+		pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+		pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	}
+	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
+	for (int i = 0 ; i < num_tests ; i++)
+		ASSERT_EQ(-1, ret[i]);
+}
+
+TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_1)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE - 2;
+	int reserved_stdout;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+
+	/* Deleting Entry Test */
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 2) // Just delete 50% nodes
+			ASSERT_EQ(0, delete_dir_entry_btree(&tmp_entry, &root_node, 
+				fh, &meta, tmp_entries, tmp_child_pos));
+	}
+
+	/* Check answer */
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 2) {
+			ASSERT_EQ(false, search_entry(&tmp_entry))
+				<< "filename = " << tmp_entry.d_name;
+		} else {	
+			ASSERT_EQ(true, search_entry(&tmp_entry))
+				<< "filename = " << tmp_entry.d_name;
+		}
+	}
+}
+
+TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_2)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE * 
+			(MAX_DIR_ENTRIES_PER_PAGE / 4);
+	int reserved_stdout;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+
+	/* Deleting Entry Test*/
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 5) { // Just delete 80% nodes
+			int ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
+				fh, &meta, tmp_entries, tmp_child_pos);
+			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
+			// Reload root
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+		}
+	}
+
+	/* Check answer */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 5)
+			ASSERT_EQ(false, search_entry(&tmp_entry));
+		else	
+			ASSERT_EQ(true, search_entry(&tmp_entry));	
+	}
+}
+
+TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
+{
+	int num_entries = MAX_DIR_ENTRIES_PER_PAGE * 
+			MAX_DIR_ENTRIES_PER_PAGE *
+			(MAX_DIR_ENTRIES_PER_PAGE / 10);
+	int reserved_stdout;
+	DIR_META_TYPE meta;
+	DIR_ENTRY_PAGE root_node;
+
+	/* Deleting entry test */
+	init_insert_many_entries(0, num_entries, "test_file");
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 10) { // Just delete 90% nodes
+			int ret = delete_dir_entry_btree(&tmp_entry, &root_node, 
+				fh, &meta, tmp_entries, tmp_child_pos);
+			ASSERT_EQ(0, ret) << "filename = " << tmp_entry.d_name;
+			// Reload root
+			pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+			pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+		}
+	}
+
+	/* Check answer */
+	pread(fh, &meta, sizeof(DIR_META_TYPE), sizeof(struct stat));
+	pread(fh, &root_node, sizeof(DIR_ENTRY_PAGE), meta.root_entry_page);
+	for (int i = 0 ; i < num_entries ; i++) {
+		DIR_ENTRY tmp_entry;
+		sprintf(tmp_entry.d_name, "test_file%d", i);
+		if (i % 10) {
+			ASSERT_EQ(false, search_entry(&tmp_entry)) 
+				<< "filename = " << tmp_entry.d_name;
+		} else {	
+			ASSERT_EQ(true, search_entry(&tmp_entry))
+				<< "filename = " << tmp_entry.d_name;
+		}
+	}
+}
+
+/*
+	End of unittest of delete_dir_entry_btree()
  */
