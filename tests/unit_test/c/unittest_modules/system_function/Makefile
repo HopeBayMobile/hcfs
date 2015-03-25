@@ -51,6 +51,10 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o
 	rm -f *.gcda *.gcno
 
+test:
+	./filetable_unittest
+	./hfuse_system_unittest
+
 # Builds gtest.a and gtest_main.a.
 
 # Usually you shouldn't tweak such internal variables, indicated by a

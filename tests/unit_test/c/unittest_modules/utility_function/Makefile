@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest 
+TESTS = utils_unittest dir_lookup_unittest dir_entry_btree_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -54,6 +54,8 @@ clean :
 
 test :
 	./utils_unittest
+	./dir_lookup_unittest
+	./dir_entry_btree_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -83,6 +85,8 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
+# unittest for utils.c
+
 utils.o : $(USER_DIR)/utils.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/utils.c
 
@@ -96,4 +100,29 @@ utils_unittest.o : $(UNITTEST_DIR)/utils_unittest.cc \
 utils_unittest : utils.o utils_fakeftn.o utils_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
+# unittest for dir_lookup.c
 
+dir_lookup.o : $(USER_DIR)/dir_lookup.c $(USER_DIR)/dir_lookup.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/dir_lookup.c
+
+dir_lookup_unittest.o : $(UNITTEST_DIR)/dir_lookup_unittest.cc $(USER_DIR)/dir_lookup.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/dir_lookup_unittest.cc
+
+dir_lookup_mock_function.o : $(UNITTEST_DIR)/dir_lookup_mock_function.c $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/dir_lookup_mock_function.c
+
+dir_lookup_unittest : dir_lookup_unittest.o dir_lookup_mock_function.o dir_lookup.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# unittest for dir_entry_btree.c
+
+dir_entry_btree.o : $(USER_DIR)/dir_entry_btree.c $(USER_DIR)/dir_entry_btree.h \
+		$(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/dir_entry_btree.c
+
+dir_entry_btree_unittest.o : $(UNITTEST_DIR)/dir_entry_btree_unittest.cc \
+		$(USER_DIR)/dir_entry_btree.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/dir_entry_btree_unittest.cc
+
+dir_entry_btree_unittest : dir_entry_btree.o dir_entry_btree_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
