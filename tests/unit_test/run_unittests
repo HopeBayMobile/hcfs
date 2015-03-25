@@ -1,13 +1,15 @@
 #!/bin/bash
 
 CURPATH=$PWD
-cd c/unittest_modules/utils/
+cd c/unittest_modules/utility_function/
 rm *.gcda
 rm *.gcov
 rm *.gcno
 make clean
 make
 ./utils_unittest
+./dir_entry_btree_unittest
+./dir_lookup_unittest
 cd $CURPATH
 cd c/unittest_modules/meta_mem_cache/
 rm *.gcda
