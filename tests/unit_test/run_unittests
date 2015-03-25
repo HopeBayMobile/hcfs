@@ -19,4 +19,13 @@ make clean
 make
 ./meta_mem_cache_unittest
 cd $CURPATH
+cd c/unittest_modules/system_function/
+rm *.gcda
+rm *.gcov
+rm *.gcno
+make clean
+make
+./filetable_unittest
+./hfuse_system_unittest
+cd $CURPATH
 gcovr -r ../../src/HCFS/
