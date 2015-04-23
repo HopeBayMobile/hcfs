@@ -1,6 +1,7 @@
 #include <semaphore.h>
 #include "gtest/gtest.h"
 #include "curl/curl.h"
+#include "attr/xattr.h"
 extern "C"{
 #include "hcfscurl.h"
 #include "global.h"
@@ -36,7 +37,7 @@ protected:
 
 		sprintf(tmp_filename, "/tmp/local_space%d", *(int *)data);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, 0, 0);
+		ret = fetch_from_cloud(fptr, 0, BLOCK_NO__FETCH_SUCCESS);
 		*(int *)data = ret;
 		fclose(fptr);
 		unlink(tmp_filename);
@@ -109,7 +110,7 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	prefetch_ptr->block_no = BLOCK_NO__FETCH_SUCCESS;
-//	 Testing 
+	/* Testing */
 	prefetch_block(prefetch_ptr);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_blocks);
@@ -122,7 +123,13 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 {
 	FILE *metafptr;
 	BLOCK_ENTRY_PAGE mock_page;
+	BLOCK_ENTRY_PAGE result_page;
+	int entry_index;
+	int meta_fpos;
+	char xattr_result;
 	
+	entry_index = prefetch_ptr->entry_index;
+	meta_fpos = prefetch_ptr->page_start_fpos;
 	mock_page.num_entries = 1;
 	mock_page.block_entries[0].status = ST_CLOUD;
 	mock_page.next_page = 0;
@@ -131,15 +138,29 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	prefetch_ptr->block_no = BLOCK_NO__FETCH_SUCCESS; // Control success or fail to fetch from cloud.
-	/* Testing */
+	/* Run */
 	prefetch_block(prefetch_ptr);
+	/* Testing */
 	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks);
-	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK));	
-
+	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK));
+	EXPECT_EQ(1, getxattr("/tmp/tmp_block", "user.dirty", &xattr_result, sizeof(char))); 
+	EXPECT_EQ('F', xattr_result); // xattr
+	metafptr = fopen("/tmp/tmp_meta", "r");	
+	fseek(metafptr, meta_fpos, SEEK_SET);
+	fread(&result_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
+	fclose(metafptr);
+	EXPECT_EQ(ST_BOTH, result_page.block_entries[entry_index].status); // status
+		
 	unlink("/tmp/tmp_meta");
 	unlink("/tmp/tmp_block");
 }
+
+TEST_F(prefetch_blockTest, PrefetchFail)
+{
+	/* Does prefetch_block fail? It seems that fetch_from_cloud() never return with failure  */	
+}
+
 /*
 	End of unittest of prefetch_block()
 */

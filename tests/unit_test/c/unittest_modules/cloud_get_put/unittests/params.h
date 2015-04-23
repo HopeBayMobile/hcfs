@@ -1,4 +1,5 @@
 #define HTTP_OK 200
+#define HTTP_FAIL 500
 
 #define BLOCK_NO__FETCH_SUCCESS 1
 #define BLOCK_NO__FETCH_FAIL 2

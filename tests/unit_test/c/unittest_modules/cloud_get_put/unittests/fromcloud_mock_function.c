@@ -23,8 +23,10 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
 	if (block_no == BLOCK_NO__FETCH_SUCCESS) {
 		ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
+		return HTTP_OK;
+	} else {
+		return HTTP_FAIL;
 	}
-	return HTTP_OK;
 }
 
 int sync_hcfs_system_data(char need_lock)
