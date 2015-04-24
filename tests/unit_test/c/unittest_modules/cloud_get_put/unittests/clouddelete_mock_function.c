@@ -8,7 +8,7 @@
 
 int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
-	return 0;
+	return HTTP_OK;
 }
 
 
