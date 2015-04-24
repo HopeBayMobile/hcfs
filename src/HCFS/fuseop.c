@@ -1451,10 +1451,14 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
 	*  reduce the size of request */
-	if (temp_stat.st_size < (offset+size_org))
-		size = (temp_stat.st_size - offset);
-	else
+	if (temp_stat.st_size < (offset+size_org)) {
+		if (temp_stat.st_size > offset)
+			size = (temp_stat.st_size - offset);
+		else
+			size = 0;
+	} else {
 		size = size_org;
+	}
 
 	if (size <= 0) {
 		fh_ptr->meta_cache_locked = FALSE;
