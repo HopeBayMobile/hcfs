@@ -608,4 +608,3 @@ void *delete_loop(void *arg)
 		}
 	}
 }
-
