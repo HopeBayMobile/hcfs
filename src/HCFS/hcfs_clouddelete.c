@@ -351,7 +351,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				tmp_t = &(delete_ctl.threads_no[which_curl]);
 				pthread_create(tmp_t, NULL,
 						(void *)&con_object_dsync,
-							(void *)tmp_t);
+							(void *)tmp_t);  // Isn't here some segfault? It seems to be (void *)&delete_ctl.delete_threads[which_curl]
 				delete_ctl.threads_created[which_curl] = TRUE;
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
@@ -607,4 +607,3 @@ void *delete_loop(void *arg)
 		}
 	}
 }
-
