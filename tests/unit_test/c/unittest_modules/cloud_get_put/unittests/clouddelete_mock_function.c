@@ -19,7 +19,13 @@ void hcfs_destroy_backend(CURL *curl)
 
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	return 0;
+	if(this_inode == INODE__FETCH_TODELETE_PATH_SUCCESS) {
+		strcpy(pathname, TODELETE_PATH);
+		return 0;
+	} else {
+		pathname[0] = '\0';
+		return -1;
+	}
 }
 
 int super_block_delete(ino_t this_inode)
@@ -34,6 +40,12 @@ int super_block_reclaim(void)
 
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
+	sem_wait(&objname_counter_sem);
+	printf("hahah\n");
+	strcpy(delete_objname[objname_counter], objname);
+	objname_counter++;
+	sem_post(&objname_counter_sem);
+
 	return 0;
 }
 

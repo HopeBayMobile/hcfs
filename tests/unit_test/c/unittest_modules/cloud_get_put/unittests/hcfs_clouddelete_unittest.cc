@@ -1,7 +1,9 @@
 #include "gtest/gtest.h"
+#include "params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
 #include "global.h"
+#include "fuseop.h"
 }
 
 /*
@@ -84,3 +86,57 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 /*
 	End of unittest init_delete_control() & collect_finished_delete_threads()
  */
+
+class dsync_single_inodeTest : public ::testing::Test {
+protected:
+	virtual void SetUp()
+	{
+		mock_thread_info = (DSYNC_THREAD_TYPE *)malloc(sizeof(DSYNC_THREAD_TYPE));
+	}
+	virtual void TearDown()
+	{
+		free(mock_thread_info);
+	}
+	void init_objname_buffer()
+	{
+		objname_counter = 0;
+		delete_objname = (char **)malloc(sizeof(char *)*500);
+		for(int i = 0 ; i < 500 ; i++)
+			delete_objname[i] = (char *)malloc(sizeof(char)*50);
+		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 100));
+	}
+	DSYNC_THREAD_TYPE *mock_thread_info;
+};
+
+TEST_F(dsync_single_inodeTest, CannotAccessMeta)
+{
+	FILE *meta;
+	struct stat meta_stat;
+	BLOCK_ENTRY_PAGE tmp_blockentry_page;
+	FILE_META_TYPE tmp_file_meta;
+	int total_page = 3;
+	
+	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
+	mock_thread_info->this_mode = S_IFREG;
+	
+	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
+	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
+	tmp_file_meta.next_block_page = sizeof(struct stat) + sizeof(FILE_META_TYPE); 
+	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
+	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
+	tmp_blockentry_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
+	for (int page_num = 0 ; page_num < total_page ; page_num++) {
+		if(page_num == total_page - 1)
+			tmp_blockentry_page.next_page = 0;
+		else
+			tmp_blockentry_page.next_page = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
+				(page_num + 1) * sizeof(BLOCK_ENTRY_PAGE);
+		fwrite(&tmp_blockentry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta); // Write block page
+	}
+	fclose(meta);
+
+	init_delete_control();
+	dsync_single_inode(mock_thread_info);	
+
+}

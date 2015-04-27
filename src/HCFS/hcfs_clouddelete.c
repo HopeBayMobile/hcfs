@@ -292,7 +292,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		return;
 
 	setbuf(metafptr, NULL);
-
+	
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
 		fseek(metafptr, sizeof(struct stat), SEEK_SET);
@@ -302,6 +302,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 		flock(fileno(metafptr), LOCK_UN);
 
+		/* Delete all blocks */
 		for (block_count = 0; page_pos != 0; block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
@@ -351,7 +352,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				tmp_t = &(delete_ctl.threads_no[which_curl]);
 				pthread_create(tmp_t, NULL,
 						(void *)&con_object_dsync,
-							(void *)tmp_t);
+							(void *)&(delete_ctl.delete_threads[which_curl]));
 				delete_ctl.threads_created[which_curl] = TRUE;
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
