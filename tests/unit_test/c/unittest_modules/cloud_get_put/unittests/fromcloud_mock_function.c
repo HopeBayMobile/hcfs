@@ -3,7 +3,7 @@
 #include <curl/curl.h>
 #include <semaphore.h>
 #include "hcfscurl.h"
-#include "params.h"
+#include "mock_params.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {

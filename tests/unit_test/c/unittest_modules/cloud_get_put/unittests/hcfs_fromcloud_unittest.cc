@@ -7,7 +7,7 @@ extern "C"{
 #include "global.h"
 #include "hcfs_fromcloud.h"
 #include "fuseop.h"
-#include "params.h"
+#include "mock_params.h"
 }
 
 /*

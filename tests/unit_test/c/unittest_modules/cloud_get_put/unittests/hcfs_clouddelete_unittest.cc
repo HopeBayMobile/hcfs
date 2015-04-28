@@ -1,9 +1,11 @@
 #include "gtest/gtest.h"
-#include "params.h"
+#include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
+#include "hcfs_tocloud.h"
 #include "global.h"
 #include "fuseop.h"
+#include "super_block.h"
 }
 
 /*
@@ -11,7 +13,7 @@ extern "C" {
  */
 void *dsync_test_thread_fn(void *data)
 {
-	sleep(0.01* *(int *)data);
+	usleep(10000 * *(int *)data);
 	return NULL;
 }
 
@@ -51,7 +53,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
  */
 void *delete_test_thread_fn(void *data)
 {
-	//sleep(0.01* *(int *)data);
+	usleep(10000 * *(int *)data);
 	return NULL;
 }
 
@@ -87,6 +89,9 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 	End of unittest init_delete_control() & collect_finished_delete_threads()
  */
 
+/*
+	Unittest of dsync_single_inode()
+*/
 class dsync_single_inodeTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
@@ -95,27 +100,68 @@ protected:
 	}
 	virtual void TearDown()
 	{
+		sem_destroy(&objname_counter_sem);
+		sem_destroy(&(sync_ctl.sync_op_sem));
+		destroy_objname_buffer(expected_num_objname);
 		free(mock_thread_info);
 	}
-	void init_objname_buffer()
+	void init_objname_buffer(unsigned num_objname)
 	{
+		size_objname = 50;
 		objname_counter = 0;
-		delete_objname = (char **)malloc(sizeof(char *)*500);
-		for(int i = 0 ; i < 500 ; i++)
-			delete_objname[i] = (char *)malloc(sizeof(char)*50);
-		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 100));
+		delete_objname = (char **)malloc(sizeof(char *) * num_objname);
+		for(int i = 0 ; i < num_objname ; i++)
+			delete_objname[i] = (char *)malloc(sizeof(char)*size_objname);
+		ASSERT_EQ(0, sem_init(&objname_counter_sem, 0, 1));
+	}
+	void destroy_objname_buffer(unsigned num_objname)
+	{	
+		for(int i = 0 ; i < num_objname ; i++)
+			if(delete_objname[i])
+				free(delete_objname[i]);
+		if(delete_objname)
+			free(delete_objname);
+	}
+	void init_sync_ctl()
+	{
+		sem_init(&(sync_ctl.sync_op_sem), 0, 1);
+		for(int i = 0 ; i < MAX_SYNC_CONCURRENCY ; i++)
+			sync_ctl.threads_in_use[i] = 0;
+	}
+	static int objname_cmp(const void *s1, const void *s2)
+	{
+		char *name1 = *(char **)s1;
+		char *name2 = *(char **)s2;
+		if (name1[0] == 'm') {
+			return 1;
+		} else if (name2[0] == 'm') {
+			return -1;
+		} else {
+			char tmp_name[30];
+			int inode1, inode2; 
+			int blocknum1, blocknum2;
+			sscanf(name1, "data_%d_%d", &inode1, &blocknum1);
+			sscanf(name2, "data_%d_%d", &inode2, &blocknum2);
+			return  -blocknum2 + blocknum1;
+		}
+
 	}
 	DSYNC_THREAD_TYPE *mock_thread_info;
+	unsigned expected_num_objname;
+	unsigned size_objname;
 };
 
-TEST_F(dsync_single_inodeTest, CannotAccessMeta)
+TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 {
 	FILE *meta;
 	struct stat meta_stat;
 	BLOCK_ENTRY_PAGE tmp_blockentry_page;
 	FILE_META_TYPE tmp_file_meta;
 	int total_page = 3;
+	expected_num_objname = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
+	void *res;
 	
+	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
 	
@@ -128,15 +174,94 @@ TEST_F(dsync_single_inodeTest, CannotAccessMeta)
 	tmp_blockentry_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 	for (int page_num = 0 ; page_num < total_page ; page_num++) {
 		if(page_num == total_page - 1)
-			tmp_blockentry_page.next_page = 0;
+			tmp_blockentry_page.next_page = 0; // Last page
 		else
 			tmp_blockentry_page.next_page = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
-				(page_num + 1) * sizeof(BLOCK_ENTRY_PAGE);
+				(page_num + 1) * sizeof(BLOCK_ENTRY_PAGE); 
 		fwrite(&tmp_blockentry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta); // Write block page
 	}
 	fclose(meta);
 
+	/* Begin to test */
 	init_delete_control();
-	dsync_single_inode(mock_thread_info);	
+	init_objname_buffer(expected_num_objname);
+	init_sync_ctl();
+	dsync_single_inode(mock_thread_info);
 
+	/* Check answer */
+	EXPECT_EQ(expected_num_objname, objname_counter); // Check # of object name.
+	qsort(delete_objname, expected_num_objname, sizeof(char *), dsync_single_inodeTest::objname_cmp);
+	for (int block = 0 ; block < expected_num_objname - 1 ; block++) {
+		char expected_objname[size_objname];
+		sprintf(expected_objname, "data_%d_%d", mock_thread_info->inode, block);
+		ASSERT_STREQ(expected_objname, delete_objname[block]); // Check all obj was recorded.
+	}
+	char expected_objname[size_objname];
+	sprintf(expected_objname, "meta_%d", mock_thread_info->inode); 
+	EXPECT_STREQ(expected_objname, delete_objname[expected_num_objname - 1]); // Check meta was recorded.
+	
+	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
+	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
+	EXPECT_EQ(PTHREAD_CANCELED, res);
+	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
 }
+
+TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
+{
+	FILE *meta;
+	struct stat meta_stat;
+	void *res;
+	expected_num_objname = 1;
+
+	/* Mock a dir meta file */
+	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
+	mock_thread_info->this_mode = S_IFDIR;	
+	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
+	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
+	fclose(meta);
+	
+	/* Begin to test */
+	init_delete_control();
+	init_objname_buffer(expected_num_objname);
+	init_sync_ctl();
+	dsync_single_inode(mock_thread_info);
+
+	/* Check answer */
+	EXPECT_EQ(1, objname_counter); // Check # of object name.
+	char expected_objname[size_objname];
+	sprintf(expected_objname, "meta_%d", mock_thread_info->inode); 
+	EXPECT_STREQ(expected_objname, delete_objname[0]); // Check meta was recorded.
+	
+	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
+	EXPECT_EQ(0, pthread_join(delete_ctl.delete_handler_thread, &res));
+	EXPECT_EQ(PTHREAD_CANCELED, res);
+	EXPECT_EQ(0, delete_ctl.total_active_delete_threads); // Check all threads finished.
+}
+/*
+	End of unittest of dsync_single_inode()
+*/
+
+/*
+	Unittest of delete_loop()
+ */
+TEST(delete_loopTest, DeleteSuccess)
+{
+	test_data.num_inode = 10;
+	test_data.to_delete_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	test_data.todelete_counter = 0;
+
+	expected_data.record_delete_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	expected_data.record_inode_counter = 0;
+	sem_init(&(expected_data.record_inode_sem), 0, 1);
+
+	for(int i = 0 ; i < test_data.num_inode ; i++)
+		test_data.to_delete_inode[i] = (i + 1) * 5; // mock inode
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_to_delete_inode = test_data.to_delete_inode[0];
+
+	/* Create a thread to run delete_loop() */
+	pthread_t thread;
+}
+/*
+	End of unittest of delete_loop()
+ */
