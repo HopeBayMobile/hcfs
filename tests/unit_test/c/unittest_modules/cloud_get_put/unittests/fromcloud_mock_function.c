@@ -21,11 +21,17 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	int inode, block_no;
 	sscanf(objname, "data_%d_%d", &inode, &block_no);
-	if (block_no == BLOCK_NO__FETCH_SUCCESS) {
+	if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
 		ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
 		return HTTP_OK;
-	} else {
+	} else if (block_no == BLOCK_NUM__FETCH_SUCCESS) {
 		return HTTP_FAIL;
+	} else {
+		sem_wait(&objname_counter_sem);
+		strcpy(objname_list[objname_counter], objname);
+		objname_counter++;
+		sem_post(&objname_counter_sem);
+		return HTTP_OK;
 	}
 }
 

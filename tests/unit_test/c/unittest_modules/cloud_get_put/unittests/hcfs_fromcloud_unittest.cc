@@ -1,4 +1,5 @@
 #include <semaphore.h>
+#include <string>
 #include "gtest/gtest.h"
 #include "curl/curl.h"
 #include "attr/xattr.h"
@@ -22,44 +23,77 @@ protected:
 		sem_init(&download_curl_control_sem, 0, 1);
 		for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++)
 			curl_handle_mask[i] = FALSE;
+
+		num_obj = 35; // fetch 35 blocks
+		objname_counter = 0; // Record actual value
+		expected_obj_counter = 0; // Record expected value
+		sem_init(&objname_counter_sem, 0, 1);
+		objname_list = (char **)malloc(sizeof(char *)*num_obj);
+		for (int i = 0 ; i < num_obj ; i++)
+			objname_list[i] = (char *)malloc(sizeof(char)*40);
 	}
 	virtual void TearDown()
 	{
 		sem_destroy(&download_curl_sem);
 		sem_destroy(&download_curl_control_sem);
+		sem_destroy(&objname_counter_sem);
+		for (int i = 0 ; i < num_obj ; i++)
+			free(objname_list[i]);
+		free(objname_list);
 	}
 	/* Static thread function, which is used to run function fetch_from_cloud() */
-	static void *fetch_from_cloud_for_thread(void *data)
+	static void *fetch_from_cloud_for_thread(void *block_no)
 	{
 		char tmp_filename[50];
 		FILE *fptr;
 		int ret;
 
-		sprintf(tmp_filename, "/tmp/local_space%d", *(int *)data);
+		sprintf(tmp_filename, "/tmp/local_space%d", *(int *)block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, 0, BLOCK_NO__FETCH_SUCCESS);
-		*(int *)data = ret;
+		ret = fetch_from_cloud(fptr, 1, *(int *)block_no);
 		fclose(fptr);
-		unlink(tmp_filename);
+		unlink(tmp_filename);	
 		return NULL;
 	}
+	std::string expected_objname[100]; // Expected answer list
+	int expected_obj_counter;
+	int num_obj;
 };
 
+int objname_cmp(const void *s1, const void *s2)
+{
+	char *name1 = *(char **)s1;
+	char *name2 = *(char **)s2;
+	int inode1, block1;
+	int inode2, block2;
+	sscanf(name1, "data_%d_%d", &inode1, &block1);
+	sscanf(name2, "data_%d_%d", &inode2, &block2);
+	return block1 - block2;
+}
 
 TEST_F(fetch_from_cloudTest, FetchSuccess)
 {
-	pthread_t tid[MAX_DOWNLOAD_CURL_HANDLE];
-	int ret_val[MAX_DOWNLOAD_CURL_HANDLE];
+	pthread_t tid[num_obj];
+	int block_no[num_obj];
 
 	/* Run fetch_from_cloud() with multi-threads */
-	for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++) {
-		ret_val[i] = i;
+	for (int i = 0 ; i < num_obj ; i++) {
+		char tmp_filename[20];
+		block_no[i] = (i + 1)*5;
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL, 
-			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&ret_val[i]));
+			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
+		
+		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]);
+		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
 	}
-	for (int i = 0 ; i < MAX_DOWNLOAD_CURL_HANDLE ; i++) {
+	sleep(1);
+
+	/* Check answer */
+	EXPECT_EQ(num_obj, objname_counter);
+	qsort(objname_list, objname_counter, sizeof(char *), objname_cmp);
+	for (int i = 0 ; i < num_obj ; i++) {
 		pthread_join(tid[i], NULL);
-		EXPECT_EQ(200, ret_val[i]);
+		ASSERT_STREQ(expected_objname[i].c_str(), objname_list[i]);
 	}
 }
 
@@ -109,9 +143,12 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 	metafptr = fopen("/tmp/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
-	prefetch_ptr->block_no = BLOCK_NO__FETCH_SUCCESS;
-	/* Testing */
+	prefetch_ptr->block_no = BLOCK_NUM__FETCH_SUCCESS;
+
+	/* Run */
 	prefetch_block(prefetch_ptr);
+	
+	/* Check answer */
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_blocks);
 	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK));	
@@ -137,13 +174,15 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	metafptr = fopen("/tmp/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
-	prefetch_ptr->block_no = BLOCK_NO__FETCH_SUCCESS; // Control success or fail to fetch from cloud.
+	prefetch_ptr->block_no = BLOCK_NUM__FETCH_SUCCESS; // Control success or fail to fetch from cloud.
+
 	/* Run */
 	prefetch_block(prefetch_ptr);
-	/* Testing */
-	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size);
-	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks);
-	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK));
+	
+	/* Check answer */
+	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size); // Total size = expected block size
+	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
+	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK)); // Mock block path
 	EXPECT_EQ(1, getxattr("/tmp/tmp_block", "user.dirty", &xattr_result, sizeof(char))); 
 	EXPECT_EQ('F', xattr_result); // xattr
 	metafptr = fopen("/tmp/tmp_meta", "r");	
