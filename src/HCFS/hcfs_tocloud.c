@@ -716,7 +716,8 @@ void upload_loop(void)
 		}
 
 		is_start_check = FALSE;
-
+		
+		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
 		super_block_exclusive_locking();
 		if (ino_check == 0)
@@ -744,6 +745,7 @@ void upload_loop(void)
 		 }
 		super_block_exclusive_release();
 
+		/* Begin to sync the inode */
 		if (ino_sync != 0) {
 			sem_wait(&(sync_ctl.sync_op_sem));
 			/*First check if this inode is actually being

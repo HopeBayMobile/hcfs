@@ -25,8 +25,8 @@ protected:
 			curl_handle_mask[i] = FALSE;
 
 		num_obj = 35; // fetch 35 blocks
-		objname_counter = 0; // Record actual value
-		expected_obj_counter = 0; // Record expected value
+		objname_counter = 0; // Counter of recording actual value
+		expected_obj_counter = 0; // Counter of recording expected value
 		sem_init(&objname_counter_sem, 0, 1);
 		objname_list = (char **)malloc(sizeof(char *)*num_obj);
 		for (int i = 0 ; i < num_obj ; i++)
@@ -83,14 +83,14 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 		EXPECT_EQ(0, pthread_create(&tid[i], NULL, 
 			fetch_from_cloudTest::fetch_from_cloud_for_thread, (void *)&block_no[i]));
 		
-		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]);
-		expected_objname[expected_obj_counter++] = std::string(tmp_filename);
+		sprintf(tmp_filename, "data_%d_%d", 1, block_no[i]); // Expected value
+		expected_objname[expected_obj_counter++] = std::string(tmp_filename); 
 	}
 	sleep(1);
 
 	/* Check answer */
 	EXPECT_EQ(num_obj, objname_counter);
-	qsort(objname_list, objname_counter, sizeof(char *), objname_cmp);
+	qsort(objname_list, objname_counter, sizeof(char *), objname_cmp); // Sort actual value
 	for (int i = 0 ; i < num_obj ; i++) {
 		pthread_join(tid[i], NULL);
 		ASSERT_STREQ(expected_objname[i].c_str(), objname_list[i]);
