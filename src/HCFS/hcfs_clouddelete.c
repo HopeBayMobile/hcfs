@@ -57,7 +57,7 @@ static inline void _dsync_terminate_thread(int index)
 									NULL);
 		if (ret == 0) {
 			dsync_ctl.threads_in_use[index] = 0;
-			dsync_ctl.threads_created[index] == FALSE;
+			dsync_ctl.threads_created[index] = FALSE;
 			dsync_ctl.total_active_dsync_threads--;
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		 }
