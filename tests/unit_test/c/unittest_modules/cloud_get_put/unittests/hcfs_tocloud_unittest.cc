@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
-#include "mock_params.h"
 #include <attr/xattr.h>
+#include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
 #include "hcfs_tocloud.h"
@@ -8,6 +8,10 @@ extern "C" {
 #include "fuseop.h"
 #include "super_block.h"
 }
+
+/*
+	Unittest of init_upload_control()
+ */
 
 class InitUploadControlTool {
 public:
@@ -88,6 +92,10 @@ public:
 	}
 private:
 	InitUploadControlTool() {}
+	~InitUploadControlTool()
+	{
+		delete tool;
+	}
 	static InitUploadControlTool *tool;
 };
 
@@ -196,10 +204,12 @@ TEST(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 {
 	void *res;
 	int num_block_entry = 10;
+	memset(upload_ctl_todelete_blockno, 0, num_block_entry);
 	
 	/* Run tested function */
 	init_upload_control();
-	InitUploadControlTool::Tool()->init_delete_ctl();	
+	InitUploadControlTool::Tool()->init_delete_ctl();
+		
 	/* Generate mock threads */
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		ino_t inode = 1;
@@ -223,10 +233,176 @@ TEST(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 	sleep(2);
 		
 	/* Verify */
-	ASSERT_EQ(0, upload_ctl.total_active_upload_threads);
+	EXPECT_EQ(0, upload_ctl.total_active_upload_threads);
 	for (int i = 0 ; i < MAX_UPLOAD_CONCURRENCY ; i++) {
 		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
 		ASSERT_EQ(FALSE, upload_ctl.threads_created[i])<< "thread " << i << " is in use";
 	}
+	for (int i = 0 ; i < num_block_entry ; i++)
+		ASSERT_EQ(TRUE, upload_ctl_todelete_blockno[i]);
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
+	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
+	EXPECT_EQ(PTHREAD_CANCELED, res);
 }
 
+/*
+	End of unittest for init_upload_control()
+ */
+
+/*
+	Unittest of init_sync_control()
+ */
+
+void *sync_thread_function(void *ptr)
+{
+	usleep(100000);
+	return NULL;
+}
+TEST(init_sync_controlTest, DoNothing_ControlSuccess)
+{
+	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY] = {0};
+	char empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
+	void *res;
+
+	/* Run tested function */
+	init_sync_control();
+	sleep(1);
+
+	/* Verify */
+	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
+	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created, sizeof(empty_created_array)));
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	EXPECT_EQ(PTHREAD_CANCELED, res);
+}
+
+TEST(init_sync_controlTest, Multithread_ControlSuccess)
+{
+	void *res;
+	int num_threads = 100;
+	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY] = {0};
+	char empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
+
+	/* Run tested function */
+	init_sync_control();
+	
+	/* Generate threads */
+	for (int i = 0 ; i < num_threads ; i++) {
+		int idle_thread = -1;
+		sem_wait(&sync_ctl.sync_queue_sem);
+		sem_wait(&sync_ctl.sync_op_sem);
+		for (int t_idx = 0 ; t_idx < MAX_SYNC_CONCURRENCY ; t_idx++) {
+			if ((sync_ctl.threads_in_use[t_idx] == 0) 
+				&& (sync_ctl.threads_created[t_idx] == FALSE)) {
+				idle_thread = t_idx;
+				break;
+			}
+		}
+		sync_ctl.threads_in_use[idle_thread] = i+1;
+		sync_ctl.threads_created[idle_thread] = TRUE;
+		pthread_create(&sync_ctl.inode_sync_thread[idle_thread], NULL,
+			sync_thread_function, NULL);
+		sync_ctl.total_active_sync_threads++;
+		sem_post(&sync_ctl.sync_op_sem);
+	}
+	sleep(1);
+	
+	/* Verify */
+	EXPECT_EQ(0, sync_ctl.total_active_sync_threads);
+	EXPECT_EQ(0, memcmp(empty_ino_array, &sync_ctl.threads_in_use, sizeof(empty_ino_array)));
+	EXPECT_EQ(0, memcmp(empty_created_array, &sync_ctl.threads_created, sizeof(empty_created_array)));
+
+	/* Reclaim resource */
+	EXPECT_EQ(0, pthread_cancel(sync_ctl.sync_handler_thread));
+	EXPECT_EQ(0, pthread_join(sync_ctl.sync_handler_thread, &res));
+	EXPECT_EQ(PTHREAD_CANCELED, res);
+}
+/*
+	End of unittest of init_sync_control()
+ */
+
+/*
+	Unittest of sync_single_inode()
+ */
+
+class sync_single_inodeTest : public ::testing:Test {
+protected:
+	void SetUp()
+	{
+		sem_init(&objname_counter_sem);
+		objname_counter = 0;
+		objname_list = (char **)malloc(sizeof(char *) * 4000);
+		for (int i = 0 ; i < 4000 ; i++)
+			objname[i] = (char *)malloc(sizeof(char) * 20);
+
+	}
+	void TearDown()
+	{
+		for (int i = 0 ; i < 4000 ; i++)
+			free(objname[i]);
+		free(objname);
+	}
+};
+
+TEST_F(sync_single_inodeTest, MetaNotExist)
+{
+	SYNC_THREAD_TYPE mock_thread_type;
+	mock_thread_type.inode = 5;
+	mock_thread_type.this_mode = S_IFREG;
+	
+	/* Run tested function */	
+	sync_single_inode(&mock_thread_type);
+}
+
+TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
+{
+	struct stat mock_stat;
+	FILE_META_TYPE mock_file_meta;
+	SYNC_THREAD_TYPE mock_thread_type;
+	BLOCK_ENTRY_PAGE mock_block_page;
+	FILE *mock_metaptr;
+	int total_page = 3;
+	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	/* Mock data */
+	mock_metaptr = fopen("/tmp/mock_file_meta", "w+");
+	mock_stat.st_size = 1000000;
+	mock_stat.st_mode = S_IFREG;
+	fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr);
+	mock_file_meta.next_block_page = sizeof(struct stat) + 
+		sizeof(FILE_META_TYPE);
+	fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr);
+	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+		mock_block_page.block_entries[i].status = ST_LDISK;
+	mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
+	for (int page_num = 0 ; page_num < total_page ; page_num++) {
+		if (page_num == total_page - 1)
+			mock_block_page.next_page = 0; // Last page
+		else
+			mock_block_page.next_page = sizeof(struct stat) + 
+				sizeof(FILE_META_TYPE) + (page_num + 1) * 
+				sizeof(BLOCK_ENTRY_PAGE); 
+		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
+			 1, mock_metaptr); // Write block page
+	} 
+	fclose(mock_metaptr);
+		
+	system_config.max_block_size = 1000;
+	mock_thread_type.inode = 5;
+	mock_thread_type.this_mode = S_IFREG;
+		
+	/* Run tested function */
+	init_upload_control();
+	sync_single_inode(&mock_thread_type);
+		
+	
+}
+
+/*
+	Unittest of sync_single_inode()
+ */

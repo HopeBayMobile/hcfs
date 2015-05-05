@@ -12,11 +12,14 @@
 #define INODE__FETCH_TODELETE_PATH_FAIL 2
 
 #define TODELETE_PATH "/tmp/todelete_meta_path"
-
+#include "params.h"
 #include <semaphore.h>
 char **objname_list;
 int objname_counter;
 sem_t objname_counter_sem;
+
+char upload_ctl_todelete_blockno[100];
+SYSTEM_CONF_STRUCT system_config;
 
 typedef struct DeleteLoopTestData {
 	int *to_delete_inode; // inode_t to be deleted by delete_loop()
