@@ -36,25 +36,22 @@
 *************************************************************************/
 int init_system_fh_table(void)
 {
-	long long count;
-
 	memset(&system_fh_table, 0, sizeof(FH_TABLE_TYPE));
-
+	/* Init entry_table_flag*/
 	system_fh_table.entry_table_flags = malloc(sizeof(char) *
 							MAX_OPEN_FILE_ENTRIES);
 	if (system_fh_table.entry_table_flags == NULL)
 		return -1;
 	memset(system_fh_table.entry_table_flags, 0, sizeof(char) *
 							MAX_OPEN_FILE_ENTRIES);
-
+	/* Init entry_table*/
 	system_fh_table.entry_table = malloc(sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
 	if (system_fh_table.entry_table == NULL)
 		return -1;
-
 	memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
-
+	
 	system_fh_table.last_available_index = 0;
 
 	sem_init(&(system_fh_table.fh_table_sem), 0, 1);
@@ -99,6 +96,7 @@ long long open_fh(ino_t thisinode)
 	system_fh_table.entry_table[index].cached_filepos = -1;
 	sem_init(&(system_fh_table.entry_table[index].block_sem), 0, 1);
 
+	system_fh_table.num_opened_files++;
 	sem_post(&(system_fh_table.fh_table_sem));
 	return index;
 }
@@ -122,6 +120,10 @@ int close_fh(long long index)
 		if (tmp_entry->meta_cache_locked == FALSE) {
 			tmp_entry->meta_cache_ptr =
 				meta_cache_lock_entry(tmp_entry->thisinode);
+			if (tmp_entry->meta_cache_ptr == NULL) {
+				sem_post(&(system_fh_table.fh_table_sem));
+				return -1;
+			}
 			tmp_entry->meta_cache_locked = TRUE;
 		}
 		meta_cache_close_file(tmp_entry->meta_cache_ptr);
@@ -141,8 +143,11 @@ int close_fh(long long index)
 		tmp_entry->opened_block = -1;
 		sem_destroy(&(tmp_entry->block_sem));
 		system_fh_table.last_available_index = index;
+	} else {
+		sem_post(&(system_fh_table.fh_table_sem));
+		return -1;
 	}
-
+	system_fh_table.num_opened_files--;
 	sem_post(&(system_fh_table.fh_table_sem));
 	return 0;
 }
