@@ -62,6 +62,12 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
+/* TODO: Add forget function and maintain lookup counts for files and dirs */
+/* TODO: Consider how to handle files and dirs that should not be deleted
+	right away */
+/* TODO: Maintain inode generations in file and dir creation. This is needed
+in various functions such as mkdir and mknod. */
+
 /* TODO: Need to go over the access rights problem for the ops */
 /* TODO: Need to revisit the following problem for all ops: access rights,
 /*   timestamp change (a_time, m_time, c_time), and error handling */
