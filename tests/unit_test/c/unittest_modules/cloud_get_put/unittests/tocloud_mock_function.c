@@ -17,7 +17,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/mockblock_%d_%d", this_inode, block_num);
+	sprintf(mock_block_path, "/tmp/data_%d_%d", this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -39,6 +39,14 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 
 int super_block_update_transit(ino_t this_inode, char is_start_transit)
 {
+	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
+		sem_wait(&to_verified_data.record_inode_sem);
+		to_verified_data.record_handle_inode[to_verified_data.record_inode_counter] = 
+			this_inode;
+		to_verified_data.record_inode_counter++;
+		sem_post(&to_verified_data.record_inode_sem);
+		printf("Test: mock inode %d is deleted\n", this_inode);
+	}
 	return 0;
 }
 
@@ -54,6 +62,14 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
+	char deleteobjname[30];
+	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
+	printf("Test: mock data %s is deleted\n", deleteobjname);
+
+	sem_wait(&objname_counter_sem);
+	strcpy(objname_list[objname_counter], deleteobjname);
+	objname_counter++;
+	sem_post(&objname_counter_sem);
 	return ;
 }
 
@@ -64,6 +80,19 @@ int super_block_exclusive_locking(void)
 
 int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	if (this_inode == 0)
+		return -1;
+
+	inode_ptr->status = IS_DIRTY;
+	inode_ptr->in_transit = FALSE;
+	
+	if (test_data.tohandle_counter == test_data.num_inode) {
+		inode_ptr->util_ll_next = 0;
+		sys_super_block->head.first_dirty_inode = 0;
+	} else {
+		inode_ptr->util_ll_next = test_data.to_handle_inode[test_data.tohandle_counter];
+		test_data.tohandle_counter++;
+	}
 	return 0;
 }
 

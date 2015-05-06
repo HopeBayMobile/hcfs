@@ -29,10 +29,10 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 	} else {
 		/* Record inode. Called when deleting inode in delete_loop() */
 		usleep(500000); // Let threads busy
-		sem_wait(&(expected_data.record_inode_sem));
-		expected_data.record_delete_inode[expected_data.record_inode_counter] = this_inode;
-		expected_data.record_inode_counter++;
-		sem_post(&(expected_data.record_inode_sem));
+		sem_wait(&(to_verified_data.record_inode_sem));
+		to_verified_data.record_handle_inode[to_verified_data.record_inode_counter] = this_inode;
+		to_verified_data.record_inode_counter++;
+		sem_post(&(to_verified_data.record_inode_sem));
 		pathname[0] = '\0';
 		printf("Test: mock inode %d is deleted\n", this_inode);
 		return -1;
@@ -68,16 +68,15 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
 	if (this_inode == 0)
 		return -1;
-	if (test_data.todelete_counter == test_data.num_inode) {
+	if (test_data.tohandle_counter == test_data.num_inode) {
 		inode_ptr->status = TO_BE_DELETED;
 		inode_ptr->util_ll_next = 0;
-		return 0;
 	} else {
 		inode_ptr->status = TO_BE_DELETED;
-		inode_ptr->util_ll_next = test_data.to_delete_inode[test_data.todelete_counter];
-		test_data.todelete_counter++;
-		return 0;
+		inode_ptr->util_ll_next = test_data.to_handle_inode[test_data.tohandle_counter];
+		test_data.tohandle_counter++;
 	}
+	return 0;
 }
 
 int super_block_share_release(void)

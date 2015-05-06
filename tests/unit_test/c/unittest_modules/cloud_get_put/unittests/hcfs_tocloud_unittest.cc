@@ -68,7 +68,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
-			sprintf(path, "/tmp/mockblock_%d_%d",inode, i);
+			sprintf(path, "/tmp/data_%d_%d",inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -149,7 +149,7 @@ TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 		
 		ASSERT_EQ(ST_BOTH, mock_block_page.block_entries[i].status);
-		sprintf(path, "/tmp/mockblock_%d_%d",1, i);
+		sprintf(path, "/tmp/data_%d_%d",1, i);
 		getxattr(path, "user.dirty", xattr_val, 1);
 		ASSERT_STREQ("F", xattr_val);
 		unlink(path);
@@ -330,29 +330,85 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 	Unittest of sync_single_inode()
  */
 
-class sync_single_inodeTest : public ::testing:Test {
+class sync_single_inodeTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		sem_init(&objname_counter_sem);
+		max_objname_num = 4000;
+		sem_init(&objname_counter_sem, 0, 1);
 		objname_counter = 0;
-		objname_list = (char **)malloc(sizeof(char *) * 4000);
-		for (int i = 0 ; i < 4000 ; i++)
-			objname[i] = (char *)malloc(sizeof(char) * 20);
+		objname_list = (char **)malloc(sizeof(char *) * max_objname_num);
+		for (int i = 0 ; i < max_objname_num ; i++)
+			objname_list[i] = (char *)malloc(sizeof(char) * 20);
 
 	}
 	void TearDown()
 	{
-		for (int i = 0 ; i < 4000 ; i++)
-			free(objname[i]);
-		free(objname);
+		void *res;
+		for (int i = 0 ; i < max_objname_num ; i++)
+			free(objname_list[i]);
+		free(objname_list);
+			
+		pthread_cancel(sync_ctl.sync_handler_thread);
+		pthread_join(sync_ctl.sync_handler_thread, &res);
 	}
+	void write_mock_meta_file(char *metapath, int total_page, char block_status)
+	{
+		struct stat mock_stat;
+		FILE_META_TYPE mock_file_meta;
+		BLOCK_ENTRY_PAGE mock_block_page;
+		FILE *mock_metaptr;
+
+		mock_metaptr = fopen(metapath, "w+");
+		mock_stat.st_size = 1000000;
+		mock_stat.st_mode = S_IFREG;
+		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
+		
+		mock_file_meta.next_block_page = sizeof(struct stat) + 
+			sizeof(FILE_META_TYPE);
+		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
+		
+		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+			mock_block_page.block_entries[i].status = block_status;
+		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
+		for (int page_num = 0 ; page_num < total_page ; page_num++) {
+			if (page_num == total_page - 1)
+				mock_block_page.next_page = 0; // Last page
+			else
+				mock_block_page.next_page = sizeof(struct stat) + 
+					sizeof(FILE_META_TYPE) + (page_num + 1) * 
+					sizeof(BLOCK_ENTRY_PAGE); 
+			fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
+					1, mock_metaptr); // Write block page
+		} 
+		fclose(mock_metaptr);
+
+	}
+	static int objname_cmp(const void *s1, const void *s2)
+	{
+		char *name1 = *(char **)s1;
+		char *name2 = *(char **)s2;
+		if (name1[0] == 'm') {
+			return 1;
+		} else if (name2[0] == 'm') {
+			return -1;
+		} else {
+			char tmp_name[30];
+			int inode1, inode2; 
+			int blocknum1, blocknum2;
+			sscanf(name1, "data_%d_%d", &inode1, &blocknum1);
+			sscanf(name2, "data_%d_%d", &inode2, &blocknum2);
+			return  -blocknum2 + blocknum1;
+		}
+	}
+private:
+	int max_objname_num;
 };
 
 TEST_F(sync_single_inodeTest, MetaNotExist)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
-	mock_thread_type.inode = 5;
+	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 	
 	/* Run tested function */	
@@ -361,48 +417,129 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 
 TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 {
-	struct stat mock_stat;
-	FILE_META_TYPE mock_file_meta;
 	SYNC_THREAD_TYPE mock_thread_type;
-	BLOCK_ENTRY_PAGE mock_block_page;
-	FILE *mock_metaptr;
+	char metapath[] = "/tmp/mock_file_meta";
 	int total_page = 3;
-	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE;
+	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
+	BLOCK_ENTRY_PAGE block_page;
+	FILE_META_TYPE filemeta;
+	FILE *metaptr;
 
 	/* Mock data */
-	mock_metaptr = fopen("/tmp/mock_file_meta", "w+");
-	mock_stat.st_size = 1000000;
-	mock_stat.st_mode = S_IFREG;
-	fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr);
-	mock_file_meta.next_block_page = sizeof(struct stat) + 
-		sizeof(FILE_META_TYPE);
-	fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr);
-	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
-		mock_block_page.block_entries[i].status = ST_LDISK;
-	mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
-	for (int page_num = 0 ; page_num < total_page ; page_num++) {
-		if (page_num == total_page - 1)
-			mock_block_page.next_page = 0; // Last page
-		else
-			mock_block_page.next_page = sizeof(struct stat) + 
-				sizeof(FILE_META_TYPE) + (page_num + 1) * 
-				sizeof(BLOCK_ENTRY_PAGE); 
-		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
-			 1, mock_metaptr); // Write block page
-	} 
-	fclose(mock_metaptr);
+	write_mock_meta_file(metapath, total_page, ST_LDISK);
 		
 	system_config.max_block_size = 1000;
-	mock_thread_type.inode = 5;
+	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 		
 	/* Run tested function */
 	init_upload_control();
 	sync_single_inode(&mock_thread_type);
-		
+	sleep(1);
 	
+	/* Verify */
+	EXPECT_EQ(num_total_blocks, objname_counter);
+	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
+	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {
+		char expected_objname[20];
+		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
+		sprintf(expected_objname, "/tmp/data_%d_%d", mock_thread_type.inode, blockno);
+		unlink(expected_objname);
+	}
+	metaptr = fopen(metapath, "r+");
+	fseek(metaptr, sizeof(struct stat), SEEK_SET);
+	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
+	int next_page = filemeta.next_block_page;
+	while (next_page != 0) {
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr);
+		for (int i = 0 ; i < block_page.num_entries ; i++)
+			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status);
+		next_page = block_page.next_page;
+	}
+	fclose(metaptr);
+	unlink(metapath);
+}
+
+TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
+{
+	
+	SYNC_THREAD_TYPE mock_thread_type;
+	char metapath[] = "/tmp/mock_file_meta";
+	int total_page = 3;
+	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
+	BLOCK_ENTRY_PAGE block_page;
+	FILE_META_TYPE filemeta;
+	FILE *metaptr;
+
+	/* Mock data */
+	write_mock_meta_file(metapath, total_page, ST_TODELETE);
+		
+	system_config.max_block_size = 1000;
+	mock_thread_type.inode = 1;
+	mock_thread_type.this_mode = S_IFREG;
+		
+	/* Run tested function */
+	init_upload_control();
+	sync_single_inode(&mock_thread_type);
+	sleep(1);
+
+	/* Verify */
+	EXPECT_EQ(num_total_blocks, objname_counter);
+	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
+	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {
+		char expected_objname[20];
+		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
+		sprintf(expected_objname, "/tmp/data_%d_%d", mock_thread_type.inode, blockno);
+		unlink(expected_objname);
+	}
+	unlink(metapath);
 }
 
 /*
-	Unittest of sync_single_inode()
+	End of unittest of sync_single_inode()
+ */
+
+/*
+	Unittest of upload_loop()
+ */
+
+TEST(upload_loopTest, UploadLoopWorkSuccess)
+{
+	pid_t pid;
+
+	test_data.num_inode = 40;
+	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	test_data.tohandle_counter = 0;
+	for (int i = 0 ; i < test_data.num_inode ; i++)
+		test_data.to_handle_inode[i] = (i + 1) * 5; // mock inode
+
+	to_verified_data.record_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	to_verified_data.record_inode_counter = 0;
+	sem_init(&(to_verified_data.record_inode_sem), 0, 1);
+	
+	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT;
+
+	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
+	sys_super_block->head.first_dirty_inode = test_data.to_handle_inode[0];
+
+	/* Create a process to run upload_loop() */
+	pid = fork();
+	if (!pid) {
+		upload_loop();
+	}
+	sleep(5);
+	kill(pid, SIGKILL);
+
+	/* Verify */
+	//qsort(expe)
+	//for (int i = 0 ; i < test_data.num_inode ; i++)
+	//	ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
+
+}
+
+/*
+	End of unittest of upload_loop()
  */

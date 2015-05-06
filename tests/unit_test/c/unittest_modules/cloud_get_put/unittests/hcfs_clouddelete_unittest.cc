@@ -261,27 +261,27 @@ TEST(delete_loopTest, DeleteSuccess)
 	void *res;
 	
 	test_data.num_inode = 40;
-	test_data.to_delete_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
-	test_data.todelete_counter = 0;
+	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	test_data.tohandle_counter = 0;
 
-	expected_data.record_delete_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
-	expected_data.record_inode_counter = 0;
-	sem_init(&(expected_data.record_inode_sem), 0, 1);
+	to_verified_data.record_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
+	to_verified_data.record_inode_counter = 0;
+	sem_init(&(to_verified_data.record_inode_sem), 0, 1);
 
 	for (int i = 0 ; i < test_data.num_inode ; i++)
-		test_data.to_delete_inode[i] = (i + 1) * 5; // mock inode
+		test_data.to_handle_inode[i] = (i + 1) * 5; // mock inode
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
-	sys_super_block->head.first_to_delete_inode = test_data.to_delete_inode[0];
+	sys_super_block->head.first_to_delete_inode = test_data.to_handle_inode[0];
 
 	/* Create a thread to run delete_loop() */
 	ASSERT_EQ(0, pthread_create(&thread, NULL, delete_loop, NULL));
 	sleep(10);
 
 	/* Check answer */
-	EXPECT_EQ(test_data.num_inode, expected_data.record_inode_counter);
-	qsort(&(expected_data.record_delete_inode), expected_data.record_inode_counter, sizeof(int), inode_cmp);
-	for (int i = 0 ; i < expected_data.record_inode_counter ; i++)
-		ASSERT_EQ(test_data.to_delete_inode[i], expected_data.record_delete_inode[i]);
+	EXPECT_EQ(test_data.num_inode, to_verified_data.record_inode_counter);
+	qsort(&(to_verified_data.record_handle_inode), to_verified_data.record_inode_counter, sizeof(int), inode_cmp);
+	for (int i = 0 ; i < to_verified_data.record_inode_counter ; i++)
+		ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
 	EXPECT_EQ(0, dsync_ctl.total_active_dsync_threads);
 	EXPECT_EQ(0, delete_ctl.total_active_delete_threads);
 
@@ -289,8 +289,8 @@ TEST(delete_loopTest, DeleteSuccess)
 	EXPECT_EQ(0, pthread_cancel(thread));
 	EXPECT_EQ(0, pthread_join(thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	free(test_data.to_delete_inode);
-	free(expected_data.record_delete_inode);
+	free(test_data.to_handle_inode);
+	free(to_verified_data.record_handle_inode);
 	free(sys_super_block);
 }
 /*

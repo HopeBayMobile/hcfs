@@ -21,17 +21,17 @@ sem_t objname_counter_sem;
 char upload_ctl_todelete_blockno[100];
 SYSTEM_CONF_STRUCT system_config;
 
-typedef struct DeleteLoopTestData {
-	int *to_delete_inode; // inode_t to be deleted by delete_loop()
-	int todelete_counter; // counter used by super_block
+typedef struct {
+	int *to_handle_inode; // inode_t to be deleted by delete_loop()
+	int tohandle_counter; // counter used by super_block
 	int num_inode; // total number of to_delete_inode
-} DeleteLoopTestData;
+} LoopTestData;
 
-typedef struct DeleteLoopExpectedData {
-	int *record_delete_inode; // Recorded in inode array when inode is called
+typedef struct{
+	int *record_handle_inode; // Recorded in inode array when inode is called
 	int record_inode_counter; 
 	sem_t record_inode_sem;
-} DeleteLoopExpectedData;
+} LoopToVerifiedData;
 
-DeleteLoopTestData test_data;
-DeleteLoopExpectedData expected_data;
+LoopTestData test_data;
+LoopToVerifiedData to_verified_data;

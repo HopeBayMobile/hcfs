@@ -52,6 +52,8 @@ clean :
 
 test :
 	./hcfs_fromcloud_unittest
+	./hcfs_tocloud_unittest
+	./hcfs_clouddelete_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -100,8 +102,6 @@ fromcloud_mock_function.o : $(UNITTEST_DIR)/fromcloud_mock_function.c
 hcfs_fromcloud_unittest : fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
-
-
 # hcfs_tocloud testing
 
 hcfs_tocloud.o : $(USER_DIR)/hcfs_tocloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
@@ -118,8 +118,6 @@ tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
 
 hcfs_tocloud_unittest : tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-
-
 
 # hcfs_clouddelete testing
 
@@ -139,5 +137,3 @@ hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 
-run: $(TESTS)
-	./$(TESTS)
