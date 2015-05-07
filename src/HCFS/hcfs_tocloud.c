@@ -50,7 +50,7 @@ static inline void _sync_terminate_thread(int index)
 									NULL);
 		if (ret == 0) {
 			sync_ctl.threads_in_use[index] = 0;
-			sync_ctl.threads_created[index] == FALSE;
+			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
 		 }

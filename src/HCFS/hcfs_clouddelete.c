@@ -57,7 +57,7 @@ static inline void _dsync_terminate_thread(int index)
 									NULL);
 		if (ret == 0) {
 			dsync_ctl.threads_in_use[index] = 0;
-			dsync_ctl.threads_created[index] == FALSE;
+			dsync_ctl.threads_created[index] = FALSE;
 			dsync_ctl.total_active_dsync_threads--;
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		 }
@@ -269,7 +269,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	FILE *metafptr;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
-	int which_curl;
+	int curl_id;
 	long long block_no, current_index;
 	long long page_pos;
 	long long count, block_count;
@@ -278,7 +278,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char in_sync;
 	int ret_val;
 	struct timespec time_to_sleep;
-	pthread_t tmp_t;
+	pthread_t *tmp_tn;
+	DELETE_THREAD_TYPE *tmp_dt;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -337,22 +338,23 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(delete_ctl.delete_queue_sem));
 				sem_wait(&(delete_ctl.delete_op_sem));
-				which_curl = -1;
+				curl_id = -1;
 				for (count = 0; count < MAX_DELETE_CONCURRENCY;
 								count++) {
 					ret_val = _use_delete_thread(count,
 						TRUE, ptr->inode, block_count);
 					if (ret_val == 0) {
-						which_curl = count;
+						curl_id = count;
 						break;
 					}
 				}
 				sem_post(&(delete_ctl.delete_op_sem));
-				tmp_t = &(delete_ctl.threads_no[which_curl]);
-				pthread_create(tmp_t, NULL,
+				tmp_tn = &(delete_ctl.threads_no[curl_id]);
+				tmp_dt = &(delete_ctl.delete_threads[curl_id]);
+				pthread_create(tmp_tn, NULL,
 						(void *)&con_object_dsync,
-							(void *)tmp_t);
-				delete_ctl.threads_created[which_curl] = TRUE;
+							(void *)tmp_dt);
+				delete_ctl.threads_created[curl_id] = TRUE;
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
 			}
@@ -383,11 +385,11 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	sem_wait(&(delete_ctl.delete_queue_sem));
 	sem_wait(&(delete_ctl.delete_op_sem));
-	which_curl = -1;
+	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
 		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
 		if (ret_val == 0) {
-			which_curl = count;
+			curl_id = count;
 			break;
 		}
 	}
@@ -395,19 +397,19 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	flock(fileno(metafptr), LOCK_EX);
 
-	pthread_create(&(delete_ctl.threads_no[which_curl]), NULL,
+	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
 		(void *)&con_object_dsync,
-		(void *)&(delete_ctl.delete_threads[which_curl]));
+		(void *)&(delete_ctl.delete_threads[curl_id]));
 
-	delete_ctl.threads_created[which_curl] = TRUE;
+	delete_ctl.threads_created[curl_id] = TRUE;
 	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 
-	pthread_join(delete_ctl.threads_no[which_curl], NULL);
+	pthread_join(delete_ctl.threads_no[curl_id], NULL);
 
 	sem_wait(&(delete_ctl.delete_op_sem));
-	delete_ctl.threads_in_use[which_curl] = FALSE;
-	delete_ctl.threads_created[which_curl] = FALSE;
+	delete_ctl.threads_in_use[curl_id] = FALSE;
+	delete_ctl.threads_created[curl_id] = FALSE;
 	delete_ctl.total_active_delete_threads--;
 	sem_post(&(delete_ctl.delete_op_sem));
 	sem_post(&(delete_ctl.delete_queue_sem));
