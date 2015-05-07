@@ -21,7 +21,7 @@
 #define MY_ACCOUNT "hopebay"
 #define MY_USER "hopebay"
 #define MY_PASS "hopebaycloud"
-#define MY_URL "https://192.168.70.31:8080"
+#define MY_URL "https://172.16.9.67:8080"
 
 #define S3_ACCESS "SE41NTAxMzIwNDEzOTQ1Mjk5NTkwNzI"
 #define S3_SECRET "NWUzOTdjNjRjOGI1NDM2ZmI4MzFlOTgxMjdkNmMyNWM"

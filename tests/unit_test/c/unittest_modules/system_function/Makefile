@@ -34,11 +34,9 @@ CXX = gcc
 
 CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
 
-CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
-
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest 
+TESTS = filetable_unittest hfuse_system_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -50,10 +48,12 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+	rm -f $(TESTS) gtest.a gtest_main.a *.o
+	rm -f *.gcda *.gcno
 
-test :
-	./utils_unittest
+test:
+	./filetable_unittest
+	./hfuse_system_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -83,17 +83,34 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
-utils.o : $(USER_DIR)/utils.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/utils.c
 
-utils_fakeftn.o : $(UNITTEST_DIR)/utils_fakeftn.c 
-	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/utils_fakeftn.c
 
-utils_unittest.o : $(UNITTEST_DIR)/utils_unittest.cc \
-                     $(USER_DIR)/utils.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/utils_unittest.cc
+# filetable unittesting
 
-utils_unittest : utils.o utils_fakeftn.o utils_unittest.o gtest_main.a
+filetables.o : $(USER_DIR)/filetables.c $(USER_DIR)/filetables.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/filetables.c
+
+filetable_unittest.o : $(UNITTEST_DIR)/filetable_unittest.cc $(USER_DIR)/meta_mem_cache.h \
+			$(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/filetable_unittest.cc
+
+filetable_mock_function.o : $(UNITTEST_DIR)/filetable_mock_function.c $(UNITTEST_DIR)/mock_params.h 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/filetable_mock_function.c
+
+filetable_unittest : filetable_mock_function.o filetables.o filetable_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
+# hfuse_system_unittesting
 
+#hfuse_system.o : $(USER_DIR)/hfuse_system.c $(USER_DIR)/hfuse_system.h  $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hfuse_system.c
+
+hfuse_system_unittest.o : $(UNITTEST_DIR)/hfuse_system_unittest.cc $(GTEST_HEADERS) \
+			$(USER_DIR)/hfuse_system.c $(USER_DIR)/hfuse_system.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hfuse_system_unittest.cc
+
+hfuse_system_mock_function.o : $(UNITTEST_DIR)/hfuse_system_mock_function.c $(UNITTEST_DIR)/mock_params.h 
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hfuse_system_mock_function.c
+
+hfuse_system_unittest : hfuse_system_mock_function.o hfuse_system_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
