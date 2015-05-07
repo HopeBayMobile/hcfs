@@ -1,5 +1,7 @@
 #include "gtest/gtest.h"
 #include <attr/xattr.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -505,39 +507,56 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	Unittest of upload_loop()
  */
 
+int inode_cmp(const void *a, const void *b)
+{
+	return *(int *)a - *(int *)b;
+}
+
 TEST(upload_loopTest, UploadLoopWorkSuccess)
 {
 	pid_t pid;
+	int shm_key, shm_key2;
 
-	test_data.num_inode = 40;
-	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
-	test_data.tohandle_counter = 0;
-	for (int i = 0 ; i < test_data.num_inode ; i++)
-		test_data.to_handle_inode[i] = (i + 1) * 5; // mock inode
+	shm_key = shmget(1122, sizeof(LoopTestData), IPC_CREAT | 0666);
+	shm_test_data = (LoopTestData *)shmat(shm_key, NULL, 0);
+	shm_test_data->num_inode = 40;	
+	shm_key2 = shmget(1244, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
+	shm_test_data->to_handle_inode = (int *)shmat(shm_key2, NULL, 0);
+	//shm_test_data->to_handle_inode = (int *)malloc(sizeof(int) * shm_test_data->num_inode);
+	shm_test_data->tohandle_counter = 0;
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++)
+		shm_test_data->to_handle_inode[i] = (i + 1) * 5; // mock inode
 
-	to_verified_data.record_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
-	to_verified_data.record_inode_counter = 0;
-	sem_init(&(to_verified_data.record_inode_sem), 0, 1);
+	shm_key = shmget(5566, sizeof(LoopToVerifiedData), IPC_CREAT | 0666);
+	shm_verified_data = (LoopToVerifiedData *) shmat(shm_key, NULL, 0);
+	shm_key2 = shmget(1144, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
+	shm_verified_data->record_handle_inode = (int *)shmat(shm_key2, NULL, 0);
+	//shm_verified_data->record_handle_inode = (int *)malloc(sizeof(int) * shm_test_data->num_inode);
+	shm_verified_data->record_inode_counter = 0;
+	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 	
 	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT;
 
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
-	sys_super_block->head.first_dirty_inode = test_data.to_handle_inode[0];
+	sys_super_block->head.first_dirty_inode = shm_test_data->to_handle_inode[0];
 
 	/* Create a process to run upload_loop() */
 	pid = fork();
-	if (!pid) {
+	if (pid == 0) {
 		upload_loop();
+		exit(0);
 	}
 	sleep(5);
 	kill(pid, SIGKILL);
 
 	/* Verify */
-	//qsort(expe)
-	//for (int i = 0 ; i < test_data.num_inode ; i++)
-	//	ASSERT_EQ(test_data.to_handle_inode[i], to_verified_data.record_handle_inode[i]);
-
+	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
+	qsort(shm_verified_data->record_handle_inode, shm_verified_data->record_inode_counter,
+		sizeof(int), inode_cmp);
+	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
+		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
+	}
 }
 
 /*

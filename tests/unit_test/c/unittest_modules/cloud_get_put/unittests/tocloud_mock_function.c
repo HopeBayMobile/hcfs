@@ -40,12 +40,12 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 int super_block_update_transit(ino_t this_inode, char is_start_transit)
 {
 	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
-		sem_wait(&to_verified_data.record_inode_sem);
-		to_verified_data.record_handle_inode[to_verified_data.record_inode_counter] = 
+		sem_wait(&shm_verified_data->record_inode_sem);
+		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
 			this_inode;
-		to_verified_data.record_inode_counter++;
-		sem_post(&to_verified_data.record_inode_sem);
-		printf("Test: mock inode %d is deleted\n", this_inode);
+		shm_verified_data->record_inode_counter++;
+		sem_post(&shm_verified_data->record_inode_sem);
+		printf("Test: inode %d is deleted\n", this_inode);
 	}
 	return 0;
 }
@@ -56,7 +56,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
-
+	//usleep(1000000);
 	return 0;
 }
 
@@ -66,6 +66,7 @@ void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_han
 	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
+	usleep(500000);
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], deleteobjname);
 	objname_counter++;
@@ -86,12 +87,12 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
 	
-	if (test_data.tohandle_counter == test_data.num_inode) {
+	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
 		inode_ptr->util_ll_next = 0;
 		sys_super_block->head.first_dirty_inode = 0;
 	} else {
-		inode_ptr->util_ll_next = test_data.to_handle_inode[test_data.tohandle_counter];
-		test_data.tohandle_counter++;
+		inode_ptr->util_ll_next = shm_test_data->to_handle_inode[shm_test_data->tohandle_counter];
+		shm_test_data->tohandle_counter++;
 	}
 	return 0;
 }

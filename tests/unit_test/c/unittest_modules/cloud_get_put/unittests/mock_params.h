@@ -35,3 +35,5 @@ typedef struct{
 
 LoopTestData test_data;
 LoopToVerifiedData to_verified_data;
+LoopTestData *shm_test_data;
+LoopToVerifiedData *shm_verified_data;
