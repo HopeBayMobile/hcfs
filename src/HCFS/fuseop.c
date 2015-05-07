@@ -1090,6 +1090,9 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 /* Helper function for read operation. Will prefetch a block from backend for
 *  reading. */
+/* TODO: For prefetching, need to prevent opening multiple threads
+to prefetch the same block (waste of resource, but not critical though as
+only one thread will actually download the block) */
 int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		ino_t this_inode, long long block_index, off_t this_page_fpos)
 {
@@ -1098,8 +1101,6 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 
 	if ((eindex+1) >= MAX_BLOCK_ENTRIES_PER_PAGE)
 		return 0;
-	if (tpage->num_entries <= (eindex+1))
-		return 0;
 	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
 		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
 		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
@@ -1107,6 +1108,8 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		temp_prefetch->block_no = block_index + 1;
 		temp_prefetch->page_start_fpos = this_page_fpos;
 		temp_prefetch->entry_index = eindex + 1;
+		printf("Prefetching block %lld for inode %lld\n",
+			block_index + 1, this_inode);
 		pthread_create(&(prefetch_thread),
 			&prefetch_thread_attr, (void *)&prefetch_block,
 			((void *)temp_prefetch));
