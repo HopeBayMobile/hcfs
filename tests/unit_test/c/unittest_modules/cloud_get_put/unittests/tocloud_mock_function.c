@@ -66,7 +66,7 @@ void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_han
 	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
-	usleep(500000);
+	usleep(200000); // Let thread busy
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], deleteobjname);
 	objname_counter++;

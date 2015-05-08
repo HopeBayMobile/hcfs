@@ -611,7 +611,7 @@ void dispatch_upload_block(int which_curl)
 		if (!access(tempfilename, F_OK)) {
 			count++;
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_meta_%lld_%lld.%d",
+				"/dev/shm/hcfs_sync_block_%lld_%lld.%d",
 				upload_ptr->inode, upload_ptr->blockno, count);
 		} else {
 			break;

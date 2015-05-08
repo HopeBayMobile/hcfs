@@ -519,10 +519,9 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 
 	shm_key = shmget(1122, sizeof(LoopTestData), IPC_CREAT | 0666);
 	shm_test_data = (LoopTestData *)shmat(shm_key, NULL, 0);
-	shm_test_data->num_inode = 40;	
 	shm_key2 = shmget(1244, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
 	shm_test_data->to_handle_inode = (int *)shmat(shm_key2, NULL, 0);
-	//shm_test_data->to_handle_inode = (int *)malloc(sizeof(int) * shm_test_data->num_inode);
+	shm_test_data->num_inode = 40; // Test 40 nodes	
 	shm_test_data->tohandle_counter = 0;
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++)
 		shm_test_data->to_handle_inode[i] = (i + 1) * 5; // mock inode
@@ -531,7 +530,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	shm_verified_data = (LoopToVerifiedData *) shmat(shm_key, NULL, 0);
 	shm_key2 = shmget(1144, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
 	shm_verified_data->record_handle_inode = (int *)shmat(shm_key2, NULL, 0);
-	//shm_verified_data->record_handle_inode = (int *)malloc(sizeof(int) * shm_test_data->num_inode);
 	shm_verified_data->record_inode_counter = 0;
 	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 	
@@ -547,7 +545,7 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 		upload_loop();
 		exit(0);
 	}
-	sleep(5);
+	sleep(3);
 	kill(pid, SIGKILL);
 
 	/* Verify */
