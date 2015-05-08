@@ -376,8 +376,15 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfnam
 		ret_val = -ret_val;
 	fuse_reply_err(req, ret_val);
 }
-void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+
+void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent_inode,
+			const char *selfname)
 {
+/* TODO: Special lookup for the name ".", even when parent_inode is not
+a directory (for NFS) */
+/* TODO: error handling if parent_inode is not a directory and name is not "."
+*/
+
 	ino_t this_inode;
 	int ret_val, ret_code;
 	DIR_ENTRY temp_dentry;
