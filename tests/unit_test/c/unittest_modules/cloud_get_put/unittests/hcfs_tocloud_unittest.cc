@@ -61,7 +61,7 @@ public:
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
-		mock_file_meta = fopen("/tmp/mock_file_meta", "w+");
+		mock_file_meta = fopen(MOCK_META_PATH, "w+");
 		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 		fclose(mock_file_meta);
 
@@ -144,7 +144,7 @@ TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
 		ASSERT_EQ(FALSE, upload_ctl.threads_created[i])<< "thread " << i << " is in use";
 	}
-	mock_file_meta = fopen("/tmp/mock_file_meta", "r+");
+	mock_file_meta = fopen(MOCK_META_PATH, "r+");
 	fread(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);	
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char xattr_val[5] = "N";
@@ -161,7 +161,7 @@ TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	unlink("/tmp/mock_file_meta");
+	unlink(MOCK_META_PATH);
 }
 
 TEST(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
@@ -184,7 +184,7 @@ TEST(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 		ASSERT_EQ(FALSE, upload_ctl.threads_in_use[i]) << "thread " << i << " is in use";
 		ASSERT_EQ(FALSE, upload_ctl.threads_created[i])<< "thread " << i << " is in use";
 	}
-	mock_file_meta = fopen("/tmp/mock_file_meta", "r+");
+	mock_file_meta = fopen(MOCK_META_PATH, "r+");
 	fread(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);	
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char path[50];	
@@ -197,7 +197,7 @@ TEST(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 	EXPECT_EQ(0, pthread_cancel(upload_ctl.upload_handler_thread));
 	EXPECT_EQ(0, pthread_join(upload_ctl.upload_handler_thread, &res));
 	EXPECT_EQ(PTHREAD_CANCELED, res);
-	unlink("/tmp/mock_file_meta");
+	unlink(MOCK_META_PATH);
 }
 
 
@@ -420,7 +420,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 {
 	SYNC_THREAD_TYPE mock_thread_type;
-	char metapath[] = "/tmp/mock_file_meta";
+	char metapath[] = MOCK_META_PATH;
 	int total_page = 3;
 	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	BLOCK_ENTRY_PAGE block_page;
@@ -437,7 +437,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	/* Run tested function */
 	init_upload_control();
 	sync_single_inode(&mock_thread_type);
-	sleep(1);
+	sleep(2);
 	
 	/* Verify */
 	EXPECT_EQ(num_total_blocks, objname_counter);
@@ -467,7 +467,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 {
 	
 	SYNC_THREAD_TYPE mock_thread_type;
-	char metapath[] = "/tmp/mock_file_meta";
+	char metapath[] = MOCK_META_PATH;
 	int total_page = 3;
 	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	BLOCK_ENTRY_PAGE block_page;
@@ -560,3 +560,4 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 /*
 	End of unittest of upload_loop()
  */
+
