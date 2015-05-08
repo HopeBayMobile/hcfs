@@ -1,7 +1,6 @@
 #include <sys/types.h>
 #include <string.h>
 #include <curl/curl.h>
-#include <fuse.h>
 #include <errno.h>
 #include <fcntl.h>
 
@@ -66,6 +65,88 @@ ino_t lookup_pathname(const char *path, int *errcode)
 
 	*errcode = -EACCES;
 	return 0;
+}
+
+int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
+{
+	ino_t this_inode;
+	char this_type;
+
+	this_inode = 0;
+
+	if (parent == 1) {   /* If parent is root */
+		if (strcmp(childname, "does_not_exist") == 0)
+			return -ENOENT;
+
+		if (strcmp(childname, "testfile") == 0) {
+			this_inode = 2;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testsamefile") == 0) {
+			this_inode = 2;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testcreate") == 0) {
+			if (before_mknod_created == TRUE)
+				return -ENOENT;
+			this_inode = 4;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testmkdir") == 0) {
+			if (before_mkdir_created == TRUE)
+				return -ENOENT;
+			this_inode = 6;
+			this_type = D_ISDIR;
+		}
+
+		if (strcmp(childname, "testfile1") == 0) {
+			this_inode = 10;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testfile2") == 0) {
+			this_inode = 11;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testdir1") == 0) {
+			this_inode = 12;
+			this_type = D_ISDIR;
+		}
+
+		if (strcmp(childname, "testdir2") == 0) {
+			this_inode = 13;
+			this_type = D_ISDIR;
+		}
+
+		if (strcmp(childname, "testtruncate") == 0) {
+			this_inode = 14;
+			this_type = D_ISREG;
+		}
+
+		if (strcmp(childname, "testread") == 0) {
+			this_inode = 15;
+			this_type = D_ISREG;
+		}
+	}
+
+	if (parent == 6) {
+		if (strcmp(childname, "test") == 0) {
+			return -ENOENT;
+		}
+	}
+
+	if (this_inode > 0) {
+		dentry->d_ino = this_inode;
+		strcpy(dentry->d_name, childname);
+		dentry->d_type = this_type;
+		return 0;
+	}
+
+	return -ENOENT;
 }
 
 off_t check_file_size(const char *path)

@@ -96,13 +96,9 @@ in various functions such as mkdir and mknod. */
 
 /************************************************************************
 *
-* Function name: hfuse_getattr
-*        Inputs: char *pathname, struct stat *inode_stat
-*       Summary: Given the string "path", read the stat of this
-*                filesystem object into inode_stat, and return to the
-*                caller.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_getattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, struct fuse_file_ino *fi
+*       Summary: Read the stat of the inode "ino" and reply to FUSE
 *
 *************************************************************************/
 static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
@@ -136,13 +132,12 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 
 /************************************************************************
 *
-* Function name: hfuse_mknod
-*        Inputs: const char *path, mode_t mode, dev_t dev
-*       Summary: Given the string "path", create a regular file with the
-*                permission specified by mode. "dev" is ignored as only
-*                regular file will be created.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_mknod
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *selfname,
+*                mode_t mode, dev_t dev
+*       Summary: Under inode "parent", create a regular file "selfname"
+*                with the permission specified by mode. "dev" is ignored
+*                as only regular file will be created.
 *
 *************************************************************************/
 static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
@@ -156,11 +151,24 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
 
+	printf("DEBUG parent %lld, name %s mode %d\n", parent, selfname, mode);
 	gettimeofday(&tmp_time1, NULL);
 
 	parent_inode = (ino_t) parent;
 
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
 	memset(&this_stat, 0, sizeof(struct stat));
 	temp_context = fuse_req_ctx(req);
 
@@ -197,8 +205,11 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 			&this_stat);
 
 	/* TODO: May need to delete from super block and parent if failed. */
-	if (ret_code < 0)
+	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
 
 	gettimeofday(&tmp_time2, NULL);
 
@@ -232,10 +243,23 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent, const char *selfna
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
 
 	gettimeofday(&tmp_time1, NULL);
 
 	parent_inode = (ino_t) parent;
+
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
 
 	memset(&this_stat, 0, sizeof(struct stat));
 	temp_context = fuse_req_ctx(req);
@@ -265,8 +289,11 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent, const char *selfna
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat);
 
-	if (ret_code < 0)
+	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
 
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = 1; /* TODO: need to find generation */
@@ -2043,8 +2070,8 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 
 /************************************************************************
 *
-* Function name: hfuse_destroy
-*        Inputs: void *private_data
+* Function name: hfuse_ll_destroy
+*        Inputs: void *userdata
 *       Summary: Destroy a FUSE mount
 *  Return value: None
 *
@@ -2118,7 +2145,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_GID) {
-		newstat->st_gid = attr->st_uid;
+		newstat->st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
 
