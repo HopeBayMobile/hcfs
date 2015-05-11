@@ -116,7 +116,6 @@ static inline void _upload_terminate_thread(int index)
 
 	if (ret_val != 0)
 		return;
-
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -331,7 +330,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
-
+	
+	/* Upload block if mode == S_IFREG */
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
 		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);

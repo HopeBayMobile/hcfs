@@ -29,6 +29,8 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	// Record to-delete block number
 	upload_ctl_todelete_blockno[delete_thread_ptr->blockno] = TRUE;
+	delete_ctl.threads_in_use[delete_thread_ptr->which_curl] = FALSE;
+	sem_post(&delete_ctl.delete_queue_sem);
 	return;
 }
 
