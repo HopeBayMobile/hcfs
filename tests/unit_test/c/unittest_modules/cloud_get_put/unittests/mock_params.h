@@ -1,3 +1,6 @@
+#include "params.h"
+#include <semaphore.h>
+
 #define HTTP_OK 200
 #define HTTP_FAIL 500
 
@@ -5,7 +8,7 @@
 #define BLOCK_NUM__FETCH_SUCCESS 1
 #define BLOCK_NUM__FETCH_FAIL 2
 
-#define EXTEND_FILE_SIZE 1234
+#define EXTEND_FILE_SIZE 1234 // Used to truncate file size
 
 /* Define for hcfs_clouddelete */
 #define INODE__FETCH_TODELETE_PATH_SUCCESS 1
@@ -14,8 +17,6 @@
 #define TODELETE_PATH "/tmp/todelete_meta_path"
 #define MOCK_META_PATH "/tmp/mock_file_meta"
 
-#include "params.h"
-#include <semaphore.h>
 char **objname_list;
 int objname_counter;
 sem_t objname_counter_sem;
@@ -37,5 +38,5 @@ typedef struct{
 
 LoopTestData test_data;
 LoopToVerifiedData to_verified_data;
-LoopTestData *shm_test_data;
-LoopToVerifiedData *shm_verified_data;
+LoopTestData *shm_test_data;  // Used in upload_loop_unittest as expected value
+LoopToVerifiedData *shm_verified_data; // Used in upload_loop_unittest as actual value
