@@ -933,8 +933,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	FILE_META_TYPE tempfilemeta;
 	int ret_val;
 	long long last_block, last_page, old_last_block;
-	long long current_page;
-	off_t nextfilepos, prevfilepos, currentfilepos;
+	long long current_page, old_last_page;
+	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
 	long long temp_block_index;
@@ -971,70 +971,67 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		}
 
 		old_last_block = ((filestat->st_size - 1) / MAX_BLOCK_SIZE);
-		nextfilepos = tempfilemeta.next_block_page;
+		old_last_page = old_last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
-		current_page = 0;
-		prevfilepos = 0;
+		filepos = seek_page(*body_ptr, last_page, 0);
+
+		current_page = last_page;
 
 		temp_block_index = last_block+1;
 
 		/*TODO: put error handling for the read/write ops here*/
-		while (current_page <= last_page) {
-			/*Data after offset does not actually exists.
-				Just change file size later*/
-			if (nextfilepos == 0)
-				break;
+		if (filepos != 0) {
+			/* Do not need to truncate the block the offset byte is in*/
+			/* If filepos is zero*/
 
 			meta_cache_lookup_file_data(this_inode, NULL,
-				NULL, &temppage, nextfilepos,
+				NULL, &temppage, filepos,
 				*body_ptr);
-			prevfilepos = nextfilepos;
-			nextfilepos = temppage.next_page;
 
-			if (current_page == last_page) {
-				/* Do the actual handling here*/
-				currentfilepos = prevfilepos;
-				last_index = last_block %
-					MAX_BLOCK_ENTRIES_PER_PAGE;
-				if ((offset % MAX_BLOCK_SIZE) != 0)
-					/* Truncate the last block that remains
-					   after the truncate operation */
-					truncate_truncate(this_inode, filestat,
-						&tempfilemeta,
-						&temppage, currentfilepos,
-						body_ptr, last_index,
-						last_block, offset);
+			/* Do the actual handling here*/
+			last_index = last_block %
+				MAX_BLOCK_ENTRIES_PER_PAGE;
+			if ((offset % MAX_BLOCK_SIZE) != 0)
+				/* Truncate the last block that remains
+				   after the truncate operation */
+				truncate_truncate(this_inode, filestat,
+					&tempfilemeta,
+					&temppage, filepos,
+					body_ptr, last_index,
+					last_block, offset);
 
-				/*Delete the rest of blocks in this same page
-				as well*/
-				truncate_delete_block(&temppage, last_index+1,
-					&temp_block_index, old_last_block,
-					filestat->st_ino);
+			/*Delete the rest of blocks in this same page
+			as well*/
+			truncate_delete_block(&temppage, last_index+1,
+				&temp_block_index, old_last_block,
+				filestat->st_ino);
 
-				meta_cache_update_file_data(this_inode, NULL,
-					NULL, &temppage, currentfilepos,
-					*body_ptr);
-				break;
-			}
-
-			current_page++;
+			meta_cache_update_file_data(this_inode, NULL,
+				NULL, &temppage, filepos,
+				*body_ptr);
 		}
 
 		/*Delete the blocks in the rest of the block status pages*/
 
-		while (nextfilepos != 0) {
-			currentfilepos = nextfilepos;
-			meta_cache_lookup_file_data(this_inode, NULL, NULL,
-				&temppage, currentfilepos, *body_ptr);
+		/* Note: if filepos = 0, just means this block does not exist. */
+		/* TODO: Will need to check if the following blocks exist or not */
+		for (current_page = last_page + 1; current_page <= old_last_page;
+				current_page++) {
+			filepos = seek_page(*body_ptr, current_page, 0);
 
-			nextfilepos = temppage.next_page;
+			/* Skipping pages that do not exist */
+			if (filepos < 1)
+				continue;
+
+			meta_cache_lookup_file_data(this_inode, NULL, NULL,
+				&temppage, filepos, *body_ptr);
 
 			truncate_delete_block(&temppage, 0,
 				&temp_block_index, old_last_block,
 				filestat->st_ino);
 
 			meta_cache_update_file_data(this_inode, NULL, NULL,
-				&temppage, currentfilepos, *body_ptr);
+				&temppage, filepos, *body_ptr);
 		}
 	}
 
@@ -1236,8 +1233,14 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 	fh_ptr->meta_cache_locked = TRUE;
 
 	/* Find the offset of the page if it is not cached */
-	if (fh_ptr->cached_page_index != current_page)
-		seek_page(fh_ptr, current_page);
+	if (fh_ptr->cached_page_index != current_page) {
+		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
+				current_page, 0);
+		if (fh_ptr->cached_filepos == 0)
+			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+				current_page);
+		fh_ptr->cached_page_index = current_page;
+	}
 
 	this_page_fpos = fh_ptr->cached_filepos;
 
@@ -1561,8 +1564,14 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	current_page = bindex / MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	/* Find the offset of the page if it is not cached */
-	if (fh_ptr->cached_page_index != current_page)
-		seek_page(fh_ptr, current_page);
+	if (fh_ptr->cached_page_index != current_page) {
+		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
+				current_page, 0);
+		if (fh_ptr->cached_filepos == 0)
+			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+				current_page);
+		fh_ptr->cached_page_index = current_page;
+	}
 
 	this_page_fpos = fh_ptr->cached_filepos;
 

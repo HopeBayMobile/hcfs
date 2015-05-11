@@ -337,6 +337,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		fread(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 		page_pos = tempfilemeta.next_block_page;
+
+/* TODO: fix from here */
 		e_index = 0;
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
