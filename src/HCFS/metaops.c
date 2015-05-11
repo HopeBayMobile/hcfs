@@ -376,6 +376,90 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 
 /************************************************************************
 *
+* Function name: change_parent_inode
+*        Inputs: ino_t self_inode, char *targetname,
+*                ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr
+*       Summary: For a directory "self_inode", change the inode of entry
+*                "targetname" to "new_inode.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int change_dir_entry_inode(ino_t self_inode, char *targetname,
+		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	DIR_META_TYPE self_meta_head;
+	DIR_ENTRY_PAGE tpage;
+	int ret_items;
+	int count;
+	int ret_val;
+
+	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
+						targetname, body_ptr);
+
+	if ((ret_val == 0) && (count >= 0)) {
+		/*Found the entry. Change parent inode*/
+		tpage.dir_entries[count].d_ino = new_inode;
+		ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
+							&tpage, body_ptr);
+		return 0;
+	}
+
+	return -1;
+}
+
+/************************************************************************
+*
+* Function name: delete_inode_meta
+*        Inputs: ino_t this_inode
+*       Summary: For inode "this_inode", delete the entry from super block
+*                and move the meta file to "todelete" folder.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int delete_inode_meta(ino_t this_inode)
+{
+	char todelete_metapath[METAPATHLEN];
+	char thismetapath[METAPATHLEN];
+	FILE *todeletefptr, *metafptr;
+	char filebuf[5000];
+	size_t read_size;
+	int ret_val;
+
+	super_block_to_delete(this_inode);
+	fetch_todelete_path(todelete_metapath, this_inode);
+	fetch_meta_path(thismetapath, this_inode);
+	/*Try a rename first*/
+	ret_val = rename(thismetapath, todelete_metapath);
+	if (ret_val < 0) {
+		/*If not successful, copy the meta*/
+		unlink(todelete_metapath);
+		todeletefptr = fopen(todelete_metapath, "w");
+		metafptr = fopen(thismetapath, "r");
+		setbuf(metafptr, NULL);
+		flock(fileno(metafptr), LOCK_EX);
+		setbuf(todeletefptr, NULL);
+		fseek(metafptr, 0, SEEK_SET);
+		while (!feof(metafptr)) {
+			read_size = fread(filebuf, 1, 4096, metafptr);
+			if (read_size > 0)
+				fwrite(filebuf, 1, read_size, todeletefptr);
+			else
+				break;
+		}
+		fclose(todeletefptr);
+
+		unlink(thismetapath);
+		flock(fileno(metafptr), LOCK_UN);
+		fclose(metafptr);
+		ret_val = meta_cache_remove(this_inode);
+	}
+	return 0;
+}
+
+/************************************************************************
+*
 * Function name: decrease_nlink_inode_file
 *        Inputs: ino_t this_inode
 *       Summary: For a regular file pointed by "this_inode", decrease its
@@ -387,17 +471,12 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *************************************************************************/
 int decrease_nlink_inode_file(ino_t this_inode)
 {
-	char todelete_metapath[METAPATHLEN];
-	char thismetapath[METAPATHLEN];
 	char thisblockpath[400];
-	char filebuf[5000];
 	struct stat this_inode_stat;
-	FILE *todeletefptr, *metafptr;
 	int ret_val;
 	long long count;
 	long long total_blocks;
 	off_t cache_block_size;
-	size_t read_size;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
@@ -409,34 +488,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 		ret_val = meta_cache_unlock_entry(body_ptr);
 
 		/*Need to delete the meta. Move the meta file to "todelete"*/
-		super_block_to_delete(this_inode);
-		fetch_todelete_path(todelete_metapath, this_inode);
-		fetch_meta_path(thismetapath, this_inode);
-		/*Try a rename first*/
-		ret_val = rename(thismetapath, todelete_metapath);
-		if (ret_val < 0) {
-			/*If not successful, copy the meta*/
-			unlink(todelete_metapath);
-			todeletefptr = fopen(todelete_metapath, "w");
-			metafptr = fopen(thismetapath, "r");
-			setbuf(metafptr, NULL);
-			flock(fileno(metafptr), LOCK_EX);
-			setbuf(todeletefptr, NULL);
-			fseek(metafptr, 0, SEEK_SET);
-			while (!feof(metafptr)) {
-				read_size = fread(filebuf, 1, 4096, metafptr);
-				if (read_size > 0)
-					fwrite(filebuf, 1, read_size,
-								todeletefptr);
-				else
-					break;
-			}
-			fclose(todeletefptr);
-
-			unlink(thismetapath);
-			flock(fileno(metafptr), LOCK_UN);
-			fclose(metafptr);
-		}
+		delete_inode_meta(this_inode);
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the

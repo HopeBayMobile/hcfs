@@ -12,10 +12,13 @@
 *              functions
 * 2015/2/11 Jiahong added inclusion of hcfs_cacheops.h
 * 2015/2/12 Jiahong added inclusion of hcfs_fromcloud.h
+* 2015/3/2~3 Jiahong revised rename function to allow existing file as target.
+* 2015/3/12 Jiahong restructure hfuse_read
+* 2015/4/30 ~  Jiahong changing to FUSE low-level interface
 *
 **************************************************************************/
 
-#define FUSE_USE_VERSION 26
+#define FUSE_USE_VERSION 29
 
 #include "fuseop.h"
 
@@ -39,7 +42,9 @@
 #include <sys/mman.h>
 
 /* Headers from the other libraries */
-#include <fuse.h>
+#include <fuse/fuse_lowlevel.h>
+#include <fuse/fuse_common.h>
+#include <fuse/fuse_opt.h>
 #include <curl/curl.h>
 
 #include "global.h"
@@ -57,9 +62,17 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
+/* TODO: Add forget function and maintain lookup counts for files and dirs */
+/* TODO: Consider how to handle files and dirs that should not be deleted
+	right away */
+/* TODO: Maintain inode generations in file and dir creation. This is needed
+in various functions such as mkdir and mknod. */
+
 /* TODO: Need to go over the access rights problem for the ops */
 /* TODO: Need to revisit the following problem for all ops: access rights,
 /*   timestamp change (a_time, m_time, c_time), and error handling */
+/* TODO: For timestamp changes, write routine for making changes to also
+	timestamps with nanosecond precision */
 /* TODO: For access rights, need to check file permission and/or system acl.
 /*   System acl is set in extended attributes. */
 /* TODO: The FUSE option "default_permission" should be turned on if there
@@ -83,98 +96,81 @@ extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
 *
-* Function name: hfuse_getattr
-*        Inputs: char *pathname, struct stat *inode_stat
-*       Summary: Given the string "path", read the stat of this
-*                filesystem object into inode_stat, and return to the
-*                caller.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_getattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, struct fuse_file_ino *fi
+*       Summary: Read the stat of the inode "ino" and reply to FUSE
 *
 *************************************************************************/
-static int hfuse_getattr(const char *path, struct stat *inode_stat)
+static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
+					struct fuse_file_ino *fi)
 {
 	ino_t hit_inode;
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
-	struct fuse_context *temp_context;
+	struct stat tmp_stat;
 
-	temp_context = fuse_get_context();
-
-	printf("Data passed in is %s\n", (char *) temp_context->private_data);
-
-	gettimeofday(&tmp_time1, NULL);
-	hit_inode = lookup_pathname(path, &ret_code);
-
-	gettimeofday(&tmp_time2, NULL);
-
-	printf("getattr lookup_pathname elapse %f\n",
-		(tmp_time2.tv_sec - tmp_time1.tv_sec)
-		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
-
+	hit_inode = (ino_t) ino;
 
 	if (hit_inode > 0) {
-		ret_code = fetch_inode_stat(hit_inode, inode_stat);
-
-		#if DEBUG >= 5
-		printf("getattr %lld, returns %d\n", inode_stat->st_ino,
-			ret_code);
-		#endif  /* DEBUG */
+		ret_code = fetch_inode_stat(hit_inode, &tmp_stat);
 
 		gettimeofday(&tmp_time2, NULL);
 
 		printf("getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
-
-		return ret_code;
+		fuse_reply_attr(req, &tmp_stat, 0);
 	 } else {
 		gettimeofday(&tmp_time2, NULL);
 
 		printf("getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+		fuse_reply_err(req, ENOENT);
 	 }
-	return ret_code;
 }
 
 /************************************************************************
 *
-* Function name: hfuse_mknod
-*        Inputs: const char *path, mode_t mode, dev_t dev
-*       Summary: Given the string "path", create a regular file with the
-*                permission specified by mode. "dev" is ignored as only
-*                regular file will be created.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_mknod
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *selfname,
+*                mode_t mode, dev_t dev
+*       Summary: Under inode "parent", create a regular file "selfname"
+*                with the permission specified by mode. "dev" is ignored
+*                as only regular file will be created.
 *
 *************************************************************************/
-static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
+static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
+		const char *selfname, mode_t mode, dev_t dev)
 {
-	char *parentname;
-	char selfname[MAX_FILE_NAME_LEN];
 	ino_t self_inode, parent_inode;
 	struct stat this_stat;
 	mode_t self_mode;
 	int ret_val;
-	struct fuse_context *temp_context;
+	struct fuse_ctx *temp_context;
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
+	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
 
+	printf("DEBUG parent %lld, name %s mode %d\n", parent, selfname, mode);
 	gettimeofday(&tmp_time1, NULL);
 
+	parent_inode = (ino_t) parent;
 
-	parentname = malloc(strlen(path)*sizeof(char));
-	parse_parent_self(path, parentname, selfname);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
 
-	parent_inode = lookup_pathname(parentname, &ret_code);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
 
-	free(parentname);
-	if (parent_inode < 1)
-		return ret_code;
-
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
 	memset(&this_stat, 0, sizeof(struct stat));
-	temp_context = fuse_get_context();
+	temp_context = fuse_req_ctx(req);
 
 /* TODO: May need to reject special file creation here */
 
@@ -196,22 +192,35 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 	this_stat.st_ctime = this_stat.st_atime;
 
 	self_inode = super_block_new_inode(&this_stat);
-	if (self_inode < 1)
-		return -EACCES;
+
+	/* If cannot get new inode number, error is ENOSPC */
+	if (self_inode < 1) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
 			&this_stat);
 
-	if (ret_code < 0)
+	/* TODO: May need to delete from super block and parent if failed. */
+	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
 
 	gettimeofday(&tmp_time2, NULL);
 
 	printf("mknod elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
-	return ret_code;
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = 1; /* TODO: need to find generation */
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	fuse_reply_entry(req, &(tmp_param));
 }
 
 /************************************************************************
@@ -224,31 +233,36 @@ static int hfuse_mknod(const char *path, mode_t mode, dev_t dev)
 *                appropriate error code.
 *
 *************************************************************************/
-static int hfuse_mkdir(const char *path, mode_t mode)
+static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent, const char *selfname, mode_t mode)
 {
-	char *parentname;
-	char selfname[400];
 	ino_t self_inode, parent_inode;
 	struct stat this_stat;
 	mode_t self_mode;
 	int ret_val;
-	struct fuse_context *temp_context;
+	struct fuse_ctx *temp_context;
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
+	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
 
 	gettimeofday(&tmp_time1, NULL);
 
-	parentname = malloc(strlen(path)*sizeof(char));
-	parse_parent_self(path, parentname, selfname);
+	parent_inode = (ino_t) parent;
 
-	parent_inode = lookup_pathname(parentname, &ret_code);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
 
-	free(parentname);
-	if (parent_inode < 1)
-		return ret_code;
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
 
 	memset(&this_stat, 0, sizeof(struct stat));
-	temp_context = fuse_get_context();
+	temp_context = fuse_req_ctx(req);
 
 	self_mode = mode | S_IFDIR;
 	this_stat.st_mode = self_mode;
@@ -266,22 +280,32 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 	this_stat.st_blocks = 0;
 
 	self_inode = super_block_new_inode(&this_stat);
-	if (self_inode < 1)
-		return -EACCES;
+	if (self_inode < 1) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
 	this_stat.st_ino = self_inode;
 
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
 			selfname, &this_stat);
 
-	if (ret_code < 0)
+	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = 1; /* TODO: need to find generation */
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	fuse_reply_entry(req, &(tmp_param));
 
 	gettimeofday(&tmp_time2, NULL);
 
 	printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
-	return ret_code;
 }
 
 /************************************************************************
@@ -293,31 +317,27 @@ static int hfuse_mkdir(const char *path, mode_t mode)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_unlink(const char *path)
+void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
 {
-	char *parentname;
-	char selfname[400];
-	ino_t this_inode, parent_inode;
+/* TODO: delay actual unlink for opened dirs (this is lowlevel op) */
+
+	ino_t this_inode;
 	int ret_val;
 	int ret_code;
+	DIR_ENTRY temp_dentry;
 
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
+	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
+	if (ret_val < 0) {
+		ret_val = -ret_val;
+		fuse_reply_err(req, ret_val);
+	}
 
-	parentname = malloc(strlen(path)*sizeof(char));
-	parse_parent_self(path, parentname, selfname);
-	parent_inode = lookup_pathname(parentname, &ret_code);
-
-	free(parentname);
-	if (parent_inode < 1)
-		return ret_code;
-
-	invalidate_pathname_cache_entry(path);
-
+	this_inode = temp_dentry.d_ino;
 	ret_val = unlink_update_meta(parent_inode, this_inode, selfname);
 
-	return ret_val;
+	if (ret_val < 0)
+		ret_val = -ret_val;
+	fuse_reply_err(req, ret_val);
 }
 
 /************************************************************************
@@ -329,40 +349,103 @@ int hfuse_unlink(const char *path)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_rmdir(const char *path)
+void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
 {
-	char *parentname;
-	char selfname[400];
-	ino_t this_inode, parent_inode;
+/* TODO: delay actual rmdir for opened dirs (this is lowlevel op) */
+	ino_t this_inode;
 	int ret_val, ret_code;
-
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	parentname = malloc(strlen(path)*sizeof(char));
-	parse_parent_self(path, parentname, selfname);
+	DIR_ENTRY temp_dentry;
 
 	if (!strcmp(selfname, ".")) {
-		free(parentname);
-		return -EINVAL;
+		fuse_reply_err(req, EINVAL);
 	}
 	if (!strcmp(selfname, "..")) {
-		free(parentname);
-		return -ENOTEMPTY;
+		fuse_reply_err(req, ENOTEMPTY);
 	}
 
-	parent_inode = lookup_pathname(parentname, &ret_code);
-	free(parentname);
+	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
+	if (ret_val < 0) {
+		ret_val = -ret_val;
+		fuse_reply_err(req, ret_val);
+	}
 
-	if (parent_inode < 1)
-		return ret_code;
-
-	invalidate_pathname_cache_entry(path);
-
+	this_inode = temp_dentry.d_ino;
 	ret_val = rmdir_update_meta(parent_inode, this_inode, selfname);
 
-	return ret_val;
+	if (ret_val < 0)
+		ret_val = -ret_val;
+	fuse_reply_err(req, ret_val);
+}
+void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+{
+	ino_t this_inode;
+	int ret_val, ret_code;
+	DIR_ENTRY temp_dentry;
+	struct fuse_entry_param *output_param;
+
+	output_param = malloc(sizeof(struct fuse_entry_param));
+	memset(output_param, 0, sizeof(struct fuse_entry_param));
+
+	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
+	if (ret_val < 0) {
+		ret_val = -ret_val;
+		fuse_reply_err(req, ret_val);
+		return;
+	}
+
+	this_inode = temp_dentry.d_ino;
+	output_param->ino = (fuse_ino_t) this_inode;
+/* TODO: how to deal with generations? */
+	output_param->generation = 1;
+	ret_code = fetch_inode_stat(this_inode, &(output_param->attr));
+
+	fuse_reply_entry(req, output_param);
+	free(output_param);
+}
+
+/* Helper function to compare if oldpath is the prefix path of newpath */
+int _check_path_prefix(const char *oldpath, const char *newpath)
+{
+	char *temppath;
+
+	if (strlen(oldpath) < strlen(newpath)) {
+		temppath = malloc(strlen(oldpath)+10);
+		if (temppath == NULL)
+			return -ENOMEM;
+		snprintf(temppath, strlen(oldpath)+5, "%s/", oldpath);
+		if (strncmp(newpath, oldpath, strlen(temppath)) == 0) {
+			free(temppath);
+			return -EINVAL;
+		}
+		free(temppath);
+	}
+	return 0;
+}
+
+/* Helper function for cleaning up after rename operation */
+static inline int _cleanup_rename(META_CACHE_ENTRY_STRUCT *body_ptr,
+				META_CACHE_ENTRY_STRUCT *old_target_ptr,
+				META_CACHE_ENTRY_STRUCT *parent1_ptr,
+				META_CACHE_ENTRY_STRUCT *parent2_ptr)
+{
+	if (parent1_ptr != NULL) {
+		meta_cache_close_file(parent1_ptr);
+		meta_cache_unlock_entry(parent1_ptr);
+	}
+	if ((parent2_ptr != NULL) && (parent2_ptr != parent1_ptr)) {
+		meta_cache_close_file(parent2_ptr);
+		meta_cache_unlock_entry(parent2_ptr);
+	}
+
+	if (body_ptr != NULL) {
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+	}
+	if (old_target_ptr != NULL) {
+		meta_cache_close_file(old_target_ptr);
+		meta_cache_unlock_entry(old_target_ptr);
+	}
+	return 0;
 }
 
 /************************************************************************
@@ -375,214 +458,207 @@ int hfuse_rmdir(const char *path)
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
-*    Limitation: Current implementation only supports the case when the
-*                target does not exist before the operation, and no symlink
+*    Limitation: Do no process symlink
 *
 *************************************************************************/
-static int hfuse_rename(const char *oldpath, const char *newpath)
+void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
+		const char *selfname1, fuse_ino_t newparent,
+		const char *selfname2)
 {
-	/* TODO: Check how to make this operation atomic */
-	char *parentname1;
-	char selfname1[400];
-	char *parentname2;
-	char selfname2[400];
-	ino_t parent_inode1, parent_inode2, self_inode;
+	/* How to make rename atomic:
+		1. Lookup the parents of oldpath and newpath.
+		2. Lock both parents of oldpath and newpath.
+		3. Lookup inode for oldpath and newpath.
+		4. Invalidate pathname cache for oldpath and newpath
+			(if needed).
+		5. Lock oldpath and newpath (if needed).
+		6. Process rename.
+	*/
+	ino_t parent_inode1, parent_inode2, self_inode, old_target_inode;
 	int ret_val;
-	struct stat tempstat;
-	mode_t self_mode;
+	struct stat tempstat, old_target_stat;
+	mode_t self_mode, old_target_mode;
 	int ret_code, ret_code2;
-	META_CACHE_ENTRY_STRUCT *body_ptr, *parent_ptr;
+	DIR_META_TYPE tempmeta;
+	META_CACHE_ENTRY_STRUCT *body_ptr = NULL, *old_target_ptr = NULL;
+	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
+	DIR_ENTRY_PAGE temp_page;
+	int temp_index;
 
-	self_inode = lookup_pathname(oldpath, &ret_code);
-	if (self_inode < 1)
-		return ret_code;
+	/*TODO: To add symlink handling for rename*/
 
-	invalidate_pathname_cache_entry(oldpath);
+	parent_inode1 = (ino_t) parent;
+	parent_inode2 = (ino_t) newparent;
 
-	if (lookup_pathname(newpath, &ret_code) > 0)
-		return -EACCES;
+	/* Lock parents */
+	parent1_ptr = meta_cache_lock_entry(parent_inode1);
+
+	if (parent_inode1 != parent_inode2)
+		parent2_ptr = meta_cache_lock_entry(parent_inode2);
+	else
+		parent2_ptr = parent1_ptr;
+
+	/* Check if oldpath and newpath exists already */
+	ret_val = meta_cache_seek_dir_entry(parent_inode1, &temp_page,
+			&temp_index, selfname1, parent1_ptr);
+
+	if ((ret_val != 0) || (temp_index < 0)) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	self_inode = temp_page.dir_entries[temp_index].d_ino;
+
+	if (self_inode < 1) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, ENOENT);
+		return;
+	}
+
+	ret_val = meta_cache_seek_dir_entry(parent_inode2, &temp_page,
+			&temp_index, selfname2, parent2_ptr);
+
+	if ((ret_val != 0) || (temp_index < 0))
+		old_target_inode = 0;
+	else
+		old_target_inode = temp_page.dir_entries[temp_index].d_ino;
+
+	/* If both newpath and oldpath refer to the same file, do nothing */
+	if (self_inode == old_target_inode) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, 0);
+		return;
+	}
+
+	/* Invalidate pathname cache for oldpath and newpath */
 
 	body_ptr = meta_cache_lock_entry(self_inode);
 	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
 			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
 		meta_cache_remove(self_inode);
-		return -ENOENT;
+		fuse_reply_err(req, EACCES);
+		return;
+	}
+
+	if (old_target_inode > 0) {
+		old_target_ptr = meta_cache_lock_entry(old_target_inode);
+		ret_val = meta_cache_lookup_file_data(old_target_inode,
+					&old_target_stat, NULL, NULL,
+						0, old_target_ptr);
+
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			meta_cache_remove(old_target_inode);
+
+			fuse_reply_err(req, EACCES);
+			return;
+		}
 	}
 
 	self_mode = tempstat.st_mode;
 
-	/*TODO: Will now only handle simple types (that the target is
-		empty and no symlinks)*/
-	parentname1 = malloc(strlen(oldpath)*sizeof(char));
-	parentname2 = malloc(strlen(newpath)*sizeof(char));
-	parse_parent_self(oldpath, parentname1, selfname1);
-	parse_parent_self(newpath, parentname2, selfname2);
-
-	parent_inode1 = lookup_pathname(parentname1, &ret_code);
-
-	parent_inode2 = lookup_pathname(parentname2, &ret_code2);
-
-	free(parentname1);
-	free(parentname2);
-
-	if (parent_inode1 < 1) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return ret_code;
+	/* Start checking if the operation leads to an error */
+	if (old_target_inode > 0) {
+		old_target_mode = old_target_stat.st_mode;
+		if (S_ISDIR(self_mode) && (!S_ISDIR(old_target_mode))) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, ENOTDIR);
+			return;
+		}
+		if ((!S_ISDIR(self_mode)) && (S_ISDIR(old_target_mode))) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, EISDIR);
+			return;
+		}
+		if (S_ISDIR(old_target_mode)) {
+			ret_val = meta_cache_lookup_dir_data(old_target_inode,
+				NULL, &tempmeta, NULL, old_target_ptr);
+			if (tempmeta.total_children > 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				fuse_reply_err(req, ENOTEMPTY);
+				return;
+			}
+		}
 	}
 
-	if (parent_inode2 < 1) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return ret_code2;
-	}
+	/* If newpath exists, replace the entry and rmdir/unlink
+		the old target */
+	if (old_target_inode > 0) {
+		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
+					self_inode, parent2_ptr);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, EACCES);
+			return;
+		}
+		meta_cache_close_file(old_target_ptr);
+		meta_cache_unlock_entry(old_target_ptr);
 
-	parent_ptr = meta_cache_lock_entry(parent_inode1);
+		if (S_ISDIR(old_target_mode))
+			ret_val = delete_inode_meta(old_target_inode);
+		else
+			ret_val = decrease_nlink_inode_file(old_target_inode);
+		old_target_ptr = NULL;
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, EACCES);
+			return;
+		}
+	} else {
+		/* If newpath does not exist, add the new entry */
+		ret_val = dir_add_entry(parent_inode2, self_inode,
+				selfname2, self_mode, parent2_ptr);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, EACCES);
+			return;
+		}
+	}
 
 	ret_val = dir_remove_entry(parent_inode1, self_inode,
-			selfname1, self_mode, parent_ptr);
+			selfname1, self_mode, parent1_ptr);
 	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		meta_cache_unlock_entry(body_ptr);
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
 		meta_cache_remove(self_inode);
-		return -EACCES;
+		fuse_reply_err(req, EACCES);
+		return;
 	}
-
-	if (parent_inode1 != parent_inode2) {
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		parent_ptr = meta_cache_lock_entry(parent_inode2);
-	}
-
-	ret_val = dir_add_entry(parent_inode2, self_inode,
-			selfname2, self_mode, parent_ptr);
-
-	if (ret_val < 0) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_close_file(parent_ptr);
-		meta_cache_unlock_entry(parent_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(self_inode);
-		return -EACCES;
-	}
-
-	meta_cache_close_file(parent_ptr);
-	meta_cache_unlock_entry(parent_ptr);
 
 	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
 				parent_inode2, body_ptr);
 		if (ret_val < 0) {
-			meta_cache_close_file(body_ptr);
-			meta_cache_unlock_entry(body_ptr);
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
 			meta_cache_remove(self_inode);
-			return -EACCES;
+			fuse_reply_err(req, EACCES);
+			return;
 		}
 	}
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
-	return 0;
+	_cleanup_rename(body_ptr, old_target_ptr,
+			parent1_ptr, parent2_ptr);
+
+	fuse_reply_err(req, 0);
 }
 
-/************************************************************************
-*
-* Function name: hfuse_chmod
-*        Inputs: const char *path, mode_t mode
-*       Summary: Change the permission of the filesystem object pointed
-*                by "path" to "mode".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*************************************************************************/
-int hfuse_chmod(const char *path, mode_t mode)
-{
-	struct stat temp_inode_stat;
-	int ret_val;
-	ino_t this_inode;
-	int ret_code;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	printf("Debug chmod\n");
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-
-	if (ret_val < 0) {  /* Cannot fetch any meta*/
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(this_inode);
-		return -EACCES;
-	}
-
-	temp_inode_stat.st_mode = mode;
-	temp_inode_stat.st_ctime = time(NULL);
-
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
-
-	return ret_val;
-}
-
-/************************************************************************
-*
-* Function name: hfuse_chown
-*        Inputs: const char *path, uid_t owner, gid_t group
-*       Summary: Change the owner/group of the filesystem object pointed
-*                by "path" to "owner" and "group".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*************************************************************************/
-int hfuse_chown(const char *path, uid_t owner, gid_t group)
-{
-	struct stat temp_inode_stat;
-	int ret_val;
-	ino_t this_inode;
-	int ret_code;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	printf("Debug chown\n");
-
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-
-	if (ret_val < 0) {  /* Cannot fetch any meta*/
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(this_inode);
-		return -EACCES;
-	}
-
-	temp_inode_stat.st_uid = owner;
-	temp_inode_stat.st_gid = group;
-	temp_inode_stat.st_ctime = time(NULL);
-
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
-
-	return ret_val;
-}
 
 /************************************************************************
 *
@@ -620,6 +696,10 @@ static int hfuse_utimens(const char *path, const struct timespec tv[2])
 
 	temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
 	temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
+
+	/* Fill in timestamps with nanosecond precision */
+	memcpy(&(temp_inode_stat.st_atim), &(tv[0]), sizeof(struct timespec));
+	memcpy(&(temp_inode_stat.st_mtim), &(tv[1]), sizeof(struct timespec));
 
 	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
 			NULL, NULL, 0, body_ptr);
@@ -787,15 +867,22 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 1);
+		change_system_meta(0, new_block_size - old_block_size, 0);
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
 	} else {
+		if ((temppage->block_entries[last_index]).status == ST_NONE)
+			return 0;
+
+		/* TODO: Error handling here if block status is not ST_NONE
+			but cannot find block on local disk */
 		blockfptr = fopen(thisblockpath, "r+");
 		setbuf(blockfptr, NULL);
 		flock(fileno(blockfptr), LOCK_EX);
 
+		/* TODO: check if it is possible for a block to be deleted
+			when truncate is conducted (meta is locked) */
 		if (stat(thisblockpath, &tempstat) == 0) {
 			(temppage->block_entries[last_index]).status = ST_LDISK;
 			setxattr(thisblockpath, "user.dirty", "T", 1, 0);
@@ -807,7 +894,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 1);
+		change_system_meta(0, new_block_size - old_block_size, 0);
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
@@ -824,7 +911,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_truncate(const char *path, off_t offset)
+int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
+	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr)
 {
 /* If truncate file smaller, do not truncate metafile, but instead set the
 *  affected entries to ST_TODELETE (which will be changed to ST_NONE once
@@ -835,10 +923,8 @@ int hfuse_truncate(const char *path, off_t offset)
 /* If need to truncate some block that's ST_CtoL or ST_CLOUD, download it
 *  first, mod it, then set to ST_LDISK*/
 
-	struct stat filestat;
 	FILE_META_TYPE tempfilemeta;
 	int ret_val;
-	ino_t this_inode;
 	long long last_block, last_page, old_last_block;
 	long long current_page;
 	off_t nextfilepos, prevfilepos, currentfilepos;
@@ -846,46 +932,26 @@ int hfuse_truncate(const char *path, off_t offset)
 	int last_index;
 	long long temp_block_index;
 	int ret_code;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	body_ptr = meta_cache_lock_entry(this_inode);
-
-	ret_val = meta_cache_lookup_file_data(this_inode, &filestat,
-			NULL, NULL, 0, body_ptr);
 
 	/* If the filesystem object is not a regular file, return error */
-	if (filestat.st_mode & S_IFREG == FALSE) {
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-
-		if (filestat.st_mode & S_IFDIR)
+	if (filestat->st_mode & S_IFREG == FALSE) {
+		if (filestat->st_mode & S_IFDIR)
 			return -EISDIR;
 		else
 			return -EACCES;
 	}
 
 	ret_val = meta_cache_lookup_file_data(this_inode, NULL, &tempfilemeta,
-			NULL, 0, body_ptr);
+			NULL, 0, *body_ptr);
 
-	if (filestat.st_size == offset) {
+	if (filestat->st_size == offset) {
 		/*Do nothing if no change needed */
 		printf("Debug truncate: no size change. Nothing changed.\n");
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
 		return 0;
 	}
 
-	if (filestat.st_size < offset) {
-		/*If need to extend, only need to change st_size*/
-		change_system_meta((long long)(offset - filestat.st_size),
-			0, 0);
-
-		filestat.st_size = offset;
-	} else {
+	/*If need to extend, only need to change st_size. Do that later.*/
+	if (filestat->st_size > offset) {
 		if (offset == 0) {
 			last_block = -1;
 			last_page = -1;
@@ -897,7 +963,7 @@ int hfuse_truncate(const char *path, off_t offset)
 			last_page = last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 		}
 
-		old_last_block = ((filestat.st_size - 1) / MAX_BLOCK_SIZE);
+		old_last_block = ((filestat->st_size - 1) / MAX_BLOCK_SIZE);
 		nextfilepos = tempfilemeta.next_block_page;
 
 		current_page = 0;
@@ -907,18 +973,14 @@ int hfuse_truncate(const char *path, off_t offset)
 
 		/*TODO: put error handling for the read/write ops here*/
 		while (current_page <= last_page) {
-			if (nextfilepos == 0) {
-				/*Data after offset does not actually exists.
-				Just change file size */
-				change_system_meta((long long)(offset -
-					filestat.st_size), 0, 0);
-				filestat.st_size = offset;
+			/*Data after offset does not actually exists.
+				Just change file size later*/
+			if (nextfilepos == 0)
 				break;
-			}
 
 			meta_cache_lookup_file_data(this_inode, NULL,
 				NULL, &temppage, nextfilepos,
-				body_ptr);
+				*body_ptr);
 			prevfilepos = nextfilepos;
 			nextfilepos = temppage.next_page;
 
@@ -930,25 +992,21 @@ int hfuse_truncate(const char *path, off_t offset)
 				if ((offset % MAX_BLOCK_SIZE) != 0)
 					/* Truncate the last block that remains
 					   after the truncate operation */
-					truncate_truncate(this_inode, &filestat,
+					truncate_truncate(this_inode, filestat,
 						&tempfilemeta,
 						&temppage, currentfilepos,
-						&body_ptr, last_index,
+						body_ptr, last_index,
 						last_block, offset);
 
 				/*Delete the rest of blocks in this same page
 				as well*/
 				truncate_delete_block(&temppage, last_index+1,
 					&temp_block_index, old_last_block,
-					filestat.st_ino);
+					filestat->st_ino);
 
 				meta_cache_update_file_data(this_inode, NULL,
 					NULL, &temppage, currentfilepos,
-					body_ptr);
-
-				change_system_meta((long long)(offset -
-						filestat.st_size), 0, 0);
-				filestat.st_size = offset;
+					*body_ptr);
 				break;
 			}
 
@@ -960,24 +1018,26 @@ int hfuse_truncate(const char *path, off_t offset)
 		while (nextfilepos != 0) {
 			currentfilepos = nextfilepos;
 			meta_cache_lookup_file_data(this_inode, NULL, NULL,
-				&temppage, currentfilepos, body_ptr);
+				&temppage, currentfilepos, *body_ptr);
 
 			nextfilepos = temppage.next_page;
 
 			truncate_delete_block(&temppage, 0,
 				&temp_block_index, old_last_block,
-				filestat.st_ino);
+				filestat->st_ino);
 
 			meta_cache_update_file_data(this_inode, NULL, NULL,
-				&temppage, currentfilepos, body_ptr);
+				&temppage, currentfilepos, *body_ptr);
 		}
 	}
 
-	filestat.st_mtime = time(NULL);
-	ret_val = meta_cache_update_file_data(this_inode, &filestat,
-			&tempfilemeta, NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	/* Update file and system meta here */
+	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
+	filestat->st_size = offset;
+	filestat->st_mtime = time(NULL);
+
+	ret_val = meta_cache_update_file_data(this_inode, filestat,
+			&tempfilemeta, NULL, 0, *body_ptr);
 
 	return 0;
 }
@@ -992,24 +1052,30 @@ int hfuse_truncate(const char *path, off_t offset)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_open(const char *path, struct fuse_file_info *file_info)
+void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
+			struct fuse_file_info *file_info)
 {
 	/*TODO: Need to check permission here*/
 	ino_t thisinode;
 	long long fh;
 	int ret_code;
 
-	thisinode = lookup_pathname(path, &ret_code);
-	if (thisinode < 1)
-		return ret_code;
+	printf("Debug open inode %lld\n", ino);
+	thisinode = (ino_t) ino;
+	if (thisinode < 1) {
+		fuse_reply_err(req, EACCES);
+		return;
+	}
 
 	fh = open_fh(thisinode);
-	if (fh < 0)
-		return -ENFILE;
+	if (fh < 0) {
+		fuse_reply_err(req, ENFILE);
+		return;
+	}
 
 	file_info->fh = fh;
 
-	return 0;
+	fuse_reply_open(req, file_info);
 }
 
 /* Helper function for read operation. Will load file object meta from
@@ -1051,24 +1117,29 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 
 /* Helper function for read operation. Will prefetch a block from backend for
 *  reading. */
+/* TODO: For prefetching, need to prevent opening multiple threads
+to prefetch the same block (waste of resource, but not critical though as
+only one thread will actually download the block) */
 int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		ino_t this_inode, long long block_index, off_t this_page_fpos)
 {
 	PREFETCH_STRUCT_TYPE *temp_prefetch;
 	pthread_t prefetch_thread;
 
-	if ((eindex+1) < MAX_BLOCK_ENTRIES_PER_PAGE) {
-		if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
-			((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
-			temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
-			temp_prefetch->this_inode = this_inode;
-			temp_prefetch->block_no = block_index + 1;
-			temp_prefetch->page_start_fpos = this_page_fpos;
-			temp_prefetch->entry_index = eindex + 1;
-			pthread_create(&(prefetch_thread),
-				&prefetch_thread_attr, (void *)&prefetch_block,
-				((void *)temp_prefetch));
-		}
+	if ((eindex+1) >= MAX_BLOCK_ENTRIES_PER_PAGE)
+		return 0;
+	if (((tpage->block_entries[eindex+1]).status == ST_CLOUD) ||
+		((tpage->block_entries[eindex+1]).status == ST_CtoL)) {
+		temp_prefetch = malloc(sizeof(PREFETCH_STRUCT_TYPE));
+		temp_prefetch->this_inode = this_inode;
+		temp_prefetch->block_no = block_index + 1;
+		temp_prefetch->page_start_fpos = this_page_fpos;
+		temp_prefetch->entry_index = eindex + 1;
+		printf("Prefetching block %lld for inode %lld\n",
+			block_index + 1, this_inode);
+		pthread_create(&(prefetch_thread),
+			&prefetch_thread_attr, (void *)&prefetch_block,
+			((void *)temp_prefetch));
 	}
 	return 0;
 }
@@ -1133,25 +1204,126 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	return 0;
 }
 
-/* Helper function for read operation. Will advance to the next block. */
-int read_advance_block(long long *entry_index, FH_ENTRY *fh_ptr,
-				off_t *this_page_fpos)
+/* Function for reading from a single block for read operation. Will fetch
+*  block from backend if needed. */
+size_t _read_block(const char *buf, size_t size, long long bindex,
+			off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode)
 {
-	if (((*entry_index)+1) >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-		/*If may need to change meta, lock*/
-		fh_ptr->meta_cache_ptr =
-				meta_cache_lock_entry(fh_ptr->thisinode);
-		fh_ptr->meta_cache_locked = TRUE;
+	long long current_page;
+	char thisblockpath[400];
+	BLOCK_ENTRY_PAGE temppage;
+	off_t this_page_fpos;
+	off_t old_cache_size, new_cache_size;
+	size_t this_bytes_read;
+	off_t nextfilepos, prevfilepos;
+	long long entry_index;
+	char fill_zeros;
 
-		*this_page_fpos = advance_block(fh_ptr->meta_cache_ptr,
-						*this_page_fpos, entry_index);
+	/* Decide the page index for block "bindex" */
+	/*Page indexing starts at zero*/
+	current_page = bindex / MAX_BLOCK_ENTRIES_PER_PAGE;
 
-		fh_ptr->meta_cache_locked = FALSE;
-		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-	} else {
-		(*entry_index)++;
+	/*If may need to change meta, lock*/
+	fh_ptr->meta_cache_ptr =
+			meta_cache_lock_entry(fh_ptr->thisinode);
+	fh_ptr->meta_cache_locked = TRUE;
+
+	/* Find the offset of the page if it is not cached */
+	if (fh_ptr->cached_page_index != current_page)
+		seek_page(fh_ptr, current_page);
+
+	this_page_fpos = fh_ptr->cached_filepos;
+
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+	entry_index = bindex % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	sem_wait(&(fh_ptr->block_sem));
+	fill_zeros = FALSE;
+	while (fh_ptr->opened_block != bindex) {
+		if (fh_ptr->opened_block != -1) {
+			fclose(fh_ptr->blockfptr);
+			fh_ptr->opened_block = -1;
+		}
+
+		read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
+
+		read_wait_full_cache(&temppage, entry_index, fh_ptr,
+			this_page_fpos);
+
+		read_prefetch_cache(&temppage, entry_index,
+			this_inode, bindex, this_page_fpos);
+
+		switch ((temppage).block_entries[entry_index].status) {
+		case ST_NONE:
+		case ST_TODELETE:
+			fill_zeros = TRUE;
+			break;
+		case ST_LDISK:
+		case ST_BOTH:
+		case ST_LtoC:
+			fill_zeros = FALSE;
+			break;
+		case ST_CLOUD:
+		case ST_CtoL:
+			/*Download from backend */
+			read_fetch_backend(this_inode,
+				bindex, fh_ptr, &temppage,
+				this_page_fpos, entry_index);
+
+			fill_zeros = FALSE;
+			break;
+		default:
+			break;
+		}
+
+		if ((fill_zeros != TRUE) && (fh_ptr->opened_block !=
+				bindex)) {
+			fetch_block_path(thisblockpath,
+					this_inode, bindex);
+
+			fh_ptr->blockfptr = fopen(thisblockpath, "r+");
+			if (fh_ptr->blockfptr != NULL) {
+				setbuf(fh_ptr->blockfptr, NULL);
+				fh_ptr->opened_block = bindex;
+			} else {
+			/* Some exception that block file is deleted in
+			*  the middle of the status check*/
+				printf("Debug read: cannot open block file. Perhaps replaced?\n");
+				fh_ptr->opened_block = -1;
+			}
+		} else {
+			break;
+		}
 	}
-	return 0;
+
+	if (fill_zeros != TRUE) {
+		flock(fileno(fh_ptr->blockfptr), LOCK_SH);
+		fseek(fh_ptr->blockfptr, offset, SEEK_SET);
+		this_bytes_read = fread(buf,
+				sizeof(char), size, fh_ptr->blockfptr);
+		if (this_bytes_read < size) {
+			/*Need to pad zeros*/
+			printf("Short reading? %ld %d\n",
+				offset, size + this_bytes_read);
+			memset(&buf[this_bytes_read],
+					 0, sizeof(char) *
+				(size - this_bytes_read));
+			this_bytes_read = size;
+		}
+
+		flock(fileno(fh_ptr->blockfptr), LOCK_UN);
+
+	} else {
+		printf("Padding zeros? %ld %d\n", offset, size);
+		this_bytes_read = size;
+		memset(buf, 0, sizeof(char) * size);
+	}
+
+	sem_post(&(fh_ptr->block_sem));
+
+	return this_bytes_read;
 }
 
 /************************************************************************
@@ -1166,32 +1338,27 @@ int read_advance_block(long long *entry_index, FH_ENTRY *fh_ptr,
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
-	struct fuse_file_info *file_info)
+void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
+	size_t size_org, off_t offset, struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block;
-	long long start_page, current_page;
-	off_t nextfilepos, prevfilepos, currentfilepos;
-	BLOCK_ENTRY_PAGE temppage;
-	long long entry_index;
 	long long block_index;
-	char thisblockpath[400];
 	int total_bytes_read;
 	int this_bytes_read;
 	off_t current_offset;
 	int target_bytes_read;
-	size_t size;
-	char fill_zeros;
-	off_t this_page_fpos;
 	struct stat temp_stat;
-
+	size_t size;
+	char *buf;
 
 /* TODO: Perhaps should do proof-checking on the inode number using pathname
 *  lookup and from file_info*/
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
-		return 0;
+	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
 
@@ -1203,15 +1370,20 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	/* Decide the true maximum bytes to read */
 	/* If read request will exceed the size of the file, need to
 	*  reduce the size of request */
-	if (temp_stat.st_size < (offset+size_org))
-		size = (temp_stat.st_size - offset);
-	else
+	if (temp_stat.st_size < (offset+size_org)) {
+		if (temp_stat.st_size > offset)
+			size = (temp_stat.st_size - offset);
+		else
+			size = 0;
+	} else {
 		size = size_org;
+	}
 
 	if (size <= 0) {
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-		return 0;
+		fuse_reply_buf(req, NULL, 0);
+		return;
 	}
 
 	total_bytes_read = 0;
@@ -1222,86 +1394,13 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 	start_block = (offset / MAX_BLOCK_SIZE);
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
-	/* Decide the page indices for the first byte and last byte of
-	*  the read */
-	/*Page indexing starts at zero*/
-	start_page = start_block / MAX_BLOCK_ENTRIES_PER_PAGE;
-
-	/* Will need to change the entry page if it is not the current one */
-	if (fh_ptr->cached_page_index != start_page)
-		seek_page(fh_ptr, start_page);
-
-	this_page_fpos = fh_ptr->cached_filepos;
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-
-	entry_index = start_block % MAX_BLOCK_ENTRIES_PER_PAGE;
+	buf = malloc(sizeof(char)*size);
 
 	/* Read data from each block involved */
 	for (block_index = start_block; block_index <= end_block;
 				block_index++) {
-		sem_wait(&(fh_ptr->block_sem));
-		fill_zeros = FALSE;
-		while (fh_ptr->opened_block != block_index) {
-			if (fh_ptr->opened_block != -1) {
-				fclose(fh_ptr->blockfptr);
-				fh_ptr->opened_block = -1;
-			}
-
-			read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
-
-			read_wait_full_cache(&temppage, entry_index, fh_ptr,
-				this_page_fpos);
-
-			read_prefetch_cache(&temppage, entry_index,
-				temp_stat.st_ino, block_index, this_page_fpos);
-
-			switch ((temppage).block_entries[entry_index].status) {
-			case ST_NONE:
-			case ST_TODELETE:
-				fill_zeros = TRUE;
-				break;
-			case ST_LDISK:
-			case ST_BOTH:
-			case ST_LtoC:
-				fill_zeros = FALSE;
-				break;
-			case ST_CLOUD:
-			case ST_CtoL:
-				/*Download from backend */
-				read_fetch_backend(temp_stat.st_ino,
-					block_index, fh_ptr, &temppage,
-					this_page_fpos, entry_index);
-
-				fill_zeros = FALSE;
-				break;
-			default:
-				break;
-			}
-
-			if ((fill_zeros != TRUE) && (fh_ptr->opened_block !=
-					block_index)) {
-				fetch_block_path(thisblockpath,
-						temp_stat.st_ino, block_index);
-
-				fh_ptr->blockfptr = fopen(thisblockpath, "r+");
-				if (fh_ptr->blockfptr != NULL) {
-					setbuf(fh_ptr->blockfptr, NULL);
-					fh_ptr->opened_block = block_index;
-				} else {
-				/* Some exception that block file is deleted in
-				*  the middle of the status check*/
-					printf("Debug read: cannot open block file. Perhaps replaced?\n");
-					fh_ptr->opened_block = -1;
-				}
-			} else {
-				break;
-			}
-		}
-
-		if (fill_zeros != TRUE)
-			flock(fileno(fh_ptr->blockfptr), LOCK_SH);
-
 		current_offset = (offset+total_bytes_read) % MAX_BLOCK_SIZE;
 		target_bytes_read = MAX_BLOCK_SIZE - current_offset;
 
@@ -1309,44 +1408,15 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 		if ((size - total_bytes_read) < target_bytes_read)
 			target_bytes_read = size - total_bytes_read;
 
-		if (fill_zeros != TRUE) {
-			fseek(fh_ptr->blockfptr, current_offset, SEEK_SET);
-			this_bytes_read = fread(&buf[total_bytes_read],
-					sizeof(char), target_bytes_read,
-							fh_ptr->blockfptr);
-			if (this_bytes_read < target_bytes_read) {
-				/*Need to pad zeros*/
-				printf("Short reading? %ld %d\n",
-					current_offset, total_bytes_read +
-							this_bytes_read);
-				memset(&buf[total_bytes_read + this_bytes_read],
-					 0, sizeof(char) *
-					(target_bytes_read - this_bytes_read));
-				this_bytes_read = target_bytes_read;
-			}
-		} else {
-			printf("Padding zeros? %ld %d\n", current_offset,
-					total_bytes_read);
-			this_bytes_read = target_bytes_read;
-			memset(&buf[total_bytes_read], 0, sizeof(char) *
-							target_bytes_read);
-		}
+		this_bytes_read = _read_block(&buf[total_bytes_read],
+				target_bytes_read, block_index,
+				current_offset, fh_ptr, fh_ptr->thisinode);
 
 		total_bytes_read += this_bytes_read;
-
-		if (fill_zeros != TRUE)
-			flock(fileno(fh_ptr->blockfptr), LOCK_UN);
-
-		sem_post(&(fh_ptr->block_sem));
 
 		/*Terminate if cannot write as much as we want*/
 		if (this_bytes_read < target_bytes_read)
 			break;
-
-		/*If this is not the last block, need to advance one more*/
-		if (block_index < end_block)
-			read_advance_block(&entry_index, fh_ptr,
-						&this_page_fpos);
 	}
 
 	if (total_bytes_read > 0) {
@@ -1368,8 +1438,9 @@ int hfuse_read(const char *path, char *buf, size_t size_org, off_t offset,
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 	}
-
-	return total_bytes_read;
+	fuse_reply_buf(req, buf, total_bytes_read);
+	free(buf);
+	return;
 }
 
 /* Helper function for write operation. Will wait on cache full and wait
@@ -1580,8 +1651,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
-			struct fuse_file_info *file_info)
+void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
+		size_t size, off_t offset, struct fuse_file_info *file_info)
 {
 	FH_ENTRY *fh_ptr;
 	long long start_block, end_block;
@@ -1595,11 +1666,15 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 /* TODO: Perhaps should do proof-checking on the inode number using pathname
 *  lookup and from file_info*/
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
-		return 0;
+	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
-	if (size <= 0)
-		return 0;
+	if (size <= 0) {
+		fuse_reply_write(req, 0);
+		return;
+	}
 
 	/*Sleep if cache already full*/
 	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
@@ -1661,7 +1736,7 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 	fh_ptr->meta_cache_locked = FALSE;
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
-	return total_bytes_written;
+	fuse_reply_write(req, total_bytes_written);
 }
 
 /************************************************************************
@@ -1673,8 +1748,11 @@ int hfuse_write(const char *path, const char *buf, size_t size, off_t offset,
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_statfs(const char *path, struct statvfs *buf)
+void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
+	struct statvfs *buf;
+
+	buf = malloc(sizeof(struct statvfs));
 	/*Prototype is linux statvfs call*/
 	sem_wait(&(hcfs_system->access_sem));
 	buf->f_bsize = 4096;
@@ -1704,7 +1782,8 @@ int hfuse_statfs(const char *path, struct statvfs *buf)
 	super_block_share_release();
 	buf->f_namemax = 256;
 
-	return 0;
+	fuse_reply_statfs(req, buf);
+	free(buf);
 }
 
 /************************************************************************
@@ -1717,9 +1796,9 @@ int hfuse_statfs(const char *path, struct statvfs *buf)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_flush(const char *path, struct fuse_file_info *file_info)
+void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
 {
-	return 0;
+	fuse_reply_err(req, 0);
 }
 
 /************************************************************************
@@ -1731,26 +1810,36 @@ int hfuse_flush(const char *path, struct fuse_file_info *file_info)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_release(const char *path, struct fuse_file_info *file_info)
+void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
+			struct fuse_file_info *file_info)
 {
 	ino_t thisinode;
 	int ret_code;
 
-	thisinode = lookup_pathname(path, &ret_code);
-	if (file_info->fh < 0)
-		return -EBADF;
+	thisinode = (ino_t) ino;
+	if (file_info->fh < 0) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
-	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES)
-		return -EBADF;
+	if (file_info->fh >= MAX_OPEN_FILE_ENTRIES) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
-	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE)
-		return -EBADF;
+	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
-	if (system_fh_table.entry_table[file_info->fh].thisinode != thisinode)
-		return -EBADF;
+	if (system_fh_table.entry_table[file_info->fh].thisinode
+					!= thisinode) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
 	close_fh(file_info->fh);
-	return 0;
+	fuse_reply_err(req, 0);
 }
 
 /************************************************************************
@@ -1763,10 +1852,10 @@ int hfuse_release(const char *path, struct fuse_file_info *file_info)
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_fsync(const char *path, int isdatasync,
+void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 					struct fuse_file_info *file_info)
 {
-	return 0;
+	fuse_reply_err(req, 0);
 }
 
 /************************************************************************
@@ -1778,10 +1867,11 @@ int hfuse_fsync(const char *path, int isdatasync,
 *                appropriate error code.
 *
 *************************************************************************/
-static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
+static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
+			struct fuse_file_info *file_info)
 {
 	/*TODO: Need to check for access rights */
-	return 0;
+	fuse_reply_open(req, file_info);
 }
 
 /************************************************************************
@@ -1796,8 +1886,8 @@ static int hfuse_opendir(const char *path, struct fuse_file_info *file_info)
 *                appropriate error code.
 *
 *************************************************************************/
-static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-				off_t offset, struct fuse_file_info *file_info)
+void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
+			off_t offset, struct fuse_file_info *file_info)
 {
 	/* Now will read partial entries and deal with others later */
 	ino_t this_inode;
@@ -1812,22 +1902,23 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	long countn;
 	off_t nextentry_pos;
 	int page_start;
+	char *buf;
+	off_t buf_pos;
+	size_t entry_size;
 
 	gettimeofday(&tmp_time1, NULL);
 
 /*TODO: Need to include symlinks*/
 	fprintf(stderr, "DEBUG readdir entering readdir\n");
 
-/* TODO: the following can be skipped if we can use some file handle from
-*  file_info input */
-	this_inode = lookup_pathname(path, &ret_code);
-
-	if (this_inode == 0)
-		return ret_code;
+	this_inode = (ino_t) ino;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
 	meta_cache_lookup_dir_data(this_inode, &tempstat, &tempmeta, NULL,
 								body_ptr);
+
+	buf = malloc(sizeof(char)*size);
+	buf_pos = 0;
 
 	page_start = 0;
 	if (offset >= MAX_DIR_ENTRIES_PER_PAGE) {
@@ -1873,12 +1964,18 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 				tempstat.st_mode = S_IFREG;
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
-			if (filler(buf, temp_page.dir_entries[count].d_name,
-						&tempstat, nextentry_pos)) {
+			entry_size = fuse_add_direntry(req, &buf[buf_pos],
+					(size - buf_pos), 
+					temp_page.dir_entries[count].d_name,
+					&tempstat, nextentry_pos);
+			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
 				printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n", nextentry_pos, temp_page.this_page_pos, (count+1));
-				return 0;
+				fuse_reply_buf(req, buf, buf_pos);
+				return;
 			}
+			buf_pos += entry_size;
+
 		}
 		page_start = 0;
 		thisfile_pos = temp_page.tree_walk_next;
@@ -1889,7 +1986,7 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 	printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
-	return 0;
+	fuse_reply_buf(req, buf, buf_pos);
 }
 
 /************************************************************************
@@ -1901,9 +1998,9 @@ static int hfuse_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 *                appropriate error code.
 *
 *************************************************************************/
-int hfuse_releasedir(const char *path, struct fuse_file_info *file_info)
+void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
 {
-	return 0;
+	fuse_reply_err(req, 0);
 }
 
 /* A prototype for reporting the current stat of HCFS */
@@ -1959,13 +2056,9 @@ void reporter_module(void)
 *  Return value: Pointer to the user data of this mount.
 *
 *************************************************************************/
-void *hfuse_init(struct fuse_conn_info *conn)
+void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 {
-	struct fuse_context *temp_context;
-
-	temp_context = fuse_get_context();
-
-	printf("Data passed in is %s\n", (char *) temp_context->private_data);
+	printf("Data passed in is %s\n", (char *) userdata);
 
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
@@ -1973,18 +2066,17 @@ void *hfuse_init(struct fuse_conn_info *conn)
 	pthread_create(&reporter_thread, NULL, (void *)reporter_module, NULL);
 	init_meta_cache_headers();
 	/* return ((void*) sys_super_block); */
-	return temp_context->private_data;
 }
 
 /************************************************************************
 *
-* Function name: hfuse_destroy
-*        Inputs: void *private_data
+* Function name: hfuse_ll_destroy
+*        Inputs: void *userdata
 *       Summary: Destroy a FUSE mount
 *  Return value: None
 *
 *************************************************************************/
-void hfuse_destroy(void *private_data)
+void hfuse_ll_destroy(void *userdata)
 {
 	int dl_count;
 
@@ -1998,6 +2090,111 @@ void hfuse_destroy(void *private_data)
 	return;
 }
 
+void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+	int to_set, struct fuse_file_info *fi)
+{
+	int ret_val;
+	ino_t this_inode;
+	int ret_code;
+	char attr_changed;
+	clockid_t this_clock_id;
+	struct timespec timenow;
+	struct stat *newstat;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+
+	printf("Debug setattr\n");
+
+	this_inode = (ino_t) ino;
+
+	attr_changed = FALSE;
+	newstat = malloc(sizeof(struct stat));
+
+	body_ptr = meta_cache_lock_entry(this_inode);
+	ret_val = meta_cache_lookup_file_data(this_inode, newstat,
+			NULL, NULL, 0, body_ptr);
+
+	if (ret_val < 0) {  /* Cannot fetch any meta*/
+		meta_cache_close_file(body_ptr);
+		meta_cache_unlock_entry(body_ptr);
+		meta_cache_remove(this_inode);
+		fuse_reply_err(req, EACCES);
+		return;
+	}
+
+	if ((to_set & FUSE_SET_ATTR_SIZE) &&
+			(newstat->st_size != attr->st_size)) {
+		ret_val = hfuse_ll_truncate((ino_t)ino, newstat,
+				attr->st_size, &body_ptr);
+		if (ret_val < 0) {
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_MODE) {
+		newstat->st_mode = attr->st_mode;
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_UID) {
+		newstat->st_uid = attr->st_uid;
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_GID) {
+		newstat->st_gid = attr->st_gid;
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_ATIME) {
+		newstat->st_atime = attr->st_atime;
+		memcpy(&(newstat->st_atim), &(attr->st_atim),
+			sizeof(struct timespec));
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_MTIME) {
+		newstat->st_mtime = attr->st_mtime;
+		memcpy(&(newstat->st_mtim), &(attr->st_mtim),
+			sizeof(struct timespec));
+		attr_changed = TRUE;
+	}
+
+	clock_getcpuclockid(0, &this_clock_id);
+	clock_gettime(this_clock_id, &timenow);
+
+	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
+		newstat->st_atime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat->st_atim), &timenow,
+			sizeof(struct timespec));
+		attr_changed = TRUE;
+	}
+
+	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
+		newstat->st_mtime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat->st_mtim), &timenow,
+			sizeof(struct timespec));
+		attr_changed = TRUE;
+	}
+
+	if (attr_changed == TRUE) {
+		newstat->st_ctime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat->st_ctim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	ret_val = meta_cache_update_file_data(this_inode, newstat,
+			NULL, NULL, 0, body_ptr);
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+	fuse_reply_attr(req, newstat, 0);
+	free(newstat);
+	return;
+}
+
 /************************************************************************
 *
 * Function name: hfuse_access
@@ -2007,37 +2204,35 @@ void hfuse_destroy(void *private_data)
 *                appropriate error code.
 *
 *************************************************************************/
-static int hfuse_access(const char *path, int mode)
+static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 {
 	/*TODO: finish this*/
-	return 0;
+	fuse_reply_err(req, 0);
 }
 
 /* Specify the functions used for the FUSE operations */
-static struct fuse_operations hfuse_ops = {
-	.getattr = hfuse_getattr,
-	.mknod = hfuse_mknod,
-	.mkdir = hfuse_mkdir,
-	.readdir = hfuse_readdir,
-	.opendir = hfuse_opendir,
-	.access = hfuse_access,
-	.rename = hfuse_rename,
-	.open = hfuse_open,
-	.release = hfuse_release,
-	.write = hfuse_write,
-	.read = hfuse_read,
-	.init = hfuse_init,
-	.destroy = hfuse_destroy,
-	.releasedir = hfuse_releasedir,
-	.chown = hfuse_chown,
-	.chmod = hfuse_chmod,
-	.utimens = hfuse_utimens,
-	.truncate = hfuse_truncate,
-	.flush = hfuse_flush,
-	.fsync = hfuse_fsync,
-	.unlink = hfuse_unlink,
-	.rmdir = hfuse_rmdir,
-	.statfs = hfuse_statfs,
+static struct fuse_lowlevel_ops hfuse_ops = {
+	.getattr = hfuse_ll_getattr,
+	.mknod = hfuse_ll_mknod,
+	.mkdir = hfuse_ll_mkdir,
+	.readdir = hfuse_ll_readdir,
+	.opendir = hfuse_ll_opendir,
+	.access = hfuse_ll_access,
+	.rename = hfuse_ll_rename,
+	.open = hfuse_ll_open,
+	.release = hfuse_ll_release,
+	.write = hfuse_ll_write,
+	.read = hfuse_ll_read,
+	.init = hfuse_ll_init,
+	.destroy = hfuse_ll_destroy,
+	.releasedir = hfuse_ll_releasedir,
+	.setattr = hfuse_ll_setattr,
+	.flush = hfuse_ll_flush,
+	.fsync = hfuse_ll_fsync,
+	.unlink = hfuse_ll_unlink,
+	.rmdir = hfuse_ll_rmdir,
+	.statfs = hfuse_ll_statfs,
+	.lookup = hfuse_ll_lookup,
 };
 
 /*
@@ -2072,7 +2267,28 @@ int hook_fuse(int argc, char **argv)
 
 	return ret_val;
 */
-	return fuse_main(argc, argv, &hfuse_ops, NULL);
+	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+	struct fuse_chan *fuse_channel;
+	struct fuse_session *session;
+	char *mount;
+	int mt, fg;
+
+	fuse_parse_cmdline(&args, &mount, &mt, &fg);
+	fuse_channel = fuse_mount(mount, &args);
+	session = fuse_lowlevel_new(&args, &hfuse_ops, sizeof(hfuse_ops), NULL);
+	fuse_set_signal_handlers(session);
+	fuse_session_add_chan(session, fuse_channel);
+	if (mt)
+		fuse_session_loop_mt(session);
+	else
+		fuse_session_loop(session);
+	fuse_session_remove_chan(fuse_channel);
+	fuse_remove_signal_handlers(session);
+	fuse_session_destroy(session);
+	fuse_unmount(mount, fuse_channel);
+	fuse_opt_free_args(&args);
+
+	return 0;	
 }
 
 /* Operations to implement

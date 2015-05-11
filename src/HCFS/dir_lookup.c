@@ -329,3 +329,27 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
 	*errcode = ret_val;
 	return 0;
 }
+
+int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
+{
+	META_CACHE_ENTRY_STRUCT *cache_entry;
+	DIR_ENTRY_PAGE temp_page;
+	int temp_index, ret_val;
+
+	cache_entry = meta_cache_lock_entry(parent);
+	ret_val = meta_cache_seek_dir_entry(parent, &temp_page,
+				&temp_index, childname, cache_entry);
+	meta_cache_close_file(cache_entry);
+	meta_cache_unlock_entry(cache_entry);
+
+	if (ret_val < 0)
+		return ret_val;
+	if (temp_index < 0)
+		return -ENOENT;
+	if (temp_page.dir_entries[temp_index].d_ino == 0)
+		return -ENOENT;
+
+	memcpy(dentry, &(temp_page.dir_entries[temp_index]),
+			sizeof(DIR_ENTRY));
+	return 0;
+}
