@@ -762,6 +762,9 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
 
+	printf("Debug truncate_delete_block, start %d, old_last %lld, \
+			idx %lld\n",
+		start_index, old_last_block, page_index);
 	for (block_count = start_index; block_count
 		< MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
 		tmp_blk_index = block_count
@@ -818,6 +821,9 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	if (total_deleted_blocks > 0)
 		change_system_meta(0, -total_deleted_cache,
 				-total_deleted_blocks);
+
+	printf("Debug truncate_delete_block end\n");
+
 	return 0;
 }
 
@@ -966,10 +972,11 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
-	long long temp_block_index, temp_trunc_size;
+	long long temp_trunc_size;
 	int ret_code;
 	ssize_t ret_ssize;
 
+	printf("Debug truncate: offset %lld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
 	if (filestat->st_mode & S_IFREG == FALSE) {
 		if (filestat->st_mode & S_IFDIR)
@@ -1003,11 +1010,12 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		old_last_block = ((filestat->st_size - 1) / MAX_BLOCK_SIZE);
 		old_last_page = old_last_block / MAX_BLOCK_ENTRIES_PER_PAGE;
 
-		filepos = seek_page(*body_ptr, last_page, 0);
+		if (last_page >= 0)
+			filepos = seek_page(*body_ptr, last_page, 0);
+		else
+			filepos = 0;
 
 		current_page = last_page;
-
-		temp_block_index = last_block+1;
 
 		/*TODO: put error handling for the read/write ops here*/
 		if (filepos != 0) {
@@ -1063,8 +1071,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_update_file_data(this_inode, NULL, NULL,
 				&temppage, filepos, *body_ptr);
 		}
+		printf("Debug truncate update xattr\n");
 		/* Will need to remember the old offset, so that sync to cloud
 		process can check the block status and delete them */
+		meta_cache_open_file(*body_ptr);
 		ret_ssize = fgetxattr(fileno((*body_ptr)->fptr),
 				"user.trunc_size",
 				&temp_trunc_size, sizeof(long long));
