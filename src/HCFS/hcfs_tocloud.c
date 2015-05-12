@@ -118,7 +118,6 @@ static inline void _upload_terminate_thread(int index)
 
 	if (ret_val != 0)
 		return;
-
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -336,7 +335,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
-
+	
+	/* Upload block if mode == S_IFREG */
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
 		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
@@ -624,7 +624,7 @@ void dispatch_upload_block(int which_curl)
 		if (!access(tempfilename, F_OK)) {
 			count++;
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_meta_%lld_%lld.%d",
+				"/dev/shm/hcfs_sync_block_%lld_%lld.%d",
 				upload_ptr->inode, upload_ptr->blockno, count);
 		} else {
 			break;
@@ -729,7 +729,8 @@ void upload_loop(void)
 		}
 
 		is_start_check = FALSE;
-
+		
+		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
 		super_block_exclusive_locking();
 		if (ino_check == 0)
@@ -757,6 +758,7 @@ void upload_loop(void)
 		 }
 		super_block_exclusive_release();
 
+		/* Begin to sync the inode */
 		if (ino_sync != 0) {
 			sem_wait(&(sync_ctl.sync_op_sem));
 			/*First check if this inode is actually being
