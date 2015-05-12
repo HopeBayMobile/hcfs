@@ -40,8 +40,8 @@
 *                element should be inserted.
 *
 *************************************************************************/
-int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries,
-				DIR_ENTRY *new_entry, int *index_to_insert)
+int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
+			const DIR_ENTRY *new_entry, int *index_to_insert)
 {
 	int compare_entry, compare_result;
 	int start_index, end_index;
@@ -619,7 +619,10 @@ elements into two, using the median as the new parent item. */
 	int temp_total, median_entry;
 	char merging;
 	size_t tmp_size;
-
+	/* Index out of bound */	
+	if(selected_child > tnode->num_entries || selected_child < 0)
+		return -1;
+	/* Leaf node needs not rebalance */
 	if (tnode->child_page_pos[selected_child] <= 0)
 		return -1;
 

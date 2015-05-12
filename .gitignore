@@ -1,15 +1,10 @@
 *.py[cod]
 *.swp
-*.c~
-*.cc~
-*.h~
-*.conf~
-.a
-.gcda
-.gcdo
+*~
 
 
 # C extensions
+*.a
 *.o
 *.so
 
@@ -35,6 +30,7 @@ pip-log.txt
 nosetests.xml
 *.gcda
 *.gcno
+/tests/unit_test/c/unittest_modules/*/*_unittest
 
 # Virtualenv
 .venv
