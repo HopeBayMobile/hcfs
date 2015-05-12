@@ -259,17 +259,27 @@ int close_fh(long long index)
 	return 0;
 }
 
-int seek_page(FH_ENTRY *fh_ptr, long long target_page)
+long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
+			long long hint_page)
 {
-	fh_ptr->cached_page_index = target_page;
-	fh_ptr->cached_filepos = sizeof(struct stat);
+	switch (target_page) {
+	case 0:
+		return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	default:
+		return 0;
+	}
 	return 0;
 }
 
-long long advance_block(META_CACHE_ENTRY_STRUCT *body_ptr, off_t thisfilepos,
-						long long *entry_index)
+long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 {
-	return 1;
+	switch (target_page) {
+	case 0:
+		return sizeof(struct stat) + sizeof(FILE_META_TYPE);
+	default:
+		return 0;
+	}
+	return 0;
 }
 
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
