@@ -8,14 +8,33 @@
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	printf("Debug inode is %lld\n", body_ptr->inode_num);
+	switch(body_ptr->inode_num) {
+	case 14:
+		body_ptr->fptr = fopen("/tmp/hcfs_unittest_truncate", "w");
+		unlink("/tmp/hcfs_unittest_truncate");
+		break;
+	default:
+		break;
+	}
 	return 0;
 }
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (body_ptr->fptr != NULL) {
+		fclose(body_ptr->fptr);
+		body_ptr->fptr = NULL;
+	}
 	return 0;
 }
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	if (target_ptr->fptr != NULL) {
+		fclose(target_ptr->fptr);
+		target_ptr->fptr = NULL;
+	}
+	if (target_ptr != NULL)
+		free(target_ptr);
 	return 0;
 }
 
@@ -99,11 +118,16 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 
 
 	if (file_meta_ptr != NULL) {
-		file_meta_ptr->next_block_page = 0;
+		file_meta_ptr->direct = 0;
+		file_meta_ptr->single_indirect = 0;
+		file_meta_ptr->double_indirect = 0;
+		file_meta_ptr->triple_indirect = 0;
+		file_meta_ptr->quadruple_indirect = 0;
 		switch (this_inode) {
 		case 14:
 		case 15:
-			file_meta_ptr->next_block_page = sizeof(struct stat);
+			file_meta_ptr->direct = sizeof(struct stat)
+				+ sizeof(FILE_META_TYPE);
 			break;
 		default:
 			break;
@@ -115,11 +139,11 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		switch (this_inode) {
 		case 14:
 		case 15:
-			if (page_pos == sizeof(struct stat)) {
+			if (page_pos == sizeof(struct stat)
+				+ sizeof(FILE_META_TYPE)) {
 				block_page->num_entries = 1;
 				block_page->block_entries[0].status
 					= fake_block_status;
-				block_page->next_page = 0;
 			}
 			break;
 		default:
@@ -151,7 +175,14 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	return NULL;
+	META_CACHE_ENTRY_STRUCT *ptr;
+
+	ptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	if (ptr != NULL) {
+		memset(ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
+		ptr->inode_num = this_inode;
+	}
+	return ptr;
 }
 
 int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
