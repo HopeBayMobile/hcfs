@@ -36,6 +36,8 @@ TODO: error handling for HTTP exceptions
 #include "super_block.h"
 #include "fuseop.h"
 
+#define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
+
 extern SYSTEM_CONF_STRUCT system_config;
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
@@ -307,8 +309,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int which_curl;
-	long long page_pos, e_index;
-	long long total_blocks, total_pages;
+	long long page_pos, e_index, which_page, current_page;
+	long long total_blocks;
 	long long count, block_count;
 	unsigned char block_status;
 	char upload_done;
@@ -316,6 +318,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	off_t tmp_size;
 	struct timespec time_to_sleep;
 	BLOCK_ENTRY *tmp_entry;
+	long long temp_trunc_size;
+	ssize_t ret_ssize;
+
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -336,25 +341,28 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_EX);
 		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		fread(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		page_pos = tempfilemeta.next_block_page;
 
-/* TODO: fix from here */
-		e_index = 0;
 		tmp_size = tempfilestat.st_size;
+
+		/* Check if need to sync past the current size */
+		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+
+		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+			tmp_size = temp_trunc_size;
+			fremovexattr(fileno(metafptr), "user.trunc_size");
+		}
+
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else
 			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
-		if (total_blocks == 0)
-			total_pages = 0;
-		else
-			total_pages = ((total_blocks - 1) /
-					MAX_BLOCK_ENTRIES_PER_PAGE) + 1;
-
 		flock(fileno(metafptr), LOCK_UN);
 
-		for (block_count = 0; page_pos != 0; block_count++) {
+		current_page = -1;
+		for (block_count = 0; block_count < total_blocks;
+							block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
 			/*Perhaps the file is deleted already*/
@@ -363,13 +371,18 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				break;
 			}
 
-			if (e_index >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-				page_pos = temppage.next_page;
-				e_index = 0;
-				if (page_pos == 0) {
+			e_index = block_count % BLK_INCREMENTS;
+			which_page = block_count / BLK_INCREMENTS;
+
+			if (current_page != which_page) {
+				page_pos = seek_page2(&tempfilemeta, metafptr,
+					which_page, 0);
+				if (page_pos <= 0) {
+					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);
-					break;
+					continue;
 				}
+				current_page = which_page;
 			}
 
 			/*TODO: error handling here if cannot read correctly*/
@@ -410,7 +423,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				dispatch_upload_block(which_curl);
 				/*TODO: Maybe should also first copy block
 					out first*/
-				e_index++;
 				continue;
 			}
 			if (block_status == ST_TODELETE) {
@@ -428,7 +440,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 			}
 
-			e_index++;
 		}
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/

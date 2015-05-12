@@ -744,7 +744,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
 						body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
-				&temp_meta, NULL, 0, body_ptr);
+				temp_meta, NULL, 0, body_ptr);
 		}
 		break;
 	case 2:
@@ -757,7 +757,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
 						body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
-				&temp_meta, NULL, 0, body_ptr);
+				temp_meta, NULL, 0, body_ptr);
 		}
 		break;
 	case 3:
@@ -770,7 +770,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
 						body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
-				&temp_meta, NULL, 0, body_ptr);
+				temp_meta, NULL, 0, body_ptr);
 		}
 		break;
 	case 4:
@@ -783,7 +783,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
 						body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
-				&temp_meta, NULL, 0, body_ptr);
+				temp_meta, NULL, 0, body_ptr);
 		}
 		break;
 	default:

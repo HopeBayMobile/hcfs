@@ -34,7 +34,7 @@
 #include "global.h"
 #include "hfuse_system.h"
 
-#typedef INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
+#define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -99,12 +99,12 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 							current_block++) {
 			if (page_index >= MAX_BLOCK_ENTRIES_PER_PAGE) {
 				pagepos = seek_page2(&temphead, metafptr,
-					current_block / INCREMENTS, 0);
+					current_block / BLK_INCREMENTS, 0);
 
 				/* No block for this page. Skipping the entire
 				page */
 				if (pagepos == 0) {
-					current_block += (INCREMENTS-1);
+					current_block += (BLK_INCREMENTS-1);
 					continue;
 				}
 				fseek(metafptr, pagepos, SEEK_SET);

@@ -743,21 +743,30 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 }
 
 /* Helper function for truncate operation. Will delete all blocks in the page
-*  pointed by temppage starting from "start_index". Block index is tracked
-*  globally using "temp_block_index. "old_last_block" indicates the last block
+*  pointed by temppage starting from "start_index". Track the current page
+*  using "page_index". "old_last_block" indicates the last block
 *  index before the truncate operation (hence we can ignore the blocks after
 *  "old_last_block". "inode_index" is the inode number of the file being
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
-			long long *temp_block_index, long long old_last_block,
+			long long page_index, long long old_last_block,
 			ino_t inode_index)
 {
 	int block_count;
 	char thisblockpath[1024];
+	long long tmp_blk_index;
+	off_t cache_block_size;
+	off_t total_deleted_cache;
+	long long total_deleted_blocks;
+
+	total_deleted_cache = 0;
+	total_deleted_blocks = 0;
 
 	for (block_count = start_index; block_count
 		< MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
-		if ((*temp_block_index) > old_last_block)
+		tmp_blk_index = block_count
+			+ (MAX_BLOCK_ENTRIES_PER_PAGE * page_index);
+		if (tmp_blk_index > old_last_block)
 			break;
 		switch ((temppage->block_entries[block_count]).status) {
 		case ST_NONE:
@@ -765,10 +774,15 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			break;
 		case ST_LDISK:
 			fetch_block_path(thisblockpath, inode_index,
-				*temp_block_index);
+				tmp_blk_index);
+
+			cache_block_size =
+					check_file_size(thisblockpath);
 			unlink(thisblockpath);
 			(temppage->block_entries[block_count]).status =
 				ST_NONE;
+			total_deleted_cache += (long long) cache_block_size;
+			total_deleted_blocks += 1;
 			break;
 		case ST_CLOUD:
 			(temppage->block_entries[block_count]).status =
@@ -776,9 +790,22 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
+			fetch_block_path(thisblockpath, inode_index,
+				tmp_blk_index);
+			if (access(thisblockpath, F_OK) == 0) {
+				cache_block_size =
+					check_file_size(thisblockpath);
+				unlink(thisblockpath);
+				total_deleted_cache +=
+					(long long) cache_block_size;
+				total_deleted_blocks += 1;
+			}
+			(temppage->block_entries[block_count]).status =
+				ST_TODELETE;
+			break;
 		case ST_CtoL:
 			fetch_block_path(thisblockpath, inode_index,
-				*temp_block_index);
+				tmp_blk_index);
 			if (access(thisblockpath, F_OK) == 0)
 				unlink(thisblockpath);
 			(temppage->block_entries[block_count]).status =
@@ -787,8 +814,10 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		default:
 			break;
 		}
-		(*temp_block_index)++;
 	}
+	if (total_deleted_blocks > 0)
+		change_system_meta(0, -total_deleted_cache,
+				-total_deleted_blocks);
 	return 0;
 }
 
@@ -937,8 +966,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
-	long long temp_block_index;
+	long long temp_block_index, temp_trunc_size;
 	int ret_code;
+	ssize_t ret_ssize;
 
 	/* If the filesystem object is not a regular file, return error */
 	if (filestat->st_mode & S_IFREG == FALSE) {
@@ -1003,7 +1033,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			/*Delete the rest of blocks in this same page
 			as well*/
 			truncate_delete_block(&temppage, last_index+1,
-				&temp_block_index, old_last_block,
+				current_page, old_last_block,
 				filestat->st_ino);
 
 			meta_cache_update_file_data(this_inode, NULL,
@@ -1027,12 +1057,22 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				&temppage, filepos, *body_ptr);
 
 			truncate_delete_block(&temppage, 0,
-				&temp_block_index, old_last_block,
+				current_page, old_last_block,
 				filestat->st_ino);
 
 			meta_cache_update_file_data(this_inode, NULL, NULL,
 				&temppage, filepos, *body_ptr);
 		}
+		/* Will need to remember the old offset, so that sync to cloud
+		process can check the block status and delete them */
+		ret_ssize = fgetxattr(fileno((*body_ptr)->fptr),
+				"user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+		if (((ret_ssize < 0) && (errno == ENOATTR)) ||
+			((ret_ssize >= 0) &&
+				(temp_trunc_size < filestat->st_size)))
+			fsetxattr(fileno((*body_ptr)->fptr), "user.trunc_size",
+				&(filestat->st_size), sizeof(long long), 0);
 	}
 
 	/* Update file and system meta here */

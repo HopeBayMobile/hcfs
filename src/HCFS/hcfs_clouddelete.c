@@ -38,6 +38,8 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "fuseop.h"
 #include "global.h"
 
+#define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
+
 extern SYSTEM_CONF_STRUCT system_config;
 
 static DSYNC_THREAD_TYPE dsync_thread_info[MAX_DSYNC_CONCURRENCY];
@@ -267,12 +269,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char thismetapath[400];
 	ino_t this_inode;
 	FILE *metafptr;
+	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int curl_id;
 	long long block_no, current_index;
-	long long page_pos;
+	long long page_pos, which_page, current_page;
 	long long count, block_count;
+	long long total_blocks;
 	unsigned char block_status;
 	char delete_done;
 	char in_sync;
@@ -280,6 +284,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	struct timespec time_to_sleep;
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
+	off_t tmp_size;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -296,23 +301,34 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
-		fseek(metafptr, sizeof(struct stat), SEEK_SET);
+		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		fread(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		page_pos = tempfilemeta.next_block_page;
-		current_index = 0;
+
+		tmp_size = tempfilestat.st_size;
+		if (tmp_size == 0)
+			total_blocks = 0;
+		else
+			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
 		flock(fileno(metafptr), LOCK_UN);
+
+		current_page = -1;
 
 		for (block_count = 0; page_pos != 0; block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
-			if (current_index >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-				page_pos = temppage.next_page;
-				current_index = 0;
-				if (page_pos == 0) {
+			current_index = block_count % BLK_INCREMENTS;
+			which_page = block_count / BLK_INCREMENTS;
+
+			if (current_page != which_page) {
+				page_pos = seek_page2(&tempfilemeta, metafptr,
+					which_page, 0);
+				if (page_pos <= 0) {
+					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);
-					break;
+					continue;
 				}
+				current_page = which_page;
 			}
 
 			/*TODO: error handling here if cannot read correctly*/
@@ -358,7 +374,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
 			}
-			current_index++;
 		}
 		/* Block deletion should be done here. Check if all delete
 		threads for this inode has returned before starting meta
