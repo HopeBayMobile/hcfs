@@ -14,6 +14,10 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 		body_ptr->fptr = fopen("/tmp/hcfs_unittest_truncate", "w");
 		unlink("/tmp/hcfs_unittest_truncate");
 		break;
+	case 16:
+		body_ptr->fptr = fopen("/tmp/hcfs_unittest_write", "w");
+		unlink("/tmp/hcfs_unittest_write");
+		break;
 	default:
 		break;
 	}
@@ -46,6 +50,11 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	if (inode_stat != NULL)
 		memcpy(&updated_stat, inode_stat, sizeof(struct stat));
 
+	if (block_page != NULL) {
+		after_update_block_page = TRUE;
+		memcpy(&updated_block_page, block_page,
+				sizeof(BLOCK_ENTRY_PAGE));
+	}
 	return 0;
 }
 
@@ -108,6 +117,12 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			inode_stat->st_atime = 100000;
 			inode_stat->st_size = 204800;
 			break;
+		case 16:
+			inode_stat->st_ino = 16;
+			inode_stat->st_mode = S_IFREG | 0700;
+			inode_stat->st_atime = 100000;
+			inode_stat->st_size = 204800;
+			break;
 		default:
 			break;
 		}
@@ -126,6 +141,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		switch (this_inode) {
 		case 14:
 		case 15:
+		case 16:
 			file_meta_ptr->direct = sizeof(struct stat)
 				+ sizeof(FILE_META_TYPE);
 			break;
@@ -139,6 +155,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		switch (this_inode) {
 		case 14:
 		case 15:
+		case 16:
 			if (page_pos == sizeof(struct stat)
 				+ sizeof(FILE_META_TYPE)) {
 				block_page->num_entries = 1;
@@ -148,6 +165,10 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			break;
 		default:
 			break;
+		}
+		if (after_update_block_page == TRUE) {
+			memcpy(block_page, &updated_block_page,
+				sizeof(BLOCK_ENTRY_PAGE));
 		}
 	}
 	return 0;

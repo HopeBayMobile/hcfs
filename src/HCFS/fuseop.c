@@ -225,15 +225,17 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 /************************************************************************
 *
-* Function name: hfuse_mkdir
-*        Inputs: const char *path, mode_t mode
-*       Summary: Given the string "path", create a subdirectory with the
+* Function name: hfuse_ll_mkdir
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *selfname,
+*                mode_t mode
+*       Summary: Create a subdirectory "selfname" under "parent" with the
 *                permission specified by mode.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent, const char *selfname, mode_t mode)
+static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
+				const char *selfname, mode_t mode)
 {
 	ino_t self_inode, parent_inode;
 	struct stat this_stat;
@@ -1388,14 +1390,12 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 
 /************************************************************************
 *
-* Function name: hfuse_read
-*        Inputs: const char *path, char *buf, size_t size_org, off_t offset,
-*                struct fuse_file_info *file_info
-*       Summary: Read "size_org" bytes from the file "path", starting from
-*                "offset", into the buffer pointed by "buf". File handle
-*                is provided by the structure in "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_read
+*        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size_org,
+*                off_t offset, struct fuse_file_info *file_info
+*       Summary: Read "size_org" bytes from the file "ino", starting from
+*                "offset". Returned data is sent via fuse_reply_buf.
+*                File handle is provided by the structure in "file_info".
 *
 *************************************************************************/
 void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
@@ -1510,6 +1510,9 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 {
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+		printf("Debug write checking if need to wait for cache\n");
+		printf("%lld, %lld\n", hcfs_system->systemdata.cache_size,
+			CACHE_HARD_LIMIT);
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
@@ -1708,13 +1711,11 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 /************************************************************************
 *
 * Function name: hfuse_write
-*        Inputs: const char *path, char *buf, size_t size, off_t offset,
-*                struct fuse_file_info *file_info
-*       Summary: Write "size" bytes to the file "path", starting from
+*        Inputs: fuse_req_t req, fuse_ino_t ino, const char *buf,
+*                size_t size, off_t offset, struct fuse_file_info *file_info
+*       Summary: Write "size" bytes to the file "ino", starting from
 *                "offset", from the buffer pointed by "buf". File handle
 *                is provided by the structure in "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
@@ -1742,10 +1743,10 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
-	/*Sleep if cache already full*/
-	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
+	/*Sleep if cache already full (don't do this now)*/
+/*	if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT)
 		sleep_on_cache_full();
-
+*/
 	total_bytes_written = 0;
 
 	/* Decide the block indices for the first byte and last byte of
@@ -1818,22 +1819,30 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
 
+	printf("Debug statfs\n");
 	buf = malloc(sizeof(struct statvfs));
 	/*Prototype is linux statvfs call*/
 	sem_wait(&(hcfs_system->access_sem));
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
 	if (hcfs_system->systemdata.system_size > (50*powl(1024, 3)))
-		buf->f_blocks = (2*hcfs_system->systemdata.system_size) / 4096;
+		buf->f_blocks = (((hcfs_system->systemdata.system_size - 1)
+						/ 4096) + 1) * 2;
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
-	buf->f_bfree = buf->f_blocks -
-				((hcfs_system->systemdata.system_size) / 4096);
+	if (hcfs_system->systemdata.system_size == 0)
+		buf->f_bfree = buf->f_blocks;
+	else
+		buf->f_bfree = buf->f_blocks -
+			(((hcfs_system->systemdata.system_size - 1)
+						/ 4096) + 1);
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
 	sem_post(&(hcfs_system->access_sem));
+
+	printf("Debug statfs, checking inodes\n");
 
 	super_block_share_locking();
 	if (sys_super_block->head.num_active_inodes > 1000000)
@@ -1848,8 +1857,11 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	super_block_share_release();
 	buf->f_namemax = 256;
 
+	printf("Debug statfs, returning info\n");
+
 	fuse_reply_statfs(req, buf);
 	free(buf);
+	printf("Debug statfs end\n");
 }
 
 /************************************************************************
