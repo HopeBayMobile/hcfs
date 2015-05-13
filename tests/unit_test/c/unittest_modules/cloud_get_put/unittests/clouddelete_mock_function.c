@@ -85,8 +85,9 @@ int super_block_share_release(void)
 	return 0;
 }
 
+/* A mock function to return linear block indexing */
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
-	long long target_page, long long hint_page)
+	long long target_page, long long hint_page) 
 {
 	long long ret_page_pos = sizeof(struct stat) + 
 		sizeof(FILE_META_TYPE) + target_page *
