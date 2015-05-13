@@ -170,20 +170,16 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
+	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
+	MAX_BLOCK_SIZE = 100;
 	
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
-	tmp_file_meta.next_block_page = sizeof(struct stat) + sizeof(FILE_META_TYPE); 
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
 	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
 	tmp_blockentry_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 	for (int page_num = 0 ; page_num < total_page ; page_num++) {
-		if (page_num == total_page - 1)
-			tmp_blockentry_page.next_page = 0; // Last page
-		else
-			tmp_blockentry_page.next_page = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
-				(page_num + 1) * sizeof(BLOCK_ENTRY_PAGE); 
 		fwrite(&tmp_blockentry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta); // Write block page
 	}
 	fclose(meta);

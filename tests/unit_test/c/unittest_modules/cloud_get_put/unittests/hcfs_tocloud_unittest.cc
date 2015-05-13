@@ -57,7 +57,6 @@ public:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_file_meta;
 
-		mock_block_page.next_page = 0;
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
@@ -362,26 +361,18 @@ protected:
 		FILE *mock_metaptr;
 
 		mock_metaptr = fopen(metapath, "w+");
-		mock_stat.st_size = 1000000;
+		mock_stat.st_size = 1000000; // Let total_blocks = 1000000/1000 = 1000
 		mock_stat.st_mode = S_IFREG;
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
 		
-		mock_file_meta.next_block_page = sizeof(struct stat) + 
-			sizeof(FILE_META_TYPE);
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
 		
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int page_num = 0 ; page_num < total_page ; page_num++) {
-			if (page_num == total_page - 1)
-				mock_block_page.next_page = 0; // Last page
-			else
-				mock_block_page.next_page = sizeof(struct stat) + 
-					sizeof(FILE_META_TYPE) + (page_num + 1) * 
-					sizeof(BLOCK_ENTRY_PAGE); 
 			fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
-					1, mock_metaptr); // Write block page
+					1, mock_metaptr); // Linearly write block page
 		} 
 		fclose(mock_metaptr);
 
@@ -430,7 +421,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	/* Mock data */
 	write_mock_meta_file(metapath, total_page, ST_LDISK);
 		
-	system_config.max_block_size = 1000;
+	system_config.max_block_size = 100;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
 		
@@ -452,12 +443,10 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	metaptr = fopen(metapath, "r+");
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
-	int next_page = filemeta.next_block_page;
-	while (next_page != 0) {
-		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr);
+	while (!feof(metaptr)) {
+		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); // Linearly read block meta
 		for (int i = 0 ; i < block_page.num_entries ; i++)
 			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status); // Check status
-		next_page = block_page.next_page;
 	}
 	fclose(metaptr);
 	unlink(metapath);
