@@ -139,7 +139,7 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 	BLOCK_ENTRY_PAGE mock_page;
 	mock_page.num_entries = 1;
 	mock_page.block_entries[0].status = ST_LDISK;
-	mock_page.next_page = 0;
+	//mock_page.next_page = 0;
 	metafptr = fopen("/tmp/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
@@ -169,7 +169,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	meta_fpos = prefetch_ptr->page_start_fpos;
 	mock_page.num_entries = 1;
 	mock_page.block_entries[0].status = ST_CLOUD;
-	mock_page.next_page = 0;
+	//mock_page.next_page = 0;
 
 	metafptr = fopen("/tmp/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);

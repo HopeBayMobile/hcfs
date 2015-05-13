@@ -5,7 +5,7 @@
 #include "mock_params.h"
 #include "super_block.h"
 #include "global.h"
-
+#include "fuseop.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -132,4 +132,12 @@ int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 int super_block_exclusive_release(void)
 {
 	return 0;
+}
+
+long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	long long target_page, long long hint_page)
+{
+	long long ret_page_pos = sizeof(struct stat) + 
+		sizeof(FILE_META_TYPE) + target_page *
+		sizeof(BLOCK_ENTRY_PAGE);
 }
