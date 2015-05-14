@@ -22,18 +22,32 @@ extern DSYNC_THREAD_CONTROL dsync_ctl;
 TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 {
 	void *res;
+	int num_threads = 40;
 	
 	/* Run the function to check whether it will terminate threads */
 	init_dsync_control();
 	
 	/* Generate threads */
-	for (int i = 0 ; i < MAX_DSYNC_CONCURRENCY ; i++) {
+	for (int i = 0 ; i < num_threads ; i++) {
 		int inode = i+1;
-		dsync_ctl.threads_in_use[i] = inode;
-		dsync_ctl.threads_created[i] = TRUE;
+		int t_index;
+		
+		sem_wait(&dsync_ctl.dsync_queue_sem);
+		sem_wait(&dsync_ctl.dsync_op_sem);
+		t_index = -1;
+		for (int idx = 0 ; idx < MAX_DSYNC_CONCURRENCY ; idx++) {
+			if ((dsync_ctl.threads_in_use[idx] == 0) && 
+				(dsync_ctl.threads_created[idx] == FALSE)) {
+				t_index = idx;
+				break;
+			}
+		}
+		dsync_ctl.threads_in_use[t_index] = inode;
+		dsync_ctl.threads_created[t_index] = TRUE;
 		dsync_ctl.total_active_dsync_threads++;
-		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[i]), NULL, 
-			dsync_test_thread_fn, (void *)&inode));
+		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL, 
+			dsync_test_thread_fn, (void *)&i));
+		sem_post(&dsync_ctl.dsync_op_sem);
 	}
 	sleep(1);
 	EXPECT_EQ(0, pthread_cancel(dsync_ctl.dsync_handler_thread));
@@ -65,18 +79,32 @@ extern DELETE_THREAD_CONTROL delete_ctl;
 TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 {
 	void *res;
-	
+	int num_threads = 40;
+		
 	/* Run the function to check whether it will terminate threads */
 	init_delete_control();
 	
 	/* Generate threads */
-	for (int i = 0 ; i < MAX_DELETE_CONCURRENCY ; i++) {
-		delete_ctl.threads_in_use[i] = TRUE;
-		delete_ctl.threads_created[i] = TRUE;
-		delete_ctl.delete_threads[i].is_block = TRUE;
+	for (int i = 0 ; i < num_threads ; i++) {
+		int t_index;
+
+		sem_wait(&delete_ctl.delete_queue_sem);
+		sem_wait(&delete_ctl.delete_op_sem);
+		t_index = -1;
+		for (int idx = 0 ; idx < MAX_DELETE_CONCURRENCY ; idx++) {
+			if((delete_ctl.threads_in_use[idx] == FALSE) &&
+				(delete_ctl.threads_created[idx] == FALSE)) {
+				t_index = idx;
+				break;
+			}
+		}
+		delete_ctl.threads_in_use[t_index] = TRUE;
+		delete_ctl.threads_created[t_index] = TRUE;
+		delete_ctl.delete_threads[t_index].is_block = TRUE;
 		delete_ctl.total_active_delete_threads++;
-		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[i]), NULL, 
+		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]), NULL,
 			delete_test_thread_fn, (void *)&i));
+		sem_post(&delete_ctl.delete_op_sem);
 	}
 	sleep(1);
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));
