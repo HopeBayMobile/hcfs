@@ -106,24 +106,30 @@ class dir_remove_entryTest : public ::testing::Test {
 			FILE *fp;
 
                         self_name = "selfname";
-			metapath = "testpatterns/dir_remove_entry_meta_file";
+			metapath = "/tmp/dir_remove_entry_meta_file";
 
 			testpage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
 			/* Create mock meta file */
 			fp = fopen(metapath, "w+");
-			fwrite(testpage, sizeof(DIR_ENTRY_PAGE), 1, fp);
+			fwrite(testpage, sizeof(DIR_ENTRY_PAGE), 1, fp); // mock root_page used to read
 			fclose(fp);
-
-			/* Init meta cache entry */
+			/* Init meta cache entry. It will be read and modified in the function. */
 			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 			sem_init(&(body_ptr->access_sem), 0, 1);
 			body_ptr->fptr = fopen(metapath, "r+");
 			setbuf(body_ptr->fptr, NULL);
 			body_ptr->meta_opened = TRUE;
+			/* parent_meta & parent_stat will be modify in dir_remove_entry().
+			   Use the global vars to verify result. */
+			memset(&parent_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&parent_stat, 0, sizeof(struct stat));
+			parent_meta.total_children = TOTAL_CHILDREN_NUM; 
+			parent_stat.st_nlink = LINK_NUM;
                 }
 
                 virtual void TearDown() {
 			fclose(body_ptr->fptr);
+			unlink(metapath);
 			free(body_ptr);
 			free(testpage);
                 }
@@ -132,20 +138,32 @@ class dir_remove_entryTest : public ::testing::Test {
 TEST_F(dir_remove_entryTest, NoLockError) {
 	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
 }
-TEST_F(dir_remove_entryTest, BtreeDelOK) {
 
+TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail) {
+	/* Mock data to force btree deletion failed */
 	sem_wait(&(body_ptr->access_sem));
-	/* Force btree deletion failed */
-	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
-	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	DELETE_DIR_ENTRY_BTREE_RESULT = 0;
+	
+	/* Run tested function */
+	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+		
+	/* Verify */
+	EXPECT_EQ(TOTAL_CHILDREN_NUM, parent_meta.total_children);
+	EXPECT_EQ(LINK_NUM, parent_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
-TEST_F(dir_remove_entryTest, BtreeDelFailed) {
 
+TEST_F(dir_remove_entryTest, RemoveDirSuccess) {
+	/* Mock data */
 	sem_wait(&(body_ptr->access_sem));
-	/* Force btree deletion failed */
-	DELETE_DIR_ENTRY_BTREE_RESULT = 0;
-	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+	
+	/* Run tested function */
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+
+	/* Verify */
+	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, parent_meta.total_children);
+	EXPECT_EQ(LINK_NUM - 1, parent_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 /*

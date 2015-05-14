@@ -1,3 +1,6 @@
+#include "sys/stat.h"
+#include "fuseop.h"
+
 /* Parameters for mock functions */
 
 /* System statistics */
@@ -12,6 +15,12 @@
 
 /* decrease_nlink_inode_file() & seek_page() */
 #define NUM_BLOCKS 10
+
+/* dir_remove_entry() */
+#define TOTAL_CHILDREN_NUM 23
+#define LINK_NUM 12
+DIR_META_TYPE parent_meta;
+struct stat parent_stat;
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
