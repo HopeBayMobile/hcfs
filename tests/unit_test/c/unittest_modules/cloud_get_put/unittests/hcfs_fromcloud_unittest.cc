@@ -11,6 +11,24 @@ extern "C"{
 #include "mock_params.h"
 }
 
+extern SYSTEM_DATA_HEAD *hcfs_system;
+
+class fromcloudEnvironment : public ::testing::Environment {
+ public:
+
+  virtual void SetUp() {
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+  }
+
+  virtual void TearDown() {
+    free(hcfs_system);
+
+  }
+};
+
+::testing::Environment* const fromcloud_env = ::testing::AddGlobalTestEnvironment(new fromcloudEnvironment);
+
 /*
 	Unittest of fetch_from_cloud()
 */
@@ -105,8 +123,6 @@ TEST_F(fetch_from_cloudTest, FetchSuccess)
 	Unittest of prefetch_block()
 */
 
-extern SYSTEM_DATA_HEAD *hcfs_system;
-
 class prefetch_blockTest : public ::testing::Test {
 protected:
 	virtual void SetUp()
@@ -116,7 +132,6 @@ protected:
 		prefetch_ptr->block_no = 1;
 		prefetch_ptr->page_start_fpos = 0;
 		prefetch_ptr->entry_index = 0;
-		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 0, 1);
 		/* Used to fetch_from_cloud */
