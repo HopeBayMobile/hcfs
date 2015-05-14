@@ -62,6 +62,12 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testread") == 0) {
 		return 15;
 	}
+	if (strcmp(path, "/testwrite") == 0) {
+		return 16;
+	}
+	if (strcmp(path, "/testlistdir") == 0) {
+		return 17;
+	}
 
 	*errcode = -EACCES;
 	return 0;
@@ -130,6 +136,14 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 		if (strcmp(childname, "testread") == 0) {
 			this_inode = 15;
 			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testwrite") == 0) {
+			this_inode = 16;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testlistdir") == 0) {
+			this_inode = 17;
+			this_type = D_ISDIR;
 		}
 	}
 
@@ -288,12 +302,24 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 }
 int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 {
+	char tempbuf[1024];
+	int tmp_len;
+
 	switch (this_inode) {
 	case 14:
 		ftruncate(fileno(fptr), 102400);
 		break;
 	case 15:
-		ftruncate(fileno(fptr), 204800);
+	case 16:
+		if (test_fetch_from_backend == TRUE) {
+			fseek(fptr, 0, SEEK_SET);
+			snprintf(tempbuf, 100, "This is a test data");
+			tmp_len = strlen(tempbuf);
+			fwrite(tempbuf, tmp_len, 1, fptr);
+			fflush(fptr);
+		} else {
+			ftruncate(fileno(fptr), 204800);
+		}
 		break;
 	default:
 		break;
@@ -303,6 +329,8 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 
 void sleep_on_cache_full(void)
 {
+	printf("Debug passed sleep on cache full\n");
+	hcfs_system->systemdata.cache_size = 1200000;
 	return;
 }
 
@@ -378,6 +406,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
 		inode_stat->st_size = 204800;
+		break;
+	case 16:
+		inode_stat->st_ino = 16;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		inode_stat->st_size = 204800;
+		break;
+	case 17:
+		inode_stat->st_ino = 17;
+		inode_stat->st_mode = S_IFDIR | 0700;
+		inode_stat->st_atime = 100000;
 		break;
 	default:
 		break;
