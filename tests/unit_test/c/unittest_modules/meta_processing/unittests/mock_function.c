@@ -118,7 +118,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
         case INO_LOOKUP_FILE_DATA_OK:
         case INO_UPDATE_FILE_DATA_FAIL:
 		if (file_meta_ptr != NULL) {
-			file_meta_ptr->next_block_page = sizeof(BLOCK_ENTRY_PAGE);
+			//file_meta_ptr->next_block_page = sizeof(BLOCK_ENTRY_PAGE);
 
 			BLOCK_ENTRY_PAGE *tmp_page = (BLOCK_ENTRY_PAGE*)malloc(sizeof(BLOCK_ENTRY_PAGE));
 			fwrite(tmp_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
@@ -127,17 +127,17 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 
 		if (block_page != NULL) {
 			/* Assume there are NUM_BLOCKS blocks */
-			if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*NUM_BLOCKS) {
-				block_page->next_page = 0;
-			} else {
-				block_page->next_page = page_pos + sizeof(BLOCK_ENTRY_PAGE);
-			}
+			//if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*NUM_BLOCKS) {
+			//	block_page->next_page = 0;
+			//} else {
+			//	block_page->next_page = page_pos + sizeof(BLOCK_ENTRY_PAGE);
+			//}
 			fwrite(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
 		}
 		
 		return 0;
         case INO_LOOKUP_FILE_DATA_OK_NO_BLOCK_PAGE:
-		file_meta_ptr->next_block_page = 0;
+		//file_meta_ptr->next_block_page = 0;
 		return 0;
 	case INO_LOOKUP_FILE_DATA_FAIL:
 		return -1;
