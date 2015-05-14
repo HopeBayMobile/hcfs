@@ -8,6 +8,23 @@ extern "C" {
 #include "super_block.h"
 }
 
+class deleteEnvironment : public ::testing::Environment {
+ public:
+
+  virtual void SetUp() {
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+  }
+
+  virtual void TearDown() {
+    free(hcfs_system);
+
+  }
+};
+
+::testing::Environment* const delete_env = ::testing::AddGlobalTestEnvironment(new deleteEnvironment);
+
+
 /*
 	Unittest of init_dsync_control() & collect_finished_dsync_threads()
  */
