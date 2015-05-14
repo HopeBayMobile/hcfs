@@ -11,7 +11,7 @@ int before_update_file_data;
 int after_update_block_page;
 int test_fetch_from_backend;
 unsigned char fake_block_status;
-
+char readdir_metapath[100];
 int fail_open_files;
 
 BLOCK_ENTRY_PAGE updated_block_page;

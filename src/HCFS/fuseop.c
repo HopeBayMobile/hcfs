@@ -109,11 +109,15 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	struct timeval tmp_time1, tmp_time2;
 	struct stat tmp_stat;
 
+	printf("Debug getattr inode %lld\n", ino);
 	hit_inode = (ino_t) ino;
+
+	printf("Debug getattr hit inode %lld\n", hit_inode);
 
 	if (hit_inode > 0) {
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat);
 
+		printf("Debug getattr return inode %lld\n", tmp_stat.st_ino);
 		gettimeofday(&tmp_time2, NULL);
 
 		printf("getattr elapse %f\n",
@@ -1987,7 +1991,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	gettimeofday(&tmp_time1, NULL);
 
 /*TODO: Need to include symlinks*/
-	fprintf(stderr, "DEBUG readdir entering readdir\n");
+	fprintf(stderr, "DEBUG readdir entering readdir, size %lld, offset %lld\n", size, offset);
 
 	this_inode = (ino_t) ino;
 
@@ -2017,6 +2021,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		}
 	}
 
+	printf("Debug readdir file pos %lld\n", thisfile_pos);
 	countn = 0;
 	while (thisfile_pos != 0) {
 		printf("Now %dth iteration\n", countn);
@@ -2033,6 +2038,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 								body_ptr->fptr);
 		}
 
+		printf("Debug readdir page start %d %d\n", page_start,
+			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
@@ -2046,6 +2053,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					(size - buf_pos), 
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
+			printf("Debug readdir entry size %d\n", entry_size);
 			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
 				printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n", nextentry_pos, temp_page.this_page_pos, (count+1));

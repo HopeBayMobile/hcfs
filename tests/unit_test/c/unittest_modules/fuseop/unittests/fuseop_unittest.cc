@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <utime.h>
 #include <math.h>
+#include <dirent.h>
 extern "C" {
 #include "fuseop.h"
 #include "global.h"
@@ -1389,6 +1390,7 @@ class hfuse_ll_statfsTest : public ::testing::Test {
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     sys_super_block->head.num_active_inodes = 10000;
+    before_update_file_data = TRUE;
   }
 
   virtual void TearDown() {
@@ -1481,4 +1483,269 @@ TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
 }
 
 /* End of the test case for the function hfuse_ll_statfs */
+
+/* Begin of the test case for the function hfuse_ll_readdir */
+class hfuse_ll_readdirTest : public ::testing::Test {
+ protected:
+  FILE *fptr;
+
+  virtual void SetUp() {
+    snprintf(readdir_metapath, 100, "/tmp/readdir_meta");
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+    if (access(readdir_metapath, F_OK) == 0)
+      unlink(readdir_metapath);
+  }
+};
+
+TEST_F(hfuse_ll_readdirTest, NoEntry) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val;
+  struct stat tempstat;
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = 0;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = 2;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, SingleEntry) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val;
+  struct stat tempstat;
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = 1;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = 3;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  temppage.dir_entries[2].d_ino = 18;
+  snprintf(temppage.dir_entries[2].d_name, 200, "test1");
+  temppage.dir_entries[2].d_type = D_ISREG;
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 18);
+  EXPECT_EQ(0, strcmp(tmp_dirent.d_name, "test1"));
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, OneMaxPageEntries) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val, count;
+  struct stat tempstat;
+  char filename[100];
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = MAX_DIR_ENTRIES_PER_PAGE - 2;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d", count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+    ASSERT_NE(0, tmp_dirptr != NULL);
+    EXPECT_EQ(tmp_dirent.d_ino, 16 + count);
+    snprintf(filename, 100, "test%d", count - 1);
+    EXPECT_EQ(0, strcmp(tmp_dirent.d_name, filename));
+  }
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
+/* Note: this won't happen in actual b-tree */
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val, count;
+  struct stat tempstat;
+  char filename[100];
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = (2 * MAX_DIR_ENTRIES_PER_PAGE) - 2;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.child_page_pos[0] = temphead.root_entry_page
+				+ sizeof(DIR_ENTRY_PAGE);
+  temppage.tree_walk_next = temppage.child_page_pos[0];
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d", count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+// Second page
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page
+				+ sizeof(DIR_ENTRY_PAGE);
+  temppage.tree_walk_prev = temphead.root_entry_page;
+  for (count = 0; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count + MAX_DIR_ENTRIES_PER_PAGE;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d",
+		MAX_DIR_ENTRIES_PER_PAGE + count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  for (count = 2; count < (2 * MAX_DIR_ENTRIES_PER_PAGE); count++) {
+    readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+    ASSERT_NE(0, tmp_dirptr != NULL);
+    EXPECT_EQ(tmp_dirent.d_ino, 16 + count);
+    snprintf(filename, 100, "test%d", count - 1);
+    EXPECT_EQ(0, strcmp(tmp_dirent.d_name, filename));
+  }
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+/* End of the test case for the function hfuse_ll_readdir */
 

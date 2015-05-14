@@ -65,6 +65,9 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testwrite") == 0) {
 		return 16;
 	}
+	if (strcmp(path, "/testlistdir") == 0) {
+		return 17;
+	}
 
 	*errcode = -EACCES;
 	return 0;
@@ -137,6 +140,10 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 		if (strcmp(childname, "testwrite") == 0) {
 			this_inode = 16;
 			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testlistdir") == 0) {
+			this_inode = 17;
+			this_type = D_ISDIR;
 		}
 	}
 
@@ -405,6 +412,11 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
 		inode_stat->st_size = 204800;
+		break;
+	case 17:
+		inode_stat->st_ino = 17;
+		inode_stat->st_mode = S_IFDIR | 0700;
+		inode_stat->st_atime = 100000;
 		break;
 	default:
 		break;
