@@ -11,6 +11,24 @@ extern "C" {
 #include "super_block.h"
 }
 
+
+class uploadEnvironment : public ::testing::Environment {
+ public:
+
+  virtual void SetUp() {
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    hcfs_system->system_going_down = FALSE;
+  }
+
+  virtual void TearDown() {
+    free(hcfs_system);
+
+  }
+};
+
+::testing::Environment* const upload_env = ::testing::AddGlobalTestEnvironment(new uploadEnvironment);
+
+
 /*
 	Unittest of init_upload_control()
  */
@@ -522,7 +540,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	shm_verified_data->record_inode_counter = 0;
 	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
 	
-	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT;
 
 	sys_super_block = (SUPER_BLOCK_CONTROL *)malloc(sizeof(SUPER_BLOCK_CONTROL));
@@ -545,7 +562,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
 	}
 
-	free(hcfs_system);
 }
 
 /*
