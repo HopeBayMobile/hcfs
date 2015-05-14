@@ -1,6 +1,7 @@
 #include "mock_params.h"
 #include "super_block.h"
 #include "hcfs_cachebuild.h"
+#include "fuseop.h"
 
 void init_mock_system_config()
 {
@@ -41,4 +42,10 @@ int super_block_mark_dirty(ino_t this_inode)
 CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 {
 	return NULL;
+}
+
+long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
+	long long target_page, long long hint_page)
+{
+	return 0;
 }

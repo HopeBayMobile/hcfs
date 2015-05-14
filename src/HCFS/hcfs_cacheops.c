@@ -239,14 +239,15 @@ void run_cache_loop(void)
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
-			if (nonempty_cache_hash_entries <= 0) {
+			if (nonempty_cache_hash_entries <= 0) { // All empty
 				build_cache_usage();
 				gettimeofday(&builttime, NULL);
 				e_index = 0;
 				skip_recent = TRUE;
 				do_something = FALSE;
 			}
-
+			
+			/* End of hash table. Restart at index 0 */
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
@@ -264,11 +265,13 @@ void run_cache_loop(void)
 				}
 			}
 
+			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
 				continue;
 			}
 
+			/* All dirty. Local data cannot be deleted. */
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
