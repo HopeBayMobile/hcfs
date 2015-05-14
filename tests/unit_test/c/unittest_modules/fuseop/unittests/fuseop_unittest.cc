@@ -8,16 +8,20 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/vfs.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <pthread.h>
 #include <utime.h>
+#include <math.h>
+#include <dirent.h>
 extern "C" {
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
 #include "filetables.h"
 #include "utils.h"
+#include "super_block.h"
 }
 #include "gtest/gtest.h"
 
@@ -49,6 +53,9 @@ class fuseopEnvironment : public ::testing::Environment {
 
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    sys_super_block = (SUPER_BLOCK_CONTROL *)
+				malloc(sizeof(SUPER_BLOCK_CONTROL));
+    memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
     system_config.max_block_size = 2097152;
     system_config.cache_hard_limit = 3200000;
     system_config.cache_soft_limit = 3200000;
@@ -72,6 +79,7 @@ class fuseopEnvironment : public ::testing::Environment {
   virtual void TearDown() {
     int ret_val, tmp_err;
 
+    sleep(3);
     if (fork() == 0)
      execlp("fusermount","fusermount","-u","/tmp/test_fuse",(char *) NULL);
     else
@@ -83,6 +91,7 @@ class fuseopEnvironment : public ::testing::Environment {
     unlink("/tmp/test_fuse_log");
     free(system_fh_table.entry_table_flags);
     free(system_fh_table.entry_table);
+    free(sys_super_block);
     free(hcfs_system);
 
   }
@@ -96,6 +105,7 @@ class hfuse_getattrTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    after_update_block_page = FALSE;
   }
 
   virtual void TearDown() {
@@ -765,6 +775,7 @@ class hfuse_truncateTest : public ::testing::Test {
   virtual void SetUp() {
     before_update_file_data = TRUE;
     fake_block_status = ST_NONE;
+    after_update_block_page = FALSE;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
@@ -1012,13 +1023,15 @@ TEST_F(hfuse_openTest, OpenFileOK) {
 
 /* End of the test case for the function hfuse_open */
 
-/* Begin of the test case for the function hfuse_read */
+/* Begin of the test case for the function hfuse_ll_read */
 class hfuse_readTest : public ::testing::Test {
  protected:
   FILE *fptr;
 
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    after_update_block_page = FALSE;
+    test_fetch_from_backend = FALSE;
     fake_block_status = ST_NONE;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
@@ -1136,5 +1149,603 @@ TEST_F(hfuse_readTest, ReadLocalContent) {
   fptr = NULL;
 }
 
+TEST_F(hfuse_readTest, ReadCloudContent) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_CLOUD;
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_readTest, ReadCloudWaitCache) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  hcfs_system->systemdata.cache_size = 5000000;
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 15, 0);
+  fake_block_status = ST_CLOUD;
+
+  fptr = fopen("/tmp/test_fuse/testread", "r");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fread(tempbuf, 100, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(strncmp(tempbuf, "This is a test data", tmp_len), 0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
 /* End of the test case for the function hfuse_read */
+
+/* Begin of the test case for the function hfuse_ll_write */
+class hfuse_ll_writeTest : public ::testing::Test {
+ protected:
+  FILE *fptr;
+
+  virtual void SetUp() {
+    before_update_file_data = TRUE;
+    after_update_block_page = FALSE;
+    test_fetch_from_backend = FALSE;
+    fake_block_status = ST_NONE;
+    hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
+    fptr = NULL;
+  }
+
+  virtual void TearDown() {
+    char temppath[1024];
+
+    if (fptr != NULL)
+      fclose(fptr);
+
+    fetch_block_path(temppath, 16, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+  }
+};
+
+TEST_F(hfuse_ll_writeTest, WriteZeroByte) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  int fd;
+  size_t ret_items;
+
+  fetch_block_path(temppath, 16, 0);
+
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+
+  ret_items = fwrite(tempbuf, 0, 0, fptr);
+  EXPECT_EQ(ret_items, 0);
+  fclose(fptr);
+  fptr = NULL;
+}
+
+TEST_F(hfuse_ll_writeTest, WritePastEnd) {
+  int ret_val;
+  int tmp_err, tmp_len;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  int fd;
+  size_t ret_items;
+
+  fetch_block_path(temppath, 16, 0);
+
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+
+  snprintf(tempbuf, 10, "test");
+  fseek(fptr, 204900, SEEK_SET);
+  tmp_len = strlen(tempbuf)+1;
+  ret_items = fwrite(tempbuf, tmp_len, 1, fptr);
+  EXPECT_EQ(ret_items,1);
+  fclose(fptr);
+  fptr = NULL;
+  fptr = fopen(temppath, "r");
+  fseek(fptr, 204900, SEEK_SET);
+  ret_items = fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(ret_items, 1);
+  EXPECT_EQ(0, strcmp(tempbuf, "test"));
+}
+
+TEST_F(hfuse_ll_writeTest, ReWriteLocalContent) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_LDISK;
+  fptr = fopen(temppath,"a+");
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
+  fwrite(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_CLOUD;
+
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
+  int ret_val;
+  int tmp_err;
+  struct stat tempstat;
+  char temppath[1024];
+  char tempbuf[1024];
+  size_t ret_items;
+  int count;
+  int tmp_len;
+
+  hcfs_system->systemdata.cache_size = 5000000;
+
+  test_fetch_from_backend = TRUE;
+  fetch_block_path(temppath, 16, 0);
+  fake_block_status = ST_CLOUD;
+
+  ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
+  fptr = fopen("/tmp/test_fuse/testwrite", "r+");
+  ASSERT_NE(fptr != NULL, 0);
+
+  fseek(fptr, 10, SEEK_SET);
+  snprintf(tempbuf, 10, "temp");
+  ret_items = fwrite(tempbuf, 4, 1, fptr);
+  EXPECT_EQ(ret_items, 1);
+  fclose(fptr);
+  fptr = NULL;
+
+  fptr = fopen(temppath,"r");
+  fread(tempbuf, tmp_len, 1, fptr);
+  fclose(fptr);
+  fptr = NULL;
+  EXPECT_EQ(strncmp(tempbuf, "This is a temp data", tmp_len), 0);
+}
+
+/* End of the test case for the function hfuse_ll_write */
+
+/* Begin of the test case for the function hfuse_ll_statfs */
+class hfuse_ll_statfsTest : public ::testing::Test {
+ protected:
+
+  virtual void SetUp() {
+    hcfs_system->systemdata.system_size = 12800000;
+    hcfs_system->systemdata.cache_size = 1200000;
+    hcfs_system->systemdata.cache_blocks = 13;
+    sys_super_block->head.num_active_inodes = 10000;
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+  }
+};
+
+TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
+
+  struct statfs tmpstat;
+  int ret_val;
+
+  ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
+
+  ASSERT_EQ(0, ret_val);
+
+  EXPECT_EQ(4096, tmpstat.f_bsize);
+  EXPECT_EQ(4096, tmpstat.f_frsize);
+  EXPECT_EQ(25*powl(1024,2), tmpstat.f_blocks);
+  EXPECT_EQ(25*powl(1024,2) - (((12800000 - 1) / 4096) + 1), tmpstat.f_bfree);
+  EXPECT_EQ(25*powl(1024,2) - (((12800000 - 1) / 4096) + 1), tmpstat.f_bavail);
+  EXPECT_EQ(2000000, tmpstat.f_files);
+  EXPECT_EQ(2000000 - 10000, tmpstat.f_ffree);
+}
+TEST_F(hfuse_ll_statfsTest, EmptySysStat) {
+
+  struct statfs tmpstat;
+  int ret_val;
+
+  hcfs_system->systemdata.system_size = 0;
+  hcfs_system->systemdata.cache_size = 0;
+  hcfs_system->systemdata.cache_blocks = 0;
+  sys_super_block->head.num_active_inodes = 0;
+
+  ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
+
+  ASSERT_EQ(0, ret_val);
+
+  EXPECT_EQ(4096, tmpstat.f_bsize);
+  EXPECT_EQ(4096, tmpstat.f_frsize);
+  EXPECT_EQ(25*powl(1024,2), tmpstat.f_blocks);
+  EXPECT_EQ(25*powl(1024,2), tmpstat.f_bfree);
+  EXPECT_EQ(25*powl(1024,2), tmpstat.f_bavail);
+  EXPECT_EQ(2000000, tmpstat.f_files);
+  EXPECT_EQ(2000000, tmpstat.f_ffree);
+}
+
+TEST_F(hfuse_ll_statfsTest, BorderStat) {
+
+  struct statfs tmpstat;
+  int ret_val;
+
+  hcfs_system->systemdata.system_size = 4096;
+  hcfs_system->systemdata.cache_size = 0;
+  hcfs_system->systemdata.cache_blocks = 0;
+
+  ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
+
+  ASSERT_EQ(0, ret_val);
+
+  EXPECT_EQ(4096, tmpstat.f_bsize);
+  EXPECT_EQ(4096, tmpstat.f_frsize);
+  EXPECT_EQ(25*powl(1024,2), tmpstat.f_blocks);
+  EXPECT_EQ(25*powl(1024,2) - 1, tmpstat.f_bfree);
+  EXPECT_EQ(25*powl(1024,2) - 1, tmpstat.f_bavail);
+  EXPECT_EQ(2000000, tmpstat.f_files);
+  EXPECT_EQ(2000000 - 10000, tmpstat.f_ffree);
+}
+
+TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
+
+  struct statfs tmpstat;
+  int ret_val;
+  long long sys_blocks;
+
+  hcfs_system->systemdata.system_size = 50*powl(1024,3) + 1;
+  sys_super_block->head.num_active_inodes = 2000000;
+
+  sys_blocks = ((50*powl(1024,3) + 1 - 1) / 4096) + 1;
+  ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
+
+  ASSERT_EQ(0, ret_val);
+
+  EXPECT_EQ(4096, tmpstat.f_bsize);
+  EXPECT_EQ(4096, tmpstat.f_frsize);
+  EXPECT_EQ(2 * sys_blocks, tmpstat.f_blocks);
+  EXPECT_EQ(sys_blocks, tmpstat.f_bfree);
+  EXPECT_EQ(sys_blocks, tmpstat.f_bavail);
+  EXPECT_EQ(4000000, tmpstat.f_files);
+  EXPECT_EQ(2000000, tmpstat.f_ffree);
+}
+
+/* End of the test case for the function hfuse_ll_statfs */
+
+/* Begin of the test case for the function hfuse_ll_readdir */
+class hfuse_ll_readdirTest : public ::testing::Test {
+ protected:
+  FILE *fptr;
+
+  virtual void SetUp() {
+    snprintf(readdir_metapath, 100, "/tmp/readdir_meta");
+    before_update_file_data = TRUE;
+  }
+
+  virtual void TearDown() {
+    if (access(readdir_metapath, F_OK) == 0)
+      unlink(readdir_metapath);
+  }
+};
+
+TEST_F(hfuse_ll_readdirTest, NoEntry) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val;
+  struct stat tempstat;
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = 0;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = 2;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, SingleEntry) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val;
+  struct stat tempstat;
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = 1;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = 3;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  temppage.dir_entries[2].d_ino = 18;
+  snprintf(temppage.dir_entries[2].d_name, 200, "test1");
+  temppage.dir_entries[2].d_type = D_ISREG;
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 18);
+  EXPECT_EQ(0, strcmp(tmp_dirent.d_name, "test1"));
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, OneMaxPageEntries) {
+
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val, count;
+  struct stat tempstat;
+  char filename[100];
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = MAX_DIR_ENTRIES_PER_PAGE - 2;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d", count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+    ASSERT_NE(0, tmp_dirptr != NULL);
+    EXPECT_EQ(tmp_dirent.d_ino, 16 + count);
+    snprintf(filename, 100, "test%d", count - 1);
+    EXPECT_EQ(0, strcmp(tmp_dirent.d_name, filename));
+  }
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
+/* Note: this won't happen in actual b-tree */
+  DIR_META_TYPE temphead;
+  DIR_ENTRY_PAGE temppage;
+  DIR *dptr;
+  struct dirent tmp_dirent, *tmp_dirptr;
+  int ret_val, count;
+  struct stat tempstat;
+  char filename[100];
+
+  fptr = fopen(readdir_metapath, "w");
+  setbuf(fptr, NULL);
+  fwrite(&tempstat, sizeof(struct stat), 1, fptr);
+  temphead.total_children = (2 * MAX_DIR_ENTRIES_PER_PAGE) - 2;
+  temphead.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+  temphead.next_xattr_page = 0;
+  temphead.entry_page_gc_list = 0;
+  temphead.tree_walk_list_head = temphead.root_entry_page;
+  fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
+
+  ASSERT_EQ(184, ftell(fptr));
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page;
+  temppage.child_page_pos[0] = temphead.root_entry_page
+				+ sizeof(DIR_ENTRY_PAGE);
+  temppage.tree_walk_next = temppage.child_page_pos[0];
+  temppage.dir_entries[0].d_ino = 17;
+  snprintf(temppage.dir_entries[0].d_name, 200, ".");
+  temppage.dir_entries[0].d_type = D_ISDIR;
+  temppage.dir_entries[1].d_ino = 1;
+  snprintf(temppage.dir_entries[1].d_name, 200, "..");
+  temppage.dir_entries[1].d_type = D_ISDIR;
+
+  for (count = 2; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d", count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+// Second page
+  memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+  temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
+  temppage.this_page_pos = temphead.root_entry_page
+				+ sizeof(DIR_ENTRY_PAGE);
+  temppage.tree_walk_prev = temphead.root_entry_page;
+  for (count = 0; count < MAX_DIR_ENTRIES_PER_PAGE; count++) {
+    temppage.dir_entries[count].d_ino = 16 + count + MAX_DIR_ENTRIES_PER_PAGE;
+    snprintf(temppage.dir_entries[count].d_name, 200, "test%d",
+		MAX_DIR_ENTRIES_PER_PAGE + count - 1);
+    temppage.dir_entries[count].d_type = D_ISREG;
+  }
+
+  fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+  fclose(fptr);
+
+  dptr = opendir("/tmp/test_fuse/testlistdir");
+  ASSERT_NE(0, dptr != NULL);
+  ret_val = readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 17);  
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_NE(0, tmp_dirptr != NULL);
+  EXPECT_EQ(tmp_dirent.d_ino, 1);  
+
+  for (count = 2; count < (2 * MAX_DIR_ENTRIES_PER_PAGE); count++) {
+    readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+    ASSERT_NE(0, tmp_dirptr != NULL);
+    EXPECT_EQ(tmp_dirent.d_ino, 16 + count);
+    snprintf(filename, 100, "test%d", count - 1);
+    EXPECT_EQ(0, strcmp(tmp_dirent.d_name, filename));
+  }
+
+  readdir_r(dptr, &tmp_dirent, &tmp_dirptr);
+  ASSERT_EQ(0, tmp_dirptr != NULL);
+  closedir(dptr);
+}
+
+/* End of the test case for the function hfuse_ll_readdir */
 
