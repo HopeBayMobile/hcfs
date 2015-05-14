@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/2 Jiahong added header for this file.
 * 2015/2/11 Jiahong moved some functions to hfuse_system.h.
+* 2015/5/11 Jiahong modifying file meta for new block indexing / searching
 *
 **************************************************************************/
 
@@ -30,6 +31,9 @@
 #define MIN_DIR_ENTRIES_PER_PAGE 30
 /* WARNING: MIN_DIR_ENTRIES_PER_PAGE must be smaller than
 *  MAX_DIR_ENTRIES_PER_PAGE/2 */
+
+/* Number of pointers in a pointer page */
+#define POINTERS_PER_PAGE 1024
 
 /* Defining the names for block status */
 /* Not stored on any media or storage. Value should be zero.*/
@@ -90,18 +94,26 @@ typedef struct {
 	unsigned char status;
 } BLOCK_ENTRY;
 
-/* Defining the structure of file meta */
-typedef struct {
-	long long next_block_page;
-	long long next_xattr_page;
-} FILE_META_TYPE;
-
 /* Defining the structure of one page of block status page */
 typedef struct {
 	int num_entries;
 	BLOCK_ENTRY block_entries[MAX_BLOCK_ENTRIES_PER_PAGE];
-	long long next_page;
 } BLOCK_ENTRY_PAGE;
+
+/* Defining the structure of pointer page (pointers to other pages) */
+typedef struct {
+	long long ptr[POINTERS_PER_PAGE];
+} PTR_ENTRY_PAGE;
+
+/* Defining the structure of file meta */
+typedef struct {
+	long long next_xattr_page;
+	long long direct;
+	long long single_indirect;
+	long long double_indirect;
+	long long triple_indirect;
+	long long quadruple_indirect;
+} FILE_META_TYPE;
 
 /*END META definition*/
 
@@ -115,6 +127,7 @@ typedef struct {
 typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
+	char system_going_down;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;

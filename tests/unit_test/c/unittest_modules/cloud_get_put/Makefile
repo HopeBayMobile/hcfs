@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = meta_mem_cache_unittest
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -51,7 +51,9 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test :
-	./meta_mem_cache_unittest
+	./hcfs_fromcloud_unittest
+	./hcfs_tocloud_unittest
+	./hcfs_clouddelete_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -83,22 +85,55 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 
 
-# meta_mem_cache testing
+# hcfs_fromcloud testing
 
-     
+hcfs_fromcloud.o : $(USER_DIR)/hcfs_fromcloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_fromcloud.c
 
-meta_mem_cache.o : $(USER_DIR)/meta_mem_cache.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/super_block.h  $(USER_DIR)/meta_mem_cache.h \
-                     $(USER_DIR)/dir_entry_btree.h  $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/meta_mem_cache.c
-
-meta_mem_cache_unittest.o : $(UNITTEST_DIR)/meta_mem_cache_unittest.cc \
-                      $(USER_DIR)/meta_mem_cache.h $(USER_DIR)/meta_mem_cache.c \
+hcfs_fromcloud_unittest.o : $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc \
+                      $(USER_DIR)/hcfs_fromcloud.h $(USER_DIR)/hcfs_fromcloud.c \
 		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/meta_mem_cache_unittest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc
 
-mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_tool.h 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
+fromcloud_mock_function.o : $(UNITTEST_DIR)/fromcloud_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fromcloud_mock_function.c
 
-meta_mem_cache_unittest : mock_function.o meta_mem_cache.o meta_mem_cache_unittest.o gtest_main.a
+hcfs_fromcloud_unittest : fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# hcfs_tocloud testing
+
+hcfs_tocloud.o : $(USER_DIR)/hcfs_tocloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_tocloud.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_tocloud.c
+
+hcfs_tocloud_unittest.o : $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc \
+                      $(USER_DIR)/hcfs_tocloud.h $(USER_DIR)/hcfs_tocloud.c \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc
+
+tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_mock_function.c
+
+hcfs_tocloud_unittest : tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# hcfs_clouddelete testing
+
+hcfs_clouddelete.o : $(USER_DIR)/hcfs_clouddelete.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_clouddelete.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_clouddelete.c
+
+hcfs_clouddelete_unittest.o : $(UNITTEST_DIR)/hcfs_clouddelete_unittest.cc \
+                      $(USER_DIR)/hcfs_clouddelete.h $(USER_DIR)/hcfs_clouddelete.c \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_clouddelete_unittest.cc
+
+clouddelete_mock_function.o : $(UNITTEST_DIR)/clouddelete_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/clouddelete_mock_function.c
+
+hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_clouddelete_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+

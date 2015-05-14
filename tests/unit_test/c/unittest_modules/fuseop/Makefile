@@ -34,9 +34,11 @@ CXX = gcc
 
 CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
 
+CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
+
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = meta_mem_cache_unittest
+TESTS = fuseop_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -48,10 +50,10 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+	rm -f $(TESTS) gtest.a gtest_main.a *.o  *.gcda *.gcov *.gcno
 
 test :
-	./meta_mem_cache_unittest
+	./fuseop_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -81,24 +83,20 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
+fuseop.o : $(USER_DIR)/fuseop.c $(USER_DIR)/fuseop.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/fuseop.c
+
+fake_meta_mem_cache.o : $(UNITTEST_DIR)/fake_meta_mem_cache.c
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/fake_meta_mem_cache.c
+
+fake_misc.o : $(UNITTEST_DIR)/fake_misc.c
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/fake_misc.c
+
+fuseop_unittest.o : $(UNITTEST_DIR)/fuseop_unittest.cc \
+                     $(USER_DIR)/fuseop.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fuseop_unittest.cc
+
+fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lfuse
 
 
-# meta_mem_cache testing
-
-     
-
-meta_mem_cache.o : $(USER_DIR)/meta_mem_cache.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/super_block.h  $(USER_DIR)/meta_mem_cache.h \
-                     $(USER_DIR)/dir_entry_btree.h  $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/meta_mem_cache.c
-
-meta_mem_cache_unittest.o : $(UNITTEST_DIR)/meta_mem_cache_unittest.cc \
-                      $(USER_DIR)/meta_mem_cache.h $(USER_DIR)/meta_mem_cache.c \
-		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/meta_mem_cache_unittest.cc
-
-mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_tool.h 
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
-
-meta_mem_cache_unittest : mock_function.o meta_mem_cache.o meta_mem_cache_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++

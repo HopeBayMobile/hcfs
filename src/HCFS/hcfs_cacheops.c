@@ -34,6 +34,8 @@
 #include "global.h"
 #include "hfuse_system.h"
 
+#define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
+
 extern SYSTEM_CONF_STRUCT system_config;
 
 /* Helper function for removing local cached block for blocks that
@@ -49,7 +51,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	struct stat temphead_stat;
 	struct stat tempstat;
 	FILE_META_TYPE temphead;
-	long long pagepos, nextpagepos;
+	long long pagepos;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	size_t ret_val;
@@ -88,7 +90,6 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		fread(&temphead_stat, sizeof(struct stat), 1, metafptr);
 
 		fread(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
-		nextpagepos = temphead.next_block_page;
 		total_blocks = (temphead_stat.st_size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
@@ -97,15 +98,20 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		for (current_block = 0; current_block < total_blocks;
 							current_block++) {
 			if (page_index >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-				if (nextpagepos == 0)
-					break;
-				pagepos = nextpagepos;
+				pagepos = seek_page2(&temphead, metafptr,
+					current_block / BLK_INCREMENTS, 0);
+
+				/* No block for this page. Skipping the entire
+				page */
+				if (pagepos == 0) {
+					current_block += (BLK_INCREMENTS-1);
+					continue;
+				}
 				fseek(metafptr, pagepos, SEEK_SET);
 				ret_val = fread(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 				if (ret_val < 1)
 					break;
-				nextpagepos = temppage.next_page;
 
 				page_index = 0;
 			}
@@ -181,7 +187,6 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 				if (ret_val < 1)
 					break;
-				nextpagepos = temppage.next_page;
 			}
 			page_index++;
 		}
@@ -230,7 +235,7 @@ void run_cache_loop(void)
 	skip_recent = TRUE;
 	do_something = FALSE;
 
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
@@ -315,6 +320,8 @@ void run_cache_loop(void)
 				do_something = FALSE;
 			}
 			sleep(1);
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			seconds_slept++;
 		}
 	}

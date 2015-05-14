@@ -9,6 +9,8 @@
 * Revision History
 * 2015/2/13,16 Jiahong revised coding style.
 * 2015/2/16 Jiahong added header for this file.
+* 2015/5/14 Jiahong changed code so that process will terminate with fuse
+*           unmount.
 *
 **************************************************************************/
 
@@ -36,6 +38,8 @@ TODO: error handling for HTTP exceptions
 #include "super_block.h"
 #include "fuseop.h"
 
+#define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
+
 extern SYSTEM_CONF_STRUCT system_config;
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
@@ -50,7 +54,7 @@ static inline void _sync_terminate_thread(int index)
 									NULL);
 		if (ret == 0) {
 			sync_ctl.threads_in_use[index] = 0;
-			sync_ctl.threads_created[index] == FALSE;
+			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
 		 }
@@ -65,9 +69,9 @@ void collect_finished_sync_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-	/*TODO: Perhaps need to change this flag to allow
-		terminating at shutdown*/
-	while (TRUE) {
+
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(sync_ctl.total_active_sync_threads > 0)) {
 		sem_wait(&(sync_ctl.sync_op_sem));
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
@@ -116,7 +120,6 @@ static inline void _upload_terminate_thread(int index)
 
 	if (ret_val != 0)
 		return;
-
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -213,9 +216,8 @@ void collect_finished_upload_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
-	/*TODO: Perhaps need to change this flag to allow
-		terminating at shutdown*/
-	while (TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(upload_ctl.total_active_upload_threads > 0)) {
 		sem_wait(&(upload_ctl.upload_op_sem));
 
 		if (upload_ctl.total_active_upload_threads <= 0) {
@@ -307,8 +309,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int which_curl;
-	long long page_pos, e_index;
-	long long total_blocks, total_pages;
+	long long page_pos, e_index, which_page, current_page;
+	long long total_blocks;
 	long long count, block_count;
 	unsigned char block_status;
 	char upload_done;
@@ -316,6 +318,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	off_t tmp_size;
 	struct timespec time_to_sleep;
 	BLOCK_ENTRY *tmp_entry;
+	long long temp_trunc_size;
+	ssize_t ret_ssize;
+
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -331,28 +336,34 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
-
+	
+	/* Upload block if mode == S_IFREG */
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
 		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		fread(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
-		page_pos = tempfilemeta.next_block_page;
-		e_index = 0;
+
 		tmp_size = tempfilestat.st_size;
+
+		/* Check if need to sync past the current size */
+		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+
+		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+			tmp_size = temp_trunc_size;
+			fremovexattr(fileno(metafptr), "user.trunc_size");
+		}
+
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else
 			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
-		if (total_blocks == 0)
-			total_pages = 0;
-		else
-			total_pages = ((total_blocks - 1) /
-					MAX_BLOCK_ENTRIES_PER_PAGE) + 1;
-
 		flock(fileno(metafptr), LOCK_UN);
 
-		for (block_count = 0; page_pos != 0; block_count++) {
+		current_page = -1;
+		for (block_count = 0; block_count < total_blocks;
+							block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
 			/*Perhaps the file is deleted already*/
@@ -361,13 +372,18 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				break;
 			}
 
-			if (e_index >= MAX_BLOCK_ENTRIES_PER_PAGE) {
-				page_pos = temppage.next_page;
-				e_index = 0;
-				if (page_pos == 0) {
+			e_index = block_count % BLK_INCREMENTS;
+			which_page = block_count / BLK_INCREMENTS;
+
+			if (current_page != which_page) {
+				page_pos = seek_page2(&tempfilemeta, metafptr,
+					which_page, 0);
+				if (page_pos <= 0) {
+					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);
-					break;
+					continue;
 				}
+				current_page = which_page;
 			}
 
 			/*TODO: error handling here if cannot read correctly*/
@@ -408,7 +424,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				dispatch_upload_block(which_curl);
 				/*TODO: Maybe should also first copy block
 					out first*/
-				e_index++;
 				continue;
 			}
 			if (block_status == ST_TODELETE) {
@@ -426,7 +441,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 			}
 
-			e_index++;
 		}
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
@@ -611,7 +625,7 @@ void dispatch_upload_block(int which_curl)
 		if (!access(tempfilename, F_OK)) {
 			count++;
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_meta_%lld_%lld.%d",
+				"/dev/shm/hcfs_sync_block_%lld_%lld.%d",
 				upload_ptr->inode, upload_ptr->blockno, count);
 		} else {
 			break;
@@ -698,7 +712,7 @@ void upload_loop(void)
 
 	printf("Start upload loop\n");
 
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			for (sleep_count = 0; sleep_count < 30;
 							sleep_count++) {
@@ -716,7 +730,8 @@ void upload_loop(void)
 		}
 
 		is_start_check = FALSE;
-
+		
+		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
 		super_block_exclusive_locking();
 		if (ino_check == 0)
@@ -744,6 +759,7 @@ void upload_loop(void)
 		 }
 		super_block_exclusive_release();
 
+		/* Begin to sync the inode */
 		if (ino_sync != 0) {
 			sem_wait(&(sync_ctl.sync_op_sem));
 			/*First check if this inode is actually being
