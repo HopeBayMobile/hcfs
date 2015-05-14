@@ -66,6 +66,7 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0);
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
+	hcfs_system->system_going_down = FALSE;
 
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
@@ -253,6 +254,16 @@ int main(int argc, char **argv)
 	init_hfuse();
 	this_pid = fork();
 	if (this_pid == 0) {
+		logfptr = fopen("cache_maintain_log", "a+");
+		setbuf(logfptr, NULL);
+		fprintf(logfptr, "\nStart logging cache cleanup\n");
+		printf("Redirecting to cache log\n");
+		dup2(fileno(logfptr), fileno(stdout));
+		dup2(fileno(logfptr), fileno(stderr));
+
+		run_cache_loop();
+		fclose(logfptr);
+	} else {
 		this_pid1 = fork();
 		if (this_pid1 == 0) {
 			logfptr = fopen("backend_upload_log", "a+");
@@ -266,31 +277,27 @@ int main(int argc, char **argv)
 			upload_loop();
 			fclose(logfptr);
 		} else {
-			logfptr = fopen("cache_maintain_log", "a+");
+
+			logfptr = fopen("fuse_log", "a+");
 			setbuf(logfptr, NULL);
-			fprintf(logfptr, "\nStart logging cache cleanup\n");
-			printf("Redirecting to cache log\n");
+			fprintf(logfptr, "\nStart logging fuse\n");
+			printf("Redirecting to fuse log\n");
 			dup2(fileno(logfptr), fileno(stdout));
 			dup2(fileno(logfptr), fileno(stderr));
+			sem_init(&download_curl_sem, 0,
+					MAX_DOWNLOAD_CURL_HANDLE);
+			sem_init(&download_curl_control_sem, 0, 1);
 
-			run_cache_loop();
+			for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+								count++)
+				_init_download_curl(count);
+
+			hook_fuse(argc, argv);
+			printf("Waiting for subprocesses to terminate\n");
+			waitpid(this_pid, NULL, 0);
+			waitpid(this_pid1, NULL, 0);
 			fclose(logfptr);
 		}
-	} else {
-		logfptr = fopen("fuse_log", "a+");
-		setbuf(logfptr, NULL);
-		fprintf(logfptr, "\nStart logging fuse\n");
-		printf("Redirecting to fuse log\n");
-		dup2(fileno(logfptr), fileno(stdout));
-		dup2(fileno(logfptr), fileno(stderr));
-		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1);
-
-		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
-			_init_download_curl(count);
-
-		hook_fuse(argc, argv);
-		return 0;
 	}
 	return 0;
 }

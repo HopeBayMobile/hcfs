@@ -2103,7 +2103,7 @@ void reporter_module(void)
 	bind(fd, &addr, sizeof(struct sockaddr_un));
 
 	listen(fd, 10);
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		fd1 = accept(fd, NULL, NULL);
 		msg_len = 0;
 		while (TRUE) {
@@ -2171,8 +2171,7 @@ void hfuse_ll_destroy(void *userdata)
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
 
-	fclose(logfptr);
-
+	hcfs_system->system_going_down = TRUE;
 	return;
 }
 

@@ -1,0 +1,444 @@
+
+Start logging fuse
+Data passed in is (null)
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000079
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000058
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000060
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000049
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000047
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000056
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000045
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000047
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000054
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000049
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000055
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000054
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000047
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000044
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000053
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000048
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000061
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000054
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000053
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000072
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000052
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000051
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000047
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000053
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000042
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000056
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000041
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000040
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000057
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000043
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000048
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000040
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000040
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000051
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000040
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000039
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000049
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000041
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000041
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000049
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000039
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000039
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000050
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000041
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000039
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000049
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000040
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000041
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000048
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000044
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000038
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000042
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000039
+DEBUG readdir entering readdir, size 4096, offset 0
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 0 3
+Debug readdir entry size 32
+Debug readdir entry size 32
+Debug readdir entry size 56
+readdir elapse 0.000073
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000046
+DEBUG readdir entering readdir, size 4096, offset 18403
+readdir starts at offset 184, entry number 3
+Debug readdir file pos 184
+Now 0th iteration
+Debug readdir page start 3 3
+readdir elapse 0.000045
+Waiting for subprocesses to terminate

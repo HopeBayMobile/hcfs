@@ -9,6 +9,8 @@
 * Revision History
 * 2015/2/13,16 Jiahong revised coding style.
 * 2015/2/16 Jiahong added header for this file.
+* 2015/5/14 Jiahong changed code so that process will terminate with fuse
+*           unmount.
 *
 **************************************************************************/
 
@@ -67,9 +69,9 @@ void collect_finished_sync_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-	/*TODO: Perhaps need to change this flag to allow
-		terminating at shutdown*/
-	while (TRUE) {
+
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(sync_ctl.total_active_sync_threads > 0)) {
 		sem_wait(&(sync_ctl.sync_op_sem));
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
@@ -214,9 +216,8 @@ void collect_finished_upload_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
-	/*TODO: Perhaps need to change this flag to allow
-		terminating at shutdown*/
-	while (TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(upload_ctl.total_active_upload_threads > 0)) {
 		sem_wait(&(upload_ctl.upload_op_sem));
 
 		if (upload_ctl.total_active_upload_threads <= 0) {
@@ -711,7 +712,7 @@ void upload_loop(void)
 
 	printf("Start upload loop\n");
 
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
 			for (sleep_count = 0; sleep_count < 30;
 							sleep_count++) {
