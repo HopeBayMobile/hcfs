@@ -8,6 +8,8 @@
 *
 * Revision History
 * 2015/2/12~13 Jiahong added header for this file, and revising coding style.
+* 2015/5/14 Jiahong changed code so that process will terminate with fuse
+*           unmount.
 *
 **************************************************************************/
 
@@ -85,9 +87,8 @@ void collect_finished_dsync_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
-	/*TODO: Perhaps need to change this flag to allow
-		terminating at shutdown*/
-	while (TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(dsync_ctl.total_active_dsync_threads > 0)) {
 		sem_wait(&(dsync_ctl.dsync_op_sem));
 
 		if (dsync_ctl.total_active_dsync_threads <= 0) {
@@ -143,9 +144,8 @@ void collect_finished_delete_threads(void *ptr)
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
-	/*TODO: Perhaps need to change this flag to allow terminating
-		at shutdown*/
-	while (TRUE) {
+	while ((hcfs_system->system_going_down == FALSE) ||
+		(delete_ctl.total_active_delete_threads > 0)) {
 		sem_wait(&(delete_ctl.delete_op_sem));
 
 		if (delete_ctl.total_active_delete_threads <= 0) {
@@ -561,7 +561,7 @@ void *delete_loop(void *arg)
 	printf("Start delete loop\n");
 
 	inode_to_check = 0;
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		if (inode_to_check == 0)
 			sleep(5);
 		

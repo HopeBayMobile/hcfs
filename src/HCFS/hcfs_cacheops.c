@@ -235,7 +235,7 @@ void run_cache_loop(void)
 	skip_recent = TRUE;
 	do_something = FALSE;
 
-	while (TRUE) {
+	while (hcfs_system->system_going_down == FALSE) {
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
@@ -320,6 +320,8 @@ void run_cache_loop(void)
 				do_something = FALSE;
 			}
 			sleep(1);
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			seconds_slept++;
 		}
 	}

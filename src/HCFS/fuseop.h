@@ -127,6 +127,7 @@ typedef struct {
 typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
+	char system_going_down;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;
