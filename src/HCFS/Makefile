@@ -1,8 +1,8 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto -Wunused-variable
 
-hcfs: file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
-	$(CC) -g -o hcfs file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
+	$(CC) -g -o hcfs lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
 
 dir_entry_btree.o: dir_entry_btree.c dir_entry_btree.h
 	$(CC) $(CFLAGS) -c dir_entry_btree.c
@@ -51,6 +51,9 @@ hcfs_cachebuild.o: hcfs_cachebuild.c hcfs_cachebuild.h params.h fuseop.h super_b
 
 hcfs_clouddelete.o: hcfs_clouddelete.c hcfs_clouddelete.h hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
 	$(CC) $(CFLAGS) -c hcfs_clouddelete.c
+
+lookup_count.o : lookup_count.c lookup_count.h
+	$(CC) $(CFLAGS) -c lookup_count.c
 
 b64encode.o: b64encode.c
 	$(CC) $(CFLAGS) -c b64encode.c

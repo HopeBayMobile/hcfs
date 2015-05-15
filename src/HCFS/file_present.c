@@ -269,8 +269,8 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 	if (ret_val < 0)
 		return -EACCES;
 
-	/*Need to delete the inode by moving it to "todelete" path*/
-	ret_val = delete_inode_meta(this_inode);
+	/* Deferring actual deletion to forget */
+	mark_inode_delete(this_inode);
 
 	return ret_val;
 }

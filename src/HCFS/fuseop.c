@@ -59,14 +59,29 @@
 #include "filetables.h"
 #include "hcfs_cacheops.h"
 #include "hcfs_fromcloud.h"
+#include "lookup_count.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
-/* TODO: Add forget function and maintain lookup counts for files and dirs */
-/* TODO: Consider how to handle files and dirs that should not be deleted
-	right away */
+/* HOWTO: 1. in lookup_count, add a field "to_delete". rmdir, unlink
+will first mark this as true and if in forget() the count is dropped
+to zero, the inode is deleted.
+          2. to allow inode deletion fixes due to system crashing, a subfolder
+will be created so that the inode number of inodes to be deleted can be
+touched here, and removed when actually deleted.
+          3. in lookup_decrease, should delete nodes when lookup drops
+to zero (to save space in the long run).
+          4. in unmount, can pick either scanning lookup table for inodes
+to delete or list the folder.
+*/
+/* TODO: When unmounting, will need to check whether there are inodes to be
+deleted (via opening then deleting perhaps) */
+/* TODO: When mounting, will need to check if there are inodes that should
+be deleted but not deleted (perhaps due to system crashing) */
+
 /* TODO: Maintain inode generations in file and dir creation. This is needed
 in various functions such as mkdir and mknod. */
+
 
 /* TODO: Need to go over the access rights problem for the ops */
 /* TODO: Need to revisit the following problem for all ops: access rights,
@@ -225,6 +240,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 	fuse_reply_entry(req, &(tmp_param));
+	lookup_increase(self_inode, 1, D_ISREG);
 }
 
 /************************************************************************
@@ -306,6 +322,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 	fuse_reply_entry(req, &(tmp_param));
+	lookup_increase(self_inode, 1, D_ISDIR);
 
 	gettimeofday(&tmp_time2, NULL);
 
@@ -413,6 +430,12 @@ a directory (for NFS) */
 	ret_code = fetch_inode_stat(this_inode, &(output_param->attr));
 
 	fuse_reply_entry(req, output_param);
+	if (S_ISREG((output_param->attr).st_mode)) {
+		lookup_increase(this_inode, 1, D_ISREG);
+	} else {
+		if (S_ISDIR((output_param->attr).st_mode))
+			lookup_increase(this_inode, 1, D_ISDIR);
+	}
 	free(output_param);
 }
 
@@ -2151,6 +2174,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 						PTHREAD_CREATE_DETACHED);
 	pthread_create(&reporter_thread, NULL, (void *)reporter_module, NULL);
 	init_meta_cache_headers();
+	lookup_init();
 	/* return ((void*) sys_super_block); */
 }
 
@@ -2295,6 +2319,38 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 	fuse_reply_err(req, 0);
 }
 
+static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
+	unsigned long nlookup)
+{
+	int amount;
+	int current_val;
+	char to_delete;
+	char d_type;
+
+	amount = (int) nlookup;
+
+	current_val = lookup_decrease((ino_t) ino, amount,
+					&d_type, &to_delete);
+
+	if (current_val < 0) {
+		printf("Error in lookup count decreasing\n");
+		fuse_reply_none(req);
+		return;
+	}
+
+	if (current_val > 0) {
+		printf("Debug forget: lookup count greater than zero\n");
+		fuse_reply_none(req);
+		return;
+	}
+
+	if ((current_val == 0) && (to_delete == TRUE))
+		actual_delete_inode((ino_t) ino, d_type);
+
+	fuse_reply_none(req);
+	return;
+}
+
 /* Specify the functions used for the FUSE operations */
 static struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -2318,6 +2374,7 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.rmdir = hfuse_ll_rmdir,
 	.statfs = hfuse_ll_statfs,
 	.lookup = hfuse_ll_lookup,
+	.forget = hfuse_ll_forget,
 };
 
 /*

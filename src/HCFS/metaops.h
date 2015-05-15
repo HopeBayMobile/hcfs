@@ -44,4 +44,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page);
 
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page);
+
+int actual_delete_inode(ino_t this_inode, char d_type);
+int mark_inode_delete(ino_t this_inode);
 #endif /* GW20_HCFS_METAOPS_H_ */
