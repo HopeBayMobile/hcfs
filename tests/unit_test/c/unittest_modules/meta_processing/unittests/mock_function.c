@@ -38,8 +38,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		return 0;
 	default:
 		dir_meta_ptr->root_entry_page = 0; 
-		dir_meta_ptr->total_children = parent_meta.total_children;
-		inode_stat->st_nlink = parent_stat.st_nlink;
+		dir_meta_ptr->total_children = to_verified_meta.total_children;
+		inode_stat->st_nlink = to_verified_stat.st_nlink;
 		return 0;
 	}
 }
@@ -48,8 +48,12 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
     const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
     META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	parent_meta = *dir_meta_ptr;
-	parent_stat = *inode_stat;
+	if (dir_meta_ptr)
+		to_verified_meta = *dir_meta_ptr;
+	
+	if (dir_meta_ptr)
+		to_verified_stat = *inode_stat;
+	
 	return 0;
 }
 

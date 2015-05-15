@@ -19,8 +19,8 @@
 /* dir_remove_entry() */
 #define TOTAL_CHILDREN_NUM 23
 #define LINK_NUM 12
-DIR_META_TYPE parent_meta;
-struct stat parent_stat;
+DIR_META_TYPE to_verified_meta;
+struct stat to_verified_stat;
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

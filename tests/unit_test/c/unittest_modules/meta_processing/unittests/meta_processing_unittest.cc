@@ -30,7 +30,8 @@ extern SYSTEM_CONF_STRUCT system_config;
 /*
 	Unittest of init_dir_page()
  */
-TEST(init_dir_pageTest, InitOK) {
+TEST(init_dir_pageTest, InitOK) 
+{
 
         long long pos = 1000;
 
@@ -81,7 +82,8 @@ class dir_add_entryTest : public ::testing::Test {
                 }
 };
 
-TEST_F(dir_add_entryTest, NoLockError) {
+TEST_F(dir_add_entryTest, NoLockError) 
+{
 	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
 }
 // TODO To be continued...
@@ -119,12 +121,12 @@ class dir_remove_entryTest : public ::testing::Test {
 			body_ptr->fptr = fopen(metapath, "r+");
 			setbuf(body_ptr->fptr, NULL);
 			body_ptr->meta_opened = TRUE;
-			/* parent_meta & parent_stat will be modify in dir_remove_entry().
+			/* to_verified_meta & to_verified_stat will be modify in dir_remove_entry().
 			   Use the global vars to verify result. */
-			memset(&parent_meta, 0, sizeof(FILE_META_TYPE));
-			memset(&parent_stat, 0, sizeof(struct stat));
-			parent_meta.total_children = TOTAL_CHILDREN_NUM; 
-			parent_stat.st_nlink = LINK_NUM;
+			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_stat, 0, sizeof(struct stat));
+			to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
+			to_verified_stat.st_nlink = LINK_NUM;
                 }
 
                 virtual void TearDown() {
@@ -135,11 +137,13 @@ class dir_remove_entryTest : public ::testing::Test {
                 }
 };
 
-TEST_F(dir_remove_entryTest, NoLockError) {
+TEST_F(dir_remove_entryTest, NoLockError) 
+{
 	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
 }
 
-TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail) {
+TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail) 
+{
 	/* Mock data to force btree deletion failed */
 	sem_wait(&(body_ptr->access_sem));
 	DELETE_DIR_ENTRY_BTREE_RESULT = 0;
@@ -148,12 +152,13 @@ TEST_F(dir_remove_entryTest, BtreeDelFailed_RemoveEntryFail) {
 	EXPECT_EQ(-1, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
 		
 	/* Verify */
-	EXPECT_EQ(TOTAL_CHILDREN_NUM, parent_meta.total_children);
-	EXPECT_EQ(LINK_NUM, parent_stat.st_nlink);
+	EXPECT_EQ(TOTAL_CHILDREN_NUM, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 
-TEST_F(dir_remove_entryTest, RemoveDirSuccess) {
+TEST_F(dir_remove_entryTest, RemoveDirSuccess) 
+{
 	/* Mock data */
 	sem_wait(&(body_ptr->access_sem));
 	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
@@ -162,8 +167,23 @@ TEST_F(dir_remove_entryTest, RemoveDirSuccess) {
 	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
 
 	/* Verify */
-	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, parent_meta.total_children);
-	EXPECT_EQ(LINK_NUM - 1, parent_stat.st_nlink);
+	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM - 1, to_verified_stat.st_nlink);
+	sem_post(&(body_ptr->access_sem));
+}
+
+TEST_F(dir_remove_entryTest, RemoveRegFileSuccess) 
+{
+	/* Mock data */
+	sem_wait(&(body_ptr->access_sem));
+	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+	
+	/* Run tested function */
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFREG, body_ptr));
+
+	/* Verify */
+	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
 /*
@@ -177,31 +197,74 @@ class change_parent_inodeTest : public ::testing::Test {
 	protected:
 
 		ino_t parent_inode2;
-
-		META_CACHE_ENTRY_STRUCT *body_ptr;	
-
+		META_CACHE_ENTRY_STRUCT *body_ptr;
 		virtual void SetUp() {
 			parent_inode2 = 6;
 
 			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		}
-
                 virtual void TearDown() {
 			free(body_ptr);
 		}
 };
-TEST_F(change_parent_inodeTest, ChangeOK) {
+
+TEST_F(change_parent_inodeTest, ChangeOK) 
+{
 	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode, parent_inode2, body_ptr));
 }
-TEST_F(change_parent_inodeTest, DirEntryNotFound) {
+
+TEST_F(change_parent_inodeTest, DirEntryNotFound) 
+{
 	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, parent_inode, parent_inode2, body_ptr));
 }
-TEST_F(change_parent_inodeTest, ChangeFail) {
+
+TEST_F(change_parent_inodeTest, ChangeFail) 
+{
 	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode, parent_inode2, body_ptr));
 }
 /*
 	End of unittest for change_parent_inode()
  */
+
+/*
+	Unittest of change_dir_entry_inode()
+ */
+class change_dir_entry_inodeTest : public ::testing::Test {
+	protected:
+
+		ino_t new_inode;
+		META_CACHE_ENTRY_STRUCT *body_ptr;
+		virtual void SetUp() {
+			new_inode = 6;
+
+			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_stat, 0, sizeof(struct stat));
+		}
+                virtual void TearDown() {
+			free(body_ptr);
+		}
+};
+
+TEST_F(change_dir_entry_inodeTest, ChangeOK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, "/mock/target/name", new_inode, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, DirEntryNotFound) 
+{
+	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, "/mock/target/name", new_inode, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeFail) 
+{
+	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, "/mock/target/name", new_inode, body_ptr));
+}
+/*
+	End of unittest for change_parent_inode()
+ */
+
+
 
 /*
 	Unittest of decrease_nlink_inode_file()

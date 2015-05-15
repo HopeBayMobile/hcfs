@@ -379,7 +379,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 
 /************************************************************************
 *
-* Function name: change_parent_inode
+* Function name: change_dir_entry_inode
 *        Inputs: ino_t self_inode, char *targetname,
 *                ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: For a directory "self_inode", change the inode of entry
@@ -456,8 +456,8 @@ int delete_inode_meta(ino_t this_inode)
 		unlink(thismetapath);
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
-		ret_val = meta_cache_remove(this_inode);
 	}
+	ret_val = meta_cache_remove(this_inode);
 	return 0;
 }
 
