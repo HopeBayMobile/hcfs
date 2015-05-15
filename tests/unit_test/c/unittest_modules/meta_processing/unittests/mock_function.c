@@ -214,14 +214,25 @@ off_t check_file_size(const char *path)
 
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	sprintf(pathname, "testpatterns/inode_%d_meta_file.todel", this_inode);
+	//sprintf(pathname, "testpatterns/inode_%d_meta_file.todel", this_inode);
+	strcpy(pathname, TO_DELETE_METAPATH);
+	if (this_inode == INO_RENAME_FAIL) {
+		strcpy(pathname, "\0");
+		/*FILE *fptr = fopen(pathname, "w");
+		fclose(fptr);
+		struct stat filestat;
+		stat(pathname, &filestat);
+		mode_t mode = filestat.st_mode | S_ISVTX;
+		chmod(pathname, mode);*/
+	}
 	return 0;
 }
 
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	sprintf(pathname, "testpatterns/inode_%d_meta_file", this_inode);
+	//sprintf(pathname, "testpatterns/inode_%d_meta_file", this_inode);
+	strcpy(pathname, META_PATH);
 	return 0;
 }
 

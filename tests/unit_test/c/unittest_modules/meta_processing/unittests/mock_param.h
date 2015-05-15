@@ -14,13 +14,19 @@
 #define PARAM_MAX_BLOCK_SIZE 1024
 
 /* decrease_nlink_inode_file() & seek_page() */
-#define NUM_BLOCKS 10
+#define NUM_BLOCKS 32
 
 /* dir_remove_entry() */
 #define TOTAL_CHILDREN_NUM 23
 #define LINK_NUM 12
 DIR_META_TYPE to_verified_meta;
 struct stat to_verified_stat;
+
+/* delete_inode_meta() */
+#define INO_RENAME_SUCCESS 3
+#define INO_RENAME_FAIL 4
+#define TO_DELETE_METAPATH "/tmp/to_delete_meta"
+#define META_PATH "/tmp/this_meta"
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

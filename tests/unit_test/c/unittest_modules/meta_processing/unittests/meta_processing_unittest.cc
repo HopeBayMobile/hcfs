@@ -32,7 +32,6 @@ extern SYSTEM_CONF_STRUCT system_config;
  */
 TEST(init_dir_pageTest, InitOK) 
 {
-
         long long pos = 1000;
 
 	DIR_ENTRY_PAGE *temppage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
@@ -230,20 +229,19 @@ TEST_F(change_parent_inodeTest, ChangeFail)
 	Unittest of change_dir_entry_inode()
  */
 class change_dir_entry_inodeTest : public ::testing::Test {
-	protected:
+protected:
+	ino_t new_inode;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+	virtual void SetUp() {
+		new_inode = 6;
 
-		ino_t new_inode;
-		META_CACHE_ENTRY_STRUCT *body_ptr;
-		virtual void SetUp() {
-			new_inode = 6;
-
-			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
-			memset(&to_verified_stat, 0, sizeof(struct stat));
-		}
-                virtual void TearDown() {
-			free(body_ptr);
-		}
+		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+		memset(&to_verified_stat, 0, sizeof(struct stat));
+	}
+	virtual void TearDown() {
+		free(body_ptr);
+	}
 };
 
 TEST_F(change_dir_entry_inodeTest, ChangeOK) 
@@ -264,39 +262,131 @@ TEST_F(change_dir_entry_inodeTest, ChangeFail)
 	End of unittest for change_parent_inode()
  */
 
+/*
+	Unittest of delete_inode_meta()
+ */
+class delete_inode_metaTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{		
+		FILE *tarfptr = fopen(META_PATH, "w+");
+		FILE *srcfptr = fopen("testpatterns/mock_meta_file", "r");
+		
+		cp_file(srcfptr, tarfptr);
+		fclose(srcfptr);
+		fclose(tarfptr);
+	}
+	void TearDown()
+	{
+		unlink(META_PATH);
+		unlink(TO_DELETE_METAPATH);
+	}
+	/* This function is used to check rename or move success  */
+	bool is_file_diff(FILE *f1, FILE *f2)
+	{
+		bool is_diff = false;
+		while (!feof(f1) || !feof(f2)) {
+			char buf1[5000], buf2[5000];
+			int read_size1 = fread(buf1, 1, 4096, f1);
+			int read_size2 = fread(buf2, 1, 4096, f2);
+			if ((read_size1 > 0) && (read_size1 == read_size2)) {
+				if (memcmp(buf1, buf2, 4096) != 0) {
+					is_diff = true;
+					break;
+				}
+			} else
+				break;
+		}
+		return is_diff;
+	}
+	/* copy pattern file to tested file */
+	bool cp_file(FILE *src, FILE *tar)
+	{
+		char filebuf[5000];
 
+		fseek(src, 0, SEEK_SET);
+		fseek(tar, 0, SEEK_SET);
+		while (!feof(src)) {
+			int read_size = fread(filebuf, 1, 4096, src);
+			if (read_size > 0)
+				fwrite(filebuf, 1, read_size, tar);
+			else
+				break;
+		}
+
+	}
+};
+TEST_F(delete_inode_metaTest, DirectlyRenameSuccess)
+{
+	FILE *todeletefptr, *expectedfptr;
+	ino_t inode = INO_RENAME_SUCCESS;
+
+	/* Run */
+	EXPECT_EQ(0, delete_inode_meta(inode));
+
+	/* Verify */
+	EXPECT_EQ(0, access(TO_DELETE_METAPATH, F_OK));
+	EXPECT_EQ(-1, access(META_PATH, F_OK));
+
+	todeletefptr = fopen(TO_DELETE_METAPATH, "r");
+	expectedfptr = fopen("testpatterns/mock_meta_file", "r");
+	
+	ASSERT_TRUE(todeletefptr != NULL);
+	ASSERT_TRUE(expectedfptr != NULL);
+	EXPECT_FALSE(is_file_diff(todeletefptr, expectedfptr));
+
+	/* Free resource */
+	fclose(todeletefptr);
+	fclose(expectedfptr);
+}
+
+TEST_F(delete_inode_metaTest, RenameFail)
+{
+	FILE *todeletefptr, *expectedfptr;
+	ino_t inode = INO_RENAME_FAIL;
+
+	/* Run */
+	EXPECT_EQ(-1, delete_inode_meta(inode));
+}
+
+
+/*
+	End of unittest of delete_inode_meta()
+ */
 
 /*
 	Unittest of decrease_nlink_inode_file()
  */
 class decrease_nlink_inode_fileTest : public ::testing::Test {
-	protected:
+protected:
+	virtual void SetUp() 
+	{
+		/* Mock user-defined parameters */
+		MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
 
-		virtual void SetUp() {
-		
-			/* Mock user-defined parameters */
-			MAX_BLOCK_SIZE = PARAM_MAX_BLOCK_SIZE;
+		/* Mock system statistics */
+		hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
+		sem_init(&(hcfs_system->access_sem), 0, 1);
+		hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
+		hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
+		hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
+	}
 
-			/* Mock system statistics */
-			hcfs_system = (SYSTEM_DATA_HEAD*)malloc(sizeof(SYSTEM_DATA_HEAD));
-			sem_init(&(hcfs_system->access_sem), 0, 1);
-			hcfs_system->systemdata.system_size = MOCK_SYSTEM_SIZE;
-			hcfs_system->systemdata.cache_size = MOCK_CACHE_SIZE;
-			hcfs_system->systemdata.cache_blocks = MOCK_CACHE_BLOCKS;
-
-		}
-
-		virtual void TearDown() {
-		
-		}
+	virtual void TearDown() 
+	{
+		free(hcfs_system);
+	}
 };
-TEST_F(decrease_nlink_inode_fileTest, InodeStillReferenced) {
+
+TEST_F(decrease_nlink_inode_fileTest, InodeStillReferenced) 
+{
 	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
 }
-TEST_F(decrease_nlink_inode_fileTest, NoBlockFilesToDel) {
+
+TEST_F(decrease_nlink_inode_fileTest, NoBlockFilesToDel) 
+{
 	char metapath[METAPATHLEN];
 	char thisblockpath[400];
-
 	FILE *tmp_file;
 
 	fetch_meta_path(metapath, INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel);
@@ -306,19 +396,19 @@ TEST_F(decrease_nlink_inode_fileTest, NoBlockFilesToDel) {
 	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
 	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);
 }
-TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel) {
+
+TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel) 
+{
 	char metapath[METAPATHLEN];
 	char thisblockpath[400];
-
-	int block_file_existed = 0;
-
+	bool block_file_existed = false;
 	FILE *tmp_fp;
 
 	fetch_meta_path(metapath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel);
 	tmp_fp = fopen(metapath, "w");
 	fclose(tmp_fp);
 	
-	for (int i=0; i<10; i++) {
+	for (int i=0; i<NUM_BLOCKS; i++) {
 		fetch_block_path(thisblockpath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel, i);
 		tmp_fp = fopen(thisblockpath, "w");
 		fclose(tmp_fp);
@@ -331,15 +421,15 @@ TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel) {
 	EXPECT_EQ((MOCK_CACHE_BLOCKS - NUM_BLOCKS), hcfs_system->systemdata.cache_blocks);
 
 	/* Test if block files are removed correctly */
-	for (int i=0; i<10; i++) {
+	for (int i=0; i<NUM_BLOCKS; i++) {
 		fetch_block_path(thisblockpath, INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel, i);
 		tmp_fp = fopen(thisblockpath, "r");
 		if (tmp_fp) {
-			block_file_existed = 1;
+			block_file_existed = true;
 			fclose(tmp_fp);
 		}
 	}
-	EXPECT_EQ(0, block_file_existed);
+	EXPECT_EQ(false, block_file_existed);
 }
 /* TODO - Test for metafile rename failed case */
 /*
