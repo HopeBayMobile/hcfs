@@ -14,7 +14,8 @@
 * 2015/5/11 Jiahong modifying seek_page for new block indexing / searching.
 *           Also remove advance_block function.
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
-*
+* 2015/5/15 Kewei add error handling of "delete_inode_meta" function and
+*           modify dubious bug.
 **************************************************************************/
 #include "metaops.h"
 
@@ -440,6 +441,8 @@ int delete_inode_meta(ino_t this_inode)
 		unlink(todelete_metapath);
 		todeletefptr = fopen(todelete_metapath, "w");
 		metafptr = fopen(thismetapath, "r");
+		if ((todeletefptr == NULL) || (metafptr == NULL))
+			return -1;
 		setbuf(metafptr, NULL);
 		flock(fileno(metafptr), LOCK_EX);
 		setbuf(todeletefptr, NULL);
