@@ -63,24 +63,19 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
-/* HOWTO: 1. in lookup_count, add a field "to_delete". rmdir, unlink
+/* Steps for allowing opened files / dirs to be accessed after deletion
+
+	1. in lookup_count, add a field "to_delete". rmdir, unlink
 will first mark this as true and if in forget() the count is dropped
 to zero, the inode is deleted.
-          2. to allow inode deletion fixes due to system crashing, a subfolder
+	2. to allow inode deletion fixes due to system crashing, a subfolder
 will be created so that the inode number of inodes to be deleted can be
 touched here, and removed when actually deleted.
-          3. in lookup_decrease, should delete nodes when lookup drops
+	3. in lookup_decrease, should delete nodes when lookup drops
 to zero (to save space in the long run).
-          4. in unmount, can pick either scanning lookup table for inodes
+	4. in unmount, can pick either scanning lookup table for inodes
 to delete or list the folder.
 */
-/* TODO: When unmounting, will need to check whether there are inodes to be
-deleted (via opening then deleting perhaps) */
-/* TODO: When mounting, will need to check if there are inodes that should
-be deleted but not deleted (perhaps due to system crashing) */
-
-/* TODO: Maintain inode generations in file and dir creation. This is needed
-in various functions such as mkdir and mknod. */
 
 
 /* TODO: Need to go over the access rights problem for the ops */
@@ -130,7 +125,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	printf("Debug getattr hit inode %lld\n", hit_inode);
 
 	if (hit_inode > 0) {
-		ret_code = fetch_inode_stat(hit_inode, &tmp_stat);
+		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
 
 		printf("Debug getattr return inode %lld\n", tmp_stat.st_ino);
 		gettimeofday(&tmp_time2, NULL);
@@ -171,13 +166,14 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
 	struct stat parent_stat;
+	unsigned long this_generation;
 
 	printf("DEBUG parent %lld, name %s mode %d\n", parent, selfname, mode);
 	gettimeofday(&tmp_time1, NULL);
 
 	parent_inode = (ino_t) parent;
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -210,7 +206,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_mtime = this_stat.st_atime;
 	this_stat.st_ctime = this_stat.st_atime;
 
-	self_inode = super_block_new_inode(&this_stat);
+	self_inode = super_block_new_inode(&this_stat, &this_generation);
 
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
@@ -221,7 +217,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat);
+			&this_stat, this_generation);
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -236,7 +232,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
-	tmp_param.generation = 1; /* TODO: need to find generation */
+	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 	fuse_reply_entry(req, &(tmp_param));
@@ -266,12 +262,13 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	struct timeval tmp_time1, tmp_time2;
 	struct fuse_entry_param tmp_param;
 	struct stat parent_stat;
+	unsigned long this_gen;
 
 	gettimeofday(&tmp_time1, NULL);
 
 	parent_inode = (ino_t) parent;
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -301,7 +298,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 
-	self_inode = super_block_new_inode(&this_stat);
+	self_inode = super_block_new_inode(&this_stat, &this_gen);
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
 		return;
@@ -309,7 +306,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_ino = self_inode;
 
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
-			selfname, &this_stat);
+			selfname, &this_stat, this_gen);
 
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -318,7 +315,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
-	tmp_param.generation = 1; /* TODO: need to find generation */
+	tmp_param.generation = this_gen;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 	fuse_reply_entry(req, &(tmp_param));
@@ -412,11 +409,15 @@ a directory (for NFS) */
 	int ret_val, ret_code;
 	DIR_ENTRY temp_dentry;
 	struct fuse_entry_param *output_param;
+	unsigned long this_gen;
 
 	output_param = malloc(sizeof(struct fuse_entry_param));
 	memset(output_param, 0, sizeof(struct fuse_entry_param));
 
 	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
+
+	printf("Debug lookup %lld, %s, %d\n", parent_inode, selfname, ret_val);
+
 	if (ret_val < 0) {
 		ret_val = -ret_val;
 		fuse_reply_err(req, ret_val);
@@ -425,9 +426,10 @@ a directory (for NFS) */
 
 	this_inode = temp_dentry.d_ino;
 	output_param->ino = (fuse_ino_t) this_inode;
-/* TODO: how to deal with generations? */
-	output_param->generation = 1;
-	ret_code = fetch_inode_stat(this_inode, &(output_param->attr));
+	ret_code = fetch_inode_stat(this_inode, &(output_param->attr),
+			&this_gen);
+	output_param->generation = this_gen;
+	printf("Debug lookup inode %lld, gen %d\n", this_inode, this_gen);
 
 	fuse_reply_entry(req, output_param);
 	if (S_ISREG((output_param->attr).st_mode)) {
@@ -644,10 +646,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		meta_cache_close_file(old_target_ptr);
 		meta_cache_unlock_entry(old_target_ptr);
 
-		if (S_ISDIR(old_target_mode))
-			ret_val = delete_inode_meta(old_target_inode);
-		else
+		if (S_ISDIR(old_target_mode)) {
+			/* Deferring actual deletion to forget */
+			ret_val = mark_inode_delete(old_target_inode);
+		} else {
 			ret_val = decrease_nlink_inode_file(old_target_inode);
+		}
 		old_target_ptr = NULL;
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
@@ -2175,6 +2179,8 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	pthread_create(&reporter_thread, NULL, (void *)reporter_module, NULL);
 	init_meta_cache_headers();
 	lookup_init();
+	startup_finish_delete();
+	lookup_increase(1, 1, D_ISDIR);
 	/* return ((void*) sys_super_block); */
 }
 
@@ -2195,6 +2201,7 @@ void hfuse_ll_destroy(void *userdata)
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
 
+	lookup_destroy();
 	hcfs_system->system_going_down = TRUE;
 	return;
 }

@@ -149,7 +149,7 @@ int init_hfuse(void)
 		this_stat.st_mtime = this_stat.st_atime;
 		this_stat.st_ctime = this_stat.st_ctime;
 
-		root_inode = super_block_new_inode(&this_stat);
+		root_inode = super_block_new_inode(&this_stat, NULL);
 		/*TODO: put error handling here if root_inode is not 1
 					(cannot initialize system)*/
 

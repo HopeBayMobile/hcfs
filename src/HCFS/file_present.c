@@ -62,11 +62,14 @@ int meta_forget_inode(ino_t self_inode)
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+		unsigned long *ret_gen)
 {
 	struct stat returned_stat;
 	int ret_code;
 	META_CACHE_ENTRY_STRUCT *temp_entry;
+	FILE_META_TYPE filemeta;
+	DIR_META_TYPE dirmeta;
 
 	/*First will try to lookup meta cache*/
 	if (this_inode > 0) {
@@ -75,6 +78,23 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		*  file or dir here*/
 		ret_code = meta_cache_lookup_file_data(this_inode,
 				&returned_stat, NULL, NULL, 0, temp_entry);
+
+		if (ret_gen != NULL) {
+			if (S_ISREG(returned_stat.st_mode)) {
+				ret_code = meta_cache_lookup_file_data(
+						this_inode, NULL, &filemeta,
+						NULL, 0, temp_entry);
+				*ret_gen = filemeta.generation;
+			}
+			if (S_ISDIR(returned_stat.st_mode)) {
+				ret_code = meta_cache_lookup_dir_data(
+						this_inode, NULL, &dirmeta,
+						NULL, temp_entry);
+				*ret_gen = dirmeta.generation;
+			}
+			/* TODO: Add case for symlink */
+		}
+
 		ret_code = meta_cache_close_file(temp_entry);
 		ret_code = meta_cache_unlock_entry(temp_entry);
 
@@ -111,7 +131,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 *
 *************************************************************************/
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-							struct stat *this_stat)
+			struct stat *this_stat, unsigned long this_gen)
 {
 	int ret_val;
 	FILE_META_TYPE this_meta;
@@ -119,6 +139,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 
+	this_meta.generation = this_gen;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
 	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
@@ -154,7 +175,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 *
 *************************************************************************/
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-							struct stat *this_stat)
+			struct stat *this_stat, unsigned long this_gen)
 {
 	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE this_meta;
@@ -168,6 +189,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	/* Initialize new directory object and save the meta to meta cache */
 	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	this_meta.generation = this_gen;
 	init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 

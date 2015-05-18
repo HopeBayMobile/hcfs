@@ -19,12 +19,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat);
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
+		unsigned long *ret_gen);
 
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat);
+			struct stat *this_stat, unsigned long this_gen);
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat);
+			struct stat *this_stat, unsigned long this_gen);
 int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname);
 
 int meta_forget_inode(ino_t self_inode);

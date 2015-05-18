@@ -47,4 +47,9 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 
 int actual_delete_inode(ino_t this_inode, char d_type);
 int mark_inode_delete(ino_t this_inode);
+
+int disk_markdelete(ino_t this_inode);
+int disk_cleardelete(ino_t this_inode);
+int disk_checkdelete(ino_t this_inode);
+int startup_finish_delete();
 #endif /* GW20_HCFS_METAOPS_H_ */

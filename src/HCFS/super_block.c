@@ -602,13 +602,15 @@ int super_block_reclaim_fullscan(void)
 *  Return value: New inode number if successful. Otherwise returns 0.
 *
 *************************************************************************/
-ino_t super_block_new_inode(struct stat *in_stat)
+ino_t super_block_new_inode(struct stat *in_stat,
+				unsigned long *ret_generation)
 {
 	int ret_items;
 	ino_t this_inode;
 	SUPER_BLOCK_ENTRY tempentry;
 	struct stat tempstat;
 	ino_t new_first_reclaimed;
+	unsigned long this_generation;
 
 	super_block_exclusive_locking();
 
@@ -636,17 +638,22 @@ ino_t super_block_new_inode(struct stat *in_stat)
 			sys_super_block->head.first_reclaimed_inode =
 							new_first_reclaimed;
 		}
+		this_generation = tempentry.generation + 1;
 	} else {
 		/* If need to append a new super inode and add total
 		*  inode count*/
 		sys_super_block->head.num_total_inodes++;
 		this_inode = sys_super_block->head.num_total_inodes;
+		this_generation = 1;
 	}
 	sys_super_block->head.num_active_inodes++;
 
 	/*Update the new super inode entry*/
 	memset(&tempentry, 0, SB_ENTRY_SIZE);
 	tempentry.this_index = this_inode;
+	tempentry.generation = this_generation;
+	if (ret_generation != NULL)
+		*ret_generation = this_generation;
 
 	memcpy(&tempstat, in_stat, sizeof(struct stat));
 	tempstat.st_ino = this_inode;

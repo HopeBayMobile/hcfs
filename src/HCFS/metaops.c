@@ -19,6 +19,7 @@
 #include "metaops.h"
 
 #include <sys/file.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -966,16 +967,13 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	off_t cache_block_size;
 	struct stat this_inode_stat;
 
-
-	/* TODO: defer the following to forget */
-
 	switch (d_type) {
 	case D_ISDIR:
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret_val = delete_inode_meta(this_inode);
 		break;
 	case D_ISREG:
-		fetch_inode_stat(this_inode, &this_inode_stat);
+		fetch_inode_stat(this_inode, &this_inode_stat, NULL);
 
 		/*Need to delete the meta. Move the meta file to "todelete"*/
 		delete_inode_meta(this_inode);
@@ -1013,15 +1011,112 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	}
 	ret_val = meta_cache_remove(this_inode);
 
-	/* TODO: clear the marker on disk for this inode */
+	disk_cleardelete(this_inode);
 	return 0;
 }
 
 int mark_inode_delete(ino_t this_inode)
 {
-/* TODO: mark the inode as to delete on disk and also in lookup count table
-*/
-
+	disk_markdelete(this_inode);
 	lookup_markdelete(this_inode);
+	return 0;
+}
 
+int disk_markdelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0) {
+		ret_val = mkdir(pathname, 0700);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) != 0) {
+		ret_val = mknod(pathname, S_IFREG | 0700, 0);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	return 0;
+}
+int disk_cleardelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return -1;
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) == 0) {
+		ret_val = unlink(pathname);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	return 0;
+}
+
+int disk_checkdelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return -1;
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) == 0)
+		return 1;
+
+	return 0;
+}
+
+int startup_finish_delete()
+{
+	DIR *dirp;
+	struct dirent tmpent, *tmpptr;
+	struct stat tmpstat;
+	char pathname[200];
+	int ret_val;
+	ino_t tmp_ino;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return 0;
+
+	dirp = opendir(pathname);
+
+	readdir_r(dirp, &tmpent, &tmpptr);
+
+	while (tmpptr != NULL) {
+		ret_val = sscanf(tmpent.d_name, "inode%lld", &tmp_ino);
+		if (ret_val > 0) {
+			fetch_inode_stat(tmp_ino, &tmpstat, NULL);
+			if (S_ISREG(tmpstat.st_mode))
+				actual_delete_inode(tmp_ino, D_ISREG);
+			else
+				actual_delete_inode(tmp_ino, D_ISDIR);
+			/* TODO: add case for sym link here */
+		}
+		readdir_r(dirp, &tmpent, &tmpptr);
+	}
+
+	return 0;
 }

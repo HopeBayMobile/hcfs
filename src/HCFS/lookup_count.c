@@ -24,9 +24,9 @@ to delete or list the folder.
 
 #include "lookup_count.h"
 
-
 #include "fuseop.h"
 #include "global.h"
+#include "metaops.h"
 
 /************************************************************************
 *
@@ -175,6 +175,7 @@ int lookup_decrease(ino_t this_inode, int amount,
 	if (found == FALSE) {
 		printf("Debug no lookup value\n");
 		result_lookup = -1;
+		sem_post(&(lookup_table[index].entry_sem));
 		return result_lookup;
 	}
 
@@ -236,6 +237,51 @@ int lookup_markdelete(ino_t this_inode)
 
 	if (ret_val < 0)
 		return ret_val;
+
+	return 0;
+}
+
+/************************************************************************
+*
+* Function name: lookup_destroy
+*        Inputs: None
+*        Output: 0 if successful, otherwise -1.
+*       Summary: Destroys the lookup count table, and delete inodes if
+*                needed.
+*
+*************************************************************************/
+
+int lookup_destroy()
+{
+	int count;
+	int ret_val;
+	LOOKUP_NODE_TYPE *ptr;
+
+	printf("Debug lookup destroy\n");
+	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
+		ret_val = sem_wait(&(lookup_table[count].entry_sem));
+
+		if (ret_val < 0)
+			return ret_val;
+
+		ptr = lookup_table[count].head;
+
+		while (ptr != NULL) {
+			printf("Debug check delete %lld\n",
+				ptr->this_inode);
+			ret_val = disk_checkdelete(ptr->this_inode);
+
+			if (ret_val == 1)
+				actual_delete_inode(ptr->this_inode,
+						ptr->d_type);
+			ptr = ptr->next;
+		}
+
+		ret_val = sem_post(&(lookup_table[count].entry_sem));
+
+		if (ret_val < 0)
+			return ret_val;
+	}
 
 	return 0;
 }
