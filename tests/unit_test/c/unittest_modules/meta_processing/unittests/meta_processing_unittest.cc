@@ -64,28 +64,121 @@ TEST(init_dir_pageTest, InitOK)
  */
 class dir_add_entryTest : public ::testing::Test {
 	protected:
-
 		char *self_name;
-
 		META_CACHE_ENTRY_STRUCT *body_ptr;	
+		char mock_metaname[200];
 
-		virtual void SetUp() {
-                        self_name = "selfname";
-
-			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		virtual void SetUp() 
+		{
+                       	strcpy(mock_metaname, "/tmp/mock_meta_used_in_dir_add_entry"); 
+			self_name = "selfname";
+			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(
+				sizeof(META_CACHE_ENTRY_STRUCT));
 			sem_init(&(body_ptr->access_sem), 0, 1);
+			body_ptr->fptr = fopen(mock_metaname, "w+");
+			/* Init meta & stat to be verified */
+			memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
+			memset(&to_verified_stat, 0, sizeof(struct stat));
                 }
 
-                virtual void TearDown() {
+                virtual void TearDown() 
+		{
+			if (body_ptr->fptr)
+				fclose(body_ptr->fptr);
+			unlink(mock_metaname);
 			free(body_ptr);
                 }
 };
 
 TEST_F(dir_add_entryTest, NoLockError) 
 {
-	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	EXPECT_EQ(-1, dir_add_entry(parent_inode, self_inode, 
+		self_name, S_IFMT, body_ptr));
 }
-// TODO To be continued...
+
+TEST_F(dir_add_entryTest, insert_dir_entryFail)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE tmp_dir_page;
+	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	sem_wait(&body_ptr->access_sem);
+	
+	/* Run */
+	EXPECT_EQ(-1, dir_add_entry(parent_inode, INO_INSERT_DIR_ENTRY_FAIL,
+		self_name, S_IFMT, body_ptr));
+}
+
+TEST_F(dir_add_entryTest, AddRegFileSuccess_WithoutSplittingRoot)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE tmp_dir_page;
+	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
+	to_verified_stat.st_nlink = LINK_NUM;
+	sem_wait(&body_ptr->access_sem);
+	
+	/* Run */
+	EXPECT_EQ(0, dir_add_entry(parent_inode, 
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
+		self_name, S_IFREG, body_ptr));
+	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+}
+
+TEST_F(dir_add_entryTest, AddDirSuccess_WithoutSplittingRoot)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE tmp_dir_page;
+	fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
+	to_verified_stat.st_nlink = LINK_NUM;
+	sem_wait(&body_ptr->access_sem);
+	
+	/* Run */
+	EXPECT_EQ(0, dir_add_entry(parent_inode, 
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING, 
+		self_name, S_IFDIR, body_ptr));
+	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.st_nlink);
+}
+
+TEST_F(dir_add_entryTest, AddRegFileSuccess_WithSplittingRoot)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE tmp_dir_page;
+
+	for (int i = 0 ; i < 5 ; i++) // 5 pages
+		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
+	to_verified_stat.st_nlink = LINK_NUM;
+	sem_wait(&body_ptr->access_sem);
+	
+	/* Run */
+	EXPECT_EQ(0, dir_add_entry(parent_inode, 
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
+		self_name, S_IFREG, body_ptr));
+	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+}
+
+TEST_F(dir_add_entryTest, AddDirSuccess_WithSplittingRoot)
+{
+	/* Mock data */
+	DIR_ENTRY_PAGE tmp_dir_page;
+
+	for (int i = 0 ; i < 5 ; i++) // 5 pages
+		fwrite(&tmp_dir_page, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	to_verified_meta.total_children = TOTAL_CHILDREN_NUM; 
+	to_verified_stat.st_nlink = LINK_NUM;
+	sem_wait(&body_ptr->access_sem);
+	
+	/* Run */
+	EXPECT_EQ(0, dir_add_entry(parent_inode, 
+		INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING, 
+		self_name, S_IFDIR, body_ptr));
+	EXPECT_EQ(TOTAL_CHILDREN_NUM + 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM + 1, to_verified_stat.st_nlink);
+}
 
 /*
 	End of unittest for dir_add_entry()
@@ -163,7 +256,7 @@ TEST_F(dir_remove_entryTest, RemoveDirSuccess)
 	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
 	
 	/* Run tested function */
-	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFMT, body_ptr));
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFDIR, body_ptr));
 
 	/* Verify */
 	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
@@ -439,6 +532,72 @@ TEST_F(decrease_nlink_inode_fileTest, BlockFilesToDel)
 /*
 	Unittest of seek_page()
  */
+
+class seek_pageTest : public ::testing::Test {
+protected:
+	char *metapath;
+	META_CACHE_ENTRY_STRUCT *body_ptr;
+	
+	void SetUp()
+	{
+		FILE_META_TYPE empty_file_meta;
+
+		metapath = "testpatterns/seek_page_meta_file";
+		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		sem_init(&(body_ptr->access_sem), 0, 1);
+		body_ptr->fptr = fopen(metapath, "w+");
+		setbuf(body_ptr->fptr, NULL);
+		fwrite(&empty_file_meta, sizeof(FILE_META_TYPE), 1, body_ptr->fptr);
+		body_ptr->meta_opened = TRUE;
+	}
+
+	void TearDown()
+	{
+		if (body_ptr->fptr)
+			fclose(body_ptr->fptr);
+		unlink(metapath);
+		free(body_ptr);
+	}
+
+};
+
+TEST_F(seek_pageTest, DirectPageSuccess)
+{
+	long long result_pos;
+	long long expected_pos = sizeof(FILE_META_TYPE);
+	long long target_page = 0;
+
+	body_ptr->inode_num = INO_DIRECT_SUCCESS;
+	
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	result_pos = seek_page(body_ptr, target_page, 0);
+	
+	/* Verify */
+	EXPECT_EQ(expected_pos, result_pos);
+}
+
+TEST_F(seek_pageTest, SingleIndirectPageSuccess)
+{
+	/* Mock data */
+	PTR_ENTRY_PAGE ptr_entry_page;
+	long long result_pos;
+	long long expected_pos = 5566;
+	long long target_page = POINTERS_PER_PAGE / 2; // Range(1, 1024)
+	
+	body_ptr->inode_num = INO_SINGLE_INDIRECT_SUCCESS;
+	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
+	ptr_entry_page.ptr[target_page - 1] = expected_pos;
+	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
+	fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	result_pos = seek_page(body_ptr, target_page, 0);
+	
+	/* Verify */
+	EXPECT_EQ(expected_pos, result_pos);
+}
 
  /*
 class seek_pageTest : public ::testing::Test {

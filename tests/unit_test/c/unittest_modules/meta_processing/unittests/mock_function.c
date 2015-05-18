@@ -38,6 +38,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		return 0;
 	default:
 		dir_meta_ptr->root_entry_page = 0; 
+		dir_meta_ptr->entry_page_gc_list = 0;
+		dir_meta_ptr->tree_walk_list_head = sizeof(DIR_ENTRY_PAGE);
 		dir_meta_ptr->total_children = to_verified_meta.total_children;
 		inode_stat->st_nlink = to_verified_stat.st_nlink;
 		return 0;
@@ -123,8 +125,27 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 
+	
 	switch(this_inode) {
-        case INO_LOOKUP_FILE_DATA_OK:
+       	case INO_DIRECT_SUCCESS:
+		file_meta_ptr->direct = sizeof(FILE_META_TYPE);
+		return 0; 
+	case INO_SINGLE_INDIRECT_SUCCESS:
+		file_meta_ptr->single_indirect = sizeof(FILE_META_TYPE);
+		return 0;
+
+        case INO_DOUBLE_INDIRECT_SUCCESS:
+		file_meta_ptr->double_indirect = sizeof(FILE_META_TYPE); 
+		return 0;
+
+	case INO_TRIPLE_INDIRECT_SUCCESS:
+		file_meta_ptr->triple_indirect = sizeof(FILE_META_TYPE); 
+		return 0;
+
+	case INO_QUADRUPLE_INDIRECT_SUCCESS:
+		file_meta_ptr->quadruple_indirect = sizeof(FILE_META_TYPE);
+		return 0;
+	case INO_LOOKUP_FILE_DATA_OK:
         case INO_UPDATE_FILE_DATA_FAIL:
 		if (file_meta_ptr != NULL) {
 			//file_meta_ptr->next_block_page = sizeof(BLOCK_ENTRY_PAGE);
@@ -174,6 +195,20 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 	DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
 						long long *temp_child_page_pos)
 {
+	DIR_ENTRY_PAGE tmp_page;
+	
+	*overflow_new_page = sizeof(DIR_ENTRY_PAGE);
+	pwrite(fh, &tmp_page, sizeof(DIR_ENTRY_PAGE), sizeof(DIR_ENTRY_PAGE));
+	overflow_median = NULL;
+	
+	switch (new_entry->d_ino) {
+	case INO_INSERT_DIR_ENTRY_FAIL:
+		return -1;
+	case INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING:
+		return 0;
+	case INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING:
+		return 1;
+	}
 	return 0;
 }
 

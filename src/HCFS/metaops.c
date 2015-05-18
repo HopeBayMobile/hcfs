@@ -785,7 +785,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			tmp_target_pos = temp_meta->quadruple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+				body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
 				temp_meta, NULL, 0, body_ptr);
 		}
