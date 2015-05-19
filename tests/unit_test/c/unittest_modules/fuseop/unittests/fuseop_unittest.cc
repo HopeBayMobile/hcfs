@@ -1520,7 +1520,7 @@ TEST_F(hfuse_ll_readdirTest, NoEntry) {
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(184, ftell(fptr));
+  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 2;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -1566,7 +1566,7 @@ TEST_F(hfuse_ll_readdirTest, SingleEntry) {
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(184, ftell(fptr));
+  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = 3;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -1624,7 +1624,7 @@ TEST_F(hfuse_ll_readdirTest, OneMaxPageEntries) {
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(184, ftell(fptr));
+  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;
@@ -1687,7 +1687,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
   temphead.tree_walk_list_head = temphead.root_entry_page;
   fwrite(&temphead, sizeof(DIR_META_TYPE), 1, fptr);
 
-  ASSERT_EQ(184, ftell(fptr));
+  ASSERT_EQ(sizeof(struct stat) + sizeof(DIR_META_TYPE), ftell(fptr));
   memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
   temppage.num_entries = MAX_DIR_ENTRIES_PER_PAGE;
   temppage.this_page_pos = temphead.root_entry_page;

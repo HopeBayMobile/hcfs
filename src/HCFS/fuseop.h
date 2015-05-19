@@ -71,6 +71,7 @@ typedef struct {
 	long long next_xattr_page;
 	long long entry_page_gc_list;
 	long long tree_walk_list_head;
+	unsigned long generation;
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
@@ -113,6 +114,7 @@ typedef struct {
 	long long double_indirect;
 	long long triple_indirect;
 	long long quadruple_indirect;
+	unsigned long generation;
 } FILE_META_TYPE;
 
 /*END META definition*/

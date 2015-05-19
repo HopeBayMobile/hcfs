@@ -20,6 +20,7 @@
 #include "metaops.h"
 
 #include <sys/file.h>
+#include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -480,9 +481,6 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	char thisblockpath[400];
 	struct stat this_inode_stat;
 	int ret_val;
-	long long count;
-	long long total_blocks;
-	off_t cache_block_size;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
@@ -490,41 +488,13 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,
 							NULL, NULL, body_ptr);
 
+	/* TODO: defer the following to forget */
 	if (this_inode_stat.st_nlink <= 1) {
 		meta_cache_close_file(body_ptr);
 		ret_val = meta_cache_unlock_entry(body_ptr);
 
-		/*Need to delete the meta. Move the meta file to "todelete"*/
-		delete_inode_meta(this_inode);
+		mark_inode_delete(this_inode);
 
-		/*Need to delete blocks as well*/
-		/* TODO: Perhaps can move the actual block deletion to the
-		*  deletion loop as well*/
-		if (this_inode_stat.st_size == 0)
-			total_blocks = 0;
-		else
-			total_blocks = ((this_inode_stat.st_size-1) /
-							MAX_BLOCK_SIZE) + 1;
-
-		for (count = 0; count < total_blocks; count++) {
-			fetch_block_path(thisblockpath, this_inode, count);
-			if (!access(thisblockpath, F_OK)) {
-				cache_block_size =
-						check_file_size(thisblockpath);
-				unlink(thisblockpath);
-				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
-						(long long) cache_block_size;
-				hcfs_system->systemdata.cache_blocks -= 1;
-				sem_post(&(hcfs_system->access_sem));
-			}
-		}
-		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
-		sync_hcfs_system_data(FALSE);
-		sem_post(&(hcfs_system->access_sem));
-
-		ret_val = meta_cache_remove(this_inode);
 	} else {
 		/* If it is still referenced, update the meta file. */
 		this_inode_stat.st_nlink--;
@@ -991,3 +961,166 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	return filepos;
 }
 
+
+int actual_delete_inode(ino_t this_inode, char d_type)
+{
+	char thisblockpath[400];
+	int ret_val;
+	long long count;
+	long long total_blocks;
+	off_t cache_block_size;
+	struct stat this_inode_stat;
+
+	switch (d_type) {
+	case D_ISDIR:
+		/*Need to delete the inode by moving it to "todelete" path*/
+		ret_val = delete_inode_meta(this_inode);
+		break;
+	case D_ISREG:
+		fetch_inode_stat(this_inode, &this_inode_stat, NULL);
+
+		/*Need to delete the meta. Move the meta file to "todelete"*/
+		delete_inode_meta(this_inode);
+
+		/*Need to delete blocks as well*/
+		/* TODO: Perhaps can move the actual block deletion to the
+		*  deletion loop as well*/
+		if (this_inode_stat.st_size == 0)
+			total_blocks = 0;
+		else
+			total_blocks = ((this_inode_stat.st_size-1) /
+							MAX_BLOCK_SIZE) + 1;
+
+		for (count = 0; count < total_blocks; count++) {
+			fetch_block_path(thisblockpath, this_inode, count);
+			if (!access(thisblockpath, F_OK)) {
+				cache_block_size =
+						check_file_size(thisblockpath);
+				unlink(thisblockpath);
+				sem_wait(&(hcfs_system->access_sem));
+				hcfs_system->systemdata.cache_size -=
+						(long long) cache_block_size;
+				hcfs_system->systemdata.cache_blocks -= 1;
+				sem_post(&(hcfs_system->access_sem));
+			}
+		}
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
+		sync_hcfs_system_data(FALSE);
+		sem_post(&(hcfs_system->access_sem));
+
+		break;
+	default:
+		break;
+	}
+	ret_val = meta_cache_remove(this_inode);
+
+	disk_cleardelete(this_inode);
+	return 0;
+}
+
+int mark_inode_delete(ino_t this_inode)
+{
+	disk_markdelete(this_inode);
+	lookup_markdelete(this_inode);
+	return 0;
+}
+
+int disk_markdelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0) {
+		ret_val = mkdir(pathname, 0700);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) != 0) {
+		ret_val = mknod(pathname, S_IFREG | 0700, 0);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	return 0;
+}
+int disk_cleardelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return -1;
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) == 0) {
+		ret_val = unlink(pathname);
+		if (ret_val < 0)
+			return ret_val;
+	}
+
+	return 0;
+}
+
+int disk_checkdelete(ino_t this_inode)
+{
+	char pathname[200];
+	int ret_val;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return -1;
+
+	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+						METAPATH, this_inode);
+
+	if (access(pathname, F_OK) == 0)
+		return 1;
+
+	return 0;
+}
+
+int startup_finish_delete()
+{
+	DIR *dirp;
+	struct dirent tmpent, *tmpptr;
+	struct stat tmpstat;
+	char pathname[200];
+	int ret_val;
+	ino_t tmp_ino;
+
+	snprintf(pathname, 200, "%s/markdelete", METAPATH);
+
+	if (access(pathname, F_OK) != 0)
+		return 0;
+
+	dirp = opendir(pathname);
+
+	readdir_r(dirp, &tmpent, &tmpptr);
+
+	while (tmpptr != NULL) {
+		ret_val = sscanf(tmpent.d_name, "inode%lld", &tmp_ino);
+		if (ret_val > 0) {
+			fetch_inode_stat(tmp_ino, &tmpstat, NULL);
+			if (S_ISREG(tmpstat.st_mode))
+				actual_delete_inode(tmp_ino, D_ISREG);
+			else
+				actual_delete_inode(tmp_ino, D_ISDIR);
+			/* TODO: add case for sym link here */
+		}
+		readdir_r(dirp, &tmpent, &tmpptr);
+	}
+
+	return 0;
+}

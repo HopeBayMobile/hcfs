@@ -37,6 +37,7 @@ typedef struct {
 	char in_transit;
 	char mod_after_in_transit;
 	ino_t this_index;
+	unsigned long generation;
 } SUPER_BLOCK_ENTRY;
 
 /* SUPER_BLOCK_HEAD defines the structure for the head of super block */
@@ -84,7 +85,8 @@ int super_block_to_delete(ino_t this_inode);
 int super_block_delete(ino_t this_inode);
 int super_block_reclaim(void);
 int super_block_reclaim_fullscan(void);
-ino_t super_block_new_inode(struct stat *in_stat);
+ino_t super_block_new_inode(struct stat *in_stat,
+				unsigned long *ret_generation);
 int super_block_update_stat(ino_t this_inode, struct stat *newstat);
 
 int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry);

@@ -504,3 +504,52 @@ int delete_inode_meta(ino_t this_inode)
 {
 	return 0;
 }
+
+int lookup_init()
+{
+	return 0;
+}
+int lookup_increase(ino_t this_inode, int amount, char d_type)
+{
+	return 0;
+}
+int lookup_decrease(ino_t this_inode, int amount, char *d_type,
+				char *need_delete)
+{
+	return 0;
+}
+int lookup_markdelete(ino_t this_inode)
+{
+	return 0;
+}
+
+int actual_delete_inode(ino_t this_inode, char d_type)
+{
+	return 0;
+}
+int mark_inode_delete(ino_t this_inode)
+{
+	return 0;
+}
+
+int disk_markdelete(ino_t this_inode)
+{
+	return 0;
+}
+int disk_cleardelete(ino_t this_inode)
+{
+	return 0;
+}
+int disk_checkdelete(ino_t this_inode)
+{
+	return 0;
+}
+int startup_finish_delete()
+{
+	return 0;
+}
+int lookup_destroy()
+{
+	return 0;
+}
+
