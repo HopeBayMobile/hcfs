@@ -17,7 +17,6 @@
 /*
 TODO: Will need to check mod time of meta file and not upload meta for
 	every block status change.
-TODO: Check if meta objects will be deleted with the deletion of files/dirs
 TODO: error handling for HTTP exceptions
 */
 
@@ -106,6 +105,7 @@ static inline void _upload_terminate_thread(int index)
 	BLOCK_ENTRY *tmp_entry;
 	size_t tmp_size;
 	DELETE_THREAD_TYPE *tmp_del;
+	char need_delete_object;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return;
@@ -126,6 +126,8 @@ static inline void _upload_terminate_thread(int index)
 	e_index = upload_ctl.upload_threads[index].page_entry_index;
 	blockno = upload_ctl.upload_threads[index].blockno;
 	fetch_meta_path(thismetapath, this_inode);
+
+	need_delete_object = FALSE;
 
 	/*Perhaps the file is deleted already*/
 	if (!access(thismetapath, F_OK)) {
@@ -160,21 +162,25 @@ static inline void _upload_terminate_thread(int index)
 								1, metafptr);
 					}
 				}
-				/*TODO: Check if status is ST_NONE. If so,
+				/*Check if status is ST_NONE. If so,
 				the block is removed due to truncating.
+				(And perhaps block deletion thread finished
+				earlier than upload, and deleted nothing.)
 				Need to schedule block for deletion due to
 				truncating*/
+				if ((tmp_entry->status == ST_NONE) &&
+						(is_delete == FALSE)) {
+					printf("Debug upload block gone\n");
+					need_delete_object = TRUE;
+				}
 			}
 			flock(fileno(metafptr), LOCK_UN);
 			fclose(metafptr);
 		}
 	}
-	/*TODO: If metafile is deleted already, schedule the
-			block to be deleted.*/
-	/*TODO: This must be before the usage flag is cleared*/
 
-	/*If file is deleted*/
-	if (access(thismetapath, F_OK) == -1) {
+	/*If file is deleted or block already deleted*/
+	if ((access(thismetapath, F_OK) == -1) || (need_delete_object)) {
 		sem_wait(&(delete_ctl.delete_queue_sem));
 		sem_wait(&(delete_ctl.delete_op_sem));
 		which_curl = -1;

@@ -33,9 +33,7 @@
 	if (sem_val > 0) \
 		return -1;
 
-/* TODO: cache meta file pointer and close only after some idle interval */
-/* TODO: delayed write to disk */
-/* TODO: Convert meta IO here and other files to allow segmented meta files */
+/* TODO: Consider whether want to use write-back mode for meta caching */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
 sem_t num_entry_sem;
@@ -306,7 +304,6 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 		body_ptr->meta_dirty = FALSE;
 	}
 
-	/*TODO: Add flush of xattr pages here */
 
 	/* Update stat info in super inode no matter what so that meta file
 		get pushed to cloud */

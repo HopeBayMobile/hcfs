@@ -3,7 +3,10 @@
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: fuseop.c
-* Abstract: The c source code file for the main FUSE operations for HCFS
+* Abstract: The c source code file for the main FUSE operations for HCFS.
+*           All fuse functions now use fuse_reply_xxxx to pass back data
+*           and returned status, and the functions themselves do not
+*           return anything (void return type).
 *
 * Revision History
 * 2015/2/2 Jiahong added header for this file, and revising coding style.
@@ -325,22 +328,19 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
-
 }
 
 /************************************************************************
 *
-* Function name: hfuse_unlink
-*        Inputs: const char *path
-*       Summary: Delete the regular file specified by the string "path".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_unlink
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Delete the regular file specified by parent "parent_inode"
+*                and name "selfname".
 *
 *************************************************************************/
-void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
+			const char *selfname)
 {
-/* TODO: delay actual unlink for opened dirs (this is lowlevel op) */
-
 	ino_t this_inode;
 	int ret_val;
 	int ret_code;
@@ -362,26 +362,24 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode, const char *selfna
 
 /************************************************************************
 *
-* Function name: hfuse_rmdir
-*        Inputs: const char *path
-*       Summary: Delete the directory specified by the string "path".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_rmdir
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Delete the directory specified by parent "parent_inode" and
+*                name "selfname".
 *
 *************************************************************************/
-void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode,
+			const char *selfname)
 {
-/* TODO: delay actual rmdir for opened dirs (this is lowlevel op) */
 	ino_t this_inode;
 	int ret_val, ret_code;
 	DIR_ENTRY temp_dentry;
 
-	if (!strcmp(selfname, ".")) {
+	if (!strcmp(selfname, "."))
 		fuse_reply_err(req, EINVAL);
-	}
-	if (!strcmp(selfname, "..")) {
+
+	if (!strcmp(selfname, ".."))
 		fuse_reply_err(req, ENOTEMPTY);
-	}
 
 	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
 	if (ret_val < 0) {
@@ -397,6 +395,15 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfnam
 	fuse_reply_err(req, ret_val);
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_lookup
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Lookup inode stat and generation info given parent
+*                "parent_inode" and name "selfname". Will return proper
+*                error value if cannot find the name.
+*
+*************************************************************************/
 void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent_inode,
 			const char *selfname)
 {
@@ -488,15 +495,13 @@ static inline int _cleanup_rename(META_CACHE_ENTRY_STRUCT *body_ptr,
 
 /************************************************************************
 *
-* Function name: hfuse_rename
-*        Inputs: const char *oldpath, const char *newpath
-*       Summary: Rename / move the filesystem object "oldpath" to
-*                "newpath", replacing the original object in "newpath" if
-*                necessary.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*    Limitation: Do no process symlink
+* Function name: hfuse_ll_rename
+*        Inputs: fuse_req_t req, fuse_ino_t parent,
+*                const char *selfname1, fuse_ino_t newparent,
+*                const char *selfname2
+*       Summary: Rename / move the filesystem object pointed by "parent"
+*                and "selfname1" to the path pointed by "newparent" and
+*                "selfname2".
 *
 *************************************************************************/
 void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
@@ -699,56 +704,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_err(req, 0);
 }
 
-
-/************************************************************************
-*
-* Function name: hfuse_utimens
-*        Inputs: const char *path, const struct timespec tv[2]
-*       Summary: Change the access / modification time of the filesystem
-*                object pointed by "path" to "tv".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*************************************************************************/
-static int hfuse_utimens(const char *path, const struct timespec tv[2])
-{
-	struct stat temp_inode_stat;
-	int ret_val;
-	ino_t this_inode;
-	int ret_code;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	printf("Debug utimens\n");
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-
-	if (ret_val < 0) {  /* Cannot fetch any meta*/
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(this_inode);
-		return -EACCES;
-	}
-
-	temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
-	temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
-
-	/* Fill in timestamps with nanosecond precision */
-	memcpy(&(temp_inode_stat.st_atim), &(tv[0]), sizeof(struct timespec));
-	memcpy(&(temp_inode_stat.st_mtim), &(tv[1]), sizeof(struct timespec));
-
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
-
-	return ret_val;
-}
-
 /* Helper function for waiting on full cache in the truncate function */
 int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
@@ -795,9 +750,9 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
 
-	printf("Debug truncate_delete_block, start %d, old_last %lld, \
-			idx %lld\n",
-		start_index, old_last_block, page_index);
+	printf("Debug truncate_delete_block, start %d, old_last %lld,",
+		start_index, old_last_block);
+	printf(" idx %lld\n", page_index);
 	for (block_count = start_index; block_count
 		< MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
 		tmp_blk_index = block_count
@@ -979,11 +934,14 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 /************************************************************************
 *
-* Function name: hfuse_truncate
-*        Inputs: const char *path, off_t offset
-*       Summary: Truncate the regular file pointed by "path to size "offset".
+* Function name: hfuse_ll_truncate
+*        Inputs: ino_t this_inode, struct stat *filestat,
+*                off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr
+*       Summary: Truncate the regular file pointed by "this_inode"
+*                to size "offset".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
+*          Note: This function is now called by hfuse_ll_setattr.
 *
 *************************************************************************/
 int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
@@ -1052,7 +1010,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 		/*TODO: put error handling for the read/write ops here*/
 		if (filepos != 0) {
-			/* Do not need to truncate the block the offset byte is in*/
+			/* Do not need to truncate the block
+				the offset byte is in*/
 			/* If filepos is zero*/
 
 			meta_cache_lookup_file_data(this_inode, NULL,
@@ -1084,10 +1043,12 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 		/*Delete the blocks in the rest of the block status pages*/
 
-		/* Note: if filepos = 0, just means this block does not exist. */
-		/* TODO: Will need to check if the following blocks exist or not */
-		for (current_page = last_page + 1; current_page <= old_last_page;
-				current_page++) {
+		/* Note: if filepos = 0, just means this block
+			does not exist. */
+		/* TODO: Will need to check if the following
+			blocks exist or not */
+		for (current_page = last_page + 1;
+			current_page <= old_last_page; current_page++) {
 			filepos = seek_page(*body_ptr, current_page, 0);
 
 			/* Skipping pages that do not exist */
@@ -1131,12 +1092,11 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 /************************************************************************
 *
-* Function name: hfuse_open
-*        Inputs: const char *path, struct fuse_file_info *file_info
-*       Summary: Open the regular file pointed by "path", and put file
+* Function name: hfuse_ll_open
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
+*       Summary: Open the regular file pointed by "ino", and put file
 *                handle info to the structure pointed by "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
@@ -1320,7 +1280,8 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
 				current_page, 0);
 		if (fh_ptr->cached_filepos == 0)
-			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+			fh_ptr->cached_filepos =
+				create_page(fh_ptr->meta_cache_ptr,
 				current_page);
 		fh_ptr->cached_page_index = current_page;
 	}
@@ -1383,7 +1344,8 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
-				printf("Debug read: cannot open block file. Perhaps replaced?\n");
+				printf("Debug read: cannot open block file.");
+				printf(" Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
 		} else {
@@ -1443,15 +1405,19 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	size_t size;
 	char *buf;
 
-/* TODO: Perhaps should do proof-checking on the inode number using pathname
-*  lookup and from file_info*/
-
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+	/* Check if ino passed in is the same as the one stored */
+
+	if (fh_ptr->thisinode != (ino_t) ino) {
+		fuse_reply_err(req, EBADFD);
+		return;
+	}
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
@@ -1531,7 +1497,6 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	}
 	fuse_reply_buf(req, buf, total_bytes_read);
 	free(buf);
-	return;
 }
 
 /* Helper function for write operation. Will wait on cache full and wait
@@ -1652,7 +1617,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
 				current_page, 0);
 		if (fh_ptr->cached_filepos == 0)
-			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+			fh_ptr->cached_filepos =
+				create_page(fh_ptr->meta_cache_ptr,
 				current_page);
 		fh_ptr->cached_page_index = current_page;
 	}
@@ -1721,7 +1687,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	old_cache_size = check_file_size(thisblockpath);
 	if (offset > old_cache_size) {
-		printf("Debug write: cache block size smaller than starting offset. Extending\n");
+		printf("Debug write: cache block size smaller than ");
+		printf("starting offset. Extending\n");
 		ftruncate(fileno(fh_ptr->blockfptr), offset);
 	}
 
@@ -1741,7 +1708,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 /************************************************************************
 *
-* Function name: hfuse_write
+* Function name: hfuse_ll_write
 *        Inputs: fuse_req_t req, fuse_ino_t ino, const char *buf,
 *                size_t size, off_t offset, struct fuse_file_info *file_info
 *       Summary: Write "size" bytes to the file "ino", starting from
@@ -1760,9 +1727,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	off_t current_offset;
 	size_t target_bytes_written;
 	struct stat temp_stat;
-
-/* TODO: Perhaps should do proof-checking on the inode number using pathname
-*  lookup and from file_info*/
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
 		fuse_reply_err(req, EBADF);
@@ -1787,6 +1751,13 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+	/* Check if ino passed in is the same as the one stored */
+
+	if (fh_ptr->thisinode != (ino_t) ino) {
+		fuse_reply_err(req, EBADFD);
+		return;
+	}
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
@@ -1839,11 +1810,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 /************************************************************************
 *
-* Function name: hfuse_statfs
-*        Inputs: const char *path, struct statvfs *buf
-*       Summary: Lookup the filesystem status. "path" is not used now.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_statfs
+*        Inputs: fuse_req_t req, fuse_ino_t ino
+*       Summary: Lookup the filesystem status. "ino" is not used now.
 *
 *************************************************************************/
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
@@ -1897,26 +1866,25 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 
 /************************************************************************
 *
-* Function name: hfuse_flush
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_flush
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Flush the file content. Not used now as cache mode is not
 *                write back.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
-void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
+void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
+				struct fuse_file_info *file_info)
 {
 	fuse_reply_err(req, 0);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_release
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_release
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Close the file handle pointed by "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
@@ -1953,12 +1921,10 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 
 /************************************************************************
 *
-* Function name: hfuse_fsync
-*        Inputs: const char *path, int isdatasync,
+* Function name: hfuse_ll_fsync
+*        Inputs: fuse_req_t req, fuse_ino_t ino, int isdatasync,
 *                struct fuse_file_info *file_info
 *       Summary: Conduct "fsync". Do nothing now (see hfuse_flush).
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
@@ -1969,11 +1935,10 @@ void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 
 /************************************************************************
 *
-* Function name: hfuse_opendir
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_opendir
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Check permission and open directory for access.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
@@ -1985,14 +1950,12 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 
 /************************************************************************
 *
-* Function name: hfuse_readdir
-*        Inputs: const char *path, void *buf, fuse_fill_dir_t filler,
+* Function name: hfuse_ll_readdir
+*        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size,
 *                off_t offset, struct fuse_file_info *file_info
 *       Summary: Read directory content starting from "offset". This
 *                implementation can return partial results and continue
 *                reading in follow-up calls.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
@@ -2018,7 +1981,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	gettimeofday(&tmp_time1, NULL);
 
 /*TODO: Need to include symlinks*/
-	fprintf(stderr, "DEBUG readdir entering readdir, size %lld, offset %lld\n", size, offset);
+	fprintf(stderr, "DEBUG readdir entering readdir, ");
+	fprintf(stderr, "size %lld, offset %lld\n", size, offset);
 
 	this_inode = (ino_t) ino;
 
@@ -2077,18 +2041,20 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
-					(size - buf_pos), 
+					(size - buf_pos),
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
 			printf("Debug readdir entry size %d\n", entry_size);
 			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
-				printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n", nextentry_pos, temp_page.this_page_pos, (count+1));
+				printf("Readdir breaks, next offset %ld, ",
+					nextentry_pos);
+				printf("file pos %ld, entry %d\n",
+					temp_page.this_page_pos, (count+1));
 				fuse_reply_buf(req, buf, buf_pos);
 				return;
 			}
 			buf_pos += entry_size;
-
 		}
 		page_start = 0;
 		thisfile_pos = temp_page.tree_walk_next;
@@ -2097,21 +2063,22 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	meta_cache_unlock_entry(body_ptr);
 	gettimeofday(&tmp_time2, NULL);
 
-	printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+	printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	fuse_reply_buf(req, buf, buf_pos);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_releasedir
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_releasedir
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Close opened directory. Do nothing now.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
-void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
+void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
+					struct fuse_file_info *file_info)
 {
 	fuse_reply_err(req, 0);
 }
@@ -2158,15 +2125,13 @@ void reporter_module(void)
 			send(fd1, buf, strlen(buf)+1, 0);
 		}
 	}
-	return;
 }
 
 /************************************************************************
 *
-* Function name: hfuse_init
-*        Inputs: struct fuse_file_info *file_info
+* Function name: hfuse_ll_init
+*        Inputs: void *userdata, struct fuse_conn_info *conn
 *       Summary: Initiate a FUSE mount
-*  Return value: Pointer to the user data of this mount.
 *
 *************************************************************************/
 void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
@@ -2189,7 +2154,6 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 * Function name: hfuse_ll_destroy
 *        Inputs: void *userdata
 *       Summary: Destroy a FUSE mount
-*  Return value: None
 *
 *************************************************************************/
 void hfuse_ll_destroy(void *userdata)
@@ -2203,9 +2167,17 @@ void hfuse_ll_destroy(void *userdata)
 
 	lookup_destroy();
 	hcfs_system->system_going_down = TRUE;
-	return;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_setattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+*                int to_set, struct fuse_file_info *fi
+*       Summary: Set attribute for a filesystem object. This includes
+*                routines such as chmod, chown, truncate, utimens.
+*
+*************************************************************************/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int to_set, struct fuse_file_info *fi)
 {
@@ -2308,16 +2280,13 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	meta_cache_unlock_entry(body_ptr);
 	fuse_reply_attr(req, newstat, 0);
 	free(newstat);
-	return;
 }
 
 /************************************************************************
 *
-* Function name: hfuse_access
-*        Inputs: const char *path, int mode
-*       Summary: Checks the permission for object "path" against "mode".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_access
+*        Inputs: fuse_req_t req, fuse_ino_t ino, int mode
+*       Summary: Checks the permission for object "ino" against "mode".
 *
 *************************************************************************/
 static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
@@ -2326,6 +2295,15 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 	fuse_reply_err(req, 0);
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_forget
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                unsigned long nlookup
+*       Summary: Decrease lookup count for object "ino" by "nlookup", and
+*                handle actual filesystem object deletion if count is 0.
+*
+*************************************************************************/
 static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	unsigned long nlookup)
 {
@@ -2355,7 +2333,6 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		actual_delete_inode((ino_t) ino, d_type);
 
 	fuse_reply_none(req);
-	return;
 }
 
 /* Specify the functions used for the FUSE operations */
@@ -2437,7 +2414,7 @@ int hook_fuse(int argc, char **argv)
 	fuse_unmount(mount, fuse_channel);
 	fuse_opt_free_args(&args);
 
-	return 0;	
+	return 0;
 }
 
 /* Operations to implement

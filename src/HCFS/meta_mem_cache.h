@@ -13,12 +13,12 @@
 #ifndef GW20_HCFS_META_MEM_CACHE_H_
 #define GW20_HCFS_META_MEM_CACHE_H_
 
+/* TODO: Perhaps don't want to cache xattr for directory objects */
+
 /* A global meta cache (Done) and a block data cache (TODO) in memory.
 All reads / writes go through the caches, and a parameter (TODO) controls
 when to write dirty cache entries back to files (could be write through or
 after several seconds). */
-/* TODO: Each data block in each inode can only occupy at most one data
-	cache entry. */
 
 /* A hard limit defines the upper bound on the number of entries
 	(or mem used?) */
@@ -84,7 +84,6 @@ typedef struct {
 	/*Zero if not pointed to any page*/
 	DIR_ENTRY_PAGE * dir_entry_cache[2];
 	char dir_entry_cache_dirty[2];
-	/* TODO: Add xattr page cached here */
 
 	sem_t access_sem;
 	char something_dirty;
