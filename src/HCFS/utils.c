@@ -13,8 +13,6 @@
 *
 **************************************************************************/
 
-/* TODO: Use fuse_context to check for what FS the function is called from */
-
 #include "utils.h"
 
 #include <stdio.h>

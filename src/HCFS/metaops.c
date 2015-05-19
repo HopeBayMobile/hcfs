@@ -484,7 +484,6 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,
 							NULL, NULL, body_ptr);
 
-	/* TODO: defer the following to forget */
 	if (this_inode_stat.st_nlink <= 1) {
 		meta_cache_close_file(body_ptr);
 		ret_val = meta_cache_unlock_entry(body_ptr);
