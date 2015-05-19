@@ -537,7 +537,8 @@ class seek_pageTest : public ::testing::Test {
 protected:
 	char *metapath;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	
+	long long pointers_per_page[5];
+
 	void SetUp()
 	{
 		FILE_META_TYPE empty_file_meta;
@@ -549,6 +550,9 @@ protected:
 		setbuf(body_ptr->fptr, NULL);
 		fwrite(&empty_file_meta, sizeof(FILE_META_TYPE), 1, body_ptr->fptr);
 		body_ptr->meta_opened = TRUE;
+		pointers_per_page[0] = 1;
+		for (int i = 1 ; i<5 ; i++)
+			pointers_per_page[i] = pointers_per_page[i - 1] * POINTERS_PER_PAGE;
 	}
 
 	void TearDown()
@@ -563,7 +567,7 @@ protected:
 
 TEST_F(seek_pageTest, DirectPageSuccess)
 {
-	long long result_pos;
+	long long actual_pos;
 	long long expected_pos = sizeof(FILE_META_TYPE);
 	long long target_page = 0;
 
@@ -571,33 +575,108 @@ TEST_F(seek_pageTest, DirectPageSuccess)
 	
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
-	result_pos = seek_page(body_ptr, target_page, 0);
+	actual_pos = seek_page(body_ptr, target_page, 0);
 	
 	/* Verify */
-	EXPECT_EQ(expected_pos, result_pos);
+	EXPECT_EQ(expected_pos, actual_pos);
 }
 
 TEST_F(seek_pageTest, SingleIndirectPageSuccess)
 {
 	/* Mock data */
 	PTR_ENTRY_PAGE ptr_entry_page;
-	long long result_pos;
+	long long actual_pos;
 	long long expected_pos = 5566;
-	long long target_page = POINTERS_PER_PAGE / 2; // Range(1, 1024)
+	long long target_page = POINTERS_PER_PAGE / 2; // Medium of range(1, 1024)
 	
 	body_ptr->inode_num = INO_SINGLE_INDIRECT_SUCCESS;
 	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
-	ptr_entry_page.ptr[target_page - 1] = expected_pos;
+	ptr_entry_page.ptr[target_page - 1] = expected_pos; // Set expected result
 	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
 	fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
-	result_pos = seek_page(body_ptr, target_page, 0);
+	actual_pos = seek_page(body_ptr, target_page, 0);
 	
 	/* Verify */
-	EXPECT_EQ(expected_pos, result_pos);
+	EXPECT_EQ(expected_pos, actual_pos);
 }
+
+TEST_F(seek_pageTest, DoubleIndirectPageSuccess)
+{
+	/* Mock data */
+	PTR_ENTRY_PAGE ptr_entry_page;
+	long long actual_pos;
+	long long expected_pos = 5566;
+	long long target_page, tmp_target_page;
+	int level1_index, level2_index;
+
+	target_page = POINTERS_PER_PAGE * 2;
+	//	(POINTERS_PER_PAGE + 1); // Medium of range(1024, 1024^2)
+	tmp_target_page = target_page -
+		pointers_per_page[0] -
+		pointers_per_page[1];
+
+	body_ptr->inode_num = INO_DOUBLE_INDIRECT_SUCCESS;
+	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
+	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
+	// Set level 1 index
+	level1_index = (tmp_target_page) / POINTERS_PER_PAGE;
+	ptr_entry_page.ptr[level1_index] = sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE);
+	fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+	// Set level 2 answer index
+	level2_index = (tmp_target_page) % POINTERS_PER_PAGE;
+	ptr_entry_page.ptr[level1_index] = 0;
+	ptr_entry_page.ptr[level2_index] = expected_pos;
+	fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+	
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	actual_pos = seek_page(body_ptr, target_page, 0);
+	
+	/* Verify */
+	EXPECT_EQ(expected_pos, actual_pos);
+
+}
+
+TEST_F(seek_pageTest, TripleIndirectPageSuccess)
+{
+	/* Mock data */
+	PTR_ENTRY_PAGE ptr_entry_page;
+	long long actual_pos;
+	long long expected_pos = 5566;
+	long long target_page, tmp_target_page;
+	int level1_index, level2_index, level3_index;
+
+	target_page = POINTERS_PER_PAGE / 2 * POINTERS_PER_PAGE * 
+		(POINTERS_PER_PAGE + 1); // Medium of range(1024^2, 1024^3)
+	body_ptr->inode_num = INO_TRIPLE_INDIRECT_SUCCESS;
+	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
+	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
+
+	tmp_target_page = target_page -
+		 pointers_per_page[0] - 
+		 pointers_per_page[1] - 
+		 pointers_per_page[2];
+	for (int level = 1 ; level <= 3 ; level++) { // Write level 1, 2, 3 index
+		int level_index = (tmp_target_page) / pointers_per_page[3 - level];
+		ptr_entry_page.ptr[level_index] = (level == 3 ? expected_pos :
+			sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * level);
+		fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+		ptr_entry_page.ptr[level_index] = 0;
+		tmp_target_page = (tmp_target_page) % pointers_per_page[3 - level];
+	}
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	actual_pos = seek_page(body_ptr, target_page, 0);
+	
+	/* Verify */
+	EXPECT_EQ(expected_pos, actual_pos);
+
+}
+
 
  /*
 class seek_pageTest : public ::testing::Test {
