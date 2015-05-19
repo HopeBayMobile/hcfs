@@ -563,6 +563,25 @@ protected:
 		free(body_ptr);
 	}
 
+	void write_mock_file_meta(int deep, long long target_page, long long expected_pos)
+	{
+		long long tmp_target_page;
+		PTR_ENTRY_PAGE ptr_entry_page;
+
+		memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE)); // Init all entry as 0
+		tmp_target_page = target_page;
+		for (int level = 0 ; level < deep ; level++) 
+			tmp_target_page -= pointers_per_page[level];
+		for (int level = 1 ; level <= deep ; level++) { // Write level 1, 2, 3 index
+			int level_index = (tmp_target_page) / pointers_per_page[deep - level];
+			ptr_entry_page.ptr[level_index] = (level == deep ? expected_pos :
+					sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * level);
+			fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
+			ptr_entry_page.ptr[level_index] = 0; // Recover
+			tmp_target_page = (tmp_target_page) % pointers_per_page[deep - level];
+		}
+	}
+
 };
 
 TEST_F(seek_pageTest, DirectPageSuccess)
@@ -588,10 +607,11 @@ TEST_F(seek_pageTest, SingleIndirectPageSuccess)
 	long long actual_pos;
 	long long expected_pos = 5566;
 	long long target_page = POINTERS_PER_PAGE / 2; // Medium of range(1, 1024)
+	long long tmp_target_page = target_page - 1;
 	
 	body_ptr->inode_num = INO_SINGLE_INDIRECT_SUCCESS;
 	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
-	ptr_entry_page.ptr[target_page - 1] = expected_pos; // Set expected result
+	ptr_entry_page.ptr[tmp_target_page] = expected_pos; // Set expected result
 	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
 	fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
 
@@ -612,8 +632,8 @@ TEST_F(seek_pageTest, DoubleIndirectPageSuccess)
 	long long target_page, tmp_target_page;
 	int level1_index, level2_index;
 
-	target_page = POINTERS_PER_PAGE * 2;
-	//	(POINTERS_PER_PAGE + 1); // Medium of range(1024, 1024^2)
+	target_page = POINTERS_PER_PAGE / 2 *
+		(POINTERS_PER_PAGE + 1); // Medium of range(1024, 1024^2)
 	tmp_target_page = target_page -
 		pointers_per_page[0] -
 		pointers_per_page[1];
@@ -643,30 +663,15 @@ TEST_F(seek_pageTest, DoubleIndirectPageSuccess)
 TEST_F(seek_pageTest, TripleIndirectPageSuccess)
 {
 	/* Mock data */
-	PTR_ENTRY_PAGE ptr_entry_page;
 	long long actual_pos;
 	long long expected_pos = 5566;
-	long long target_page, tmp_target_page;
-	int level1_index, level2_index, level3_index;
+	long long target_page;
 
-	target_page = POINTERS_PER_PAGE / 2 * POINTERS_PER_PAGE * 
-		(POINTERS_PER_PAGE + 1); // Medium of range(1024^2, 1024^3)
+	target_page = (pointers_per_page[2] + 
+		pointers_per_page[3]) / 2; // Medium of range(1024^2, 1024^3)
 	body_ptr->inode_num = INO_TRIPLE_INDIRECT_SUCCESS;
-	memset(&ptr_entry_page, 0, sizeof(PTR_ENTRY_PAGE));
 	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
-
-	tmp_target_page = target_page -
-		 pointers_per_page[0] - 
-		 pointers_per_page[1] - 
-		 pointers_per_page[2];
-	for (int level = 1 ; level <= 3 ; level++) { // Write level 1, 2, 3 index
-		int level_index = (tmp_target_page) / pointers_per_page[3 - level];
-		ptr_entry_page.ptr[level_index] = (level == 3 ? expected_pos :
-			sizeof(FILE_META_TYPE) + sizeof(PTR_ENTRY_PAGE) * level);
-		fwrite(&ptr_entry_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
-		ptr_entry_page.ptr[level_index] = 0;
-		tmp_target_page = (tmp_target_page) % pointers_per_page[3 - level];
-	}
+	write_mock_file_meta(3, target_page, expected_pos);
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
@@ -674,97 +679,29 @@ TEST_F(seek_pageTest, TripleIndirectPageSuccess)
 	
 	/* Verify */
 	EXPECT_EQ(expected_pos, actual_pos);
-
 }
 
+TEST_F(seek_pageTest, QuadrupleIndirectPageSuccess)
+{
+	/* Mock data */
+	long long actual_pos;
+	long long expected_pos = 5566;
+	long long target_page;
 
- /*
-class seek_pageTest : public ::testing::Test {
-	protected:
+	target_page = (pointers_per_page[3] + 
+		pointers_per_page[4]) / 2; // Medium of range(1024^3, 1024^4)
+	body_ptr->inode_num = INO_QUADRUPLE_INDIRECT_SUCCESS;
+	fseek(body_ptr->fptr, sizeof(FILE_META_TYPE), SEEK_SET);
+	write_mock_file_meta(4, target_page, expected_pos);
 
-		char *metapath;
-		long long target_page;
-
-		FH_ENTRY *fh_ptr;
-		META_CACHE_ENTRY_STRUCT *body_ptr;	
-
-		virtual void SetUp() {
-			metapath = "testpatterns/seek_page_meta_file";
-
-			target_page = 0;
-
-			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
-			sem_init(&(body_ptr->access_sem), 0, 1);
-			body_ptr->fptr = fopen(metapath, "w+");
-			setbuf(body_ptr->fptr, NULL);
-			body_ptr->meta_opened = TRUE;
-
-			fh_ptr = (FH_ENTRY*)malloc(sizeof(FH_ENTRY));
-			fh_ptr->thisinode = self_inode;
-			fh_ptr->meta_cache_ptr = body_ptr;
-		}
-
-                virtual void TearDown() {
-			fclose(body_ptr->fptr);
-			free(fh_ptr);
-			free(body_ptr);
-			remove(metapath);
-		}
-};
-TEST_F(seek_pageTest, NoLockError) {
-	EXPECT_EQ(-1, seek_page(fh_ptr, target_page));
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	actual_pos = seek_page(body_ptr, target_page, 0);
+	
+	/* Verify */
+	EXPECT_EQ(expected_pos, actual_pos);
 }
-TEST_F(seek_pageTest, LookupFileDataFailed) {
-	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_FAIL;
-	sem_wait(&(body_ptr->access_sem));
 
-	EXPECT_EQ(-1, seek_page(fh_ptr, target_page));
-	sem_post(&(body_ptr->access_sem));
-}
-TEST_F(seek_pageTest, UpdateFileDataFailed) {
-	fh_ptr->thisinode = INO_UPDATE_FILE_DATA_FAIL;
-	sem_wait(&(body_ptr->access_sem));
-
-	EXPECT_EQ(-1, seek_page(fh_ptr, target_page));
-	sem_post(&(body_ptr->access_sem));
-}
-TEST_F(seek_pageTest, TargetPageExisted) {
-	target_page = NUM_BLOCKS - 1;
-
-	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
-	sem_wait(&(body_ptr->access_sem));
-
-	EXPECT_EQ(0, seek_page(fh_ptr, target_page));
-	EXPECT_EQ(target_page, fh_ptr->cached_page_index);
-	// Assume the position of first page is 0 
-	EXPECT_EQ((target_page+1)*sizeof(BLOCK_ENTRY_PAGE), fh_ptr->cached_filepos);
-	sem_post(&(body_ptr->access_sem));
-}
-// Test for target block page isn't generated 
-TEST_F(seek_pageTest, TargetPageNotExisted) {
-	target_page = NUM_BLOCKS;
-
-	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK;
-	sem_wait(&(body_ptr->access_sem));
-
-	EXPECT_EQ(0, seek_page(fh_ptr, target_page));
-	EXPECT_EQ(target_page, fh_ptr->cached_page_index);
-	EXPECT_EQ((target_page+1)*sizeof(BLOCK_ENTRY_PAGE), fh_ptr->cached_filepos);
-	sem_post(&(body_ptr->access_sem));
-}
-// Test for first block page isn't generated 
-TEST_F(seek_pageTest, FirstPageNotExisted) {
-	target_page = 0;
-
-	fh_ptr->thisinode = INO_LOOKUP_FILE_DATA_OK_NO_BLOCK_PAGE;
-	sem_wait(&(body_ptr->access_sem));
-
-	EXPECT_EQ(0, seek_page(fh_ptr, target_page));
-	EXPECT_EQ(target_page, fh_ptr->cached_page_index);
-	EXPECT_EQ(0, fh_ptr->cached_filepos);
-	sem_post(&(body_ptr->access_sem));
-}
-*/
 /*
 	Unittest of seek_page()
  */
