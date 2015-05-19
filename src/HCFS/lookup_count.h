@@ -36,3 +36,5 @@ int lookup_increase(ino_t this_inode, int amount, char d_type);
 int lookup_decrease(ino_t this_inode, int amount, char *d_type,
 				char *need_delete);
 int lookup_markdelete(ino_t this_inode);
+
+int lookup_destroy();
