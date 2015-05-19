@@ -145,32 +145,9 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	case INO_QUADRUPLE_INDIRECT_SUCCESS:
 		file_meta_ptr->quadruple_indirect = sizeof(FILE_META_TYPE);
 		return 0;
-	case INO_LOOKUP_FILE_DATA_OK:
-        case INO_UPDATE_FILE_DATA_FAIL:
-		if (file_meta_ptr != NULL) {
-			//file_meta_ptr->next_block_page = sizeof(BLOCK_ENTRY_PAGE);
-
-			BLOCK_ENTRY_PAGE *tmp_page = (BLOCK_ENTRY_PAGE*)malloc(sizeof(BLOCK_ENTRY_PAGE));
-			fwrite(tmp_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
-			free(tmp_page);
-		}
-
-		if (block_page != NULL) {
-			/* Assume there are NUM_BLOCKS blocks */
-			//if (page_pos >= sizeof(BLOCK_ENTRY_PAGE)*NUM_BLOCKS) {
-			//	block_page->next_page = 0;
-			//} else {
-			//	block_page->next_page = page_pos + sizeof(BLOCK_ENTRY_PAGE);
-			//}
-			fwrite(block_page, sizeof(BLOCK_ENTRY_PAGE), 1, body_ptr->fptr);
-		}
-		
+        case INO_CREATE_PAGE_SUCCESS:
+		memset(file_meta_ptr, 0, sizeof(FILE_META_TYPE));
 		return 0;
-        case INO_LOOKUP_FILE_DATA_OK_NO_BLOCK_PAGE:
-		//file_meta_ptr->next_block_page = 0;
-		return 0;
-	case INO_LOOKUP_FILE_DATA_FAIL:
-		return -1;
 	default:
 		return 0;
 	}
@@ -183,6 +160,15 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	switch(this_inode) {
         case INO_UPDATE_FILE_DATA_FAIL:
 		return -1;
+	case INO_CREATE_PAGE_SUCCESS:
+		if (!body_ptr->fptr)
+			return 0;
+		if (file_meta_ptr)
+			pwrite(fileno(body_ptr->fptr), file_meta_ptr, 
+				sizeof(FILE_META_TYPE), 0);
+		if (block_page)
+			pwrite(fileno(body_ptr->fptr), block_page, 
+				sizeof(BLOCK_ENTRY_PAGE), page_pos);
 	default:
 		return 0;
 	}
@@ -275,5 +261,16 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	sprintf(pathname, "testpatterns/inode_%d_block_%d", this_inode, block_num);
+	return 0;
+}
+
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, 
+	unsigned long *ret_gen)
+{
+	return 0;
+}
+
+int lookup_markdelete(ino_t this_inode)
+{
 	return 0;
 }

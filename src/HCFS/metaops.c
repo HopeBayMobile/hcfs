@@ -841,16 +841,17 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	/*TODO: put error handling for the read/write ops here*/
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
 	/*If meta cache lock is not locked, return -1*/
 	if (sem_val > 0)
+		return -1;
+
+	if (target_page < 0)
 		return -1;
 
 	meta_cache_lookup_file_data(body_ptr->inode_num, NULL, &temp_meta,
 							NULL, 0, body_ptr);
 
 	which_indirect = _check_page_level(target_page);
-
 	switch (which_indirect) {
 	case 0:
 		filepos = temp_meta.direct;
