@@ -92,4 +92,5 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	long long ret_page_pos = sizeof(struct stat) + 
 		sizeof(FILE_META_TYPE) + target_page *
 		sizeof(BLOCK_ENTRY_PAGE);
+	return ret_page_pos;
 }
