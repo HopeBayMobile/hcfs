@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = meta_processing_unittest 
+TESTS = metaops_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -83,13 +83,13 @@ gtest_main.a : gtest-all.o gtest_main.o
 metaops.o : $(USER_DIR)/metaops.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/metaops.c
 
-mock_function.o : $(UNITTEST_DIR)/mock_function.c $(UNITTEST_DIR)/mock_param.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
+metaops_mock_function.o : $(UNITTEST_DIR)/metaops_mock_function.c $(UNITTEST_DIR)/mock_param.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/metaops_mock_function.c
 
-meta_processing_unittest.o : $(UNITTEST_DIR)/meta_processing_unittest.cc $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/meta_processing_unittest.cc
+metaops_unittest.o : $(UNITTEST_DIR)/metaops_unittest.cc $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/metaops_unittest.cc
 
-meta_processing_unittest : mock_function.o metaops.o meta_processing_unittest.o gtest_main.a
+metaops_unittest : metaops_mock_function.o metaops.o metaops_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 

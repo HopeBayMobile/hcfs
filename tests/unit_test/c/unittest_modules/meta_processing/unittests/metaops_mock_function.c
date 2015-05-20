@@ -229,7 +229,7 @@ int sync_hcfs_system_data(char need_lock)
 /* mock functions - utils.c*/
 off_t check_file_size(const char *path)
 {
-	return MOCK_BLOCK_SIZE;
+	return MAX_BLOCK_SIZE;
 }
 
 
@@ -267,6 +267,12 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, 
 	unsigned long *ret_gen)
 {
+	if (this_inode == INO_DELETE_FILE_BLOCK) {
+		inode_stat->st_size = NUM_BLOCKS * MAX_BLOCK_SIZE;
+	} else {
+		inode_stat->st_size = 0;
+		inode_stat->st_mode = (this_inode % 2 ? S_IFREG : S_IFDIR);
+	}
 	return 0;
 }
 

@@ -33,6 +33,9 @@ struct stat to_verified_stat;
 #define INO_INSERT_DIR_ENTRY_SUCCESS_WITHOUT_SPLITTING 21
 #define INO_INSERT_DIR_ENTRY_SUCCESS_WITH_SPLITTING 22
 
+/* actual_delete_inode() */
+#define INO_DELETE_FILE_BLOCK 200000
+
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
 	INO_SEEK_DIR_ENTRY_NOTFOUND - meta_cache_seek_dir_entry() return 0 and result_index<0
