@@ -1178,7 +1178,7 @@ TEST(startup_finish_deleteTest, DeleteInodeSuccess)
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "/tmp/markdelete/inode%d", i);
-		mknod(pathname, S_IFREG | 0700, 0);
+		ASSERT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
 	}
 
 	/* Run */

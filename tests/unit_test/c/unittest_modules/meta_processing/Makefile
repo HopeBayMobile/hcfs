@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = metaops_unittest 
+TESTS = metaops_unittest file_present_unittest 
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -80,6 +80,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
+# metaops.c
 metaops.o : $(USER_DIR)/metaops.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/metaops.c
 
@@ -92,4 +93,16 @@ metaops_unittest.o : $(UNITTEST_DIR)/metaops_unittest.cc $(GTEST_HEADERS)
 metaops_unittest : metaops_mock_function.o metaops.o metaops_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
+# file_present.c
+file_present.o : $(USER_DIR)/file_present.c $(USER_DIR)/hfuse_system.h $(USER_DIR)/params.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/file_present.c
+
+file_present_mock_function.o : $(UNITTEST_DIR)/file_present_mock_function.c $(UNITTEST_DIR)/mock_param.h
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/file_present_mock_function.c
+
+file_present_unittest.o : $(UNITTEST_DIR)/file_present_unittest.cc $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/file_present_unittest.cc
+
+file_present_unittest : file_present_mock_function.o file_present.o file_present_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
