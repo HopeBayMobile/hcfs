@@ -61,12 +61,13 @@ int init_system_fh_table(void)
 /************************************************************************
 *
 * Function name: open_fh
-*        Inputs: ino_t thisinode
+*        Inputs: ino_t thisinode, int flags
 *       Summary: Allocate a file handle for inode number "thisinode".
+*                Also record the file opening flag from "flags".
 *  Return value: Index of file handle if successful. Otherwise returns -1.
 *
 *************************************************************************/
-long long open_fh(ino_t thisinode)
+long long open_fh(ino_t thisinode, int flags)
 {
 	long long index;
 	char thismetapath[METAPATHLEN];
@@ -89,6 +90,7 @@ long long open_fh(ino_t thisinode)
 	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
 	system_fh_table.entry_table[index].meta_cache_locked = FALSE;
 	system_fh_table.entry_table[index].thisinode = thisinode;
+	system_fh_table.entry_table[index].flags = flags;
 
 	system_fh_table.entry_table[index].blockfptr = NULL;
 	system_fh_table.entry_table[index].opened_block = -1;
