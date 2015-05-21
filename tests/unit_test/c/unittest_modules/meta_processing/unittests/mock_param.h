@@ -36,6 +36,25 @@ struct stat to_verified_stat;
 /* actual_delete_inode() */
 #define INO_DELETE_FILE_BLOCK 200000
 
+/* fetch_inode_stat() */
+#define INO_REGFILE 7
+#define INO_DIR 8
+#define GENERATION_NUM 5
+
+/* mknod_update_meta() & mkdir_update_meta() */
+#define INO_META_CACHE_UPDATE_FILE_SUCCESS 5
+#define INO_META_CACHE_UPDATE_FILE_FAIL 6
+#define INO_DIR_ADD_ENTRY_SUCCESS 7
+#define INO_DIR_ADD_ENTRY_FAIL 8
+#define INO_META_CACHE_UPDATE_DIR_SUCCESS 9
+#define INO_META_CACHE_UPDATE_DIR_FAIL 10
+
+/* unlink_update_meta() & rmdir_update_meta() */
+#define INO_DIR_REMOVE_ENTRY_SUCCESS 3
+#define INO_DIR_REMOVE_ENTRY_FAIL 4
+#define INO_CHILDREN_IS_EMPTY 5
+#define INO_CHILDREN_IS_NONEMPTY 6
+
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
 	INO_SEEK_DIR_ENTRY_NOTFOUND - meta_cache_seek_dir_entry() return 0 and result_index<0

@@ -49,6 +49,10 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 
 all : $(TESTS)
 
+test:
+	./metaops_unittest
+	./file_present_unittest
+
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcno *.gcda
 
