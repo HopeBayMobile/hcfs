@@ -247,6 +247,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	parent_meta.total_children++;
 	printf("TOTAL CHILDREN is now %ld\n", parent_meta.total_children);
 
+	set_timestamp_now(&parent_stat, MTIME | CTIME);
 	/* Stat may be dirty after the operation so should write them back
 	*  to cache*/
 	ret_val = meta_cache_update_dir_data(parent_inode, &parent_stat,
@@ -336,6 +337,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		parent_meta.total_children--;
 		printf("TOTAL CHILDREN is now %ld\n",
 						parent_meta.total_children);
+		set_timestamp_now(&parent_stat, MTIME | CTIME);
+
 		ret_val = meta_cache_update_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
 		return 0;
@@ -363,15 +366,20 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	int ret_items;
 	int count;
 	int ret_val;
+	struct stat tmpstat;
 
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
 								"..", body_ptr);
 
 	if ((ret_val == 0) && (count >= 0)) {
 		/*Found the entry. Change parent inode*/
+		ret_val = meta_cache_lookup_dir_data(self_inode, &tmpstat,
+					NULL, NULL, body_ptr);
+
 		tpage.dir_entries[count].d_ino = parent_inode2;
-		ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
-							&tpage, body_ptr);
+		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
+					NULL, &tpage, body_ptr);
 		return 0;
 	}
 
@@ -380,11 +388,13 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 
 /************************************************************************
 *
-* Function name: change_parent_inode
+* Function name: change_dir_entry_inode
 *        Inputs: ino_t self_inode, char *targetname,
-*                ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr
+*                ino_t new_inode, struct stat *thisstat,
+*                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: For a directory "self_inode", change the inode of entry
-*                "targetname" to "new_inode.
+*                "targetname" to "new_inode. "thisstat" is the inode stat
+*                of "self_inode".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
@@ -397,15 +407,19 @@ int change_dir_entry_inode(ino_t self_inode, char *targetname,
 	int ret_items;
 	int count;
 	int ret_val;
+	struct stat tmpstat;
 
 	ret_val = meta_cache_seek_dir_entry(self_inode, &tpage, &count,
 						targetname, body_ptr);
 
 	if ((ret_val == 0) && (count >= 0)) {
-		/*Found the entry. Change parent inode*/
+		/*Found the entry. Change inode*/
+		ret_val = meta_cache_lookup_dir_data(self_inode, &tmpstat,
+					NULL, NULL, body_ptr);
 		tpage.dir_entries[count].d_ino = new_inode;
-		ret_val = meta_cache_update_dir_data(self_inode, NULL, NULL,
-							&tpage, body_ptr);
+		set_timestamp_now(&tmpstat, MTIME | CTIME);
+		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
+					NULL, &tpage, body_ptr);
 		return 0;
 	}
 
@@ -493,6 +507,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	} else {
 		/* If it is still referenced, update the meta file. */
 		this_inode_stat.st_nlink--;
+		set_timestamp_now(&this_inode_stat, CTIME);
 		ret_val = meta_cache_update_dir_data(this_inode,
 					&this_inode_stat, NULL, NULL, body_ptr);
 		meta_cache_close_file(body_ptr);

@@ -23,6 +23,7 @@
 **************************************************************************/
 
 #define FUSE_USE_VERSION 29
+#define _GNU_SOURCE
 
 #include "fuseop.h"
 
@@ -44,6 +45,7 @@
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -81,25 +83,13 @@ to zero (to save space in the long run).
 to delete or list the folder.
 */
 
+/* TODO: Go over the details involving S_ISUID, S_ISGID, and linux capability
+	problems (involving chmod, chown, etc) */
 
-/* TODO: Need to go over the access rights problem for the ops */
+/* TODO: Need to revisit the following problem for all ops:
+     timestamp change (a_time, m_time, c_time), and error handling */
 
-/* TODO: For read and write ops, check the flags to make sure the permission
-is correct */
-/* TODO: Need to revisit the following problem for all ops: access rights,
-/*   timestamp change (a_time, m_time, c_time), and error handling */
-/* TODO: For timestamp changes, write routine for making changes to also
-	timestamps with nanosecond precision */
-/* TODO: Access time may not be changed for file accesses, if noatime is
-/*   specified in file opening or mounting. */
-
-
-
-/* TODO: For access rights, need to check file permission and/or system acl.
-/*   System acl is set in extended attributes. */
-/* TODO: The FUSE option "default_permission" should be turned on if there
-/*   is no actual file permission check, or turned off if we are checking
-/*   system acl. */
+/* TODO: system acl. System acl is set in extended attributes. */
 
 /* TODO: Will need to implement rollback or error marking when ops failed*/
 
@@ -118,6 +108,36 @@ is correct */
    Inputs: fuse_req_t req, struct stat *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
 */
+
+int set_timestamp_now(struct stat *thisstat, char mode)
+{
+	int ret_val;
+	clockid_t this_clock_id;
+	struct timespec timenow;
+
+	clock_getcpuclockid(0, &this_clock_id);
+	clock_gettime(this_clock_id, &timenow);
+
+	if (mode & ATIME) {
+		thisstat->st_atime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_atim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	if (mode & MTIME) {
+		thisstat->st_mtime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_mtim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	if (mode & CTIME) {
+		thisstat->st_ctime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_ctim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	return 0;
+}
 
 int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 {
@@ -174,6 +194,11 @@ int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 					sizeof(gid_t) * num_groups, tmp_list);
 	}
 
+	if (num_groups < 0) {
+		printf("Debug check permission getgroups failed, skipping\n");
+		num_groups = 0;
+	}
+
 	is_in_group = FALSE;
 	printf("Debug permission number of groups %d\n", num_groups);
 	for (count = 0; count < num_groups; count++) {
@@ -211,6 +236,163 @@ int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 			return -EACCES;
 	return 0;
 }
+
+/* Check permission routine for ll_access only */
+int check_permission_access(fuse_req_t req, struct stat *thisstat, int mode)
+{
+	int ret_val;
+	struct fuse_ctx *temp_context;
+	gid_t *tmp_list, tmp1_list[10];
+	int num_groups, count;
+	char is_in_group;
+
+	temp_context = fuse_req_ctx(req);
+
+	/*If this is the root check if exec is set for any for reg files*/
+	if (temp_context->uid == 0) {
+		if ((S_ISREG(thisstat->st_mode)) && (mode & X_OK)) {
+			if (!(thisstat->st_mode &
+				(S_IXUSR | S_IXGRP | S_IXOTH)))
+				return -EACCES;
+		}
+		return 0;
+	}
+
+	/* First check owner permission */
+	if (temp_context->uid == thisstat->st_uid) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRUSR))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWUSR))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXUSR))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check group permission */
+	if (temp_context->gid == thisstat->st_gid) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check supplementary group ID */
+
+	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
+
+	if (num_groups <= 10) {
+		tmp_list = tmp1_list;
+	} else {
+		tmp_list = malloc(sizeof(gid_t) * num_groups);
+		if (tmp_list == NULL)
+			return -ENOMEM;
+		num_groups = fuse_req_getgroups(req,
+					sizeof(gid_t) * num_groups, tmp_list);
+	}
+
+	if (num_groups < 0) {
+		printf("Debug check permission getgroups failed, skipping\n");
+		num_groups = 0;
+	}
+
+	is_in_group = FALSE;
+	printf("Debug permission number of groups %d\n", num_groups);
+	for (count = 0; count < num_groups; count++) {
+		printf("group gid %d, %d\n", tmp_list[count],
+					thisstat->st_gid);
+		if (tmp_list[count] == thisstat->st_gid) {
+			is_in_group = TRUE;
+			break;
+		}
+	}
+
+	if (is_in_group == TRUE) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check others */
+
+	if (mode & R_OK)
+		if (!(thisstat->st_mode & S_IROTH))
+			return -EACCES;
+	if (mode & W_OK)
+		if (!(thisstat->st_mode & S_IWOTH))
+			return -EACCES;
+	if (mode & X_OK)
+		if (!(thisstat->st_mode & S_IXOTH))
+			return -EACCES;
+	return 0;
+}
+
+
+int is_member(fuse_req_t req, gid_t this_gid, gid_t target_gid)
+{
+	int ret_val;
+	gid_t *tmp_list, tmp1_list[10];
+	int num_groups, count;
+	char is_in_group;
+
+
+	if (this_gid == target_gid)
+		return 1;
+
+	/* Check supplementary group ID */
+
+	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
+
+	if (num_groups <= 10) {
+		tmp_list = tmp1_list;
+	} else {
+		tmp_list = malloc(sizeof(gid_t) * num_groups);
+		if (tmp_list == NULL)
+			return 0;
+		num_groups = fuse_req_getgroups(req,
+					sizeof(gid_t) * num_groups, tmp_list);
+	}
+
+	if (num_groups < 0) {
+		if (tmp_list != tmp1_list)
+			free(tmp_list);
+		return 0;
+	}
+
+	is_in_group = FALSE;
+	for (count = 0; count < num_groups; count++) {
+		if (tmp_list[count] == target_gid) {
+			is_in_group = TRUE;
+			break;
+		}
+	}
+
+	if (tmp_list != tmp1_list)
+		free(tmp_list);
+
+	if (is_in_group == TRUE)
+		return 1;
+
+	return 0;
+}
+
+
 /************************************************************************
 *
 * Function name: hfuse_ll_getattr
@@ -319,9 +501,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
-	this_stat.st_atime = time(NULL);
-	this_stat.st_mtime = this_stat.st_atime;
-	this_stat.st_ctime = this_stat.st_atime;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation);
 
@@ -416,9 +596,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
 
-	this_stat.st_atime = time(NULL);
-	this_stat.st_mtime = this_stat.st_atime;
-	this_stat.st_ctime = this_stat.st_atime;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+
 	this_stat.st_size = 0;
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
@@ -712,42 +891,42 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
 	DIR_ENTRY_PAGE temp_page;
 	int temp_index;
-	struct stat parent_stat;
+	struct stat parent_stat1, parent_stat2;
 
-	ret_val = fetch_inode_stat((ino_t)parent, &parent_stat, NULL);
+	ret_val = fetch_inode_stat((ino_t)parent, &parent_stat1, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat1.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat1, 3);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
-	ret_val = fetch_inode_stat((ino_t)newparent, &parent_stat, NULL);
+	ret_val = fetch_inode_stat((ino_t)newparent, &parent_stat2, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
-	if (!S_ISDIR(parent_stat.st_mode)) {
+	if (!S_ISDIR(parent_stat2.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat2, 3);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -817,8 +996,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	if (S_ISDIR(tempstat.st_mode)) {
-		ret_val = check_permission(req, &parent_stat, 2);
+	/* Check if need to move to different parent inode, a dir is
+		writeable*/
+	if ((S_ISDIR(tempstat.st_mode)) && (parent_inode1 != parent_inode2)) {
+		ret_val = check_permission(req, &tempstat, 2);
 
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
@@ -879,7 +1060,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		the old target */
 	if (old_target_inode > 0) {
 		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
-					self_inode, parent2_ptr);
+				self_inode, parent2_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -928,7 +1109,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
-				parent_inode2, body_ptr);
+				parent_inode2, &tempstat, body_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -1674,6 +1855,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	struct stat temp_stat;
 	size_t size;
 	char *buf;
+	char noatime;
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
 		fuse_reply_err(req, EBADF);
@@ -1688,6 +1870,16 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, EBADFD);
 		return;
 	}
+
+	if ((!(fh_ptr->flags & O_RDONLY)) && (!(fh_ptr->flags & O_RDWR))) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	if (fh_ptr->flags & O_NOATIME)
+		noatime = TRUE;
+	else
+		noatime = FALSE;
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
@@ -1746,7 +1938,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			break;
 	}
 
-	if (total_bytes_read > 0) {
+	if ((total_bytes_read > 0) && (noatime == FALSE)) {
 		fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		fh_ptr->meta_cache_locked = TRUE;
@@ -1756,8 +1948,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
 					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
 
-		if (total_bytes_read > 0)
-			temp_stat.st_atime = time(NULL);
+		set_timestamp_now(&temp_stat, ATIME);
 
 		meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat,
 					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
@@ -2029,6 +2220,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
+	if ((!(fh_ptr->flags & O_WRONLY)) && (!(fh_ptr->flags & O_RDWR))) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
 
@@ -2214,7 +2410,29 @@ void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
-	/*TODO: Need to check for access rights */
+	int ret_val;
+	struct stat this_stat;
+
+	ret_val = fetch_inode_stat((ino_t)ino, &this_stat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(this_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &this_stat, 4);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	fuse_reply_open(req, file_info);
 }
 
@@ -2459,8 +2677,11 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	struct timespec timenow;
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
+	struct fuse_ctx *temp_context;
 
 	printf("Debug setattr\n");
+
+	temp_context = fuse_req_ctx(req);
 
 	this_inode = (ino_t) ino;
 
@@ -2501,21 +2722,62 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MODE) {
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
 		newstat.st_mode = attr->st_mode;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
+		temp_context = fuse_req_ctx(req);
+		if (temp_context->uid != 0) {   /* Not privileged */
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_GID) {
+		temp_context = fuse_req_ctx(req);
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(!is_member(req, newstat.st_gid,
+					attr->st_gid)))) {
+			/* Not privileged and (not owner or not in group) */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
 		newstat.st_atime = attr->st_atime;
 		memcpy(&(newstat.st_atim), &(attr->st_atim),
 			sizeof(struct timespec));
@@ -2523,6 +2785,15 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME) {
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
 		newstat.st_mtime = attr->st_mtime;
 		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
 			sizeof(struct timespec));
@@ -2533,6 +2804,17 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	clock_gettime(this_clock_id, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(check_permission(req, &newstat, 2) < 0))) {
+			/* Not privileged and
+				(not owner or no write permission)*/
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EACCES);
+			return;
+		}			
 		newstat.st_atime = (time_t)(timenow.tv_sec);
 		memcpy(&(newstat.st_atim), &timenow,
 			sizeof(struct timespec));
@@ -2540,6 +2822,17 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(check_permission(req, &newstat, 2) < 0))) {
+			/* Not privileged and
+				(not owner or no write permission)*/
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EACCES);
+			return;
+		}			
 		newstat.st_mtime = (time_t)(timenow.tv_sec);
 		memcpy(&(newstat.st_mtim), &timenow,
 			sizeof(struct timespec));
@@ -2568,7 +2861,27 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 *************************************************************************/
 static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 {
-	/*TODO: finish this*/
+	struct stat thisstat;
+	int ret_val;
+
+	ret_val = fetch_inode_stat((ino_t)ino, &thisstat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (mode == F_OK)
+		fuse_reply_err(req, 0);
+
+	/* Checking permission */
+	ret_val = check_permission_access(req, &thisstat, mode);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	fuse_reply_err(req, 0);
 }
 
