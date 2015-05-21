@@ -29,8 +29,8 @@
 #include "global.h"
 #include "params.h"
 
-#define SB_ENTRY_SIZE sizeof(SUPER_BLOCK_ENTRY)
-#define SB_HEAD_SIZE sizeof(SUPER_BLOCK_HEAD)
+#define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
 
 extern SYSTEM_CONF_STRUCT system_config;
 

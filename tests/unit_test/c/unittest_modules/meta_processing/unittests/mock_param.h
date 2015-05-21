@@ -1,6 +1,9 @@
 #include "sys/stat.h"
 #include "fuseop.h"
+#include "params.h"
 
+#ifndef META_PROCESSING_MOCK_PARAMS_H_
+#define META_PROCESSING_MOCK_PARAMS_H_
 /* Parameters for mock functions */
 
 /* System statistics */
@@ -96,3 +99,10 @@ enum { INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_1,
 	INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel,
 	INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel
 };
+
+/*
+	Mock data for super_block
+ */
+SYSTEM_CONF_STRUCT system_config;
+
+#endif
