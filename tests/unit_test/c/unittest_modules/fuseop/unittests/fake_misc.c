@@ -235,7 +235,7 @@ int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 	return 0;
 }
 
-long long open_fh(ino_t thisinode)
+long long open_fh(ino_t thisinode, int flags)
 {
 	long long index;
 
@@ -247,6 +247,7 @@ long long open_fh(ino_t thisinode)
 	system_fh_table.entry_table[index].thisinode = thisinode;
 	system_fh_table.entry_table[index].meta_cache_ptr = NULL;
 	system_fh_table.entry_table[index].meta_cache_locked = FALSE;
+	system_fh_table.entry_table[index].flags = flags;
 
 	system_fh_table.entry_table[index].blockfptr = NULL;
 	system_fh_table.entry_table[index].opened_block = -1;
@@ -422,7 +423,12 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		break;
 	}
 
-	if (before_update_file_data == FALSE)
+	inode_stat->st_uid = geteuid();
+	inode_stat->st_gid = getegid();
+
+	if (this_inode == 1 && root_updated == TRUE)
+		memcpy(inode_stat, &updated_root, sizeof(struct stat));
+	if (this_inode != 1 && before_update_file_data == FALSE)
 		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
 
 	return 0;

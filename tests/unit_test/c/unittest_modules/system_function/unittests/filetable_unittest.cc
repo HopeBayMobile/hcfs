@@ -52,7 +52,7 @@ TEST_F(open_fhTest, num_opened_files_LimitExceeded)
 	/* Mock data */
 	system_fh_table.num_opened_files = MAX_OPEN_FILE_ENTRIES + 1;
 	/* Run function & Test */
-	ASSERT_EQ(-1, open_fh(1)) << "Testing open_fh() should fail";
+	ASSERT_EQ(-1, open_fh(1, 0)) << "Testing open_fh() should fail";
 	/* Recover */
 	system_fh_table.num_opened_files = 0;
 }
@@ -66,7 +66,7 @@ TEST_F(open_fhTest, OpenfhSuccess)
 		srand(time(NULL));
 		inode = times;
 		/* Run function */
-		index = open_fh(inode) ;
+		index = open_fh(inode, 0) ;
 		/* Check answer */
 		ASSERT_NE(-1, index) << "Fail with inode = " << inode;
 		ASSERT_EQ(TRUE, system_fh_table.entry_table_flags[index]);
@@ -98,7 +98,7 @@ TEST_F(close_fhTest, meta_cache_lock_entry_ReturnNull)
 {
 	int index;
 	/* Mock data */
-	index = open_fh(INO__META_CACHE_LOCK_ENTRY_FAIL);
+	index = open_fh(INO__META_CACHE_LOCK_ENTRY_FAIL, 0);
 	ASSERT_NE(-1, index);
 	/* Test */
 	ASSERT_EQ(-1, close_fh(index));
@@ -114,7 +114,7 @@ TEST_F(close_fhTest, CloseSuccess)
 	for (int num_inode = 0; num_inode < 500 ; num_inode++) {
 		int index;
 		int inode = num_inode * 27;
-		index = open_fh(inode);
+		index = open_fh(inode, 0);
 		ASSERT_NE(-1, index) << "Fail to open fh with inode " << inode;
 		index_list.push_back(index);
 		ans_num_opened_files++;

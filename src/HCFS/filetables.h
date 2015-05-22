@@ -25,6 +25,7 @@
 
 typedef struct {
 	ino_t thisinode;
+	int flags;
 	META_CACHE_ENTRY_STRUCT *meta_cache_ptr;
 	char meta_cache_locked;
 	FILE *blockfptr;
@@ -45,7 +46,7 @@ typedef struct {
 FH_TABLE_TYPE system_fh_table;
 
 int init_system_fh_table(void);
-long long open_fh(ino_t thisinode);
+long long open_fh(ino_t thisinode, int flags);
 int close_fh(long long index);
 
 /*END definition of file handle */
