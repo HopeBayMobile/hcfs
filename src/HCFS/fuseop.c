@@ -762,8 +762,11 @@ a directory (for NFS) */
 	unsigned long this_gen;
 	struct stat parent_stat;
 
+	printf("Debug lookup parent %lld, name %s\n",
+			parent_inode, selfname);
 	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
 
+	printf("Debug lookup parent mode %lld\n", parent_stat.st_mode);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1545,7 +1548,8 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 
 	file_flags = file_info->flags;
 
-	if ((file_flags & O_RDONLY) || (file_flags & O_RDWR)) {
+	if (((file_flags & O_ACCMODE) == O_RDONLY) ||
+			((file_flags & O_ACCMODE) == O_RDWR)) {
 		/* Checking permission */
 		ret_val = check_permission(req, &this_stat, 4);
 
@@ -1555,7 +1559,8 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		}
 	}
 
-	if ((file_flags & O_WRONLY) || (file_flags & O_RDWR)) {
+	if (((file_flags & O_ACCMODE) == O_WRONLY) ||
+			((file_flags & O_ACCMODE) == O_RDWR)) {
 		/* Checking permission */
 		ret_val = check_permission(req, &this_stat, 2);
 
@@ -1871,7 +1876,8 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if ((!(fh_ptr->flags & O_RDONLY)) && (!(fh_ptr->flags & O_RDWR))) {
+	if ((!((fh_ptr->flags & O_ACCMODE) == O_RDONLY)) &&
+			(!((fh_ptr->flags & O_ACCMODE) == O_RDWR))) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -2220,7 +2226,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		return;
 	}
 
-	if ((!(fh_ptr->flags & O_WRONLY)) && (!(fh_ptr->flags & O_RDWR))) {
+	printf("flags %d\n", fh_ptr->flags & O_ACCMODE);
+	if ((!((fh_ptr->flags & O_ACCMODE) == O_WRONLY)) &&
+			(!((fh_ptr->flags & O_ACCMODE) == O_RDWR))) {
 		fuse_reply_err(req, EBADF);
 		return;
 	}
@@ -2263,7 +2271,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if (total_bytes_written > 0)
-		temp_stat.st_mtime = time(NULL);
+		set_timestamp_now(&temp_stat, MTIME | CTIME);
 
 	meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL,
 						0, fh_ptr->meta_cache_ptr);
@@ -2455,7 +2463,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	off_t thisfile_pos;
 	DIR_META_TYPE tempmeta;
 	DIR_ENTRY_PAGE temp_page;
-	struct stat tempstat;
+	struct stat tempstat, thisstat;
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -2475,7 +2483,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	this_inode = (ino_t) ino;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	meta_cache_lookup_dir_data(this_inode, &tempstat, &tempmeta, NULL,
+	meta_cache_lookup_dir_data(this_inode, &thisstat, &tempmeta, NULL,
 								body_ptr);
 
 	buf = malloc(sizeof(char)*size);
@@ -2521,6 +2529,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
+			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
@@ -2546,6 +2555,12 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 		}
 		page_start = 0;
 		thisfile_pos = temp_page.tree_walk_next;
+	}
+
+	if (buf_pos > 0) {
+		set_timestamp_now(&thisstat, ATIME);
+		meta_cache_update_dir_data(this_inode, &thisstat, NULL, NULL,
+								body_ptr);
 	}
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
@@ -2679,7 +2694,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	struct fuse_ctx *temp_context;
 
-	printf("Debug setattr\n");
+	printf("Debug setattr, to_set %d\n", to_set);
 
 	temp_context = fuse_req_ctx(req);
 
@@ -2722,6 +2737,9 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MODE) {
+		printf("Debug setattr context %d, file %d\n",
+			temp_context->uid, newstat.st_uid);
+
 		if ((temp_context->uid != 0) &&
 			(temp_context->uid != newstat.st_uid)) {
 			/* Not privileged and not owner */
@@ -2843,6 +2861,11 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		newstat.st_ctime = (time_t)(timenow.tv_sec);
 		memcpy(&(newstat.st_ctim), &timenow,
 			sizeof(struct timespec));
+		if (to_set & FUSE_SET_ATTR_SIZE) {
+			newstat.st_mtime = (time_t)(timenow.tv_sec);
+			memcpy(&(newstat.st_mtim), &timenow,
+				sizeof(struct timespec));
+		}
 	}
 
 	ret_val = meta_cache_update_file_data(this_inode, &newstat,
@@ -2871,8 +2894,10 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 		return;
 	}
 
-	if (mode == F_OK)
+	if (mode == F_OK) {
 		fuse_reply_err(req, 0);
+		return;
+	}
 
 	/* Checking permission */
 	ret_val = check_permission_access(req, &thisstat, mode);

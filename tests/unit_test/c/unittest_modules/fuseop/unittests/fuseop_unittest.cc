@@ -106,6 +106,7 @@ class hfuse_getattrTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     after_update_block_page = FALSE;
   }
 
@@ -148,6 +149,7 @@ class hfuse_mknodTest : public ::testing::Test {
     fail_mknod_update_meta = FALSE;
     before_mknod_created = TRUE;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     tmp_dev = makedev(0, 0);
   }
 
@@ -223,6 +225,7 @@ class hfuse_mkdirTest : public ::testing::Test {
     fail_mkdir_update_meta = FALSE;
     before_mkdir_created = TRUE;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -296,6 +299,7 @@ class hfuse_unlinkTest : public ::testing::Test {
     before_mkdir_created = TRUE;
     before_mknod_created = TRUE;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -373,6 +377,7 @@ class hfuse_rmdirTest : public ::testing::Test {
     before_mkdir_created = TRUE;
     before_mknod_created = TRUE;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -472,6 +477,7 @@ class hfuse_renameTest : public ::testing::Test {
   virtual void SetUp() {
     before_mkdir_created = TRUE;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -583,6 +589,7 @@ class hfuse_chmodTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -631,6 +638,7 @@ class hfuse_chownTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -647,20 +655,20 @@ TEST_F(hfuse_chownTest, FileNotExist) {
   EXPECT_EQ(tmp_err, ENOENT);
 }
 
-TEST_F(hfuse_chownTest, ChmodFile) {
+TEST_F(hfuse_chownTest, ChownNotRoot) {
   int ret_val;
   int tmp_err;
   struct stat tempstat;
 
-  ret_val = chown("/tmp/test_fuse/testfile1", 1002, 1003);
+  ret_val = chown("/tmp/test_fuse/testfile1", 1, 1);
   tmp_err = errno;
 
-  ASSERT_EQ(ret_val, 0);
-  stat("/tmp/test_fuse/testfile1", &tempstat);
-  EXPECT_EQ(tempstat.st_uid, 1002);
-  EXPECT_EQ(tempstat.st_gid, 1003);
+  ASSERT_EQ(ret_val, -1);
+  EXPECT_EQ(tmp_err, EPERM);
 }
-TEST_F(hfuse_chownTest, ChmodDir) {
+/* Cannot test this if not root */
+/*
+TEST_F(hfuse_chownTest, ChownDir) {
   int ret_val;
   int tmp_err;
   struct stat tempstat;
@@ -672,7 +680,7 @@ TEST_F(hfuse_chownTest, ChmodDir) {
   stat("/tmp/test_fuse/testdir1", &tempstat);
   EXPECT_EQ(tempstat.st_uid, 1);
   EXPECT_EQ(tempstat.st_gid, 1);
-}
+}*/
 
 /* End of the test case for the function hfuse_chown */
 
@@ -681,6 +689,7 @@ class hfuse_utimensTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -775,6 +784,7 @@ class hfuse_truncateTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     fake_block_status = ST_NONE;
     after_update_block_page = FALSE;
     hcfs_system->systemdata.system_size = 12800000;
@@ -967,6 +977,7 @@ class hfuse_openTest : public ::testing::Test {
 
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     fail_open_files = FALSE;
     fptr = NULL;
   }
@@ -1031,6 +1042,7 @@ class hfuse_readTest : public ::testing::Test {
 
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     after_update_block_page = FALSE;
     test_fetch_from_backend = FALSE;
     fake_block_status = ST_NONE;
@@ -1209,6 +1221,7 @@ class hfuse_ll_writeTest : public ::testing::Test {
 
   virtual void SetUp() {
     before_update_file_data = TRUE;
+    root_updated = FALSE;
     after_update_block_page = FALSE;
     test_fetch_from_backend = FALSE;
     fake_block_status = ST_NONE;
@@ -1392,6 +1405,7 @@ class hfuse_ll_statfsTest : public ::testing::Test {
     hcfs_system->systemdata.cache_blocks = 13;
     sys_super_block->head.num_active_inodes = 10000;
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {
@@ -1493,6 +1507,7 @@ class hfuse_ll_readdirTest : public ::testing::Test {
   virtual void SetUp() {
     snprintf(readdir_metapath, 100, "/tmp/readdir_meta");
     before_update_file_data = TRUE;
+    root_updated = FALSE;
   }
 
   virtual void TearDown() {

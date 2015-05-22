@@ -8,6 +8,7 @@ int fail_mkdir_update_meta;
 int before_mkdir_created;
 
 int before_update_file_data;
+int root_updated;
 int after_update_block_page;
 int test_fetch_from_backend;
 unsigned char fake_block_status;
@@ -15,7 +16,7 @@ char readdir_metapath[100];
 int fail_open_files;
 
 BLOCK_ENTRY_PAGE updated_block_page;
-struct stat updated_stat;
+struct stat updated_stat, updated_root;
 mode_t updated_mode;
 uid_t updated_uid;
 gid_t updated_gid;

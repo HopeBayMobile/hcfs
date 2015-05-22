@@ -49,9 +49,16 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
 	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	before_update_file_data = FALSE;
-	if (inode_stat != NULL)
-		memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+	if (this_inode == 1)
+		root_updated = TRUE;
+	else
+		before_update_file_data = FALSE;
+	if (inode_stat != NULL) {
+		if (this_inode == 1)
+			memcpy(&updated_root, inode_stat, sizeof(struct stat));
+		else
+			memcpy(&updated_stat, inode_stat, sizeof(struct stat));
+	}
 
 	if (block_page != NULL) {
 		after_update_block_page = TRUE;
@@ -135,7 +142,12 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			break;
 		}
 
-		if (before_update_file_data == FALSE)
+		inode_stat->st_uid = geteuid();
+		inode_stat->st_gid = getegid();
+
+		if (this_inode == 1 && root_updated == TRUE)
+			memcpy(inode_stat, &updated_root, sizeof(struct stat));
+		if (this_inode != 1 && before_update_file_data == FALSE)
 			memcpy(inode_stat, &updated_stat, sizeof(struct stat));
 	}
 
