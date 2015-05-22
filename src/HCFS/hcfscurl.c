@@ -13,6 +13,7 @@
 /* Implemented routines to parse http return code to distinguish errors
 	from normal ops*/
 /*TODO: Retry mechanism if HTTP operations failed due to timeout */
+#include "hcfscurl.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,8 +24,10 @@
 #include <semaphore.h>
 #include <curl/curl.h>
 
-#include "hcfscurl.h"
 #include "b64encode.h"
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 typedef struct {
 	FILE *fptr;
@@ -255,7 +258,7 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	fptr = fopen(filename, "w+");
 	chunk = NULL;
 
-	sprintf(auth_url, "%s/auth/v1.0", swift_url);
+	sprintf(auth_url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
 	sprintf(user_string, "X-Storage-User: %s", swift_user);
 	sprintf(pass_string, "X-Storage-Pass: %s", swift_pass);
 	chunk = curl_slist_append(chunk, user_string);
@@ -311,10 +314,11 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 	curl_handle->curl = curl_easy_init();
 
 	if (curl_handle->curl) {
-		sprintf(account_user_string, "%s:%s", MY_ACCOUNT, MY_USER);
+		sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
+						SWIFT_USER);
 
-		ret_code = hcfs_get_auth_swift(account_user_string, MY_PASS,
-						MY_URL, curl_handle);
+		ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						SWIFT_URL, curl_handle);
 
 		return ret_code;
 	}
@@ -361,10 +365,11 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 	curl_handle->curl = curl_easy_init();
 
 	if (curl_handle->curl) {
-		sprintf(account_user_string, "%s:%s", MY_ACCOUNT, MY_USER);
+		sprintf(account_user_string, "%s:%s", SWIFT_ACCOUNT,
+						SWIFT_USER);
 
-		ret_code = hcfs_get_auth_swift(account_user_string, MY_PASS,
-						MY_URL, curl_handle);
+		ret_code = hcfs_get_auth_swift(account_user_string, SWIFT_PASS,
+						SWIFT_URL, curl_handle);
 
 		return ret_code;
 	}
@@ -482,8 +487,8 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s_private_container", swift_url_string,
-								MY_USER);
+	sprintf(container_string, "%s/%s", swift_url_string,
+							SWIFT_CONTAINER);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, "Content-Length:");
@@ -558,8 +563,8 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s_private_container/%s",
-					swift_url_string, MY_USER, objname);
+	sprintf(container_string, "%s/%s/%s",
+				swift_url_string, SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	fseek(fptr, 0, SEEK_END);
@@ -640,8 +645,8 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s_private_container/%s",
-					swift_url_string, MY_USER, objname);
+	sprintf(container_string, "%s/%s/%s",
+				swift_url_string, SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 	fseek(fptr, 0, SEEK_END);
@@ -717,8 +722,8 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	strcpy(delete_command, "DELETE");
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s_private_container/%s",
-					swift_url_string, MY_USER, objname);
+	sprintf(container_string, "%s/%s/%s",
+				swift_url_string, SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 

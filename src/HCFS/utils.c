@@ -240,6 +240,7 @@ int read_system_config(char *config_path)
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
 	char argname[200], argval[200], *tokptr1, *tokptr2, *toktmp, *strptr;
 	long long temp_val;
+	int tmp_len;
 
 	fptr = fopen(config_path, "r");
 
@@ -360,7 +361,109 @@ int read_system_config(char *config_path)
 			MAX_BLOCK_SIZE = temp_val;
 			continue;
 		}
+		if (strcasecmp(argname, "current_backend") == 0) {
+			CURRENT_BACKEND = -1;
+			if (strcasecmp(argval, "SWIFT") == 0)
+				CURRENT_BACKEND = SWIFT;
+			if (strcasecmp(argval, "S3") == 0)
+				CURRENT_BACKEND = S3;
+			if (CURRENT_BACKEND == -1) {
+				fclose(fptr);
+				printf("Unsupported backend\n");
+				return -1;
+			}
+			continue;
+		}
+		if (strcasecmp(argname, "swift_account") == 0) {
+			SWIFT_ACCOUNT = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_ACCOUNT, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_user") == 0) {
+			SWIFT_USER = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_USER, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_pass") == 0) {
+			SWIFT_PASS = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_PASS, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_url") == 0) {
+			SWIFT_URL = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_URL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_container") == 0) {
+			SWIFT_CONTAINER = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_CONTAINER, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_protocol") == 0) {
+			if ((strcasecmp(argval, "HTTP") != 0) &&
+				(strcasecmp(argval, "HTTPS") != 0)) {
+				fclose(fptr);
+				printf("Unsupported protocol\n");
+				return -1;
+			}
+			SWIFT_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_PROTOCOL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_access") == 0) {
+			S3_ACCESS = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_ACCESS, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_secret") == 0) {
+			S3_SECRET = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_SECRET, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_url") == 0) {
+			S3_URL = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_URL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_bucket") == 0) {
+			S3_BUCKET = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_BUCKET, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_protocol") == 0) {
+			if ((strcasecmp(argval, "HTTP") != 0) &&
+				(strcasecmp(argval, "HTTPS") != 0)) {
+				fclose(fptr);
+				printf("Unsupported protocol\n");
+				return -1;
+			}
+			S3_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_PROTOCOL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
 	}
+
+	if (((S3_URL != NULL) && (S3_PROTOCOL != NULL))
+				&& (S3_BUCKET != NULL)) {
+		tmp_len = strlen(S3_URL) + strlen(S3_PROTOCOL)
+					+ strlen(S3_BUCKET) + 20;
+		S3_BUCKET_URL = (char *) malloc(tmp_len);
+		snprintf(S3_BUCKET_URL, tmp_len, "%s://%s.%s",
+				S3_PROTOCOL, S3_BUCKET, S3_URL);
+	}
+
+
 	fclose(fptr);
 
 	return 0;
