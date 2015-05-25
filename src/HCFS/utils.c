@@ -250,6 +250,8 @@ int read_system_config(char *config_path)
 		return -1;
 	}
 
+	CURRENT_BACKEND = -1;
+
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
 		if (ret_ptr == NULL)
@@ -300,21 +302,6 @@ int read_system_config(char *config_path)
 		if (strcasecmp(argname, "blockpath") == 0) {
 			BLOCKPATH = (char *) malloc(strlen(argval) + 10);
 			strcpy(BLOCKPATH, argval);
-			continue;
-		}
-		if (strcasecmp(argname, "superblock") == 0) {
-			SUPERBLOCK = (char *) malloc(strlen(argval) + 10);
-			strcpy(SUPERBLOCK, argval);
-			continue;
-		}
-		if (strcasecmp(argname, "unclaimedfile") == 0) {
-			UNCLAIMEDFILE = (char *) malloc(strlen(argval) + 10);
-			strcpy(UNCLAIMEDFILE, argval);
-			continue;
-		}
-		if (strcasecmp(argname, "hcfssystem") == 0) {
-			HCFSSYSTEM = (char *) malloc(strlen(argval) + 10);
-			strcpy(HCFSSYSTEM, argval);
 			continue;
 		}
 		if (strcasecmp(argname, "cache_soft_limit") == 0) {
@@ -484,10 +471,22 @@ int validate_system_config(void)
 	char tempval[10];
 	int ret_val;
 
-	printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH, BLOCKPATH,
-					SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
-	printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
-					CACHE_DELTA, MAX_BLOCK_SIZE);
+	/* Validating system path settings */
+
+	if (CURRENT_BACKEND < 0) {
+		printf("Backend selection does not exist\n");
+		return -1;
+	}
+
+	if (access(METAPATH, F_OK) != 0) {
+		printf("Meta path does not exist. Aborting\n");
+		return -1;
+	}
+
+	if (access(BLOCKPATH, F_OK) != 0) {
+		printf("Block cache path does not exist. Aborting\n");
+		return -1;
+	}
 
 	sprintf(pathname, "%s/testfile", BLOCKPATH);
 
@@ -507,7 +506,112 @@ int validate_system_config(void)
 	printf("test value is: %s, %d\n", tempval, strncmp(tempval, "T", 1));
 	unlink(pathname);
 
-	/* TODO: Complete system config validation */
+	SUPERBLOCK = (char *) malloc(strlen(METAPATH) + 20);
+	if (SUPERBLOCK == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(SUPERBLOCK, strlen(METAPATH) + 20, "%s/superblock",
+			METAPATH);
+
+	UNCLAIMEDFILE = (char *) malloc(strlen(METAPATH) + 20);
+	if (UNCLAIMEDFILE == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(UNCLAIMEDFILE, strlen(METAPATH) + 20, "%s/unclaimedlist",
+			METAPATH);
+
+	HCFSSYSTEM = (char *) malloc(strlen(METAPATH) + 20);
+	if (HCFSSYSTEM == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(HCFSSYSTEM, strlen(METAPATH) + 20, "%s/hcfssystemfile",
+			METAPATH);
+
+	/* Validating cache and block settings */
+	/* TODO: If system already created, need to check if block size
+		is changed, or just use existing block size. */
+	/* TODO: For cache size, perhaps need to check against space
+		already used on the target disk (or adjust dynamically).*/
+
+	if (MAX_BLOCK_SIZE <= 0) {
+		printf("Block size cannot be zero or less\n");
+		return -1;
+	}
+	if (CACHE_DELTA < MAX_BLOCK_SIZE) {
+		printf("cache_delta must be at least max_block_size\n");
+		return -1;
+	}
+	if (CACHE_SOFT_LIMIT < MAX_BLOCK_SIZE) {
+		printf("cache_soft_limit must be at least max_block_size\n");
+		return -1;
+	}
+	if (CACHE_HARD_LIMIT < CACHE_SOFT_LIMIT) {
+		printf("cache_hard_limit must be at least cache_soft_limit\n");
+		return -1;
+	}
+
+	/* Validate that the information for the assigned backend
+		is complete. */
+	/* TODO: Maybe move format checking of backend settings here, and
+		also connection testing. */
+
+	if (CURRENT_BACKEND == SWIFT) {
+		if (SWIFT_ACCOUNT == NULL) {
+			printf("Swift account missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_USER == NULL) {
+			printf("Swift user missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_PASS == NULL) {
+			printf("Swift password missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_URL == NULL) {
+			printf("Swift URL missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_CONTAINER == NULL) {
+			printf("Swift container missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_PROTOCOL == NULL) {
+			printf("Swift protocol missing from configuration\n");
+			return -1;
+		}
+	}
+
+	if (CURRENT_BACKEND == S3) {
+		if (S3_ACCESS == NULL) {
+			printf("S3 access key missing from configuration\n");
+			return -1;
+		}
+		if (S3_SECRET == NULL) {
+			printf("S3 secret key missing from configuration\n");
+			return -1;
+		}
+		if (S3_URL == NULL) {
+			printf("S3 URL missing from configuration\n");
+			return -1;
+		}
+		if (S3_BUCKET == NULL) {
+			printf("S3 bucket missing from configuration\n");
+			return -1;
+		}
+		if (S3_PROTOCOL == NULL) {
+			printf("S3 protocol missing from configuration\n");
+			return -1;
+		}
+	}
+
+	printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH, BLOCKPATH,
+					SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
+	printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
+					CACHE_DELTA, MAX_BLOCK_SIZE);
 
 	return 0;
 }
