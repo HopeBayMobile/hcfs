@@ -197,7 +197,7 @@ int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	ret_val = 0;
 	super_block_exclusive_locking();
-	if (inode_ptr->status != IS_DIRTY) {
+	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ll_dequeue(this_inode, inode_ptr);
 		ll_enqueue(this_inode, IS_DIRTY, inode_ptr);
 		write_super_block_head();
