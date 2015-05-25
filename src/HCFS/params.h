@@ -23,7 +23,39 @@ typedef struct {
 	long long cache_hard_limit;
 	long long cache_update_delta;
 	long long max_block_size;
+	int current_backend;
+	char *swift_account;
+	char *swift_user;
+	char *swift_pass;
+	char *swift_url;
+	char *swift_container;
+	char *swift_protocol;
+	char *s3_access;
+	char *s3_secret;
+	char *s3_url;
+	char *s3_bucket;
+	char *s3_protocol;
+	char *s3_bucket_url;
 } SYSTEM_CONF_STRUCT;
+
+#define S3 1
+#define SWIFT 0
+
+#define CURRENT_BACKEND system_config.current_backend
+
+#define SWIFT_ACCOUNT system_config.swift_account
+#define SWIFT_USER system_config.swift_user
+#define SWIFT_PASS system_config.swift_pass
+#define SWIFT_URL system_config.swift_url
+#define SWIFT_CONTAINER system_config.swift_container
+#define SWIFT_PROTOCOL system_config.swift_protocol
+
+#define S3_ACCESS system_config.s3_access
+#define S3_SECRET system_config.s3_secret
+#define S3_URL system_config.s3_url
+#define S3_BUCKET system_config.s3_bucket
+#define S3_PROTOCOL system_config.s3_protocol
+#define S3_BUCKET_URL system_config.s3_bucket_url
 
 #define METAPATH system_config.metapath
 #define BLOCKPATH system_config.blockpath

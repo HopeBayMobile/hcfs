@@ -469,11 +469,26 @@ TEST_F(parse_parent_selfTest, ObjectsNotUnderRoot) {
 
 /* Start of the test case for the function read_system_config */
 
-TEST(read_system_configTest, PathNotExist) {
+class read_system_configTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    mkdir("/tmp/testHCFS/metastorage", 0700);
+    mkdir("/tmp/testHCFS/blockstorage", 0700);
+   }
+
+  virtual void TearDown() {
+    rmdir("/tmp/testHCFS/metastorage");
+    rmdir("/tmp/testHCFS/blockstorage");
+    rmdir("/tmp/testHCFS");
+   }
+ };
+
+TEST_F(read_system_configTest, PathNotExist) {
   EXPECT_EQ(-1,read_system_config("EmptyFile"));
  }
-
-TEST(read_system_configTest, GoodConfig) {
+TEST_F(read_system_configTest, GoodConfig) {
   char pathname[100];
 
   strcpy(pathname,"testpatterns/test_good_hcfs.conf");
@@ -482,26 +497,326 @@ TEST(read_system_configTest, GoodConfig) {
 
   ASSERT_EQ(0,read_system_config(pathname));
 
-  EXPECT_STREQ(METAPATH, "/testHCFS/metastorage");
-  EXPECT_STREQ(BLOCKPATH, "/testHCFS/blockstorage");
-  EXPECT_STREQ(SUPERBLOCK, "/testHCFS/metastorage/superblock");
-  EXPECT_STREQ(UNCLAIMEDFILE, "/testHCFS/metastorage/unclaimedlist");
-  EXPECT_STREQ(HCFSSYSTEM, "/testHCFS/metastorage/hcfssystemfile");
+  EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+  EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
   EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
   EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
   EXPECT_EQ(CACHE_DELTA, 10485760);
   EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+  EXPECT_EQ(CURRENT_BACKEND, SWIFT);
+  EXPECT_STREQ(SWIFT_ACCOUNT,"hopebay");
+  EXPECT_STREQ(SWIFT_USER, "hopebay");
+  EXPECT_STREQ(SWIFT_PASS, "hopebaycloud");
+  EXPECT_STREQ(SWIFT_URL, "1.1.1.1:8080");
+  EXPECT_STREQ(SWIFT_CONTAINER, "hopebay_private_container");
+  EXPECT_STREQ(SWIFT_PROTOCOL, "https");
+  EXPECT_STREQ(S3_ACCESS, "aaaaaaaaaaaaaaaaaaaaaaaa");
+  EXPECT_STREQ(S3_SECRET, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  EXPECT_STREQ(S3_URL, "s3.hicloud.net.tw");
+  EXPECT_STREQ(S3_BUCKET, "hopebay");
+  EXPECT_STREQ(S3_PROTOCOL, "https");
+  EXPECT_STREQ(S3_BUCKET_URL, "https://hopebay.s3.hicloud.net.tw");
  }
-TEST(read_system_configTest, WrongNumbersConfig) {
+TEST_F(read_system_configTest, GoodS3Config) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+  EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+  EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+  EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+  EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+  EXPECT_EQ(CURRENT_BACKEND, S3);
+  EXPECT_STREQ(SWIFT_ACCOUNT,"hopebay");
+  EXPECT_STREQ(SWIFT_USER, "hopebay");
+  EXPECT_STREQ(SWIFT_PASS, "hopebaycloud");
+  EXPECT_STREQ(SWIFT_URL, "1.1.1.1:8080");
+  EXPECT_STREQ(SWIFT_CONTAINER, "hopebay_private_container");
+  EXPECT_STREQ(SWIFT_PROTOCOL, "https");
+  EXPECT_STREQ(S3_ACCESS, "aaaaaaaaaaaaaaaaaaaaaaaa");
+  EXPECT_STREQ(S3_SECRET, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  EXPECT_STREQ(S3_URL, "s3.hicloud.net.tw");
+  EXPECT_STREQ(S3_BUCKET, "hopebay");
+  EXPECT_STREQ(S3_PROTOCOL, "https");
+  EXPECT_STREQ(S3_BUCKET_URL, "https://hopebay.s3.hicloud.net.tw");
+ }
+TEST_F(read_system_configTest, UnsupportedBackendConfig) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_wrong_hcfs_nosupport_backend.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(-1,read_system_config(pathname));
+ }
+TEST_F(read_system_configTest, UnsupportedProtocol) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_wrong_protocol.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(-1,read_system_config(pathname));
+ }
+TEST_F(read_system_configTest, UnsupportedProtocolS3) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_wrong_protocol_s3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(-1,read_system_config(pathname));
+ }
+TEST_F(read_system_configTest, OptionsTooLong) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/options_too_long.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(-1,read_system_config(pathname));
+ }
+TEST_F(read_system_configTest, WrongNumbersConfig) {
   char pathname[100];
 
   strcpy(pathname,"testpatterns/test_wrong_soft_limit_hcfs.conf");
 
   ASSERT_EQ(0,access(pathname, F_OK));
 
-  ASSERT_EQ(-1,read_system_config(pathname));
+  EXPECT_EQ(-1,read_system_config(pathname));
+
+  strcpy(pathname,"testpatterns/test_wrong_hard_limit_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  EXPECT_EQ(-1,read_system_config(pathname));
+
+  strcpy(pathname,"testpatterns/test_wrong_delta_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  EXPECT_EQ(-1,read_system_config(pathname));
+
+  strcpy(pathname,"testpatterns/test_wrong_block_size_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  EXPECT_EQ(-1,read_system_config(pathname));
 
  }
 
-/* End of the test case for the function read_system_config */
+/* End of the test case for the function read_system_config*/
+
+/* Start of the test case for the function validate_system_config */
+
+class validate_system_configTest : public ::testing::Test {
+ protected:
+  virtual void SetUp() {
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    mkdir("/tmp/testHCFS/metastorage", 0700);
+    mkdir("/tmp/testHCFS/blockstorage", 0700);
+   }
+
+  virtual void TearDown() {
+    rmdir("/tmp/testHCFS/metastorage");
+    rmdir("/tmp/testHCFS/blockstorage");
+    rmdir("/tmp/testHCFS");
+   }
+ };
+
+TEST_F(validate_system_configTest, PathNotExist) {
+  EXPECT_EQ(-1,read_system_config("EmptyFile"));
+ }
+TEST_F(validate_system_configTest, GoodConfig) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  ASSERT_EQ(0,validate_system_config());
+
+  EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+  EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+  EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+  EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+  EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+  EXPECT_EQ(CURRENT_BACKEND, SWIFT);
+ }
+TEST_F(validate_system_configTest, GoodS3Config) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  ASSERT_EQ(0,validate_system_config());
+
+  EXPECT_STREQ(METAPATH, "/tmp/testHCFS/metastorage");
+  EXPECT_STREQ(BLOCKPATH, "/tmp/testHCFS/blockstorage");
+  EXPECT_EQ(CACHE_SOFT_LIMIT, 53687091);
+  EXPECT_EQ(CACHE_HARD_LIMIT, 107374182);
+  EXPECT_EQ(CACHE_DELTA, 10485760);
+  EXPECT_EQ(MAX_BLOCK_SIZE, 1048576);
+  EXPECT_EQ(CURRENT_BACKEND, S3);
+ }
+TEST_F(validate_system_configTest, NoBackendConfig) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_wrong_hcfs_no_backend.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  ASSERT_EQ(-1,validate_system_config());
+ }
+TEST_F(validate_system_configTest, NoMetaPath) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  rmdir(METAPATH);
+
+  ASSERT_EQ(-1,validate_system_config());
+ }
+TEST_F(validate_system_configTest, NoBlockPath) {
+  char pathname[100];
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  rmdir(BLOCKPATH);
+
+  ASSERT_EQ(-1,validate_system_config());
+ }
+TEST_F(validate_system_configTest, InvalidValue) {
+  char pathname[100];
+  long long tmpval;
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  tmpval = MAX_BLOCK_SIZE;
+  MAX_BLOCK_SIZE = 0;
+  EXPECT_EQ(-1,validate_system_config());
+  MAX_BLOCK_SIZE = tmpval;
+
+  tmpval = CACHE_DELTA;
+  CACHE_DELTA = MAX_BLOCK_SIZE - 1;
+  EXPECT_EQ(-1,validate_system_config());
+  CACHE_DELTA = tmpval;
+
+  tmpval = CACHE_SOFT_LIMIT;
+  CACHE_SOFT_LIMIT = MAX_BLOCK_SIZE - 1;
+  EXPECT_EQ(-1,validate_system_config());
+  CACHE_SOFT_LIMIT = tmpval;
+
+  tmpval = CACHE_HARD_LIMIT;
+  CACHE_HARD_LIMIT = CACHE_SOFT_LIMIT - 1;
+  EXPECT_EQ(-1,validate_system_config());
+  CACHE_HARD_LIMIT = tmpval;
+
+ }
+TEST_F(validate_system_configTest, MissingSWIFTConfig) {
+  char pathname[100];
+  char *tmpptr;
+
+  strcpy(pathname,"testpatterns/test_good_hcfs.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  tmpptr = SWIFT_ACCOUNT;
+  SWIFT_ACCOUNT = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_ACCOUNT = tmpptr;
+
+  tmpptr = SWIFT_USER;
+  SWIFT_USER = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_USER = tmpptr;
+
+  tmpptr = SWIFT_PASS;
+  SWIFT_PASS = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_PASS = tmpptr;
+
+  tmpptr = SWIFT_URL;
+  SWIFT_URL = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_URL = tmpptr;
+
+  tmpptr = SWIFT_CONTAINER;
+  SWIFT_CONTAINER = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_CONTAINER = tmpptr;
+
+  tmpptr = SWIFT_PROTOCOL;
+  SWIFT_PROTOCOL = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  SWIFT_PROTOCOL = tmpptr;
+
+ }
+
+TEST_F(validate_system_configTest, MissingS3Config) {
+  char pathname[100];
+  char *tmpptr;
+
+  strcpy(pathname,"testpatterns/test_good_hcfs_S3.conf");
+
+  ASSERT_EQ(0,access(pathname, F_OK));
+
+  ASSERT_EQ(0,read_system_config(pathname));
+
+  tmpptr = S3_ACCESS;
+  S3_ACCESS = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  S3_ACCESS = tmpptr;
+
+  tmpptr = S3_SECRET;
+  S3_SECRET = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  S3_SECRET = tmpptr;
+
+  tmpptr = S3_URL;
+  S3_URL = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  S3_URL = tmpptr;
+
+  tmpptr = S3_BUCKET;
+  S3_BUCKET = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  S3_BUCKET = tmpptr;
+
+  tmpptr = S3_PROTOCOL;
+  S3_PROTOCOL = NULL;
+  EXPECT_EQ(-1,validate_system_config());
+  S3_PROTOCOL = tmpptr;
+
+ }
+/* End of the test case for the function validate_system_config*/
 

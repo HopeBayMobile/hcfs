@@ -13,21 +13,10 @@
 #ifndef GW20_HCFS_HCFSCURL_H_
 #define GW20_HCFS_HCFSCURL_H_
 
-#define S3 1
-#define SWIFT 0
-
-#define CURRENT_BACKEND SWIFT
-
-#define MY_ACCOUNT "hopebay"
-#define MY_USER "hopebay"
-#define MY_PASS "hopebaycloud"
-#define MY_URL "https://172.16.9.67:8080"
-
-#define S3_ACCESS "SE41NTAxMzIwNDEzOTQ1Mjk5NTkwNzI"
-#define S3_SECRET "NWUzOTdjNjRjOGI1NDM2ZmI4MzFlOTgxMjdkNmMyNWM"
-#define S3_URL "https://s3.hicloud.net.tw"
-#define S3_BUCKET "testgateway"
-#define S3_BUCKET_URL "https://testgateway.s3.hicloud.net.tw"
+#include <stdio.h>
+#include <stdlib.h>
+#include <curl/curl.h>
+#include <semaphore.h>
 
 #define MAX_DOWNLOAD_CURL_HANDLE 16
 
