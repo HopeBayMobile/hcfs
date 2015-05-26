@@ -37,6 +37,8 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 		}
 		return 0;
 	default:
+		if (!dir_meta_ptr)
+			return 0;
 		dir_meta_ptr->root_entry_page = 0; 
 		dir_meta_ptr->entry_page_gc_list = 0;
 		dir_meta_ptr->tree_walk_list_head = sizeof(DIR_ENTRY_PAGE);
@@ -277,6 +279,11 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 }
 
 int lookup_markdelete(ino_t this_inode)
+{
+	return 0;
+}
+
+int set_timestamp_now(struct stat *thisstat, char mode)
 {
 	return 0;
 }

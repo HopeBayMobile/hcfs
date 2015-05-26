@@ -883,7 +883,11 @@ int super_block_share_locking(void)
 *************************************************************************/
 int super_block_share_release(void)
 {
-	sem_wait(&(sys_super_block->share_CR_lock_sem));
+	sem_wait(&(sys_super_block->share_CR_lock_sem));	
+	if (sys_super_block->share_counter == 0) { 
+		sem_post(&(sys_super_block->share_CR_lock_sem));
+		return -1; /* Return error if share_counter==0 before decreasing */
+	}
 	sys_super_block->share_counter--;
 	if (sys_super_block->share_counter == 0)
 		sem_post(&(sys_super_block->share_lock_sem));

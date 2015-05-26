@@ -1,6 +1,7 @@
 extern "C" {
 #include <fcntl.h>
 #include <errno.h>
+#include <semaphore.h>
 #include "mock_param.h"
 #include "super_block.h"
 #include "global.h"
@@ -1002,3 +1003,70 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 /*
 	End of unittest of super_block_new_inode()
  */
+
+/*
+	Unittest of super_block_share_locking()
+*/
+
+class super_block_share_lockingTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_share_lockingTest, LockingSuccess)
+{
+	int value;
+	int num_share_counter = 56;
+
+	/* Run */
+	for (int lock = 0 ; lock < num_share_counter ; lock++)
+		EXPECT_EQ(0, super_block_share_locking());
+
+	/* Verify */
+	EXPECT_EQ(num_share_counter, sys_super_block->share_counter);
+	
+	sem_getvalue(&sys_super_block->share_lock_sem, &value);
+	EXPECT_EQ(0, value);
+}
+
+/*
+	End of unittest of super_block_share_locking()
+*/
+
+/*
+	Unittest of super_block_share_release()
+ */
+
+class super_block_share_releaseTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_share_releaseTest, ReleaseFail)
+{
+	int num_share_counter = 10;
+
+	/* Run */
+	for (int lock = 0 ; lock < num_share_counter ; lock++)
+		EXPECT_EQ(-1, super_block_share_release());
+}
+
+TEST_F(super_block_share_releaseTest, ReleaseSuccess)
+{
+	int value;
+	int num_share_counter = 56;
+
+	/* Mock locking */
+	for (int lock = 0 ; lock < num_share_counter ; lock++)
+		EXPECT_EQ(0, super_block_share_locking());
+	
+	/* Run */
+	for (int lock = 0 ; lock < num_share_counter ; lock++)
+		EXPECT_EQ(0, super_block_share_release());
+	
+	/* Verify */
+	EXPECT_EQ(0, sys_super_block->share_counter);
+	
+	sem_getvalue(&sys_super_block->share_lock_sem, &value);
+	EXPECT_EQ(1, value);
+}
+
+/*
+	End of unittest of super_block_share_release()
+ */	
