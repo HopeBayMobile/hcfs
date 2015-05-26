@@ -153,5 +153,5 @@ pthread_t reporter_thread;  /* Used by utility prototype */
 /* Functions for initializing HCFS */
 int hook_fuse(int argc, char **argv);
 
-int set_timestamp_now(struct stat *thisstat, char mode);
+void set_timestamp_now(struct stat *thisstat, char mode);
 #endif  /* GW20_HCFS_FUSEOP_H_ */
