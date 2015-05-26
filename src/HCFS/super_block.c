@@ -400,7 +400,8 @@ int super_block_delete(ino_t this_inode)
 		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 	}
-
+	
+	/* Add to unclaimed_list file */
 	temp = this_inode;
 	fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_END);
 	fwrite(&temp, sizeof(ino_t), 1, sys_super_block->unclaimed_list_fptr);
@@ -533,13 +534,13 @@ int super_block_reclaim_fullscan(void)
 	last_reclaimed = 0;
 	first_reclaimed = 0;
 
-	ret_val = 0;
-
 	super_block_exclusive_locking();
 	sys_super_block->head.num_inode_reclaimed = 0;
 	sys_super_block->head.num_to_be_reclaimed = 0;
 
 	lseek(sys_super_block->iofptr, SB_HEAD_SIZE, SEEK_SET);
+
+	/* Traverse all entries and reclaim. */
 	for (count = 0; count < sys_super_block->head.num_total_inodes;
 								count++) {
 		thisfilepos = SB_HEAD_SIZE + count * SB_ENTRY_SIZE;
@@ -552,19 +553,24 @@ int super_block_reclaim_fullscan(void)
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
 				((tempentry.inode_stat.st_ino == 0) &&
 					(tempentry.status != TO_BE_DELETED))) {
+	
+			/* Modify status and reclaim the entry. */
 			tempentry.status = RECLAIMED;
 			sys_super_block->head.num_inode_reclaimed++;
 			tempentry.util_ll_next = 0;
 			ret_items = pwrite(sys_super_block->iofptr, &tempentry,
 						SB_ENTRY_SIZE, thisfilepos);
-
 			if (ret_items < SB_ENTRY_SIZE)
 				break;
-			if (first_reclaimed == 0)
-				first_reclaimed = tempentry.this_index;
-			old_last_reclaimed = last_reclaimed;
-			last_reclaimed = tempentry.this_index;
 
+			if (first_reclaimed == 0) /* Record first reclaimed node */ 
+				first_reclaimed = tempentry.this_index;
+
+			/* Save previous and now reclaimed inode */
+			old_last_reclaimed = last_reclaimed;
+			last_reclaimed = tempentry.this_index;	
+			/* Connect previous and now reclaimed entry by setting
+			   prev_entry.util_ll_next = now */
 			if (old_last_reclaimed > 0) {
 				thisfilepos = SB_HEAD_SIZE +
 					(old_last_reclaimed-1) * SB_ENTRY_SIZE;
@@ -589,8 +595,16 @@ int super_block_reclaim_fullscan(void)
 	pwrite(sys_super_block->iofptr, &(sys_super_block->head),
 							SB_HEAD_SIZE, 0);
 
+	ftruncate(fileno(sys_super_block->unclaimed_list_fptr), 0);
+	
+	if (sys_super_block->head.num_total_inodes == 0) {
+		super_block_exclusive_release();
+		return 0;
+	}
+
 	super_block_exclusive_release();
-	return ret_val;
+
+	return ret_items < SB_ENTRY_SIZE ? -1 : 0;
 }
 
 /************************************************************************

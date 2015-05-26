@@ -468,7 +468,6 @@ class super_block_mark_dirtyTest : public InitSuperBlockBaseClass {
 
 TEST_F(super_block_mark_dirtyTest, ReadEntryFail)
 {
-	struct stat new_stat;
 	ino_t inode = 8;
 
 	/* Mock data. open a nonexisted file */	
@@ -683,8 +682,7 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 	sb_entry.in_transit = TRUE;
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
 		entry_filepos);
-	
-		
+			
 	/* Run */
 	EXPECT_EQ(0, super_block_delete(inode));
 
@@ -700,6 +698,307 @@ TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
 	EXPECT_EQ(1, sb_head.num_to_be_reclaimed);
 	EXPECT_EQ(inode, result_inode);
 }
+
 /*
 	Unittest of super_block_delete()
+ */
+
+/*
+	Unittest of super_block_reclaim()
+ */
+
+class super_block_reclaimTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_reclaimTest, ReclaimNotTrigger)
+{
+	sys_super_block->head.num_to_be_reclaimed = 0;
+
+	EXPECT_EQ(0, super_block_reclaim());
+}
+
+TEST_F(super_block_reclaimTest, ReclaimSuccess)
+{
+	unsigned long num_inode = RECLAIM_TRIGGER + 123;
+	SUPER_BLOCK_ENTRY now_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	ino_t now_reclaimed_inode;
+
+	/* Mock unclaimed list, head and entries. */
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+		sizeof(SUPER_BLOCK_ENTRY) * num_inode); // Prepare entry
+	
+	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+		SUPER_BLOCK_ENTRY sb_entry;
+
+		fwrite(&inode, sizeof(ino_t), 1, 
+			sys_super_block->unclaimed_list_fptr); // Add unclaimed list
+
+		sb_entry.status = TO_BE_RECLAIMED; // Set status
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(inode - 1)); // Write entry status
+	}
+	
+	sys_super_block->head.num_to_be_reclaimed = num_inode; // Set head data
+	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+		sizeof(SUPER_BLOCK_HEAD), 0); // Write head data
+	
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim());
+
+	/* Verify */
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode;
+	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+		unsigned long file_pos;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(now_reclaimed_inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+		
+		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
+		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		
+		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
+	}
+	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
+
+	EXPECT_EQ(num_inode, sys_super_block->head.num_inode_reclaimed);
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed); // Check number of to_be_reclaimed
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	EXPECT_EQ(0, sb_head.num_to_be_reclaimed);
+}
+
+/*
+	End of unittest of super_block_reclaim()
+ */
+
+/*
+	Unittest of super_block_reclaim_fullscan()
+ */
+
+class super_block_reclaim_fullscanTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(super_block_reclaim_fullscanTest, ReadEntryFail)
+{
+	/* Mock data. open a nonexisted file */	
+	close(sys_super_block->iofptr);
+	sys_super_block->head.num_total_inodes = 5;
+	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
+	
+	/* Run */
+	EXPECT_EQ(-1, super_block_reclaim_fullscan());
+
+}
+
+TEST_F(super_block_reclaim_fullscanTest, num_total_inodes_EqualsZero)
+{
+	/* Mock data. open a nonexisted file */	
+	sys_super_block->head.num_total_inodes = 0;
+	
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim_fullscan());
+	
+	/* Verify */
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
+	EXPECT_EQ(0, sys_super_block->head.num_inode_reclaimed);
+
+}
+
+TEST_F(super_block_reclaim_fullscanTest, ScanReclaimedInodeSuccess)
+{
+	ino_t now_reclaimed_inode;
+	SUPER_BLOCK_ENTRY sb_entry;
+	unsigned long num_inode = 20000;
+	
+	ftruncate(sys_super_block->iofptr, sizeof(SUPER_BLOCK_HEAD) + 
+		num_inode * sizeof(SUPER_BLOCK_ENTRY));
+	
+	/* Write mock entries to be reclaimed */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = TO_BE_RECLAIMED;
+	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+		sb_entry.this_index = inode;
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(inode - 1)); // Write entry status
+	}
+	sys_super_block->head.num_total_inodes = num_inode;
+
+	/* Run */
+	EXPECT_EQ(0, super_block_reclaim_fullscan());
+
+	/* Verify */
+	now_reclaimed_inode = sys_super_block->head.first_reclaimed_inode; // first entry
+	for (ino_t inode = 1 ; inode <= num_inode ; inode++) {
+		unsigned long file_pos;
+		SUPER_BLOCK_ENTRY now_entry;
+
+		file_pos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(now_reclaimed_inode - 1);
+		pread(sys_super_block->iofptr, &now_entry,
+			sizeof(SUPER_BLOCK_ENTRY), file_pos);
+		
+		ASSERT_EQ(inode, now_reclaimed_inode); // Check reclaimed inode
+		ASSERT_EQ(RECLAIMED, now_entry.status); // Check status is set
+		
+		now_reclaimed_inode = now_entry.util_ll_next; // Go to next reclaimed entry
+	}
+	EXPECT_EQ(num_inode, sys_super_block->head.last_reclaimed_inode); // Check last inode
+
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_reclaimed);
+	EXPECT_EQ(num_inode, sys_super_block->head.num_inode_reclaimed);
+}
+
+/*
+	End of unittest of super_block_reclaim_fullscan()
+ */
+
+/*
+	Unittest of super_block_new_inode()
+ */
+
+class super_block_new_inodeTest : public InitSuperBlockBaseClass {
+protected:
+	struct stat expected_stat;
+	
+	void SetUp()
+	{
+		InitSuperBlockBaseClass::SetUp();
+		expected_stat.st_ino = 1;
+		expected_stat.st_mode = S_IFDIR;
+		expected_stat.st_dev = 5;
+		expected_stat.st_nlink = 6;
+		expected_stat.st_size = 5566;
+	}
+};
+
+TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
+{
+	unsigned long generation;
+	ino_t ret_node;
+	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_HEAD sb_head;
+
+	/* Mock stat */
+	generation = 0;
+
+	/* Run */
+	ret_node = super_block_new_inode(&expected_stat, &generation);
+	EXPECT_EQ(1, ret_node); // ret_node == 1 since system is empty
+
+	/* Verify */	
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		sizeof(SUPER_BLOCK_HEAD));
+
+	EXPECT_EQ(1, sys_super_block->head.num_total_inodes); // Just a new inode
+	EXPECT_EQ(1, sys_super_block->head.num_active_inodes); // the inode is active
+
+	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(1, sb_entry.generation); // It is first time to be created
+	EXPECT_EQ(1, generation);
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+		sizeof(struct stat)));
+}
+
+TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes)
+{
+	unsigned long num_reclaimed;
+	unsigned long generation;
+	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	ino_t ret_node;
+
+	/* Mock reclaimed inodes */
+	num_reclaimed = 150;
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.generation = 1;
+	for (ino_t inode = 1 ; inode <= num_reclaimed ; inode++) {
+		sb_entry.this_index = inode;
+		if (inode < num_reclaimed)
+			sb_entry.util_ll_next = inode + 1;
+		else
+			sb_entry.util_ll_next = 0;
+		
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+			sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(inode - 1)); // Write entry
+	}
+
+	sys_super_block->head.num_inode_reclaimed = num_reclaimed;
+	sys_super_block->head.num_total_inodes = num_reclaimed;
+	sys_super_block->head.last_reclaimed_inode = num_reclaimed;
+	sys_super_block->head.first_reclaimed_inode = 1;
+	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
+	
+	/* Run */
+	ret_node = super_block_new_inode(&expected_stat, &generation);
+	EXPECT_EQ(1, ret_node); // ret_node == 1 since first_reclaimed = 1
+
+	/* Verify */	
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		sizeof(SUPER_BLOCK_HEAD));
+
+	EXPECT_EQ(num_reclaimed, sb_head.num_total_inodes); // num_total_inodes doesn't change
+	EXPECT_EQ(num_reclaimed - 1, sb_head.num_inode_reclaimed); // one node is used now
+	EXPECT_EQ(num_reclaimed, sb_head.last_reclaimed_inode); // last reclaimed is the same
+	EXPECT_EQ(2, sb_head.first_reclaimed_inode); // first reclaimed is now inode == 2
+	EXPECT_EQ(1, sb_head.num_active_inodes); // a node return and be active now
+
+	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(2, sb_entry.generation); // generation++
+	EXPECT_EQ(2, generation);
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+		sizeof(struct stat)));
+}
+
+TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNode)
+{
+	unsigned long generation;
+	SUPER_BLOCK_ENTRY sb_entry;
+	SUPER_BLOCK_HEAD sb_head;
+	ino_t ret_node;
+	
+	/* Mock one reclaimed inode */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.generation = 1;
+	sb_entry.util_ll_next = 0;
+	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		sizeof(SUPER_BLOCK_HEAD)); // Write entry
+
+	sys_super_block->head.num_inode_reclaimed = 1;
+	sys_super_block->head.num_total_inodes = 1; // Just one inode
+	sys_super_block->head.last_reclaimed_inode = 1;
+	sys_super_block->head.first_reclaimed_inode = 1;
+	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
+		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
+
+	/* Run */
+	ret_node = super_block_new_inode(&expected_stat, &generation);
+	EXPECT_EQ(1, ret_node); // ret_node == 1 since first_reclaimed = 1
+
+	/* Verify */	
+	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
+	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+		sizeof(SUPER_BLOCK_HEAD));
+
+	EXPECT_EQ(1, sb_head.num_total_inodes); // num_total_inodes doesn't change
+	EXPECT_EQ(0, sb_head.num_inode_reclaimed); // No reclaimed inode now
+	EXPECT_EQ(0, sb_head.last_reclaimed_inode); // No reclaimed inode now
+	EXPECT_EQ(0, sb_head.first_reclaimed_inode); // No reclaimed inode now
+	EXPECT_EQ(1, sb_head.num_active_inodes); // a node return and be active now
+
+	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(2, sb_entry.generation); // generation++
+	EXPECT_EQ(2, generation);
+	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
+		sizeof(struct stat)));
+}
+/*
+	End of unittest of super_block_new_inode()
  */
