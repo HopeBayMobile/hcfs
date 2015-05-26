@@ -314,7 +314,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 		/* Delete all blocks */
 		current_page = -1;
-		for (block_count = 0; page_pos != 0; block_count++) {
+		for (block_count = 0; block_count < total_blocks;
+							block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
 			current_index = block_count % BLK_INCREMENTS;
@@ -323,6 +324,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			if (current_page != which_page) {
 				page_pos = seek_page2(&tempfilemeta, metafptr,
 					which_page, 0);
+
 				if (page_pos <= 0) {
 					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);

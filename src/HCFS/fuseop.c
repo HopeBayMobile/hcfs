@@ -3,7 +3,10 @@
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: fuseop.c
-* Abstract: The c source code file for the main FUSE operations for HCFS
+* Abstract: The c source code file for the main FUSE operations for HCFS.
+*           All fuse functions now use fuse_reply_xxxx to pass back data
+*           and returned status, and the functions themselves do not
+*           return anything (void return type).
 *
 * Revision History
 * 2015/2/2 Jiahong added header for this file, and revising coding style.
@@ -15,10 +18,12 @@
 * 2015/3/2~3 Jiahong revised rename function to allow existing file as target.
 * 2015/3/12 Jiahong restructure hfuse_read
 * 2015/4/30 ~  Jiahong changing to FUSE low-level interface
+* 2015/5/20 Jiahong Adding permission checking for operations
 *
 **************************************************************************/
 
 #define FUSE_USE_VERSION 29
+#define _GNU_SOURCE
 
 #include "fuseop.h"
 
@@ -40,6 +45,7 @@
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -77,20 +83,14 @@ to zero (to save space in the long run).
 to delete or list the folder.
 */
 
+/* TODO: Go over the details involving S_ISUID, S_ISGID, and linux capability
+	problems (involving chmod, chown, etc) */
 
-/* TODO: Need to go over the access rights problem for the ops */
-/* TODO: Need to revisit the following problem for all ops: access rights,
-/*   timestamp change (a_time, m_time, c_time), and error handling */
-/* TODO: For timestamp changes, write routine for making changes to also
-	timestamps with nanosecond precision */
-/* TODO: For access rights, need to check file permission and/or system acl.
-/*   System acl is set in extended attributes. */
-/* TODO: The FUSE option "default_permission" should be turned on if there
-/*   is no actual file permission check, or turned off if we are checking
-/*   system acl. */
+/* TODO: Need to revisit the following problem for all ops:
+     timestamp change (a_time, m_time, c_time), and error handling */
 
-/* TODO: Access time may not be changed for file accesses, if noatime is
-/*   specified in file opening or mounting. */
+/* TODO: system acl. System acl is set in extended attributes. */
+
 /* TODO: Will need to implement rollback or error marking when ops failed*/
 
 /* TODO: Pending design for a single cache device, and use pread/pwrite to
@@ -103,6 +103,295 @@ to delete or list the folder.
 /*   file handling in this file */
 /* TODO: Multiple paths for read / write / other ops for different folder
 /*   policies. Policies to be determined at file or dir open. */
+
+/* Helper function for checking permissions.
+   Inputs: fuse_req_t req, struct stat *thisstat, char mode
+     Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
+*/
+
+int set_timestamp_now(struct stat *thisstat, char mode)
+{
+	int ret_val;
+	clockid_t this_clock_id;
+	struct timespec timenow;
+
+	clock_getcpuclockid(0, &this_clock_id);
+	clock_gettime(this_clock_id, &timenow);
+
+	if (mode & ATIME) {
+		thisstat->st_atime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_atim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	if (mode & MTIME) {
+		thisstat->st_mtime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_mtim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	if (mode & CTIME) {
+		thisstat->st_ctime = (time_t)(timenow.tv_sec);
+		memcpy(&(thisstat->st_ctim), &timenow,
+			sizeof(struct timespec));
+	}
+
+	return 0;
+}
+
+int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
+{
+	int ret_val;
+	struct fuse_ctx *temp_context;
+	gid_t *tmp_list, tmp1_list[10];
+	int num_groups, count;
+	char is_in_group;
+
+	temp_context = fuse_req_ctx(req);
+
+	if (temp_context->uid == 0)  /*If this is the root grant any req */
+		return 0;
+
+	/* First check owner permission */
+	if (temp_context->uid == thisstat->st_uid) {
+		if (mode & 4)
+			if (!(thisstat->st_mode & S_IRUSR))
+				return -EACCES;
+		if (mode & 2)
+			if (!(thisstat->st_mode & S_IWUSR))
+				return -EACCES;
+		if (mode & 1)
+			if (!(thisstat->st_mode & S_IXUSR))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check group permission */
+	if (temp_context->gid == thisstat->st_gid) {
+		if (mode & 4)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & 2)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & 1)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check supplementary group ID */
+
+	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
+
+	if (num_groups <= 10) {
+		tmp_list = tmp1_list;
+	} else {
+		tmp_list = malloc(sizeof(gid_t) * num_groups);
+		if (tmp_list == NULL)
+			return -ENOMEM;
+		num_groups = fuse_req_getgroups(req,
+					sizeof(gid_t) * num_groups, tmp_list);
+	}
+
+	if (num_groups < 0) {
+		printf("Debug check permission getgroups failed, skipping\n");
+		num_groups = 0;
+	}
+
+	is_in_group = FALSE;
+	printf("Debug permission number of groups %d\n", num_groups);
+	for (count = 0; count < num_groups; count++) {
+		printf("group gid %d, %d\n", tmp_list[count],
+					thisstat->st_gid);
+		if (tmp_list[count] == thisstat->st_gid) {
+			is_in_group = TRUE;
+			break;
+		}
+	}
+
+	if (is_in_group == TRUE) {
+		if (mode & 4)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & 2)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & 1)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check others */
+
+	if (mode & 4)
+		if (!(thisstat->st_mode & S_IROTH))
+			return -EACCES;
+	if (mode & 2)
+		if (!(thisstat->st_mode & S_IWOTH))
+			return -EACCES;
+	if (mode & 1)
+		if (!(thisstat->st_mode & S_IXOTH))
+			return -EACCES;
+	return 0;
+}
+
+/* Check permission routine for ll_access only */
+int check_permission_access(fuse_req_t req, struct stat *thisstat, int mode)
+{
+	int ret_val;
+	struct fuse_ctx *temp_context;
+	gid_t *tmp_list, tmp1_list[10];
+	int num_groups, count;
+	char is_in_group;
+
+	temp_context = fuse_req_ctx(req);
+
+	/*If this is the root check if exec is set for any for reg files*/
+	if (temp_context->uid == 0) {
+		if ((S_ISREG(thisstat->st_mode)) && (mode & X_OK)) {
+			if (!(thisstat->st_mode &
+				(S_IXUSR | S_IXGRP | S_IXOTH)))
+				return -EACCES;
+		}
+		return 0;
+	}
+
+	/* First check owner permission */
+	if (temp_context->uid == thisstat->st_uid) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRUSR))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWUSR))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXUSR))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check group permission */
+	if (temp_context->gid == thisstat->st_gid) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check supplementary group ID */
+
+	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
+
+	if (num_groups <= 10) {
+		tmp_list = tmp1_list;
+	} else {
+		tmp_list = malloc(sizeof(gid_t) * num_groups);
+		if (tmp_list == NULL)
+			return -ENOMEM;
+		num_groups = fuse_req_getgroups(req,
+					sizeof(gid_t) * num_groups, tmp_list);
+	}
+
+	if (num_groups < 0) {
+		printf("Debug check permission getgroups failed, skipping\n");
+		num_groups = 0;
+	}
+
+	is_in_group = FALSE;
+	printf("Debug permission number of groups %d\n", num_groups);
+	for (count = 0; count < num_groups; count++) {
+		printf("group gid %d, %d\n", tmp_list[count],
+					thisstat->st_gid);
+		if (tmp_list[count] == thisstat->st_gid) {
+			is_in_group = TRUE;
+			break;
+		}
+	}
+
+	if (is_in_group == TRUE) {
+		if (mode & R_OK)
+			if (!(thisstat->st_mode & S_IRGRP))
+				return -EACCES;
+		if (mode & W_OK)
+			if (!(thisstat->st_mode & S_IWGRP))
+				return -EACCES;
+		if (mode & X_OK)
+			if (!(thisstat->st_mode & S_IXGRP))
+				return -EACCES;
+		return 0;
+	}
+
+	/* Check others */
+
+	if (mode & R_OK)
+		if (!(thisstat->st_mode & S_IROTH))
+			return -EACCES;
+	if (mode & W_OK)
+		if (!(thisstat->st_mode & S_IWOTH))
+			return -EACCES;
+	if (mode & X_OK)
+		if (!(thisstat->st_mode & S_IXOTH))
+			return -EACCES;
+	return 0;
+}
+
+
+int is_member(fuse_req_t req, gid_t this_gid, gid_t target_gid)
+{
+	int ret_val;
+	gid_t *tmp_list, tmp1_list[10];
+	int num_groups, count;
+	char is_in_group;
+
+
+	if (this_gid == target_gid)
+		return 1;
+
+	/* Check supplementary group ID */
+
+	num_groups = fuse_req_getgroups(req, 10, tmp1_list);
+
+	if (num_groups <= 10) {
+		tmp_list = tmp1_list;
+	} else {
+		tmp_list = malloc(sizeof(gid_t) * num_groups);
+		if (tmp_list == NULL)
+			return 0;
+		num_groups = fuse_req_getgroups(req,
+					sizeof(gid_t) * num_groups, tmp_list);
+	}
+
+	if (num_groups < 0) {
+		if (tmp_list != tmp1_list)
+			free(tmp_list);
+		return 0;
+	}
+
+	is_in_group = FALSE;
+	for (count = 0; count < num_groups; count++) {
+		if (tmp_list[count] == target_gid) {
+			is_in_group = TRUE;
+			break;
+		}
+	}
+
+	if (tmp_list != tmp1_list)
+		free(tmp_list);
+
+	if (is_in_group == TRUE)
+		return 1;
+
+	return 0;
+}
+
 
 /************************************************************************
 *
@@ -184,8 +473,18 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOTDIR);
 		return;
 	}
-	memset(&this_stat, 0, sizeof(struct stat));
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	temp_context = fuse_req_ctx(req);
+
+	memset(&this_stat, 0, sizeof(struct stat));
 
 /* TODO: May need to reject special file creation here */
 
@@ -202,9 +501,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_gid = temp_context->gid;
 
 	/* Use the current time for timestamps */
-	this_stat.st_atime = time(NULL);
-	this_stat.st_mtime = this_stat.st_atime;
-	this_stat.st_ctime = this_stat.st_atime;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation);
 
@@ -280,6 +577,14 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	memset(&this_stat, 0, sizeof(struct stat));
 	temp_context = fuse_req_ctx(req);
 
@@ -291,9 +596,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
 
-	this_stat.st_atime = time(NULL);
-	this_stat.st_mtime = this_stat.st_atime;
-	this_stat.st_ctime = this_stat.st_atime;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+
 	this_stat.st_size = 0;
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
@@ -325,26 +629,44 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	printf("mkdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
 		+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
-
 }
 
 /************************************************************************
 *
-* Function name: hfuse_unlink
-*        Inputs: const char *path
-*       Summary: Delete the regular file specified by the string "path".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_unlink
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Delete the regular file specified by parent "parent_inode"
+*                and name "selfname".
 *
 *************************************************************************/
-void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
+			const char *selfname)
 {
-/* TODO: delay actual unlink for opened dirs (this is lowlevel op) */
-
 	ino_t this_inode;
 	int ret_val;
 	int ret_code;
 	DIR_ENTRY temp_dentry;
+	struct stat parent_stat;
+
+	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
 
 	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
 	if (ret_val < 0) {
@@ -362,26 +684,45 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode, const char *selfna
 
 /************************************************************************
 *
-* Function name: hfuse_rmdir
-*        Inputs: const char *path
-*       Summary: Delete the directory specified by the string "path".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_rmdir
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Delete the directory specified by parent "parent_inode" and
+*                name "selfname".
 *
 *************************************************************************/
-void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfname)
+void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode,
+			const char *selfname)
 {
-/* TODO: delay actual rmdir for opened dirs (this is lowlevel op) */
 	ino_t this_inode;
 	int ret_val, ret_code;
 	DIR_ENTRY temp_dentry;
+	struct stat parent_stat;
 
-	if (!strcmp(selfname, ".")) {
+	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!strcmp(selfname, "."))
 		fuse_reply_err(req, EINVAL);
-	}
-	if (!strcmp(selfname, "..")) {
+
+	if (!strcmp(selfname, ".."))
 		fuse_reply_err(req, ENOTEMPTY);
-	}
 
 	ret_val = lookup_dir((ino_t)parent_inode, selfname, &temp_dentry);
 	if (ret_val < 0) {
@@ -397,6 +738,15 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode, const char *selfnam
 	fuse_reply_err(req, ret_val);
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_lookup
+*        Inputs: fuse_req_t req, fuse_ino_t parent_inode, const char *selfname
+*       Summary: Lookup inode stat and generation info given parent
+*                "parent_inode" and name "selfname". Will return proper
+*                error value if cannot find the name.
+*
+*************************************************************************/
 void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent_inode,
 			const char *selfname)
 {
@@ -410,6 +760,30 @@ a directory (for NFS) */
 	DIR_ENTRY temp_dentry;
 	struct fuse_entry_param *output_param;
 	unsigned long this_gen;
+	struct stat parent_stat;
+
+	printf("Debug lookup parent %lld, name %s\n",
+			parent_inode, selfname);
+	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
+
+	printf("Debug lookup parent mode %lld\n", parent_stat.st_mode);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 1);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
 
 	output_param = malloc(sizeof(struct fuse_entry_param));
 	memset(output_param, 0, sizeof(struct fuse_entry_param));
@@ -488,15 +862,13 @@ static inline int _cleanup_rename(META_CACHE_ENTRY_STRUCT *body_ptr,
 
 /************************************************************************
 *
-* Function name: hfuse_rename
-*        Inputs: const char *oldpath, const char *newpath
-*       Summary: Rename / move the filesystem object "oldpath" to
-*                "newpath", replacing the original object in "newpath" if
-*                necessary.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*    Limitation: Do no process symlink
+* Function name: hfuse_ll_rename
+*        Inputs: fuse_req_t req, fuse_ino_t parent,
+*                const char *selfname1, fuse_ino_t newparent,
+*                const char *selfname2
+*       Summary: Rename / move the filesystem object pointed by "parent"
+*                and "selfname1" to the path pointed by "newparent" and
+*                "selfname2".
 *
 *************************************************************************/
 void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
@@ -522,6 +894,48 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	META_CACHE_ENTRY_STRUCT *parent1_ptr = NULL, *parent2_ptr = NULL;
 	DIR_ENTRY_PAGE temp_page;
 	int temp_index;
+	struct stat parent_stat1, parent_stat2;
+
+	ret_val = fetch_inode_stat((ino_t)parent, &parent_stat1, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat1.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat1, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	ret_val = fetch_inode_stat((ino_t)newparent, &parent_stat2, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(parent_stat2.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat2, 3);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 
 	/*TODO: To add symlink handling for rename*/
 
@@ -585,6 +999,20 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	/* Check if need to move to different parent inode, a dir is
+		writeable*/
+	if ((S_ISDIR(tempstat.st_mode)) && (parent_inode1 != parent_inode2)) {
+		ret_val = check_permission(req, &tempstat, 2);
+
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+
 	if (old_target_inode > 0) {
 		old_target_ptr = meta_cache_lock_entry(old_target_inode);
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
@@ -635,7 +1063,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		the old target */
 	if (old_target_inode > 0) {
 		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
-					self_inode, parent2_ptr);
+				self_inode, parent2_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -684,7 +1112,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
-				parent_inode2, body_ptr);
+				parent_inode2, &tempstat, body_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -697,56 +1125,6 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			parent1_ptr, parent2_ptr);
 
 	fuse_reply_err(req, 0);
-}
-
-
-/************************************************************************
-*
-* Function name: hfuse_utimens
-*        Inputs: const char *path, const struct timespec tv[2]
-*       Summary: Change the access / modification time of the filesystem
-*                object pointed by "path" to "tv".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
-*
-*************************************************************************/
-static int hfuse_utimens(const char *path, const struct timespec tv[2])
-{
-	struct stat temp_inode_stat;
-	int ret_val;
-	ino_t this_inode;
-	int ret_code;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	printf("Debug utimens\n");
-	this_inode = lookup_pathname(path, &ret_code);
-	if (this_inode < 1)
-		return ret_code;
-
-	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-
-	if (ret_val < 0) {  /* Cannot fetch any meta*/
-		meta_cache_close_file(body_ptr);
-		meta_cache_unlock_entry(body_ptr);
-		meta_cache_remove(this_inode);
-		return -EACCES;
-	}
-
-	temp_inode_stat.st_atime = (time_t)(tv[0].tv_sec);
-	temp_inode_stat.st_mtime = (time_t)(tv[1].tv_sec);
-
-	/* Fill in timestamps with nanosecond precision */
-	memcpy(&(temp_inode_stat.st_atim), &(tv[0]), sizeof(struct timespec));
-	memcpy(&(temp_inode_stat.st_mtim), &(tv[1]), sizeof(struct timespec));
-
-	ret_val = meta_cache_update_file_data(this_inode, &temp_inode_stat,
-			NULL, NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
-
-	return ret_val;
 }
 
 /* Helper function for waiting on full cache in the truncate function */
@@ -795,9 +1173,9 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
 
-	printf("Debug truncate_delete_block, start %d, old_last %lld, \
-			idx %lld\n",
-		start_index, old_last_block, page_index);
+	printf("Debug truncate_delete_block, start %d, old_last %lld,",
+		start_index, old_last_block);
+	printf(" idx %lld\n", page_index);
 	for (block_count = start_index; block_count
 		< MAX_BLOCK_ENTRIES_PER_PAGE; block_count++) {
 		tmp_blk_index = block_count
@@ -979,11 +1357,14 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 /************************************************************************
 *
-* Function name: hfuse_truncate
-*        Inputs: const char *path, off_t offset
-*       Summary: Truncate the regular file pointed by "path to size "offset".
+* Function name: hfuse_ll_truncate
+*        Inputs: ino_t this_inode, struct stat *filestat,
+*                off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr
+*       Summary: Truncate the regular file pointed by "this_inode"
+*                to size "offset".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
+*          Note: This function is now called by hfuse_ll_setattr.
 *
 *************************************************************************/
 int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
@@ -1052,7 +1433,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 		/*TODO: put error handling for the read/write ops here*/
 		if (filepos != 0) {
-			/* Do not need to truncate the block the offset byte is in*/
+			/* Do not need to truncate the block
+				the offset byte is in*/
 			/* If filepos is zero*/
 
 			meta_cache_lookup_file_data(this_inode, NULL,
@@ -1084,10 +1466,12 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 		/*Delete the blocks in the rest of the block status pages*/
 
-		/* Note: if filepos = 0, just means this block does not exist. */
-		/* TODO: Will need to check if the following blocks exist or not */
-		for (current_page = last_page + 1; current_page <= old_last_page;
-				current_page++) {
+		/* Note: if filepos = 0, just means this block
+			does not exist. */
+		/* TODO: Will need to check if the following
+			blocks exist or not */
+		for (current_page = last_page + 1;
+			current_page <= old_last_page; current_page++) {
 			filepos = seek_page(*body_ptr, current_page, 0);
 
 			/* Skipping pages that do not exist */
@@ -1131,12 +1515,11 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 /************************************************************************
 *
-* Function name: hfuse_open
-*        Inputs: const char *path, struct fuse_file_info *file_info
-*       Summary: Open the regular file pointed by "path", and put file
+* Function name: hfuse_ll_open
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
+*       Summary: Open the regular file pointed by "ino", and put file
 *                handle info to the structure pointed by "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
@@ -1145,7 +1528,9 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	/*TODO: Need to check permission here*/
 	ino_t thisinode;
 	long long fh;
-	int ret_code;
+	int ret_code, ret_val;
+	struct stat this_stat;
+	int file_flags;
 
 	printf("Debug open inode %lld\n", ino);
 	thisinode = (ino_t) ino;
@@ -1154,7 +1539,38 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	fh = open_fh(thisinode);
+	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	file_flags = file_info->flags;
+
+	if (((file_flags & O_ACCMODE) == O_RDONLY) ||
+			((file_flags & O_ACCMODE) == O_RDWR)) {
+		/* Checking permission */
+		ret_val = check_permission(req, &this_stat, 4);
+
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+
+	if (((file_flags & O_ACCMODE) == O_WRONLY) ||
+			((file_flags & O_ACCMODE) == O_RDWR)) {
+		/* Checking permission */
+		ret_val = check_permission(req, &this_stat, 2);
+
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+
+	fh = open_fh(thisinode, file_flags);
 	if (fh < 0) {
 		fuse_reply_err(req, ENFILE);
 		return;
@@ -1320,7 +1736,8 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
 				current_page, 0);
 		if (fh_ptr->cached_filepos == 0)
-			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+			fh_ptr->cached_filepos =
+				create_page(fh_ptr->meta_cache_ptr,
 				current_page);
 		fh_ptr->cached_page_index = current_page;
 	}
@@ -1383,7 +1800,8 @@ size_t _read_block(const char *buf, size_t size, long long bindex,
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
-				printf("Debug read: cannot open block file. Perhaps replaced?\n");
+				printf("Debug read: cannot open block file.");
+				printf(" Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
 		} else {
@@ -1442,9 +1860,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	struct stat temp_stat;
 	size_t size;
 	char *buf;
-
-/* TODO: Perhaps should do proof-checking on the inode number using pathname
-*  lookup and from file_info*/
+	char noatime;
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
 		fuse_reply_err(req, EBADF);
@@ -1452,6 +1868,24 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+	/* Check if ino passed in is the same as the one stored */
+
+	if (fh_ptr->thisinode != (ino_t) ino) {
+		fuse_reply_err(req, EBADFD);
+		return;
+	}
+
+	if ((!((fh_ptr->flags & O_ACCMODE) == O_RDONLY)) &&
+			(!((fh_ptr->flags & O_ACCMODE) == O_RDWR))) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
+
+	if (fh_ptr->flags & O_NOATIME)
+		noatime = TRUE;
+	else
+		noatime = FALSE;
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
@@ -1510,7 +1944,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			break;
 	}
 
-	if (total_bytes_read > 0) {
+	if ((total_bytes_read > 0) && (noatime == FALSE)) {
 		fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		fh_ptr->meta_cache_locked = TRUE;
@@ -1520,8 +1954,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 		meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
 					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
 
-		if (total_bytes_read > 0)
-			temp_stat.st_atime = time(NULL);
+		set_timestamp_now(&temp_stat, ATIME);
 
 		meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat,
 					NULL, NULL, 0, fh_ptr->meta_cache_ptr);
@@ -1531,7 +1964,6 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	}
 	fuse_reply_buf(req, buf, total_bytes_read);
 	free(buf);
-	return;
 }
 
 /* Helper function for write operation. Will wait on cache full and wait
@@ -1652,7 +2084,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
 				current_page, 0);
 		if (fh_ptr->cached_filepos == 0)
-			fh_ptr->cached_filepos = create_page(fh_ptr->meta_cache_ptr,
+			fh_ptr->cached_filepos =
+				create_page(fh_ptr->meta_cache_ptr,
 				current_page);
 		fh_ptr->cached_page_index = current_page;
 	}
@@ -1721,7 +2154,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	old_cache_size = check_file_size(thisblockpath);
 	if (offset > old_cache_size) {
-		printf("Debug write: cache block size smaller than starting offset. Extending\n");
+		printf("Debug write: cache block size smaller than ");
+		printf("starting offset. Extending\n");
 		ftruncate(fileno(fh_ptr->blockfptr), offset);
 	}
 
@@ -1741,7 +2175,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 /************************************************************************
 *
-* Function name: hfuse_write
+* Function name: hfuse_ll_write
 *        Inputs: fuse_req_t req, fuse_ino_t ino, const char *buf,
 *                size_t size, off_t offset, struct fuse_file_info *file_info
 *       Summary: Write "size" bytes to the file "ino", starting from
@@ -1760,9 +2194,6 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	off_t current_offset;
 	size_t target_bytes_written;
 	struct stat temp_stat;
-
-/* TODO: Perhaps should do proof-checking on the inode number using pathname
-*  lookup and from file_info*/
 
 	if (system_fh_table.entry_table_flags[file_info->fh] == FALSE) {
 		fuse_reply_err(req, EBADF);
@@ -1787,6 +2218,20 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	end_block = ((offset+size-1) / MAX_BLOCK_SIZE);
 
 	fh_ptr = &(system_fh_table.entry_table[file_info->fh]);
+
+	/* Check if ino passed in is the same as the one stored */
+
+	if (fh_ptr->thisinode != (ino_t) ino) {
+		fuse_reply_err(req, EBADFD);
+		return;
+	}
+
+	printf("flags %d\n", fh_ptr->flags & O_ACCMODE);
+	if ((!((fh_ptr->flags & O_ACCMODE) == O_WRONLY)) &&
+			(!((fh_ptr->flags & O_ACCMODE) == O_RDWR))) {
+		fuse_reply_err(req, EBADF);
+		return;
+	}
 
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	fh_ptr->meta_cache_locked = TRUE;
@@ -1826,7 +2271,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if (total_bytes_written > 0)
-		temp_stat.st_mtime = time(NULL);
+		set_timestamp_now(&temp_stat, MTIME | CTIME);
 
 	meta_cache_update_file_data(fh_ptr->thisinode, &temp_stat, NULL, NULL,
 						0, fh_ptr->meta_cache_ptr);
@@ -1839,11 +2284,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 /************************************************************************
 *
-* Function name: hfuse_statfs
-*        Inputs: const char *path, struct statvfs *buf
-*       Summary: Lookup the filesystem status. "path" is not used now.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_statfs
+*        Inputs: fuse_req_t req, fuse_ino_t ino
+*       Summary: Lookup the filesystem status. "ino" is not used now.
 *
 *************************************************************************/
 void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
@@ -1897,26 +2340,25 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 
 /************************************************************************
 *
-* Function name: hfuse_flush
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_flush
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Flush the file content. Not used now as cache mode is not
 *                write back.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
-void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
+void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
+				struct fuse_file_info *file_info)
 {
 	fuse_reply_err(req, 0);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_release
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_release
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Close the file handle pointed by "file_info".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
@@ -1953,12 +2395,10 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 
 /************************************************************************
 *
-* Function name: hfuse_fsync
-*        Inputs: const char *path, int isdatasync,
+* Function name: hfuse_ll_fsync
+*        Inputs: fuse_req_t req, fuse_ino_t ino, int isdatasync,
 *                struct fuse_file_info *file_info
 *       Summary: Conduct "fsync". Do nothing now (see hfuse_flush).
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
@@ -1969,30 +2409,49 @@ void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 
 /************************************************************************
 *
-* Function name: hfuse_opendir
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_opendir
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Check permission and open directory for access.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
-	/*TODO: Need to check for access rights */
+	int ret_val;
+	struct stat this_stat;
+
+	ret_val = fetch_inode_stat((ino_t)ino, &this_stat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (!S_ISDIR(this_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &this_stat, 4);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	fuse_reply_open(req, file_info);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_readdir
-*        Inputs: const char *path, void *buf, fuse_fill_dir_t filler,
+* Function name: hfuse_ll_readdir
+*        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size,
 *                off_t offset, struct fuse_file_info *file_info
 *       Summary: Read directory content starting from "offset". This
 *                implementation can return partial results and continue
 *                reading in follow-up calls.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
 void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
@@ -2004,7 +2463,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	off_t thisfile_pos;
 	DIR_META_TYPE tempmeta;
 	DIR_ENTRY_PAGE temp_page;
-	struct stat tempstat;
+	struct stat tempstat, thisstat;
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -2018,12 +2477,13 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	gettimeofday(&tmp_time1, NULL);
 
 /*TODO: Need to include symlinks*/
-	fprintf(stderr, "DEBUG readdir entering readdir, size %lld, offset %lld\n", size, offset);
+	fprintf(stderr, "DEBUG readdir entering readdir, ");
+	fprintf(stderr, "size %lld, offset %lld\n", size, offset);
 
 	this_inode = (ino_t) ino;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	meta_cache_lookup_dir_data(this_inode, &tempstat, &tempmeta, NULL,
+	meta_cache_lookup_dir_data(this_inode, &thisstat, &tempmeta, NULL,
 								body_ptr);
 
 	buf = malloc(sizeof(char)*size);
@@ -2069,6 +2529,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			temp_page.num_entries);
 		for (count = page_start; count < temp_page.num_entries;
 								count++) {
+			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
@@ -2077,41 +2538,50 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
-					(size - buf_pos), 
+					(size - buf_pos),
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
 			printf("Debug readdir entry size %d\n", entry_size);
 			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
-				printf("Readdir breaks, next offset %ld, file pos %ld, entry %d\n", nextentry_pos, temp_page.this_page_pos, (count+1));
+				printf("Readdir breaks, next offset %ld, ",
+					nextentry_pos);
+				printf("file pos %ld, entry %d\n",
+					temp_page.this_page_pos, (count+1));
 				fuse_reply_buf(req, buf, buf_pos);
 				return;
 			}
 			buf_pos += entry_size;
-
 		}
 		page_start = 0;
 		thisfile_pos = temp_page.tree_walk_next;
+	}
+
+	if (buf_pos > 0) {
+		set_timestamp_now(&thisstat, ATIME);
+		meta_cache_update_dir_data(this_inode, &thisstat, NULL, NULL,
+								body_ptr);
 	}
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	gettimeofday(&tmp_time2, NULL);
 
-	printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec) + 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
+	printf("readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	fuse_reply_buf(req, buf, buf_pos);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_releasedir
-*        Inputs: const char *path, struct fuse_file_info *file_info
+* Function name: hfuse_ll_releasedir
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                struct fuse_file_info *file_info
 *       Summary: Close opened directory. Do nothing now.
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
 *
 *************************************************************************/
-void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *file_info)
+void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
+					struct fuse_file_info *file_info)
 {
 	fuse_reply_err(req, 0);
 }
@@ -2158,15 +2628,13 @@ void reporter_module(void)
 			send(fd1, buf, strlen(buf)+1, 0);
 		}
 	}
-	return;
 }
 
 /************************************************************************
 *
-* Function name: hfuse_init
-*        Inputs: struct fuse_file_info *file_info
+* Function name: hfuse_ll_init
+*        Inputs: void *userdata, struct fuse_conn_info *conn
 *       Summary: Initiate a FUSE mount
-*  Return value: Pointer to the user data of this mount.
 *
 *************************************************************************/
 void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
@@ -2189,7 +2657,6 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 * Function name: hfuse_ll_destroy
 *        Inputs: void *userdata
 *       Summary: Destroy a FUSE mount
-*  Return value: None
 *
 *************************************************************************/
 void hfuse_ll_destroy(void *userdata)
@@ -2203,9 +2670,17 @@ void hfuse_ll_destroy(void *userdata)
 
 	lookup_destroy();
 	hcfs_system->system_going_down = TRUE;
-	return;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_setattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, struct stat *attr,
+*                int to_set, struct fuse_file_info *fi
+*       Summary: Set attribute for a filesystem object. This includes
+*                routines such as chmod, chown, truncate, utimens.
+*
+*************************************************************************/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int to_set, struct fuse_file_info *fi)
 {
@@ -2215,18 +2690,20 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	char attr_changed;
 	clockid_t this_clock_id;
 	struct timespec timenow;
-	struct stat *newstat;
+	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
+	struct fuse_ctx *temp_context;
 
-	printf("Debug setattr\n");
+	printf("Debug setattr, to_set %d\n", to_set);
+
+	temp_context = fuse_req_ctx(req);
 
 	this_inode = (ino_t) ino;
 
 	attr_changed = FALSE;
-	newstat = malloc(sizeof(struct stat));
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	ret_val = meta_cache_lookup_file_data(this_inode, newstat,
+	ret_val = meta_cache_lookup_file_data(this_inode, &newstat,
 			NULL, NULL, 0, body_ptr);
 
 	if (ret_val < 0) {  /* Cannot fetch any meta*/
@@ -2238,8 +2715,17 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if ((to_set & FUSE_SET_ATTR_SIZE) &&
-			(newstat->st_size != attr->st_size)) {
-		ret_val = hfuse_ll_truncate((ino_t)ino, newstat,
+			(newstat.st_size != attr->st_size)) {
+
+		/* Checking permission */
+		ret_val = check_permission(req, &newstat, 2);
+
+		if (ret_val < 0) {
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
+		ret_val = hfuse_ll_truncate((ino_t)ino, &newstat,
 				attr->st_size, &body_ptr);
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
@@ -2251,30 +2737,83 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	}
 
 	if (to_set & FUSE_SET_ATTR_MODE) {
-		newstat->st_mode = attr->st_mode;
+		printf("Debug setattr context %d, file %d\n",
+			temp_context->uid, newstat.st_uid);
+
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
+		newstat.st_mode = attr->st_mode;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_UID) {
-		newstat->st_uid = attr->st_uid;
+		temp_context = fuse_req_ctx(req);
+		if (temp_context->uid != 0) {   /* Not privileged */
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
+		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_GID) {
-		newstat->st_gid = attr->st_gid;
+		temp_context = fuse_req_ctx(req);
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(!is_member(req, newstat.st_gid,
+					attr->st_gid)))) {
+			/* Not privileged and (not owner or not in group) */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
+		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
-		newstat->st_atime = attr->st_atime;
-		memcpy(&(newstat->st_atim), &(attr->st_atim),
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+
+		newstat.st_atime = attr->st_atime;
+		memcpy(&(newstat.st_atim), &(attr->st_atim),
 			sizeof(struct timespec));
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME) {
-		newstat->st_mtime = attr->st_mtime;
-		memcpy(&(newstat->st_mtim), &(attr->st_mtim),
+		if ((temp_context->uid != 0) &&
+			(temp_context->uid != newstat.st_uid)) {
+			/* Not privileged and not owner */
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EPERM);
+			return;
+		}			
+		newstat.st_mtime = attr->st_mtime;
+		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
 			sizeof(struct timespec));
 		attr_changed = TRUE;
 	}
@@ -2283,49 +2822,103 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	clock_gettime(this_clock_id, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
-		newstat->st_atime = (time_t)(timenow.tv_sec);
-		memcpy(&(newstat->st_atim), &timenow,
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(check_permission(req, &newstat, 2) < 0))) {
+			/* Not privileged and
+				(not owner or no write permission)*/
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EACCES);
+			return;
+		}			
+		newstat.st_atime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat.st_atim), &timenow,
 			sizeof(struct timespec));
 		attr_changed = TRUE;
 	}
 
 	if (to_set & FUSE_SET_ATTR_MTIME_NOW) {
-		newstat->st_mtime = (time_t)(timenow.tv_sec);
-		memcpy(&(newstat->st_mtim), &timenow,
+		if ((temp_context->uid != 0) &&
+			((temp_context->uid != newstat.st_uid) ||
+				(check_permission(req, &newstat, 2) < 0))) {
+			/* Not privileged and
+				(not owner or no write permission)*/
+
+			meta_cache_close_file(body_ptr);
+			meta_cache_unlock_entry(body_ptr);
+			fuse_reply_err(req, EACCES);
+			return;
+		}			
+		newstat.st_mtime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat.st_mtim), &timenow,
 			sizeof(struct timespec));
 		attr_changed = TRUE;
 	}
 
 	if (attr_changed == TRUE) {
-		newstat->st_ctime = (time_t)(timenow.tv_sec);
-		memcpy(&(newstat->st_ctim), &timenow,
+		newstat.st_ctime = (time_t)(timenow.tv_sec);
+		memcpy(&(newstat.st_ctim), &timenow,
 			sizeof(struct timespec));
+		if (to_set & FUSE_SET_ATTR_SIZE) {
+			newstat.st_mtime = (time_t)(timenow.tv_sec);
+			memcpy(&(newstat.st_mtim), &timenow,
+				sizeof(struct timespec));
+		}
 	}
 
-	ret_val = meta_cache_update_file_data(this_inode, newstat,
+	ret_val = meta_cache_update_file_data(this_inode, &newstat,
 			NULL, NULL, 0, body_ptr);
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
-	fuse_reply_attr(req, newstat, 0);
-	free(newstat);
-	return;
+	fuse_reply_attr(req, &newstat, 0);
 }
 
 /************************************************************************
 *
-* Function name: hfuse_access
-*        Inputs: const char *path, int mode
-*       Summary: Checks the permission for object "path" against "mode".
-*  Return value: 0 if successful. Otherwise returns the negation of the
-*                appropriate error code.
+* Function name: hfuse_ll_access
+*        Inputs: fuse_req_t req, fuse_ino_t ino, int mode
+*       Summary: Checks the permission for object "ino" against "mode".
 *
 *************************************************************************/
 static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 {
-	/*TODO: finish this*/
+	struct stat thisstat;
+	int ret_val;
+
+	ret_val = fetch_inode_stat((ino_t)ino, &thisstat, NULL);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	if (mode == F_OK) {
+		fuse_reply_err(req, 0);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission_access(req, &thisstat, mode);
+
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
 	fuse_reply_err(req, 0);
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_forget
+*        Inputs: fuse_req_t req, fuse_ino_t ino,
+*                unsigned long nlookup
+*       Summary: Decrease lookup count for object "ino" by "nlookup", and
+*                handle actual filesystem object deletion if count is 0.
+*
+*************************************************************************/
 static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	unsigned long nlookup)
 {
@@ -2355,7 +2948,6 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		actual_delete_inode((ino_t) ino, d_type);
 
 	fuse_reply_none(req);
-	return;
 }
 
 /* Specify the functions used for the FUSE operations */
@@ -2437,7 +3029,7 @@ int hook_fuse(int argc, char **argv)
 	fuse_unmount(mount, fuse_channel);
 	fuse_opt_free_args(&args);
 
-	return 0;	
+	return 0;
 }
 
 /* Operations to implement

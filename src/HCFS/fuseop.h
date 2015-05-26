@@ -19,6 +19,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /*BEGIN META definition*/
 
@@ -55,6 +58,11 @@
 #define D_ISDIR 0
 #define D_ISREG 1
 #define D_ISLNK 2
+
+/* Define constants for timestamp changes */
+#define ATIME 4
+#define MTIME 2
+#define CTIME 1
 
 /* Structures for directories */
 /* Defining directory entry in meta files*/
@@ -145,4 +153,5 @@ pthread_t reporter_thread;  /* Used by utility prototype */
 /* Functions for initializing HCFS */
 int hook_fuse(int argc, char **argv);
 
+int set_timestamp_now(struct stat *thisstat, char mode);
 #endif  /* GW20_HCFS_FUSEOP_H_ */

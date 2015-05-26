@@ -13,8 +13,6 @@
 *
 **************************************************************************/
 
-/* TODO: Use fuse_context to check for what FS the function is called from */
-
 #include "utils.h"
 
 #include <stdio.h>
@@ -242,6 +240,7 @@ int read_system_config(char *config_path)
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
 	char argname[200], argval[200], *tokptr1, *tokptr2, *toktmp, *strptr;
 	long long temp_val;
+	int tmp_len;
 
 	fptr = fopen(config_path, "r");
 
@@ -250,6 +249,8 @@ int read_system_config(char *config_path)
 								config_path);
 		return -1;
 	}
+
+	CURRENT_BACKEND = -1;
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
@@ -303,21 +304,6 @@ int read_system_config(char *config_path)
 			strcpy(BLOCKPATH, argval);
 			continue;
 		}
-		if (strcasecmp(argname, "superblock") == 0) {
-			SUPERBLOCK = (char *) malloc(strlen(argval) + 10);
-			strcpy(SUPERBLOCK, argval);
-			continue;
-		}
-		if (strcasecmp(argname, "unclaimedfile") == 0) {
-			UNCLAIMEDFILE = (char *) malloc(strlen(argval) + 10);
-			strcpy(UNCLAIMEDFILE, argval);
-			continue;
-		}
-		if (strcasecmp(argname, "hcfssystem") == 0) {
-			HCFSSYSTEM = (char *) malloc(strlen(argval) + 10);
-			strcpy(HCFSSYSTEM, argval);
-			continue;
-		}
 		if (strcasecmp(argname, "cache_soft_limit") == 0) {
 			errno = 0;
 			temp_val = strtoll(argval, &num_check_ptr, 10);
@@ -362,7 +348,109 @@ int read_system_config(char *config_path)
 			MAX_BLOCK_SIZE = temp_val;
 			continue;
 		}
+		if (strcasecmp(argname, "current_backend") == 0) {
+			CURRENT_BACKEND = -1;
+			if (strcasecmp(argval, "SWIFT") == 0)
+				CURRENT_BACKEND = SWIFT;
+			if (strcasecmp(argval, "S3") == 0)
+				CURRENT_BACKEND = S3;
+			if (CURRENT_BACKEND == -1) {
+				fclose(fptr);
+				printf("Unsupported backend\n");
+				return -1;
+			}
+			continue;
+		}
+		if (strcasecmp(argname, "swift_account") == 0) {
+			SWIFT_ACCOUNT = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_ACCOUNT, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_user") == 0) {
+			SWIFT_USER = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_USER, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_pass") == 0) {
+			SWIFT_PASS = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_PASS, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_url") == 0) {
+			SWIFT_URL = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_URL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_container") == 0) {
+			SWIFT_CONTAINER = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_CONTAINER, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "swift_protocol") == 0) {
+			if ((strcasecmp(argval, "HTTP") != 0) &&
+				(strcasecmp(argval, "HTTPS") != 0)) {
+				fclose(fptr);
+				printf("Unsupported protocol\n");
+				return -1;
+			}
+			SWIFT_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			snprintf(SWIFT_PROTOCOL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_access") == 0) {
+			S3_ACCESS = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_ACCESS, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_secret") == 0) {
+			S3_SECRET = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_SECRET, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_url") == 0) {
+			S3_URL = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_URL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_bucket") == 0) {
+			S3_BUCKET = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_BUCKET, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
+		if (strcasecmp(argname, "s3_protocol") == 0) {
+			if ((strcasecmp(argval, "HTTP") != 0) &&
+				(strcasecmp(argval, "HTTPS") != 0)) {
+				fclose(fptr);
+				printf("Unsupported protocol\n");
+				return -1;
+			}
+			S3_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			snprintf(S3_PROTOCOL, strlen(argval) + 10,
+				"%s", argval);
+			continue;
+		}
 	}
+
+	if (((S3_URL != NULL) && (S3_PROTOCOL != NULL))
+				&& (S3_BUCKET != NULL)) {
+		tmp_len = strlen(S3_URL) + strlen(S3_PROTOCOL)
+					+ strlen(S3_BUCKET) + 20;
+		S3_BUCKET_URL = (char *) malloc(tmp_len);
+		snprintf(S3_BUCKET_URL, tmp_len, "%s://%s.%s",
+				S3_PROTOCOL, S3_BUCKET, S3_URL);
+	}
+
+
 	fclose(fptr);
 
 	return 0;
@@ -383,10 +471,22 @@ int validate_system_config(void)
 	char tempval[10];
 	int ret_val;
 
-	printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH, BLOCKPATH,
-					SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
-	printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
-					CACHE_DELTA, MAX_BLOCK_SIZE);
+	/* Validating system path settings */
+
+	if (CURRENT_BACKEND < 0) {
+		printf("Backend selection does not exist\n");
+		return -1;
+	}
+
+	if (access(METAPATH, F_OK) != 0) {
+		printf("Meta path does not exist. Aborting\n");
+		return -1;
+	}
+
+	if (access(BLOCKPATH, F_OK) != 0) {
+		printf("Block cache path does not exist. Aborting\n");
+		return -1;
+	}
 
 	sprintf(pathname, "%s/testfile", BLOCKPATH);
 
@@ -406,7 +506,112 @@ int validate_system_config(void)
 	printf("test value is: %s, %d\n", tempval, strncmp(tempval, "T", 1));
 	unlink(pathname);
 
-	/* TODO: Complete system config validation */
+	SUPERBLOCK = (char *) malloc(strlen(METAPATH) + 20);
+	if (SUPERBLOCK == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(SUPERBLOCK, strlen(METAPATH) + 20, "%s/superblock",
+			METAPATH);
+
+	UNCLAIMEDFILE = (char *) malloc(strlen(METAPATH) + 20);
+	if (UNCLAIMEDFILE == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(UNCLAIMEDFILE, strlen(METAPATH) + 20, "%s/unclaimedlist",
+			METAPATH);
+
+	HCFSSYSTEM = (char *) malloc(strlen(METAPATH) + 20);
+	if (HCFSSYSTEM == NULL) {
+		printf("Out of memory\n");
+		return -1;
+	}
+	snprintf(HCFSSYSTEM, strlen(METAPATH) + 20, "%s/hcfssystemfile",
+			METAPATH);
+
+	/* Validating cache and block settings */
+	/* TODO: If system already created, need to check if block size
+		is changed, or just use existing block size. */
+	/* TODO: For cache size, perhaps need to check against space
+		already used on the target disk (or adjust dynamically).*/
+
+	if (MAX_BLOCK_SIZE <= 0) {
+		printf("Block size cannot be zero or less\n");
+		return -1;
+	}
+	if (CACHE_DELTA < MAX_BLOCK_SIZE) {
+		printf("cache_delta must be at least max_block_size\n");
+		return -1;
+	}
+	if (CACHE_SOFT_LIMIT < MAX_BLOCK_SIZE) {
+		printf("cache_soft_limit must be at least max_block_size\n");
+		return -1;
+	}
+	if (CACHE_HARD_LIMIT < CACHE_SOFT_LIMIT) {
+		printf("cache_hard_limit must be at least cache_soft_limit\n");
+		return -1;
+	}
+
+	/* Validate that the information for the assigned backend
+		is complete. */
+	/* TODO: Maybe move format checking of backend settings here, and
+		also connection testing. */
+
+	if (CURRENT_BACKEND == SWIFT) {
+		if (SWIFT_ACCOUNT == NULL) {
+			printf("Swift account missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_USER == NULL) {
+			printf("Swift user missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_PASS == NULL) {
+			printf("Swift password missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_URL == NULL) {
+			printf("Swift URL missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_CONTAINER == NULL) {
+			printf("Swift container missing from configuration\n");
+			return -1;
+		}
+		if (SWIFT_PROTOCOL == NULL) {
+			printf("Swift protocol missing from configuration\n");
+			return -1;
+		}
+	}
+
+	if (CURRENT_BACKEND == S3) {
+		if (S3_ACCESS == NULL) {
+			printf("S3 access key missing from configuration\n");
+			return -1;
+		}
+		if (S3_SECRET == NULL) {
+			printf("S3 secret key missing from configuration\n");
+			return -1;
+		}
+		if (S3_URL == NULL) {
+			printf("S3 URL missing from configuration\n");
+			return -1;
+		}
+		if (S3_BUCKET == NULL) {
+			printf("S3 bucket missing from configuration\n");
+			return -1;
+		}
+		if (S3_PROTOCOL == NULL) {
+			printf("S3 protocol missing from configuration\n");
+			return -1;
+		}
+	}
+
+	printf("%s 1\n%s 2\n%s 3\n%s 4\n%s 5\n", METAPATH, BLOCKPATH,
+					SUPERBLOCK, UNCLAIMEDFILE, HCFSSYSTEM);
+	printf("%lld %lld %lld %lld\n", CACHE_SOFT_LIMIT, CACHE_HARD_LIMIT,
+					CACHE_DELTA, MAX_BLOCK_SIZE);
 
 	return 0;
 }
