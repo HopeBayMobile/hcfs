@@ -633,7 +633,8 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 *                "hint_page" is used for quickly finding the position of
 *                the new page. This should be the page index before the
 *                function call, or 0 if this is the first relevant call.
-*  Return value: File pos of the page if successful. Otherwise returns -1.
+*  Return value: File pos of the page if successful. Otherwise returns 
+*                negation of error code.
 *                If file pos is 0, the page is not found.
 *
 *************************************************************************/
@@ -656,7 +657,7 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 
 	/*If meta cache lock is not locked, return -1*/
 	if (sem_val > 0)
-		return -1;
+		return -EPERM;
 
 	meta_cache_lookup_file_data(body_ptr->inode_num, NULL, &temp_meta,
 							NULL, 0, body_ptr);
@@ -837,7 +838,8 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 *        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page
 *       Summary: Given meta cache entry pointed by "body_ptr", create the block
 *                entry page "target_page" and return the file pos of the page.
-*  Return value: File pos of the page if successful. Otherwise returns -1.
+*  Return value: File pos of the page if successful. Otherwise returns
+*                negation of error code.
 *
 *************************************************************************/
 long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
@@ -857,7 +859,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	/*If meta cache lock is not locked, return -1*/
 	if (sem_val > 0)
-		return -1;
+		return -EPERM;
 
 	if (target_page < 0)
 		return -1;

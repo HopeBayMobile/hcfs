@@ -104,7 +104,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		}
 
 		if (ret_code < 0)
-			return -ENOENT;
+			return ret_code;
 	} else {
 		return -ENOENT;
 	}
@@ -130,7 +130,8 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 *                appropriate error code.
 *
 *************************************************************************/
-int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
+int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen)
 {
 	int ret_val;
@@ -148,7 +149,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
@@ -157,7 +158,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	return 0;
 }
@@ -174,7 +175,8 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 *                appropriate error code.
 *
 *************************************************************************/
-int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
+int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen)
 {
 	char thismetapath[METAPATHLEN];
@@ -202,7 +204,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
@@ -212,7 +214,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	return 0;
 }
@@ -228,7 +230,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 *                appropriate error code.
 *
 *************************************************************************/
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
+				const char *selfname)
 {
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -239,7 +242,7 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	ret_val = decrease_nlink_inode_file(this_inode);
 
@@ -259,7 +262,8 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 *                appropriate error code.
 *
 *************************************************************************/
-int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
+			const char *selfname)
 {
 	DIR_META_TYPE tempmeta;
 	char thismetapath[METAPATHLEN];
@@ -289,7 +293,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
 	meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
-		return -EACCES;
+		return ret_val;
 
 	/* Deferring actual deletion to forget */
 	mark_inode_delete(this_inode);
