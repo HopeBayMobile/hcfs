@@ -73,7 +73,7 @@ TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-EACCES, mknod_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode, 
 		"\0", NULL, 0));
 }
 
@@ -85,7 +85,7 @@ TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFREG;
 
-	EXPECT_EQ(-EACCES, mknod_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode, 
 		"\0", &tmp_stat, 0));
 }
 
@@ -114,7 +114,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-EACCES, mkdir_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode, 
 		"\0", NULL, 0));
 }
 
@@ -126,7 +126,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFDIR;
 
-	EXPECT_EQ(-EACCES, mkdir_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode, 
 		"\0", &tmp_stat, 0));
 }
 
@@ -155,7 +155,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry)
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
 	ino_t self_inode = 1;
 
-	EXPECT_EQ(-EACCES, unlink_update_meta(parent_inode, 
+	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
 		self_inode, "\0"));
 }
 
@@ -190,7 +190,7 @@ TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
 
-	EXPECT_EQ(-EACCES, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(-1, rmdir_update_meta(parent_inode, 
 		self_inode, "\0"));
 }
 

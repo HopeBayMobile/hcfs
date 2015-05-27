@@ -523,17 +523,20 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 {
 	pid_t pid;
 	int shm_key, shm_key2;
-
+	
+	/* Generate mock data and allocate space to check answer */
 	shm_key = shmget(1122, sizeof(LoopTestData), IPC_CREAT | 0666);
 	ASSERT_NE(-1, shm_key);
 	shm_test_data = (LoopTestData *)shmat(shm_key, NULL, 0);
 	ASSERT_NE((void *)-1, shm_test_data);
 	shm_test_data->num_inode = 40; // Test 40 nodes	
+	
 	shm_key2 = shmget(1244, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
 	ASSERT_NE(-1, shm_key2);
 	shm_test_data->to_handle_inode = (int *)shmat(shm_key2, NULL, 0);
-	ASSERT_NE(shm_test_data->to_handle_inode, (void *)-1);
+	ASSERT_NE((void *)-1, shm_test_data->to_handle_inode);
 	shm_test_data->tohandle_counter = 0;
+	
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++)
 		shm_test_data->to_handle_inode[i] = (i + 1) * 5; // mock inode
 
@@ -565,7 +568,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
 		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
 	}
-
 }
 
 /*

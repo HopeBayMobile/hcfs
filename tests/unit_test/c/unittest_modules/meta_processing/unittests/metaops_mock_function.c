@@ -62,7 +62,7 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 }
 
 int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-	int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
+	int *result_index, const char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	switch(this_inode) {
         case INO_SEEK_DIR_ENTRY_OK:
@@ -283,7 +283,7 @@ int lookup_markdelete(ino_t this_inode)
 	return 0;
 }
 
-int set_timestamp_now(struct stat *thisstat, char mode)
+void set_timestamp_now(struct stat *thisstat, char mode)
 {
-	return 0;
+	return;
 }
