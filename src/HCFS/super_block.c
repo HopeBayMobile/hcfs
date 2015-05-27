@@ -9,8 +9,11 @@
 *           and garbage collection).
 *
 * Revision History
-* 2015/2/6 Jiahong added header for this file, and revising coding style.
-*
+* 2015/2/6  Jiahong added header for this file, and revising coding style.
+* 2015/5/26 Kewei added some error handling about function 
+*           super_block_reclaim_fullscan() & super_block_share_release(),
+*           and besides modified macro SB_ENTRY_SIZE & SB_HEAD_SIZE to avoid 
+*           comparing between signed and unsigned integers.
 **************************************************************************/
 
 /* TODO: Consider to convert super inode to multiple files and use striping
