@@ -10,6 +10,7 @@
 *           the functions.
 * 2015/1/27 Jiahong revised the coding format for coding style check.
 * 2015/2/11 Jiahong revised coding style and add hfuse_system.h inclusion.
+* 2015/5/27 Jiahong working on improving error handling
 *
 **************************************************************************/
 
