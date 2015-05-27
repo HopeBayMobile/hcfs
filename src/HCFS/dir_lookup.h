@@ -37,6 +37,6 @@ int replace_pathname_cache(long long index, char *path, ino_t inode_number);
 	this function has to be called */
 int invalidate_pathname_cache_entry(const char *path);
 ino_t check_cached_path(const char *path);
-int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry);
+int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
 
 #endif  /* GW20_HCFS_DIR_LOOKUP_H_ */

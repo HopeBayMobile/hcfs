@@ -176,7 +176,6 @@ ino_t check_cached_path(const char *path)
 ino_t lookup_pathname(const char *path, int *errcode)
 {
 	int strptr;
-	unsigned long long index;
 	char tempdir[MAX_PATHNAME+10];
 	ino_t cached_inode;
 
@@ -233,7 +232,6 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
 	int count;
 	int new_prefix_len;
 	char search_subdir_only;
-	char metapathname[METAPATHLEN];
 	char target_entry_name[400];
 	char tempname[400];
 	ino_t hit_inode;
@@ -330,7 +328,10 @@ ino_t lookup_pathname_recursive(ino_t subroot, int prefix_len,
 	return 0;
 }
 
-int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
+/* Given parent "parent", search for "childname" in parent and return
+the directory entry in structure pointed by "dentry" if found. If not or
+if error, return the negation of error code. */
+int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 {
 	META_CACHE_ENTRY_STRUCT *cache_entry;
 	DIR_ENTRY_PAGE temp_page;

@@ -274,7 +274,8 @@ int meta_cache_remove(ino_t this_inode)
 }
 
 int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-	int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
+		int *result_index, const char *childname,
+		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	switch (this_inode) {
 	case 1:

@@ -44,7 +44,7 @@ static inline int _open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	int ret_val = 0;
 
-	if (body_ptr->meta_opened == FALSE)
+	if ((body_ptr->meta_opened == FALSE) || (body_ptr->fptr == NULL))
 		ret_val = meta_cache_open_file(body_ptr);
 	return ret_val;
 }
@@ -67,17 +67,19 @@ static inline int _load_dir_page(META_CACHE_ENTRY_STRUCT *ptr,
 *        Inputs: META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Open the meta file for the cache entry
 *                pointed by "body_ptr".
-*  Return value: 0 if successful. Otherwise returns -1.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	char thismetapath[METAPATHLEN];
+	int ret;
 
 	thismetapath[0] = '\0';
-	if (body_ptr->meta_opened == FALSE) {
-		if (fetch_meta_path(thismetapath, body_ptr->inode_num))
-			return -1;
+	if ((body_ptr->meta_opened == FALSE) || (body_ptr->fptr == NULL)) {
+		ret = fetch_meta_path(thismetapath, body_ptr->inode_num);
+		if (ret < 0)
+			return ret;
 
 		body_ptr->fptr = fopen(thismetapath, "r+");
 		if (body_ptr->fptr == NULL) {
@@ -85,7 +87,7 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 			if (access(thismetapath, F_OK) < 0)
 				body_ptr->fptr = fopen(thismetapath, "w+");
 			if (body_ptr->fptr == NULL)
-				return -1;
+				return -EIO;
 		}
 
 		setbuf(body_ptr->fptr, NULL);
@@ -385,6 +387,11 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 		free(entry_body->dir_entry_cache[0]);
 	if (entry_body->dir_entry_cache[1] != NULL)
 		free(entry_body->dir_entry_cache[1]);
+	if (entry_body->meta_opened) {
+		if (entry_body->fptr != NULL)
+			fclose(entry_body->fptr);
+		entry_body->meta_opened = FALSE;
+	}
 
 	return 0;
 }
@@ -485,10 +492,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
 		long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int index;
-	char thismetapath[METAPATHLEN];
-	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val;
+	int ret_val;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -591,9 +595,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
 				META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	int index;
-	SUPER_BLOCK_ENTRY tempentry;
-	int ret_code, ret_val;
+	int ret_val;
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
@@ -670,9 +672,7 @@ and will check page_pos input against the two entries in the cache. If does
 not match any of the two, flush the older page entry first before processing
 the new one */
 
-	int index;
 	int ret_val;
-	char need_new;
 
 	printf("Debug meta cache update dir data\n");
 
@@ -741,20 +741,16 @@ the new one */
 *
 *************************************************************************/
 int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
-	int *result_index, char *childname, META_CACHE_ENTRY_STRUCT *body_ptr)
+	int *result_index, const char *childname,
+				META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	FILE *fptr;
 	char thismetapath[METAPATHLEN];
-	struct stat inode_stat;
 	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE temppage, rootpage, tmp_resultpage;
 	DIR_ENTRY_PAGE *tmp_page_ptr;
-	int ret_items;
 	int ret_val;
-	long nextfilepos, oldfilepos;
-	int index;
+	long nextfilepos;
 	int can_use_index;
-	int count;
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
 	int cache_idx;
@@ -854,7 +850,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 /* Exception handling from here */
 file_exception:
-	return -1;
+	return -EIO;
 }
 
 /************************************************************************
@@ -868,13 +864,10 @@ file_exception:
 *************************************************************************/
 int meta_cache_remove(ino_t this_inode)
 {
-	FILE *fptr;
-	int ret_val;
 	int index;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr, *prev_ptr;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	char found_entry, meta_opened;
-	int can_use_index;
+	char found_entry;
 
 	index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
@@ -992,11 +985,9 @@ static inline int _expire_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr,
 *************************************************************************/
 int expire_meta_mem_cache_entry(void)
 {
-	int start_index, cindex, ret_val;
+	int start_index, cindex;
 	struct timeval current_time, *atime_ptr;
-	char expired;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *lptr;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
 	double float_current_time, float_access_time;
 
 	gettimeofday(&current_time, NULL);
@@ -1056,12 +1047,9 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 	int ret_val;
 	int index;
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char need_new, expire_done;
-	int can_use_index;
-	int count;
 	SUPER_BLOCK_ENTRY tempentry;
-	META_CACHE_ENTRY_STRUCT *result_ptr, *prev_ptr;
+	META_CACHE_ENTRY_STRUCT *result_ptr;
 	struct timespec time_to_sleep;
 
 	time_to_sleep.tv_sec = 0;
@@ -1167,8 +1155,6 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 *************************************************************************/
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	int ret_val;
-
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
 	gettimeofday(&(target_ptr->last_access_time), NULL);
@@ -1196,6 +1182,7 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(target_ptr->access_sem));
 
+	/* TODO: Use error logging here. Return value may not be useful. */
 	gettimeofday(&(target_ptr->last_access_time), NULL);
 
 	if (META_CACHE_FLUSH_NOW == TRUE)

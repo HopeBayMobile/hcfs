@@ -32,6 +32,7 @@ class BaseClassWithMetaCacheEntry : public ::testing::Test {
 		virtual void SetUp() 
 		{
 			body_ptr = (META_CACHE_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+			memset(body_ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 			sem_init(&(body_ptr->access_sem), 0, 1);
 		}
 
@@ -66,7 +67,7 @@ TEST_F(meta_cache_open_fileTest, FetchMetaPathError)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_ERR; 
 	/* Test */
-	EXPECT_EQ(-1, meta_cache_open_file(body_ptr));
+	EXPECT_EQ(-EIO, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
 }
 
@@ -78,7 +79,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathCannotAccess)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS; 
 	/* Test */
-	EXPECT_EQ(-1, meta_cache_open_file(body_ptr));
+	EXPECT_EQ(-EIO, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
 	/* Delete tmp dir and file */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
@@ -102,11 +103,17 @@ TEST_F(meta_cache_open_fileTest, MetaPathNotExist)
 
 TEST_F(meta_cache_open_fileTest, MetaFileAlreadyOpened)
 {
+	mkdir(TMP_META_DIR, 0700);
+	mknod(TMP_META_FILE_PATH, 0700, S_IFREG);
+	body_ptr->fptr = fopen(TMP_META_FILE_PATH, "r+");
 	/* Meta file has been opened*/
 	body_ptr->meta_opened = TRUE;
 	/* Test */	
 	EXPECT_EQ(0, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, TRUE);
+	fclose(body_ptr->fptr);
+	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
+	ASSERT_EQ(0, rmdir(TMP_META_DIR));
 }
 
 TEST_F(meta_cache_open_fileTest, OpenMetaPathSuccess)
@@ -160,7 +167,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, EntryCannotBeOpened)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS;
 	
-	EXPECT_EQ(-1, meta_cache_flush_dir_cache(body_ptr, 0));
+	EXPECT_EQ(-EIO, meta_cache_flush_dir_cache(body_ptr, 0));
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
 	ASSERT_EQ(0, rmdir(TMP_META_DIR));
 }
