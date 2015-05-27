@@ -1005,6 +1005,454 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
  */
 
 /*
+	Unittest of ll_enqueue()
+ */
+
+class ll_enqueueTest : public InitSuperBlockBaseClass {
+};
+
+TEST_F(ll_enqueueTest, AlreadyInQueue_StatusTheSame)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+	char test_status[] = {NO_LL, TO_BE_RECLAIMED, RECLAIMED, IS_DIRTY, TO_BE_DELETED};
+
+	/* Run */
+	for (unsigned int st = 0 ; st < sizeof(test_status) / sizeof(char) ; st++) {
+		sb_entry.status = test_status[st];
+		EXPECT_EQ(0, ll_enqueue(inode, test_status[st], &sb_entry));
+	}
+}
+
+TEST_F(ll_enqueueTest, Enqueue_NO_LL)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+
+	/* Run */
+	EXPECT_EQ(0, ll_enqueue(inode, NO_LL, &sb_entry));
+}
+
+
+TEST_F(ll_enqueueTest, Enqueue_TO_BE_RECLAIMED)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+
+	/* Run */
+	EXPECT_EQ(0, ll_enqueue(inode, TO_BE_RECLAIMED, &sb_entry));
+}
+
+TEST_F(ll_enqueueTest, Enqueue_RECLAIMED)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+
+	/* Run */
+	EXPECT_EQ(0, ll_enqueue(inode, RECLAIMED, &sb_entry));
+}
+
+TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_WithEmptyList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+
+	/* Run */
+	EXPECT_EQ(0, ll_enqueue(inode, IS_DIRTY, &sb_entry));
+
+	/* Verify */
+	EXPECT_EQ(inode, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(inode, sys_super_block->head.last_dirty_inode);
+	EXPECT_EQ(1, sys_super_block->head.num_dirty);
+	
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(IS_DIRTY, sb_entry.status);
+}
+
+TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_WithEmptyList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+
+	/* Run */
+	EXPECT_EQ(0, ll_enqueue(inode, TO_BE_DELETED, &sb_entry));
+
+	/* Verify */
+	EXPECT_EQ(inode, sys_super_block->head.first_to_delete_inode);
+	EXPECT_EQ(inode, sys_super_block->head.last_to_delete_inode);
+	EXPECT_EQ(1, sys_super_block->head.num_to_be_deleted);
+	
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(TO_BE_DELETED, sb_entry.status);
+}
+
+TEST_F(ll_enqueueTest, Enqueue_IS_DIRTY_ManyTimes)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	unsigned long num_inode = 20000;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	for (ino_t inode = 1; inode <= num_inode ; inode++) {
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+		sb_entry.status = NO_LL;
+		EXPECT_EQ(0, ll_enqueue(inode, IS_DIRTY, &sb_entry));
+		pwrite(sys_super_block->iofptr, &sb_entry, 
+			sizeof(SUPER_BLOCK_ENTRY), filepos);
+	}
+
+	/* Verify head and entry data */
+	EXPECT_EQ(1, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(num_inode, sys_super_block->head.last_dirty_inode);
+	EXPECT_EQ(num_inode, sys_super_block->head.num_dirty);
+		
+	ino_t now_inode = sys_super_block->head.first_dirty_inode;
+	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
+		long long filepos;
+		
+		filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, 
+			sizeof(SUPER_BLOCK_ENTRY), filepos);
+		// Check status and inode number
+		ASSERT_EQ(IS_DIRTY, sb_entry.status) << "status = "
+			<< sb_entry.status << ", need IS_DIRTY";
+		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = " 
+			<< expected_inode << ", now_inode = " << now_inode;
+		
+		now_inode = sb_entry.util_ll_next; // Go to next dirty inode	
+	}	
+}
+
+TEST_F(ll_enqueueTest, Enqueue_TO_BE_DELETED_ManyTimes)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	unsigned long num_inode = 20000;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+
+	/* Run */
+	for (ino_t inode = 1; inode <= num_inode ; inode++) {
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+		sb_entry.status = NO_LL;
+		EXPECT_EQ(0, ll_enqueue(inode, TO_BE_DELETED, &sb_entry));
+		pwrite(sys_super_block->iofptr, &sb_entry, 
+			sizeof(SUPER_BLOCK_ENTRY), filepos);
+	}
+
+	/* Verify head and entry data */
+	EXPECT_EQ(1, sys_super_block->head.first_to_delete_inode);
+	EXPECT_EQ(num_inode, sys_super_block->head.last_to_delete_inode);
+	EXPECT_EQ(num_inode, sys_super_block->head.num_to_be_deleted);
+		
+	ino_t now_inode = sys_super_block->head.first_to_delete_inode;
+	for (ino_t expected_inode = 1 ;  now_inode ; expected_inode++) {
+		long long filepos;
+		
+		filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, 
+			sizeof(SUPER_BLOCK_ENTRY), filepos);
+		// Check status and inode number
+		ASSERT_EQ(TO_BE_DELETED, sb_entry.status) << "status = "
+			<< sb_entry.status << ", need IS_DIRTY";
+		ASSERT_EQ(expected_inode, now_inode) << "expected_inode = " 
+			<< expected_inode << ", now_inode = " << now_inode;
+		
+		now_inode = sb_entry.util_ll_next; // Go to next dirty inode	
+	}	
+}
+/*
+	End of unittest of ll_enqueue()
+ */
+
+/*
+	Unittest of ll_dequeue()
+*/
+
+class ll_dequeueTest : public InitSuperBlockBaseClass {
+protected:
+	/* Generate a mock dirt_list or to_delete_list */
+	void generate_mock_list(unsigned num_inode, char status)
+	{
+		SUPER_BLOCK_ENTRY sb_entry;
+
+		memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+		sb_entry.status = status;
+
+		/* First dirty inode */
+		sb_entry.util_ll_next = 2;
+		sb_entry.util_ll_prev = 0;
+		sb_entry.this_index = 1;
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+				sizeof(SUPER_BLOCK_HEAD));
+		
+		/* General dirty inode */
+		for (ino_t inode = 2 ; inode < num_inode ; inode++) {
+			long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+				sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+
+			sb_entry.util_ll_next = inode + 1;
+			sb_entry.util_ll_prev = inode - 1;
+			sb_entry.this_index = inode;
+			pwrite(sys_super_block->iofptr, &sb_entry, 
+					sizeof(SUPER_BLOCK_ENTRY), filepos);
+		}
+		
+		/* Last dirty inode */
+		sb_entry.util_ll_next = 0;
+		sb_entry.util_ll_prev = num_inode - 1;
+		sb_entry.this_index = num_inode;
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
+				sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY)
+				* (num_inode - 1));
+
+		/* Head */
+		if (status == IS_DIRTY) {
+			sys_super_block->head.first_dirty_inode = 1;
+			sys_super_block->head.last_dirty_inode = num_inode;
+			sys_super_block->head.num_dirty = num_inode;
+		} else {
+			sys_super_block->head.first_to_delete_inode = 1;
+			sys_super_block->head.last_to_delete_inode = num_inode;
+			sys_super_block->head.num_to_be_deleted = num_inode;
+		}
+	}
+	
+	/* Traverse all entry in dirty_list or to_delete_list */
+	unsigned traverse_all_list_entry(char status)
+	{
+		ino_t now_inode;
+		unsigned remaining_inode;
+		SUPER_BLOCK_ENTRY sb_entry;
+
+		if (status == IS_DIRTY)
+			now_inode = sys_super_block->head.first_dirty_inode;
+		else
+			now_inode = sys_super_block->head.first_to_delete_inode;
+		
+		remaining_inode = 0;
+		while (now_inode) {
+			remaining_inode++;
+			pread(sys_super_block->iofptr, &sb_entry, 
+				sizeof(SUPER_BLOCK_ENTRY), sizeof(SUPER_BLOCK_HEAD) + 
+				sizeof(SUPER_BLOCK_ENTRY) * (now_inode - 1));
+
+			now_inode = sb_entry.util_ll_next;
+		}
+		
+		return remaining_inode;
+	}
+
+};
+
+TEST_F(ll_dequeueTest, Dequeue_NO_LL)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = NO_LL;
+
+	/* Run */
+	EXPECT_EQ(0, ll_dequeue(inode, &sb_entry));
+}
+
+TEST_F(ll_dequeueTest, Dequeue_TO_BE_RECLAIMED)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = TO_BE_RECLAIMED;
+
+	/* Run */
+	EXPECT_EQ(0, ll_dequeue(inode, &sb_entry));
+}
+
+TEST_F(ll_dequeueTest, Dequeue_RECLAIMED)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = RECLAIMED;
+
+	/* Run */
+	EXPECT_EQ(0, ll_dequeue(inode, &sb_entry));
+}
+
+TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_JustOneElementList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+	
+	/* Mock data */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = IS_DIRTY;
+
+	sys_super_block->head.first_dirty_inode = inode;
+	sys_super_block->head.last_dirty_inode = inode;
+	sys_super_block->head.num_dirty++;
+
+	/* Run */
+	EXPECT_EQ(0, ll_dequeue(inode, &sb_entry));
+
+	/* Verify */
+	EXPECT_EQ(0, sys_super_block->head.first_dirty_inode);
+	EXPECT_EQ(0, sys_super_block->head.last_dirty_inode);
+	EXPECT_EQ(0, sys_super_block->head.num_dirty);
+
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(NO_LL, sb_entry.status);
+}
+
+TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_JustOneElementList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t inode = 5;
+	
+	/* Mock data */
+	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
+	sb_entry.status = TO_BE_DELETED;
+
+	sys_super_block->head.first_to_delete_inode = inode;
+	sys_super_block->head.last_to_delete_inode = inode;
+	sys_super_block->head.num_to_be_deleted++;
+
+	/* Run */
+	EXPECT_EQ(0, ll_dequeue(inode, &sb_entry));
+
+	/* Verify */
+	EXPECT_EQ(0, sys_super_block->head.first_to_delete_inode);
+	EXPECT_EQ(0, sys_super_block->head.last_to_delete_inode);
+	EXPECT_EQ(0, sys_super_block->head.num_to_be_deleted);
+
+	EXPECT_EQ(0, sb_entry.util_ll_prev);
+	EXPECT_EQ(0, sb_entry.util_ll_next);
+	EXPECT_EQ(NO_LL, sb_entry.status);
+}
+
+TEST_F(ll_dequeueTest, Dequeue_IS_DIRTY_ManyElementsInList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	unsigned num_inode = 200;
+	unsigned remaining_inode;
+	long long filepos;
+	ino_t now_inode;
+		
+	/* Mock dirty_inode list */	
+	generate_mock_list(num_inode, IS_DIRTY);
+		
+	/* Run */
+	remaining_inode = num_inode;
+	now_inode = num_inode / 2; // Start dequeue from medium dirty inode
+	
+	while (remaining_inode) {
+		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(now_inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+		ll_dequeue(now_inode, &sb_entry);
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+
+		remaining_inode--;
+		
+		// Check remaining inodes by traversing all list entry
+		ASSERT_EQ(remaining_inode, traverse_all_list_entry(IS_DIRTY));
+		ASSERT_EQ(remaining_inode, sys_super_block->head.num_dirty);
+		
+		now_inode = (now_inode % num_inode) + 1; // Go to next dirty inode
+	}
+
+	/* Verify all inodes */
+	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+		
+		ASSERT_EQ(0, sb_entry.util_ll_next) << "inode = " << inode;
+		ASSERT_EQ(0, sb_entry.util_ll_prev);
+		ASSERT_EQ(NO_LL, sb_entry.status);
+	}
+}
+
+TEST_F(ll_dequeueTest, Dequeue_TO_BE_DELETED_ManyElementsInList)
+{
+	SUPER_BLOCK_ENTRY sb_entry;
+	unsigned num_inode = 200;
+	unsigned remaining_inode;
+	long long filepos;
+	ino_t now_inode;
+		
+	/* Mock dirty_inode list */	
+	generate_mock_list(num_inode, TO_BE_DELETED);
+		
+	/* Run */
+	remaining_inode = num_inode;
+	now_inode = num_inode / 2; // Start dequeue from medium dirty inode
+	
+	while (remaining_inode) {
+		filepos = sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY) * 
+			(now_inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+		ll_dequeue(now_inode, &sb_entry);
+		pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+
+		remaining_inode--;
+		
+		// Check remaining inodes by traversing all list entry
+		ASSERT_EQ(remaining_inode, traverse_all_list_entry(TO_BE_DELETED));
+		ASSERT_EQ(remaining_inode, sys_super_block->head.num_to_be_deleted);
+		
+		now_inode = (now_inode % num_inode) + 1; // Go to next dirty inode
+	}
+
+	/* Verify all inodes */
+	for (ino_t inode = 1 ; inode < num_inode ; inode++) {
+		long long filepos = sizeof(SUPER_BLOCK_HEAD) + 
+			sizeof(SUPER_BLOCK_ENTRY) * (inode - 1);
+		pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY),
+			filepos);
+		
+		ASSERT_EQ(0, sb_entry.util_ll_next) << "inode = " << inode;
+		ASSERT_EQ(0, sb_entry.util_ll_prev);
+		ASSERT_EQ(NO_LL, sb_entry.status);
+	}
+}
+
+/*
+	End of unittest of ll_dequeue()
+*/
+
+/*
 	Unittest of super_block_share_locking()
 */
 
