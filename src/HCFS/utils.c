@@ -50,6 +50,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	char tempname[METAPATHLEN];
 	int sub_dir;
 	int ret_code = 0;
+	int errcode;
 
 	if (METAPATH == NULL)
 		return -1;
@@ -57,24 +58,30 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	/* Creates meta path if it does not exist */
 	if (access(METAPATH, F_OK) == -1) {
 		ret_code = mkdir(METAPATH, 0700);
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating meta dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
 
 	sub_dir = this_inode % NUMSUBDIR;
-	sprintf(tempname, "%s/sub_%d", METAPATH, sub_dir);
+	snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
 
 	/* Creates meta path for meta subfolder if it does not exist */
 	if (access(tempname, F_OK) == -1) {
 		ret_code = mkdir(tempname, 0700);
-
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating meta dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
 
-	sprintf(tempname, "%s/sub_%d/meta%lld", METAPATH, sub_dir,
-		this_inode);
-	strcpy(pathname, tempname);
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%ld",
+		METAPATH, sub_dir, this_inode);
 
 	return 0;
 }
@@ -94,37 +101,48 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 *************************************************************************/
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	char tempname[400];
+	char tempname[METAPATHLEN];
 	int sub_dir;
 	int ret_code = 0;
+	int errcode;
 
 	if (METAPATH == NULL)
-		return -1;
+		return -EPERM;
 
 	if (access(METAPATH, F_OK) == -1) {
 		ret_code = mkdir(METAPATH, 0700);
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating meta dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
 
 	sub_dir = this_inode % NUMSUBDIR;
-	sprintf(tempname, "%s/todelete", METAPATH);
+	snprintf(tempname, METAPATHLEN, "%s/todelete", METAPATH);
 	if (access(tempname, F_OK) == -1) {
 		ret_code = mkdir(tempname, 0700);
-
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating meta dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
-	sprintf(tempname, "%s/todelete/sub_%d", METAPATH, sub_dir);
+	snprintf(tempname, METAPATHLEN, "%s/todelete/sub_%d",
+				METAPATH, sub_dir);
 	if (access(tempname, F_OK) == -1) {
 		ret_code = mkdir(tempname, 0700);
-
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating meta dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
-	sprintf(tempname, "%s/todelete/sub_%d/meta%lld", METAPATH, sub_dir,
-								this_inode);
-	strcpy(pathname, tempname);
+	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%ld",
+			METAPATH, sub_dir, this_inode);
 	return 0;
 }
 
@@ -140,30 +158,38 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 *************************************************************************/
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	char tempname[400];
+	char tempname[BLOCKPATHLEN];
 	int sub_dir;
 	int ret_code = 0;
+	int errcode;
 
 	if (BLOCKPATH == NULL)
-		return -1;
+		return -EPERM;
 
 	if (access(BLOCKPATH, F_OK) == -1) {
 		ret_code = mkdir(BLOCKPATH, 0700);
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating cache dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
 
 	sub_dir = (this_inode + block_num) % NUMSUBDIR;
-	sprintf(tempname, "%s/sub_%d", BLOCKPATH, sub_dir);
+	snprintf(tempname, BLOCKPATHLEN, "%s/sub_%d", BLOCKPATH, sub_dir);
 	if (access(tempname, F_OK) == -1) {
 		ret_code = mkdir(tempname, 0700);
-
-		if (ret_code < 0)
-			return ret_code;
+		if (ret_code < 0) {
+			errcode = errno;
+			printf("Error in creating cache dir. Code %d, %s\n",
+					errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
-	sprintf(tempname, "%s/sub_%d/block%lld_%lld", BLOCKPATH, sub_dir,
-						this_inode, block_num);
-	strcpy(pathname, tempname);
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%ld_%lld",
+			BLOCKPATH, sub_dir, this_inode, block_num);
+
 	return 0;
 }
 
@@ -179,6 +205,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 *          Note: Inputs to parse_parent_self need to properly allocate memory.
 *
 *************************************************************************/
+/* TODO: remove this function if no further use. */
 int parse_parent_self(const char *pathname, char *parentname, char *selfname)
 {
 	int count;
@@ -238,15 +265,18 @@ int read_system_config(char *config_path)
 {
 	FILE *fptr;
 	char tempbuf[200], *ret_ptr, *num_check_ptr;
-	char argname[200], argval[200], *tokptr1, *tokptr2, *toktmp, *strptr;
+	char argname[200], argval[200], *tokptr1, *toktmp, *strptr;
 	long long temp_val;
 	int tmp_len;
+	int errcode;
 
 	fptr = fopen(config_path, "r");
 
 	if (fptr == NULL) {
+		errcode = errno;
 		printf("Cannot open config file (%s) for reading\n",
 								config_path);
+		printf("Code %d, %s\n", errcode, strerror(errcode));
 		return -1;
 	}
 
@@ -254,8 +284,15 @@ int read_system_config(char *config_path)
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
-		if (ret_ptr == NULL)
+		if (ret_ptr == NULL) {
+			if (ferror(fptr) != 0) {
+				printf("Error while reading config file. ");
+				printf("Aborting.\n");
+				fclose(fptr);
+				return -1;
+			}
 			break;
+		}
 
 		if (strlen(tempbuf) > 170) {
 			printf("Length of option value exceeds limit (170 chars). Exiting.\n");
@@ -296,11 +333,22 @@ int read_system_config(char *config_path)
 		/*Match param name with required params*/
 		if (strcasecmp(argname, "metapath") == 0) {
 			METAPATH = (char *) malloc(strlen(argval) + 10);
+			if (METAPATH == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			strcpy(METAPATH, argval);
 			continue;
 		}
 		if (strcasecmp(argname, "blockpath") == 0) {
 			BLOCKPATH = (char *) malloc(strlen(argval) + 10);
+			if (BLOCKPATH == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
+
 			strcpy(BLOCKPATH, argval);
 			continue;
 		}
@@ -363,30 +411,56 @@ int read_system_config(char *config_path)
 		}
 		if (strcasecmp(argname, "swift_account") == 0) {
 			SWIFT_ACCOUNT = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_ACCOUNT == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
+
 			snprintf(SWIFT_ACCOUNT, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_user") == 0) {
 			SWIFT_USER = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_USER == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(SWIFT_USER, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_pass") == 0) {
 			SWIFT_PASS = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_PASS == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(SWIFT_PASS, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_url") == 0) {
 			SWIFT_URL = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_URL == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(SWIFT_URL, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "swift_container") == 0) {
 			SWIFT_CONTAINER = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_CONTAINER == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(SWIFT_CONTAINER, strlen(argval) + 10,
 				"%s", argval);
 			continue;
@@ -399,30 +473,55 @@ int read_system_config(char *config_path)
 				return -1;
 			}
 			SWIFT_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			if (SWIFT_PROTOCOL == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(SWIFT_PROTOCOL, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_access") == 0) {
 			S3_ACCESS = (char *) malloc(strlen(argval) + 10);
+			if (S3_ACCESS == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(S3_ACCESS, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_secret") == 0) {
 			S3_SECRET = (char *) malloc(strlen(argval) + 10);
+			if (S3_SECRET == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(S3_SECRET, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_url") == 0) {
 			S3_URL = (char *) malloc(strlen(argval) + 10);
+			if (S3_URL == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(S3_URL, strlen(argval) + 10,
 				"%s", argval);
 			continue;
 		}
 		if (strcasecmp(argname, "s3_bucket") == 0) {
 			S3_BUCKET = (char *) malloc(strlen(argval) + 10);
+			if (S3_BUCKET == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(S3_BUCKET, strlen(argval) + 10,
 				"%s", argval);
 			continue;
@@ -435,6 +534,11 @@ int read_system_config(char *config_path)
 				return -1;
 			}
 			S3_PROTOCOL = (char *) malloc(strlen(argval) + 10);
+			if (S3_PROTOCOL == NULL) {
+				printf("Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
 			snprintf(S3_PROTOCOL, strlen(argval) + 10,
 				"%s", argval);
 			continue;
@@ -446,6 +550,11 @@ int read_system_config(char *config_path)
 		tmp_len = strlen(S3_URL) + strlen(S3_PROTOCOL)
 					+ strlen(S3_BUCKET) + 20;
 		S3_BUCKET_URL = (char *) malloc(tmp_len);
+		if (S3_BUCKET_URL == NULL) {
+			printf("Out of memory when reading config\n");
+			fclose(fptr);
+			return -1;
+		}
 		snprintf(S3_BUCKET_URL, tmp_len, "%s://%s.%s",
 				S3_PROTOCOL, S3_BUCKET, S3_URL);
 	}
@@ -470,6 +579,7 @@ int validate_system_config(void)
 	char pathname[400];
 	char tempval[10];
 	int ret_val;
+	int errcode;
 
 	/* Validating system path settings */
 
@@ -491,18 +601,31 @@ int validate_system_config(void)
 	sprintf(pathname, "%s/testfile", BLOCKPATH);
 
 	fptr = fopen(pathname, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		printf("Error when testing cache dir writing. Code %d, %s\n",
+				errcode, strerror(errcode));
+		return -1;
+	}
 	fprintf(fptr, "test\n");
 	fclose(fptr);
 
 	ret_val = setxattr(pathname, "user.dirty", "T", 1, 0);
 	if (ret_val < 0) {
+		errcode = errno;
 		printf("Needs support for extended attributes, error no: %d\n",
-								errno);
+								errcode);
 		return -1;
 	}
 
 	tempval[0] = 0;
-	getxattr(pathname, "user.dirty", (void *) tempval, 1);
+	ret_val = getxattr(pathname, "user.dirty", (void *) tempval, 1);
+	if (ret_val < 0) {
+		errcode = errno;
+		printf("Needs support for extended attributes, error no: %d\n",
+								errcode);
+		return -1;
+	}
 	printf("test value is: %s, %d\n", tempval, strncmp(tempval, "T", 1));
 	unlink(pathname);
 
@@ -621,17 +744,22 @@ int validate_system_config(void)
 * Function name: check_file_size
 *        Inputs: const char *path
 *       Summary: Check the file length of "path.
-*  Return value: File length in bytes if successful. Otherwise returns -1.
+*  Return value: File length in bytes if successful. Otherwise returns
+*                negation of error code.
 *
 *************************************************************************/
 off_t check_file_size(const char *path)
 {
 	struct stat block_stat;
+	int errcode;
 
-	if (stat(path, &block_stat) == 0)
+	errcode = stat(path, &block_stat);
+	if (errcode == 0)
 		return block_stat.st_size;
-	else
-		return -1;
+	errcode = errno;
+	printf("Error when checking file size. Code %d, %s\n",
+			errcode, strerror(errcode));
+	return -errcode;
 }
 
 /************************************************************************

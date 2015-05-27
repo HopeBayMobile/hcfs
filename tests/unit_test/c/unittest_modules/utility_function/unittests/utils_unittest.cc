@@ -24,7 +24,7 @@ TEST(check_file_sizeTest, Nonexist) {
 
   strcpy(temp,"nonexist");
 
-  EXPECT_EQ(-1, check_file_size(temp));
+  EXPECT_EQ(-ENOENT, check_file_size(temp));
 }
 
 TEST(check_file_sizeTest, Test_8_bytes) {
@@ -56,7 +56,7 @@ TEST_F(fetch_meta_pathTest, NullMetaPath) {
   tempptr = METAPATH;
   METAPATH = NULL;
 
-  EXPECT_EQ(-1,fetch_meta_path(pathname,0));
+  EXPECT_EQ(-EPERM,fetch_meta_path(pathname,0));
 
   METAPATH = tempptr;
  }
@@ -75,7 +75,7 @@ TEST_F(fetch_meta_pathTest, MetaPathNotCreatable) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_meta_path(pathname,0));
+  EXPECT_EQ(-EACCES,fetch_meta_path(pathname,0));
 
   chmod("/tmp/testmeta",0700);
   rmdir(METAPATH);
@@ -95,7 +95,7 @@ TEST_F(fetch_meta_pathTest, MetaPathNotAccessible) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_meta_path(pathname,0));
+  EXPECT_EQ(-EACCES,fetch_meta_path(pathname,0));
 
   rmdir(METAPATH);
  }
@@ -168,7 +168,7 @@ TEST_F(fetch_todelete_pathTest, NullMetaPath) {
   tempptr = METAPATH;
   METAPATH = NULL;
 
-  EXPECT_EQ(-1,fetch_todelete_path(pathname,0));
+  EXPECT_EQ(-EPERM,fetch_todelete_path(pathname,0));
 
   METAPATH = tempptr;
  }
@@ -187,14 +187,14 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotCreatable) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_todelete_path(pathname,0));
+  EXPECT_EQ(-EACCES,fetch_todelete_path(pathname,0));
 
   chmod("/tmp/testmeta",0700);
 
   ret_code = mkdir(METAPATH, 0400);
   ASSERT_EQ(0,ret_code);
 
-  EXPECT_EQ(-1,fetch_todelete_path(pathname,0));
+  EXPECT_EQ(-EACCES,fetch_todelete_path(pathname,0));
 
   rmdir(METAPATH);
  }
@@ -224,7 +224,7 @@ TEST_F(fetch_todelete_pathTest, ToDeletePathNotAccessible) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_todelete_path(pathname,0));
+  EXPECT_EQ(-EACCES,fetch_todelete_path(pathname,0));
 
   rmdir(todelete_path);
   rmdir(METAPATH);
@@ -321,7 +321,7 @@ TEST_F(fetch_block_pathTest, BlockPathNotCreatable) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
+  EXPECT_EQ(-EACCES,fetch_block_path(pathname,0,0));
 
   chmod("/tmp/testmeta",0700);
   rmdir(BLOCKPATH);
@@ -341,7 +341,7 @@ TEST_F(fetch_block_pathTest, BlockPathNotAccessible) {
 
   ASSERT_EQ(ret_code,0);
 
-  EXPECT_EQ(-1,fetch_block_path(pathname,0,0));
+  EXPECT_EQ(-EACCES,fetch_block_path(pathname,0,0));
 
   rmdir(BLOCKPATH);
  }
