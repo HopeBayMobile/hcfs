@@ -860,7 +860,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 		return -EPERM;
 
 	if (target_page < 0)
-		return -1;
+		return -EPERM;
 
 	meta_cache_lookup_file_data(body_ptr->inode_num, NULL, &temp_meta,
 							NULL, 0, body_ptr);
@@ -1028,7 +1028,6 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	default:
 		break;
 	}
-	ret_val = meta_cache_remove(this_inode);
 
 	disk_cleardelete(this_inode);
 	return 0;

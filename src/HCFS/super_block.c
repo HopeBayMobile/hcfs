@@ -755,7 +755,7 @@ int super_block_reclaim(void)
 *************************************************************************/
 int super_block_reclaim_fullscan(void)
 {
-	int ret_val, errcode;
+	int errcode;
 	SUPER_BLOCK_ENTRY tempentry;
 	long long count;
 	off_t thisfilepos, retval;
