@@ -14,7 +14,6 @@
 * 2015/5/11 Jiahong modifying seek_page for new block indexing / searching.
 *           Also remove advance_block function.
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
-*
 **************************************************************************/
 #include "metaops.h"
 
@@ -455,6 +454,8 @@ int delete_inode_meta(ino_t this_inode)
 		unlink(todelete_metapath);
 		todeletefptr = fopen(todelete_metapath, "w");
 		metafptr = fopen(thismetapath, "r");
+		if ((todeletefptr == NULL) || (metafptr == NULL))
+			return -1;
 		setbuf(metafptr, NULL);
 		flock(fileno(metafptr), LOCK_EX);
 		setbuf(todeletefptr, NULL);
@@ -471,8 +472,8 @@ int delete_inode_meta(ino_t this_inode)
 		unlink(thismetapath);
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
-		ret_val = meta_cache_remove(this_inode);
 	}
+	ret_val = meta_cache_remove(this_inode);
 	return 0;
 }
 
@@ -495,6 +496,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
+	/* Only fetch inode stat here. Can be replaced by meta_cache_lookup_file_data() */
 	ret_val = meta_cache_lookup_dir_data(this_inode, &this_inode_stat,
 							NULL, NULL, body_ptr);
 
@@ -766,7 +768,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 			tmp_target_pos = temp_meta->quadruple_indirect;
 			memset(&tmp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
 			fwrite(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1,
-						body_ptr->fptr);
+				body_ptr->fptr);
 			meta_cache_update_file_data(body_ptr->inode_num, NULL,
 				temp_meta, NULL, 0, body_ptr);
 		}
@@ -853,16 +855,17 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	/*TODO: put error handling for the read/write ops here*/
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
-
 	/*If meta cache lock is not locked, return -1*/
 	if (sem_val > 0)
+		return -EPERM;
+
+	if (target_page < 0)
 		return -EPERM;
 
 	meta_cache_lookup_file_data(body_ptr->inode_num, NULL, &temp_meta,
 							NULL, 0, body_ptr);
 
 	which_indirect = _check_page_level(target_page);
-
 	switch (which_indirect) {
 	case 0:
 		filepos = temp_meta.direct;
@@ -1025,7 +1028,6 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	default:
 		break;
 	}
-	ret_val = meta_cache_remove(this_inode);
 
 	disk_cleardelete(this_inode);
 	return 0;

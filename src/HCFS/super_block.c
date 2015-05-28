@@ -9,9 +9,13 @@
 *           and garbage collection).
 *
 * Revision History
-* 2015/2/6 Jiahong added header for this file, and revising coding style.
+* 2015/2/6  Jiahong added header for this file, and revising coding style.
+* 2015/5/26 Kewei added some error handling about function 
+*           super_block_reclaim_fullscan() & super_block_share_release(),
+*           and besides modified macro SB_ENTRY_SIZE & SB_HEAD_SIZE to avoid 
+*           comparing between signed and unsigned integers.
 * 2015/5/27 Jiahong working on improving error handling
-*
+* 2015/5/28 Jiahong resolving merges
 **************************************************************************/
 
 /* TODO: Consider to convert super inode to multiple files and use striping
@@ -31,8 +35,8 @@
 #include "global.h"
 #include "params.h"
 
-#define SB_ENTRY_SIZE sizeof(SUPER_BLOCK_ENTRY)
-#define SB_HEAD_SIZE sizeof(SUPER_BLOCK_HEAD)
+#define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
+#define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -301,7 +305,7 @@ int super_block_write(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	ret_val = 0;
 	super_block_exclusive_locking();
-	if (inode_ptr->status != IS_DIRTY) {
+	if (inode_ptr->status != IS_DIRTY) { /* Add to dirty node list */
 		ret_val = ll_dequeue(this_inode, inode_ptr);
 		if (ret_val < 0) {
 			super_block_exclusive_release();
@@ -557,7 +561,8 @@ int super_block_delete(ino_t this_inode)
 			return ret_val;
 		}
 	}
-
+	
+	/* Add to unclaimed_list file */
 	temp = this_inode;
 	ret_val = fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_END);
 	if (ret_val < 0) {
@@ -750,7 +755,7 @@ int super_block_reclaim(void)
 *************************************************************************/
 int super_block_reclaim_fullscan(void)
 {
-	int ret_val, errcode;
+	int errcode;
 	SUPER_BLOCK_ENTRY tempentry;
 	long long count;
 	off_t thisfilepos, retval;
@@ -759,8 +764,6 @@ int super_block_reclaim_fullscan(void)
 
 	last_reclaimed = 0;
 	first_reclaimed = 0;
-
-	ret_val = 0;
 
 	super_block_exclusive_locking();
 	sys_super_block->head.num_inode_reclaimed = 0;
@@ -774,6 +777,7 @@ int super_block_reclaim_fullscan(void)
 		super_block_exclusive_release();
 		return -errcode;
 	}
+	/* Traverse all entries and reclaim. */
 	for (count = 0; count < sys_super_block->head.num_total_inodes;
 								count++) {
 		thisfilepos = SB_HEAD_SIZE + count * SB_ENTRY_SIZE;
@@ -792,6 +796,8 @@ int super_block_reclaim_fullscan(void)
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
 				((tempentry.inode_stat.st_ino == 0) &&
 					(tempentry.status != TO_BE_DELETED))) {
+	
+			/* Modify status and reclaim the entry. */
 			tempentry.status = RECLAIMED;
 			sys_super_block->head.num_inode_reclaimed++;
 			tempentry.util_ll_next = 0;
@@ -807,11 +813,15 @@ int super_block_reclaim_fullscan(void)
 
 			if (retsize < SB_ENTRY_SIZE)
 				break;
-			if (first_reclaimed == 0)
-				first_reclaimed = tempentry.this_index;
-			old_last_reclaimed = last_reclaimed;
-			last_reclaimed = tempentry.this_index;
 
+			if (first_reclaimed == 0) /* Record first reclaimed node */ 
+				first_reclaimed = tempentry.this_index;
+
+			/* Save previous and now reclaimed inode */
+			old_last_reclaimed = last_reclaimed;
+			last_reclaimed = tempentry.this_index;	
+			/* Connect previous and now reclaimed entry by setting
+			   prev_entry.util_ll_next = now */
 			if (old_last_reclaimed > 0) {
 				thisfilepos = SB_HEAD_SIZE +
 					(old_last_reclaimed-1) * SB_ENTRY_SIZE;
@@ -855,8 +865,16 @@ int super_block_reclaim_fullscan(void)
 		printf("IO error in inode reclaiming. Code %d, %s\n",
 			errcode, strerror(errcode));
 	}
+
+	ftruncate(fileno(sys_super_block->unclaimed_list_fptr), 0);
+	
 	super_block_exclusive_release();
-	return ret_val;
+
+	/* TODO: Consider how to handle failure in reclaim_fullscan
+	better. Now will just stop at any error but still try to return
+	partially reclaimed list. */
+
+	return 0;
 }
 
 /************************************************************************
@@ -1214,7 +1232,11 @@ int super_block_share_locking(void)
 *************************************************************************/
 int super_block_share_release(void)
 {
-	sem_wait(&(sys_super_block->share_CR_lock_sem));
+	sem_wait(&(sys_super_block->share_CR_lock_sem));	
+	if (sys_super_block->share_counter == 0) { 
+		sem_post(&(sys_super_block->share_CR_lock_sem));
+		return -1; /* Return error if share_counter==0 before decreasing */
+	}
 	sys_super_block->share_counter--;
 	if (sys_super_block->share_counter == 0)
 		sem_post(&(sys_super_block->share_lock_sem));
