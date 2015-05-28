@@ -617,9 +617,18 @@ TEST_F(read_system_configTest, WrongNumbersConfig) {
 
 class validate_system_configTest : public ::testing::Test {
  protected:
+  char *workpath, *tmppath;
   virtual void SetUp() {
-    if (access("/tmp/testHCFS", F_OK) != 0)
-      mkdir("/tmp/testHCFS", 0700);
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
     mkdir("/tmp/testHCFS/metastorage", 0700);
     mkdir("/tmp/testHCFS/blockstorage", 0700);
    }
@@ -627,7 +636,11 @@ class validate_system_configTest : public ::testing::Test {
   virtual void TearDown() {
     rmdir("/tmp/testHCFS/metastorage");
     rmdir("/tmp/testHCFS/blockstorage");
-    rmdir("/tmp/testHCFS");
+    unlink("/tmp/testHCFS");
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
    }
  };
 
