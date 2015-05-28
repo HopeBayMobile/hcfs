@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "params.h"
+
 /*BEGIN META definition*/
 
 /* Defining parameters for B-tree operations (dir entries). */
@@ -68,7 +70,7 @@
 /* Defining directory entry in meta files*/
 typedef struct {
 	ino_t d_ino;
-	char d_name[256];
+	char d_name[MAX_FILENAME_LEN+1];
 	char d_type;
 } DIR_ENTRY;
 

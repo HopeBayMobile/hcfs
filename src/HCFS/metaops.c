@@ -14,6 +14,7 @@
 * 2015/5/11 Jiahong modifying seek_page for new block indexing / searching.
 *           Also remove advance_block function.
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
+* 2015/5/28 Jiahong adding error handling
 **************************************************************************/
 #include "metaops.h"
 
@@ -36,6 +37,35 @@
 #include "hfuse_system.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
+
+#define FSEEK(A, B, C)\
+	errcode = 0; \
+	ret = fseek(A, B, C); \
+	if (ret < 0) { \
+		errcode = errno; \
+		printf("IO error in %s. Code %d, %s\n", __func__, \
+			errcode, strerror(errcode)); \
+		errcode = -errcode; \
+		goto errcode_handle; \
+	}
+
+#define FREAD(A, B, C, D) \
+	errcode = 0; \
+	ret = fread(A, B, C, D); \
+	if ((ret < 1) && (ferror(D) != 0)) { \
+		clearerr(D); \
+		printf("IO error in %s.\n", __func__);\
+		errcode = -EIO; \
+		goto errcode_handle; \
+	}
+
+static inline void logerr(int errcode, char *msg)
+{
+	if (errcode > 0)
+		printf("%s. Code %d, %s\n", msg, errcode, strerror(errcode));
+	else
+		printf("%s.\n", msg);
+}
 
 /************************************************************************
 *
@@ -85,10 +115,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
 	long long overflow_new_page;
-	int ret_items;
-	int ret_val;
-	long page_pos;
-	int entry_index;
+	int ret, errcode;
 	int sem_val;
 	char no_need_rewrite;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
@@ -96,75 +123,100 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 
 	sem_getvalue(&(body_ptr->access_sem), &sem_val);
 	if (sem_val > 0) {
-		/*Not locked, return -1*/
-		return -1;
+		/*Not locked, return -EPERM*/
+		return -EPERM;
 	}
 
 	memset(&temp_entry, 0, sizeof(DIR_ENTRY));
 	memset(&overflow_entry, 0, sizeof(DIR_ENTRY));
 
 	temp_entry.d_ino = child_inode;
-	strcpy(temp_entry.d_name, childname);
+	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", childname);
 	if (S_ISREG(child_mode))
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
 
 	/* Load parent meta from meta cache */
-	ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
+	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
 					&parent_meta, NULL, body_ptr);
+
+	if (ret < 0)
+		return ret;
 
 	/* Initialize B-tree insertion by first loading the root of
 	*  the B-tree. */
 	tpage.this_page_pos = parent_meta.root_entry_page;
 
-	ret_val = meta_cache_open_file(body_ptr);
+	ret = meta_cache_open_file(body_ptr);
 
-	fseek(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-	fread(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	if (ret < 0)
+		return ret;
+
+	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
+
+	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Drop all cached pages first before inserting */
 	/* TODO: Future changes could remove this limitation if can update
 	*  cache with each node change in b-tree*/
-	ret_val = meta_cache_drop_pages(body_ptr);
+	ret = meta_cache_drop_pages(body_ptr);
+	if (ret < 0) {
+		meta_cache_close_file(body_ptr);
+		return ret;
+	}
 
 	/* Recursive routine for B-tree insertion*/
 	/* Temp space for traversing the tree is allocated before calling */
-	ret_val = insert_dir_entry_btree(&temp_entry, &tpage,
+	ret = insert_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &overflow_entry,
 			&overflow_new_page, &parent_meta, temp_dir_entries,
 							temp_child_page_pos);
 
 	/* An error occured and the routine will terminate now */
 	/* TODO: Consider error recovering here */
-	if (ret_val < 0)
-		return ret_val;
+	if (ret < 0) {
+		meta_cache_close_file(body_ptr);
+		return ret;
+	}
 
 	/* If return value is 1, we need to handle overflow by splitting
 	*  the old root node in two and create a new root page to point
 	*  to the two splitted nodes. Note that a new node has already been
 	*  created in this case and pointed by "overflow_new_page". */
-	if (ret_val == 1) {
+	if (ret == 1) {
 		/* Reload old root */
-		fseek(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-		fread(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+		FSEEK(body_ptr->fptr, parent_meta.root_entry_page,
+				SEEK_SET);
+
+		FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 		/* tpage contains the old root node now */
 
 		/*Need to create a new root node and write to disk*/
 		if (parent_meta.entry_page_gc_list != 0) {
 			/*Reclaim node from gc list first*/
-			fseek(body_ptr->fptr, parent_meta.entry_page_gc_list,
-								SEEK_SET);
-			fread(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
-								body_ptr->fptr);
+			FSEEK(body_ptr->fptr,
+				parent_meta.entry_page_gc_list, SEEK_SET);
+
+			FREAD(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
+						body_ptr->fptr);
+
 			new_root.this_page_pos = parent_meta.entry_page_gc_list;
 			parent_meta.entry_page_gc_list = new_root.gc_list_next;
 		} else {
 			/* If cannot reclaim, extend the meta file */
 			memset(&new_root, 0, sizeof(DIR_ENTRY_PAGE));
-			fseek(body_ptr->fptr, 0, SEEK_END);
+			FSEEK(body_ptr->fptr, 0, SEEK_END);
+
 			new_root.this_page_pos = ftell(body_ptr->fptr);
+			if (new_root.this_page_pos == -1) {
+				errcode = errno;
+				logerr(errcode,
+					"IO error in adding dir entry");
+				meta_cache_close_file(body_ptr);
+				return -errcode;
+			}
 		}
 
 		/* Insert the new root to the head of tree_walk_list. This list
@@ -177,19 +229,28 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		if (parent_meta.tree_walk_list_head == tpage.this_page_pos) {
 			tpage.tree_walk_prev = new_root.this_page_pos;
 		} else {
-			fseek(body_ptr->fptr, parent_meta.tree_walk_list_head,
-								SEEK_SET);
-			fread(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-								body_ptr->fptr);
+			FSEEK(body_ptr->fptr,
+				parent_meta.tree_walk_list_head, SEEK_SET);
+
+			FREAD(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
+							body_ptr->fptr);
+
 			tpage2.tree_walk_prev = new_root.this_page_pos;
 			if (tpage2.this_page_pos == overflow_new_page) {
 				tpage2.parent_page_pos = new_root.this_page_pos;
 				no_need_rewrite = TRUE;
 			}
-			fseek(body_ptr->fptr, parent_meta.tree_walk_list_head,
-								SEEK_SET);
-			fwrite(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
+			FSEEK(body_ptr->fptr,
+				parent_meta.tree_walk_list_head, SEEK_SET);
+
+			ret = fwrite(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
 							body_ptr->fptr);
+			if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
+				clearerr(body_ptr->fptr);
+				logerr(0, "IO error in adding dir entry");
+				meta_cache_close_file(body_ptr);
+				return -EIO;
+			}
 		}
 
 
@@ -210,32 +271,68 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		/* Set the root of B-tree to the new root, and write the
 		*  content of the new root the the meta file. */
 		parent_meta.root_entry_page = new_root.this_page_pos;
-		fseek(body_ptr->fptr, new_root.this_page_pos, SEEK_SET);
-		fwrite(&new_root, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+		FSEEK(body_ptr->fptr, new_root.this_page_pos, SEEK_SET);
+
+		ret = fwrite(&new_root, sizeof(DIR_ENTRY_PAGE), 1,
+				body_ptr->fptr);
+		if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
+			clearerr(body_ptr->fptr);
+			logerr(0, "IO error in adding dir entry");
+			meta_cache_close_file(body_ptr);
+			return -EIO;
+		}
 
 		/* Change the parent of the old root to point to the new root.
 		*  Write to the meta file afterward. */
 		tpage.parent_page_pos = new_root.this_page_pos;
-		fseek(body_ptr->fptr, tpage.this_page_pos, SEEK_SET);
-		fwrite(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+		FSEEK(body_ptr->fptr, tpage.this_page_pos, SEEK_SET);
+		ret = fwrite(&tpage, sizeof(DIR_ENTRY_PAGE), 1,
+				body_ptr->fptr);
+		if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
+			clearerr(body_ptr->fptr);
+			logerr(0, "IO error in adding dir entry");
+			meta_cache_close_file(body_ptr);
+			return -EIO;
+		}
 
 		/* If no_need_rewrite is true, we have already write modified
 		*  content for the new node from the overflow. Otherwise we need
 		*  to write it to the meta file here. */
 		if (no_need_rewrite == FALSE) {
-			fseek(body_ptr->fptr, overflow_new_page, SEEK_SET);
-			fread(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-								body_ptr->fptr);
+			FSEEK(body_ptr->fptr, overflow_new_page,
+					SEEK_SET);
+			FREAD(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
+							body_ptr->fptr);
+			if (errcode < 0) {
+				meta_cache_close_file(body_ptr);
+				return errcode;
+			}
+
 			tpage2.parent_page_pos = new_root.this_page_pos;
-			fseek(body_ptr->fptr, overflow_new_page, SEEK_SET);
-			fwrite(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
-								body_ptr->fptr);
+			FSEEK(body_ptr->fptr, overflow_new_page,
+					SEEK_SET);
+			ret = fwrite(&tpage2, sizeof(DIR_ENTRY_PAGE), 1,
+							body_ptr->fptr);
+			if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
+				clearerr(body_ptr->fptr);
+				logerr(0, "IO error in adding dir entry");
+				meta_cache_close_file(body_ptr);
+				return -EIO;
+			}
 		}
 
 		/* Complete the splitting by updating the meta of the
 		*  directory. */
-		fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
-		fwrite(&parent_meta, sizeof(DIR_META_TYPE), 1, body_ptr->fptr);
+		FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+		ret = fwrite(&parent_meta, sizeof(DIR_META_TYPE), 1,
+					body_ptr->fptr);
+		if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
+			clearerr(body_ptr->fptr);
+			logerr(0, "IO error in adding dir entry");
+			meta_cache_close_file(body_ptr);
+			return -EIO;
+		}
+
 	}
 
 	/*If the new entry is a subdir, increase the hard link of the parent*/
@@ -244,17 +341,19 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		parent_stat.st_nlink++;
 
 	parent_meta.total_children++;
-	printf("TOTAL CHILDREN is now %ld\n", parent_meta.total_children);
+	printf("TOTAL CHILDREN is now %lld\n", parent_meta.total_children);
 
 	set_timestamp_now(&parent_stat, MTIME | CTIME);
 	/* Stat may be dirty after the operation so should write them back
 	*  to cache*/
-	ret_val = meta_cache_update_dir_data(parent_inode, &parent_stat,
+	ret = meta_cache_update_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
 
-	printf("debug dir_add_entry page_pos 2 %ld\n", page_pos);
+	return ret;
 
-	return ret_val;
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
 }
 
 /************************************************************************
@@ -276,12 +375,9 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	struct stat parent_stat;
 	DIR_META_TYPE parent_meta;
 	DIR_ENTRY_PAGE tpage;
-	int ret_items;
-	off_t nextfilepos, oldfilepos;
-	long page_pos;
-	int count, ret_val;
 	int sem_val;
 	DIR_ENTRY temp_entry;
+	int ret, errcode;
 
 	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	long long temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
@@ -302,31 +398,34 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISDIR;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
-	ret_val = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
+	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
+
+	if (ret < 0)
+		return ret;
 
 	tpage.this_page_pos = parent_meta.root_entry_page;
 
-	ret_val = meta_cache_open_file(body_ptr);
+	ret = meta_cache_open_file(body_ptr);
 
-	fseek(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-	fread(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
+	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
+	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Drop all cached pages first before deleting */
 	/* TODO: Future changes could remove this limitation if can update cache
 	*  with each node change in b-tree*/
 
-	ret_val = meta_cache_drop_pages(body_ptr);
+	ret = meta_cache_drop_pages(body_ptr);
 
 	/* Recursive B-tree deletion routine*/
-	ret_val = delete_dir_entry_btree(&temp_entry, &tpage,
+	ret = delete_dir_entry_btree(&temp_entry, &tpage,
 			fileno(body_ptr->fptr), &parent_meta, temp_dir_entries,
 							temp_child_page_pos);
 
-	printf("delete dir entry returns %d\n", ret_val);
+	printf("delete dir entry returns %d\n", ret);
 	/* tpage might be invalid after calling delete_dir_entry_btree */
 
-	if (ret_val == 0) {
+	if (ret == 0) {
 		/* If the new entry is a subdir, decrease the hard link of
 		*  the parent*/
 
@@ -334,16 +433,20 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 			parent_stat.st_nlink--;
 
 		parent_meta.total_children--;
-		printf("TOTAL CHILDREN is now %ld\n",
+		printf("TOTAL CHILDREN is now %lld\n",
 						parent_meta.total_children);
 		set_timestamp_now(&parent_stat, MTIME | CTIME);
 
-		ret_val = meta_cache_update_dir_data(parent_inode, &parent_stat,
+		ret = meta_cache_update_dir_data(parent_inode, &parent_stat,
 						&parent_meta, NULL, body_ptr);
 		return 0;
 	}
 
 	return -1;
+
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
 }
 
 /************************************************************************
@@ -360,9 +463,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	DIR_META_TYPE self_meta_head;
 	DIR_ENTRY_PAGE tpage;
-	int ret_items;
 	int count;
 	int ret_val;
 	struct stat tmpstat;
@@ -401,9 +502,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
-	DIR_META_TYPE self_meta_head;
 	DIR_ENTRY_PAGE tpage;
-	int ret_items;
 	int count;
 	int ret_val;
 	struct stat tmpstat;
@@ -490,7 +589,6 @@ int delete_inode_meta(ino_t this_inode)
 *************************************************************************/
 int decrease_nlink_inode_file(ino_t this_inode)
 {
-	char thisblockpath[400];
 	struct stat this_inode_stat;
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -639,9 +737,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 			long long hint_page)
 {
-	long long current_page;
 	off_t filepos;
-	BLOCK_ENTRY_PAGE temppage;
 	int sem_val;
 	FILE_META_TYPE temp_meta;
 	int which_indirect;
@@ -842,7 +938,6 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 *************************************************************************/
 long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 {
-	long long current_page;
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int sem_val;
@@ -924,10 +1019,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page)
 {
-	long long current_page;
 	off_t filepos;
-	BLOCK_ENTRY_PAGE temppage;
-	int sem_val;
 	int which_indirect;
 
 	/* TODO: hint_page is not used now. Consider how to enhance. */
@@ -1053,7 +1145,7 @@ int disk_markdelete(ino_t this_inode)
 			return ret_val;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%ld",
 						METAPATH, this_inode);
 
 	if (access(pathname, F_OK) != 0) {
@@ -1074,7 +1166,7 @@ int disk_cleardelete(ino_t this_inode)
 	if (access(pathname, F_OK) != 0)
 		return -1;
 
-	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%ld",
 						METAPATH, this_inode);
 
 	if (access(pathname, F_OK) == 0) {
@@ -1089,14 +1181,13 @@ int disk_cleardelete(ino_t this_inode)
 int disk_checkdelete(ino_t this_inode)
 {
 	char pathname[200];
-	int ret_val;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
 	if (access(pathname, F_OK) != 0)
 		return -1;
 
-	snprintf(pathname, 200, "%s/markdelete/inode%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%ld",
 						METAPATH, this_inode);
 
 	if (access(pathname, F_OK) == 0)
@@ -1124,7 +1215,7 @@ int startup_finish_delete()
 	readdir_r(dirp, &tmpent, &tmpptr);
 
 	while (tmpptr != NULL) {
-		ret_val = sscanf(tmpent.d_name, "inode%lld", &tmp_ino);
+		ret_val = sscanf(tmpent.d_name, "inode%ld", &tmp_ino);
 		if (ret_val > 0) {
 			fetch_inode_stat(tmp_ino, &tmpstat, NULL);
 			if (S_ISREG(tmpstat.st_mode))
