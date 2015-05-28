@@ -74,6 +74,7 @@ typedef struct {
 #define META_CACHE_FLUSH_NOW TRUE
 
 #define METAPATHLEN 400
+#define BLOCKPATHLEN 400
 #define MAX_FILE_NAME_LEN 400
 
 #define NUMSUBDIR 1000
