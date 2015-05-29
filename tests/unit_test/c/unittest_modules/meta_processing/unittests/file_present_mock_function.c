@@ -109,7 +109,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, META_PATH);
+	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 

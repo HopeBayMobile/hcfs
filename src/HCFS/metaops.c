@@ -138,7 +138,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
 
 	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-
+	
 	/* Drop all cached pages first before inserting */
 	/* TODO: Future changes could remove this limitation if can update
 	*  cache with each node change in b-tree*/
@@ -523,7 +523,7 @@ int delete_inode_meta(ino_t this_inode)
 	ret = fetch_todelete_path(todelete_metapath, this_inode);
 	if (ret < 0)
 		return ret;
-
+	
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -1183,6 +1183,7 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 			total_blocks = ((this_inode_stat.st_size-1) /
 							MAX_BLOCK_SIZE) + 1;
 
+		
 		for (count = 0; count < total_blocks; count++) {
 			ret = fetch_block_path(thisblockpath, this_inode,
 						count);
@@ -1208,7 +1209,7 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	default:
 		break;
 	}
-
+	
 	ret = disk_cleardelete(this_inode);
 	return ret;
 

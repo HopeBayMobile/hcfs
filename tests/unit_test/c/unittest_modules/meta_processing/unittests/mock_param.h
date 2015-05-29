@@ -27,9 +27,9 @@ struct stat to_verified_stat;
 
 /* delete_inode_meta() */
 #define INO_RENAME_SUCCESS 3
-#define INO_RENAME_FAIL 4
+#define INO_RENAME_FAIL 4566789
 #define TO_DELETE_METAPATH "/tmp/to_delete_meta"
-#define META_PATH "/tmp/this_meta"
+#define MOCK_META_PATH "/tmp/this_meta"
 
 /* add_dir_entry() */
 #define INO_INSERT_DIR_ENTRY_FAIL 20
@@ -38,6 +38,7 @@ struct stat to_verified_stat;
 
 /* actual_delete_inode() */
 #define INO_DELETE_FILE_BLOCK 200000
+#define INO_DELETE_DIR 12345
 
 /* fetch_inode_stat() */
 #define INO_REGFILE 7
@@ -97,7 +98,8 @@ enum { INO_LOOKUP_FILE_DATA_OK,
 enum { INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_1,
 	INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2,
 	INO_LOOKUP_DIR_DATA_OK_WITH_BlocksToDel,
-	INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel
+	INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel,
+	INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL
 };
 
 /*
