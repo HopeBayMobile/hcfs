@@ -371,7 +371,7 @@ protected:
 		FILE *tarfptr = fopen(path, "w+");
 		FILE *srcfptr = fopen("testpatterns/mock_meta_file", "r");
 		
-		cp_file(srcfptr, tarfptr);
+		cp_file(srcfptr, tarfptr); // Copy mock meta file to virify
 		fclose(srcfptr);
 		fclose(tarfptr);
 	}
@@ -515,7 +515,7 @@ TEST_F(decrease_nlink_inode_fileTest, MarkBlockFilesToDel)
 		INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel);
 	EXPECT_EQ(0, access(thisblockpath, F_OK));
 
-	unlink(metapath);
+	EXPECT_EQ(0, unlink(metapath));
 	EXPECT_EQ(0, unlink(thisblockpath));
 }
 
@@ -1230,7 +1230,12 @@ protected:
 
 	void TearDown()
 	{
-		
+		for (int i = 0 ; i < num_inode ; i++) {
+			char pathname[200];
+			sprintf(pathname, "testpatterns/markdelete/inode%d", i);
+			unlink(pathname);
+		}
+		rmdir("testpatterns/markdelete");
 	}
 };
 
@@ -1252,7 +1257,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d", i);
-		EXPECT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
+		ASSERT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
 
 		fetch_meta_path(pathname, i);
 		mknod(pathname, S_IFREG, 0);
@@ -1265,7 +1270,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d", i);
-		EXPECT_EQ(-1, access(pathname, F_OK));
+		ASSERT_EQ(-1, access(pathname, F_OK));
 	}
 	rmdir("testpatterns/markdelete");
 	
