@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <semaphore.h>
+#include <errno.h>
 
 #include "global.h"
 #include "params.h"
@@ -91,7 +92,7 @@ int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 /************************************************************************
 *
 * Function name: search_dir_entry_btree
-*        Inputs: char *target_name, DIR_ENTRY_PAGE *tnode,
+*        Inputs: const char *target_name, DIR_ENTRY_PAGE *tnode,
 		int fh, int *result_index, DIR_ENTRY_PAGE *result_node
 *       Summary: Recursive search routine for B-tree search.
 *                Searches for the directory entry with name "target_name"
@@ -99,10 +100,11 @@ int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 *                returning the tree node with the target index in the node
 *                ("result_node" and "result_index"). "fh" is the file
 *                handle for the meta file.
-*  Return value: Target index in the node if found. If not found, returns -1.
+*  Return value: Target index in the node if found. If not found, returns 
+*                -ENOENT. If error, return negation of error code;
 *
 *************************************************************************/
-int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode,
+int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 		int fh, int *result_index, DIR_ENTRY_PAGE *result_node)
 {
 	DIR_ENTRY temp_entry;
@@ -124,7 +126,7 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode,
 
 	/* If already at leaf, return -1 (item not found) */
 	if (tnode->child_page_pos[s_index] == 0)
-		return -1;
+		return -ENOENT;
 
 	/*Load child node*/
 	pread(fh, &temp_page, sizeof(DIR_ENTRY_PAGE),

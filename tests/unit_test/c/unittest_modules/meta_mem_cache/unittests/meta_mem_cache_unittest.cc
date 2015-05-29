@@ -67,7 +67,7 @@ TEST_F(meta_cache_open_fileTest, FetchMetaPathError)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_ERR; 
 	/* Test */
-	EXPECT_EQ(-EIO, meta_cache_open_file(body_ptr));
+	EXPECT_EQ(-ENOENT, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
 }
 
@@ -79,7 +79,7 @@ TEST_F(meta_cache_open_fileTest, MetaPathCannotAccess)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS; 
 	/* Test */
-	EXPECT_EQ(-EIO, meta_cache_open_file(body_ptr));
+	EXPECT_EQ(-EPERM, meta_cache_open_file(body_ptr));
 	EXPECT_EQ(body_ptr->meta_opened, FALSE);
 	/* Delete tmp dir and file */
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
@@ -167,7 +167,7 @@ TEST_F(meta_cache_flush_dir_cacheTest, EntryCannotBeOpened)
 	body_ptr->meta_opened = FALSE;
 	body_ptr->inode_num = INO__FETCH_META_PATH_SUCCESS;
 	
-	EXPECT_EQ(-EIO, meta_cache_flush_dir_cache(body_ptr, 0));
+	EXPECT_EQ(-EPERM, meta_cache_flush_dir_cache(body_ptr, 0));
 	ASSERT_EQ(0, unlink(TMP_META_FILE_PATH));
 	ASSERT_EQ(0, rmdir(TMP_META_DIR));
 }
@@ -910,7 +910,7 @@ class expire_meta_mem_cache_entryTest : public SomeEntryInMetaMemCacheArray {
 TEST_F(expire_meta_mem_cache_entryTest, ExpireNothing)
 {
 	/* Expire nothing because period time < 0.5 sec */
-	ASSERT_EQ(-1, expire_meta_mem_cache_entry());
+	ASSERT_EQ(-EBUSY, expire_meta_mem_cache_entry());
 }
 
 TEST_F(expire_meta_mem_cache_entryTest, ExpireEntrySuccess)

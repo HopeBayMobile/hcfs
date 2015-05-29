@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 #include <stdio.h>
+#include <errno.h>
 #include "super_block.h"
 #include "fuseop.h"
 #include "mock_tool.h"
@@ -41,7 +42,7 @@ int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries, DIR_ENTRY *new
 	for (i=0 ; i<num_entries ; i++) {
 		if (strcmp(new_entry->d_name, entry_array[i].d_name) == 0) {
 			memcpy(new_entry, &entry_array[i], sizeof(DIR_ENTRY));
-			return 0;
+			return i;
 		}
 	}
 	return -1;
@@ -51,13 +52,17 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int fh, int
 {
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
+	int ret;
 
 	strcpy(tmp_entry.d_name, target_name);
-	if (dentry_binary_search(tnode->dir_entries, tnode->num_entries, &tmp_entry, &tmp_index) == 0) {
+	ret = dentry_binary_search(tnode->dir_entries, tnode->num_entries,
+		&tmp_entry, &tmp_index);
+	if (ret >= 0) {
 		memcpy(result_node, tnode, sizeof(DIR_ENTRY_PAGE));
+		*result_index = ret;
 		return 0;
 	} 
-	return -1;
+	return -ENOENT;
 }
 
 struct stat *generate_mock_stat(ino_t inode_num)
