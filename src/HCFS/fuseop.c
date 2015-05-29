@@ -471,6 +471,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	/* Reject if name too long */
+	if (strlen(selfname) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
 	parent_inode = (ino_t) parent;
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
@@ -579,6 +585,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	gettimeofday(&tmp_time1, NULL);
 
+	/* Reject if name too long */
+	if (strlen(selfname) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
 	parent_inode = (ino_t) parent;
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
@@ -673,6 +685,12 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
 
+	/* Reject if name too long */
+	if (strlen(selfname) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
 	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
 
 	if (ret_val < 0) {
@@ -722,6 +740,12 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent_inode,
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
+
+	/* Reject if name too long */
+	if (strlen(selfname) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
 
 	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
 
@@ -794,6 +818,13 @@ a directory (for NFS) */
 
 	printf("Debug lookup parent %ld, name %s\n",
 			parent_inode, selfname);
+
+	/* Reject if name too long */
+	if (strlen(selfname) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
 	ret_val = fetch_inode_stat((ino_t)parent_inode, &parent_stat, NULL);
 
 	printf("Debug lookup parent mode %d\n", parent_stat.st_mode);
@@ -932,6 +963,18 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int temp_index;
 	struct stat parent_stat1, parent_stat2;
 
+	/* Reject if name too long */
+	if (strlen(selfname1) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Reject if name too long */
+	if (strlen(selfname2) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
 	ret_val = fetch_inode_stat((ino_t)parent, &parent_stat1, NULL);
 
 	if (ret_val < 0) {
@@ -1036,6 +1079,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	/* Invalidate pathname cache for oldpath and newpath */
 
 	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
 			NULL, NULL, 0, body_ptr);
 
@@ -1063,6 +1112,15 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if (old_target_inode > 0) {
 		old_target_ptr = meta_cache_lock_entry(old_target_inode);
+		if (old_target_ptr == NULL) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
 					&old_target_stat, NULL, NULL,
 						0, old_target_ptr);
@@ -2500,6 +2558,10 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
+			if (fh_ptr->meta_cache_ptr == NULL) {
+				sem_wait(&(fh_ptr->block_sem));
+				return -ENOMEM;
+			}
 			fh_ptr->meta_cache_locked = TRUE;
 
 			sem_wait(&(fh_ptr->block_sem));
@@ -2964,9 +3026,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			target_bytes_written, block_index, current_offset,
 				fh_ptr, fh_ptr->thisinode, &errcode);
 		if ((this_bytes_written == 0) && (errcode < 0)) {
-			fh_ptr->meta_cache_locked = FALSE;
-			meta_cache_close_file(fh_ptr->meta_cache_ptr);
-			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			if (fh_ptr->meta_cache_ptr != NULL) {
+				fh_ptr->meta_cache_locked = FALSE;
+				meta_cache_close_file(fh_ptr->meta_cache_ptr);
+				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			}
 			fuse_reply_err(req, -errcode);
 			return;
 		}
@@ -3068,7 +3132,7 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		buf->f_ffree = 0;
 	buf->f_favail = buf->f_ffree;
 	super_block_share_release();
-	buf->f_namemax = 256;
+	buf->f_namemax = MAX_FILENAME_LEN;
 
 	printf("Debug statfs, returning info\n");
 
