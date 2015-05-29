@@ -1128,7 +1128,7 @@ TEST(disk_checkdeleteTest, Dir_markdelete_CannotAccess)
 {
 	METAPATH = "\0";
 
-	EXPECT_EQ(-1, disk_cleardelete(6));
+	EXPECT_EQ(-ENOENT, disk_cleardelete(6));
 }
 
 TEST(disk_checkdeleteTest, InodeExist_Return1)
@@ -1165,7 +1165,7 @@ TEST(startup_finish_deleteTest, Dir_markdelete_NotCreateYet)
 {
 	METAPATH = "\0";
 
-	EXPECT_EQ(0, startup_finish_delete());
+	EXPECT_EQ(-ENOENT, startup_finish_delete());
 }
 
 TEST(startup_finish_deleteTest, DeleteInodeSuccess)

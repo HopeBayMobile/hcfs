@@ -1079,6 +1079,12 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	/* Invalidate pathname cache for oldpath and newpath */
 
 	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		_cleanup_rename(body_ptr, old_target_ptr,
+				parent1_ptr, parent2_ptr);
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
 	ret_val = meta_cache_lookup_file_data(self_inode, &tempstat,
 			NULL, NULL, 0, body_ptr);
 
@@ -1106,6 +1112,15 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if (old_target_inode > 0) {
 		old_target_ptr = meta_cache_lock_entry(old_target_inode);
+		if (old_target_ptr == NULL) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
 		ret_val = meta_cache_lookup_file_data(old_target_inode,
 					&old_target_stat, NULL, NULL,
 						0, old_target_ptr);
@@ -2543,6 +2558,10 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			/*Re-read status*/
 			fh_ptr->meta_cache_ptr =
 				meta_cache_lock_entry(fh_ptr->thisinode);
+			if (fh_ptr->meta_cache_ptr == NULL) {
+				sem_wait(&(fh_ptr->block_sem));
+				return -ENOMEM;
+			}
 			fh_ptr->meta_cache_locked = TRUE;
 
 			sem_wait(&(fh_ptr->block_sem));
@@ -3007,9 +3026,11 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 			target_bytes_written, block_index, current_offset,
 				fh_ptr, fh_ptr->thisinode, &errcode);
 		if ((this_bytes_written == 0) && (errcode < 0)) {
-			fh_ptr->meta_cache_locked = FALSE;
-			meta_cache_close_file(fh_ptr->meta_cache_ptr);
-			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			if (fh_ptr->meta_cache_ptr != NULL) {
+				fh_ptr->meta_cache_locked = FALSE;
+				meta_cache_close_file(fh_ptr->meta_cache_ptr);
+				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			}
 			fuse_reply_err(req, -errcode);
 			return;
 		}
