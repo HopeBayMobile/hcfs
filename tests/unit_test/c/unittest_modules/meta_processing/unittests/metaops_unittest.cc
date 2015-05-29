@@ -377,7 +377,6 @@ protected:
 	}
 	void TearDown()
 	{
-		unlink(MOCK_META_PATH);
 		unlink(TO_DELETE_METAPATH);
 	}
 	/* This function is used to check rename or move success  */
@@ -440,6 +439,8 @@ TEST_F(delete_inode_metaTest, DirectlyRenameSuccess)
 	/* Free resource */
 	fclose(todeletefptr);
 	fclose(expectedfptr);
+	unlink(path);
+	unlink(TO_DELETE_METAPATH);
 }
 
 TEST_F(delete_inode_metaTest, RenameFail)
@@ -1220,37 +1221,38 @@ TEST(disk_checkdeleteTest, InodeNotExist_Return0)
 
 class startup_finish_deleteTest : public ::testing::Test {
 protected:
+	int num_inode;
+	
 	void SetUp()
 	{
+	
 	}
 
 	void TearDown()
 	{
-		char pathname[200];
 		
-		fetch_meta_path(pathname, 1); // MOCK_META_PATH
-		unlink(pathname);
 	}
 };
 
-TEST(startup_finish_deleteTest, Dir_markdelete_NotCreateYet)
+TEST_F(startup_finish_deleteTest, Dir_markdelete_NotCreateYet)
 {
 	METAPATH = "\0";
 
 	EXPECT_EQ(-ENOENT, startup_finish_delete());
 }
 
-TEST(startup_finish_deleteTest, DeleteInodeSuccess)
+TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 {
-	/* Mock inode file */
-	int num_inode = 200;
+	char pathname[200];
+	num_inode = 200;
 
+	/* Mock inode file */
 	METAPATH = "testpatterns";
 	ASSERT_EQ(0, mkdir("testpatterns/markdelete", 0700));
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d", i);
-		ASSERT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
+		EXPECT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
 
 		fetch_meta_path(pathname, i);
 		mknod(pathname, S_IFREG, 0);
@@ -1263,9 +1265,13 @@ TEST(startup_finish_deleteTest, DeleteInodeSuccess)
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d", i);
-		ASSERT_EQ(-1, access(pathname, F_OK));
+		EXPECT_EQ(-1, access(pathname, F_OK));
 	}
 	rmdir("testpatterns/markdelete");
+	
+	/* Unlink */
+	fetch_meta_path(pathname, num_inode); // MOCK_META_PATH
+	unlink(pathname);
 }
 
 /*
