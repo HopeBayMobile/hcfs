@@ -36,6 +36,7 @@
 #include "dir_entry_btree.h"
 #include "hfuse_system.h"
 #include "macro.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

@@ -34,6 +34,7 @@
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
+#include "logger.h"
 
 #define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))

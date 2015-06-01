@@ -18,7 +18,7 @@
 	ret = fseek(A, B, C); \
 	if (ret < 0) { \
 		errcode = errno; \
-		printf("IO error in %s. Code %d, %s\n", __func__, \
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 			errcode, strerror(errcode)); \
 		errcode = -errcode; \
 		goto errcode_handle; \
@@ -28,23 +28,21 @@
 	ret_pos = ftell(A); \
 	if (ret_pos < 0) { \
 		errcode = errno; \
-		printf("IO error in %s. Code %d, %s\n", __func__, \
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 			errcode, strerror(errcode)); \
 		errcode = -errcode; \
 		goto errcode_handle; \
 	}
 
 #define UNLINK(A)\
-	{ \
-		errcode = 0; \
-		ret = unlink(A); \
-		if (ret < 0) { \
-			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
-			errcode = -errcode; \
-			goto errcode_handle; \
-		}\
+	errcode = 0; \
+	ret = unlink(A); \
+	if (ret < 0) { \
+		errcode = errno; \
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
+		errcode = -errcode; \
+		goto errcode_handle; \
 	}
 
 #define MKDIR(A, B)\
@@ -52,7 +50,7 @@
 	ret = mkdir(A, B); \
 	if (ret < 0) { \
 		errcode = errno; \
-		printf("IO error in %s. Code %d, %s\n", __func__, \
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 			errcode, strerror(errcode)); \
 		errcode = -errcode; \
 		goto errcode_handle; \
@@ -63,7 +61,7 @@
 	ret = mknod(A, B, C); \
 	if (ret < 0) { \
 		errcode = errno; \
-		printf("IO error in %s. Code %d, %s\n", __func__, \
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
 			errcode, strerror(errcode)); \
 		errcode = -errcode; \
 		goto errcode_handle; \
@@ -72,9 +70,9 @@
 #define FREAD(A, B, C, D) \
 	errcode = 0; \
 	ret_size = fread(A, B, C, D); \
-	if ((ret < C) && (ferror(D) != 0)) { \
+	if ((ret_size < C) && (ferror(D) != 0)) { \
 		clearerr(D); \
-		printf("IO error in %s.\n", __func__);\
+		write_log(0, "IO error in %s.\n", __func__);\
 		errcode = -EIO; \
 		goto errcode_handle; \
 	}
@@ -82,9 +80,9 @@
 #define FWRITE(A, B, C, D) \
 	errcode = 0; \
 	ret_size = fwrite(A, B, C, D); \
-	if ((ret < C) && (ferror(D) != 0)) { \
+	if ((ret_size < C) && (ferror(D) != 0)) { \
 		clearerr(D); \
-		printf("IO error in %s.\n", __func__);\
+		write_log(0, "IO error in %s.\n", __func__);\
 		errcode = -EIO; \
 		goto errcode_handle; \
 	}

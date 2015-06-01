@@ -9,6 +9,7 @@
 * 2015/2/2 Jiahong added header for this file.
 * 2015/2/11 Jiahong moved some functions to hfuse_system.h.
 * 2015/5/11 Jiahong modifying file meta for new block indexing / searching
+* 2015/6/1 Jiahong adding structure for logger.
 *
 **************************************************************************/
 
@@ -149,7 +150,6 @@ typedef struct {
 SYSTEM_DATA_HEAD *hcfs_system;
 
 /* Other system-related resources */
-FILE *logfptr;  /* File pointer to logs */
 pthread_t reporter_thread;  /* Used by utility prototype */
 
 /* Functions for initializing HCFS */

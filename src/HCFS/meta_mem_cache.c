@@ -26,6 +26,7 @@
 #include "super_block.h"
 #include "dir_entry_btree.h"
 #include "macro.h"
+#include "logger.h"
 
 /* If cache lock not locked, return -1*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \

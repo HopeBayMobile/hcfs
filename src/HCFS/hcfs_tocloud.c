@@ -18,6 +18,7 @@
 TODO: Will need to check mod time of meta file and not upload meta for
 	every block status change.
 TODO: error handling for HTTP exceptions
+TODO: Reconsider how to do error handling for forked threads (how to retry?)
 */
 
 #include "hcfs_tocloud.h"

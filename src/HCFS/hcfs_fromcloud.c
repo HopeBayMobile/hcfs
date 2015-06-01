@@ -15,6 +15,7 @@
 
 /*
 TODO: error handling for HTTP exceptions
+TODO: Reconsider how to do error handling for forked threads (how to retry?)
 */
 #include <time.h>
 #include <semaphore.h>

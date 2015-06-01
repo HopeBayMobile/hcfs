@@ -31,6 +31,8 @@
 #include "fuseop.h"
 #include "params.h"
 #include "hfuse_system.h"
+#include "macro.h"
+#include "logger.h"
 
 SYSTEM_CONF_STRUCT system_config;
 
@@ -50,41 +52,28 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char tempname[METAPATHLEN];
 	int sub_dir;
-	int ret_code = 0;
-	int errcode;
+	int errcode, ret;
 
 	if (METAPATH == NULL)
 		return -1;
 
 	/* Creates meta path if it does not exist */
-	if (access(METAPATH, F_OK) == -1) {
-		ret_code = mkdir(METAPATH, 0700);
-		if (ret_code < 0) {
-			errcode = errno;
-			printf("Error in creating meta dir. Code %d, %s\n",
-					errcode, strerror(errcode));
-			return -errcode;
-		}
-	}
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
 
 	sub_dir = this_inode % NUMSUBDIR;
 	snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
 
 	/* Creates meta path for meta subfolder if it does not exist */
-	if (access(tempname, F_OK) == -1) {
-		ret_code = mkdir(tempname, 0700);
-		if (ret_code < 0) {
-			errcode = errno;
-			printf("Error in creating meta dir. Code %d, %s\n",
-					errcode, strerror(errcode));
-			return -errcode;
-		}
-	}
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
 
 	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%ld",
 		METAPATH, sub_dir, this_inode);
 
 	return 0;
+errcode_handle:
+	return errcode;
 }
 
 /************************************************************************
@@ -105,20 +94,13 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 	char tempname[METAPATHLEN];
 	int sub_dir;
 	int ret_code = 0;
-	int errcode;
+	int errcode, ret;
 
 	if (METAPATH == NULL)
 		return -EPERM;
 
-	if (access(METAPATH, F_OK) == -1) {
-		ret_code = mkdir(METAPATH, 0700);
-		if (ret_code < 0) {
-			errcode = errno;
-			printf("Error in creating meta dir. Code %d, %s\n",
-					errcode, strerror(errcode));
-			return -errcode;
-		}
-	}
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
 
 	sub_dir = this_inode % NUMSUBDIR;
 	snprintf(tempname, METAPATHLEN, "%s/todelete", METAPATH);
@@ -282,6 +264,7 @@ int read_system_config(char *config_path)
 	}
 
 	CURRENT_BACKEND = -1;
+	LOG_LEVEL = 0;
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
@@ -332,6 +315,24 @@ int read_system_config(char *config_path)
 			argval[strlen(argval)-1] = 0;
 
 		/*Match param name with required params*/
+
+		if (strcasecmp(argname, "log_level") == 0) {
+			errno = 0;
+			temp_val = strtoll(argval, &num_check_ptr, 10);
+			if ((errno != 0) || (*num_check_ptr != '\0')) {
+				fclose(fptr);
+				printf("Number conversion error\n");
+				return -1;
+			}
+			if (temp_val < 0) {
+				fclose(fptr);
+				printf("Log level cannot be less than zero.\n");
+				return -1;
+			}
+			LOG_LEVEL = temp_val;
+			continue;
+		}
+
 		if (strcasecmp(argname, "metapath") == 0) {
 			METAPATH = (char *) malloc(strlen(argval) + 10);
 			if (METAPATH == NULL) {

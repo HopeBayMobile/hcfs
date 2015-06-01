@@ -959,6 +959,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+		write_log(0, "Connecting to Swift backend\n");
 		ret_val = hcfs_init_swift_backend(curl_handle);
 		while ((ret_val < 200) || (ret_val > 299)) {
 			if (curl_handle->curl != NULL)
