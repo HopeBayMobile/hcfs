@@ -454,15 +454,22 @@ TEST_F(delete_inode_metaTest, DirectlyRenameSuccess)
 	unlink(TO_DELETE_METAPATH);
 }
 
-TEST_F(delete_inode_metaTest, RenameFail)
+TEST_F(delete_inode_metaTest, Error_ToDeleteMetaError)
 {
+	/* This inode number results in fetch_todelete_path() set pathname = "\0" */
 	ino_t inode = INO_RENAME_FAIL; 
-		// This inode # result in fetch_todelete_path() let pathname = "\0"
 
 	/* Run */
 	EXPECT_EQ(-ENOENT, delete_inode_meta(inode));
 }
 
+TEST_F(delete_inode_metaTest, Error_MetaFileNotExist)
+{	
+	ino_t inode = INO_RENAME_SUCCESS;
+		
+	/* Run */
+	EXPECT_EQ(-ENOENT, delete_inode_meta(inode));
+}
 
 /*
 	End of unittest of delete_inode_meta()
@@ -542,7 +549,7 @@ class seek_pageTest : public ::testing::Test {
 protected:
 	char *metapath;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	long long pointers_per_page[5];
+	long long pointers_per_page[5]; // A lookup table to find pow(POINTERS_PER_PAGE, k)
 
 	void SetUp()
 	{
@@ -558,7 +565,7 @@ protected:
 		body_ptr->meta_opened = TRUE;
 		
 		pointers_per_page[0] = 1;
-		for (int i = 1 ; i < 5 ; i++)
+		for (int i = 1 ; i < 5 ; i++) // build power table
 			pointers_per_page[i] = pointers_per_page[i - 1] * POINTERS_PER_PAGE;
 	}
 
@@ -1252,6 +1259,8 @@ protected:
 			unlink(pathname);
 		}
 		rmdir("testpatterns/markdelete");
+
+		unlink(TO_DELETE_METAPATH);
 	}
 };
 
