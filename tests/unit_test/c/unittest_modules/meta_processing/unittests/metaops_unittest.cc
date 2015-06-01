@@ -306,17 +306,20 @@ class change_parent_inodeTest : public ::testing::Test {
 
 TEST_F(change_parent_inodeTest, ChangeOK) 
 {
-	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode, parent_inode2, body_ptr));
+	EXPECT_EQ(0, change_parent_inode(INO_SEEK_DIR_ENTRY_OK, parent_inode, 
+		parent_inode2, body_ptr));
 }
 
 TEST_F(change_parent_inodeTest, DirEntryNotFound) 
 {
-	EXPECT_EQ(-ENOENT, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, parent_inode, parent_inode2, body_ptr));
+	EXPECT_EQ(-ENOENT, change_parent_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
+		parent_inode, parent_inode2, body_ptr));
 }
 
 TEST_F(change_parent_inodeTest, ChangeFail) 
 {
-	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode, parent_inode2, body_ptr));
+	EXPECT_EQ(-1, change_parent_inode(INO_SEEK_DIR_ENTRY_FAIL, parent_inode, 
+		parent_inode2, body_ptr));
 }
 /*
 	End of unittest for change_parent_inode()
@@ -343,17 +346,20 @@ protected:
 
 TEST_F(change_dir_entry_inodeTest, ChangeOK) 
 {	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, "/mock/target/name", new_inode, body_ptr));
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, "/mock/target/name", 
+		new_inode, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, DirEntryNotFound) 
 {
-	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, "/mock/target/name", new_inode, body_ptr));
+	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
+		"/mock/target/name", new_inode, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFail) 
 {
-	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, "/mock/target/name", new_inode, body_ptr));
+	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, 
+		"/mock/target/name", new_inode, body_ptr));
 }
 /*
 	End of unittest for change_parent_inode()
@@ -366,22 +372,20 @@ class delete_inode_metaTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{		
-		char path[200];
-		fetch_meta_path(path, INO_RENAME_SUCCESS);
-		FILE *tarfptr = fopen(path, "w+");
-		FILE *srcfptr = fopen("testpatterns/mock_meta_file", "r");
-		
-		cp_file(srcfptr, tarfptr); // Copy mock meta file to virify
-		fclose(srcfptr);
-		fclose(tarfptr);
+	
 	}
+
 	void TearDown()
 	{
 		unlink(TO_DELETE_METAPATH);
 	}
+	
 	/* This function is used to check rename or move success  */
 	bool is_file_diff(FILE *f1, FILE *f2)
 	{
+		if ((!f1) || (!f2))
+			return true;
+
 		bool is_diff = false;
 		while (!feof(f1) || !feof(f2)) {
 			char buf1[5000], buf2[5000];
@@ -397,10 +401,13 @@ protected:
 		}
 		return is_diff;
 	}
+	
 	/* copy pattern file to tested file */
-	void cp_file(FILE *src, FILE *tar)
+	void cp_pattern_meta(char *path)
 	{
 		char filebuf[5000];
+		FILE *tar = fopen(path, "w+");
+		FILE *src = fopen("testpatterns/mock_meta_pattern", "r");
 
 		fseek(src, 0, SEEK_SET);
 		fseek(tar, 0, SEEK_SET);
@@ -411,6 +418,9 @@ protected:
 			else
 				break;
 		}
+		
+		fclose(src);
+		fclose(tar);
 
 	}
 };
@@ -420,7 +430,10 @@ TEST_F(delete_inode_metaTest, DirectlyRenameSuccess)
 	ino_t inode = INO_RENAME_SUCCESS;
 	char path[200];
 	
+	/* Copy pattern_meta to a mock meta file. it will be renamed in 
+	   delete_inode_meta() */
 	fetch_meta_path(path, INO_RENAME_SUCCESS);
+	cp_pattern_meta(path); 
 
 	/* Run */
 	EXPECT_EQ(0, delete_inode_meta(inode));
@@ -430,10 +443,8 @@ TEST_F(delete_inode_metaTest, DirectlyRenameSuccess)
 	EXPECT_EQ(-1, access(path, F_OK)); // Old path should be deleted
 
 	todeletefptr = fopen(TO_DELETE_METAPATH, "r"); // copied content
-	expectedfptr = fopen("testpatterns/mock_meta_file", "r"); // expected content
+	expectedfptr = fopen("testpatterns/mock_meta_pattern", "r"); // expected content
 	
-	ASSERT_TRUE(todeletefptr != NULL);
-	ASSERT_TRUE(expectedfptr != NULL);
 	EXPECT_FALSE(is_file_diff(todeletefptr, expectedfptr));
 
 	/* Free resource */
@@ -1008,15 +1019,18 @@ class actual_delete_inodeTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-		char thisblockpath[100];
+		char markdelete_path[100];
 		
 		METAPATH = "testpatterns";
-		if (access("testpatterns/markdelete", F_OK))
+		
+		/* Make a mock markdelete-inode because disk_cleardelete will 
+		   unlink the file. */	
+		if (access("testpatterns/markdelete", F_OK) < 0)
 			mkdir("testpatterns/markdelete", 0700);
 
-		snprintf(thisblockpath, 100, "%s/markdelete/inode%d", METAPATH, 
+		snprintf(markdelete_path, 100, "%s/markdelete/inode%d", METAPATH, 
 			INO_DELETE_FILE_BLOCK);
-		mknod(thisblockpath, S_IFREG, 0);
+		mknod(markdelete_path, S_IFREG, 0); 	
 	}
 
 	void TearDown()
@@ -1028,16 +1042,17 @@ protected:
 		fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
 		if (!access(thismetapath, F_OK))
 			unlink(thismetapath);
+		
 		/* delete todelete_meta */
 		fetch_todelete_path(thismetapath, INO_DELETE_FILE_BLOCK);
 		if (!access(thismetapath, F_OK))
 			unlink(thismetapath);
+		
 		/* delete markdelete_inode */
 		snprintf(thisblockpath, 100, "%s/markdelete/inode%d", METAPATH, 
 			INO_DELETE_FILE_BLOCK);
 		unlink(thisblockpath);
 		rmdir("testpatterns/markdelete");
-
 	}
 };
 
@@ -1068,9 +1083,10 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 		fclose(tmp_fp);
 	}
 	
-		// make a node so that delete_inode_meta() will success
+		// make mock meta file so that delete_inode_meta() will success
 	fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
 	mknod(thismetapath, S_IFREG, 0); 
+	
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG));
 	
@@ -1094,6 +1110,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	}
 	EXPECT_EQ(false, block_file_existed);
 	
+	/* Free resource */
 	free(hcfs_system);
 }
 
@@ -1139,6 +1156,7 @@ class disk_cleardeleteTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		mkdir("/tmp/markdelete", 0700);
 	}
 
 	void TearDown()
@@ -1150,15 +1168,14 @@ protected:
 
 TEST_F(disk_cleardeleteTest, Dir_markdelete_NotExist)
 {
-	METAPATH = "\0";
+	METAPATH = "\0"; // Let access fail
 
 	EXPECT_EQ(-ENOENT, disk_cleardelete(6));
 }
 
 TEST_F(disk_cleardeleteTest, InodeNotExist)
 {
-	METAPATH = "/tmp";
-	mkdir("/tmp/markdelete", 0700);
+	METAPATH = "/tmp"; // inode6 does not exist in /tmp/markdelete
 	
 	EXPECT_EQ(0, disk_cleardelete(6));
 }
@@ -1166,7 +1183,6 @@ TEST_F(disk_cleardeleteTest, InodeNotExist)
 TEST_F(disk_cleardeleteTest, ClearInodeSuccess)
 {	
 	METAPATH = "/tmp";
-	mkdir("/tmp/markdelete", 0700);
 	mknod("/tmp/markdelete/inode6", S_IFREG | 0700, 0);
 
 	EXPECT_EQ(0, disk_cleardelete(6));
@@ -1253,14 +1269,17 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 
 	/* Mock inode file */
 	METAPATH = "testpatterns";
-	ASSERT_EQ(0, mkdir("testpatterns/markdelete", 0700));
+	
+	if (access("testpatterns/markdelete", F_OK) < 0)
+		mkdir("testpatterns/markdelete", 0700);
+
 	for (int i = 0 ; i < num_inode ; i++) {
 		char pathname[200];
 		sprintf(pathname, "testpatterns/markdelete/inode%d", i);
-		ASSERT_EQ(0, mknod(pathname, S_IFREG | 0700, 0));
+		mknod(pathname, S_IFREG | 0700, 0);
 
 		fetch_meta_path(pathname, i);
-		mknod(pathname, S_IFREG, 0);
+		mknod(pathname, S_IFREG, 0); // a mock markdelete-inode
 	}
 
 	/* Run */
@@ -1273,10 +1292,6 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 		ASSERT_EQ(-1, access(pathname, F_OK));
 	}
 	rmdir("testpatterns/markdelete");
-	
-	/* Unlink */
-	fetch_meta_path(pathname, num_inode); // MOCK_META_PATH
-	unlink(pathname);
 }
 
 /*
