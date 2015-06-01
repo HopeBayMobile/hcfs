@@ -18,7 +18,7 @@
 int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 			const DIR_ENTRY *new_entry, int *index_to_insert);
 
-int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode,
+int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 		int fh, int *result_index, DIR_ENTRY_PAGE *result_node);
 
 /* if returns 1, then there is an entry to be added to the parent */
