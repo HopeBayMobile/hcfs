@@ -35,14 +35,16 @@
 	}
 
 #define UNLINK(A)\
-	errcode = 0; \
-	ret = unlink(A); \
-	if (ret < 0) { \
-		errcode = errno; \
-		printf("IO error in %s. Code %d, %s\n", __func__, \
-			errcode, strerror(errcode)); \
-		errcode = -errcode; \
-		goto errcode_handle; \
+	{ \
+		errcode = 0; \
+		ret = unlink(A); \
+		if (ret < 0) { \
+			errcode = errno; \
+			printf("IO error in %s. Code %d, %s\n", __func__, \
+					errcode, strerror(errcode)); \
+			errcode = -errcode; \
+			goto errcode_handle; \
+		}\
 	}
 
 #define MKDIR(A, B)\

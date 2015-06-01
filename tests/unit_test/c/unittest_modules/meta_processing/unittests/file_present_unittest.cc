@@ -11,10 +11,10 @@ extern "C" {
  */
 TEST(meta_forget_inodeTest, RemoveMetaSucces)
 {
-	mknod(META_PATH, S_IFREG | 0700, 0);
+	mknod(MOCK_META_PATH, S_IFREG | 0700, 0);
 	EXPECT_EQ(0, meta_forget_inode(5));
 
-	EXPECT_EQ(-1, access(META_PATH, F_OK));
+	EXPECT_EQ(-1, access(MOCK_META_PATH, F_OK));
 }
 /*
 	End of unittest of meta_forget_inode()

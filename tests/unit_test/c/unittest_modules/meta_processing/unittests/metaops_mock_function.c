@@ -80,8 +80,11 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
-{
-	return 0;
+{	
+	if (this_inode != INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL)
+		return 1;
+	else
+		return 0;
 }
 
 
@@ -217,6 +220,8 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 /* mock functions - super_block.c*/
 int super_block_to_delete(ino_t this_inode)
 {
+	if (this_inode == INO_DELETE_DIR)
+		return -1;
 	return 0;
 }
 
@@ -254,8 +259,8 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	//sprintf(pathname, "testpatterns/inode_%d_meta_file", this_inode);
-	strcpy(pathname, META_PATH);
+	sprintf(pathname, "%s_%d", MOCK_META_PATH, this_inode);
+	//strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 

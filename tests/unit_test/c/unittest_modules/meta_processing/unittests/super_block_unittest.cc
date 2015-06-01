@@ -32,10 +32,11 @@ class write_super_block_headTest : public MallocSuperBlockBaseClass {
 
 TEST_F(write_super_block_headTest, WriteSuperBlockFail)
 {
+	/* Mock fd to make failure since no such file */
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
 	
 	/* Run */
-	EXPECT_EQ(-1, write_super_block_head());
+	EXPECT_EQ(-EBADF, write_super_block_head());
 
 	close(sys_super_block->iofptr);
 }
@@ -69,7 +70,7 @@ TEST_F(read_super_block_entryTest, ReadEntryFail)
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
 	
 	/* Run */
-	EXPECT_EQ(-1, read_super_block_entry(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, read_super_block_entry(inode, &sb_entry));
 
 	close(sys_super_block->iofptr);
 }
@@ -127,7 +128,7 @@ TEST_F(write_super_block_entryTest, WriteEntryFail)
 	sys_super_block->iofptr = open(sb_path, O_RDONLY, 0600);
 	
 	/* Run */
-	EXPECT_EQ(-1, write_super_block_entry(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, write_super_block_entry(inode, &sb_entry));
 
 	close(sys_super_block->iofptr);
 }
@@ -296,7 +297,7 @@ TEST_F(super_block_readTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 	
 	/* Run */
-	EXPECT_EQ(-1, super_block_read(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, super_block_read(inode, &sb_entry));
 }
 
 TEST_F(super_block_readTest, ReadEntrySuccess)
@@ -342,6 +343,7 @@ TEST_F(super_block_readTest, ReadEntrySuccess)
  */
 
 class super_block_writeTest : public InitSuperBlockBaseClass {
+	/* Do not need to let write_super_block_entry() success */
 };
 
 TEST_F(super_block_writeTest, WriteEntryFail)
@@ -356,10 +358,10 @@ TEST_F(super_block_writeTest, WriteEntryFail)
 	sb_entry.in_transit = FALSE;
 		
 	/* Run */
-	EXPECT_EQ(-1, super_block_write(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 }
 
-TEST_F(super_block_writeTest, AddDirtyNode_Dequeue_Enqueue_andWriteHead)
+TEST_F(super_block_writeTest, AddDirtyNode_Dequeue_Enqueue_andWriteHeadFail)
 {
 	SUPER_BLOCK_ENTRY sb_entry;
 	ino_t inode = 7;
@@ -372,7 +374,7 @@ TEST_F(super_block_writeTest, AddDirtyNode_Dequeue_Enqueue_andWriteHead)
 	EXPECT_EQ(0, sys_super_block->head.num_dirty);
 		
 	/* Run */
-	EXPECT_EQ(-1, super_block_write(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 
 	/* Verify that # of dirty nodes = 1, which means addition success. */
 	EXPECT_EQ(1, sys_super_block->head.num_dirty);
@@ -391,7 +393,7 @@ TEST_F(super_block_writeTest, ModAfterTransit)
 	sb_entry.mod_after_in_transit = FALSE;
 		
 	/* Run */
-	EXPECT_EQ(-1, super_block_write(inode, &sb_entry));
+	EXPECT_EQ(-EBADF, super_block_write(inode, &sb_entry));
 
 	/* Verify that modify after transitting is set as true. */
 	EXPECT_EQ(TRUE, sb_entry.mod_after_in_transit);
@@ -418,7 +420,7 @@ TEST_F(super_block_update_statTest, UpdateFail_SinceReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-1, super_block_update_stat(inode, &new_stat));
+	EXPECT_EQ(-EBADF, super_block_update_stat(inode, &new_stat));
 }
 
 TEST_F(super_block_update_statTest, UpdateStatSuccess)
@@ -476,7 +478,7 @@ TEST_F(super_block_mark_dirtyTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-1, super_block_mark_dirty(inode));
+	EXPECT_EQ(-EBADF, super_block_mark_dirty(inode));
 }
 
 TEST_F(super_block_mark_dirtyTest, MarkDirtySuccess)
@@ -530,7 +532,7 @@ TEST_F(super_block_update_transitTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-1, super_block_update_transit(inode, FALSE));
+	EXPECT_EQ(-EBADF, super_block_update_transit(inode, FALSE));
 }
 
 TEST_F(super_block_update_transitTest, SetStartTransit_TRUE)
@@ -612,7 +614,7 @@ TEST_F(super_block_to_deleteTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-1, super_block_to_delete(inode));
+	EXPECT_EQ(-EBADF, super_block_to_delete(inode));
 }
 
 TEST_F(super_block_to_deleteTest, MarkToDeleteSuccess)
@@ -663,7 +665,7 @@ TEST_F(super_block_deleteTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-1, super_block_delete(inode));
+	EXPECT_EQ(-EBADF, super_block_delete(inode));
 }
 
 TEST_F(super_block_deleteTest, AddToUnclaimedFileSuccess)
@@ -790,7 +792,7 @@ TEST_F(super_block_reclaim_fullscanTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 	
 	/* Run */
-	EXPECT_EQ(-1, super_block_reclaim_fullscan());
+	EXPECT_EQ(-EBADF, super_block_reclaim_fullscan());
 
 }
 
