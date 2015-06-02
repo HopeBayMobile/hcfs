@@ -7,8 +7,7 @@
 *
 * Revision History
 * 2015/5/29 Jiahong created this file.
-* 2015/6/1  Kewei let macro in a block to avoid some omitted-brace 
-*           situations in if-else statement.
+*
 **************************************************************************/
 
 #ifndef GW20_HCFS_MACRO_H_
