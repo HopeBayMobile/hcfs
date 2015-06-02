@@ -687,6 +687,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
 class meta_cache_update_dir_dataTest : public BaseClassWithMetaCacheEntry {
 protected:
 	char *mock_dir_meta;
+	DIR_ENTRY_PAGE test_dir_entry_page;
 
 	void SetUp()
 	{
@@ -698,6 +699,15 @@ protected:
 		body_ptr->meta_opened = TRUE;
 		truncate(mock_dir_meta, sizeof(struct stat) + 
 			sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE));
+		
+		/* Init dir_entry_page to be tested */
+		memset(&test_dir_entry_page, 0, sizeof(DIR_ENTRY_PAGE));
+		test_dir_entry_page.num_entries = 123;
+		test_dir_entry_page.this_page_pos = 456;
+		test_dir_entry_page.parent_page_pos = 789;
+		test_dir_entry_page.gc_list_next = 234;
+		test_dir_entry_page.tree_walk_next = 567;
+		test_dir_entry_page.tree_walk_prev = 901;
 	}
 
 	void TearDown()
@@ -719,7 +729,7 @@ TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
 {
 	/* Mock data */
 	struct stat *test_stat = generate_mock_stat(0);
-	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
+	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41, 9};
 	
 	body_ptr->dir_meta = NULL;
 
@@ -738,8 +748,6 @@ TEST_F(meta_cache_update_dir_dataTest, UpdataSuccess)
 TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage_HitIndex_0)
 {
 	/* Mock data, hit cache[0] and update cache[0]*/
-	DIR_ENTRY_PAGE test_dir_entry_page = {66, {0, {0}, 0}, 78, {0}, 93, 80, 41, 5};
-	
 	body_ptr->dir_entry_cache[0] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 	body_ptr->dir_entry_cache[1] = NULL;
 	body_ptr->dir_entry_cache[0]->this_page_pos = test_dir_entry_page.this_page_pos; // The same page
@@ -759,8 +767,6 @@ TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage_HitIndex_0)
 TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage_HitIndex_1)
 {	
 	/* Mock data, hit cache[1] and update cache[1] */
-	DIR_ENTRY_PAGE test_dir_entry_page = {66, {0, {0}, 0}, 78, {0}, 93, 80, 41, 5};
-	
 	body_ptr->dir_entry_cache[1] = (DIR_ENTRY_PAGE *)malloc(sizeof(DIR_ENTRY_PAGE));
 	body_ptr->dir_entry_cache[0] = NULL;
 	body_ptr->dir_entry_cache[1]->this_page_pos = test_dir_entry_page.this_page_pos; // The same page
@@ -780,8 +786,6 @@ TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage_HitIndex_1)
 TEST_F(meta_cache_update_dir_dataTest, UpdateOnlyDirPage_HitNothing)
 {	
 	/* Mock data, hit nothing */
-	DIR_ENTRY_PAGE test_dir_entry_page = {66, {0, {0}, 0}, 78, {0}, 93, 80, 41, 5};
-	
 	body_ptr->dir_entry_cache[0] = NULL;
 	body_ptr->dir_entry_cache[1] = NULL;
 	
@@ -819,7 +823,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupSuccess)
 {
 	/* Mock data */
 	struct stat *test_stat = generate_mock_stat(0);
-	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41};
+	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41, 6};
 	struct stat empty_stat;
 	DIR_META_TYPE empty_dir_meta;
 	
