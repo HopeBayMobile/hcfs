@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/10 ~ 11 Jiahong added header for this file, and revising coding style.
 * 2015/2/11  Jiahong moved "seek_page" and "advance_block" to metaops
+* 2015/6/2  Jiahong added error handling
 *
 **************************************************************************/
 
@@ -31,7 +32,7 @@
 * Function name: init_system_fh_table
 *        Inputs: None
 *       Summary: Initialize file handle table for the system.
-*  Return value: 0 if successful. Otherwise returns -1.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int init_system_fh_table(void)
@@ -41,14 +42,16 @@ int init_system_fh_table(void)
 	system_fh_table.entry_table_flags = malloc(sizeof(char) *
 							MAX_OPEN_FILE_ENTRIES);
 	if (system_fh_table.entry_table_flags == NULL)
-		return -1;
+		return -ENOMEM;
 	memset(system_fh_table.entry_table_flags, 0, sizeof(char) *
 							MAX_OPEN_FILE_ENTRIES);
 	/* Init entry_table*/
 	system_fh_table.entry_table = malloc(sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
-	if (system_fh_table.entry_table == NULL)
-		return -1;
+	if (system_fh_table.entry_table == NULL) {
+		free(system_fh_table.entry_table_flags);
+		return -ENOMEM;
+	}
 	memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
 	
@@ -64,7 +67,8 @@ int init_system_fh_table(void)
 *        Inputs: ino_t thisinode, int flags
 *       Summary: Allocate a file handle for inode number "thisinode".
 *                Also record the file opening flag from "flags".
-*  Return value: Index of file handle if successful. Otherwise returns -1.
+*  Return value: Index of file handle if successful. Otherwise returns
+*                negation of error code.
 *
 *************************************************************************/
 long long open_fh(ino_t thisinode, int flags)
@@ -76,7 +80,7 @@ long long open_fh(ino_t thisinode, int flags)
 	if (system_fh_table.num_opened_files >= MAX_OPEN_FILE_ENTRIES) {
 		sem_post(&(system_fh_table.fh_table_sem));
 		/*Not able to allocate any more fh entry as table is full.*/
-		return -1;
+		return -EMFILE;
 	}
 
 	index = system_fh_table.last_available_index % MAX_OPEN_FILE_ENTRIES;
