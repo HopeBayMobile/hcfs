@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/10 Jiahong added header for this file, and revising coding style.
+* 2015/6/2 Jiahong added error handling
 *
 **************************************************************************/
 
@@ -15,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 unsigned char base64_codes[64] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -27,7 +29,7 @@ unsigned char base64_codes[64] =
 *                int *outlen, int inputlen
 *       Summary: b64-encode input string "inputstr" (of length "inputlen")
 *                to output string "outputstr" (of length "*outlen").
-*  Return value: 0 if successful. Otherwise returns -1.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
@@ -41,6 +43,11 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 
 	origin_str_len = inputlen;
 	tmpstr = malloc(1+((origin_str_len+2)/3)*3);
+
+	if (tmpstr == NULL) {
+		write_log(0, "Out of memory in %s\n", __func__);
+		return -ENOMEM;
+	}
 
 	memcpy(tmpstr, inputstr, origin_str_len);
 

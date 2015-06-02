@@ -33,6 +33,7 @@
 #include "super_block.h"
 #include "global.h"
 #include "hfuse_system.h"
+#include "logger.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -122,7 +123,8 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					cloud and local*/
 				blk_entry_ptr->status = ST_CLOUD;
 
-				printf("Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
+				write_log(10,
+					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);
 				fseek(metafptr, pagepos, SEEK_SET);
 				ret_val = fwrite(&temppage,

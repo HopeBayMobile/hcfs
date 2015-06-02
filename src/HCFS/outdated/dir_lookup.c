@@ -9,6 +9,8 @@
 * Revision History
 * 2015/2/10 Jiahong added header for this file, and revising coding style.
 *
+* NOTE: This file may not be used anymore due to switching to low-level ops
+*
 **************************************************************************/
 
 #include "dir_lookup.h"

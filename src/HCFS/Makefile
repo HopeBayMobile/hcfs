@@ -1,11 +1,14 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto -Wunused-variable
 
-hcfs: lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
-	$(CC) -g -o hcfs lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o dir_lookup.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
+	$(CC) -g -o hcfs logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
 
 dir_entry_btree.o: dir_entry_btree.c dir_entry_btree.h
 	$(CC) $(CFLAGS) -c dir_entry_btree.c
+
+logger.o: logger.c logger.h
+	$(CC) $(CFLAGS) -c logger.c
 
 meta_mem_cache.o: meta_mem_cache.c global.h params.h meta_mem_cache.h
 	$(CC) $(CFLAGS) -c meta_mem_cache.c
@@ -13,10 +16,7 @@ meta_mem_cache.o: meta_mem_cache.c global.h params.h meta_mem_cache.h
 file_present.o: file_present.c global.h file_present.h super_block.h
 	$(CC) $(CFLAGS) -c file_present.c
 
-dir_lookup.o: dir_lookup.c fuseop.h dir_lookup.h
-	$(CC) $(CFLAGS) -c dir_lookup.c
-
-fuseop.o: fuseop.c fuseop.h dir_lookup.h super_block.h params.h
+fuseop.o: fuseop.c fuseop.h super_block.h params.h
 	$(CC) $(CFLAGS) -c fuseop.c
 
 super_block.o: super_block.c fuseop.h super_block.h params.h
@@ -25,7 +25,7 @@ super_block.o: super_block.c fuseop.h super_block.h params.h
 utils.o: utils.c fuseop.h params.h
 	$(CC) $(CFLAGS) -c utils.c
 
-hfuse_system.o: hfuse_system.c fuseop.h super_block.h dir_lookup.h
+hfuse_system.o: hfuse_system.c fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hfuse_system.c
 
 metaops.o: metaops.c fuseop.h params.h

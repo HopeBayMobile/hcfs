@@ -16,6 +16,4 @@
 #define TRUE 1
 #define FALSE 0
 
-#define DEBUG 10
-
 #endif  /* GW20_SRC_GLOBAL_H_ */

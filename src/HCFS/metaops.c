@@ -15,6 +15,7 @@
 *           Also remove advance_block function.
 * 2015/5/11 Jiahong adding "create_page" function for creating new block page
 * 2015/5/28 Jiahong adding error handling
+* 2015/6/2 Jiahong moving lookup_dir to this file
 **************************************************************************/
 #include "metaops.h"
 
@@ -36,15 +37,16 @@
 #include "dir_entry_btree.h"
 #include "hfuse_system.h"
 #include "macro.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
 static inline void logerr(int errcode, char *msg)
 {
 	if (errcode > 0)
-		printf("%s. Code %d, %s\n", msg, errcode, strerror(errcode));
+		write_log(0, "%s. Code %d, %s\n", msg, errcode, strerror(errcode));
 	else
-		printf("%s.\n", msg);
+		write_log(0, "%s.\n", msg);
 }
 
 /************************************************************************
@@ -293,7 +295,8 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		parent_stat.st_nlink++;
 
 	parent_meta.total_children++;
-	printf("TOTAL CHILDREN is now %lld\n", parent_meta.total_children);
+	write_log(10,
+		"TOTAL CHILDREN is now %lld\n", parent_meta.total_children);
 
 	set_timestamp_now(&parent_stat, MTIME | CTIME);
 	/* Stat may be dirty after the operation so should write them back
@@ -384,7 +387,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		goto errcode_handle;
 	}
 
-	printf("delete dir entry returns %d\n", ret);
+	write_log(10, "delete dir entry returns %d\n", ret);
 	/* tpage might be invalid after calling delete_dir_entry_btree */
 
 	if (ret == 0) {
@@ -395,7 +398,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 			parent_stat.st_nlink--;
 
 		parent_meta.total_children--;
-		printf("TOTAL CHILDREN is now %lld\n",
+		write_log(10, "TOTAL CHILDREN is now %lld\n",
 						parent_meta.total_children);
 		set_timestamp_now(&parent_stat, MTIME | CTIME);
 
@@ -539,14 +542,16 @@ int delete_inode_meta(ino_t this_inode)
 		todeletefptr = fopen(todelete_metapath, "w");
 		if (todeletefptr == NULL) {
 			errcode = errno;
-			printf("Unable to open file in %s. Code %d, %s\n",
+			write_log(0,
+				"Unable to open file in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			return -errcode;
 		}
 		metafptr = fopen(thismetapath, "r");
 		if (metafptr == NULL) {
 			errcode = errno;
-			printf("Unable to open file in %s. Code %d, %s\n",
+			write_log(0,
+				"Unable to open file in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
@@ -1264,7 +1269,7 @@ int disk_cleardelete(ino_t this_inode)
 
 	if (access(pathname, F_OK) < 0) {
 		errcode = errno;
-		printf("IO error in %s. Code %d, %s\n",
+		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
@@ -1293,7 +1298,7 @@ int disk_checkdelete(ino_t this_inode)
 	if (access(pathname, F_OK) < 0) {
 		errcode = errno;
 		if (errcode != ENOENT)
-			printf("IO error in %s. Code %d, %s\n",
+			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
@@ -1324,7 +1329,7 @@ int startup_finish_delete()
 	if (access(pathname, F_OK) < 0) {
 		errcode = errno;
 		if (errcode != ENOENT)
-			printf("IO error in %s. Code %d, %s\n",
+			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
@@ -1332,14 +1337,14 @@ int startup_finish_delete()
 	dirp = opendir(pathname);
 	if (dirp == NULL) {
 		errcode = errno;
-		printf("IO error in %s. Code %d, %s\n",
+		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
 
 	errcode = readdir_r(dirp, &tmpent, &tmpptr);
 	if (errcode > 0) {
-		printf("IO error in %s. Code %d, %s\n",
+		write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 		closedir(dirp);
 		return -errcode;
@@ -1366,7 +1371,7 @@ int startup_finish_delete()
 		}
 		errcode = readdir_r(dirp, &tmpent, &tmpptr);
 		if (errcode > 0) {
-			printf("IO error in %s. Code %d, %s\n",
+			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			closedir(dirp);
 			return -errcode;
@@ -1374,5 +1379,35 @@ int startup_finish_delete()
 	}
 
 	closedir(dirp);
+	return 0;
+}
+
+/* Given parent "parent", search for "childname" in parent and return
+the directory entry in structure pointed by "dentry" if found. If not or
+if error, return the negation of error code. */
+int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
+{
+	META_CACHE_ENTRY_STRUCT *cache_entry;
+	DIR_ENTRY_PAGE temp_page;
+	int temp_index, ret_val;
+
+	cache_entry = meta_cache_lock_entry(parent);
+	if (cache_entry == NULL)
+		return -ENOMEM;
+
+	ret_val = meta_cache_seek_dir_entry(parent, &temp_page,
+				&temp_index, childname, cache_entry);
+	meta_cache_close_file(cache_entry);
+	meta_cache_unlock_entry(cache_entry);
+
+	if (ret_val < 0)
+		return ret_val;
+	if (temp_index < 0)
+		return -ENOENT;
+	if (temp_page.dir_entries[temp_index].d_ino == 0)
+		return -ENOENT;
+
+	memcpy(dentry, &(temp_page.dir_entries[temp_index]),
+			sizeof(DIR_ENTRY));
 	return 0;
 }

@@ -20,12 +20,25 @@
 		ret = fseek(A, B, C); \
 		if (ret < 0) { \
 			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
 			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
-	} 
+	}
+
+#define LSEEK(A, B, C)\
+	{ \
+		errcode = 0; \
+		ret_pos = lseek(A, B, C); \
+		if (ret_pos == (off_t) -1) { \
+			errcode = errno; \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
+			errcode = -errcode; \
+			goto errcode_handle; \
+		} \
+	}
 
 #define FTELL(A)\
 	{ \
@@ -33,12 +46,12 @@
 		ret_pos = ftell(A); \
 		if (ret_pos < 0) { \
 			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
 			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
-	} 
+	}
 
 #define UNLINK(A)\
 	{ \
@@ -46,12 +59,12 @@
 		ret = unlink(A); \
 		if (ret < 0) { \
 			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
 			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
-	}
+	} 
 
 #define MKDIR(A, B)\
 	{ \
@@ -59,8 +72,8 @@
 		ret = mkdir(A, B); \
 		if (ret < 0) { \
 			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
 			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
@@ -72,8 +85,8 @@
 		ret = mknod(A, B, C); \
 		if (ret < 0) { \
 			errcode = errno; \
-			printf("IO error in %s. Code %d, %s\n", __func__, \
-					errcode, strerror(errcode)); \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
 			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
@@ -83,9 +96,9 @@
 	{ \
 		errcode = 0; \
 		ret_size = fread(A, B, C, D); \
-		if ((ret < (C)) && (ferror(D) != 0)) { \
+		if ((ret_size < C) && (ferror(D) != 0)) { \
 			clearerr(D); \
-			printf("IO error in %s.\n", __func__);\
+			write_log(0, "IO error in %s.\n", __func__);\
 			errcode = -EIO; \
 			goto errcode_handle; \
 		} \
@@ -95,10 +108,36 @@
 	{ \
 		errcode = 0; \
 		ret_size = fwrite(A, B, C, D); \
-		if ((ret < (C)) && (ferror(D) != 0)) { \
+		if ((ret_size < C) && (ferror(D) != 0)) { \
 			clearerr(D); \
-			printf("IO error in %s.\n", __func__);\
+			write_log(0, "IO error in %s.\n", __func__);\
 			errcode = -EIO; \
+			goto errcode_handle; \
+		} \
+	}
+
+#define PREAD(A, B, C, D) \
+	{ \
+		errcode = 0; \
+		ret_ssize = pread(A, B, C, D); \
+		if (ret_ssize < 0) { \
+			errcode = errno; \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
+			errcode = -errcode; \
+			goto errcode_handle; \
+		} \
+	}
+
+#define PWRITE(A, B, C, D) \
+	{ \
+		errcode = 0; \
+		ret_ssize = pwrite(A, B, C, D); \
+		if (ret_ssize < 0) { \
+			errcode = errno; \
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__, \
+				errcode, strerror(errcode)); \
+			errcode = -errcode; \
 			goto errcode_handle; \
 		} \
 	}

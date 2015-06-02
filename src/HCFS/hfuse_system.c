@@ -8,6 +8,8 @@
 * Revision History
 * 2015/2/11 Jiahong added header for this file, and revising coding style.
 *           Also changed inclusion of hcfs_cache.h to hcfs_cacheops.h.
+* 2015/6/1 Jiahong working on improving error handling
+* 2015/6/1 Jiahong changing logger
 *
 **************************************************************************/
 #include "hfuse_system.h"
@@ -22,6 +24,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <string.h>
+#include <errno.h>
 
 #include <curl/curl.h>
 #include <openssl/hmac.h>
@@ -31,7 +34,6 @@
 #include "meta_mem_cache.h"
 #include "global.h"
 #include "super_block.h"
-#include "dir_lookup.h"
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
@@ -39,6 +41,8 @@
 #include "params.h"
 #include "utils.h"
 #include "filetables.h"
+#include "macro.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -56,10 +60,19 @@ extern SYSTEM_CONF_STRUCT system_config;
 *************************************************************************/
 int init_hcfs_system_data(void)
 {
-	int shm_key;
+	int shm_key, errcode;
+	size_t ret_size;
 
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+	if (shm_key < 0) {
+		errcode = errno;
+		return -errcode;
+	}
 	hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
+	if (hcfs_system == (void *)-1) {
+		errcode = errno;
+		return -errcode;
+	}
 
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 1, 1);
@@ -70,17 +83,39 @@ int init_hcfs_system_data(void)
 
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
+		errcode = errno;
+		if (errcode != -ENOENT) {
+			write_log(0, "Error reading system file. Code %d, %s\n",
+				errcode, strerror(errcode));
+			return -errcode;
+		}
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "w+");
-		fwrite(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE),
+		if (hcfs_system->system_val_fptr == NULL) {
+			errcode = errno;
+			write_log(0, "Error reading system file. Code %d, %s\n",
+				errcode, strerror(errcode));
+			return -errcode;
+		}
+
+		FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE),
 					1, hcfs_system->system_val_fptr);
 		fclose(hcfs_system->system_val_fptr);
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
+		if (hcfs_system->system_val_fptr == NULL) {
+			errcode = errno;
+			write_log(0, "Error reading system file. Code %d, %s\n",
+				errcode, strerror(errcode));
+			return -errcode;
+		}
 	}
 	setbuf(hcfs_system->system_val_fptr, NULL);
-	fread(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
+	FREAD(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 						hcfs_system->system_val_fptr);
 
 	return 0;
+errcode_handle:
+	fclose(hcfs_system->system_val_fptr);
+	return errcode;
 }
 
 /************************************************************************
@@ -95,15 +130,21 @@ int init_hcfs_system_data(void)
 *************************************************************************/
 int sync_hcfs_system_data(char need_lock)
 {
+	int ret, errcode;
+	size_t ret_size;
+
 	if (need_lock == TRUE)
 		sem_wait(&(hcfs_system->access_sem));
-	fseek(hcfs_system->system_val_fptr, 0, SEEK_SET);
-	fwrite(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
+	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
+	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
 						hcfs_system->system_val_fptr);
 	if (need_lock == TRUE)
 		sem_post(&(hcfs_system->access_sem));
 
 	return 0;
+
+errcode_handle:
+	return errcode;
 }
 
 /************************************************************************
@@ -117,7 +158,9 @@ int sync_hcfs_system_data(char need_lock)
 *************************************************************************/
 int init_hfuse(void)
 {
-	int ret_val;
+	int ret_val, ret, errcode;
+	size_t ret_size;
+	long ret_pos;
 	char rootmetapath[METAPATHLEN];
 	ino_t root_inode;
 	struct stat this_stat;
@@ -127,12 +170,20 @@ int init_hfuse(void)
 	FILE *metafptr;
 
 	ret_val = super_block_init();
-	init_pathname_cache();
+	if (ret_val < 0)
+		return ret_val;
 	ret_val = init_system_fh_table();
-	init_hcfs_system_data();
+	if (ret_val < 0)
+		return ret_val;
+	ret_val = init_hcfs_system_data();
+	if (ret_val < 0)
+		return ret_val;
 
 	/* Check if need to initialize the root meta file */
-	fetch_meta_path(rootmetapath, 1);
+	ret_val = fetch_meta_path(rootmetapath, 1);
+	if (ret_val < 0)
+		return ret_val;
+
 	if (access(rootmetapath, F_OK) != 0) {
 		memset(&this_stat, 0, sizeof(struct stat));
 		memset(&this_meta, 0, sizeof(DIR_META_TYPE));
@@ -152,32 +203,53 @@ int init_hfuse(void)
 		root_inode = super_block_new_inode(&this_stat, NULL);
 		/*TODO: put error handling here if root_inode is not 1
 					(cannot initialize system)*/
+		if (root_inode != 1) {
+			write_log(0, "Error initializing system\n");
+			return -EPERM;
+		}
 
 		this_stat.st_ino = 1;
 
 		metafptr = fopen(rootmetapath, "w");
+		if (metafptr == NULL) {
+			write_log(0, "IO error in initializing system\n");
+			return -EIO;
+		}
 
-		ret_val = fwrite(&this_stat, sizeof(struct stat), 1, metafptr);
+		FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
 
 
-		ret_val = fwrite(&this_meta, sizeof(DIR_META_TYPE), 1,
+		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
 								metafptr);
 
-		this_meta.root_entry_page = ftell(metafptr);
+		FTELL(metafptr);
+		this_meta.root_entry_page = ret_pos;
 		this_meta.tree_walk_list_head = this_meta.root_entry_page;
-		fseek(metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
-		ret_val = fwrite(&this_meta, sizeof(DIR_META_TYPE), 1,
+		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
 								metafptr);
 
-		init_dir_page(&temppage, 1, 0, this_meta.root_entry_page);
+		ret = init_dir_page(&temppage, 1, 0,
+					this_meta.root_entry_page);
+		if (ret < 0) {
+			fclose(metafptr);
+			return ret;
+		}
 
-		ret_val = fwrite(&temppage, sizeof(DIR_ENTRY_PAGE), 1,
+		FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1,
 								metafptr);
 		fclose(metafptr);
-		super_block_mark_dirty(1);
+		ret = super_block_mark_dirty(1);
+		if (ret < 0)
+			return ret;
 	}
 	return 0;
+
+errcode_handle:
+	if (metafptr != NULL)
+		fclose(metafptr);
+	return errcode;
 }
 
 /* Helper function to initialize curl handles for downloading objects */
@@ -189,7 +261,7 @@ int _init_download_curl(int count)
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend\n");
+		write_log(0, "error in connecting to backend\n");
 		if (download_curl_handles[count].curl != NULL)
 			hcfs_destroy_backend(download_curl_handles[count].curl);
 		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
@@ -214,7 +286,8 @@ int main(int argc, char **argv)
 	int count;
 	struct rlimit nofile_limit;
 	pthread_t delete_loop_thread;
-	FILE *fptr;
+
+	logptr = NULL;
 
 	ENGINE_load_builtin_engines();
 	ENGINE_register_all_complete();
@@ -224,7 +297,10 @@ int main(int argc, char **argv)
 
 /* TODO: Selection of backend type via configuration */
 
-	read_system_config(DEFAULT_CONFIG_PATH);
+	ret_val = read_system_config(DEFAULT_CONFIG_PATH);
+
+	if (ret_val < 0)
+		exit(-1);
 
 	ret_val = validate_system_config();
 
@@ -235,55 +311,54 @@ int main(int argc, char **argv)
 	nofile_limit.rlim_max = 150001;
 
 	ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
+	if (ret_val < 0) {
+		write_log(0, "Error in setting open file limits\n");
+/*
+		exit(-1);
+*/
+	}
 	sprintf(curl_handle.id, "main");
 	ret_val = hcfs_init_backend(&curl_handle);
 	if ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend\n");
-		exit(0);
+		write_log(0, "Error in connecting to backend. Code %d\n", ret_val);
+		write_log(0, "Backend %d\n", CURRENT_BACKEND);
+		exit(-1);
 	}
 
 	ret_val = hcfs_list_container(&curl_handle);
 	if ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend\n");
-		exit(0);
+		write_log(0, "Error in connecting to backend\n");
+		exit(-1);
 	}
-	printf("ret code %d\n", ret_val);
+	write_log(10, "ret code %d\n", ret_val);
 
 	hcfs_destroy_backend(curl_handle.curl);
 
-	init_hfuse();
+	ret_val = init_hfuse();
+	if (ret_val < 0)
+		exit(-1);
+
+	/* TODO: error handling for log files */
 	this_pid = fork();
 	if (this_pid == 0) {
-		logfptr = fopen("cache_maintain_log", "a+");
-		setbuf(logfptr, NULL);
-		fprintf(logfptr, "\nStart logging cache cleanup\n");
-		printf("Redirecting to cache log\n");
-		dup2(fileno(logfptr), fileno(stdout));
-		dup2(fileno(logfptr), fileno(stderr));
+		open_log("cache_maintain_log");
+		write_log(2, "\nStart logging cache cleanup\n");
 
 		run_cache_loop();
-		fclose(logfptr);
+		close_log();
 	} else {
 		this_pid1 = fork();
 		if (this_pid1 == 0) {
-			logfptr = fopen("backend_upload_log", "a+");
-			setbuf(logfptr, NULL);
-			fprintf(logfptr, "\nStart logging backend upload\n");
-			printf("Redirecting to backend log\n");
-			dup2(fileno(logfptr), fileno(stdout));
-			dup2(fileno(logfptr), fileno(stderr));
+			open_log("backend_upload_log");
+			write_log(2, "\nStart logging backend upload\n");
 			pthread_create(&delete_loop_thread, NULL, &delete_loop,
 									NULL);
 			upload_loop();
-			fclose(logfptr);
+			close_log();
 		} else {
 
-			logfptr = fopen("fuse_log", "a+");
-			setbuf(logfptr, NULL);
-			fprintf(logfptr, "\nStart logging fuse\n");
-			printf("Redirecting to fuse log\n");
-			dup2(fileno(logfptr), fileno(stdout));
-			dup2(fileno(logfptr), fileno(stderr));
+			open_log("fuse_log");
+			write_log(2, "\nStart logging fuse\n");
 			sem_init(&download_curl_sem, 0,
 					MAX_DOWNLOAD_CURL_HANDLE);
 			sem_init(&download_curl_control_sem, 0, 1);
@@ -293,10 +368,10 @@ int main(int argc, char **argv)
 				_init_download_curl(count);
 
 			hook_fuse(argc, argv);
-			printf("Waiting for subprocesses to terminate\n");
+			write_log(2, "Waiting for subprocesses to terminate\n");
 			waitpid(this_pid, NULL, 0);
 			waitpid(this_pid1, NULL, 0);
-			fclose(logfptr);
+			close_log();
 		}
 	}
 	return 0;

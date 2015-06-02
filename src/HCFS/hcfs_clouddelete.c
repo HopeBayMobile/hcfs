@@ -39,6 +39,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "super_block.h"
 #include "fuseop.h"
 #include "global.h"
+#include "logger.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -81,7 +82,6 @@ static inline void _dsync_terminate_thread(int index)
 void collect_finished_dsync_threads(void *ptr)
 {
 	int count;
-	int ret_val;
 	struct timespec time_to_sleep;
 
 	time_to_sleep.tv_sec = 0;
@@ -138,7 +138,6 @@ static inline void _delete_terminate_thread(int index)
 void collect_finished_delete_threads(void *ptr)
 {
 	int count;
-	int ret_val;
 	struct timespec time_to_sleep;
 
 	time_to_sleep.tv_sec = 0;
@@ -273,7 +272,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	FILE_META_TYPE tempfilemeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int curl_id;
-	long long block_no, current_index;
+	long long current_index;
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
 	long long total_blocks;
@@ -471,10 +470,10 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	char objname[1000];
 	int ret_val;
 
-	sprintf(objname, "meta_%lld", this_inode);
-	printf("Debug meta deletion: objname %s, inode %lld\n",
+	sprintf(objname, "meta_%ld", this_inode);
+	write_log(10, "Debug meta deletion: objname %s, inode %ld\n",
 						objname, this_inode);
-	sprintf(curl_handle->id, "delete_meta_%lld", this_inode);
+	sprintf(curl_handle->id, "delete_meta_%ld", this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
 }
 
@@ -493,10 +492,11 @@ void do_block_delete(ino_t this_inode, long long block_no,
 	char objname[1000];
 	int ret_val;
 
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	printf("Debug delete object: objname %s, inode %lld, block %lld\n",
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	write_log(10,
+		"Debug delete object: objname %s, inode %lld, block %lld\n",
 					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
 	ret_val = hcfs_delete_object(objname, curl_handle);
 }
 
@@ -553,14 +553,14 @@ void *delete_loop(void *arg)
 {
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;
-	int count, sleep_count;
+	int count;
 	char in_dsync;
 	int ret_val;
 
 	init_delete_control();
 	init_dsync_control();
 
-	printf("Start delete loop\n");
+	write_log(2, "Start delete loop\n");
 
 	inode_to_check = 0;
 	while (hcfs_system->system_going_down == FALSE) {
