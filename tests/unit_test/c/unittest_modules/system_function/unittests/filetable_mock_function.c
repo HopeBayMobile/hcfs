@@ -28,3 +28,9 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+

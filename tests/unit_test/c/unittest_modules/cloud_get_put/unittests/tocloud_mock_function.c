@@ -142,3 +142,8 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		sizeof(FILE_META_TYPE) + target_page *
 		sizeof(BLOCK_ENTRY_PAGE);
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}

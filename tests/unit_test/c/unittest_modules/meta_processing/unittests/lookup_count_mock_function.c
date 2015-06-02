@@ -9,3 +9,9 @@ int disk_checkdelete(ino_t this_inode)
 {
 	return 0;
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+

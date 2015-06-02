@@ -104,3 +104,18 @@ int hook_fuse(int argc, char **argv)
 {
 	return 0;
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+
+int open_log(char *filename)
+{
+	return 0;
+}
+
+int close_log(void)
+{
+	return 0;
+}

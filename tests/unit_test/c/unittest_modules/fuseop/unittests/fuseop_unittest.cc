@@ -70,9 +70,6 @@ class fuseopEnvironment : public ::testing::Environment {
     system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
     memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
 
-    logfptr = fopen("/tmp/test_fuse_log","a+");
-    setbuf(logfptr, NULL);
-
     pthread_create(&new_thread, NULL, &_mount_test_fuse, NULL);
     sleep(5);
   }
@@ -89,7 +86,6 @@ class fuseopEnvironment : public ::testing::Environment {
     ret_val = rmdir("/tmp/test_fuse");
     tmp_err = errno;
     printf("delete return %d\n",ret_val);
-    unlink("/tmp/test_fuse_log");
     free(system_fh_table.entry_table_flags);
     free(system_fh_table.entry_table);
     free(sys_super_block);
