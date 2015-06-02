@@ -292,3 +292,9 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 {
 	return;
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+

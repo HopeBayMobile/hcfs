@@ -88,6 +88,8 @@ int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	return 0;
 }
 
-
-
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
 
