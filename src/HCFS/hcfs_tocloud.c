@@ -37,6 +37,7 @@ TODO: Reconsider how to do error handling for forked threads (how to retry?)
 #include "global.h"
 #include "super_block.h"
 #include "fuseop.h"
+#include "logger.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -171,7 +172,8 @@ static inline void _upload_terminate_thread(int index)
 				truncating*/
 				if ((tmp_entry->status == ST_NONE) &&
 						(is_delete == FALSE)) {
-					printf("Debug upload block gone\n");
+					write_log(5,
+						"Debug upload block gone\n");
 					need_delete_object = TRUE;
 				}
 			}
@@ -520,10 +522,10 @@ void do_block_sync(ino_t this_inode, long long block_no,
 	FILE *fptr;
 	int ret_val;
 
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	printf("Debug datasync: objname %s, inode %lld, block %lld\n",
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	write_log(10, "Debug datasync: objname %s, inode %ld, block %lld\n",
 					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
+	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
 	fptr = fopen(filename, "r");
 	ret_val = hcfs_put_object(fptr, objname, curl_handle);
 	fclose(fptr);
@@ -535,9 +537,11 @@ void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	int ret_val;
 	FILE *fptr;
 
-	sprintf(objname, "meta_%lld", this_inode);
-	printf("Debug datasync: objname %s, inode %lld\n", objname, this_inode);
-	sprintf(curl_handle->id, "upload_meta_%lld", this_inode);
+	sprintf(objname, "meta_%ld", this_inode);
+	write_log(10,
+		"Debug datasync: objname %s, inode %ld\n",
+		objname, this_inode);
+	sprintf(curl_handle->id, "upload_meta_%ld", this_inode);
 	fptr = fopen(filename, "r");
 	ret_val = hcfs_put_object(fptr, objname, curl_handle);
 	fclose(fptr);
@@ -578,14 +582,14 @@ void schedule_sync_meta(FILE *metafptr, int which_curl)
 	int count;
 	FILE *fptr;
 
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.tmp",
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.tmp",
 			upload_ctl.upload_threads[which_curl].inode);
 
 	count = 0;
 	while (TRUE) {
 		if (!access(tempfilename, F_OK)) {
 			count++;
-			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.%d",
+			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.%d",
 				upload_ctl.upload_threads[which_curl].inode,
 									count);
 		} else {
@@ -624,7 +628,7 @@ void dispatch_upload_block(int which_curl)
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
 
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%lld_%lld.tmp",
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%ld_%lld.tmp",
 				upload_ptr->inode, upload_ptr->blockno);
 
 	count = 0;
@@ -632,7 +636,7 @@ void dispatch_upload_block(int which_curl)
 		if (!access(tempfilename, F_OK)) {
 			count++;
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_block_%lld_%lld.%d",
+				"/dev/shm/hcfs_sync_block_%ld_%lld.%d",
 				upload_ptr->inode, upload_ptr->blockno, count);
 		} else {
 			break;
@@ -717,7 +721,7 @@ void upload_loop(void)
 	init_sync_control();
 	is_start_check = TRUE;
 
-	printf("Start upload loop\n");
+	write_log(2, "Start upload loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {

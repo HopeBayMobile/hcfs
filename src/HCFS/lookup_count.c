@@ -77,7 +77,7 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup increase for inode %ld, amount %d\n",
+	write_log(10, "Debug lookup increase for inode %ld, amount %d\n",
 			this_inode, amount);
 	index = this_inode % NUM_LOOKUP_ENTRIES;
 
@@ -85,7 +85,7 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -105,7 +105,7 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 	if (found == FALSE) {  /* Will need to create a new node */
 		ptr = malloc(sizeof(LOOKUP_NODE_TYPE));
 		if (ptr == NULL) {
-			printf("Out of memory in %s\n", __func__);
+			write_log(0, "Out of memory in %s\n", __func__);
 			sem_post(&(lookup_table[index].entry_sem));
 			return -ENOMEM;
 		}
@@ -117,13 +117,13 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 		lookup_table[index].head = ptr;
 	}
 
-	printf("Debug lookup increase lookup now %d\n", ptr->lookup_count);
+	write_log(10, "Debug lookup increase lookup now %d\n", ptr->lookup_count);
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -151,7 +151,7 @@ int lookup_decrease(ino_t this_inode, int amount,
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
-	printf("Debug lookup decrease for inode %ld, amount %d\n",
+	write_log(10, "Debug lookup decrease for inode %ld, amount %d\n",
 			this_inode, amount);
 
 	if (need_delete == NULL)
@@ -164,7 +164,7 @@ int lookup_decrease(ino_t this_inode, int amount,
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -178,7 +178,8 @@ int lookup_decrease(ino_t this_inode, int amount,
 			found = TRUE;
 			ptr->lookup_count -= amount;
 			if (ptr->lookup_count < 0) {
-				printf("Debug lookup underflow. Resetting\n");
+				write_log(5,
+					"Debug lookup underflow. Resetting\n");
 				ptr->lookup_count = 0;
 			}
 			result_lookup = ptr->lookup_count;
@@ -199,19 +200,19 @@ int lookup_decrease(ino_t this_inode, int amount,
 	}
 
 	if (found == FALSE) {
-		printf("Debug no lookup value\n");
+		write_log(5, "Debug no lookup value\n");
 		result_lookup = -EINVAL;
 		sem_post(&(lookup_table[index].entry_sem));
 		return result_lookup;
 	}
 
-	printf("Debug lookup decrease lookup now %d\n", result_lookup);
+	write_log(10, "Debug lookup decrease lookup now %d\n", result_lookup);
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -235,7 +236,7 @@ int lookup_markdelete(ino_t this_inode)
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup markdelete for inode %ld\n",
+	write_log(10, "Debug lookup markdelete for inode %ld\n",
 			this_inode);
 
 	index = this_inode % NUM_LOOKUP_ENTRIES;
@@ -244,7 +245,7 @@ int lookup_markdelete(ino_t this_inode)
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -262,7 +263,7 @@ int lookup_markdelete(ino_t this_inode)
 	}
 
 	if (found == FALSE) {
-		printf("Debug no lookup value\n");
+		write_log(5, "Debug no lookup value\n");
 		result_lookup = -EINVAL;
 		return result_lookup;
 	}
@@ -271,7 +272,7 @@ int lookup_markdelete(ino_t this_inode)
 
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in %s. Code %d, %s\n", __func__, errcode,
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 		return -errcode;
 	}
@@ -295,13 +296,14 @@ int lookup_destroy()
 	int ret_val, errcode;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup destroy\n");
+	write_log(10, "Debug lookup destroy\n");
 	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 		ret_val = sem_wait(&(lookup_table[count].entry_sem));
 
 		if (ret_val < 0) {
 			errcode = errno;
-			printf("Error in %s. Code %d, %s\n", __func__, errcode,
+			write_log(0,
+				"Error in %s. Code %d, %s\n", __func__, errcode,
 				strerror(errcode));
 			return -errcode;
 		}
@@ -309,7 +311,7 @@ int lookup_destroy()
 		ptr = lookup_table[count].head;
 
 		while (ptr != NULL) {
-			printf("Debug check delete %ld\n",
+			write_log(10, "Debug check delete %ld\n",
 				ptr->this_inode);
 			ret_val = disk_checkdelete(ptr->this_inode);
 
@@ -323,7 +325,8 @@ int lookup_destroy()
 
 		if (ret_val < 0) {
 			errcode = errno;
-			printf("Error in %s. Code %d, %s\n", __func__, errcode,
+			write_log(0,
+				"Error in %s. Code %d, %s\n", __func__, errcode,
 				strerror(errcode));
 			return -errcode;
 		}

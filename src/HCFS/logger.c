@@ -64,8 +64,26 @@ int open_log(char *filename)
 		return -errcode;
 	}
 
-	dup2(fileno(logptr->fptr), fileno(stdout));
-	dup2(fileno(logptr->fptr), fileno(stderr));
+	ret = dup2(fileno(logptr->fptr), fileno(stdout));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Failed to redirect stdout. Code %d, %s\n",
+				errcode, strerror(errcode));
+		free(logptr);
+		logptr = NULL;
+		return -errcode;
+	}
+
+	ret = dup2(fileno(logptr->fptr), fileno(stderr));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Failed to redirect stderr. Code %d, %s\n",
+				errcode, strerror(errcode));
+		free(logptr);
+		logptr = NULL;
+		return -errcode;
+	}
+
 	return 0;
 }
 

@@ -34,6 +34,7 @@ TODO: Reconsider how to do error handling for forked threads (how to retry?)
 #include "fuseop.h"
 #include "global.h"
 #include "hfuse_system.h"
+#include "logger.h"
 
 /************************************************************************
 *
@@ -51,7 +52,7 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	int which_curl_handle;
 	char idname[256];
 
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 	while (TRUE) {
 		sem_wait(&download_curl_sem);
 		fseek(fptr, 0, SEEK_SET);
@@ -65,7 +66,7 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 			}
 		}
 		sem_post(&download_curl_control_sem);
-		printf("Debug: downloading using curl handle %d\n",
+		write_log(10, "Debug: downloading using curl handle %d\n",
 							which_curl_handle);
 		sprintf(idname, "download_thread_%d", which_curl_handle);
 		strcpy(download_curl_handles[which_curl_handle].id, idname);

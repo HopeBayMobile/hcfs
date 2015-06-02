@@ -99,13 +99,14 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 				body_ptr->fptr = fopen(thismetapath, "w+");
 				if (body_ptr->fptr == NULL) {
 					errcode = errno;
-					printf("IO error in %s. Code %d, %s\n",
+					write_log(0,
+						"IO error in %s. Code %d, %s\n",
 						__func__, errcode,
 						strerror(errcode));
 					return -errcode;
 				}
 			} else {
-				printf("IO error in %s. Code %d, %s\n",
+				write_log(0, "IO error in %s. Code %d, %s\n",
 						__func__, errcode,
 						strerror(errcode));
 				return -errcode;
@@ -161,7 +162,7 @@ int init_meta_cache_headers(void)
 	return 0;
 
 errcode_handle:
-	printf("Error in %s. Code %d, %s\n", __func__, errcode,
+	write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
 			strerror(errcode));
 	errcode = -errcode;
 	free(meta_mem_cache);
@@ -787,7 +788,7 @@ the new one */
 
 	int ret;
 
-	printf("Debug meta cache update dir data\n");
+	write_log(10, "Debug meta cache update dir data\n");
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(bptr->access_sem));
 
@@ -919,7 +920,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			body_ptr->fptr = fopen(thismetapath, "r+");
 			if (body_ptr->fptr == NULL) {
 				errcode = errno;
-				printf("IO error in %s. Code %d, %s\n",
+				write_log(0, "IO error in %s. Code %d, %s\n",
 					__func__, errcode, strerror(errcode));
 				goto errcode_handle;
 			}
@@ -953,7 +954,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		body_ptr->fptr = fopen(thismetapath, "r+");
 		if (body_ptr->fptr == NULL) {
 			errcode = errno;
-			printf("IO error in %s. Code %d, %s\n",
+			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			goto errcode_handle;
 		}
@@ -1258,8 +1259,8 @@ META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 					if (ret_val != -EBUSY)
 						errcount++;
 					if (errcount > 5) {
-						printf("Cannot process meta");
-						printf(" cache alloc.\n");
+						write_log(0,
+							"Lock meta cache err");
 						return NULL;
 					}
 					nanosleep(&time_to_sleep, NULL);

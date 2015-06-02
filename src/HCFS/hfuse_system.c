@@ -34,7 +34,6 @@
 #include "meta_mem_cache.h"
 #include "global.h"
 #include "super_block.h"
-#include "dir_lookup.h"
 #include "hcfscurl.h"
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
@@ -86,14 +85,14 @@ int init_hcfs_system_data(void)
 	if (hcfs_system->system_val_fptr == NULL) {
 		errcode = errno;
 		if (errcode != -ENOENT) {
-			printf("Error reading system file. Code %d, %s\n",
+			write_log(0, "Error reading system file. Code %d, %s\n",
 				errcode, strerror(errcode));
 			return -errcode;
 		}
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "w+");
 		if (hcfs_system->system_val_fptr == NULL) {
 			errcode = errno;
-			printf("Error reading system file. Code %d, %s\n",
+			write_log(0, "Error reading system file. Code %d, %s\n",
 				errcode, strerror(errcode));
 			return -errcode;
 		}
@@ -104,7 +103,7 @@ int init_hcfs_system_data(void)
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 		if (hcfs_system->system_val_fptr == NULL) {
 			errcode = errno;
-			printf("Error reading system file. Code %d, %s\n",
+			write_log(0, "Error reading system file. Code %d, %s\n",
 				errcode, strerror(errcode));
 			return -errcode;
 		}
@@ -173,9 +172,6 @@ int init_hfuse(void)
 	ret_val = super_block_init();
 	if (ret_val < 0)
 		return ret_val;
-	ret_val = init_pathname_cache();
-	if (ret_val < 0)
-		return ret_val;
 	ret_val = init_system_fh_table();
 	if (ret_val < 0)
 		return ret_val;
@@ -208,7 +204,7 @@ int init_hfuse(void)
 		/*TODO: put error handling here if root_inode is not 1
 					(cannot initialize system)*/
 		if (root_inode != 1) {
-			printf("Error initializing system\n");
+			write_log(0, "Error initializing system\n");
 			return -EPERM;
 		}
 
@@ -216,7 +212,7 @@ int init_hfuse(void)
 
 		metafptr = fopen(rootmetapath, "w");
 		if (metafptr == NULL) {
-			printf("IO error in initializing system\n");
+			write_log(0, "IO error in initializing system\n");
 			return -EIO;
 		}
 
@@ -265,7 +261,7 @@ int _init_download_curl(int count)
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend\n");
+		write_log(0, "error in connecting to backend\n");
 		if (download_curl_handles[count].curl != NULL)
 			hcfs_destroy_backend(download_curl_handles[count].curl);
 		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
@@ -316,7 +312,7 @@ int main(int argc, char **argv)
 
 	ret_val = setrlimit(RLIMIT_NOFILE, &nofile_limit);
 	if (ret_val < 0) {
-		printf("Error in setting open file limits\n");
+		write_log(0, "Error in setting open file limits\n");
 /*
 		exit(-1);
 */
@@ -324,17 +320,17 @@ int main(int argc, char **argv)
 	sprintf(curl_handle.id, "main");
 	ret_val = hcfs_init_backend(&curl_handle);
 	if ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend. Code %d\n", ret_val);
-		printf("Backend %d\n", CURRENT_BACKEND);
+		write_log(0, "Error in connecting to backend. Code %d\n", ret_val);
+		write_log(0, "Backend %d\n", CURRENT_BACKEND);
 		exit(-1);
 	}
 
 	ret_val = hcfs_list_container(&curl_handle);
 	if ((ret_val < 200) || (ret_val > 299)) {
-		printf("error in connecting to backend\n");
+		write_log(0, "Error in connecting to backend\n");
 		exit(-1);
 	}
-	printf("ret code %d\n", ret_val);
+	write_log(10, "ret code %d\n", ret_val);
 
 	hcfs_destroy_backend(curl_handle.curl);
 
@@ -346,7 +342,7 @@ int main(int argc, char **argv)
 	this_pid = fork();
 	if (this_pid == 0) {
 		open_log("cache_maintain_log");
-		write_log(0, "\nStart logging cache cleanup\n");
+		write_log(2, "\nStart logging cache cleanup\n");
 
 		run_cache_loop();
 		close_log();
@@ -354,7 +350,7 @@ int main(int argc, char **argv)
 		this_pid1 = fork();
 		if (this_pid1 == 0) {
 			open_log("backend_upload_log");
-			write_log(0, "\nStart logging backend upload\n");
+			write_log(2, "\nStart logging backend upload\n");
 			pthread_create(&delete_loop_thread, NULL, &delete_loop,
 									NULL);
 			upload_loop();
@@ -362,7 +358,7 @@ int main(int argc, char **argv)
 		} else {
 
 			open_log("fuse_log");
-			write_log(0, "\nStart logging fuse\n");
+			write_log(2, "\nStart logging fuse\n");
 			sem_init(&download_curl_sem, 0,
 					MAX_DOWNLOAD_CURL_HANDLE);
 			sem_init(&download_curl_control_sem, 0, 1);
@@ -372,7 +368,7 @@ int main(int argc, char **argv)
 				_init_download_curl(count);
 
 			hook_fuse(argc, argv);
-			write_log(0, "Waiting for subprocesses to terminate\n");
+			write_log(2, "Waiting for subprocesses to terminate\n");
 			waitpid(this_pid, NULL, 0);
 			waitpid(this_pid1, NULL, 0);
 			close_log();

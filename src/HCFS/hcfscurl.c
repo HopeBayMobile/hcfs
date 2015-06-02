@@ -26,6 +26,7 @@
 
 #include "b64encode.h"
 #include "params.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -126,7 +127,7 @@ int parse_list_header(FILE *fptr)
 				"X-Container-Object-Count: %s\n", temp_string2);
 			total_objs = atoi(temp_string2);
 
-			printf("total objects %d\n", total_objs);
+			write_log(10, "total objects %d\n", total_objs);
 
 			return retcodenum;
 		}
@@ -147,8 +148,7 @@ int parse_list_header(FILE *fptr)
 int parse_S3_list_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
-	char temp_string[1024], temp_string2[1024];
-	int ret_val, retcodenum, total_objs;
+	int ret_val, retcodenum;
 
 	fseek(fptr, 0, SEEK_SET);
 	ret_val = fscanf(fptr, "%s %s", httpcode, retcode);
@@ -189,7 +189,7 @@ int parse_http_header_retcode(FILE *fptr)
 *
 * Function name: dump_list_body
 *        Inputs: FILE *fptr
-*       Summary: For Swift list requests, dump to stdout the content of results.
+*       Summary: For Swift list requests, dump the content of results.
 *  Return value: None.
 *
 *************************************************************************/
@@ -203,7 +203,7 @@ void dump_list_body(FILE *fptr)
 		ret_val = fscanf(fptr, "%s\n", temp_string);
 		if (ret_val < 1)
 			break;
-		printf("%s\n", temp_string);
+		write_log(10, "%s\n", temp_string);
 	}
 }
 
@@ -226,7 +226,7 @@ void dump_S3_list_body(FILE *fptr)
 		temp_string[ret_val] = 0;
 		if (ret_val < 1)
 			break;
-		printf("%s", temp_string);
+		write_log(10, "%s", temp_string);
 	}
 }
 
@@ -336,9 +336,6 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 *************************************************************************/
 int hcfs_init_S3_backend(CURL_HANDLE *curl_handle)
 {
-	char account_user_string[1000];
-	int ret_code;
-
 	curl_handle->curl = curl_easy_init();
 
 	if (curl_handle->curl)
@@ -386,8 +383,6 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 *************************************************************************/
 int hcfs_S3_reauth(CURL_HANDLE *curl_handle)
 {
-	char account_user_string[1000];
-	int ret_code;
 
 	if (curl_handle->curl != NULL)
 		hcfs_destroy_swift_backend(curl_handle->curl);
@@ -704,7 +699,6 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 	char delete_command[10];
@@ -781,7 +775,7 @@ void convert_currenttime(unsigned char *date_string)
 	gmtime_r(&tmptime, &tmp_gmtime);
 	asctime_r(&tmp_gmtime, current_time);
 
-	printf("current time %s\n", current_time);
+	write_log(10, "current time %s\n", current_time);
 
 	sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday,
 							timestr, year);
@@ -789,7 +783,7 @@ void convert_currenttime(unsigned char *date_string)
 	sprintf(date_string, "%s, %s %s %s %s GMT", wday, mday, month,
 							year, timestr);
 
-	printf("converted string %s\n", date_string);
+	write_log(10, "converted string %s\n", date_string);
 }
 
 /************************************************************************
@@ -809,9 +803,9 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	HMAC_CTX myctx;
 	int count;
 
-	printf("key: %s\n", key);
-	printf("input: %s\n", input_str);
-	printf("%d, %d\n", strlen(key), strlen(input_str));
+	write_log(10, "key: %s\n", key);
+	write_log(10, "input: %s\n", input_str);
+	write_log(10, "%d, %d\n", strlen(key), strlen(input_str));
 	HMAC_CTX_init(&myctx);
 
 	HMAC_Init_ex(&myctx, key, strlen(key), EVP_sha1(), NULL);
@@ -824,8 +818,8 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	*outputlen = len_finalhash;
 
 	for (count = 0; count < len_finalhash; count++)
-		printf("%02X", finalhash[count]);
-	printf("\n");
+		write_log(10, "%02X", finalhash[count]);
+	write_log(10, "\n");
 }
 
 /************************************************************************
@@ -846,12 +840,12 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 	convert_currenttime(date_string);
 	sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
 							resource_string);
-	printf("sig temp1: %s\n", sig_temp1);
+	write_log(10, "sig temp1: %s\n", sig_temp1);
 	compute_hmac_sha1(sig_temp1, sig_temp2, S3_SECRET, &hashlen);
-	printf("sig temp2: %s\n", sig_temp2);
+	write_log(10, "sig temp2: %s\n", sig_temp2);
 	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
 
-	printf("final sig: %s, %d\n", sig_string, hashlen);
+	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
 }
 
 /************************************************************************
@@ -894,7 +888,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -933,7 +927,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 		dump_S3_list_body(S3_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
 
-	printf("return val is: %d\n", ret_val);
+	write_log(10, "return val is: %d\n", ret_val);
 
 	fclose(S3_list_header_fptr);
 	unlink(header_filename);
@@ -959,7 +953,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
-		write_log(0, "Connecting to Swift backend\n");
+		write_log(2, "Connecting to Swift backend\n");
 		ret_val = hcfs_init_swift_backend(curl_handle);
 		while ((ret_val < 200) || (ret_val > 299)) {
 			if (curl_handle->curl != NULL)
@@ -1191,7 +1185,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -1291,7 +1285,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -1357,7 +1351,6 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 	char delete_command[10];
@@ -1388,7 +1381,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 

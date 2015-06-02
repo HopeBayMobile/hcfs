@@ -27,6 +27,7 @@
 #include "params.h"
 #include "utils.h"
 #include "meta_mem_cache.h"
+#include "logger.h"
 
 /************************************************************************
 *
@@ -111,9 +112,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 
 /*TODO: What to do if cannot create new meta cache entry? */
 
-	#if DEBUG >= 5
-	printf("fetch_inode_stat %lld\n", inode_stat->st_ino);
-	#endif	/* DEBUG */
+	write_log(10, "fetch_inode_stat %lld\n", inode_stat->st_ino);
 
 	return 0;
 }
@@ -179,7 +178,6 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen)
 {
-	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
@@ -266,12 +264,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 			const char *selfname)
 {
 	DIR_META_TYPE tempmeta;
-	char thismetapath[METAPATHLEN];
-	char todelete_metapath[METAPATHLEN];
 	int ret_val;
-	FILE *todeletefptr, *metafptr;
-	char filebuf[5000];
-	size_t read_size;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
@@ -280,7 +273,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 
-	printf("TOTAL CHILDREN is now %ld\n", tempmeta.total_children);
+	write_log(10, "TOTAL CHILDREN is now %ld\n", tempmeta.total_children);
 
 	if (tempmeta.total_children > 0)
 		return -ENOTEMPTY;

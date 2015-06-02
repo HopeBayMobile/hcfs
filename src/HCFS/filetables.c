@@ -70,7 +70,6 @@ int init_system_fh_table(void)
 long long open_fh(ino_t thisinode, int flags)
 {
 	long long index;
-	char thismetapath[METAPATHLEN];
 
 	sem_wait(&(system_fh_table.fh_table_sem));
 

@@ -30,6 +30,7 @@
 #include "params.h"
 #include "fuseop.h"
 #include "super_block.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -244,7 +245,7 @@ void build_cache_usage(void)
 	char tempval[10];
 	size_t tmp_size;
 
-	printf("Building cache usage hash table\n");
+	write_log(5, "Building cache usage hash table\n");
 	cache_usage_hash_init();
 
 	for (count = 0; count < NUMSUBDIR; count++) {
@@ -257,7 +258,7 @@ void build_cache_usage(void)
 
 		readdir_r(dirptr, &temp_dirent, &direntptr);
 		while (direntptr != NULL) {
-			ret_val = sscanf(temp_dirent.d_name, "block%lld_%lld",
+			ret_val = sscanf(temp_dirent.d_name, "block%ld_%lld",
 							&this_inode, &blockno);
 			if (ret_val != 2) {
 				readdir_r(dirptr, &temp_dirent, &direntptr);
