@@ -720,7 +720,7 @@ void upload_loop(void)
 	init_upload_control();
 	init_sync_control();
 	is_start_check = TRUE;
-
+	
 	write_log(2, "Start upload loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {

@@ -36,7 +36,8 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	return NULL;
+	/* Don't care the return value except NULL. It is not used. */
+	return 1; 
 }
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
