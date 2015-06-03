@@ -30,11 +30,12 @@
 
 /* If cache lock not locked, return -1*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
-	int sem_val; \
-	sem_getvalue((ptr_sem), &sem_val); \
-	if (sem_val > 0) \
-		return -1;
-
+	{ \
+		int sem_val; \
+		sem_getvalue((ptr_sem), &sem_val); \
+		if (sem_val > 0) \
+		return -1; \
+	} 
 /* TODO: Consider whether want to use write-back mode for meta caching */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;

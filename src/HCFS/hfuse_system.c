@@ -84,7 +84,7 @@ int init_hcfs_system_data(void)
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
 		errcode = errno;
-		if (errcode != -ENOENT) {
+		if (errcode != ENOENT) {
 			write_log(0, "Error reading system file. Code %d, %s\n",
 				errcode, strerror(errcode));
 			return -errcode;

@@ -140,5 +140,4 @@
 			goto errcode_handle;\
 		}\
 	}
-
 #endif  /* GW20_HCFS_MACRO_H_ */

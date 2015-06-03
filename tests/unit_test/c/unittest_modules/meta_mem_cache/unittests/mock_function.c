@@ -74,12 +74,14 @@ struct stat *generate_mock_stat(ino_t inode_num)
 	test_stat->st_uid = inode_num + 6;
 	test_stat->st_gid = inode_num + 9;
 	test_stat->st_size = inode_num * 97;
+	test_stat->st_mode = S_IFREG;
+	
 	return test_stat;
 }
 
 int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	if(inode_ptr == NULL)
+	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
 
 	memcpy(&(inode_ptr->inode_stat), generate_mock_stat(this_inode), sizeof(struct stat));
