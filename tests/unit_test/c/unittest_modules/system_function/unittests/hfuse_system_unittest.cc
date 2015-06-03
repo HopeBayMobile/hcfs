@@ -30,13 +30,20 @@ class BaseClassWithSystemPath : public ::testing::Test {
 };
 
 class init_hcfs_system_dataTest : public BaseClassWithSystemPath {
+protected:
+	void TearDown()
+	{
+		unlink(HCFSSYSTEM);
 
+		BaseClassWithSystemPath::TearDown();
+	}
 };
 
 TEST_F(init_hcfs_system_dataTest, Creat_and_Init_SystemDataSuccess)
 {
 	/* Run function */
 	ASSERT_EQ(0, init_hcfs_system_data());
+	
 	/* Check answer */
 	ASSERT_EQ(0, access(HCFSSYSTEM, F_OK));
 	ASSERT_EQ(0, unlink(HCFSSYSTEM));
@@ -52,18 +59,21 @@ TEST_F(init_hcfs_system_dataTest, ReadSystemDataSuccess)
 	systemdata_answer.cache_size = 98765;
 	systemdata_answer.cache_blocks = 11223344;
 	fptr = fopen(HCFSSYSTEM, "r+");
-	if (fptr != NULL)
+	if (fptr != NULL) {
+		fclose(fptr);
 		unlink(HCFSSYSTEM);
+	}
 	fptr = fopen(HCFSSYSTEM, "w+");
 	fwrite(&systemdata_answer, sizeof(SYSTEM_DATA_TYPE), 1, fptr);
 	fclose(fptr);
+	
 	/* Run function */
 	ASSERT_EQ(0, init_hcfs_system_data());
+	
 	/* Check answer */
 	ASSERT_EQ(0, access(HCFSSYSTEM, F_OK));
 	EXPECT_EQ(0, memcmp(&systemdata_answer, &(hcfs_system->systemdata), 
 						sizeof(SYSTEM_DATA_TYPE)));
-	//unlink(HCFSSYSTEM);
 	ASSERT_EQ(0, unlink(HCFSSYSTEM));
 }
 /*
@@ -129,19 +139,29 @@ TEST_F(sync_hcfs_system_dataTest, NeedLock_SyncSuccess)
  */
 
 class init_hfuseTest : public BaseClassWithSystemPath {
+protected:
+	void TearDown()
+	{
+		unlink("/tmp/root_meta_path");
+		unlink(HCFSSYSTEM);	
+
+		BaseClassWithSystemPath::TearDown();
+	}
 };
 
 TEST_F(init_hfuseTest, RootMetaPathAlreadyExist)
 {
 	mknod("/tmp/root_meta_path", 0700, S_IFREG);
+	
 	/* Run function */
-	ASSERT_EQ(0, init_hfuse());
+	EXPECT_EQ(0, init_hfuse());
+	
 	/* Remove */
 	unlink("/tmp/root_meta_path");
 	unlink(HCFSSYSTEM);
 }
 
-TEST_F(init_hfuseTest, RootMetaPath)
+TEST_F(init_hfuseTest, CreateRootMetaPathSuccess)
 {
 	FILE *meta_ptr;
 	struct stat result_stat;
@@ -149,6 +169,7 @@ TEST_F(init_hfuseTest, RootMetaPath)
 
 	/* Run function */
 	ASSERT_EQ(0, init_hfuse());
+	
 	/* Check_answer */
 	meta_ptr = fopen("/tmp/root_meta_path", "r+");
 	ASSERT_TRUE( NULL != meta_ptr );
@@ -160,6 +181,7 @@ TEST_F(init_hfuseTest, RootMetaPath)
 	EXPECT_EQ(getgid(), result_stat.st_gid);
 	EXPECT_EQ(1, result_stat.st_ino);
 	EXPECT_EQ(sizeof(DIR_META_TYPE) + sizeof(struct stat), result_meta.root_entry_page);
+	
 	/* Remove */
 	unlink("/tmp/root_meta_path");
 	unlink(HCFSSYSTEM);
@@ -195,7 +217,7 @@ TEST_F(mainTest, InitBackendFail)
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = FALSE;
 	/* Test */	
-	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(0), "");
+	EXPECT_EXIT(main(1, tmp_argv), ::testing::ExitedWithCode(255), "");
 }
 
 TEST_F(mainTest, ListContainerFail)
@@ -203,7 +225,7 @@ TEST_F(mainTest, ListContainerFail)
 	hcfs_list_container_success = FALSE;
 	hcfs_init_backend_success = TRUE;
 	/* Test */
-	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(0), "");
+	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(255), "");
 }
 
 TEST_F(mainTest, MainFunctionSuccess)
@@ -214,13 +236,13 @@ TEST_F(mainTest, MainFunctionSuccess)
 	hcfs_list_container_success = TRUE;
 	hcfs_init_backend_success = TRUE;
 	/* Test */
-	ASSERT_EQ(0, main(1, tmp_argv));
+	EXPECT_EQ(0, main(1, tmp_argv));
 	sleep(1); // Waiting for child process finishing their work
 	/* Check */
 	EXPECT_EQ(0, access("backend_upload_log", F_OK));
 	EXPECT_EQ(0, access("cache_maintain_log", F_OK));
 	EXPECT_EQ(0, access("fuse_log", F_OK));
-	/* Restore */
+	/* Recover */
 	EXPECT_EQ(0, unlink("backend_upload_log"));
 	EXPECT_EQ(0, unlink("cache_maintain_log"));
 	EXPECT_EQ(0, unlink("fuse_log"));
