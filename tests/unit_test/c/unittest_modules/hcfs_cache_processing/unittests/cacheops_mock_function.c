@@ -19,7 +19,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
-void build_cache_usage()
+int build_cache_usage(void)
 {
 	return ;
 }
@@ -46,6 +46,11 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	long long target_page, long long hint_page)
+{
+	return 0;
+}
+
+int write_log(int level, char *format, ...)
 {
 	return 0;
 }

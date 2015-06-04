@@ -16,3 +16,7 @@ void init_mock_system_config()
 	strcpy(system_config.blockpath, "/tmp/blockpath");
 }
 
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}

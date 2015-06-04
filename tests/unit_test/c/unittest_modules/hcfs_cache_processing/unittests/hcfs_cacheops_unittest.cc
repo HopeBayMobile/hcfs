@@ -1,28 +1,29 @@
+#include "gtest/gtest.h"
 extern "C" {
 #include "hcfs_cacheops.h"
+#include "hcfs_cachebuild.h"
 #include "mock_params.h"
+#include "fuseop.h"
+#include "global.h"
 }
 
 class run_cache_loopTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-
-	}
-	void TearDown()
-	{
-
-	}
-	void init_mock_hcfssystem()
-	{
 		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 		sem_init(&(hcfs_system->access_sem), 1, 1); 
 		sem_init(&(hcfs_system->num_cache_sleep_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_cache_sem), 1, 0); 
 		sem_init(&(hcfs_system->check_next_sem), 1, 0);
-		
-		hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; 
+
 	}
+	
+	void TearDown()
+	{
+		free(hcfs_system);
+	}
+	
 	void init_mock_cache_usage()
 	{
 		cache_usage_init();
@@ -57,8 +58,24 @@ private:
 	}	
 };
 
+void *cache_loop_function(void *ptr)
+{
+	run_cache_loop();
+	printf("Test: run_cache_loop() thread leave\n");
+	return NULL;
+}
+
 TEST_F(run_cache_loopTest, DeleteLocalBlock_WhenFull)
 {
-	init_mock_hcfssystem();
+	pthread_t thread_id;
+
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; 
+	hcfs_system->system_going_down = FALSE;
 	init_mock_cache_usage();
+
+	pthread_create(&thread_id, NULL, cache_loop_function, NULL);
+	sleep(1);
+	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT - 1; 
+	hcfs_system->system_going_down = TRUE;
+	sleep(1);
 }
