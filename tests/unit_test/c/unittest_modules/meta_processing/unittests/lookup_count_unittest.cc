@@ -5,6 +5,7 @@ extern "C" {
 #include "fuseop.h"
 #include <semaphore.h>
 #include <errno.h>
+#include "mock_param.h"
 }
 
 /*
@@ -298,4 +299,105 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsNegativeNumber)
 
 /*
 	End of unittest of lookup_decrease()
+ */
+
+/*
+	Unittest of lookup_markdelete()
+ */
+
+class lookup_markdeleteTest : public InitLookupTableBaseClass {
+
+};
+
+TEST_F(lookup_markdeleteTest, MarkDeleteFail_LookupEntryNotFound)
+{	
+	unsigned num_insert_inode;
+	ino_t inode_markdelete;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	inode_markdelete = NUM_LOOKUP_ENTRIES * 3 + 100;
+
+	/* Run 3 times */
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 1));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 2));
+}
+
+TEST_F(lookup_markdeleteTest, MarkDeleteSuccess)
+{	
+	unsigned num_insert_inode;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+
+	/* Run many times */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) 
+		// All vars not_delete is set as FALSE before running
+		EXPECT_EQ(0, lookup_markdelete(inode));
+
+	/* Verify */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) {
+		LOOKUP_NODE_TYPE *ptr;
+
+		ptr = find_lookup_entry(inode);
+		ASSERT_EQ(TRUE, ptr->to_delete);
+	}
+}
+
+/*
+	End of unittest of lookup_markdelete()
+ */
+
+/*
+	Unittest of lookup_destroy()
+ */
+
+class lookup_destroyTest : public InitLookupTableBaseClass {
+protected:
+	void SetUp()
+	{
+		InitLookupTableBaseClass::SetUp();
+		
+		check_actual_delete_table = NULL;
+	}
+
+	void TearDown()
+	{
+		if (check_actual_delete_table)
+			free(check_actual_delete_table);
+
+		InitLookupTableBaseClass::TearDown();
+	}
+};
+
+TEST_F(lookup_destroyTest, DestroyEmptyTableSuccess)
+{
+	/* Run */
+	EXPECT_EQ(0, lookup_destroy());
+}
+
+TEST_F(lookup_destroyTest, DestroyTableSuccess)
+{
+	unsigned num_insert_inode;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	check_actual_delete_table = (char *)malloc(num_insert_inode * sizeof(char));
+	memset(check_actual_delete_table, FALSE, num_insert_inode * sizeof(char));
+
+	/* Run */
+	EXPECT_EQ(0, lookup_destroy());
+	
+	/* Verify */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) {
+		EXPECT_EQ(TRUE, check_actual_delete_table[inode]);
+	}
+}
+
+/*
+	End of unittest of lookup_destroy()
  */

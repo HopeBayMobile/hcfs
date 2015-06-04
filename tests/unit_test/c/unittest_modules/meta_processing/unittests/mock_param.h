@@ -103,8 +103,13 @@ enum { INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_1,
 };
 
 /*
-	Mock data for super_block
+	Mock data for super_block_unittest
  */
 SYSTEM_CONF_STRUCT system_config;
+
+/*
+	Tool vars used for lookup_count_unittest	
+ */
+char *check_actual_delete_table;
 
 #endif
