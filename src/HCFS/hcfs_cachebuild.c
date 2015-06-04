@@ -118,12 +118,12 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 *  Return value: None
 *
 *************************************************************************/
-void insert_cache_usage_node(ino_t this_inode, CACHE_USAGE_NODE *this_node)
+void insert_cache_usage_node(CACHE_USAGE_NODE *this_node)
 {
 	int hash_value;
 	CACHE_USAGE_NODE *node_ptr, *next_ptr;
 
-	hash_value = this_inode % CACHE_USAGE_NUM_ENTRIES;
+	hash_value = this_node->this_inode % CACHE_USAGE_NUM_ENTRIES;
 
 	node_ptr = inode_cache_usage_hash[hash_value];
 
