@@ -140,4 +140,38 @@
 			goto errcode_handle;\
 		}\
 	}
+
+#define ATOL(A)\
+	{\
+		errno = 0;\
+		endptr = 0;\
+		ret_num = strtol(A, &endptr, 10);\
+		errcode = errno;\
+		if (errcode != 0) {\
+			write_log(0, "Conversion error in %s. Code %d, %s\n",\
+				__func__, errcode, strerror(errcode));\
+			goto errcode_handle;\
+		}\
+		if ((endptr != 0) && (*endptr != '\0')) {\
+			write_log(0, "Conversion error in %s.\n",\
+				__func__);\
+			goto errcode_handle;\
+		}\
+	}
+
+#define HTTP_PERFORM_RETRY(A)\
+	{\
+		num_retries = 0;\
+		while (num_retries < MAX_RETRIES) {\
+			res = curl_easy_perform(A);\
+			if (res == CURLE_OPERATION_TIMEDOUT) {\
+				num_retries++;\
+				if (num_retries < MAX_RETRIES)\
+					continue;\
+			}\
+			if (res != CURLE_OK)\
+				break;\
+		}\
+	}
+
 #endif  /* GW20_HCFS_MACRO_H_ */
