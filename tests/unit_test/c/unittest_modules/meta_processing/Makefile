@@ -49,7 +49,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 
 all : $(TESTS)
 
-test:
+test: $(TESTS)
 	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest

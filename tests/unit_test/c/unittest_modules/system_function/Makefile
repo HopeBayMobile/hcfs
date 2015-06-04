@@ -51,7 +51,7 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o
 	rm -f *.gcda *.gcno
 
-test:
+test: $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
 

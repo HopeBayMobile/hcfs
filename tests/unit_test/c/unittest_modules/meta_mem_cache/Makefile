@@ -50,7 +50,7 @@ all : $(TESTS)
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test :
+test : $(TESTS)
 	./meta_mem_cache_unittest
 
 # Builds gtest.a and gtest_main.a.
