@@ -439,10 +439,13 @@ int super_block_mark_dirty(ino_t this_inode)
 *        Inputs: ino_t this_inode, char is_start_transit
 *       Summary: Update the in_transit status for inode number "this_inode".
 *                Mark the in_transit flag using the input "is_start_transit".
+*                "transit_incomplete" indicates whether the transfer is not
+*                finished completely and we should not clear dirty bit.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_update_transit(ino_t this_inode, char is_start_transit)
+int super_block_update_transit(ino_t this_inode, char is_start_transit,
+	char transit_incomplete)
 {
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -454,7 +457,8 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit)
 	if (ret_val >= 0) {
 		if (((is_start_transit == FALSE) &&
 				(tempentry.status == IS_DIRTY)) &&
-				(tempentry.mod_after_in_transit == FALSE)) {
+				((transit_incomplete != TRUE) &&
+				(tempentry.mod_after_in_transit == FALSE))) {
 			/* If finished syncing and no more mod is done after
 			*  queueing the inode for syncing */
 			/* Remove from is_dirty list */
