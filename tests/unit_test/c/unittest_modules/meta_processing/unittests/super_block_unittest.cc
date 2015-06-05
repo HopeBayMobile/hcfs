@@ -554,7 +554,7 @@ TEST_F(super_block_update_transitTest, Set_is_start_transit_TRUE)
 		entry_filepos);
 	
 	/* Run */
-	EXPECT_EQ(0, super_block_update_transit(inode, TRUE, TRUE));
+	EXPECT_EQ(0, super_block_update_transit(inode, TRUE, FALSE));
 
 	/* Verify */
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
