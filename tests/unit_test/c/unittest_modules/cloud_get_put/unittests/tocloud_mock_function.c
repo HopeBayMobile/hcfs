@@ -1,4 +1,5 @@
 #include <sys/stat.h>
+#include <stdarg.h>
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -39,7 +40,8 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return HTTP_OK;
 }
 
-int super_block_update_transit(ino_t this_inode, char is_start_transit)
+int super_block_update_transit(ino_t this_inode, char is_start_transit,
+	char transit_incomplete)
 {
 	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
@@ -47,7 +49,7 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit)
 			this_inode;
 		shm_verified_data->record_inode_counter++;
 		sem_post(&shm_verified_data->record_inode_sem);
-		printf("Test: inode %d is deleted\n", this_inode);
+		printf("Test: inode %d is updated\n", this_inode);
 	}
 	return 0;
 }
@@ -87,7 +89,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return 0;
 }
 
-void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
+int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
 	char deleteobjname[30];
 	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
@@ -98,7 +100,7 @@ void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_han
 	strcpy(objname_list[objname_counter], deleteobjname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
-	return ;
+	return 0;
 }
 
 int super_block_exclusive_locking(void)
@@ -113,6 +115,7 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
+	(inode_ptr->inode_stat).st_mode = S_IFDIR;
 	
 	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
 		inode_ptr->util_ll_next = 0;
@@ -145,5 +148,10 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }

@@ -16,12 +16,17 @@ class uploadEnvironment : public ::testing::Environment {
  public:
 
   virtual void SetUp() {
-    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    int shm_key;
+
+    shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
+    hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
+
+//    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
   }
 
   virtual void TearDown() {
-    free(hcfs_system);
+//    free(hcfs_system);
 
   }
 };
@@ -75,6 +80,7 @@ public:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_file_meta;
 
+		init_sync_control();
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
@@ -523,7 +529,16 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 {
 	pid_t pid;
 	int shm_key, shm_key2;
-	
+	struct stat test;
+
+	FILE *mock_file_meta;
+
+	init_upload_control();
+	init_sync_control();
+	mock_file_meta = fopen(MOCK_META_PATH, "w+");
+	fwrite(&test, sizeof(struct stat), 1, mock_file_meta);
+	fclose(mock_file_meta);
+
 	/* Generate mock data and allocate space to check answer */
 	shm_key = shmget(1122, sizeof(LoopTestData), IPC_CREAT | 0666);
 	ASSERT_NE(-1, shm_key);
@@ -558,8 +573,10 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 		upload_loop();
 		exit(0);
 	}
-	sleep(3);
-	kill(pid, SIGKILL); // Kill child process
+	sleep(10);
+	hcfs_system->system_going_down = TRUE;
+	wait(NULL);
+//	kill(pid, SIGKILL); // Kill child process
 
 	/* Verify */
 	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);
@@ -568,6 +585,8 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
 		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
 	}
+
+	unlink(MOCK_META_PATH);
 }
 
 /*

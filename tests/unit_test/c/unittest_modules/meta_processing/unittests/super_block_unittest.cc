@@ -532,7 +532,7 @@ TEST_F(super_block_update_transitTest, ReadEntryFail)
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
 	/* Run */
-	EXPECT_EQ(-EBADF, super_block_update_transit(inode, FALSE));
+	EXPECT_EQ(-EBADF, super_block_update_transit(inode, FALSE, FALSE));
 }
 
 TEST_F(super_block_update_transitTest, SetStartTransit_TRUE)
@@ -554,7 +554,7 @@ TEST_F(super_block_update_transitTest, SetStartTransit_TRUE)
 		entry_filepos);
 	
 	/* Run */
-	EXPECT_EQ(0, super_block_update_transit(inode, TRUE));
+	EXPECT_EQ(0, super_block_update_transit(inode, TRUE, FALSE));
 
 	/* Verify */
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
@@ -583,7 +583,7 @@ TEST_F(super_block_update_transitTest, DequeueDirtyList_CancelTransitSuccess)
 		entry_filepos);
 	
 	/* Run */
-	EXPECT_EQ(0, super_block_update_transit(inode, FALSE));
+	EXPECT_EQ(0, super_block_update_transit(inode, FALSE, FALSE));
 
 	/* Verify */
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
