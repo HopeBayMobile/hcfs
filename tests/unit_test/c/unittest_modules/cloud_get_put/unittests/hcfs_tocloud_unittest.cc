@@ -573,7 +573,7 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	ASSERT_NE((void *)-1, shm_test_data);
 	shm_test_data->num_inode = 40; // Test 40 nodes	
 	
-	shm_key2 = shmget(1244, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
+	shm_key2 = shmget(2222, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
 	ASSERT_NE(-1, shm_key2);
 	shm_test_data->to_handle_inode = (int *)shmat(shm_key2, NULL, 0);
 	ASSERT_NE((void *)-1, shm_test_data->to_handle_inode);
@@ -586,7 +586,7 @@ TEST(upload_loopTest, UploadLoopWorkSuccess)
 	/* Allocate a share space to store actual value */
 	shm_key = shmget(5566, sizeof(LoopToVerifiedData), IPC_CREAT | 0666);
 	shm_verified_data = (LoopToVerifiedData *) shmat(shm_key, NULL, 0);
-	shm_key2 = shmget(1144, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
+	shm_key2 = shmget(8899, sizeof(int)*shm_test_data->num_inode, IPC_CREAT | 0666);
 	shm_verified_data->record_handle_inode = (int *)shmat(shm_key2, NULL, 0);
 	shm_verified_data->record_inode_counter = 0;
 	sem_init(&(shm_verified_data->record_inode_sem), 0, 1);
