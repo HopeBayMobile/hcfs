@@ -462,19 +462,25 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 *        Inputs: ino_t this_inode, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the meta object
 *                of inode number "this_inode" from backend.
-*  Return value: None
+*  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
+int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
-	int ret_val;
+	int ret_val, ret;
 
 	sprintf(objname, "meta_%ld", this_inode);
 	write_log(10, "Debug meta deletion: objname %s, inode %ld\n",
 						objname, this_inode);
 	sprintf(curl_handle->id, "delete_meta_%ld", this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
+	/* Already retried in get object if necessary */
+	if ((ret_val >= 200) && (ret_val <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
+	return ret;
 }
 
 /************************************************************************
@@ -483,14 +489,14 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *        Inputs: ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the block object
 *                of inode number "this_inode", block no "block_no" from backend.
-*  Return value: None
+*  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-void do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, long long block_no,
 						CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
-	int ret_val;
+	int ret_val, ret;
 
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 	write_log(10,
@@ -498,6 +504,12 @@ void do_block_delete(ino_t this_inode, long long block_no,
 					objname, this_inode, block_no);
 	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
 	ret_val = hcfs_delete_object(objname, curl_handle);
+	/* Already retried in get object if necessary */
+	if ((ret_val >= 200) && (ret_val <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
+	return ret;
 }
 
 /************************************************************************

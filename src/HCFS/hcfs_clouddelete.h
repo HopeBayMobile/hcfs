@@ -67,9 +67,9 @@ typedef struct {
 DELETE_THREAD_CONTROL delete_ctl;
 DSYNC_THREAD_CONTROL dsync_ctl;
 
-void do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, long long block_no,
 					CURL_HANDLE *curl_handle);
-void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
+int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
 void init_delete_control(void);
 void init_dsync_control(void);
