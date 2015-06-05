@@ -39,7 +39,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 	return HTTP_OK;
 }
 
-int super_block_update_transit(ino_t this_inode, char is_start_transit)
+int super_block_update_transit(ino_t this_inode, char is_start_transit, char transit_incomplete)
 {
 	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
@@ -87,7 +87,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return 0;
 }
 
-void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
+int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
 	char deleteobjname[30];
 	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
@@ -98,7 +98,7 @@ void do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_han
 	strcpy(objname_list[objname_counter], deleteobjname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
-	return ;
+	return 0;
 }
 
 int super_block_exclusive_locking(void)

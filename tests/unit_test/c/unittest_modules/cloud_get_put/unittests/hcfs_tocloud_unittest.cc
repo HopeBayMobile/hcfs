@@ -87,6 +87,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
+			
 			sprintf(path, "/tmp/data_%d_%d",inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
@@ -95,6 +96,7 @@ public:
 			sem_wait(&(upload_ctl.upload_queue_sem));
 			sem_wait(&(upload_ctl.upload_op_sem));
 			index = get_thread_index();
+			
 			upload_ctl.upload_threads[index].inode = inode;
 			upload_ctl.upload_threads[index].is_delete= is_delete;
 			upload_ctl.upload_threads[index].page_filepos = 0;
@@ -104,6 +106,7 @@ public:
 			upload_ctl.threads_in_use[index] = TRUE;
 			upload_ctl.threads_created[index] = TRUE;
 			upload_ctl.total_active_upload_threads++;
+			
 			pthread_create(&(upload_ctl.upload_threads_no[index]), 
 					NULL, InitUploadControlTool::upload_thread_function, NULL); // create thread
 			sem_post(&(upload_ctl.upload_op_sem));
@@ -147,6 +150,7 @@ TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	int num_block_entry = 80;
 	BLOCK_ENTRY_PAGE mock_block_page;
 	FILE *mock_file_meta;
+
 	/* Run tested function */
 	init_upload_control();
 
