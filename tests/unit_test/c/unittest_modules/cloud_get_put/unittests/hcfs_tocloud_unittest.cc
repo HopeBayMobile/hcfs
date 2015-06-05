@@ -84,6 +84,7 @@ public:
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
+		
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
 		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 		fclose(mock_file_meta);
@@ -127,9 +128,22 @@ private:
 	static InitUploadControlTool *tool;
 };
 
+
 InitUploadControlTool *InitUploadControlTool::tool = NULL;
 
-TEST(init_upload_controlTest, DoNothing_JustRun)
+class init_upload_controlTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+		unlink(MOCK_META_PATH);
+	}
+};
+
+TEST_F(init_upload_controlTest, DoNothing_JustRun)
 {
 	void *res;
 	char zero_mem[MAX_UPLOAD_CONCURRENCY] = {0};
@@ -150,7 +164,7 @@ TEST(init_upload_controlTest, DoNothing_JustRun)
 
 
 
-TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
+TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 {
 	void *res;
 	int num_block_entry = 80;
@@ -191,7 +205,7 @@ TEST(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 	unlink(MOCK_META_PATH);
 }
 
-TEST(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
+TEST_F(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 {
 	void *res;
 	int num_block_entry = 80;
@@ -229,10 +243,10 @@ TEST(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 
 
 
-TEST(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
+TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 {
 	void *res;
-	int num_block_entry = 20;
+	int num_block_entry = 80;
 	memset(upload_ctl_todelete_blockno, 0, num_block_entry);
 	
 	/* Run tested function */
@@ -243,9 +257,9 @@ TEST(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		ino_t inode = 1;
 		int index;
-		usleep(100000);	
-		sem_wait(&(upload_ctl.upload_op_sem));
+		//usleep(100000);	
 		sem_wait(&(upload_ctl.upload_queue_sem));
+		sem_wait(&(upload_ctl.upload_op_sem));
 		index = InitUploadControlTool::Tool()->get_thread_index();
 		upload_ctl.upload_threads[index].inode = inode;
 		upload_ctl.upload_threads[index].page_filepos = 0;
@@ -377,6 +391,8 @@ protected:
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
+		
+		unlink(MOCK_META_PATH);
 			
 		pthread_cancel(sync_ctl.sync_handler_thread);
 		pthread_join(sync_ctl.sync_handler_thread, &res);
