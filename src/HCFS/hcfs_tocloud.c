@@ -11,14 +11,19 @@
 * 2015/2/16 Jiahong added header for this file.
 * 2015/5/14 Jiahong changed code so that process will terminate with fuse
 *           unmount.
-* 2015/6/4 Jiahong added error handling.
+* 2015/6/4, 6/5 Jiahong added error handling.
 *
 **************************************************************************/
 
 /*
 TODO: Will need to check mod time of meta file and not upload meta for
 	every block status change.
-TODO: error handling for HTTP exceptions
+TODO: Need to consider how to better handle meta deletion after sync, then recreate
+(perhaps due to reusing inode.) Potential race conditions:
+1. Create a file, sync, then delete right after meta is being uploaded.
+(already a todo in sync_single_inode)
+2. If the meta is being deleted, but the inode of the meta is reused and a new
+meta is created and going to be synced.
 )
 */
 
