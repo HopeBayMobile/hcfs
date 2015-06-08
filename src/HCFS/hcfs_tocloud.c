@@ -861,7 +861,7 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 			(void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
 
-	return;
+	return 0;
 
 errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
@@ -1076,9 +1076,9 @@ void upload_loop(void)
 							&tempentry);
 					if (ret < 0)
 						ino_sync = 0;
-				 }
-			 }
-		 }
+				}
+			}
+		}
 		super_block_exclusive_release();
 		write_log(10, "Inode to sync is %ld\n", ino_sync);
 		/* Begin to sync the inode */

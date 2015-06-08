@@ -552,18 +552,36 @@ static void *upload_loop_thread_function(void *ptr)
 	return NULL;
 }
 
-TEST(upload_loopTest, UploadLoopWorkSuccess)
+TEST(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 {
 	pthread_t thread_id;
 	int shm_key, shm_key2;
-	struct stat test;
-
+	struct stat empty_stat;
+	DIR_META_TYPE empty_meta;
+	BLOCK_ENTRY_PAGE mock_block_page;
 	FILE *mock_file_meta;
 
 	init_upload_control();
 	init_sync_control();
+	
+	/* Write something into meta, int the unittest, only test
+	   the case that upload dir meta because regfile case has
+	   been tested in sync_single_inodeTest(). */
 	mock_file_meta = fopen(MOCK_META_PATH, "w+");
-	fwrite(&test, sizeof(struct stat), 1, mock_file_meta);
+	memset(&empty_stat, 0, sizeof(struct stat));
+	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	fseek(mock_file_meta, 0, SEEK_SET);
+	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
+	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
+	/*
+	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+		mock_block_page.block_entries[i].status = ST_LDISK;
+	mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
+	for (int page_num = 0 ; page_num < total_page ; page_num++) {
+		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE),
+				1, mock_metaptr); // Linearly write block page
+	}
+*/
 	fclose(mock_file_meta);
 
 	/* Generate mock data and allocate space to check answer */
