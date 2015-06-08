@@ -84,11 +84,12 @@ to zero (to save space in the long run).
 to delete or list the folder.
 */
 
+/* TODO: for mechanisms that needs timer, use per-process or per-thread
+cpu clock instead of using current time to avoid time changes due to
+ntpdate / ntpd or manual changes*/
+
 /* TODO: Go over the details involving S_ISUID, S_ISGID, and linux capability
 	problems (involving chmod, chown, etc) */
-
-/* TODO: Need to revisit the following problem for all ops:
-         error handling */
 
 /* TODO: system acl. System acl is set in extended attributes. */
 
@@ -111,12 +112,13 @@ nanosecond precision.
 */
 void set_timestamp_now(struct stat *thisstat, char mode)
 {
-	clockid_t this_clock_id;
 	struct timespec timenow;
+	int ret;
 
-	clock_getcpuclockid(0, &this_clock_id);
-	clock_gettime(this_clock_id, &timenow);
+	ret = clock_gettime(CLOCK_REALTIME, &timenow);
 
+	write_log(10, "Current time %s, ret %d\n",
+		ctime(&(timenow.tv_sec)), ret);
 	if (mode & ATIME) {
 		thisstat->st_atime = (time_t)(timenow.tv_sec);
 		memcpy(&(thisstat->st_atim), &timenow,
@@ -3533,7 +3535,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int ret_val;
 	ino_t this_inode;
 	char attr_changed;
-	clockid_t this_clock_id;
 	struct timespec timenow;
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -3679,8 +3680,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		attr_changed = TRUE;
 	}
 
-	clock_getcpuclockid(0, &this_clock_id);
-	clock_gettime(this_clock_id, &timenow);
+	clock_gettime(CLOCK_REALTIME, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
 		if ((temp_context->uid != 0) &&

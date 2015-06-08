@@ -104,7 +104,7 @@ int parse_swift_auth_header(FILE *fptr)
 	if (ret_val < 2)
 		return -1;
 
-	sprintf(swift_auth_string, "%1023s %1023s", temp_string,
+	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);
 
 	return retcodenum;
@@ -363,7 +363,8 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 
 	curl_slist_free_all(chunk);
 
-	return 0;
+	write_log(10, "Ret code %d\n", ret_val);
+	return ret_val;
 
 errcode_handle:
 	return -1;
