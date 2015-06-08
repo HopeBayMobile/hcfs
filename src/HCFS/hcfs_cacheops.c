@@ -147,7 +147,6 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				/*Only delete blocks that exists on both
 					cloud and local*/
 				blk_entry_ptr->status = ST_CLOUD;
-
 				write_log(10,
 					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);

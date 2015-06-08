@@ -11,11 +11,21 @@ void init_mock_system_config()
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
+	char block_name[200];
+
+	sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", this_inode, block_num);
+	strcpy(pathname, block_name);
+	
 	return 0;
 }
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
+	char meta_name[200];
+
+	sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", this_inode);
+	strcpy(pathname, meta_name);
+
 	return 0;
 }
 
@@ -26,6 +36,12 @@ int build_cache_usage(void)
 
 int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
+	if (inode_ptr == NULL)
+		inode_ptr = (SUPER_BLOCK_ENTRY *) malloc(sizeof(SUPER_BLOCK_ENTRY));
+	
+	inode_ptr->inode_stat.st_ino = 1;
+	inode_ptr->inode_stat.st_mode = S_IFREG;
+
 	return 0;
 }
 
@@ -46,8 +62,11 @@ CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	long long target_page, long long hint_page)
-{
-	return 0;
+{	
+	long long ret = sizeof(struct stat) + sizeof(FILE_META_TYPE) + 
+		target_page * sizeof(BLOCK_ENTRY_PAGE);
+	
+	return ret;
 }
 
 int write_log(int level, char *format, ...)
