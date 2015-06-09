@@ -15,14 +15,33 @@ extern SYSTEM_DATA_HEAD *hcfs_system;
 
 class fromcloudEnvironment : public ::testing::Environment {
  public:
+  char *workpath, *tmppath;
 
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
+
   }
 
   virtual void TearDown() {
     free(hcfs_system);
+    rmdir(tmppath);
+    unlink("/tmp/testHCFS");
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
 
   }
 };
@@ -66,7 +85,7 @@ protected:
 		FILE *fptr;
 		int ret;
 
-		sprintf(tmp_filename, "/tmp/local_space%d", *(int *)block_no);
+		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int *)block_no);
 		fptr = fopen(tmp_filename, "w+");
 		ret = fetch_from_cloud(fptr, 1, *(int *)block_no);
 		fclose(fptr);
@@ -155,7 +174,7 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 	mock_page.num_entries = 1;
 	mock_page.block_entries[0].status = ST_LDISK;
 	//mock_page.next_page = 0;
-	metafptr = fopen("/tmp/tmp_meta", "w+");
+	metafptr = fopen("/tmp/testHCFS/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	prefetch_ptr->block_no = BLOCK_NUM__FETCH_SUCCESS;
@@ -166,9 +185,9 @@ TEST_F(prefetch_blockTest, BlockStatus_is_neither_STCLOUD_STCtoL)
 	/* Check answer */
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_size);
 	EXPECT_EQ(0, hcfs_system->systemdata.cache_blocks);
-	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK));	
-	unlink("/tmp/tmp_meta");
-	unlink("/tmp/tmp_block");
+	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK));	
+	unlink("/tmp/testHCFS/tmp_meta");
+	unlink("/tmp/testHCFS/tmp_block");
 }
 
 TEST_F(prefetch_blockTest, PrefetchSuccess)
@@ -186,7 +205,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	mock_page.block_entries[0].status = ST_CLOUD;
 	//mock_page.next_page = 0;
 
-	metafptr = fopen("/tmp/tmp_meta", "w+");
+	metafptr = fopen("/tmp/testHCFS/tmp_meta", "w+");
 	fwrite(&mock_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	prefetch_ptr->block_no = BLOCK_NUM__FETCH_SUCCESS; // Control success or fail to fetch from cloud.
@@ -197,17 +216,17 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	/* Check answer */
 	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size); // Total size = expected block size
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
-	EXPECT_EQ(0, access("/tmp/tmp_block", F_OK)); // Mock block path
-	EXPECT_EQ(1, getxattr("/tmp/tmp_block", "user.dirty", &xattr_result, sizeof(char))); 
+	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK)); // Mock block path
+	EXPECT_EQ(1, getxattr("/tmp/testHCFS/tmp_block", "user.dirty", &xattr_result, sizeof(char))); 
 	EXPECT_EQ('F', xattr_result); // xattr
-	metafptr = fopen("/tmp/tmp_meta", "r");	
+	metafptr = fopen("/tmp/testHCFS/tmp_meta", "r");	
 	fseek(metafptr, meta_fpos, SEEK_SET);
 	fread(&result_page, sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 	fclose(metafptr);
 	EXPECT_EQ(ST_BOTH, result_page.block_entries[entry_index].status); // status
 		
-	unlink("/tmp/tmp_meta");
-	unlink("/tmp/tmp_block");
+	unlink("/tmp/testHCFS/tmp_meta");
+	unlink("/tmp/testHCFS/tmp_block");
 }
 
 TEST_F(prefetch_blockTest, PrefetchFail)

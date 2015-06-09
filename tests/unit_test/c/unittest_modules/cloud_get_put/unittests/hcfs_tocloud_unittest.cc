@@ -41,6 +41,7 @@ class uploadEnvironment : public ::testing::Environment {
   virtual void TearDown() {
 //    free(hcfs_system);
     unlink("/tmp/testHCFS");
+    rmdir(tmppath);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)
@@ -103,6 +104,11 @@ public:
 			mock_block_page.block_entries[i].status = block_status;
 		
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
+		if (mock_file_meta == NULL) {
+			printf("Failed to generate mock\n");
+			return;
+		}
+		printf("Working on generate mock\n");
 		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 		fclose(mock_file_meta);
 
