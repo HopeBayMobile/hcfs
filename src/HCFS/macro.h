@@ -194,9 +194,9 @@
 				num_retries++;\
 				if (num_retries < MAX_RETRIES)\
 					continue;\
-			}\
-			if (res != CURLE_OK)\
+			} else {\
 				break;\
+			}\
 		}\
 	}
 

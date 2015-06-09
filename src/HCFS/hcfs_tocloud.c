@@ -25,6 +25,7 @@ TODO: Need to consider how to better handle meta deletion after sync, then recre
 2. If the meta is being deleted, but the inode of the meta is reused and a new
 meta is created and going to be synced.
 )
+TODO: Cleanup temp files in /dev/shm at system startup
 */
 
 #include "hcfs_tocloud.h"
@@ -150,10 +151,10 @@ static inline int _upload_terminate_thread(int index)
 	}
 	/* Check whether the sync-inode-thread raise error or not. */
 	if (count1 < MAX_SYNC_CONCURRENCY) {
-		if (sync_ctl.threads_error[index] == TRUE) {
+		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
-			upload_ctl.threads_in_use[index] = FALSE;
-			upload_ctl.threads_created[index] = FALSE;
+			upload_ctl.threads_in_use[count1] = FALSE;
+			upload_ctl.threads_created[count1] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0;  /* Error already marked */
@@ -314,6 +315,7 @@ void collect_finished_upload_threads(void *ptr)
 					upload_ctl.upload_threads[count].inode)
 					break;
 			}
+			write_log(10, "Recording error in %s\n", __func__);
 			if (count1 < MAX_SYNC_CONCURRENCY)
 				sync_ctl.threads_error[count1] = TRUE;
 			sem_post(&(sync_ctl.sync_op_sem));
@@ -644,6 +646,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 		if (sync_error == FALSE) {
 			/* Check the error in sync_thread */
+			write_log(10, "Checking for other error\n");
 			sem_wait(&(sync_ctl.sync_op_sem));
 			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
 				count1++) {
@@ -656,7 +659,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			sem_post(&(sync_ctl.sync_op_sem));
 		}
 		if (sync_error == TRUE)
-			write_log(0, "Sync inode %ld to backend incomplete.\n",
+			write_log(10, "Sync inode %ld to backend incomplete.\n",
 				ptr->inode);
 		super_block_update_transit(ptr->inode, FALSE, sync_error);
 	} else {
@@ -759,6 +762,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	return;
 
 errcode_handle:
+	write_log(10, "Recording error in %s\n", __func__);
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
 		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
@@ -784,6 +788,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	return;
 
 errcode_handle:
+	write_log(10, "Recording error in %s\n", __func__);
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
 		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
@@ -1003,6 +1008,10 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			sync_ctl.threads_error[count] = FALSE;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
+
+			write_log(10, "Before syncing: inode %ld, mode %d\n",
+				sync_threads[count].inode,
+				sync_threads[count].this_mode);
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
 					NULL, (void *)&sync_single_inode,
 					(void *)&(sync_threads[count]));
@@ -1114,5 +1123,8 @@ void upload_loop(void)
 			is_start_check = TRUE;
 		}
 	}
+
+	pthread_join(upload_ctl.upload_handler_thread, NULL);
+	pthread_join(sync_ctl.sync_handler_thread, NULL);
 }
 
