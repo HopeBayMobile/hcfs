@@ -23,6 +23,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "params.h"
 #include "global.h"
@@ -52,9 +53,6 @@ int open_log(char *filename)
 		return -errcode;
 	}
 	logptr->fptr = fopen(filename, "a+");
-	setbuf(logptr->fptr, NULL);
-	fchmod(fileno(logptr->fptr), 0600);
-
 	if (logptr->fptr == NULL) {
 		errcode = errno;
 		write_log(0, "Failed to open log file. Code %d, %s\n",
@@ -63,6 +61,9 @@ int open_log(char *filename)
 		logptr = NULL;
 		return -errcode;
 	}
+
+	setbuf(logptr->fptr, NULL);
+	fchmod(fileno(logptr->fptr), 0600);
 
 	ret = dup2(fileno(logptr->fptr), fileno(stdout));
 	if (ret < 0) {
@@ -100,7 +101,7 @@ int write_log(int level, char *format, ...)
 		add_newline = TRUE;
 	else
 		add_newline = FALSE;
-	if (logptr == NULL) {
+	if ((logptr == NULL) || (logptr->fptr == NULL)) {
 		if (level <= LOG_LEVEL) {
 			gettimeofday(&tmptime, NULL);
 			localtime_r(&(tmptime.tv_sec), &tmptm);

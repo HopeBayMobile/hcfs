@@ -10,7 +10,7 @@
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, "/tmp/mock_file_meta");
+	strcpy(pathname, "/tmp/testHCFS/mock_file_meta");
 	return 0;
 }
 
@@ -18,7 +18,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/data_%d_%d", this_inode, block_num);
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%d_%d", this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -61,7 +61,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int readsize1, readsize2;
 	char filebuf1[4096], filebuf2[4096];
 
-	sprintf(objectpath, "/tmp/%s", objname);
+	sprintf(objectpath, "/tmp/testHCFS/%s", objname);
 	if (access(objectpath, F_OK) < 0) {
 		if (access(MOCK_META_PATH, F_OK) < 0)
 			return 0;

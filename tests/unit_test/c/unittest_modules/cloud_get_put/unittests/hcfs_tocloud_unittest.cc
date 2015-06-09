@@ -14,6 +14,7 @@ extern "C" {
 
 class uploadEnvironment : public ::testing::Environment {
  public:
+  char *workpath, *tmppath;
 
   virtual void SetUp() {
     int shm_key;
@@ -23,11 +24,28 @@ class uploadEnvironment : public ::testing::Environment {
 
 //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
+
   }
 
   virtual void TearDown() {
 //    free(hcfs_system);
-
+    unlink("/tmp/testHCFS");
+    rmdir(tmppath);
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
   }
 };
 
@@ -86,6 +104,11 @@ public:
 			mock_block_page.block_entries[i].status = block_status;
 		
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
+		if (mock_file_meta == NULL) {
+			printf("Failed to generate mock\n");
+			return;
+		}
+		printf("Working on generate mock\n");
 		fwrite(&mock_block_page, sizeof(BLOCK_ENTRY_PAGE), 1, mock_file_meta);
 		fclose(mock_file_meta);
 
@@ -94,8 +117,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
-			
-			sprintf(path, "/tmp/data_%d_%d",inode, i);
+			sprintf(path, "/tmp/testHCFS/data_%d_%d",inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -192,7 +214,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 		
 		ASSERT_EQ(ST_BOTH, mock_block_page.block_entries[i].status); // Check status
-		sprintf(path, "/tmp/data_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/data_%d_%d",1, i);
 		getxattr(path, "user.dirty", xattr_val, 1);
 		ASSERT_STREQ("F", xattr_val);
 		unlink(path);
@@ -230,7 +252,7 @@ TEST_F(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char path[50];	
 		ASSERT_EQ(ST_NONE, mock_block_page.block_entries[i].status);
-		sprintf(path, "/tmp/mockblock_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/mockblock_%d_%d",1, i);
 		unlink(path);
 	}
 
@@ -481,7 +503,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 		char expected_objname[20];
 		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-		sprintf(expected_objname, "/tmp/data_%d_%d", mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	metaptr = fopen(metapath, "r+");
@@ -526,7 +548,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 		char expected_objname[20];
 		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/data_%d_%d", mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	unlink(metapath);

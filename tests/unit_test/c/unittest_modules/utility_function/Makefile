@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = utils_unittest dir_entry_btree_unittest 
+TESTS = utils_unittest dir_entry_btree_unittest logger_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -55,6 +55,7 @@ clean :
 test :
 	./utils_unittest
 	./dir_entry_btree_unittest
+	./logger_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -114,3 +115,16 @@ dir_entry_btree_unittest.o : $(UNITTEST_DIR)/dir_entry_btree_unittest.cc \
 
 dir_entry_btree_unittest : dir_entry_btree.o dir_entry_btree_fakeftn.o dir_entry_btree_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# unittest for logger.c
+
+logger.o : $(USER_DIR)/logger.c $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/logger.c
+
+logger_unittest.o : $(UNITTEST_DIR)/logger_unittest.cc \
+                      $(USER_DIR)/logger.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/logger_unittest.cc
+
+logger_unittest : logger.o logger_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
