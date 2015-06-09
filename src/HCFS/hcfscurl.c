@@ -104,7 +104,7 @@ int parse_swift_auth_header(FILE *fptr)
 	if (ret_val < 2)
 		return -1;
 
-	sprintf(swift_auth_string, "%1023s %1023s", temp_string,
+	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);
 
 	return retcodenum;
@@ -363,7 +363,8 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 
 	curl_slist_free_all(chunk);
 
-	return 0;
+	write_log(10, "Ret code %d\n", ret_val);
+	return ret_val;
 
 errcode_handle:
 	return -1;
@@ -714,7 +715,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (swift_header_fptr == NULL) {
@@ -803,7 +804,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (swift_header_fptr == NULL) {
@@ -890,7 +891,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	fclose(swift_header_fptr);
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 errcode_handle:
 	return -1;
 }
@@ -1559,7 +1560,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (S3_header_fptr == NULL) {
@@ -1665,7 +1666,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (S3_header_fptr == NULL) {
@@ -1769,7 +1770,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	fclose(S3_header_fptr);
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	return -1;

@@ -102,6 +102,13 @@ int write_log(int level, char *format, ...)
 		add_newline = FALSE;
 	if (logptr == NULL) {
 		if (level <= LOG_LEVEL) {
+			gettimeofday(&tmptime, NULL);
+			localtime_r(&(tmptime.tv_sec), &tmptm);
+			strftime(timestr, 90, "%F %T", &tmptm);
+
+			printf("%s.%06d\t", timestr,
+				(unsigned int)tmptime.tv_usec);
+
 			vprintf(format, alist);
 			if (add_newline == TRUE)
 				printf("\n");
@@ -113,7 +120,7 @@ int write_log(int level, char *format, ...)
 			strftime(timestr, 90, "%F %T", &tmptm);
 
 			sem_wait(&(logptr->logsem));
-			fprintf(logptr->fptr, "%s.%d\t", timestr,
+			fprintf(logptr->fptr, "%s.%06d\t", timestr,
 				(unsigned int)tmptime.tv_usec);
 			vfprintf(logptr->fptr, format, alist);
 			if (add_newline == TRUE)
