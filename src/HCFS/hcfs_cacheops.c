@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
+* 2015/6/3 Jiahong added error handling
 *
 **************************************************************************/
 
@@ -33,10 +34,16 @@
 #include "super_block.h"
 #include "global.h"
 #include "hfuse_system.h"
+#include "logger.h"
+#include "macro.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 extern SYSTEM_CONF_STRUCT system_config;
+
+/* TODO: Consider whether need to update block status when throwing
+out blocks and sync to cloud, and how this may interact with meta
+sync in upload process */
 
 /* Helper function for removing local cached block for blocks that
 are synced to backend already */
@@ -54,13 +61,17 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	long long pagepos;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
-	size_t ret_val;
 	int page_index;
 	long long timediff;
 	struct timeval currenttime;
 	BLOCK_ENTRY *blk_entry_ptr;
+	int ret, errcode;
+	size_t ret_size;
 
-	super_block_read(this_inode, &tempentry);
+	ret = super_block_read(this_inode, &tempentry);
+
+	if (ret < 0)
+		return ret;
 
 	/* If inode is not dirty or in transit, or if cache is
 	already full, check if can replace uploaded blocks */
@@ -70,26 +81,37 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	while*/
 	if ((tempentry.inode_stat.st_ino > 0) &&
 			(tempentry.inode_stat.st_mode & S_IFREG)) {
-		fetch_meta_path(thismetapath, this_inode);
+		ret = fetch_meta_path(thismetapath, this_inode);
+		if (ret < 0)
+			return ret;
+
 		metafptr = fopen(thismetapath, "r+");
-		if (metafptr == NULL)
-			return -1;
+		if (metafptr == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			return -errcode;
+		}
 
 		setbuf(metafptr, NULL);
 		flock(fileno(metafptr), LOCK_EX);
 		if (access(thismetapath, F_OK) < 0) {
-			/*If meta file does not exist,
+			/*If meta file does not exist or error,
 			do nothing*/
+			errcode = errno;
+			if (errcode != ENOENT)
+				write_log(0, "IO error in %s. Code %d, %s\n",
+					__func__, errcode, strerror(errcode));
 			flock(fileno(metafptr), LOCK_UN);
 			fclose(metafptr);
-			return -1;
+			return -errcode;
 		}
 
 		current_block = 0;
 
-		fread(&temphead_stat, sizeof(struct stat), 1, metafptr);
+		FREAD(&temphead_stat, sizeof(struct stat), 1, metafptr);
 
-		fread(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
+		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
 		total_blocks = (temphead_stat.st_size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
@@ -101,16 +123,20 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				pagepos = seek_page2(&temphead, metafptr,
 					current_block / BLK_INCREMENTS, 0);
 
+				if (pagepos < 0) {
+					errcode = pagepos;
+					goto errcode_handle;
+				}
 				/* No block for this page. Skipping the entire
 				page */
 				if (pagepos == 0) {
 					current_block += (BLK_INCREMENTS-1);
 					continue;
 				}
-				fseek(metafptr, pagepos, SEEK_SET);
-				ret_val = fread(&temppage,
+				FSEEK(metafptr, pagepos, SEEK_SET);
+				FREAD(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
-				if (ret_val < 1)
+				if (ret_size < 1)
 					break;
 
 				page_index = 0;
@@ -122,25 +148,52 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					cloud and local*/
 				blk_entry_ptr->status = ST_CLOUD;
 
-				printf("Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
+				write_log(10,
+					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);
-				fseek(metafptr, pagepos, SEEK_SET);
-				ret_val = fwrite(&temppage,
+				FSEEK(metafptr, pagepos, SEEK_SET);
+				FWRITE(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
-				if (ret_val < 1)
+				if (ret_size < 1)
 					break;
-				fetch_block_path(thisblockpath, this_inode,
-								current_block);
-
-				stat(thisblockpath, &tempstat);
+				ret = fetch_block_path(thisblockpath,
+						this_inode, current_block);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				ret = stat(thisblockpath, &tempstat);
+				if (ret < 0) {
+					errcode = errno;
+					write_log(0,
+						"IO error in %s. Code %d, %s\n",
+						__func__, errcode,
+						strerror(errcode));
+					errcode = -errcode;
+					goto errcode_handle;
+				}
 				sem_wait(&(hcfs_system->access_sem));
 				hcfs_system->systemdata.cache_size -=
 							tempstat.st_size;
 				hcfs_system->systemdata.cache_blocks--;
-				unlink(thisblockpath);
+				ret = unlink(thisblockpath);
+				if (ret < 0) {
+					errcode = errno;
+					write_log(0,
+						"IO error in %s. Code %d, %s\n",
+						__func__, errcode,
+						strerror(errcode));
+					errcode = -errcode;
+					sem_post(&(hcfs_system->access_sem));
+					goto errcode_handle;
+				}
 				sync_hcfs_system_data(FALSE);
 				sem_post(&(hcfs_system->access_sem));
-				super_block_mark_dirty(this_inode);
+				ret = super_block_mark_dirty(this_inode);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
 			if (hcfs_system->systemdata.cache_size <
@@ -182,10 +235,10 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				if (access(thismetapath, F_OK) < 0)
 					break;
 
-				fseek(metafptr, pagepos, SEEK_SET);
-				ret_val = fread(&temppage,
+				FSEEK(metafptr, pagepos, SEEK_SET);
+				FREAD(&temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
-				if (ret_val < 1)
+				if (ret_size < 1)
 					break;
 			}
 			page_index++;
@@ -195,6 +248,11 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		fclose(metafptr);
 	}
 	return 0;
+
+errcode_handle:
+	flock(fileno(metafptr), LOCK_UN);
+	fclose(metafptr);
+	return errcode;
 }
 
 /*TODO: For scanning caches, only need to check one block subfolder a time,
@@ -219,15 +277,22 @@ out. Will need to consider whether to force checking of replacement? */
 void run_cache_loop(void)
 {
 	ino_t this_inode;
-	int ret_val;
 	struct timeval builttime, currenttime;
 	long seconds_slept;
 	int e_index;
 	char skip_recent, do_something;
 	time_t node_time;
 	CACHE_USAGE_NODE *this_cache_node;
+	int ret;
 
-	build_cache_usage();
+	ret = -1;
+	while (ret < 0) {
+		ret = build_cache_usage();
+		if (ret < 0) {
+			write_log(0, "Error in cache mgmt.\n");
+			sleep(10);
+		}
+	}
 	gettimeofday(&builttime, NULL);
 
 	/*Index for doing the round robin in cache dropping*/
@@ -240,7 +305,12 @@ void run_cache_loop(void)
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
 			if (nonempty_cache_hash_entries <= 0) {
-				build_cache_usage();
+				ret = build_cache_usage();
+				if (ret < 0) {
+					write_log(0, "Error in cache mgmt.\n");
+					sleep(10);
+					continue;
+				}
 				gettimeofday(&builttime, NULL);
 				e_index = 0;
 				skip_recent = TRUE;
@@ -250,7 +320,13 @@ void run_cache_loop(void)
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
-					build_cache_usage();
+					ret = build_cache_usage();
+					if (ret < 0) {
+						write_log(0,
+							"Error in cache mgmt.\n");
+						sleep(10);
+						continue;
+					}
 					gettimeofday(&builttime, NULL);
 					e_index = 0;
 					skip_recent = TRUE;
@@ -302,8 +378,10 @@ void run_cache_loop(void)
 			free(this_cache_node);
 			e_index++;
 
-			ret_val = _remove_synced_block(this_inode, &builttime,
+			ret = _remove_synced_block(this_inode, &builttime,
 								&seconds_slept);
+			if (ret < 0)
+				sleep(10);
 		}
 
 		while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) {
@@ -312,7 +390,12 @@ void run_cache_loop(void)
 			not near full*/
 			if (((currenttime.tv_sec-builttime.tv_sec) > 300) ||
 							(seconds_slept > 300)) {
-				build_cache_usage();
+				ret = build_cache_usage();
+				if (ret < 0) {
+					write_log(0, "Error in cache mgmt.\n");
+					sleep(10);
+					continue;
+				}
 				gettimeofday(&builttime, NULL);
 				seconds_slept = 0;
 				e_index = 0;

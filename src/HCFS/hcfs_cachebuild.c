@@ -30,6 +30,7 @@
 #include "params.h"
 #include "fuseop.h"
 #include "super_block.h"
+#include "logger.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -38,7 +39,7 @@ extern SYSTEM_CONF_STRUCT system_config;
 * Function name: cache_usage_hash_init
 *        Inputs: None
 *       Summary: Initialize cache usage structure.
-*  Return value: 0 if successful. Otherwise returns -1.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int cache_usage_hash_init(void)
@@ -225,10 +226,11 @@ int compare_cache_usage(CACHE_USAGE_NODE *first_node,
 *        Inputs: None
 *       Summary: Build the cache usage structure based on the current local
 *                block cache status.
-*  Return value: None
+*  Return value: 0 if successful, otherwise negation of error code.
 *
+* Note: Will continue to scan for cache usage even if encountered some error
 *************************************************************************/
-void build_cache_usage(void)
+int build_cache_usage(void)
 {
 	char blockpath[400];
 	char thisblockpath[400];
@@ -236,7 +238,7 @@ void build_cache_usage(void)
 	int count;
 	struct dirent temp_dirent;
 	struct dirent *direntptr;
-	int ret_val;
+	int ret, errcode;
 	long long blockno;
 	ino_t this_inode;
 	struct stat tempstat;
@@ -244,8 +246,10 @@ void build_cache_usage(void)
 	char tempval[10];
 	size_t tmp_size;
 
-	printf("Building cache usage hash table\n");
-	cache_usage_hash_init();
+	write_log(5, "Building cache usage hash table\n");
+	ret = cache_usage_hash_init();
+	if (ret < 0)
+		return ret;
 
 	for (count = 0; count < NUMSUBDIR; count++) {
 		sprintf(blockpath, "%s/sub_%d", BLOCKPATH, count);
@@ -255,19 +259,51 @@ void build_cache_usage(void)
 
 		dirptr = opendir(blockpath);
 
-		readdir_r(dirptr, &temp_dirent, &direntptr);
+		if (dirptr == NULL) {
+			errcode = errno;
+			write_log(0, "Error in cache replacement. Skipping\n");
+			write_log(2, "Code %d, %s\n", errcode,
+				strerror(errcode));
+			continue;
+		}
+
+		ret = readdir_r(dirptr, &temp_dirent, &direntptr);
+		if (ret > 0) {
+			errcode = ret;
+			write_log(0, "Error in cache replacement. Skipping\n");
+			write_log(2, "Code %d, %s\n", errcode,
+				strerror(errcode));
+			closedir(dirptr);
+			continue;
+		}
+
 		while (direntptr != NULL) {
-			ret_val = sscanf(temp_dirent.d_name, "block%lld_%lld",
+			errcode = 0;
+			ret = sscanf(temp_dirent.d_name, "block%ld_%lld",
 							&this_inode, &blockno);
-			if (ret_val != 2) {
-				readdir_r(dirptr, &temp_dirent, &direntptr);
+			if (ret != 2) {
+				ret = readdir_r(dirptr, &temp_dirent,
+					&direntptr);
+				if (ret > 0) {
+					errcode = ret;
+					break;
+				}
 				continue;
 			}
-			fetch_block_path(thisblockpath, this_inode, blockno);
-			ret_val = stat(thisblockpath, &tempstat);
+			ret = fetch_block_path(thisblockpath, this_inode, blockno);
+			if (ret < 0) {
+				errcode = ret;
+				break;
+			}
+			ret = stat(thisblockpath, &tempstat);
 
-			if (ret_val != 0) {
-				readdir_r(dirptr, &temp_dirent, &direntptr);
+			if (ret != 0) {
+				ret = readdir_r(dirptr, &temp_dirent,
+					&direntptr);
+				if (ret > 0) {
+					errcode = ret;
+					break;
+				}
 				continue;
 			}
 
@@ -285,9 +321,12 @@ void build_cache_usage(void)
 
 			tempnode->this_inode = this_inode;
 
-			getxattr(thisblockpath, "user.dirty",
+			ret = getxattr(thisblockpath, "user.dirty",
 							(void *)tempval, 1);
-
+			if (ret < 0) {
+				errcode = errno;
+				break;
+			}
 			/*If this is dirty cache entry*/
 			if (!strncmp(tempval, "T", 1)) {
 				tempnode->dirty_cache_size += tempstat.st_size;
@@ -300,8 +339,20 @@ void build_cache_usage(void)
 						the block, so do nothing*/
 			}
 			insert_cache_usage_node(this_inode, tempnode);
-			readdir_r(dirptr, &temp_dirent, &direntptr);
+			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
+			if (ret > 0) {
+				errcode = ret;
+				break;
+			}
 		}
+
+		if (errcode > 0) {
+			write_log(0, "Error in cache replacement. Skipping\n");
+			write_log(2, "Code %d, %s\n", errcode,
+				strerror(errcode));
+		}
+
 		closedir(dirptr);
 	}
+	return 0;
 }

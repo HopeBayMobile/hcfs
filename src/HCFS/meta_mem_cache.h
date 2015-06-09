@@ -129,7 +129,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 
 int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 	const DIR_META_TYPE *dir_meta_ptr, const DIR_ENTRY_PAGE *dir_page,
-	META_CACHE_ENTRY_STRUCT *body_ptr);
+	META_CACHE_ENTRY_STRUCT *bptr);
 
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
@@ -141,7 +141,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 
 int meta_cache_remove(ino_t this_inode);
 int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
-					DIR_ENTRY_PAGE *temppage);
+				const DIR_ENTRY_PAGE *temppage);
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode);
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr);

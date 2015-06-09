@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/5/15 Jiahong created the file.
+* 2015/6/1 Jiahong working on improving error handling
 *
 **************************************************************************/
 
@@ -24,15 +25,19 @@ to delete or list the folder.
 
 #include "lookup_count.h"
 
+#include <string.h>
+#include <errno.h>
+
 #include "fuseop.h"
 #include "global.h"
 #include "metaops.h"
+#include "logger.h"
 
 /************************************************************************
 *
 * Function name: lookup_init
 *        Inputs: None
-*        Output: 0 if successful, otherwise -1.
+*        Output: 0 if successful, otherwise negation of error code.
 *       Summary: Initialize the inode lookup count table
 *
 *************************************************************************/
@@ -40,12 +45,14 @@ to delete or list the folder.
 int lookup_init()
 {
 	int count;
-	int ret_val;
+	int ret_val, errcode;
 
 	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 		ret_val = sem_init(&(lookup_table[count].entry_sem), 0, 1);
-		if (ret_val < 0)
-			return ret_val;
+		if (ret_val < 0) {
+			errcode = errno;
+			return -errcode;
+		}
 		lookup_table[count].head = NULL;
 	}
 
@@ -56,7 +63,8 @@ int lookup_init()
 *
 * Function name: lookup_increase
 *        Inputs: ino_t this_inode, int amount
-*        Output: The updated lookup count if successful, or -1 if not.
+*        Output: The updated lookup count if successful, or negation of
+*                error code if not.
 *       Summary: Increase the inode lookup count for this_inode, creating
 *                an entry in the table if necessary.
 *
@@ -65,18 +73,22 @@ int lookup_init()
 int lookup_increase(ino_t this_inode, int amount, char d_type)
 {
 	int index;
-	int ret_val;
+	int ret_val, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup increase for inode %lld, amount %d\n",
+	write_log(10, "Debug lookup increase for inode %ld, amount %d\n",
 			this_inode, amount);
 	index = this_inode % NUM_LOOKUP_ENTRIES;
 
 	ret_val = sem_wait(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	ptr = lookup_table[index].head;
 	found = FALSE;
@@ -92,6 +104,11 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 
 	if (found == FALSE) {  /* Will need to create a new node */
 		ptr = malloc(sizeof(LOOKUP_NODE_TYPE));
+		if (ptr == NULL) {
+			write_log(0, "Out of memory in %s\n", __func__);
+			sem_post(&(lookup_table[index].entry_sem));
+			return -ENOMEM;
+		}
 		ptr->this_inode = this_inode;
 		ptr->lookup_count = amount;
 		ptr->to_delete = FALSE;
@@ -100,12 +117,16 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 		lookup_table[index].head = ptr;
 	}
 
-	printf("Debug lookup increase lookup now %d\n", ptr->lookup_count);
+	write_log(10, "Debug lookup increase lookup now %d\n", ptr->lookup_count);
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	return ptr->lookup_count;
 }
@@ -114,7 +135,8 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 *
 * Function name: lookup_decrease
 *        Inputs: ino_t this_inode, int amount, char *dtype, char *need_delete
-*        Output: The updated lookup count if successful, or -1 if not.
+*        Output: The updated lookup count if successful, or negation of error
+*                code if not.
 *       Summary: Decrease the inode lookup count for this_inode. If lookup
 *                count is dropped to zero, remove the node. If the inode
 *                needs to be deleted when lookup is zero, mark in *need_delete.
@@ -125,11 +147,11 @@ int lookup_decrease(ino_t this_inode, int amount,
 			char *d_type, char *need_delete)
 {
 	int index;
-	int ret_val, result_lookup;
+	int ret_val, result_lookup, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
-	printf("Debug lookup decrease for inode %lld, amount %d\n",
+	write_log(10, "Debug lookup decrease for inode %ld, amount %d\n",
 			this_inode, amount);
 
 	if (need_delete == NULL)
@@ -140,8 +162,12 @@ int lookup_decrease(ino_t this_inode, int amount,
 
 	ret_val = sem_wait(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	ptr = lookup_table[index].head;
 	prev_ptr = NULL;
@@ -152,7 +178,8 @@ int lookup_decrease(ino_t this_inode, int amount,
 			found = TRUE;
 			ptr->lookup_count -= amount;
 			if (ptr->lookup_count < 0) {
-				printf("Debug lookup underflow. Resetting\n");
+				write_log(5,
+					"Debug lookup underflow. Resetting\n");
 				ptr->lookup_count = 0;
 			}
 			result_lookup = ptr->lookup_count;
@@ -173,18 +200,22 @@ int lookup_decrease(ino_t this_inode, int amount,
 	}
 
 	if (found == FALSE) {
-		printf("Debug no lookup value\n");
-		result_lookup = -1;
+		write_log(5, "Debug no lookup value\n");
+		result_lookup = -EINVAL;
 		sem_post(&(lookup_table[index].entry_sem));
 		return result_lookup;
 	}
 
-	printf("Debug lookup decrease lookup now %d\n", result_lookup);
+	write_log(10, "Debug lookup decrease lookup now %d\n", result_lookup);
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	return result_lookup;
 }
@@ -193,7 +224,7 @@ int lookup_decrease(ino_t this_inode, int amount,
 *
 * Function name: lookup_markdelete
 *        Inputs: ino_t this_inode
-*        Output: 0 if successful, or -1 if not.
+*        Output: 0 if successful, or negation of error code if not.
 *       Summary: Mark inode "this_inode" as to_delete.
 *
 *************************************************************************/
@@ -201,19 +232,23 @@ int lookup_decrease(ino_t this_inode, int amount,
 int lookup_markdelete(ino_t this_inode)
 {
 	int index;
-	int ret_val, result_lookup;
+	int ret_val, result_lookup, errcode;
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup markdelete for inode %lld\n",
+	write_log(10, "Debug lookup markdelete for inode %ld\n",
 			this_inode);
 
 	index = this_inode % NUM_LOOKUP_ENTRIES;
 
 	ret_val = sem_wait(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	ptr = lookup_table[index].head;
 	found = FALSE;
@@ -228,15 +263,19 @@ int lookup_markdelete(ino_t this_inode)
 	}
 
 	if (found == FALSE) {
-		printf("Debug no lookup value\n");
-		result_lookup = -1;
+		write_log(5, "Debug no lookup value\n");
+		result_lookup = -EINVAL;
 		return result_lookup;
 	}
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
-	if (ret_val < 0)
-		return ret_val;
+	if (ret_val < 0) {
+		errcode = errno;
+		write_log(0, "Error in %s. Code %d, %s\n", __func__, errcode,
+			strerror(errcode));
+		return -errcode;
+	}
 
 	return 0;
 }
@@ -254,20 +293,25 @@ int lookup_markdelete(ino_t this_inode)
 int lookup_destroy()
 {
 	int count;
-	int ret_val;
+	int ret_val, errcode;
 	LOOKUP_NODE_TYPE *ptr;
 
-	printf("Debug lookup destroy\n");
+	write_log(10, "Debug lookup destroy\n");
 	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 		ret_val = sem_wait(&(lookup_table[count].entry_sem));
 
-		if (ret_val < 0)
-			return ret_val;
+		if (ret_val < 0) {
+			errcode = errno;
+			write_log(0,
+				"Error in %s. Code %d, %s\n", __func__, errcode,
+				strerror(errcode));
+			return -errcode;
+		}
 
 		ptr = lookup_table[count].head;
 
 		while (ptr != NULL) {
-			printf("Debug check delete %lld\n",
+			write_log(10, "Debug check delete %ld\n",
 				ptr->this_inode);
 			ret_val = disk_checkdelete(ptr->this_inode);
 
@@ -279,8 +323,13 @@ int lookup_destroy()
 
 		ret_val = sem_post(&(lookup_table[count].entry_sem));
 
-		if (ret_val < 0)
-			return ret_val;
+		if (ret_val < 0) {
+			errcode = errno;
+			write_log(0,
+				"Error in %s. Code %d, %s\n", __func__, errcode,
+				strerror(errcode));
+			return -errcode;
+		}
 	}
 
 	return 0;

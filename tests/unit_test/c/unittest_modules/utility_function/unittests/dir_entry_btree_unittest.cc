@@ -3,6 +3,7 @@
 extern "C" {
 #include "dir_entry_btree.h"
 #include "fuseop.h"
+#include <errno.h>
 }
 
 static inline int compare(const void *a, const void *b)
@@ -380,7 +381,7 @@ TEST_F(insert_dir_entry_btreeTest, InsertFail_EntryFoundInBtree)
 		ret = insert_dir_entry_btree(entry, &root_node, fh, 
 			overflow_median, overflow_new_pos, &meta, tmp_entries, 
 			tmp_child_pos);
-		ASSERT_EQ(-1, ret);
+		ASSERT_EQ(-EEXIST, ret);
 		free(entry);
 	}
 }
@@ -452,7 +453,7 @@ TEST_F(search_dir_entry_btreeTest, SearchEmptyBtree)
 		sprintf(filename, "search_file_%d", i);
 		index = search_dir_entry_btree(filename, &root_node, 
 			fh, &index, &result_node);
-		EXPECT_EQ(-1, index);
+		ASSERT_EQ(-ENOENT, index);
 	}
 }
 
@@ -473,7 +474,7 @@ TEST_F(search_dir_entry_btreeTest, EntryNotFound)
 		sprintf(filename, "test_file_not_found%d", i);
 		index = search_dir_entry_btree(filename, &root_node, 
 			fh, &index, &result_node);
-		EXPECT_EQ(-1, index);
+		ASSERT_EQ(-ENOENT, index);
 	}
 }
 
@@ -814,7 +815,7 @@ class delete_dir_entry_btreeTest : public BaseClassInsertBtreeEntryIsUsable {
 
 };
 
-TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree)
+TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree_EntryNotFound)
 {
 	int reserved_stdout;
 	DIR_META_TYPE meta;
@@ -834,11 +835,11 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInEmptyTree)
 	}
 	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 	for (int i = 0 ; i < num_tests ; i++)
-		ASSERT_EQ(-1, ret[i]);
+		ASSERT_EQ(-ENOENT, ret[i]);
 		
 }
 
-TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree)
+TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree_EntryNotFound)
 {
 	int num_entries = MAX_DIR_ENTRIES_PER_PAGE * MAX_DIR_ENTRIES_PER_PAGE;
 	int reserved_stdout;
@@ -862,7 +863,7 @@ TEST_F(delete_dir_entry_btreeTest, DeleteEntryInNonemptyTree)
 	}
 	_RESTORE_STDOUT_(reserved_stdout, "/tmp/tmpout");
 	for (int i = 0 ; i < num_tests ; i++)
-		ASSERT_EQ(-1, ret[i]);
+		ASSERT_EQ(-ENOENT, ret[i]);
 }
 
 TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_is_1)
@@ -981,3 +982,4 @@ TEST_F(delete_dir_entry_btreeTest, DeleteSuccessFor_depth_exceed_2)
 /*
 	End of unittest of delete_dir_entry_btree()
  */
+

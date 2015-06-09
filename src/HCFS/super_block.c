@@ -34,6 +34,7 @@
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
+#include "logger.h"
 
 #define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
@@ -57,12 +58,12 @@ int write_super_block_head(void)
 							SB_HEAD_SIZE, 0);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in writing super block head. Code %d, %s\n",
+		write_log(0, "Error in writing super block head. Code %d, %s\n",
 			errcode, strerror(errcode));
 		return -errcode;
 	}
 	if (ret_val < SB_HEAD_SIZE) {
-		printf("Short-write in writing super block head\n");
+		write_log(0, "Short-write in writing super block head\n");
 		return -EIO;
 	}
 	return 0;
@@ -86,12 +87,13 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 			SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in reading super block entry. Code %d, %s\n",
+		write_log(0,
+			"Error in reading super block entry. Code %d, %s\n",
 			errcode, strerror(errcode));
 		return -errcode;
 	}
 	if (ret_val < SB_ENTRY_SIZE) {
-		printf("Short-read in reading super block entry.\n");
+		write_log(0, "Short-read in reading super block entry.\n");
 		return -EIO;
 	}
 	return 0;
@@ -115,12 +117,13 @@ int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 				SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in writing super block entry. Code %d, %s\n",
+		write_log(0,
+			"Error in writing super block entry. Code %d, %s\n",
 			errcode, strerror(errcode));
 		return -errcode;
 	}
 	if (ret_val < SB_ENTRY_SIZE) {
-		printf("Short-write in writing super block entry.\n");
+		write_log(0, "Short-write in writing super block entry.\n");
 		return -EIO;
 	}
 	return 0;
@@ -143,14 +146,14 @@ int super_block_init(void)
 	shm_key = shmget(1234, sizeof(SUPER_BLOCK_CONTROL), IPC_CREAT | 0666);
 	if (shm_key < 0) {
 		errcode = errno;
-		printf("Error in opening super block. Code %d, %s\n",
+		write_log(0, "Error in opening super block. Code %d, %s\n",
 			errcode, strerror(errcode));
 		return -errcode;
 	}
 	sys_super_block = (SUPER_BLOCK_CONTROL *) shmat(shm_key, NULL, 0);
 	if (sys_super_block == (void *)-1) {
 		errcode = errno;
-		printf("Error in opening super block. Code %d, %s\n",
+		write_log(0, "Error in opening super block. Code %d, %s\n",
 			errcode, strerror(errcode));
 		return -errcode;
 	}
@@ -168,22 +171,24 @@ int super_block_init(void)
 									0600);
 		if (sys_super_block->iofptr < 0) {
 			errcode = errno;
-			printf("Error in initializing super block. ");
-			printf("Code %d, %s\n", errcode, strerror(errcode));
+			write_log(0, "Error in initializing super block. ");
+			write_log(0,
+				"Code %d, %s\n", errcode, strerror(errcode));
 			return -errcode;
 		}
 		ret = pwrite(sys_super_block->iofptr, &(sys_super_block->head),
 						SB_HEAD_SIZE, 0);
 		if (ret < 0) {
 			errcode = errno;
-			printf("Error in initializing super block. ");
-			printf("Code %d, %s\n", errcode, strerror(errcode));
+			write_log(0, "Error in initializing super block. ");
+			write_log(0,
+				"Code %d, %s\n", errcode, strerror(errcode));
 			close(sys_super_block->iofptr);
 			return -errcode;
 		}
 
 		if (ret < SB_HEAD_SIZE) {
-			printf("Error in initializing super block. ");
+			write_log(0, "Error in initializing super block. ");
 			close(sys_super_block->iofptr);
 			return -EIO;
 		}
@@ -191,16 +196,17 @@ int super_block_init(void)
 		sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
 		if (sys_super_block->iofptr < 0) {
 			errcode = errno;
-			printf("Error in opening super block. ");
-			printf("Code %d, %s\n", errcode, strerror(errcode));
+			write_log(0, "Error in opening super block. ");
+			write_log(0,
+				"Code %d, %s\n", errcode, strerror(errcode));
 			return -errcode;
 		}
 	}
 	sys_super_block->unclaimed_list_fptr = fopen(UNCLAIMEDFILE, "a+");
 	if (sys_super_block->unclaimed_list_fptr == NULL) {
 		errcode = errno;
-		printf("Error in opening super block. ");
-		printf("Code %d, %s\n", errcode, strerror(errcode));
+		write_log(0, "Error in opening super block. ");
+		write_log(0, "Code %d, %s\n", errcode, strerror(errcode));
 		close(sys_super_block->iofptr);
 		return -errcode;
 	}
@@ -210,15 +216,15 @@ int super_block_init(void)
 							SB_HEAD_SIZE, 0);
 	if (ret < 0) {
 		errcode = errno;
-		printf("Error in opening super block. ");
-		printf("Code %d, %s\n", errcode, strerror(errcode));
+		write_log(0, "Error in opening super block. ");
+		write_log(0, "Code %d, %s\n", errcode, strerror(errcode));
 		close(sys_super_block->iofptr);
 		fclose(sys_super_block->unclaimed_list_fptr);
 		return -errcode;
 	}
 
 	if (ret < SB_HEAD_SIZE) {
-		printf("Error in opening super block. ");
+		write_log(0, "Error in opening super block. ");
 		close(sys_super_block->iofptr);
 		fclose(sys_super_block->unclaimed_list_fptr);
 		return -EIO;
@@ -248,12 +254,12 @@ int super_block_destroy(void)
 							SB_HEAD_SIZE, 0);
 	if (ret < 0) {
 		errcode = errno;
-		printf("Error in closing super block. ");
-		printf("Code %d, %s\n", errcode, strerror(errcode));
+		write_log(0, "Error in closing super block. ");
+		write_log(0, "Code %d, %s\n", errcode, strerror(errcode));
 		ret_val = -errcode;
 	} else {
 		if (ret < SB_HEAD_SIZE) {
-			printf("Error in closing super block. ");
+			write_log(0, "Error in closing super block. ");
 			ret_val = -EIO;
 		}
 	}
@@ -433,10 +439,13 @@ int super_block_mark_dirty(ino_t this_inode)
 *        Inputs: ino_t this_inode, char is_start_transit
 *       Summary: Update the in_transit status for inode number "this_inode".
 *                Mark the in_transit flag using the input "is_start_transit".
+*                "transit_incomplete" indicates whether the transfer is not
+*                finished completely and we should not clear dirty bit.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int super_block_update_transit(ino_t this_inode, char is_start_transit)
+int super_block_update_transit(ino_t this_inode, char is_start_transit,
+	char transit_incomplete)
 {
 	int ret_val;
 	SUPER_BLOCK_ENTRY tempentry;
@@ -448,7 +457,8 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit)
 	if (ret_val >= 0) {
 		if (((is_start_transit == FALSE) &&
 				(tempentry.status == IS_DIRTY)) &&
-				(tempentry.mod_after_in_transit == FALSE)) {
+				((transit_incomplete != TRUE) &&
+				(tempentry.mod_after_in_transit == FALSE))) {
 			/* If finished syncing and no more mod is done after
 			*  queueing the inode for syncing */
 			/* Remove from is_dirty list */
@@ -567,7 +577,7 @@ int super_block_delete(ino_t this_inode)
 	ret_val = fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_END);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("Error in writing to unclaimed list. Code %d, %s\n",
+		write_log(0, "Error in writing to unclaimed list. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -577,7 +587,7 @@ int super_block_delete(ino_t this_inode)
 				sys_super_block->unclaimed_list_fptr);
 	if ((retsize < 1) && (ferror(sys_super_block->unclaimed_list_fptr))) {
 		clearerr(sys_super_block->unclaimed_list_fptr);
-		printf("IO Error in writing to unclaimed list.\n");
+		write_log(0, "IO Error in writing to unclaimed list.\n");
 		super_block_exclusive_release();
 		return -EIO;
 	}
@@ -635,7 +645,7 @@ int super_block_reclaim(void)
 	ret_val = fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_END);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -643,7 +653,7 @@ int super_block_reclaim(void)
 	total_bytes = ftell(sys_super_block->unclaimed_list_fptr);
 	if (total_bytes < 0) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -653,7 +663,7 @@ int super_block_reclaim(void)
 
 	unclaimed_list = (ino_t *) malloc(sizeof(ino_t) * num_unclaimed);
 	if (unclaimed_list == NULL) {
-		printf("Out of memory in inode reclaiming\n");
+		write_log(0, "Out of memory in inode reclaiming\n");
 		super_block_exclusive_release();
 		return -ENOMEM;
 	}
@@ -661,7 +671,7 @@ int super_block_reclaim(void)
 	ret_val = fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_SET);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -673,13 +683,13 @@ int super_block_reclaim(void)
 	if (ret_items != num_unclaimed) {
 		if (ferror(sys_super_block->unclaimed_list_fptr) != 0) {
 			clearerr(sys_super_block->unclaimed_list_fptr);
-			printf("IO error in inode reclaiming\n");
+			write_log(0, "IO error in inode reclaiming\n");
 			super_block_exclusive_release();
 			return -EIO;
 		}
 			
-		printf("Warning: wrong number of items read in ");
-		printf("inode reclaiming.\n");
+		write_log(0, "Warning: wrong number of items read in ");
+		write_log(0, "inode reclaiming.\n");
 		num_unclaimed = ret_items;
 	}
 	/* TODO: Handle the case if the number of inodes in file is different
@@ -732,7 +742,7 @@ int super_block_reclaim(void)
 	ret_val = ftruncate(fileno(sys_super_block->unclaimed_list_fptr), 0);
 	if (ret_val < 0) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -772,7 +782,7 @@ int super_block_reclaim_fullscan(void)
 	retval = lseek(sys_super_block->iofptr, SB_HEAD_SIZE, SEEK_SET);
 	if (retval == (off_t) -1) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 			errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -785,7 +795,8 @@ int super_block_reclaim_fullscan(void)
 						SB_ENTRY_SIZE, thisfilepos);
 		if (retsize < 0) {
 			errcode = errno;
-			printf("IO error in inode reclaiming. Code %d, %s\n",
+			write_log(0,
+				"IO error in inode reclaiming. Code %d, %s\n",
 				errcode, strerror(errcode));
 			break;
 		}
@@ -805,8 +816,8 @@ int super_block_reclaim_fullscan(void)
 						SB_ENTRY_SIZE, thisfilepos);
 			if (retsize < 0) {
 				errcode = errno;
-				printf("IO error in inode reclaiming. ");
-				printf("Code %d, %s\n",
+				write_log(0, "IO error in inode reclaiming. ");
+				write_log(0, "Code %d, %s\n",
 					errcode, strerror(errcode));
 				break;
 			}
@@ -829,8 +840,9 @@ int super_block_reclaim_fullscan(void)
 					&tempentry, SB_ENTRY_SIZE, thisfilepos);
 				if (retsize < 0) {
 					errcode = errno;
-					printf("IO error in inode reclaiming.");
-					printf(" Code %d, %s\n",
+					write_log(0,
+						"IO error in inode reclaiming.");
+					write_log(0, " Code %d, %s\n",
 						errcode, strerror(errcode));
 					break;
 				}
@@ -844,8 +856,9 @@ int super_block_reclaim_fullscan(void)
 					&tempentry, SB_ENTRY_SIZE, thisfilepos);
 				if (retsize < 0) {
 					errcode = errno;
-					printf("IO error in inode reclaiming.");
-					printf(" Code %d, %s\n",
+					write_log(0,
+						"IO error in inode reclaiming.");
+					write_log(0, " Code %d, %s\n",
 						errcode, strerror(errcode));
 					break;
 				}
@@ -862,7 +875,7 @@ int super_block_reclaim_fullscan(void)
 							SB_HEAD_SIZE, 0);
 	if (retsize < 0) {
 		errcode = errno;
-		printf("IO error in inode reclaiming. Code %d, %s\n",
+		write_log(0, "IO error in inode reclaiming. Code %d, %s\n",
 			errcode, strerror(errcode));
 	}
 
@@ -906,7 +919,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 						(this_inode-1) * SB_ENTRY_SIZE);
 		if (retsize < 0) {
 			errcode = errno;
-			printf("IO error in alloc inode. Code %d, %s\n",
+			write_log(0, "IO error in alloc inode. Code %d, %s\n",
 				errcode, strerror(errcode));
 		}
 		if (retsize < SB_ENTRY_SIZE) {
@@ -952,7 +965,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 				SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (retsize < 0) {
 		errcode = errno;
-		printf("IO error in alloc inode. Code %d, %s\n",
+		write_log(0, "IO error in alloc inode. Code %d, %s\n",
 			errcode, strerror(errcode));
 	}
 	if (retsize < SB_ENTRY_SIZE) {
@@ -964,7 +977,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 							SB_HEAD_SIZE, 0);
 	if (retsize < 0) {
 		errcode = errno;
-		printf("IO error in alloc inode. Code %d, %s\n",
+		write_log(0, "IO error in alloc inode. Code %d, %s\n",
 			errcode, strerror(errcode));
 	}
 	if (retsize < SB_HEAD_SIZE) {
@@ -1030,13 +1043,13 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
 			if (retsize < 0) {
 				errcode = errno;
-				printf("IO error in superblock.");
-				printf(" Code %d, %s\n",
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
 					errcode, strerror(errcode));
 				return -errcode;
 			}
 			if (retsize < SB_ENTRY_SIZE) {
-				printf("IO error in superblock.");
+				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
 
@@ -1046,13 +1059,13 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
 			if (retsize < 0) {
 				errcode = errno;
-				printf("IO error in superblock.");
-				printf(" Code %d, %s\n",
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
 					errcode, strerror(errcode));
 				return -errcode;
 			}
 			if (retsize < SB_ENTRY_SIZE) {
-				printf("IO error in superblock.");
+				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
 		}
@@ -1075,13 +1088,13 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
 			if (retsize < 0) {
 				errcode = errno;
-				printf("IO error in superblock.");
-				printf(" Code %d, %s\n",
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
 					errcode, strerror(errcode));
 				return -errcode;
 			}
 			if (retsize < SB_ENTRY_SIZE) {
-				printf("IO error in superblock.");
+				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
 			tempentry.util_ll_next = thisinode;
@@ -1090,13 +1103,13 @@ int ll_enqueue(ino_t thisinode, char which_ll, SUPER_BLOCK_ENTRY *this_entry)
 				((this_entry->util_ll_prev-1) * SB_ENTRY_SIZE));
 			if (retsize < 0) {
 				errcode = errno;
-				printf("IO error in superblock.");
-				printf(" Code %d, %s\n",
+				write_log(0, "IO error in superblock.");
+				write_log(0, " Code %d, %s\n",
 					errcode, strerror(errcode));
 				return -errcode;
 			}
 			if (retsize < SB_ENTRY_SIZE) {
-				printf("IO error in superblock.");
+				write_log(0, "IO error in superblock.");
 				return -EIO;
 			}
 		}

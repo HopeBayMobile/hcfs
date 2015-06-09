@@ -2,6 +2,7 @@ extern "C" {
 #include "meta_mem_cache.h"
 #include "filetables.h"
 #include "global.h"
+#include <errno.h>
 }
 #include <vector>
 #include "mock_params.h"
@@ -52,7 +53,7 @@ TEST_F(open_fhTest, num_opened_files_LimitExceeded)
 	/* Mock data */
 	system_fh_table.num_opened_files = MAX_OPEN_FILE_ENTRIES + 1;
 	/* Run function & Test */
-	ASSERT_EQ(-1, open_fh(1, 0)) << "Testing open_fh() should fail";
+	ASSERT_EQ(-EMFILE, open_fh(1, 0)) << "Testing open_fh() should fail";
 	/* Recover */
 	system_fh_table.num_opened_files = 0;
 }

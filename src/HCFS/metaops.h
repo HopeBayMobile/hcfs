@@ -13,6 +13,7 @@
 * 2015/2/11  Jiahong moved "seek_page" and "advance_block" from filetables
 * 2015/5/11 Jiahong modifying seek_page for new block indexing / searching.
 *           Also remove advance_block function.
+* 2015/6/2 Jiahong moving lookup_dir to this file
 *
 **************************************************************************/
 #ifndef GW20_HCFS_METAOPS_H_
@@ -52,4 +53,6 @@ int disk_markdelete(ino_t this_inode);
 int disk_cleardelete(ino_t this_inode);
 int disk_checkdelete(ino_t this_inode);
 int startup_finish_delete();
+
+int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
 #endif /* GW20_HCFS_METAOPS_H_ */

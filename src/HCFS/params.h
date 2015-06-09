@@ -14,6 +14,7 @@
 #define GW20_SRC_PARAMS_H_
 
 typedef struct {
+	int log_level;
 	char *metapath;
 	char *blockpath;
 	char *superblock_name;
@@ -37,6 +38,8 @@ typedef struct {
 	char *s3_protocol;
 	char *s3_bucket_url;
 } SYSTEM_CONF_STRUCT;
+
+#define LOG_LEVEL system_config.log_level
 
 #define S3 1
 #define SWIFT 0
@@ -75,7 +78,7 @@ typedef struct {
 
 #define METAPATHLEN 400
 #define BLOCKPATHLEN 400
-#define MAX_FILE_NAME_LEN 400
+#define MAX_FILENAME_LEN 255
 
 #define NUMSUBDIR 1000
 

@@ -64,6 +64,7 @@ typedef struct {
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
 	char threads_created[MAX_SYNC_CONCURRENCY];
+	char threads_error[MAX_SYNC_CONCURRENCY];
 	int total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
@@ -71,18 +72,18 @@ typedef struct {
 UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
-void do_block_sync(ino_t this_inode, long long block_no,
+int do_block_sync(ino_t this_inode, long long block_no,
 				CURL_HANDLE *curl_handle, char *filename);
-void do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
+int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);
 void init_sync_control(void);
 void sync_single_inode(SYNC_THREAD_TYPE *ptr);
 void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
-void dispatch_upload_block(int which_curl);
+int dispatch_upload_block(int which_curl);
 void dispatch_delete_block(int which_curl);
-void schedule_sync_meta(FILE *metafptr, int which_curl);
+int schedule_sync_meta(FILE *metafptr, int which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void upload_loop(void);

@@ -8,14 +8,12 @@
 *
 * Revision History
 * 2015/2/12 Jiahong added header for this file, and revising coding style.
+* 2015/6/4 Jiahong added error handling
 *
 **************************************************************************/
 
 #include "hcfs_fromcloud.h"
 
-/*
-TODO: error handling for HTTP exceptions
-*/
 #include <time.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -33,6 +31,8 @@ TODO: error handling for HTTP exceptions
 #include "fuseop.h"
 #include "global.h"
 #include "hfuse_system.h"
+#include "logger.h"
+#include "macro.h"
 
 /************************************************************************
 *
@@ -40,7 +40,7 @@ TODO: error handling for HTTP exceptions
 *        Inputs: FILE *fptr, ino_t this_inode, long long block_no
 *       Summary: Read block "block_no" of inode "this_inode" from backend,
 *                and write to the file pointed by "fptr".
-*  Return value: HTTP status code, or negation of error code.
+*  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
 int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
@@ -49,41 +49,46 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	int status;
 	int which_curl_handle;
 	char idname[256];
+	int ret, errcode;
 
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	while (TRUE) {
-		sem_wait(&download_curl_sem);
-		fseek(fptr, 0, SEEK_SET);
-		ftruncate(fileno(fptr), 0);
-		sem_wait(&download_curl_control_sem);
-		for (which_curl_handle = 0; which_curl_handle <
-			MAX_DOWNLOAD_CURL_HANDLE; which_curl_handle++) {
-			if (curl_handle_mask[which_curl_handle] == FALSE) {
-				curl_handle_mask[which_curl_handle] = TRUE;
-				break;
-			}
-		}
-		sem_post(&download_curl_control_sem);
-		printf("Debug: downloading using curl handle %d\n",
-							which_curl_handle);
-		sprintf(idname, "download_thread_%d", which_curl_handle);
-		strcpy(download_curl_handles[which_curl_handle].id, idname);
-		status = hcfs_get_object(fptr, objname,
-				&(download_curl_handles[which_curl_handle]));
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 
-		sem_wait(&download_curl_control_sem);
-		curl_handle_mask[which_curl_handle] = FALSE;
-		sem_post(&download_curl_sem);
-		sem_post(&download_curl_control_sem);
+	sem_wait(&download_curl_sem);
+	FSEEK(fptr, 0, SEEK_SET);
+	FTRUNCATE(fileno(fptr), 0);
 
-/* TODO: Fix handling in retrying. Now will retry for any HTTP error*/
-
-		if ((status >= 200) && (status <= 299))
+	sem_wait(&download_curl_control_sem);
+	for (which_curl_handle = 0; which_curl_handle <
+		MAX_DOWNLOAD_CURL_HANDLE; which_curl_handle++) {
+		if (curl_handle_mask[which_curl_handle] == FALSE) {
+			curl_handle_mask[which_curl_handle] = TRUE;
 			break;
+		}
 	}
+	sem_post(&download_curl_control_sem);
+	write_log(10, "Debug: downloading using curl handle %d\n",
+						which_curl_handle);
+	sprintf(idname, "download_thread_%d", which_curl_handle);
+	strcpy(download_curl_handles[which_curl_handle].id, idname);
+	status = hcfs_get_object(fptr, objname,
+			&(download_curl_handles[which_curl_handle]));
+
+	sem_wait(&download_curl_control_sem);
+	curl_handle_mask[which_curl_handle] = FALSE;
+	sem_post(&download_curl_sem);
+	sem_post(&download_curl_control_sem);
+
+	/* Already retried in get object if necessary */
+	if ((status >= 200) && (status <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
 
 	fflush(fptr);
 	return status;
+
+errcode_handle:
+	return errcode;
 }
 
 /************************************************************************
@@ -92,6 +97,9 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 *        Inputs: PREFETCH_STRUCT_TYPE *ptr
 *       Summary: Prefetch the block specified in "ptr" to local cache.
 *  Return value: None
+*
+* Note: For prefetch, will not attempt to return error code to others,
+*       but will just log error and give up prefetching.
 *
 *************************************************************************/
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
@@ -103,6 +111,14 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	BLOCK_ENTRY_PAGE temppage;
 	int entry_index;
 	struct stat tempstat;
+	int ret, errcode;
+	size_t ret_size;
+	char block, mlock, bopen, mopen;
+
+	block = FALSE;
+	mlock = FALSE;
+	bopen = FALSE;
+	mopen = FALSE;
 
 	entry_index = ptr->entry_index;
 	/*Download from backend */
@@ -114,40 +130,61 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		free(ptr);
 		return;
 	}
+	mopen = TRUE;
 	setbuf(metafptr, NULL);
 
 	blockfptr = fopen(thisblockpath, "a+");
+	if (blockfptr == NULL) {
+		free(ptr);
+		fclose(metafptr);
+		return;
+	}
 	fclose(blockfptr);
 
 	blockfptr = fopen(thisblockpath, "r+");
+	if (blockfptr == NULL) {
+		free(ptr);
+		fclose(metafptr);
+		return;
+	}
 	setbuf(blockfptr, NULL);
 	flock(fileno(blockfptr), LOCK_EX);
+	bopen = TRUE;
+	block = TRUE;
 
 	flock(fileno(metafptr), LOCK_EX);
-	fseek(metafptr, ptr->page_start_fpos, SEEK_SET);
-	fread(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
+	mlock = TRUE;
+
+	FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+	FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 
 	if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
 		((temppage).block_entries[entry_index].status == ST_CtoL)) {
 		if ((temppage).block_entries[entry_index].status == ST_CLOUD) {
 			(temppage).block_entries[entry_index].status = ST_CtoL;
-			fseek(metafptr, ptr->page_start_fpos, SEEK_SET);
-			fwrite(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
+			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			fflush(metafptr);
 		}
 		flock(fileno(metafptr), LOCK_UN);
-		fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		mlock = FALSE;
+		ret = fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		if (ret < 0) {
+			write_log(0, "Error prefetching\n");
+			goto errcode_handle;
+		}
 		/*Do not process cache update and stored_where change if block
 			is actually deleted by other ops such as truncate*/
 		flock(fileno(metafptr), LOCK_EX);
-		fseek(metafptr, ptr->page_start_fpos, SEEK_SET);
-		fread(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
+		mlock = TRUE;
+		FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+		FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 		if (stat(thisblockpath, &tempstat) == 0) {
 			(temppage).block_entries[entry_index].status = ST_BOTH;
 			fsetxattr(fileno(blockfptr), "user.dirty", "F", 1, 0);
-			fseek(metafptr, ptr->page_start_fpos, SEEK_SET);
-			fwrite(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
+			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
+			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			fflush(metafptr);
 
@@ -163,4 +200,18 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 	free(ptr);
+
+	return;
+
+errcode_handle:
+	if (block == TRUE)
+		flock(fileno(blockfptr), LOCK_UN);
+	if (bopen == TRUE)
+		fclose(blockfptr);
+	if (mlock == TRUE)
+		flock(fileno(metafptr), LOCK_UN);
+	if (mopen == TRUE)
+		fclose(metafptr);
+	free(ptr);
+	return;
 }

@@ -28,7 +28,7 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 
 ino_t super_block_new_inode(struct stat *in_stat)
 {
-	return 0;
+	return 1;
 }
 
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode, 
@@ -101,6 +101,22 @@ void run_cache_loop(void)
 }
 
 int hook_fuse(int argc, char **argv)
+{
+	return 0;
+}
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+
+int open_log(char *filename)
+{
+	mknod(filename, 0700, 0);
+	return 0;
+}
+
+int close_log(void)
 {
 	return 0;
 }

@@ -9,6 +9,7 @@
 * 2015/2/2 Jiahong added header for this file.
 * 2015/2/11 Jiahong moved some functions to hfuse_system.h.
 * 2015/5/11 Jiahong modifying file meta for new block indexing / searching
+* 2015/6/1 Jiahong adding structure for logger.
 *
 **************************************************************************/
 
@@ -22,6 +23,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include "params.h"
 
 /*BEGIN META definition*/
 
@@ -68,7 +71,7 @@
 /* Defining directory entry in meta files*/
 typedef struct {
 	ino_t d_ino;
-	char d_name[256];
+	char d_name[MAX_FILENAME_LEN+1];
 	char d_type;
 } DIR_ENTRY;
 
@@ -147,7 +150,6 @@ typedef struct {
 SYSTEM_DATA_HEAD *hcfs_system;
 
 /* Other system-related resources */
-FILE *logfptr;  /* File pointer to logs */
 pthread_t reporter_thread;  /* Used by utility prototype */
 
 /* Functions for initializing HCFS */

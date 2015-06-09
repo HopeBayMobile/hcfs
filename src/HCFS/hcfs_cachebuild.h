@@ -44,6 +44,6 @@ returns a positive number (> 0) if the second node needs to be placed in front
 of the first node*/
 int compare_cache_usage(CACHE_USAGE_NODE *first_node,
 					CACHE_USAGE_NODE *second_node);
-void build_cache_usage(void);
+int build_cache_usage(void);
 
 #endif  /* GW20_HCFS_HCFS_CACHEBUILD_H_ */

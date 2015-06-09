@@ -7,12 +7,13 @@
 *
 * Revision History
 * 2015/2/17 Jiahong added header for this file, and revising coding style.
+* 2015/6/3, 6/4 Jiahong added error handling
 *
 **************************************************************************/
 
 /* Implemented routines to parse http return code to distinguish errors
 	from normal ops*/
-/*TODO: Retry mechanism if HTTP operations failed due to timeout */
+
 #include "hcfscurl.h"
 
 #include <stdio.h>
@@ -26,6 +27,11 @@
 
 #include "b64encode.h"
 #include "params.h"
+#include "logger.h"
+#include "macro.h"
+#include "global.h"
+
+#define MAX_RETRIES 5
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -40,21 +46,25 @@ typedef struct {
 * Function name: write_file_function
 *        Inputs: void *ptr, size_t size, size_t nmemb, void *fstream
 *       Summary: Same as fwrite but will return total bytes.
-*  Return value: Total size for writing to fstream
+*  Return value: Total size for writing to fstream. Return 0 if error.
 *
 *************************************************************************/
 size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 {
-	size_t total_size;
+	size_t ret_size;
+	int errcode;
 
-	total_size = fwrite(ptr, size, nmemb, fstream);
+	FWRITE(ptr, size, nmemb, fstream);
 
-	return total_size*size;
+	return ret_size*size;
+
+errcode_handle:
+	return 0;
 }
 
 /************************************************************************
 *
-* Function name: parse_auth_header
+* Function name: parse_swift_auth_header
 *        Inputs: FILE *fptr
 *       Summary: Parse the HTTP header for auth requests and return HTTP
 *                return code (in integer). If successful, auth string is
@@ -62,76 +72,103 @@ size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_auth_header(FILE *fptr)
+int parse_swift_auth_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
+	char *endptr;
 	char temp_string[1024], temp_string2[1024];
-	int ret_val, retcodenum;
+	long ret_num;
+	int retcodenum, ret_val;
+	int ret, errcode;
 
-	fseek(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%s %s %s\n", httpcode, retcode, retstatus);
+	FSEEK(fptr, 0, SEEK_SET);
+	ret_val = fscanf(fptr, "%19s %19s %19s\n",
+			httpcode, retcode, retstatus);
 	if (ret_val < 3)
 		return -1;
 
-	retcodenum = atoi(retcode);
+	ATOL(retcode);
+	retcodenum = (int) ret_num;
 
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
 
-	ret_val = fscanf(fptr, "%s %s\n", temp_string, swift_url_string);
+	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
+			swift_url_string);
 
 	if (ret_val < 2)
 		return -1;
 
-	ret_val = fscanf(fptr, "%s %s\n", temp_string, temp_string2);
+	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
+			temp_string2);
 	if (ret_val < 2)
 		return -1;
 
-	sprintf(swift_auth_string, "%s %s", temp_string, temp_string2);
+	sprintf(swift_auth_string, "%s %s", temp_string,
+			temp_string2);
 
 	return retcodenum;
+
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
 *
-* Function name: parse_list_header
+* Function name: parse_swift_list_header
 *        Inputs: FILE *fptr
 *       Summary: Parse the HTTP header for Swift list requests and return HTTP
 *                return code (in integer).
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int parse_list_header(FILE *fptr)
+int parse_swift_list_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
 	char temp_string[1024], temp_string2[1024];
 	int ret_val, retcodenum, total_objs;
+	int ret, errcode;
+	long ret_num;
+	char *endptr, *tmpptr;
 
-	fseek(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%s %s", httpcode, retcode);
+	FSEEK(fptr, 0, SEEK_SET);
+	ret_val = fscanf(fptr, "%19s %19s", httpcode, retcode);
 	if (ret_val < 2)
 		return -1;
 
-	fgets(retstatus, 19, fptr);
-	retcodenum = atoi(retcode);
+	tmpptr = fgets(retstatus, 19, fptr);
+	if (tmpptr == NULL) {
+		write_log(0, "Error parsing in %s\n", __func__);
+		return -1;
+	}
+	ATOL(retcode);
+	retcodenum = (int) ret_num;
 
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
 
 	while (!feof(fptr)) {
-		fgets(temp_string, 1000, fptr);
+		tmpptr = fgets(temp_string, 1000, fptr);
+		if (tmpptr == NULL) {
+			write_log(0, "Error parsing in %s\n", __func__);
+			return -1;
+		}
+
 		if (!strncmp(temp_string, "X-Container-Object-Count",
 			sizeof("X-Container-Object-Count")-1)) {
 			ret_val = sscanf(temp_string,
 				"X-Container-Object-Count: %s\n", temp_string2);
-			total_objs = atoi(temp_string2);
+			ATOL(temp_string2);
+			total_objs = (int) ret_num;
 
-			printf("total objects %d\n", total_objs);
+			write_log(10, "total objects %d\n", total_objs);
 
 			return retcodenum;
 		}
 		memset(temp_string, 0, 1000);
 	}
+	return -1;
+errcode_handle:
 	return -1;
 }
 
@@ -147,18 +184,27 @@ int parse_list_header(FILE *fptr)
 int parse_S3_list_header(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
-	char temp_string[1024], temp_string2[1024];
-	int ret_val, retcodenum, total_objs;
+	int ret, retcodenum;
+	long ret_num;
+	int errcode;
+	char *endptr, *tmpptr;
 
-	fseek(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%s %s", httpcode, retcode);
-	if (ret_val < 2)
+	FSEEK(fptr, 0, SEEK_SET);
+	ret = fscanf(fptr, "%19s %19s", httpcode, retcode);
+	if (ret < 2)
 		return -1;
 
-	fgets(retstatus, 19, fptr);
-	retcodenum = atoi(retcode);
+	tmpptr = fgets(retstatus, 19, fptr);
+	if (tmpptr == NULL) {
+		write_log(0, "Error parsing in %s\n", __func__);
+		return -1;
+	}
+	ATOL(retcode);
+	retcodenum = (int) ret_num;
 
 	return retcodenum;
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
@@ -173,23 +219,31 @@ int parse_S3_list_header(FILE *fptr)
 int parse_http_header_retcode(FILE *fptr)
 {
 	char httpcode[20], retcode[20], retstatus[20];
-	int ret_val, retcodenum;
+	int ret, retcodenum;
+	long ret_num;
+	int errcode;
+	char *endptr;
 
-	fseek(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%s %s %s\n", httpcode, retcode, retstatus);
-	if (ret_val < 3)
+	FSEEK(fptr, 0, SEEK_SET);
+	ret = fscanf(fptr, "%19s %19s %19s\n", httpcode, retcode,
+			retstatus);
+	if (ret < 3)
 		return -1;
 
-	retcodenum = atoi(retcode);
+	ATOL(retcode);
+	retcodenum = (int) ret_num;
 
 	return retcodenum;
+
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
 *
 * Function name: dump_list_body
 *        Inputs: FILE *fptr
-*       Summary: For Swift list requests, dump to stdout the content of results.
+*       Summary: For Swift list requests, dump the content of results.
 *  Return value: None.
 *
 *************************************************************************/
@@ -200,10 +254,10 @@ void dump_list_body(FILE *fptr)
 
 	fseek(fptr, 0, SEEK_SET);
 	while (!feof(fptr)) {
-		ret_val = fscanf(fptr, "%s\n", temp_string);
+		ret_val = fscanf(fptr, "%1023s\n", temp_string);
 		if (ret_val < 1)
 			break;
-		printf("%s\n", temp_string);
+		write_log(10, "%s\n", temp_string);
 	}
 }
 
@@ -226,7 +280,7 @@ void dump_S3_list_body(FILE *fptr)
 		temp_string[ret_val] = 0;
 		if (ret_val < 1)
 			break;
-		printf("%s", temp_string);
+		write_log(10, "%s", temp_string);
 	}
 }
 
@@ -251,11 +305,19 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	FILE *fptr;
 	CURL *curl;
 	char filename[100];
+	int errcode, ret;
+	int num_retries;
 
 	sprintf(filename, "/run/shm/swiftauth%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
 
 	fptr = fopen(filename, "w+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO Error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		return -1;
+	}
 	chunk = NULL;
 
 	sprintf(auth_url, "%s://%s/auth/v1.0", SWIFT_PROTOCOL, swift_url);
@@ -275,27 +337,37 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
 		fclose(fptr);
 		unlink(filename);
 		curl_slist_free_all(chunk);
-
-		return -1;
+			return -1;
 	}
 
-	ret_val = parse_auth_header(fptr);
+	ret_val = parse_swift_auth_header(fptr);
 
 	/*TODO: add retry routines somewhere for failed attempts*/
 
+	if (ret_val < 0) {
+		fclose(fptr);
+		unlink(filename);
+		curl_slist_free_all(chunk);
+		return ret_val;
+	}
+
 	fclose(fptr);
-	unlink(filename);
+	UNLINK(filename);
 
 	curl_slist_free_all(chunk);
 
+	write_log(10, "Ret code %d\n", ret_val);
 	return ret_val;
+
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
@@ -336,9 +408,6 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 *************************************************************************/
 int hcfs_init_S3_backend(CURL_HANDLE *curl_handle)
 {
-	char account_user_string[1000];
-	int ret_code;
-
 	curl_handle->curl = curl_easy_init();
 
 	if (curl_handle->curl)
@@ -386,8 +455,6 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle)
 *************************************************************************/
 int hcfs_S3_reauth(CURL_HANDLE *curl_handle)
 {
-	char account_user_string[1000];
-	int ret_code;
 
 	if (curl_handle->curl != NULL)
 		hcfs_destroy_swift_backend(curl_handle->curl);
@@ -436,10 +503,11 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 {
 	/*TODO: Consider if it is possible for the actual file size to be
 		smaller than object size due to truncating*/
-	size_t total_size;
 	FILE *fptr;
 	size_t actual_to_read;
 	object_put_control *put_control;
+	int errcode;
+	size_t ret_size;
 
 	put_control = (object_put_control *) put_control1;
 
@@ -452,10 +520,12 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 	else
 		actual_to_read = size * nmemb;
 
-	total_size = fread(ptr, 1, actual_to_read, fptr);
-	put_control->remaining_size -= total_size;
+	FREAD(ptr, 1, actual_to_read, fptr);
+	put_control->remaining_size -= ret_size;
 
-	return total_size;
+	return ret_size;
+errcode_handle:
+	return 0;
 }
 
 /************************************************************************
@@ -472,18 +542,32 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
 	char container_string[200];
-	FILE *swift_list_header_fptr, *swift_list_body_fptr;
+	FILE *swift_header_fptr, *swift_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	int ret_val;
+	int ret_val, num_retries, errcode;
 
 	sprintf(header_filename, "/run/shm/swiftlisthead%s.tmp",
 							curl_handle->id);
 	sprintf(body_filename, "/run/shm/swiftlistbody%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
 
-	swift_list_header_fptr = fopen(header_filename, "w+");
+	swift_header_fptr = fopen(header_filename, "w+");
+	if (swift_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
+
 	swift_list_body_fptr = fopen(body_filename, "w+");
+	if (swift_list_body_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		fclose(swift_header_fptr);
+		return -1;
+	}
 
 	chunk = NULL;
 
@@ -498,18 +582,19 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, swift_list_body_fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(swift_list_header_fptr);
+		fclose(swift_header_fptr);
 		unlink(header_filename);
 		fclose(swift_list_body_fptr);
 		unlink(body_filename);
@@ -517,13 +602,13 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 		return -1;
 	}
 
-	ret_val = parse_list_header(swift_list_header_fptr);
+	ret_val = parse_swift_list_header(swift_header_fptr);
 
 	if ((ret_val >= 200) && (ret_val < 300))
 		dump_list_body(swift_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
 
-	fclose(swift_list_header_fptr);
+	fclose(swift_header_fptr);
 	unlink(header_filename);
 	fclose(swift_list_body_fptr);
 	unlink(body_filename);
@@ -550,37 +635,48 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	object_put_control put_control;
 	CURLcode res;
 	char container_string[200];
-	FILE *swift_list_header_fptr;
+	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val;
+	int ret_val, ret, errcode;
+	int num_retries;
+	long ret_pos;
 
 	sprintf(header_filename, "/run/shm/swiftputhead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
-	swift_list_header_fptr = fopen(header_filename, "w+");
+	swift_header_fptr = fopen(header_filename, "w+");
 
+	if (swift_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
 	chunk = NULL;
 
 	sprintf(container_string, "%s/%s/%s",
 				swift_url_string, SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
-	fseek(fptr, 0, SEEK_END);
-	objsize = ftell(fptr);
-	fseek(fptr, 0, SEEK_SET);
-	put_control.fptr = fptr;
-	put_control.object_size = objsize;
-	put_control.remaining_size = objsize;
+
+	FSEEK(fptr, 0, SEEK_END);
+	FTELL(fptr);
+	objsize = ret_pos;
+	FSEEK(fptr, 0, SEEK_SET);
 
 	if (objsize < 0) {
-		fclose(swift_list_header_fptr);
+		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
 
 		return -1;
 	}
+
+	put_control.fptr = fptr;
+	put_control.object_size = objsize;
+	put_control.remaining_size = objsize;
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -592,27 +688,43 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(swift_list_header_fptr);
+		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
-
 		return -1;
 	}
 
 	curl_slist_free_all(chunk);
-	ret_val = parse_http_header_retcode(swift_list_header_fptr);
-	fclose(swift_list_header_fptr);
-	unlink(header_filename);
+	ret_val = parse_http_header_retcode(swift_header_fptr);
+	if (ret_val < 0) {
+		fclose(swift_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
+	fclose(swift_header_fptr);
+	swift_header_fptr = NULL;
+	UNLINK(header_filename);
 
 	return ret_val;
+
+errcode_handle:
+	if (swift_header_fptr == NULL) {
+		fclose(swift_header_fptr);
+		unlink(header_filename);
+		curl_slist_free_all(chunk);
+	}
+
+	return -1;
 }
 
 /************************************************************************
@@ -628,20 +740,26 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 
-	FILE *swift_list_header_fptr;
+	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val;
+	int ret_val, ret, errcode;
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/swiftgethead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
-	swift_list_header_fptr = fopen(header_filename, "w+");
+	swift_header_fptr = fopen(header_filename, "w+");
+	if (swift_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
 
 	chunk = NULL;
 
@@ -649,16 +767,6 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 				swift_url_string, SWIFT_CONTAINER, objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
-	fseek(fptr, 0, SEEK_END);
-	objsize = ftell(fptr);
-	fseek(fptr, 0, SEEK_SET);
-	if (objsize < 0) {
-		fclose(swift_list_header_fptr);
-		unlink(header_filename);
-		curl_slist_free_all(chunk);
-
-		return -1;
-	}
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -670,26 +778,43 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(swift_list_header_fptr);
+		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
 		return -1;
 	}
 
 	curl_slist_free_all(chunk);
-	ret_val = parse_http_header_retcode(swift_list_header_fptr);
-	fclose(swift_list_header_fptr);
-	unlink(header_filename);
+	ret_val = parse_http_header_retcode(swift_header_fptr);
+	if (ret_val < 0) {
+		fclose(swift_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
+	fclose(swift_header_fptr);
+	swift_header_fptr = NULL;
+	UNLINK(header_filename);
 
 	return ret_val;
+
+errcode_handle:
+	if (swift_header_fptr == NULL) {
+		fclose(swift_header_fptr);
+		unlink(header_filename);
+		curl_slist_free_all(chunk);
+	}
+
+	return -1;
+
 }
 
 /************************************************************************
@@ -704,21 +829,27 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 	char delete_command[10];
-
-	FILE *swift_list_header_fptr;
+	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val;
+	int ret_val, errcode, ret;
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/swiftdeletehead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
-	swift_list_header_fptr = fopen(header_filename, "w+");
+	swift_header_fptr = fopen(header_filename, "w+");
+	if (swift_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
+
 	strcpy(delete_command, "DELETE");
 	chunk = NULL;
 
@@ -735,26 +866,34 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(swift_list_header_fptr);
+		fclose(swift_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
 		return -1;
 	}
 
 	curl_slist_free_all(chunk);
-	ret_val = parse_http_header_retcode(swift_list_header_fptr);
-	fclose(swift_list_header_fptr);
-	unlink(header_filename);
+	ret_val = parse_http_header_retcode(swift_header_fptr);
+	if (ret_val < 0) {
+		fclose(swift_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
+	fclose(swift_header_fptr);
+	UNLINK(header_filename);
 
 	return ret_val;
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
@@ -781,7 +920,7 @@ void convert_currenttime(unsigned char *date_string)
 	gmtime_r(&tmptime, &tmp_gmtime);
 	asctime_r(&tmp_gmtime, current_time);
 
-	printf("current time %s\n", current_time);
+	write_log(10, "current time %s\n", current_time);
 
 	sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday,
 							timestr, year);
@@ -789,7 +928,7 @@ void convert_currenttime(unsigned char *date_string)
 	sprintf(date_string, "%s, %s %s %s %s GMT", wday, mday, month,
 							year, timestr);
 
-	printf("converted string %s\n", date_string);
+	write_log(10, "converted string %s\n", date_string);
 }
 
 /************************************************************************
@@ -809,9 +948,9 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	HMAC_CTX myctx;
 	int count;
 
-	printf("key: %s\n", key);
-	printf("input: %s\n", input_str);
-	printf("%d, %d\n", strlen(key), strlen(input_str));
+	write_log(10, "key: %s\n", key);
+	write_log(10, "input: %s\n", input_str);
+	write_log(10, "%d, %d\n", strlen(key), strlen(input_str));
 	HMAC_CTX_init(&myctx);
 
 	HMAC_Init_ex(&myctx, key, strlen(key), EVP_sha1(), NULL);
@@ -824,8 +963,8 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	*outputlen = len_finalhash;
 
 	for (count = 0; count < len_finalhash; count++)
-		printf("%02X", finalhash[count]);
-	printf("\n");
+		write_log(10, "%02X", finalhash[count]);
+	write_log(10, "\n");
 }
 
 /************************************************************************
@@ -846,12 +985,12 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 	convert_currenttime(date_string);
 	sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
 							resource_string);
-	printf("sig temp1: %s\n", sig_temp1);
+	write_log(10, "sig temp1: %s\n", sig_temp1);
 	compute_hmac_sha1(sig_temp1, sig_temp2, S3_SECRET, &hashlen);
-	printf("sig temp2: %s\n", sig_temp2);
+	write_log(10, "sig temp2: %s\n", sig_temp2);
 	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
 
-	printf("final sig: %s, %d\n", sig_string, hashlen);
+	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
 }
 
 /************************************************************************
@@ -871,13 +1010,13 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	FILE *S3_list_header_fptr, *S3_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-
 	unsigned char date_string[100];
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
 	unsigned char resource[200];
-	int ret_val;
+	int ret_val, errcode;
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/S3listhead%s.tmp", curl_handle->id);
 	sprintf(body_filename, "/run/shm/S3listbody%s.tmp", curl_handle->id);
@@ -886,7 +1025,21 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl = curl_handle->curl;
 
 	S3_list_header_fptr = fopen(header_filename, "w+");
+	if (S3_list_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
+
 	S3_list_body_fptr = fopen(body_filename, "w+");
+	if (S3_list_body_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		fclose(S3_list_header_fptr);
+		return -1;
+	}
 
 	generate_S3_sig("GET", date_string, S3_signature, resource);
 
@@ -894,7 +1047,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -915,7 +1068,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
@@ -933,7 +1086,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 		dump_S3_list_body(S3_list_body_fptr);
 	/*TODO: add retry routines somewhere for failed attempts*/
 
-	printf("return val is: %d\n", ret_val);
+	write_log(10, "return val is: %d\n", ret_val);
 
 	fclose(S3_list_header_fptr);
 	unlink(header_filename);
@@ -943,6 +1096,59 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_slist_free_all(chunk);
 
 	return ret_val;
+}
+
+int _http_is_success(int code)
+{
+	if ((code >= 200) && (code < 300))
+		return TRUE;
+
+	return FALSE;
+}
+int _swift_http_can_retry(int code)
+{
+	switch (code) {
+	case 401:
+		return TRUE;
+		break;
+	case 408:
+		return TRUE;
+		break;
+	case 500:
+		return TRUE;
+		break;
+	case 503:
+		return TRUE;
+		break;
+	case 504:
+		return TRUE;
+		break;
+	default:
+		break;
+	}
+
+	return FALSE;
+}
+int _S3_http_can_retry(int code)
+{
+	switch (code) {
+	case 408:
+		return TRUE;
+		break;
+	case 500:
+		return TRUE;
+		break;
+	case 503:
+		return TRUE;
+		break;
+	case 504:
+		return TRUE;
+		break;
+	default:
+		break;
+	}
+
+	return FALSE;
 }
 
 /************************************************************************
@@ -955,12 +1161,20 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 *************************************************************************/
 int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
-	int ret_val;
+	int ret_val, num_retries;
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
+		write_log(2, "Connecting to Swift backend\n");
+		num_retries = 0;
 		ret_val = hcfs_init_swift_backend(curl_handle);
-		while ((ret_val < 200) || (ret_val > 299)) {
+		while ((!_http_is_success(ret_val)) &&
+			((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
 			if (curl_handle->curl != NULL)
 				hcfs_destroy_swift_backend(curl_handle->curl);
 			ret_val = hcfs_init_swift_backend(curl_handle);
@@ -1007,25 +1221,43 @@ void hcfs_destroy_backend(CURL *curl)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-/* TODO: Fix handling in reauthing in SWIFT. Now will try
-	to reauth for any HTTP error*/
 /* TODO: nothing is actually returned in list container. FIX THIS*/
 int hcfs_list_container(CURL_HANDLE *curl_handle)
 {
-	int ret_val;
+	int ret_val, num_retries;
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_list_container(curl_handle);
-		while ((ret_val < 200) || (ret_val > 299)) {
-			ret_val = hcfs_swift_reauth(curl_handle);
-			if ((ret_val < 200) || (ret_val > 299))
-				continue;
+
+		while ((!_http_is_success(ret_val)) &&
+			((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			if (ret_val == 401) {
+				ret_val = hcfs_swift_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
 			ret_val = hcfs_swift_list_container(curl_handle);
 		}
+
 		break;
 	case S3:
 		ret_val = hcfs_S3_list_container(curl_handle);
+		while ((!_http_is_success(ret_val)) &&
+			((_S3_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			ret_val = hcfs_S3_list_container(curl_handle);
+		}
+
 		break;
 	default:
 		ret_val = -1;
@@ -1044,26 +1276,44 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-/* TODO: Fix handling in reauthing in SWIFT. Now will try to reauth for
-		any HTTP error*/
 int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
-	int ret_val;
+	int ret_val, num_retries;
+	int ret, errcode;
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle);
-		while ((ret_val < 200) || (ret_val > 299)) {
-			ret_val = hcfs_swift_reauth(curl_handle);
-			if ((ret_val < 200) && (ret_val > 299))
-				continue;
-			fseek(fptr, 0, SEEK_SET);
+		while ((!_http_is_success(ret_val)) &&
+			((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			if (ret_val == 401) {
+				ret_val = hcfs_swift_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
 			ret_val = hcfs_swift_put_object(fptr, objname,
-								curl_handle);
+				curl_handle);
 		}
 		break;
 	case S3:
 		ret_val = hcfs_S3_put_object(fptr, objname, curl_handle);
+		while ((!_http_is_success(ret_val)) &&
+			((_S3_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			FSEEK(fptr, 0, SEEK_SET);
+			ret_val = hcfs_S3_put_object(fptr, objname,
+				curl_handle);
+		}
 		break;
 	default:
 		ret_val = -1;
@@ -1071,6 +1321,9 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	}
 
 	return ret_val;
+
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
@@ -1087,23 +1340,53 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	Now will try to reauth for any HTTP error*/
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
-	int status;
+	int ret_val, num_retries;
+	int ret, errcode;
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
-		status = hcfs_swift_get_object(fptr, objname, curl_handle);
-
-		while ((status < 200) || (status > 299))
-			status = hcfs_swift_reauth(curl_handle);
+		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle);
+		while ((!_http_is_success(ret_val)) &&
+			((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			if (ret_val == 401) {
+				ret_val = hcfs_swift_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			FSEEK(fptr, 0, SEEK_SET);
+			FTRUNCATE(fileno(fptr), 0);
+			ret_val = hcfs_swift_get_object(fptr, objname,
+				curl_handle);
+		}
 		break;
 	case S3:
-		status = hcfs_S3_get_object(fptr, objname, curl_handle);
+		ret_val = hcfs_S3_get_object(fptr, objname, curl_handle);
+		while ((!_http_is_success(ret_val)) &&
+			((_S3_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			FSEEK(fptr, 0, SEEK_SET);
+			FTRUNCATE(fileno(fptr), 0);
+			ret_val = hcfs_S3_get_object(fptr, objname,
+				curl_handle);
+		}
 		break;
 	default:
-		status = -1;
+		ret_val = -1;
 		break;
 	}
-	return status;
+	return ret_val;
+
+errcode_handle:
+	return -1;
 }
 
 /************************************************************************
@@ -1119,28 +1402,41 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	Now will try to reauth for any HTTP error*/
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
-	int ret_val;
+	int ret_val, num_retries;
 
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_delete_object(objname, curl_handle);
-		while (((ret_val < 200) || (ret_val > 299)) &&
-					(ret_val != 404)) {
-			ret_val = hcfs_swift_reauth(curl_handle);
-			if ((ret_val >= 200) && (ret_val <= 299))
-				ret_val = hcfs_swift_delete_object(objname,
-								curl_handle);
+
+		while ((!_http_is_success(ret_val)) &&
+			((_swift_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			if (ret_val == 401) {
+				ret_val = hcfs_swift_reauth(curl_handle);
+				if ((ret_val < 200) || (ret_val > 299))
+					continue;
+			}
+			ret_val = hcfs_swift_delete_object(objname,
+					curl_handle);
 		}
 		break;
 	case S3:
 		ret_val = hcfs_S3_delete_object(objname, curl_handle);
-		while (((ret_val < 200) || (ret_val > 299)) &&
-							(ret_val != 404)) {
-			ret_val = hcfs_S3_reauth(curl_handle);
-			if ((ret_val >= 200) && (ret_val <= 299))
-				ret_val = hcfs_S3_delete_object(objname,
-								curl_handle);
+		while ((!_http_is_success(ret_val)) &&
+			((_S3_http_can_retry(ret_val)) &&
+			(num_retries < MAX_RETRIES))) {
+			num_retries++;
+			write_log(2,
+				"Retrying backend operation in 10 seconds");
+			sleep(10);
+			ret_val = hcfs_S3_delete_object(objname,
+				curl_handle);
 		}
+
 		break;
 	default:
 		ret_val = -1;
@@ -1174,9 +1470,10 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
-	int ret_val;
+	int ret_val, ret, errcode;
 	unsigned char resource[200];
-
+	int num_retries;
+	long ret_pos;
 
 	sprintf(header_filename, "/run/shm/s3puthead%s.tmp", curl_handle->id);
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
@@ -1184,13 +1481,20 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	S3_header_fptr = fopen(header_filename, "w+");
 
+	if (S3_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
+
 	generate_S3_sig("PUT", date_string, S3_signature, resource);
 
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -1199,12 +1503,10 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 
-	fseek(fptr, 0, SEEK_END);
-	objsize = ftell(fptr);
-	fseek(fptr, 0, SEEK_SET);
-	put_control.fptr = fptr;
-	put_control.object_size = objsize;
-	put_control.remaining_size = objsize;
+	FSEEK(fptr, 0, SEEK_END);
+	FTELL(fptr);
+	objsize = ret_pos;
+	FSEEK(fptr, 0, SEEK_SET);
 
 	if (objsize < 0) {
 		fclose(S3_header_fptr);
@@ -1213,6 +1515,11 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 		return -1;
 	}
+
+	put_control.fptr = fptr;
+	put_control.object_size = objsize;
+	put_control.remaining_size = objsize;
+
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -1230,7 +1537,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
@@ -1243,10 +1550,26 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	curl_slist_free_all(chunk);
 	ret_val = parse_http_header_retcode(S3_header_fptr);
+	if (ret_val < 0) {
+		fclose(S3_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
 	fclose(S3_header_fptr);
-	unlink(header_filename);
+	S3_header_fptr = NULL;
+	UNLINK(header_filename);
 
 	return ret_val;
+
+errcode_handle:
+	if (S3_header_fptr == NULL) {
+		fclose(S3_header_fptr);
+		unlink(header_filename);
+		curl_slist_free_all(chunk);
+	}
+
+	return -1;
 }
 
 /************************************************************************
@@ -1262,14 +1585,14 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 
-	FILE *S3_list_header_fptr;
+	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val;
+	int ret_val, ret, errcode;
+	int num_retries;
 
 	unsigned char date_string[100];
 	char date_string_header[100];
@@ -1283,14 +1606,20 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 
 	curl = curl_handle->curl;
 
-	S3_list_header_fptr = fopen(header_filename, "w+");
+	S3_header_fptr = fopen(header_filename, "w+");
+	if (S3_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
 
 	generate_S3_sig("GET", date_string, S3_signature, resource);
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -1298,17 +1627,6 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
-
-	fseek(fptr, 0, SEEK_END);
-	objsize = ftell(fptr);
-	fseek(fptr, 0, SEEK_SET);
-	if (objsize < 0) {
-		fclose(S3_list_header_fptr);
-		unlink(header_filename);
-		curl_slist_free_all(chunk);
-
-		return -1;
-	}
 
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
@@ -1322,26 +1640,42 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(S3_list_header_fptr);
+		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
 		return -1;
 	}
 
 	curl_slist_free_all(chunk);
-	ret_val = parse_http_header_retcode(S3_list_header_fptr);
-	fclose(S3_list_header_fptr);
-	unlink(header_filename);
+	ret_val = parse_http_header_retcode(S3_header_fptr);
+	if (ret_val < 0) {
+		fclose(S3_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
+	fclose(S3_header_fptr);
+	S3_header_fptr = NULL;
+	UNLINK(header_filename);
 
 	return ret_val;
+
+errcode_handle:
+	if (S3_header_fptr == NULL) {
+		fclose(S3_header_fptr);
+		unlink(header_filename);
+		curl_slist_free_all(chunk);
+	}
+
+	return -1;
 }
 
 /************************************************************************
@@ -1356,21 +1690,20 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
-	off_t objsize;
 	CURLcode res;
 	char container_string[200];
 	char delete_command[10];
 
-	FILE *S3_list_header_fptr;
+	FILE *S3_header_fptr;
 	CURL *curl;
 	char header_filename[100];
-	int ret_val;
-
+	int ret_val, errcode, ret;
 	unsigned char date_string[100];
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
 	unsigned char resource[200];
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/s3deletehead%s.tmp",
 						curl_handle->id);
@@ -1379,7 +1712,14 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	curl = curl_handle->curl;
 
-	S3_list_header_fptr = fopen(header_filename, "w+");
+	S3_header_fptr = fopen(header_filename, "w+");
+	if (S3_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		return -1;
+	}
+
 	strcpy(delete_command, "DELETE");
 
 	generate_S3_sig("DELETE", date_string, S3_signature, resource);
@@ -1387,7 +1727,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
 
-	printf("%s\n", AWS_auth_string);
+	write_log(10, "%s\n", AWS_auth_string);
 
 	chunk = NULL;
 
@@ -1406,23 +1746,32 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, delete_command);
 	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
-	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_list_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, S3_header_fptr);
 
 	curl_easy_setopt(curl, CURLOPT_URL, container_string);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-	res = curl_easy_perform(curl);
+	HTTP_PERFORM_RETRY(curl);
 	if (res != CURLE_OK) {
 		fprintf(stderr, "failed %s\n", curl_easy_strerror(res));
-		fclose(S3_list_header_fptr);
+		fclose(S3_header_fptr);
 		unlink(header_filename);
 		curl_slist_free_all(chunk);
 		return -1;
 	}
 
 	curl_slist_free_all(chunk);
-	ret_val = parse_http_header_retcode(S3_list_header_fptr);
-	fclose(S3_list_header_fptr);
-	unlink(header_filename);
+	ret_val = parse_http_header_retcode(S3_header_fptr);
+	if (ret_val < 0) {
+		fclose(S3_header_fptr);
+		unlink(header_filename);
+		return -1;
+	}
+
+	fclose(S3_header_fptr);
+	UNLINK(header_filename);
 
 	return ret_val;
+
+errcode_handle:
+	return -1;
 }

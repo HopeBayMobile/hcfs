@@ -1,6 +1,7 @@
 #include <sys/stat.h>
 #include <semaphore.h>
 #include <stdio.h>
+#include <errno.h>
 #include "super_block.h"
 #include "fuseop.h"
 #include "mock_tool.h"
@@ -41,7 +42,7 @@ int dentry_binary_search(DIR_ENTRY *entry_array, int num_entries, DIR_ENTRY *new
 	for (i=0 ; i<num_entries ; i++) {
 		if (strcmp(new_entry->d_name, entry_array[i].d_name) == 0) {
 			memcpy(new_entry, &entry_array[i], sizeof(DIR_ENTRY));
-			return 0;
+			return i;
 		}
 	}
 	return -1;
@@ -51,13 +52,17 @@ int search_dir_entry_btree(char *target_name, DIR_ENTRY_PAGE *tnode, int fh, int
 {
 	DIR_ENTRY tmp_entry;
 	int tmp_index;
+	int ret;
 
 	strcpy(tmp_entry.d_name, target_name);
-	if (dentry_binary_search(tnode->dir_entries, tnode->num_entries, &tmp_entry, &tmp_index) == 0) {
+	ret = dentry_binary_search(tnode->dir_entries, tnode->num_entries,
+		&tmp_entry, &tmp_index);
+	if (ret >= 0) {
 		memcpy(result_node, tnode, sizeof(DIR_ENTRY_PAGE));
+		*result_index = ret;
 		return 0;
 	} 
-	return -1;
+	return -ENOENT;
 }
 
 struct stat *generate_mock_stat(ino_t inode_num)
@@ -69,18 +74,22 @@ struct stat *generate_mock_stat(ino_t inode_num)
 	test_stat->st_uid = inode_num + 6;
 	test_stat->st_gid = inode_num + 9;
 	test_stat->st_size = inode_num * 97;
+	test_stat->st_mode = S_IFREG;
+	
 	return test_stat;
 }
 
 int super_block_read(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 {
-	if(inode_ptr == NULL)
+	if (inode_ptr == NULL)
 		inode_ptr = (SUPER_BLOCK_ENTRY *)malloc(sizeof(SUPER_BLOCK_ENTRY));
 
 	memcpy(&(inode_ptr->inode_stat), generate_mock_stat(this_inode), sizeof(struct stat));
 	return 0;
 }
 
-
-
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
 

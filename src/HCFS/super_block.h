@@ -95,7 +95,8 @@ int write_super_block_head(void);
 int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr);
 int write_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr);
 
-int super_block_update_transit(ino_t this_inode, char is_start_transit);
+int super_block_update_transit(ino_t this_inode, char is_start_transit,
+	char transit_incomplete);
 int super_block_mark_dirty(ino_t this_inode);
 int super_block_share_locking(void);
 int super_block_share_release(void);

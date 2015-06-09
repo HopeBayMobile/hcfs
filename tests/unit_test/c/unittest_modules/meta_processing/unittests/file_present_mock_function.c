@@ -36,7 +36,7 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	return NULL;
+	return 1;
 }
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
@@ -109,7 +109,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, META_PATH);
+	strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
 
@@ -128,3 +128,9 @@ int mark_inode_delete(ino_t this_inode)
 {
 	return 0;
 }
+
+int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+

@@ -9,6 +9,7 @@
 *
 * Revision History
 * 2015/2/5 Jiahong added header for this file, and revising coding style.
+* 2015/6/2 Jiahong added error handling
 *
 **************************************************************************/
 
@@ -27,6 +28,8 @@
 #include "params.h"
 #include "utils.h"
 #include "meta_mem_cache.h"
+#include "logger.h"
+#include "macro.h"
 
 /************************************************************************
 *
@@ -41,15 +44,21 @@
 int meta_forget_inode(ino_t self_inode)
 {
 	char thismetapath[METAPATHLEN];
+	int ret, errcode;
 
-	fetch_meta_path(thismetapath, self_inode);
+	ret = fetch_meta_path(thismetapath, self_inode);
+	if (ret < 0)
+		return ret;
 
 	if (access(thismetapath, F_OK) == 0)
-		unlink(thismetapath);
+		UNLINK(thismetapath);
 
 /*TODO: Need to remove entry from super block if needed */
 
 	return 0;
+
+errcode_handle:
+	return errcode;
 }
 
 /************************************************************************
@@ -74,28 +83,42 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 	/*First will try to lookup meta cache*/
 	if (this_inode > 0) {
 		temp_entry = meta_cache_lock_entry(this_inode);
+		if (temp_entry == NULL)
+			return -ENOMEM;
+
 		/* Only fetch inode stat, so does not matter if inode is reg
 		*  file or dir here*/
 		ret_code = meta_cache_lookup_file_data(this_inode,
 				&returned_stat, NULL, NULL, 0, temp_entry);
+		if (ret_code < 0)
+			goto error_handling;
 
 		if (ret_gen != NULL) {
 			if (S_ISREG(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
+				if (ret_code < 0)
+					goto error_handling;
 				*ret_gen = filemeta.generation;
 			}
 			if (S_ISDIR(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_dir_data(
 						this_inode, NULL, &dirmeta,
 						NULL, temp_entry);
+				if (ret_code < 0)
+					goto error_handling;
 				*ret_gen = dirmeta.generation;
 			}
 			/* TODO: Add case for symlink */
 		}
 
 		ret_code = meta_cache_close_file(temp_entry);
+		if (ret_code < 0) {
+			meta_cache_unlock_entry(temp_entry);
+			return ret_code;
+		}
+
 		ret_code = meta_cache_unlock_entry(temp_entry);
 
 		if (ret_code == 0) {
@@ -109,13 +132,14 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		return -ENOENT;
 	}
 
-/*TODO: What to do if cannot create new meta cache entry? */
-
-	#if DEBUG >= 5
-	printf("fetch_inode_stat %lld\n", inode_stat->st_ino);
-	#endif	/* DEBUG */
+	write_log(10, "fetch_inode_stat %lld\n", inode_stat->st_ino);
 
 	return 0;
+
+error_handling:
+	meta_cache_close_file(temp_entry);
+	meta_cache_unlock_entry(temp_entry);
+	return ret_code;
 }
 
 /************************************************************************
@@ -143,24 +167,46 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.generation = this_gen;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
+
 	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
 							NULL, 0, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
 		return ret_val;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
+		goto error_handling;
+
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
 		return ret_val;
+	}
+
+	ret_val = meta_cache_unlock_entry(body_ptr);
 
 	return 0;
+
+error_handling:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+	return ret_val;
 }
 
 /************************************************************************
@@ -179,7 +225,6 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen)
 {
-	char thismetapath[METAPATHLEN];
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
@@ -192,16 +237,25 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
-	init_dir_page(&temppage, self_inode, parent_inode,
+	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
+	if (ret_val < 0)
+		return ret_val;
 
 	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
 
 	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
 							&temppage, body_ptr);
-
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
 		return ret_val;
@@ -210,13 +264,27 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
 		return ret_val;
 
 	return 0;
+
+error_handling:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+
+	return ret_val;
+
 }
 
 /************************************************************************
@@ -237,14 +305,30 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(parent_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
+
 	ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
 							S_IFREG, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
 	if (ret_val < 0)
 		return ret_val;
 
 	ret_val = decrease_nlink_inode_file(this_inode);
+
+	return ret_val;
+
+error_handling:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
 
 	return ret_val;
 }
@@ -266,37 +350,59 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 			const char *selfname)
 {
 	DIR_META_TYPE tempmeta;
-	char thismetapath[METAPATHLEN];
-	char todelete_metapath[METAPATHLEN];
 	int ret_val;
-	FILE *todeletefptr, *metafptr;
-	char filebuf[5000];
-	size_t read_size;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
+
 	ret_val = meta_cache_lookup_dir_data(this_inode, NULL, &tempmeta,
 							NULL, body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
 
-	printf("TOTAL CHILDREN is now %ld\n", tempmeta.total_children);
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
+
+	if (ret_val < 0)
+		return ret_val;
+
+	write_log(10, "TOTAL CHILDREN is now %ld\n", tempmeta.total_children);
 
 	if (tempmeta.total_children > 0)
 		return -ENOTEMPTY;
 
 	/* Remove this directory from its parent */
 	body_ptr = meta_cache_lock_entry(parent_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
 	ret_val = dir_remove_entry(parent_inode, this_inode, selfname, S_IFDIR,
 								body_ptr);
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
 
 	if (ret_val < 0)
 		return ret_val;
 
 	/* Deferring actual deletion to forget */
-	mark_inode_delete(this_inode);
+	ret_val = mark_inode_delete(this_inode);
 
+	return ret_val;
+
+error_handling:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
 	return ret_val;
 }

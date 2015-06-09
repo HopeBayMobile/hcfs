@@ -300,7 +300,14 @@ TEST(delete_loopTest, DeleteSuccess)
 {
 	pthread_t thread;
 	void *res;
-	
+	int size_objname;
+
+	size_objname = 50;
+	objname_counter = 0;
+	objname_list = (char **)malloc(sizeof(char *) * 100);
+	for (int i = 0 ; i < 100 ; i++)
+		objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
+
 	test_data.num_inode = 40;
 	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
 	test_data.tohandle_counter = 0;
