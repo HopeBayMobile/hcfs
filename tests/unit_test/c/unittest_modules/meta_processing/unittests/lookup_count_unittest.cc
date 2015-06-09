@@ -4,6 +4,8 @@ extern "C" {
 #include "global.h"
 #include "fuseop.h"
 #include <semaphore.h>
+#include <errno.h>
+#include "mock_param.h"
 }
 
 /*
@@ -64,7 +66,7 @@ protected:
 	{
 		LOOKUP_NODE_TYPE *ptr;
 
-		for (int i = 0; i< num; i++) {
+		for (int i = 0; i < num; i++) {
 			int index = i % NUM_LOOKUP_ENTRIES;
 			/* inode i has lookup_count = i */
 			ptr = (LOOKUP_NODE_TYPE *)malloc(sizeof(LOOKUP_NODE_TYPE));
@@ -76,16 +78,33 @@ protected:
 			lookup_table[index].head = ptr;
 		}
 	}
+
+	LOOKUP_NODE_TYPE *find_lookup_entry(ino_t inode)
+	{
+		int index;
+		LOOKUP_NODE_TYPE *ptr = NULL;
+
+		index = inode % NUM_LOOKUP_ENTRIES;	
+		ptr = lookup_table[index].head;
+		while (ptr) {
+			if (ptr->this_inode == inode)
+				break;
+			ptr = ptr->next;
+		}
+
+		return ptr;
+	}
 };
 
 
 class lookup_increaseTest : public InitLookupTableBaseClass {
 };
 
-TEST_F(lookup_increaseTest, IncreaseNode_InEmptyTable)
+TEST_F(lookup_increaseTest, InsertOneNode_InEmptyTable)
 {
 	LOOKUP_NODE_TYPE expected_node;
 	unsigned ret_count;
+	int index;
 	
 	expected_node.this_inode = 123;
 	expected_node.lookup_count = 567777;
@@ -98,14 +117,287 @@ TEST_F(lookup_increaseTest, IncreaseNode_InEmptyTable)
 		expected_node.lookup_count, expected_node.d_type);
 
 	/* Verify: find the entry and compare with expected answer */
-	int index = expected_node.this_inode % NUM_LOOKUP_ENTRIES;
+	index = expected_node.this_inode % NUM_LOOKUP_ENTRIES;
 
 	EXPECT_EQ(expected_node.lookup_count, ret_count);
 	EXPECT_EQ(0, memcmp(&expected_node, lookup_table[index].head, 
 		sizeof(LOOKUP_NODE_TYPE)));
+
 }
 
+TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
+{
+	LOOKUP_NODE_TYPE expected_node;
+	LOOKUP_NODE_TYPE *ptr;
+	unsigned num_insert_node;
+	unsigned ret_count;
+
+	num_insert_node = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_node);
+	
+	expected_node.this_inode = NUM_LOOKUP_ENTRIES * 3 + 123;
+	expected_node.lookup_count = 567777;
+	expected_node.d_type = D_ISDIR;
+	expected_node.to_delete = FALSE;
+	expected_node.next = NULL;
+
+	/* Run */
+	ret_count = lookup_increase(expected_node.this_inode, 
+		expected_node.lookup_count, expected_node.d_type);
+
+	/* Verify: find the entry and compare with expected answer */
+	EXPECT_EQ(expected_node.lookup_count, ret_count);
+	
+	ptr = find_lookup_entry(expected_node.this_inode);
+	
+	ASSERT_TRUE(ptr != NULL);
+	EXPECT_EQ(expected_node.lookup_count, ptr->lookup_count);
+	EXPECT_EQ(expected_node.d_type, ptr->d_type);
+	EXPECT_EQ(expected_node.to_delete, ptr->to_delete);
+}
+
+TEST_F(lookup_increaseTest, IncreaseManyNode)
+{
+	LOOKUP_NODE_TYPE *ptr;
+	unsigned num_insert_node;
+	unsigned ret_count;
+	unsigned add_amount;
+	char expected_type;
+
+	num_insert_node = NUM_LOOKUP_ENTRIES * 3;
+
+	add_amount = 123;
+	expected_type = D_ISREG;
+
+	/* Run */ 
+	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
+		unsigned  init_amount = inode;
+
+		ret_count = lookup_increase(inode, init_amount, expected_type);
+		/* Verify */
+		EXPECT_EQ(init_amount, ret_count);
+	}
+
+	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
+		ret_count = lookup_increase(inode, add_amount, expected_type);
+		/* Verify */
+		EXPECT_EQ(inode + add_amount, ret_count);
+	}
+	
+	/* Verify: find all entry */   
+	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
+		ptr = find_lookup_entry(inode);	
+
+		ASSERT_TRUE(ptr != NULL);
+		EXPECT_EQ(inode + add_amount, ptr->lookup_count);
+		EXPECT_EQ(expected_type, ptr->d_type);
+	}
+}
 
 /*
 	End of unittest of lookup_increase()
+ */
+
+/*
+	Unittest of lookup_decrease()
+ */
+
+class lookup_decreaseTest : public InitLookupTableBaseClass {
+	
+};
+
+TEST_F(lookup_decreaseTest, Arg_need_delete_IsNull)
+{
+	ino_t inode = 2;
+	int amount = 123;
+	char d_type;
+
+	/* Run */
+	EXPECT_EQ(-1, lookup_decrease(inode, amount, &d_type, NULL));
+}
+
+TEST_F(lookup_decreaseTest, DecreaseInode_ButNotFound)
+{
+	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
+	int amount = 123;
+	char need_delete;
+	char d_type;
+
+	/* Run */
+	EXPECT_EQ(-EINVAL, lookup_decrease(inode, amount, &d_type, &need_delete));
+}
+
+TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsPositiveNumber)
+{
+	LOOKUP_NODE_TYPE *ptr;	
+	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
+	int amount;
+	char need_delete;
+	char d_type;
+	unsigned num_insert_inode;
+	int expected_count;
+
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	
+	amount = 12;
+	expected_count = inode - amount;
+
+	/* Run */
+	EXPECT_EQ(expected_count, lookup_decrease(inode, amount, &d_type, &need_delete));
+
+	/* Verify */
+	ptr = find_lookup_entry(inode);
+	EXPECT_EQ(expected_count, ptr->lookup_count);
+	EXPECT_EQ(need_delete, ptr->to_delete);
+	EXPECT_EQ(d_type, ptr->d_type);
+}
+
+TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsZero)
+{
+	LOOKUP_NODE_TYPE *ptr;	
+	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
+	int amount;
+	char need_delete;
+	char d_type;
+	unsigned num_insert_inode;
+
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	
+	amount = inode;
+
+	/* Run */
+	EXPECT_EQ(0, lookup_decrease(inode, amount, &d_type, &need_delete));
+
+	/* Verify */
+	ptr = find_lookup_entry(inode);
+	EXPECT_EQ(NULL, ptr);
+}
+
+TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsNegativeNumber)
+{
+	LOOKUP_NODE_TYPE *ptr;	
+	ino_t inode = NUM_LOOKUP_ENTRIES * 1.5;
+	int amount;
+	char need_delete;
+	char d_type;
+	unsigned num_insert_inode;
+
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	
+	amount = inode * 2;
+
+	/* Run */
+	EXPECT_EQ(0, lookup_decrease(inode, amount, &d_type, &need_delete));
+
+	/* Verify */
+	ptr = find_lookup_entry(inode);
+	EXPECT_EQ(NULL, ptr);
+}
+
+/*
+	End of unittest of lookup_decrease()
+ */
+
+/*
+	Unittest of lookup_markdelete()
+ */
+
+class lookup_markdeleteTest : public InitLookupTableBaseClass {
+
+};
+
+TEST_F(lookup_markdeleteTest, MarkDeleteFail_LookupEntryNotFound)
+{	
+	unsigned num_insert_inode;
+	ino_t inode_markdelete;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	inode_markdelete = NUM_LOOKUP_ENTRIES * 3 + 100;
+
+	/* Run 3 times */
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 1));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 2));
+}
+
+TEST_F(lookup_markdeleteTest, MarkDeleteSuccess)
+{	
+	unsigned num_insert_inode;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+
+	/* Run many times */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) 
+		// All vars not_delete is set as FALSE before running
+		EXPECT_EQ(0, lookup_markdelete(inode));
+
+	/* Verify */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) {
+		LOOKUP_NODE_TYPE *ptr;
+
+		ptr = find_lookup_entry(inode);
+		ASSERT_EQ(TRUE, ptr->to_delete);
+	}
+}
+
+/*
+	End of unittest of lookup_markdelete()
+ */
+
+/*
+	Unittest of lookup_destroy()
+ */
+
+class lookup_destroyTest : public InitLookupTableBaseClass {
+protected:
+	void SetUp()
+	{
+		InitLookupTableBaseClass::SetUp();
+		
+		check_actual_delete_table = NULL;
+	}
+
+	void TearDown()
+	{
+		if (check_actual_delete_table)
+			free(check_actual_delete_table);
+
+		InitLookupTableBaseClass::TearDown();
+	}
+};
+
+TEST_F(lookup_destroyTest, DestroyEmptyTableSuccess)
+{
+	/* Run */
+	EXPECT_EQ(0, lookup_destroy());
+}
+
+TEST_F(lookup_destroyTest, DestroyTableSuccess)
+{
+	unsigned num_insert_inode;
+
+	/* Insert many inodes */
+	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
+	insert_many_mock_nodes(num_insert_inode);
+	check_actual_delete_table = (char *)malloc(num_insert_inode * sizeof(char));
+	memset(check_actual_delete_table, FALSE, num_insert_inode * sizeof(char));
+
+	/* Run */
+	EXPECT_EQ(0, lookup_destroy());
+	
+	/* Verify */
+	for (ino_t inode = 0; inode < num_insert_inode; inode++) {
+		EXPECT_EQ(TRUE, check_actual_delete_table[inode]);
+	}
+}
+
+/*
+	End of unittest of lookup_destroy()
  */

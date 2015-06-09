@@ -50,7 +50,7 @@ all : $(TESTS)
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test :
+test : $(TESTS)
 	./hcfs_fromcloud_unittest
 	./hcfs_tocloud_unittest
 	./hcfs_clouddelete_unittest

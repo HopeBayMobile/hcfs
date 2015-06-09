@@ -52,7 +52,7 @@ all : $(TESTS)
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test :
+test : $(TESTS)
 	./utils_unittest
 	./dir_entry_btree_unittest
 	./logger_unittest
