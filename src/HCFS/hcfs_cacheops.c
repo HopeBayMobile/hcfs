@@ -377,7 +377,8 @@ void run_cache_loop(void)
 				return_cache_usage_node(
 				inode_cache_usage_hash[e_index]->this_inode);
 
-			free(this_cache_node);
+			if (this_cache_node)
+				free(this_cache_node);
 			e_index++;
 
 			ret = _remove_synced_block(this_inode, &builttime,

@@ -2,6 +2,7 @@
 #include "super_block.h"
 #include "hcfs_cachebuild.h"
 #include "fuseop.h"
+#include <stdarg.h>
 
 void init_mock_system_config()
 {
@@ -57,6 +58,9 @@ int super_block_mark_dirty(ino_t this_inode)
 
 CACHE_USAGE_NODE *return_cache_usage_node(ino_t this_inode)
 {
+	if (this_inode > 0)
+		nonempty_cache_hash_entries--;
+	
 	return NULL;
 }
 
@@ -71,5 +75,11 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 
 int write_log(int level, char *format, ...)
 {
+	va_list ap;
+
+	/*va_start(ap, format);
+	vprintf(format, ap);
+	va_end(ap);*/
+
 	return 0;
 }

@@ -21,11 +21,19 @@ protected:
 	
 	void TearDown()
 	{
-		char meta_name[50];
+		char meta_name[200];
+		char block_name[200];
+		
 		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
-			sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", 
-				(i + 1) * 5);
+			ino_t inode = inode_cache_usage_hash[i]->this_inode;
+
+			sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode);
 			unlink(meta_name);
+			for (int blockno = 0; blockno < 10 ; blockno++) {	
+				sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", 
+					inode, blockno);
+				unlink(block_name);
+			}
 		}
 		
 		free(hcfs_system);
@@ -67,6 +75,7 @@ private:
 		}   
 	}
 	
+	/* Generate mock meta and blocks */
 	void genetate_mock_meta(ino_t inode)
 	{
 		struct stat file_stat;
@@ -75,7 +84,7 @@ private:
 		char meta_name[200];
 		FILE *fptr;
 
-		file_stat.st_size = 100000; // block_num = 100000/10000 = 10 = 1 page in meta
+		file_stat.st_size = 1000; // block_num = 1000/100 = 10 = 1 page in meta
 		file_entry.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 		for (int i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
@@ -85,13 +94,13 @@ private:
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(struct stat), 1, fptr);
 		fwrite(&file_meta, sizeof(FILE_META_TYPE), 1, fptr);
-		//for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++)
-		fwrite(&file_entry, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+		fwrite(&file_entry, sizeof(BLOCK_ENTRY_PAGE), 1, fptr); // Just write one page
 		fclose(fptr);
 
 		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
 			sprintf(meta_name, "/tmp/run_cache_loop_block%d_%d", inode, blockno);
 			mknod(meta_name, 0700, 0);
+			truncate(meta_name, MAX_BLOCK_SIZE);
 		}
 	}
 };
@@ -103,32 +112,58 @@ void *cache_loop_function(void *ptr)
 	return NULL;
 }
 
-TEST_F(run_cache_loopTest, DeleteLocalBlock_WhenFull)
+TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 {
 	pthread_t thread_id;
 	BLOCK_ENTRY_PAGE file_entry;
 	char meta_name[200];
 	FILE *fptr;
 
-	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT; 
+	/* Generate mock cache usage nodes and mock block file */
+	MAX_BLOCK_SIZE = 100;
+	CACHE_SOFT_LIMIT = 1;
+	hcfs_system->systemdata.cache_size = CURRENT_CACHE_SIZE; 
 	hcfs_system->system_going_down = FALSE;
-	MAX_BLOCK_SIZE = 10000;
+	hcfs_system->systemdata.cache_blocks = CURRENT_BLOCK_NUM;
+	printf("Test: Generate mock data (cache usage & block file).\n");
 	init_mock_cache_usage();
-
+	
+	/* Run */
 	pthread_create(&thread_id, NULL, cache_loop_function, NULL);
+	printf("Test: cache_loop() is running. process sleep 15 seconds.\n");
 	sleep(15);
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT - 1; 
 	hcfs_system->system_going_down = TRUE;
+	printf("Test: Let thread leave.\n");
 	sleep(2);
 
-
+	/* Verify */
+	int expected_block_num = CURRENT_BLOCK_NUM;
 	for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
-		sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode_cache_usage_hash[i]->this_inode);
+		struct stat file_stat;
+		ino_t inode;
+		
+		inode = inode_cache_usage_hash[i]->this_inode;
+		sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode);
 		fptr = fopen(meta_name, "r");
+		
+		fseek(fptr, 0, SEEK_SET);
+		fread(&file_stat, sizeof(struct stat), 1, fptr);
+		
 		fseek(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE), SEEK_SET);
 		fread(&file_entry, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-		for (int entry = 0; entry < 10; entry++)
+		//** Verify status is changed to ST_CLOUD and block is removed. **
+		for (int entry = 0; entry < file_stat.st_size/MAX_BLOCK_SIZE; entry++) {
+			char block_name[200];
+			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
+			sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", inode, entry);
+			ASSERT_TRUE(access(block_name, F_OK) < 0);
+
+			expected_block_num--;
+		}
+		fclose(fptr);
 	}
 
+	EXPECT_EQ(expected_block_num, hcfs_system->systemdata.cache_blocks);
 }
