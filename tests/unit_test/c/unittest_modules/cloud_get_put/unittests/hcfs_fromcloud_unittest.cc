@@ -214,7 +214,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 
 	/* Run */
 	prefetch_block(prefetch_ptr);
-	
+
 	/* Check answer */
 	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size); // Total size = expected block size
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
