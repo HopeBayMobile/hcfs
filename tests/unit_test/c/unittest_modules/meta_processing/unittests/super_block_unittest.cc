@@ -531,11 +531,11 @@ TEST_F(super_block_update_transitTest, ReadEntryFail)
 	close(sys_super_block->iofptr);
 	sys_super_block->iofptr = open("/testpatterns/not_exist", O_RDONLY, 0600);
 
-	/* Run */
+	/* Run, don't care arguments */
 	EXPECT_EQ(-EBADF, super_block_update_transit(inode, FALSE, FALSE));
 }
 
-TEST_F(super_block_update_transitTest, SetStartTransit_TRUE)
+TEST_F(super_block_update_transitTest, Set_is_start_transit_TRUE)
 {
 	ino_t inode = 8;
 	SUPER_BLOCK_ENTRY sb_entry;

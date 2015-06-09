@@ -46,7 +46,7 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 	if (this_inode > 1) { // inode > 1 is used to test upload_loop()
 		sem_wait(&shm_verified_data->record_inode_sem);
 		shm_verified_data->record_handle_inode[shm_verified_data->record_inode_counter] = 
-			this_inode;
+			this_inode; // Record the inode number to verify.
 		shm_verified_data->record_inode_counter++;
 		sem_post(&shm_verified_data->record_inode_sem);
 		printf("Test: inode %d is updated\n", this_inode);
@@ -62,13 +62,17 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	char filebuf1[4096], filebuf2[4096];
 
 	sprintf(objectpath, "/tmp/testHCFS/%s", objname);
-	objptr = fopen(objectpath, "r");
-	if (!objptr) {
-		objptr = fopen(MOCK_META_PATH, "r");
-		if (!objptr)
+	if (access(objectpath, F_OK) < 0) {
+		if (access(MOCK_META_PATH, F_OK) < 0)
 			return 0;
 	}
-	while (!feof(fptr) || !feof(objptr)) {  // Check file content
+/*	objptr = fopen(objectpath, "r");
+	if (objptr == NULL) {
+		objptr = fopen(MOCK_META_PATH, "r");
+		if (objptr == NULL)
+			return 0;
+	}*/
+/*	while (!feof(fptr) || !feof(objptr)) {  // Check file content
 		readsize1 = fread(filebuf1, 1, 4096, fptr);
 		readsize2 = fread(filebuf2, 1, 4096, objptr);
 		if ((readsize1 > 0) && (readsize1 == readsize2)){
@@ -81,12 +85,13 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 			return 0;
 		}
 	}
-
+*/
+	//fclose(objptr);
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
 	sem_post(&objname_counter_sem);
-	return 0;
+	return 200;
 }
 
 int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
@@ -142,8 +147,9 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	long long target_page, long long hint_page)
 {
 	long long ret_page_pos = sizeof(struct stat) + 
-		sizeof(FILE_META_TYPE) + target_page *
-		sizeof(BLOCK_ENTRY_PAGE);
+		sizeof(FILE_META_TYPE) + target_page * sizeof(BLOCK_ENTRY_PAGE);
+	
+	return ret_page_pos;
 }
 
 int write_log(int level, char *format, ...)
