@@ -1,5 +1,6 @@
 #include <semaphore.h>
 #include <string>
+#include <errno.h>
 #include "gtest/gtest.h"
 #include "curl/curl.h"
 #include "attr/xattr.h"
@@ -198,6 +199,7 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	int entry_index;
 	int meta_fpos;
 	char xattr_result;
+	int ret, errcode;
 	
 	entry_index = prefetch_ptr->entry_index;
 	meta_fpos = prefetch_ptr->page_start_fpos;
@@ -217,7 +219,14 @@ TEST_F(prefetch_blockTest, PrefetchSuccess)
 	EXPECT_EQ(EXTEND_FILE_SIZE, hcfs_system->systemdata.cache_size); // Total size = expected block size
 	EXPECT_EQ(1, hcfs_system->systemdata.cache_blocks); // Prefetch one block from cloud
 	EXPECT_EQ(0, access("/tmp/testHCFS/tmp_block", F_OK)); // Mock block path
-	EXPECT_EQ(1, getxattr("/tmp/testHCFS/tmp_block", "user.dirty", &xattr_result, sizeof(char))); 
+	ret = getxattr("/tmp/testHCFS/tmp_block", "user.dirty", &xattr_result,
+			sizeof(char));
+	if (ret < 0) {
+		errcode = errno;
+		printf("Failed to getxattr. Code %d, %s\n", errcode,
+			strerror(errcode));
+	}
+	EXPECT_EQ(1, ret);
 	EXPECT_EQ('F', xattr_result); // xattr
 	metafptr = fopen("/tmp/testHCFS/tmp_meta", "r");	
 	fseek(metafptr, meta_fpos, SEEK_SET);
