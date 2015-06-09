@@ -53,6 +53,7 @@ test:
 	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest
+	./lookup_count_unittest
 
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcno *.gcda
