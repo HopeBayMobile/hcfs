@@ -715,7 +715,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (swift_header_fptr == NULL) {
@@ -804,7 +804,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (swift_header_fptr == NULL) {
@@ -891,7 +891,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	fclose(swift_header_fptr);
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 errcode_handle:
 	return -1;
 }
@@ -1560,7 +1560,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (S3_header_fptr == NULL) {
@@ -1666,7 +1666,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	if (S3_header_fptr == NULL) {
@@ -1770,7 +1770,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	fclose(S3_header_fptr);
 	UNLINK(header_filename);
 
-	return 0;
+	return ret_val;
 
 errcode_handle:
 	return -1;
