@@ -35,9 +35,6 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/uio.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3433,51 +3430,6 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 	fuse_reply_err(req, 0);
 }
 
-/* A prototype for reporting the current stat of HCFS */
-/* TODO: move this prototype to other source file, and finish stat util */
-void reporter_module(void)
-{
-	int fd, fd1, size_msg, msg_len;
-	struct sockaddr_un addr;
-	char buf[4096];
-
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, "/dev/shm/hcfs_reporter");
-	unlink(addr.sun_path);
-	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	bind(fd, &addr, sizeof(struct sockaddr_un));
-
-	listen(fd, 10);
-	while (hcfs_system->system_going_down == FALSE) {
-		fd1 = accept(fd, NULL, NULL);
-		msg_len = 0;
-		while (TRUE) {
-			size_msg = recv(fd1, &buf[msg_len], 512, 0);
-			if (size_msg <= 0)
-				break;
-			msg_len += size_msg;
-			if (msg_len > 3000)
-				break;
-			if (buf[msg_len-1] == 0)
-				break;
-		}
-		buf[msg_len] = 0;
-		if (strcmp(buf, "terminate") == 0)
-			break;
-		if (strcmp(buf, "stat") == 0) {
-			buf[0] = 0;
-			sem_wait(&(hcfs_system->access_sem));
-			sprintf(buf, "%lld %lld %lld",
-				hcfs_system->systemdata.system_size,
-				hcfs_system->systemdata.cache_size,
-				hcfs_system->systemdata.cache_blocks);
-			sem_post(&(hcfs_system->access_sem));
-			write_log(10, "debug stat hcfs %s\n", buf);
-			send(fd1, buf, strlen(buf)+1, 0);
-		}
-	}
-}
-
 /************************************************************************
 *
 * Function name: hfuse_ll_init
@@ -3492,7 +3444,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
-	pthread_create(&reporter_thread, NULL, (void *)reporter_module, NULL);
+	int init_api_interface(void);
 	init_meta_cache_headers();
 	lookup_init();
 	startup_finish_delete();

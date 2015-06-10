@@ -149,9 +149,6 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
-/* Other system-related resources */
-pthread_t reporter_thread;  /* Used by utility prototype */
-
 /* Functions for initializing HCFS */
 int hook_fuse(int argc, char **argv);
 
