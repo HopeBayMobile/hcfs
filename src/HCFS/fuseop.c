@@ -67,6 +67,7 @@
 #include "lookup_count.h"
 #include "logger.h"
 #include "macro.h"
+#include "xattr_ops.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -3818,7 +3819,58 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
 	const char *value, size_t size, int flag)
 {
+	/* TODO: flags and permission of namespace */
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	XATTR_PAGE xattr_page;
+	long long xattr_filepos;
+	char key[MAX_KEY_SIZE];
+	char name_space;
+	int retcode;
+	ino_t this_inode;
+	
+	this_inode = (ino_t) ino;
 
+	/* Parse input name and separate it into namespace and key */
+	retcode = parse_xattr_namespace(name, &name_space, key);
+	if (retcode < 0) {
+		fuse_reply_err(req, -retcode);
+		return;
+	}
+	
+	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {	
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	/* Open the meta file and set exclusive lock to it */
+	retcode = meta_cache_open_file(meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+
+	/* Find pos of xattr page */
+	ret_code = fetch_xattr_filepos(meta_cache_entry, &xattr_filepos); 	
+	if (retcode < 0)
+		goto error_handle;
+	
+	if (xattr_filepos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
+		memset(&xattr_page, 0, sizeof(XATTR_PAGE));
+		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
+		xattr_filepos = ftell(meta_cache_entry->fptr);	//// err handle
+		FWRITE(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+
+	} else { /* xattr has been existed. Just read it. */
+		FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
+		FREAD(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	
+	}
+	
+error_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(this_inode);
+	fuse_reply_err(req, -retcode);
+	return;
 }
 
 
