@@ -10,6 +10,7 @@
 * 2015/2/12~13 Jiahong added header for this file, and revising coding style.
 * 2015/5/14 Jiahong changed code so that process will terminate with fuse
 *           unmount.
+* 2015/6/5 Jiahong added error handling.
 *
 **************************************************************************/
 
@@ -40,6 +41,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "fuseop.h"
 #include "global.h"
 #include "logger.h"
+#include "macro.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -52,6 +54,9 @@ CURL_HANDLE delete_curl_handles[MAX_DELETE_CONCURRENCY];
 /* Helper function for terminating threads in deleting backend objects */
 /* Dsync threads are the ones that find the objects to be deleted in
 	a single filesystem object. */
+/* Don't need to collect return code for the per-inode dsync thread, as
+the error handling for sync-for-deletion for this inode will be handled in
+dsync_single_inode. */
 static inline void _dsync_terminate_thread(int index)
 {
 	int ret;
@@ -59,7 +64,7 @@ static inline void _dsync_terminate_thread(int index)
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
 			(dsync_ctl.threads_created[index] == TRUE)) {
 		ret = pthread_tryjoin_np(dsync_ctl.inode_dsync_thread[index],
-									NULL);
+					NULL);
 		if (ret == 0) {
 			dsync_ctl.threads_in_use[index] = 0;
 			dsync_ctl.threads_created[index] = FALSE;
@@ -194,6 +199,7 @@ static inline int _init_delete_handle(int index)
 	ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
+		write_log(0, "Error initializing delete threads. Retrying.\n");
 		if (delete_curl_handles[index].curl != NULL)
 			hcfs_destroy_backend(delete_curl_handles[index].curl);
 		ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
@@ -279,29 +285,37 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	unsigned char block_status;
 	char delete_done;
 	char in_sync;
-	int ret_val;
+	int ret_val, errcode, ret;
+	size_t ret_size;
 	struct timespec time_to_sleep;
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
+	char mlock;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
+	mlock = FALSE;
 	this_inode = ptr->inode;
 
 	fetch_todelete_path(thismetapath, this_inode);
 
 	metafptr = fopen(thismetapath, "r+");
-	if (metafptr == NULL)
-		return;
+	if (metafptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+			errcode, strerror(errcode));\
+		goto errcode_handle;
+	}
 
 	setbuf(metafptr, NULL);
 	
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
-		fread(&tempfilestat, sizeof(struct stat), 1, metafptr);
-		fread(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		mlock = TRUE;
+		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
+		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
@@ -310,12 +324,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
 		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
 
 		/* Delete all blocks */
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
 							block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
+			mlock = TRUE;
 
 			current_index = block_count % BLK_INCREMENTS;
 			which_page = block_count / BLK_INCREMENTS;
@@ -327,6 +343,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				if (page_pos <= 0) {
 					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);
+					mlock = FALSE;
 					continue;
 				}
 				current_page = which_page;
@@ -334,25 +351,17 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 			/*TODO: error handling here if cannot read correctly*/
 
-			fseek(metafptr, page_pos, SEEK_SET);
-			if (ftell(metafptr) != page_pos) {
-				flock(fileno(metafptr), LOCK_UN);
-				break;
-			}
+			FSEEK(metafptr, page_pos, SEEK_SET);
 
-			ret_val = fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
+			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
-			if (ret_val < 1) {
-				flock(fileno(metafptr), LOCK_UN);
-				break;
-			}
-
 			block_status =
 				temppage.block_entries[current_index].status;
 
 			if ((block_status != ST_LDISK) &&
 						(block_status != ST_NONE)) {
 				flock(fileno(metafptr), LOCK_UN);
+				mlock = FALSE;
 				sem_wait(&(delete_ctl.delete_queue_sem));
 				sem_wait(&(delete_ctl.delete_op_sem));
 				curl_id = -1;
@@ -374,6 +383,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				delete_ctl.threads_created[curl_id] = TRUE;
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
+				mlock = FALSE;
 			}
 		}
 		/* Block deletion should be done here. Check if all delete
@@ -399,6 +409,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		}
 	}
 
+errcode_handle:
+	/* TODO: If cannot handle object deletion from metaptr, need to scrub */
+	if (metafptr != NULL) {
+		if (mlock == TRUE)
+			flock(fileno(metafptr), LOCK_UN);
+		fclose(metafptr);
+	}
+
 	/* Delete meta */
 	sem_wait(&(delete_ctl.delete_queue_sem));
 	sem_wait(&(delete_ctl.delete_op_sem));
@@ -412,15 +430,11 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 	sem_post(&(delete_ctl.delete_op_sem));
 
-	flock(fileno(metafptr), LOCK_EX);
-
 	pthread_create(&(delete_ctl.threads_no[curl_id]), NULL,
 		(void *)&con_object_dsync,
 		(void *)&(delete_ctl.delete_threads[curl_id]));
 
 	delete_ctl.threads_created[curl_id] = TRUE;
-	flock(fileno(metafptr), LOCK_UN);
-	fclose(metafptr);
 
 	pthread_join(delete_ctl.threads_no[curl_id], NULL);
 
@@ -454,6 +468,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
+	return;
 }
 
 /************************************************************************
@@ -462,19 +477,25 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 *        Inputs: ino_t this_inode, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the meta object
 *                of inode number "this_inode" from backend.
-*  Return value: None
+*  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
+int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
-	int ret_val;
+	int ret_val, ret;
 
 	sprintf(objname, "meta_%ld", this_inode);
 	write_log(10, "Debug meta deletion: objname %s, inode %ld\n",
 						objname, this_inode);
 	sprintf(curl_handle->id, "delete_meta_%ld", this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
+	/* Already retried in get object if necessary */
+	if ((ret_val >= 200) && (ret_val <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
+	return ret;
 }
 
 /************************************************************************
@@ -483,14 +504,14 @@ void do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *        Inputs: ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle
 *       Summary: Given curl handle "curl_handle", delete the block object
 *                of inode number "this_inode", block no "block_no" from backend.
-*  Return value: None
+*  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-void do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, long long block_no,
 						CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
-	int ret_val;
+	int ret_val, ret;
 
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 	write_log(10,
@@ -498,7 +519,14 @@ void do_block_delete(ino_t this_inode, long long block_no,
 					objname, this_inode, block_no);
 	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
 	ret_val = hcfs_delete_object(objname, curl_handle);
+	/* Already retried in get object if necessary */
+	if ((ret_val >= 200) && (ret_val <= 299))
+		ret = 0;
+	else
+		ret = -EIO;
+	return ret;
 }
+/* TODO: How to retry object deletion later if failed at some point */
 
 /************************************************************************
 *

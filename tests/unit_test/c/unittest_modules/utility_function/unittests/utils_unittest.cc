@@ -637,6 +637,7 @@ class validate_system_configTest : public ::testing::Test {
     rmdir("/tmp/testHCFS/metastorage");
     rmdir("/tmp/testHCFS/blockstorage");
     unlink("/tmp/testHCFS");
+    rmdir(tmppath);
     if (workpath != NULL)
       free(workpath);
     if (tmppath != NULL)

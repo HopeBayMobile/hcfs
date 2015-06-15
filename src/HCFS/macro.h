@@ -26,6 +26,32 @@
 		}\
 	}
 
+#define FTRUNCATE(A, B)\
+	{\
+		errcode = 0;\
+		ret = ftruncate(A, B);\
+		if (ret < 0) {\
+			errcode = errno;\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+				errcode, strerror(errcode));\
+			errcode = -errcode;\
+			goto errcode_handle;\
+		}\
+	}
+
+#define SETXATTR(A, B, C, D, E)\
+	{\
+		errcode = 0;\
+		ret = setxattr(A, B, C, D, E);\
+		if (ret < 0) {\
+			errcode = errno;\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+				errcode, strerror(errcode));\
+			errcode = -errcode;\
+			goto errcode_handle;\
+		}\
+	}
+
 #define LSEEK(A, B, C)\
 	{\
 		errcode = 0;\
@@ -168,9 +194,9 @@
 				num_retries++;\
 				if (num_retries < MAX_RETRIES)\
 					continue;\
-			}\
-			if (res != CURLE_OK)\
+			} else {\
 				break;\
+			}\
 		}\
 	}
 

@@ -52,7 +52,6 @@
 #include <fuse/fuse_lowlevel.h>
 #include <fuse/fuse_common.h>
 #include <fuse/fuse_opt.h>
-#include <curl/curl.h>
 
 #include "global.h"
 #include "file_present.h"
@@ -67,6 +66,7 @@
 #include "hcfs_fromcloud.h"
 #include "lookup_count.h"
 #include "logger.h"
+#include "macro.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -84,11 +84,12 @@ to zero (to save space in the long run).
 to delete or list the folder.
 */
 
+/* TODO: for mechanisms that needs timer, use per-process or per-thread
+cpu clock instead of using current time to avoid time changes due to
+ntpdate / ntpd or manual changes*/
+
 /* TODO: Go over the details involving S_ISUID, S_ISGID, and linux capability
 	problems (involving chmod, chown, etc) */
-
-/* TODO: Need to revisit the following problem for all ops:
-         error handling */
 
 /* TODO: system acl. System acl is set in extended attributes. */
 
@@ -111,12 +112,13 @@ nanosecond precision.
 */
 void set_timestamp_now(struct stat *thisstat, char mode)
 {
-	clockid_t this_clock_id;
 	struct timespec timenow;
+	int ret;
 
-	clock_getcpuclockid(0, &this_clock_id);
-	clock_gettime(this_clock_id, &timenow);
+	ret = clock_gettime(CLOCK_REALTIME, &timenow);
 
+	write_log(10, "Current time %s, ret %d\n",
+		ctime(&(timenow.tv_sec)), ret);
 	if (mode & ATIME) {
 		thisstat->st_atime = (time_t)(timenow.tv_sec);
 		memcpy(&(thisstat->st_atim), &timenow,
@@ -2172,17 +2174,17 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 /* Function for reading from a single block for read operation. Will fetch
 *  block from backend if needed. */
 size_t _read_block(char *buf, size_t size, long long bindex,
-		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *errcode)
+		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *reterr)
 {
 	long long current_page;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
-	size_t this_bytes_read;
+	size_t this_bytes_read, ret_size;
 	long long entry_index;
 	char fill_zeros;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
-	int ret, errnum;
+	int ret, errnum, errcode;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -2192,7 +2194,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 	fh_ptr->meta_cache_ptr =
 			meta_cache_lock_entry(fh_ptr->thisinode);
 	if (fh_ptr->meta_cache_ptr == NULL) {
-		*errcode = -ENOMEM;
+		*reterr = -ENOMEM;
 		return 0;
 	}
 	fh_ptr->meta_cache_locked = TRUE;
@@ -2205,7 +2207,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			fh_ptr->meta_cache_locked = FALSE;
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-			*errcode = fh_ptr->cached_filepos;
+			*reterr = fh_ptr->cached_filepos;
 			return 0;
 		}
 		if (fh_ptr->cached_filepos == 0) {
@@ -2217,7 +2219,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 				fh_ptr->meta_cache_locked = FALSE;
 				meta_cache_close_file(tmpptr);
 				meta_cache_unlock_entry(tmpptr);
-				*errcode = fh_ptr->cached_filepos;
+				*reterr = fh_ptr->cached_filepos;
 				return 0;
 			}
 		}
@@ -2242,7 +2244,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 		ret = read_lookup_meta(fh_ptr, &temppage, this_page_fpos);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = ret;
+			*reterr = ret;
 			return 0;
 		}
 
@@ -2250,7 +2252,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			this_page_fpos);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = ret;
+			*reterr = ret;
 			return 0;
 		}
 
@@ -2258,7 +2260,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			this_inode, bindex, this_page_fpos);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = ret;
+			*reterr = ret;
 			return 0;
 		}
 
@@ -2280,7 +2282,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 				this_page_fpos, entry_index);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = ret;
+				*reterr = ret;
 				return 0;
 			}
 
@@ -2296,7 +2298,7 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 					this_inode, bindex);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = ret;
+				*reterr = ret;
 				return 0;
 			}
 
@@ -2323,30 +2325,15 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			write_log(0, "Error in read. Code %d, %s\n", errnum,
 					strerror(errnum));
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = -EIO;
+			*reterr = -EIO;
 			return 0;
 		}
-		ret = fseek(fh_ptr->blockfptr, offset, SEEK_SET);
-		if (ret < 0) {
-			errnum = errno;
-			write_log(0, "Error in read. Code %d, %s\n", errnum,
-					strerror(errnum));
-			sem_post(&(fh_ptr->block_sem));
-			*errcode = -EIO;
-			return 0;
-		}
+		FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
 
-		this_bytes_read = fread(buf,
-				sizeof(char), size, fh_ptr->blockfptr);
+		FREAD(buf, sizeof(char), size, fh_ptr->blockfptr);
+
+		this_bytes_read = ret_size;
 		if (this_bytes_read < size) {
-			if (ferror(fh_ptr->blockfptr) != 0) {
-				/* An error occurred in file stream */
-				clearerr(fh_ptr->blockfptr);
-				sem_post(&(fh_ptr->block_sem));
-				*errcode = -EIO;
-				return 0;
-			}
-
 			/*Need to pad zeros*/
 			write_log(5, "Short reading? %ld %ld\n",
 				offset, size + this_bytes_read);
@@ -2367,6 +2354,11 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 	sem_post(&(fh_ptr->block_sem));
 
 	return this_bytes_read;
+
+errcode_handle:
+	sem_post(&(fh_ptr->block_sem));
+	*reterr = errcode;
+	return 0;
 }
 
 /************************************************************************
@@ -2750,16 +2742,16 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 /* Function for writing to a single block for write operation. Will fetch
 *  block from backend if needed. */
 size_t _write_block(const char *buf, size_t size, long long bindex,
-		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *errcode)
+		off_t offset, FH_ENTRY *fh_ptr, ino_t this_inode, int *reterr)
 {
 	long long current_page;
 	char thisblockpath[400];
 	BLOCK_ENTRY_PAGE temppage;
 	off_t this_page_fpos;
 	off_t old_cache_size, new_cache_size;
-	size_t this_bytes_written;
+	size_t this_bytes_written, ret_size;
 	long long entry_index;
-	int ret, errnum;
+	int ret, errnum, errcode;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -2770,7 +2762,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		fh_ptr->cached_filepos = seek_page(fh_ptr->meta_cache_ptr,
 				current_page, 0);
 		if (fh_ptr->cached_filepos < 0) {
-			*errcode = fh_ptr->cached_filepos;
+			*reterr = fh_ptr->cached_filepos;
 			return 0;
 		}
 		if (fh_ptr->cached_filepos == 0) {
@@ -2778,7 +2770,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				create_page(fh_ptr->meta_cache_ptr,
 				current_page);
 			if (fh_ptr->cached_filepos < 0) {
-				*errcode = fh_ptr->cached_filepos;
+				*reterr = fh_ptr->cached_filepos;
 				return 0;
 			}
 		}
@@ -2791,7 +2783,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0) {
-		*errcode = ret;
+		*reterr = ret;
 		return 0;
 	}
 	sem_wait(&(fh_ptr->block_sem));
@@ -2809,7 +2801,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 						fh_ptr->meta_cache_ptr);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = ret;
+			*reterr = ret;
 			return 0;
 		}
 
@@ -2817,7 +2809,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 							this_page_fpos);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = ret;
+			*reterr = ret;
 			return 0;
 		}
 
@@ -2829,7 +2821,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			if (fh_ptr->blockfptr == NULL) {
 				errnum = errno;
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = -EIO;
+				*reterr = -EIO;
 				write_log(0, "Error in write. Code %d, %s\n",
 					errnum, strerror(errnum));
 				return 0;
@@ -2840,7 +2832,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			if (ret < 0) {
 				errnum = errno;
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = -EIO;
+				*reterr = -EIO;
 				write_log(0, "Error in write. Code %d, %s\n",
 					errnum, strerror(errnum));
 				return 0;
@@ -2850,7 +2842,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 						fh_ptr->meta_cache_ptr);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = ret;
+				*reterr = ret;
 				return 0;
 			}
 
@@ -2865,7 +2857,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			if (ret < 0) {
 				errnum = errno;
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = -EIO;
+				*reterr = -EIO;
 				write_log(0, "Error in write. Code %d, %s\n",
 					errnum, strerror(errnum));
 				return 0;
@@ -2875,7 +2867,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 						fh_ptr->meta_cache_ptr);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = ret;
+				*reterr = ret;
 				return 0;
 			}
 			break;
@@ -2886,7 +2878,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 					&temppage, this_page_fpos, entry_index);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
-				*errcode = ret;
+				*reterr = ret;
 				return 0;
 			}
 			break;
@@ -2898,7 +2890,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		if (fh_ptr->blockfptr == NULL) {
 			errnum = errno;
 			sem_post(&(fh_ptr->block_sem));
-			*errcode = -EIO;
+			*reterr = -EIO;
 			write_log(0, "Error in write. Code %d, %s\n",
 				errnum, strerror(errnum));
 			return 0;
@@ -2910,7 +2902,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	if (ret < 0) {
 		errnum = errno;
 		sem_post(&(fh_ptr->block_sem));
-		*errcode = -EIO;
+		*reterr = -EIO;
 		write_log(0, "Error in write. Code %d, %s\n",
 			errnum, strerror(errnum));
 		return 0;
@@ -2923,26 +2915,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		ftruncate(fileno(fh_ptr->blockfptr), offset);
 	}
 
-	ret = fseek(fh_ptr->blockfptr, offset, SEEK_SET);
-	if (ret < 0) {
-		errnum = errno;
-		sem_post(&(fh_ptr->block_sem));
-		*errcode = -EIO;
-		write_log(0, "Error in write. Code %d, %s\n",
-			errnum, strerror(errnum));
-		return 0;
-	}
-	this_bytes_written = fwrite(buf, sizeof(char), size, fh_ptr->blockfptr);
+	FSEEK(fh_ptr->blockfptr, offset, SEEK_SET);
 
-	if (this_bytes_written < size) {
-		if (ferror(fh_ptr->blockfptr) != 0) {
-			clearerr(fh_ptr->blockfptr);
-			sem_post(&(fh_ptr->block_sem));
-			*errcode = -EIO;
-			write_log(0, "Error in write\n");
-			return 0;
-		}
-	}
+	FWRITE(buf, sizeof(char), size, fh_ptr->blockfptr);
+
+	this_bytes_written = ret_size;
+
 	new_cache_size = check_file_size(thisblockpath);
 
 	if (old_cache_size != new_cache_size)
@@ -2952,6 +2930,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	sem_post(&(fh_ptr->block_sem));
 
 	return this_bytes_written;
+
+errcode_handle:
+	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
+	sem_post(&(fh_ptr->block_sem));
+	*reterr = errcode;
+	return 0;
 }
 
 /************************************************************************
@@ -3283,7 +3267,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	int page_start;
 	char *buf;
 	off_t buf_pos;
-	size_t entry_size;
+	size_t entry_size, ret_size;
 	int ret, errcode;
 
 	gettimeofday(&tmp_time1, NULL);
@@ -3369,24 +3353,10 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				return;
 			}
 		} else {
-			ret = fseek(body_ptr->fptr, thisfile_pos, SEEK_SET);
-			if (ret < 0) {
-				errcode = errno;
-				meta_cache_close_file(body_ptr);
-				meta_cache_unlock_entry(body_ptr);
-				write_log(0, "Error in Readdir. Code %d, %s\n",
-					errcode, strerror(errcode));
-				fuse_reply_err(req, EIO);
-				return;
-			}
-			ret = fread(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
+			FSEEK(body_ptr->fptr, thisfile_pos, SEEK_SET);
+
+			FREAD(&temp_page, sizeof(DIR_ENTRY_PAGE), 1,
 						body_ptr->fptr);
-			if ((ret < 1) && (ferror(body_ptr->fptr) != 0)) {
-				meta_cache_close_file(body_ptr);
-				meta_cache_unlock_entry(body_ptr);
-				write_log(0, "Error in Readdir.\n");
-				fuse_reply_err(req, EIO);
-			}
 		}
 
 		write_log(10, "Debug readdir page start %d %d\n", page_start,
@@ -3439,6 +3409,14 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	fuse_reply_buf(req, buf, buf_pos);
+
+	return;
+
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	meta_cache_unlock_entry(body_ptr);
+	fuse_reply_err(req, -errcode);
+	return;
 }
 
 /************************************************************************
@@ -3557,7 +3535,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int ret_val;
 	ino_t this_inode;
 	char attr_changed;
-	clockid_t this_clock_id;
 	struct timespec timenow;
 	struct stat newstat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
@@ -3703,8 +3680,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		attr_changed = TRUE;
 	}
 
-	clock_getcpuclockid(0, &this_clock_id);
-	clock_gettime(this_clock_id, &timenow);
+	clock_gettime(CLOCK_REALTIME, &timenow);
 
 	if (to_set & FUSE_SET_ATTR_ATIME_NOW) {
 		if ((temp_context->uid != 0) &&

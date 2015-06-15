@@ -10,14 +10,32 @@ extern "C" {
 
 class deleteEnvironment : public ::testing::Environment {
  public:
+  char *workpath, *tmppath;
 
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
   }
 
   virtual void TearDown() {
     free(hcfs_system);
+    rmdir(tmppath);
+    unlink("/tmp/testHCFS");
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
 
   }
 };
@@ -300,7 +318,14 @@ TEST(delete_loopTest, DeleteSuccess)
 {
 	pthread_t thread;
 	void *res;
-	
+	int size_objname;
+
+	size_objname = 50;
+	objname_counter = 0;
+	objname_list = (char **)malloc(sizeof(char *) * 100);
+	for (int i = 0 ; i < 100 ; i++)
+		objname_list[i] = (char *)malloc(sizeof(char)*size_objname);
+
 	test_data.num_inode = 40;
 	test_data.to_handle_inode = (int *)malloc(sizeof(int) * test_data.num_inode);
 	test_data.tohandle_counter = 0;

@@ -264,9 +264,12 @@ int lookup_markdelete(ino_t this_inode)
 
 	if (found == FALSE) {
 		write_log(5, "Debug no lookup value\n");
-		if (sem_post(&(lookup_table[index].entry_sem)) < 0) /* Unlock */
+		ret_val = sem_post(&(lookup_table[index].entry_sem));
+		if (ret_val < 0) {  /* Unlock */
+			errcode = errno;
 			write_log(0, "Error in %s. Code %d, %s\n", __func__, 
-				errno, strerror(errno));
+				errcode, strerror(errcode));
+		}
 		result_lookup = -EINVAL;
 		return result_lookup;
 	}

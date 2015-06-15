@@ -7,13 +7,13 @@
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	strcpy(pathname, "/tmp/tmp_meta");
+	strcpy(pathname, "/tmp/testHCFS/tmp_meta");
 	return 0;
 }
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	strcpy(pathname, "/tmp/tmp_block");
+	strcpy(pathname, "/tmp/testHCFS/tmp_block");
 	return 0;
 }
 
