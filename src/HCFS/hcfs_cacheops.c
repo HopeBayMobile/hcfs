@@ -46,7 +46,7 @@ out blocks and sync to cloud, and how this may interact with meta
 sync in upload process */
 
 /* Helper function for removing local cached block for blocks that
-are synced to backend already */
+has been synced to backend already */
 int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 							long *seconds_slept)
 {
@@ -147,7 +147,6 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				/*Only delete blocks that exists on both
 					cloud and local*/
 				blk_entry_ptr->status = ST_CLOUD;
-
 				write_log(10,
 					"Debug status changed to ST_CLOUD, block %lld, inode %lld\n",
 						current_block, this_inode);
@@ -304,7 +303,7 @@ void run_cache_loop(void)
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
-			if (nonempty_cache_hash_entries <= 0) {
+			if (nonempty_cache_hash_entries <= 0) { // All empty
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -316,7 +315,8 @@ void run_cache_loop(void)
 				skip_recent = TRUE;
 				do_something = FALSE;
 			}
-
+			
+			/* End of hash table. Restart at index 0 */
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&
 						(skip_recent == FALSE)) {
@@ -340,11 +340,13 @@ void run_cache_loop(void)
 				}
 			}
 
+			/* skip empty bucket */
 			if (inode_cache_usage_hash[e_index] == NULL) {
 				e_index++;
 				continue;
 			}
 
+			/* All dirty. Local data cannot be deleted. */
 			if (inode_cache_usage_hash[e_index]->clean_cache_size
 									<= 0) {
 				e_index++;
@@ -375,7 +377,8 @@ void run_cache_loop(void)
 				return_cache_usage_node(
 				inode_cache_usage_hash[e_index]->this_inode);
 
-			free(this_cache_node);
+			if (this_cache_node)
+				free(this_cache_node);
 			e_index++;
 
 			ret = _remove_synced_block(this_inode, &builttime,
