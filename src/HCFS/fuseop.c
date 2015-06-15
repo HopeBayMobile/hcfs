@@ -3815,6 +3815,13 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	fuse_reply_none(req);
 }
 
+static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
+	const char *value, size_t size, int flag)
+{
+
+}
+
+
 /* Specify the functions used for the FUSE operations */
 static struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
