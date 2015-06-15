@@ -52,6 +52,10 @@ clean :
 	rm -f *.gcno
 	rm -f *.gcda
 
+test : $(TESTS)
+	./hcfs_cachebuild_unittest
+	./hcfs_cacheops_unittest
+
 # Builds gtest.a and gtest_main.a.
 
 # Usually you shouldn't tweak such internal variables, indicated by a
