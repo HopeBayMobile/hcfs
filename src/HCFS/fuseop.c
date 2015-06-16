@@ -3819,7 +3819,7 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
 	const char *value, size_t size, int flag)
 {
-	/* TODO: flags and permission of namespace */
+	/* TODO: Tmp ignore flags and permission of namespace */
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE xattr_page;
 	long long xattr_filepos;
@@ -3849,26 +3849,25 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 
-	/* Find pos of xattr page */
-	ret_code = fetch_xattr_filepos(meta_cache_entry, &xattr_filepos); 	
+	/* Fetch xattr page. Allocate new page if need. */
+	retcode = fetch_xattr_page(meta_cache_entry, &xattr_page, 
+		&xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
 	
-	if (xattr_filepos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
-		memset(&xattr_page, 0, sizeof(XATTR_PAGE));
-		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
-		xattr_filepos = ftell(meta_cache_entry->fptr);	//// err handle
-		FWRITE(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
-
-	} else { /* xattr has been existed. Just read it. */
-		FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
-		FREAD(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	/* Begin to Insert xattr */	
+	retcode = insert_xattr(meta_cache_entry, &xattr_page, xattr_filepos, 
+		name_space, key, value, size);
+	if (retcode < 0)
+		goto error_handle;
 	
-	}
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	fuse_reply_err(req, 0);
 	
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
-	meta_cache_unlock_entry(this_inode);
+	meta_cache_unlock_entry(meta_cache_entry);
 	fuse_reply_err(req, -retcode);
 	return;
 }

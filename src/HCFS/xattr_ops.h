@@ -49,7 +49,7 @@ typedef struct {
 /* XATTR_PAGE is pointed by next_xattr_page in meta file. Namespace is one of 
    user, system, security, and trusted. */
 typedef struct {
-	long long reclaimed_key_list;
+	long long reclaimed_key_list_page;
 	long long reclaimed_value_block;
 	NAMESPACE_PAGE namespace_page[4]; 
 } XATTR_PAGE;

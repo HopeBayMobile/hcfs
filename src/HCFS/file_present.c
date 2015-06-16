@@ -30,6 +30,7 @@
 #include "meta_mem_cache.h"
 #include "logger.h"
 #include "macro.h"
+#include "xattr_ops.h"
 
 /************************************************************************
 *
@@ -405,4 +406,81 @@ error_handling:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	return ret_val;
+}
+
+
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *xattr_pos)
+{
+	int ret_code;
+	ino_t this_inode;
+	struct stat stat_data;
+	FILE_META_TYPE filemeta;
+	DIR_META_TYPE dirmeta;
+	int errcode;
+	int ret;
+	long long ret_pos;
+	long long ret_size; 
+
+	this_inode = meta_cache_entry->inode_num;
+	if (this_inode <= 0)
+		return -EINVAL;
+
+	/* First lookup stat to confirm the file type. */
+	ret_code = meta_cache_lookup_file_data(this_inode, &stat_data,
+		NULL, NULL, 0, meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+	
+	/* Get metadata by case */
+	if (S_ISREG(stat_data.st_mode)) {
+		ret_code = meta_cache_lookup_file_data(this_inode, NULL, &filemeta,
+				NULL, 0, meta_cache_entry);
+		if (ret_code < 0)
+			return ret_code;
+		*xattr_pos = filemeta.next_xattr_page; /* Get xattr file position */
+	}
+	if (S_ISDIR(stat_data.st_mode)) {
+		ret_code = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
+				NULL, meta_cache_entry);
+		if (ret_code < 0)
+			return ret_code;
+		*xattr_pos = dirmeta.next_xattr_page; /* Get xattr file position */
+	}
+	/* TODO: case symlink */
+	
+	/* Allocate a xattr page if it is first time to insert xattr */
+	if (*xattr_pos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
+		memset(&xattr_page, 0, sizeof(XATTR_PAGE));
+		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
+		FTELL(meta_cache_entry->fptr);
+		*xattr_pos = ret_pos;
+		FWRITE(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+
+		/* Update xattr filepos in meta cache */
+		if (S_ISREG(stat_data.st_mode)) {
+			filemeta.next_xattr_page = *xattr_pos;
+			ret_code = meta_cache_update_file_data(this_inode, NULL, 
+				&filemeta, NULL, 0, meta_cache_entry);
+			if (ret_code < 0)
+				return ret_code;
+		}
+		if (S_ISDIR(stat_data.st_mode)) {
+			dirmeta.next_xattr_page = *xattr_pos;
+			ret_code = meta_cache_update_dir_data(this_inode, NULL, 
+				&dirmeta, NULL, meta_cache_entry);
+			if (ret_code < 0)
+				return ret_code;
+		}
+		/* TODO: case symlink */
+
+	} else { /* xattr has been existed. Just read it. */
+		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
+		FREAD(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);	
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;	
 }
