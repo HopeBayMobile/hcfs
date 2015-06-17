@@ -9,25 +9,25 @@ Config file
 
 Please put the following as a text file under /etc/hcfs.conf
 
-METAPATH = <Directory of meta file storage, must exist>
-BLOCKPATH = <Diectory of block file storage, must exist>
-CACHE_SOFT_LIMIT = <Soft limit for triggering cache replacement, in bytes>
-CACHE_HARD_LIMIT = <Hard limit for blocking further IO, in bytes>
-CACHE_DELTA = <Amount of cache to be replaced after hitting hard limit and before allowing further IO, in bytes>
-MAX_BLOCK_SIZE = <Data block size, in bytes>
-CURRENT_BACKEND = <Name of backend type>  (Currently supporting swift or S3)
-SWIFT_ACCOUNT = <swift account>
-SWIFT_USER = <swift user name>
-SWIFT_PASS = <swift password>
-SWIFT_URL = <swift proxy IP + port>
-SWIFT_CONTAINER = <swift container>
-SWIFT_PROTOCOL = <protocol for swift connection (https for now)>
-S3_ACCESS = <S3 access key>
-S3_SECRET = <S3 secret key>
-S3_URL = <S3 url>
-S3_BUCKET = <S3 bucket name>
-S3_PROTOCOL = <protocol for S3 connection (https for now)>
-LOG_LEVEL = <To which log level the log messages should be dumped> (Ranged from 0 to 10 now, with 0 being the most critical level)
+METAPATH = (Directory of meta file storage, must exist)
+BLOCKPATH = (Diectory of block file storage, must exist)
+CACHE_SOFT_LIMIT = (Soft limit for triggering cache replacement, in bytes)
+CACHE_HARD_LIMIT = (Hard limit for blocking further IO, in bytes)
+CACHE_DELTA = (Amount of cache to be replaced after hitting hard limit and before allowing further IO, in bytes)
+MAX_BLOCK_SIZE = (Data block size, in bytes)
+CURRENT_BACKEND = (Name of backend type)  (Currently supporting swift or S3)
+SWIFT_ACCOUNT = (swift account)
+SWIFT_USER = (swift user name)
+SWIFT_PASS = (swift password)
+SWIFT_URL = (swift proxy IP + port)
+SWIFT_CONTAINER = (swift container)
+SWIFT_PROTOCOL = (protocol for swift connection (https for now))
+S3_ACCESS = (S3 access key)
+S3_SECRET = (S3 secret key)
+S3_URL = (S3 url)
+S3_BUCKET = (S3 bucket name)
+S3_PROTOCOL = (protocol for S3 connection (https for now))
+LOG_LEVEL = (To which log level the log messages should be dumped) (Ranged from 0 to 10 now, with 0 being the most critical level)
 
 Example:
 
