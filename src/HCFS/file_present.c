@@ -451,11 +451,11 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	
 	/* Allocate a xattr page if it is first time to insert xattr */
 	if (*xattr_pos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
-		memset(&xattr_page, 0, sizeof(XATTR_PAGE));
+		memset(xattr_page, 0, sizeof(XATTR_PAGE));
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
 		FTELL(meta_cache_entry->fptr);
 		*xattr_pos = ret_pos;
-		FWRITE(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
 		if (S_ISREG(stat_data.st_mode)) {
@@ -476,7 +476,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	} else { /* xattr has been existed. Just read it. */
 		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
-		FREAD(&xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);	
+		FREAD(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);	
 	}
 
 	return 0;

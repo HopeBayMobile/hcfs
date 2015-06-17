@@ -3832,6 +3832,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
+	write_log(10, "Debug setxattr: namespace = %d, key = %s\n", name_space, key);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
@@ -3840,6 +3841,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
+		write_log(10, "Debug setxattr: lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -3852,10 +3854,11 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Fetch xattr page. Allocate new page if need. */
 	retcode = fetch_xattr_page(meta_cache_entry, &xattr_page, 
 		&xattr_filepos);
+	write_log(10, "Debug setxattr: xattr_filepos = %lld\n", xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
 	
-	/* Begin to Insert xattr */	
+	/* Begin to Insert xattr */
 	retcode = insert_xattr(meta_cache_entry, &xattr_page, xattr_filepos, 
 		name_space, key, value, size);
 	if (retcode < 0)
@@ -3897,6 +3900,7 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.statfs = hfuse_ll_statfs,
 	.lookup = hfuse_ll_lookup,
 	.forget = hfuse_ll_forget,
+	.setxattr = hfuse_ll_setxattr,
 };
 
 /*

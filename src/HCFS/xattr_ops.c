@@ -269,6 +269,98 @@ errcode_handle:
 
 }
 
+int write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+	long long *replace_value_block_pos, long long first_value_pos, 
+	const char *value, size_t size)
+{
+	size_t index;
+	VALUE_BLOCK tmp_value_block;
+	long long now_pos, next_pos;
+	int ret_code;
+	int errcode;
+	int ret, ret_size;
+
+
+	index = 0;
+	now_pos = first_value_pos;
+	while (index < size) {
+		
+		if (size - index > MAX_VALUE_BLOCK_SIZE) { /* Not last block */
+			memcpy(tmp_value_block.content, value + index, 
+				sizeof(char) * MAX_VALUE_BLOCK_SIZE);	
+			ret_code = get_usable_value_filepos(meta_cache_entry, 
+				xattr_page, replace_value_block_pos, &next_pos);
+			if (ret_code < 0)
+				return ret_code;
+
+			tmp_value_block.next_block_pos = next_pos;
+			
+		} else { /* last value block */
+			memcpy(tmp_value_block.content, value + index, 
+				sizeof(char) * (size - index));
+			tmp_value_block.next_block_pos = 0;
+			next_pos = 0;
+		}
+
+		FSEEK(meta_cache_entry->fptr, now_pos, SEEK_SET);
+		FWRITE(&tmp_value_block, sizeof(VALUE_BLOCK), 1, 
+			meta_cache_entry->fptr);
+		now_pos = next_pos;
+
+		index += MAX_VALUE_BLOCK_SIZE; /* Go to next content */
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+
+}
+
+
+int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *replace_value_block_pos)
+{
+	
+	long long head_pos;
+	long long tail_pos;
+	VALUE_BLOCK tmp_value_block;
+	int errcode, ret, ret_size;
+
+	if (*replace_value_block_pos == 0) /* Nothing has to be reclaimed */
+		return 0;
+
+	head_pos = *replace_value_block_pos;
+	tail_pos = head_pos;
+	while(TRUE) {
+		FSEEK(meta_cache_entry->fptr, tail_pos, SEEK_SET);
+		FREAD(&tmp_value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
+		if (tmp_value_block.next_block_pos == 0)
+			break;
+		tail_pos = tmp_value_block.next_block_pos;
+	}
+	
+	/* Link tail block to first reclaimed block */	
+	tmp_value_block.next_block_pos = xattr_page->reclaimed_value_block;
+	FSEEK(meta_cache_entry->fptr, tail_pos, SEEK_SET);
+	FWRITE(&tmp_value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
+	
+	/* Link first reclaimed block to head block */
+	xattr_page->reclaimed_value_block = head_pos;
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+
+}
+
+/*
+	The insert_xattr function is parted into 3 steps:
+	Step 1: Find the key and insert into data structure
+	Step 2: Write value data into linked-value_block
+	Step 3: Modify and write xattr header(xattr_page)
+ */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	long long xattr_filepos, char name_space, const char *key, const char *value, 
 	size_t size)
@@ -288,10 +380,10 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	int ret_size;
 	long long replace_value_block_pos; /* Used to record value block pos when replacing */
 
-	/* Find the key entry */
+	/* Step1: Find the key entry and appropriate insertion position */
 	hash_entry = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);
-	
+		
 	if (namespace_page->key_hash_table[hash_entry] == 0) { /* Allocate if no page */
 		/* Get key list pos from "gc list" or "end of file" */
 		ret_code = get_usable_key_list_filepos(meta_cache_entry, 
@@ -320,7 +412,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		/* In namespace, # of xattr += 1 */
 		(xattr_page->namespace_page[name_space].num_xattr)++;
 
-	} else { /* Page exists. Find the entry and "CREATE" or "REPLACE" */
+	} else { /* At least 1 page exists. Find the entry and "CREATE" or "REPLACE" */
 		first_key_list_pos = namespace_page->key_hash_table[hash_entry];
 
 		ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
@@ -363,7 +455,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			/* Insert key into target_key_list */
 			replace_value_block_pos = 0;
 			ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
-					&replace_value_block_pos, &value_pos); /* Get first value block pos */
+				&replace_value_block_pos, &value_pos); /* Get first value block pos */
 			if (ret_code < 0)
 				return ret_code;
 			
@@ -398,29 +490,27 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			return ret_code;
 		}
 	}
-
+	
 	/* After insert key, then write value data */
-
+	ret_code = write_value_data(meta_cache_entry, xattr_page,
+		&replace_value_block_pos, value_pos, value, size);
+	if (ret_code < 0)
+		return ret_code;
+	
+	/* Reclaim remaining value_block (if REPLACE situation) */	
+	ret_code = reclaim_replace_value_block(meta_cache_entry, xattr_page, 
+		&replace_value_block_pos);
+	if (ret_code < 0)
+		return ret_code;
+		
+	/* Finally write xattr header(xattr_page) */
+	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
+	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
 
 errcode_handle:
 	return errcode;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
