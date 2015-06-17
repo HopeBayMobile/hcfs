@@ -9,7 +9,7 @@
 *
 * Revision History
 * 2015/6/15 Kewei creates the file and add function parse_xattr_namespace()
-* 2015/6/16 Kewei adds some functions about xattr_insert
+* 2015/6/16 Kewei adds some functions about xattr_insert operation
 *
 **************************************************************************/
 
@@ -96,6 +96,9 @@ int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 {
 	long long ret_pos;
 	KEY_LIST_PAGE key_list_page;
+	int errcode; 
+	int ret;
+	int ret_size;
 
 	if (xattr_page->reclaimed_key_list_page != 0) { /* Get reclaimed page if exist */
 		ret_pos = xattr_page->reclaimed_key_list_page;
@@ -113,6 +116,9 @@ int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	*usable_pos = ret_pos;
 	return 0;
+
+errcode_handle:
+	return errcode;
 }
 
 
@@ -156,10 +162,17 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int index;
 	char find_first_insert;
 	char hit_key_entry;
+	int errcode;
+	int ret_size;
+
+	if (first_key_list_pos == 0) {
+		*key_index = -1;
+		return 1;
+	}
 
 	memset(&now_page, 0, sizeof(KEY_LIST_PAGE));
 	key_list_pos = first_key_list_pos;
-	find_first_insert = FALSE;
+	find_first_insert = FALSE; 
 	hit_key_entry = FALSE;
 
 	while (key_list_pos) {
@@ -203,11 +216,57 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		*target_key_list_pos = key_list_pos;
 		return 1;
 	}
-	/* Hit nothing, but can insert into an entry but don't have to allocate
+	/* Hit nothing, can insert into an entry but don't have to allocate
 	   a new page, return the page which can be inserted key. */
 	if ((hit_key_entry == FALSE) && (find_first_insert == TRUE)) {
 		return 1;
 	}
+
+errcode_handle:
+	return errcode;
+
+}
+
+int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *replace_value_block_pos, 
+	long long *usable_value_pos)
+{
+	VALUE_BLOCK value_block;
+	int errcode;
+	int ret;
+	int ret_size;
+	int ret_pos;
+
+	/* Priority 1: reuse the replace_value_block_pos when replacing */
+	if (*replace_value_block_pos > 0) {	
+		*usable_value_pos = *replace_value_block_pos;
+		/* Point to next replace block */
+		FSEEK(meta_cache_entry->fptr, *replace_value_block_pos, SEEK_SET);
+		FREAD(&value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
+		*replace_value_block_pos = value_block.next_block_pos;
+		return 0;
+	}
+
+	/* Priority 2: return the reclaimed value-block */
+	if (xattr_page->reclaimed_value_block > 0) {
+		*usable_value_pos = xattr_page->reclaimed_value_block;
+		/* Point to next reclaimed block */
+		FSEEK(meta_cache_entry->fptr, xattr_page->reclaimed_value_block, 
+			SEEK_SET);
+		FREAD(&value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
+		xattr_page->reclaimed_value_block = value_block.next_block_pos;
+		return 0;
+	}
+
+	/* Priority 3: Allocate a new value_block at EOF */
+	FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
+	FTELL(meta_cache_entry->fptr); /* Store filepos in ret_pos */
+	*usable_value_pos = ret_pos;
+	return 0;
+
+errcode_handle:
+	return errcode;
+
 }
 
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
@@ -217,15 +276,17 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	unsigned hash_entry;
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
-	KEY_LIST_PAGE tmp_key_list_page;
 	KEY_ENTRY *now_key_entry;
 	KEY_ENTRY buf_key_list[MAX_KEY_ENTRY_PER_LIST];
 	int ret_code;
 	int key_index;
 	long long first_key_list_pos;
 	long long target_key_list_pos;
-	long long tmp_key_list_pos;
-	long long value_pos;
+	long long value_pos; /* Record position of first value block */
+	int errcode;
+	int ret;
+	int ret_size;
+	long long replace_value_block_pos; /* Used to record value block pos when replacing */
 
 	/* Find the key entry */
 	hash_entry = hash(key); /* Hash the key */
@@ -239,25 +300,34 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			return ret_code;
 
 		/* Assign the position */
-		namespace_page->key_hash_table[hash_entry] = target_key_list_pos;
-		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE));
-		value_pos = get_usable_value_filepos(); /* Get first value block */
-		now_key_entry = &(target_key_list_page.key_list[0]);
+		namespace_page->key_hash_table[hash_entry] = target_key_list_pos; 
+		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE)); /* Init page */
+		replace_value_block_pos = 0;
+		ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
+			&replace_value_block_pos, &value_pos); /* Get first value block pos */
+		if (ret_code < 0)
+			return ret_code;
+		
+		now_key_entry = &(target_key_list_page.key_list[0]); /* index = 0 */
 		copy_key_entry(now_key_entry, key, value_pos, size); /* Copy entry */
+
+		(target_key_list_page.num_xattr)++; /* # of xattr += 1 */
 
 		FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
 		FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  /* Write data */
 			meta_cache_entry->fptr);
+		
+		/* In namespace, # of xattr += 1 */
+		(xattr_page->namespace_page[name_space].num_xattr)++;
 
-	} else { /* Find the entry and "CREATE" or "REPLACE" */
+	} else { /* Page exists. Find the entry and "CREATE" or "REPLACE" */
 		first_key_list_pos = namespace_page->key_hash_table[hash_entry];
 
 		ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
 				&target_key_list_page, &key_index, 
 				&target_key_list_pos, key);
 
-
-		if (ret_code > 0) { /* Hit nothing, create key and value */
+		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
 				long long usable_pos;
@@ -283,16 +353,21 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				key_list = target_key_list_page.key_list;
 				num_remaining = target_key_list_page.num_xattr - key_index;
 				
+				/* Shift one entry for elements after key_index */
 				memcpy(buf_key_list, key_list + sizeof(KEY_ENTRY) * key_index,
 					num_remaining);
 				memcpy(key_list + sizeof(KEY_ENTRY) * (key_index + 1), 
 					buf_key_list, num_remaining);
 			}
+
 			/* Insert key into target_key_list */
+			replace_value_block_pos = 0;
+			ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
+					&replace_value_block_pos, &value_pos); /* Get first value block pos */
+			if (ret_code < 0)
+				return ret_code;
 			
-			value_pos = get_usable_value_filepos(); /* Get a usable value filepos */
 			now_key_entry = &(target_key_list_page.key_list[key_index]);
-			
 			copy_key_entry(now_key_entry, key, value_pos, size); /* Copy entry */
 			(target_key_list_page.num_xattr)++; /* # of xattr += 1 */
 			
@@ -300,19 +375,35 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  /* Write data */
 				meta_cache_entry->fptr);
 
-		} else if (ret_code == 0) { /* Hit the key entry, replace value */
+			/* In namespace, # of xattr += 1 */
+			(xattr_page->namespace_page[name_space].num_xattr)++;
+
+		} else if (ret_code == 0) { /* Hit the key entry, REPLACE value */
 			/* Replace the value size and then rewrite. */
-			target_key_list_page.key_list[key_index].value_size = size; 
+			now_key_entry = &(target_key_list_page.key_list[key_index]);
+			now_key_entry->value_size = size; 
+
+			replace_value_block_pos = now_key_entry->first_value_block_pos;
+			ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
+					&replace_value_block_pos, &value_pos); /* Get first value block pos */
+			if (ret_code < 0)
+				return ret_code;
+			
 			FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
 			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  /* Write data */
 				meta_cache_entry->fptr);
 			
-			value_pos = target_key_list_page.key_list[key_index].first_value_block_pos;
 		
-		} else {
+		} else { /* Error */
 			return ret_code;
 		}
 	}
+
+	/* After insert key, then write value data */
+
+
+errcode_handle:
+	return errcode;
 
 }
 
