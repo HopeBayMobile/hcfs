@@ -77,9 +77,8 @@ TEST_F(open_logTest, LogFileOpenError) {
 
 class write_logTest : public ::testing::Test {
  protected:
-  char tmpfilename[25], tmpstr[85];
+  char tmpfilename[25];
   int outfileno, errfileno;
-  FILE *fptr1;
   virtual void SetUp() {
     snprintf(tmpfilename, 25, "/tmp/testlog");
     logptr = NULL;
@@ -88,14 +87,6 @@ class write_logTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    fptr1 = fopen(tmpfilename, "r");
-    tmpstr[0] = 0;
-    if (fptr1 != NULL) {
-      printf("Have file\n");
-      fgets(tmpstr, 81, fptr1);
-      printf("%s\n", tmpstr);
-      fclose(fptr1);
-     }
     if (logptr != NULL) {
       if (logptr->fptr != NULL) {
         fclose(logptr->fptr);
@@ -126,7 +117,6 @@ TEST_F(write_logTest, LogWriteOK) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-//  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
@@ -148,7 +138,6 @@ TEST_F(write_logTest, NoLogEntry) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-//  unlink(tmpfilename);
   EXPECT_EQ(EOF, ret);
  }
 TEST_F(write_logTest, NoLogWriteOK) {
@@ -157,7 +146,6 @@ TEST_F(write_logTest, NoLogWriteOK) {
   int errcode;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
-  dprintf(outfileno, "fd %d, %d\n", fileno(stdout), fileno(stderr));
   fptr = fopen(tmpfilename, "a+");
   setbuf(fptr, NULL);
   if (fptr == NULL)
@@ -166,21 +154,16 @@ TEST_F(write_logTest, NoLogWriteOK) {
     failed = 0;
   ASSERT_EQ(0, failed);
 
-  dprintf(outfileno, "fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
-
   errcode = 0;
   ret = dup2(fileno(fptr), fileno(stdout));
   errcode = errno;
-  dprintf(outfileno, "%d, %d\n", ret, errcode);
   ASSERT_NE(-1, ret);
   setbuf(stdout, NULL);
   errcode = 0;
   ret = dup2(fileno(fptr), fileno(stderr));
   errcode = errno;
-  dprintf(outfileno, "%d, %d\n", ret, errcode);
   ASSERT_NE(-1, ret);
   setbuf(stderr, NULL);
-  dprintf(outfileno, "fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
   fclose(fptr);
@@ -190,19 +173,11 @@ TEST_F(write_logTest, NoLogWriteOK) {
 
   fptr = fopen(tmpfilename, "r");
   failed = 0;
-  if (fptr == NULL) {
-    errcode = errno;
-    printf("Error %d, %s\n", errcode, strerror(errcode));
+  if (fptr == NULL)
     failed = 1;
-  }
   ASSERT_EQ(0, failed);
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
-  if (ret < 0) {
-    errcode = errno;
-    printf("Error %d, %s\n", errcode, strerror(errcode));
-   }
   fclose(fptr);
-//  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
