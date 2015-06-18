@@ -77,8 +77,9 @@ TEST_F(open_logTest, LogFileOpenError) {
 
 class write_logTest : public ::testing::Test {
  protected:
-  char tmpfilename[25];
+  char tmpfilename[25], tmpstr[85];
   int outfileno, errfileno;
+  FILE *fptr;
   virtual void SetUp() {
     snprintf(tmpfilename, 25, "/tmp/testlog");
     logptr = NULL;
@@ -89,14 +90,21 @@ class write_logTest : public ::testing::Test {
   virtual void TearDown() {
     dup2(outfileno, fileno(stdout));
     dup2(errfileno, fileno(stderr));
+    fptr = fopen(tmpfilename, "r");
+    if (fptr != NULL) {
+      dprintf(outfileno, "Have file\n");
+      fgets(tmpstr, 81, fptr);
+      dprintf(outfileno, "%s\n", tmpstr);
+      fclose(fptr);
+     }
     if (logptr != NULL) {
       if (logptr->fptr != NULL) {
         fclose(logptr->fptr);
-      }
-      unlink(tmpfilename);
+       }
       sem_destroy(&(logptr->logsem));
       free(logptr);
-    }
+     }
+    unlink(tmpfilename);
    }
 
  };
@@ -116,7 +124,7 @@ TEST_F(write_logTest, LogWriteOK) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
+//  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
@@ -135,17 +143,23 @@ TEST_F(write_logTest, NoLog) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
+//  unlink(tmpfilename);
   EXPECT_EQ(EOF, ret);
  }
 TEST_F(write_logTest, NoLogWriteOK) {
-  int ret;
+  int ret, failed;
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
   fptr = fopen(tmpfilename, "w");
+  if (fptr == NULL)
+    failed = 1;
+  else
+    failed = 0;
+  ASSERT_EQ(0, failed);
 
-  dup2(fileno(fptr), fileno(stdout));
+  ret = dup2(fileno(fptr), fileno(stdout));
+  ASSERT_NE(-1, ret);
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
   fclose(fptr);
@@ -153,7 +167,7 @@ TEST_F(write_logTest, NoLogWriteOK) {
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
+//  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
