@@ -154,6 +154,7 @@ TEST_F(write_logTest, NoLogEntry) {
 TEST_F(write_logTest, NoLogWriteOK) {
   int ret, failed;
   FILE *fptr;
+  int errcode;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
   fptr = fopen(tmpfilename, "a+");
@@ -174,6 +175,10 @@ TEST_F(write_logTest, NoLogWriteOK) {
 
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
+  if (ret < 0) {
+    errcode = errno;
+    printf("Error %d, %s\n", errcode, strerror(errcode));
+   }
   fclose(fptr);
 //  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
