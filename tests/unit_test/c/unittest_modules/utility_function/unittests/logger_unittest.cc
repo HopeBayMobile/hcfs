@@ -79,7 +79,7 @@ class write_logTest : public ::testing::Test {
  protected:
   char tmpfilename[25], tmpstr[85];
   int outfileno, errfileno;
-  FILE *fptr;
+  FILE *fptr1;
   virtual void SetUp() {
     snprintf(tmpfilename, 25, "/tmp/testlog");
     logptr = NULL;
@@ -88,13 +88,13 @@ class write_logTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    fptr = fopen(tmpfilename, "r");
+    fptr1 = fopen(tmpfilename, "r");
     tmpstr[0] = 0;
-    if (fptr != NULL) {
+    if (fptr1 != NULL) {
       dprintf(outfileno, "Have file\n");
-      fgets(tmpstr, 81, fptr);
+      fgets(tmpstr, 81, fptr1);
       dprintf(outfileno, "%s\n", tmpstr);
-      fclose(fptr);
+      fclose(fptr1);
      }
     if (logptr != NULL) {
       if (logptr->fptr != NULL) {
@@ -174,6 +174,13 @@ TEST_F(write_logTest, NoLogWriteOK) {
   dup2(errfileno, fileno(stderr));
 
   fptr = fopen(tmpfilename, "r");
+  failed = 0;
+  if (fptr == NULL) {
+    errcode = errno;
+    printf("Error %d, %s\n", errcode, strerror(errcode));
+    failed = 1;
+  }
+  ASSERT_EQ(0, failed);
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   if (ret < 0) {
     errcode = errno;
