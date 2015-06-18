@@ -91,6 +91,7 @@ class write_logTest : public ::testing::Test {
     dup2(outfileno, fileno(stdout));
     dup2(errfileno, fileno(stderr));
     fptr = fopen(tmpfilename, "r");
+    tmpstr[0] = 0;
     if (fptr != NULL) {
       dprintf(outfileno, "Have file\n");
       fgets(tmpstr, 81, fptr);
@@ -128,7 +129,7 @@ TEST_F(write_logTest, LogWriteOK) {
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
-TEST_F(write_logTest, NoLog) {
+TEST_F(write_logTest, NoLogEntry) {
   int ret;
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
@@ -151,7 +152,7 @@ TEST_F(write_logTest, NoLogWriteOK) {
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
-  fptr = fopen(tmpfilename, "w");
+  fptr = fopen(tmpfilename, "a+");
   if (fptr == NULL)
     failed = 1;
   else
