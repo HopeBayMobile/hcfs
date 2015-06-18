@@ -173,9 +173,9 @@ off_t check_file_size(const char *path)
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	if (access("/tmp/testblock", F_OK) != 0)
-		mkdir("/tmp/testblock", 0700);
-	snprintf(pathname, 100, "/tmp/testblock/block_%lld_%lld",
+	if (access("/tmp/testHCFS/testblock", F_OK) != 0)
+		mkdir("/tmp/testHCFS/testblock", 0700);
+	snprintf(pathname, 100, "/tmp/testHCFS/testblock/block_%lld_%lld",
 		this_inode, block_num);
 	return 0;
 }
