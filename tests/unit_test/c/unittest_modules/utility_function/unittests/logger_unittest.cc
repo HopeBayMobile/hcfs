@@ -88,8 +88,6 @@ class write_logTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    dup2(outfileno, fileno(stdout));
-    dup2(errfileno, fileno(stderr));
     fptr = fopen(tmpfilename, "r");
     tmpstr[0] = 0;
     if (fptr != NULL) {
@@ -122,6 +120,9 @@ TEST_F(write_logTest, LogWriteOK) {
 
   close_log();
 
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
+
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
@@ -140,6 +141,9 @@ TEST_F(write_logTest, NoLogEntry) {
   write_log(10, "Thisisatest");
 
   close_log();
+
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
 
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
@@ -164,6 +168,9 @@ TEST_F(write_logTest, NoLogWriteOK) {
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
   fclose(fptr);
+
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
 
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
