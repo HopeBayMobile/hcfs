@@ -3864,6 +3864,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	
+	write_log(10, "Debug setxattr: setxattr operation success\n");
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	fuse_reply_err(req, 0);

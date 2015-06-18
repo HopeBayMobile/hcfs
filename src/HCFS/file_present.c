@@ -10,6 +10,7 @@
 * Revision History
 * 2015/2/5 Jiahong added header for this file, and revising coding style.
 * 2015/6/2 Jiahong added error handling
+* 2015/6/16 Kewei added function fetch_xattr_page()
 *
 **************************************************************************/
 

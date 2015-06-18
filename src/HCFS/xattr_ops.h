@@ -1,11 +1,24 @@
+/*************************************************************************
+*
+* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: xattr_ops.h
+* Abstract: The header file for xattr structure and definition
+*
+* Revision History
+* 2015/6/15 Kewei created the header file
+* 2015/6/16 Kewei defined the xattr structure
+*
+**************************************************************************/
+
 
 #ifndef GW20_XATTR_OPS_H_
 #define GW20_XATTR_OPS_H_
 
 #define MAX_KEY_SIZE 256 /* Max key length */
-#define MAX_VALUE_BLOCK_SIZE 4096 /* Max value size per block */
-#define MAX_KEY_ENTRY_PER_LIST 55 /* Max key entry of the sorted array */
-#define MAX_KEY_HASH_ENTRY 64 /* Max hash table entries */
+#define MAX_VALUE_BLOCK_SIZE 4 /* Max value size per block(4096) */
+#define MAX_KEY_ENTRY_PER_LIST 2 /* Max key entry of the sorted array (55)*/
+#define MAX_KEY_HASH_ENTRY 2 /* Max hash table entries (64)*/
 
 /* Define namespace of xattr */
 #define USER 0
