@@ -157,6 +157,7 @@ TEST_F(write_logTest, NoLogWriteOK) {
   int errcode;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
+  printf("fd %d, %d\n", fileno(stdout), fileno(stderr));
   fptr = fopen(tmpfilename, "a+");
   if (fptr == NULL)
     failed = 1;
@@ -164,7 +165,11 @@ TEST_F(write_logTest, NoLogWriteOK) {
     failed = 0;
   ASSERT_EQ(0, failed);
 
+  printf("fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
+
   ret = dup2(fileno(fptr), fileno(stdout));
+  ASSERT_NE(-1, ret);
+  ret = dup2(fileno(fptr), fileno(stderr));
   ASSERT_NE(-1, ret);
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
