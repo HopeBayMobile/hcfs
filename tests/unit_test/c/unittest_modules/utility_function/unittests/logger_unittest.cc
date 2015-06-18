@@ -91,9 +91,9 @@ class write_logTest : public ::testing::Test {
     fptr1 = fopen(tmpfilename, "r");
     tmpstr[0] = 0;
     if (fptr1 != NULL) {
-      dprintf(outfileno, "Have file\n");
+      printf("Have file\n");
       fgets(tmpstr, 81, fptr1);
-      dprintf(outfileno, "%s\n", tmpstr);
+      printf("%s\n", tmpstr);
       fclose(fptr1);
      }
     if (logptr != NULL) {
@@ -165,12 +165,19 @@ TEST_F(write_logTest, NoLogWriteOK) {
     failed = 0;
   ASSERT_EQ(0, failed);
 
-  printf("fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
+  dprintf(outfileno, "fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
 
+  errcode = 0;
   ret = dup2(fileno(fptr), fileno(stdout));
+  errcode = errno;
+  dprintf(outfileno, "%d, %d\n", ret, errcode);
   ASSERT_NE(-1, ret);
+  errcode = 0;
   ret = dup2(fileno(fptr), fileno(stderr));
+  errcode = errno;
+  dprintf(outfileno, "%d, %d\n", ret, errcode);
   ASSERT_NE(-1, ret);
+  dprintf(outfileno, "fd %d, %d, %d\n", fileno(stdout), fileno(stderr), fileno(fptr));
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
   fclose(fptr);
