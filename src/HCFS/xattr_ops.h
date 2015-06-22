@@ -15,6 +15,8 @@
 #ifndef GW20_XATTR_OPS_H_
 #define GW20_XATTR_OPS_H_
 
+#include "meta_mem_cache.h"
+
 #define MAX_KEY_SIZE 256 /* Max key length */
 #define MAX_VALUE_BLOCK_SIZE 4 /* Max value size per block(4096) */
 #define MAX_KEY_ENTRY_PER_LIST 2 /* Max key entry of the sorted array (55)*/
@@ -69,4 +71,11 @@ typedef struct {
 
 int parse_xattr_namespace(const char *name, char *name_space, char *key);
 
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, const char name_space, const char *key, 
+	const char *value, const size_t size);
+
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, const char name_space, const char *key, 
+	char *value, const size_t size, size_t *actual_size);
 #endif

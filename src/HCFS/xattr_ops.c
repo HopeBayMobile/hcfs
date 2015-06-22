@@ -8,9 +8,10 @@
 *           to fuse operaion about xattr.
 *
 * Revision History
-* 2015/6/15 Kewei created the file and add function parse_xattr_namespace()
-* 2015/6/16 Kewei added some functions about xattr_insert operation
+* 2015/6/15 Kewei created the file and add function parse_xattr_namespace().
+* 2015/6/16 Kewei added some functions about xattr_insert operation.
 * 2015/6/18 Kewei fixed bugs about insert_xattr(). It works now.
+* 2015/6/22 Kewei added function get_xattr().
 *
 **************************************************************************/
 
@@ -38,7 +39,7 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 	}
 	
 	if (name[index] != '.') /* No character '.', invalid args. */
-		return -EINVAL;
+		return -EPERM;
 	
 	key_len = strlen(name) - (index + 1);
 	if ((key_len >= MAX_KEY_SIZE) || (key_len <= 0)) /* key len is invalid. */
@@ -62,7 +63,7 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 		*name_space = TRUSTED;
 		return 0;
 	} else {	
-		return -EINVAL; /* Namespace is not supported. */
+		return -EPERM; /* Namespace is not supported. */
 	}
 
 	return 0;
@@ -340,6 +341,47 @@ errcode_handle:
 }
 
 
+int read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, KEY_ENTRY *key_entry, 
+	char *value_buf)
+{
+	VALUE_BLOCK tmp_value_block;
+	size_t value_size;
+	size_t index;
+	long long now_pos;
+	int errcode;
+	int ret, ret_size;
+
+	index = 0;
+	value_size = key_entry->value_size;
+	now_pos = key_entry->first_value_block_pos;
+
+	while (index < value_size) {
+		FSEEK(meta_cache_entry->fptr, now_pos, SEEK_SET);
+		FREAD(&tmp_value_block, sizeof(VALUE_BLOCK), 1, 
+			meta_cache_entry->fptr);
+		
+		if (value_size - index > MAX_VALUE_BLOCK_SIZE) { /* Not last block */
+			memcpy(&value_buf[index], tmp_value_block.content, 
+				sizeof(char) * MAX_VALUE_BLOCK_SIZE);
+		} else { /* Last one */	
+			memcpy(&value_buf[index], tmp_value_block.content, 
+				sizeof(char) * (value_size - index));
+		}
+
+		now_pos = tmp_value_block.next_block_pos;
+		index += MAX_VALUE_BLOCK_SIZE; /* Go to next content */
+	}
+
+	value_buf[value_size] = '\0';
+	write_log(10, "value = %s, value_size = %d\n", value_buf, value_size);
+	return 0;
+
+errcode_handle:
+	return errcode;
+
+}
+
+
 int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *replace_value_block_pos)
 {
@@ -381,7 +423,7 @@ errcode_handle:
 static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
 {
 	int i;
-	for (i = 0 ; i< key_page->num_xattr ; i++) {
+	for (i = 0 ; i < key_page->num_xattr ; i++) {
 		long long pos = key_page->key_list[i].first_value_block_pos;
 		VALUE_BLOCK block;
 
@@ -403,8 +445,8 @@ static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
 	Step 3: Modify and write xattr header(xattr_page)
  */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-	long long xattr_filepos, char name_space, const char *key, const char *value, 
-	size_t size)
+	const long long xattr_filepos, const char name_space, const char *key, 
+	const char *value, const size_t size)
 {
 	unsigned hash_entry;
 	NAMESPACE_PAGE *namespace_page;
@@ -567,4 +609,67 @@ errcode_handle:
 	return errcode;
 
 }
+
+/*
+	This function aims to fill the buffer with value of a given key, and there
+	are four cases:
+	1. Return error if key is not found.
+	2. If buffer size <= 0, assign expected size of value to "actual_size".
+	3. If buffer size is too small, return -ERANGE.
+	4. If buffer is sufficient, fill it with value.
+*/
+
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, const char name_space, const char *key, 
+	char *value_buf, const size_t size, size_t *actual_size)
+{
+	NAMESPACE_PAGE *namespace_page;
+	KEY_ENTRY *key_entry;
+	KEY_LIST_PAGE target_key_list_page;
+	long long target_key_list_pos;
+	long long first_key_list_pos;
+	unsigned hash_index;
+	unsigned key_index;
+	int ret_code;
+
+	hash_index = hash(key); /* Hash the key */
+	namespace_page = &(xattr_page->namespace_page[name_space]);
+
+	if (namespace_page->key_hash_table[hash_index] == 0)
+		return -ENOENT;
+	
+	first_key_list_pos = namespace_page->key_hash_table[hash_index];
+	ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
+			&target_key_list_page, &key_index, 
+			&target_key_list_pos, key);
+	
+	if (ret_code < 0)
+		return ret_code;
+	
+	if (ret_code > 0) /* Hit nothing */
+		return -ENOENT;
+	
+	/* Else, key is found */
+	key_entry = &(target_key_list_page.key_list[key_index]);
+	*actual_size = key_entry->value_size; 
+	if (size <= 0) /* Get actual size when size == 0 */
+		return 0;
+
+	if (size > 0) {
+		if (size < *actual_size)
+			return -ERANGE;
+		
+		ret_code = read_value_data(meta_cache_entry, key_entry, value_buf);
+		if (ret_code < 0)
+			return ret_code;
+	}
+
+	return 0; /* Success when size == 0 or finishing to read value */
+
+}
+
+
+
+
+
 
