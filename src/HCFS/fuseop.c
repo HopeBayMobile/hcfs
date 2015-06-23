@@ -105,6 +105,8 @@ ntpdate / ntpd or manual changes*/
 /*   file handling in this file */
 /* TODO: Multiple paths for read / write / other ops for different folder
 /*   policies. Policies to be determined at file or dir open. */
+/* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
+changes */
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
