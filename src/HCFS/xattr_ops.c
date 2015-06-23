@@ -39,7 +39,7 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 	}
 	
 	if (name[index] != '.') /* No character '.', invalid args. */
-		return -EPERM;
+		return -EOPNOTSUPP;
 	
 	key_len = strlen(name) - (index + 1);
 	if ((key_len >= MAX_KEY_SIZE) || (key_len <= 0)) /* key len is invalid. */
@@ -63,7 +63,7 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 		*name_space = TRUSTED;
 		return 0;
 	} else {	
-		return -EPERM; /* Namespace is not supported. */
+		return -EOPNOTSUPP; /* Namespace is not supported. */
 	}
 
 	return 0;
@@ -166,7 +166,6 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 	*index = mid_index;
 	return -1;
 }
-
 
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page, 
@@ -372,8 +371,6 @@ int read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, KEY_ENTRY *key_en
 		index += MAX_VALUE_BLOCK_SIZE; /* Go to next content */
 	}
 
-	value_buf[value_size] = '\0';
-	write_log(10, "value = %s, value_size = %d\n", value_buf, value_size);
 	return 0;
 
 errcode_handle:
@@ -665,10 +662,100 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	}
 
 	return 0; /* Success when size == 0 or finishing to read value */
-
 }
 
+static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf, 
+	const size_t size, size_t *actual_size, const char *namespace_prefix)
+{	
+	int key_index;
+	char tmp_buf[MAX_KEY_SIZE + 50];
+	int key_size;
+	int namespace_len;
 
+	namespace_len = strlen(namespace_prefix);
+	
+	for (key_index = 0; key_index < key_page->num_xattr ; key_index++) {
+		key_size = (namespace_len + 1) + 
+			key_page->key_list[key_index].key_size + 1;
+
+		if (size > 0) {
+			if (*actual_size + key_size > size)
+				return -1;
+			/* combine namespace and key */
+			strcpy(tmp_buf, namespace_prefix);
+			tmp_buf[namespace_len] = '.';
+			strcpy(tmp_buf + namespace_len + 1, 
+				key_page->key_list[key_index].key);
+			tmp_buf[key_size - 1] = '\0';
+
+			memcpy(&key_buf[*actual_size], tmp_buf, 
+				sizeof(char) * key_size);
+			
+			write_log(10, "key = %s\n", tmp_buf);
+		}
+		
+		*actual_size += key_size;
+	}
+
+	return 0;
+}
+
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, char *key_buf, const size_t size, 
+	size_t *actual_size)
+{
+	NAMESPACE_PAGE *namespace_page;
+	KEY_LIST_PAGE key_page;
+	int ns_count;
+	int hash_count;
+	int ret, ret_size, errcode;
+	char namespace_prefix[30];
+
+	for (ns_count = 0; ns_count < 4; ns_count++) {
+		namespace_page = &(xattr_page->namespace_page[ns_count]);
+		if (namespace_page->num_xattr == 0)
+			continue;
+
+		memset(namespace_prefix, 0, sizeof(char) * 30);
+		switch (ns_count) {
+		case USER:
+			strcpy(namespace_prefix, "user");
+			break;
+		case SYSTEM:
+			strcpy(namespace_prefix, "system");
+			break;
+		case SECURITY:
+			strcpy(namespace_prefix, "security");
+			break;
+		case TRUSTED:
+			strcpy(namespace_prefix, "trusted");
+			break;
+		default:
+			break;
+		}
+
+		for (hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY ; hash_count++) {
+			long long pos;
+			
+			pos = namespace_page->key_hash_table[hash_count];
+			while (pos) {
+				FSEEK(meta_cache_entry->fptr, pos, SEEK_SET);
+				FREAD(&key_page, sizeof(KEY_LIST_PAGE), 1, 
+					meta_cache_entry->fptr);
+				ret = fill_buffer_with_key(&key_page, key_buf, size, 
+					actual_size, namespace_prefix);
+				if (ret < 0)
+					return -ERANGE;
+				pos = key_page.next_list_pos;
+			}
+		}
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
 
 
 

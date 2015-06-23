@@ -78,4 +78,9 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key, 
 	char *value, const size_t size, size_t *actual_size);
+
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, char *key_buf, const size_t size, 
+	size_t *actual_size);
+
 #endif
