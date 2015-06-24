@@ -193,7 +193,7 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	find_first_insert = FALSE; 
 	hit_key_entry = FALSE;
 
-	while (key_list_pos) {
+	do {
 		FSEEK(meta_cache_entry->fptr, key_list_pos, SEEK_SET);
 		FREAD(&now_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);
 		
@@ -219,7 +219,7 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		
 		prev_key_list_pos = key_list_pos;
 		key_list_pos = now_page.next_list_pos; /* Go to next page */
-	}
+	} while (key_list_pos != first_key_list_pos);
 	
 	/* Key has been exist, return 0 */
 	if (hit_key_entry == TRUE) { 
@@ -476,6 +476,8 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		/* Assign the position */
 		namespace_page->key_hash_table[hash_entry] = target_key_list_pos; 
 		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE)); /* Init page */
+		target_key_list_page.next_list_pos = target_key_list_pos;
+		
 		replace_value_block_pos = 0;
 		ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
 			&replace_value_block_pos, &value_pos); /* Get first value block pos */
@@ -521,11 +523,12 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				/* New page at end of the linked-key_list */
 				memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE));
 				target_key_list_pos = usable_pos; /* Move to next page pos */
+				target_key_list_page.next_list_pos = first_key_list_pos;
 				key_index = 0;
 				write_log(10, "Debug setxattr: Allocate a new key_list_page,"
 					" usable_pos = %lld\n", usable_pos);
 
-			} else { /* Hit nothing, but can insert to target_key_list_page */
+			} else { /* It can be inserted to existed target_key_list_page */
 				KEY_ENTRY *key_list;
 				unsigned num_remaining;
 				
@@ -737,10 +740,11 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 		}
 
 		for (hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY ; hash_count++) {
-			long long pos;
+			long long pos, first_pos;
 			
-			pos = namespace_page->key_hash_table[hash_count];
-			while (pos) {
+			first_pos = namespace_page->key_hash_table[hash_count];
+			pos = first_pos;
+			do {
 				FSEEK(meta_cache_entry->fptr, pos, SEEK_SET);
 				FREAD(&key_page, sizeof(KEY_LIST_PAGE), 1, 
 					meta_cache_entry->fptr);
@@ -749,7 +753,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 				if (ret < 0)
 					return -ERANGE;
 				pos = key_page.next_list_pos;
-			}
+			} while (pos != first_pos);
 		}
 	}
 
@@ -799,6 +803,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
+	KEY_LIST_PAGE first_key_list_page;
 	KEY_ENTRY tmp_key_buf[MAX_KEY_SIZE];
 	long long target_key_list_pos;
 	long long first_key_list_pos;
@@ -840,32 +845,43 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	} else { /* Reclaim the key_list_page */
 		long long reclaim_key_list_pos;
 		KEY_LIST_PAGE tmp_list_page;
-
-		if (target_key_list_page.next_list_pos == 0) { /* Last page */
-			KEY_LIST_PAGE prev_key_list_page;
-			long long prev_key_list_pos;
-
-			ret_code = find_prev_key_page(meta_cache_entry, first_key_list_pos, 
-					&prev_key_list_page, &prev_key_list_pos,
-					target_key_list_pos);
-			if (ret_code < 0)
-				return ret_code;
-			
-			if (prev_key_list_pos == 0) { /* Previous page does not exist */
+		
+		/* Last page */
+		if (target_key_list_page.next_list_pos == first_key_list_pos) { 
+			/* Case 1: Last page == First page */
+			if (target_key_list_pos == target_key_list_page.next_list_pos) {
 				namespace_page->key_hash_table[hash_index] = 0;
 				FSEEK(meta_cache_entry->fptr, xattr_filepos, 
 					SEEK_SET);
 				FWRITE(xattr_page, sizeof(XATTR_PAGE), 
-						1, meta_cache_entry->fptr);
-			} else { /* Prev page is found */
-				prev_key_list_page.next_list_pos = 0;
-				FSEEK(meta_cache_entry->fptr, prev_key_list_pos, 
-					SEEK_SET);
-				FWRITE(&prev_key_list_page, sizeof(KEY_LIST_PAGE), 
 					1, meta_cache_entry->fptr);
+				
+				reclaim_key_list_pos = target_key_list_pos;
+
+			} else { /* Case 2: Last page != First Page */
+				
+				FSEEK(meta_cache_entry->fptr, first_key_list_pos, 
+					SEEK_SET);
+				FREAD(&first_key_list_page, sizeof(KEY_LIST_PAGE), 
+					1, meta_cache_entry->fptr);
+		
+				/* In xattr, assign new first page position */
+				namespace_page->key_hash_table[hash_index] = 
+					first_key_list_page.next_list_pos;
+				FSEEK(meta_cache_entry->fptr, xattr_filepos, 
+					SEEK_SET);
+				FWRITE(xattr_page, sizeof(XATTR_PAGE), 
+					1, meta_cache_entry->fptr);
+				
+				/* Write old first-page to the last position */
+				FSEEK(meta_cache_entry->fptr, target_key_list_pos, 
+					SEEK_SET);
+				FWRITE(&first_key_list_page, sizeof(KEY_LIST_PAGE), 
+					1, meta_cache_entry->fptr);
+				
+				/* Reclaim old first_page_pos */
+				reclaim_key_list_pos = first_key_list_pos;
 			}
-			
-			reclaim_key_list_pos = target_key_list_pos;
 
 		} else {
 			KEY_LIST_PAGE next_key_list_page;
