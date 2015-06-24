@@ -51,7 +51,6 @@ typedef struct {
 	unsigned num_xattr;
 	KEY_ENTRY key_list[MAX_KEY_ENTRY_PER_LIST];
 	long long next_list_pos;
-	long long prev_list_pos;
 } KEY_LIST_PAGE;
 
 /* NAMESPACE_PAGE includes a hash table which is used to hash the input key.
@@ -82,5 +81,8 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, char *key_buf, const size_t size, 
 	size_t *actual_size);
+
+int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, const char name_space, const char *key);
 
 #endif

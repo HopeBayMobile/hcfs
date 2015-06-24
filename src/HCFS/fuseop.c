@@ -3975,12 +3975,6 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	
-	if (xattr_page->namespace_page[name_space].num_xattr == 0) {
-		write_log(10, "Debug getxattr: key does NOT exist\n");
-		retcode = -ENOENT;
-		goto error_handle; /* Namespace is empty, wrong key */
-	}
-	
 	/* Get xattr if size is sufficient. If size is zero, return actual needed 
 	   size. If size is non-zero but too small, return error code ERANGE */	
 	if (size != 0) {
@@ -4127,8 +4121,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n", 
-		name_space, key, size);
+	write_log(10, "Debug removexattr: namespace = %d, key = %s\n", 
+		name_space, key);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
@@ -4137,7 +4131,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
-		write_log(10, "Debug listxattr: lock_entry fail\n");
+		write_log(10, "Debug removexattr: lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -4157,15 +4151,18 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	/* Remove xattr */
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
 		name_space, key);
-	if (retcode < 0) /* ENOENT or others */
+	if (retcode < 0) { /* ENOENT or others */
+		write_log(10, "Debug removexattr: remove xattr fail\n");
 		goto error_handle;
-
+	}
 	
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
 	fuse_reply_err(req, 0);
+	write_log(10, "Debug removexattr: Remove key success\n");
+	return ;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4203,6 +4200,7 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.setxattr = hfuse_ll_setxattr,
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
+	.removexattr = hfuse_ll_removexattr,
 };
 
 /*
