@@ -439,11 +439,15 @@ static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
 	}
 }
 
-/*
-	The insert_xattr function is parted into 3 steps:
-	Step 1: Find the key and insert into data structure
-	Step 2: Write value data into linked-value_block
-	Step 3: Modify and write xattr header(xattr_page)
+/**
+ * Set a extended attribute 
+ *
+ * The insert_xattr function is parted into 3 steps:
+ * Step 1: Find the key and insert into data structure
+ * Step 2: Write value data into linked-value_block
+ * Step 3: Modify and write xattr header(xattr_page)
+ *
+ * @return 0 if success to set xattr, otherwise negative error code.
  */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key, 
@@ -614,14 +618,19 @@ errcode_handle:
 
 }
 
-/*
-	This function aims to fill the buffer with value of a given key, and there
-	are four cases:
-	1. Return error if key is not found.
-	2. If buffer size <= 0, assign expected size of value to "actual_size".
-	3. If buffer size is too small, return -ERANGE.
-	4. If buffer is sufficient, fill it with value.
-*/
+/**
+ * Get extended attribute.
+ *
+ * This function aims to fill the buffer with value of a given key, and there
+ * are four cases:
+ * Case 1: Return error if key is not found.
+ * Case 2: If buffer size <= 0, assign expected size of value to "actual_size".
+ * Case 3: If buffer size is too small, return -ERANGE.
+ * Case 4: If buffer is sufficient, fill it with value.
+ *
+ * @return 0 if success to get xattr or to get needed buffer size, 
+ *         and error code on error.
+ */
 
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key, 
@@ -707,6 +716,20 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
 	return 0;
 }
 
+/**
+ * List all xattr names stored in meta.
+ *
+ * This function mainly aims to fill the buffer with all names in meta, which is 
+ * separated by null characters. If the parameter "size" is zero, then this 
+ * function will find out the needed size of the buffer such that FUSE will 
+ * allocate a appropriate name buffer with sufficient size, and then fill the 
+ * buffer with all names next time.
+ * 
+ * @return 0 if success to fill the name buffer or to find out needed size, 
+ *         otherwise return negative error code.
+ */
+
+
 int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, char *key_buf, const size_t size, 
 	size_t *actual_size)
@@ -765,7 +788,15 @@ errcode_handle:
 	return errcode;
 }
 
-
+/**
+ * Remove the xattr. 
+ *
+ * Remove xattr if key is found, and some corresponding garbage collection is processed 
+ * when it is needed. The function first deletes the key entry and then reclaims
+ * the value blocks. All fwrite operations in this function is safe when crashing.
+ * 
+ * @return 0 if key exists and success to delete, otherwise return error code.
+ */
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key)
 {
