@@ -138,8 +138,9 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 	
 	start_index = 0;
 	end_index = num_xattr;
-	while (end_index >= start_index) {
-		mid_index = (end_index + start_index) / 2;
+	mid_index = (end_index + start_index) / 2;
+	
+	while (end_index > start_index) {
 
 		if (mid_index >= MAX_KEY_ENTRY_PER_LIST) {
 			mid_index = -1; /* Not found and list is full */
@@ -157,11 +158,12 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 			*index = mid_index;
 			return 0;
 		}
-
+		
 		if (cmp_result < 0)
-			end_index = mid_index - 1;
+			end_index = mid_index;
 		else
-			start_index = mid_index + 1;
+			start_index = mid_index + 1;	
+		mid_index = (end_index + start_index) / 2;
 	}
 		
 	/* Key entry not found */
@@ -763,40 +765,6 @@ errcode_handle:
 	return errcode;
 }
 
-
-static int find_prev_key_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
-	const long long first_key_list_pos, KEY_LIST_PAGE *prev_key_list_page, 
-	long long *prev_key_list_pos, const long long target_key_list_pos)
-{
-	long long now_pos;
-	int errcode;
-	int ret, ret_size;
-
-	if (first_key_list_pos == target_key_list_pos) {
-		*prev_key_list_pos = 0;
-		return 0;
-	}
-
-	now_pos = first_key_list_pos;
-	while (now_pos) {
-		FSEEK(meta_cache_entry->fptr, now_pos, SEEK_SET);
-		FREAD(prev_key_list_page, sizeof(KEY_LIST_PAGE), 1, 
-			meta_cache_entry->fptr);
-		
-		if (prev_key_list_page->next_list_pos == target_key_list_pos) {
-			*prev_key_list_pos = now_pos;
-			return 0;
-		}
-
-		now_pos = prev_key_list_page->next_list_pos;
-	}
-
-	return -EFAULT;
-
-errcode_handle:
-	return errcode;
-
-}
 
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key)

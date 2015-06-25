@@ -19,7 +19,7 @@
 
 #define MAX_KEY_SIZE 256 /* Max key length */
 #define MAX_VALUE_BLOCK_SIZE 4 /* Max value size per block(4096) */
-#define MAX_KEY_ENTRY_PER_LIST 2 /* Max key entry of the sorted array (55)*/
+#define MAX_KEY_ENTRY_PER_LIST 3 /* Max key entry of the sorted array (55)*/
 #define MAX_KEY_HASH_ENTRY 2 /* Max hash table entries (64)*/
 
 /* Define namespace of xattr */
