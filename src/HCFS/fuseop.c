@@ -154,10 +154,8 @@ int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 	if (temp_context == NULL)
 		return -ENOMEM;
 
-	if (temp_context->uid == 0) { /*If this is the root grant any req */
-		write_log(10, "root!!!\n");
+	if (temp_context->uid == 0)  /*If this is the root grant any req */
 		return 0;
-	}
 
 	/* First check owner permission */
 	if (temp_context->uid == thisstat->st_uid) {
