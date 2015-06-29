@@ -18,20 +18,30 @@
 **************************************************************************/
 
 
-#include <errno.h>
 #include "xattr_ops.h"
 #include "meta_mem_cache.h"
 #include "string.h"
 #include "global.h"
 #include "macro.h"
 
+#include <attr/xattr.h>
+#include <errno.h>
+
+/**
+ * Parse input parameter "name"
+ *
+ * Parse input name into namespace and key, which are separated by '.'.
+ * That is, [name] = [name_space].[key]
+ *
+ * @return 0 if success, otherwise corresponding negavite error code.
+ */
 int parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
 	int index;
 	int key_len;
 	char namespace_string[20];
 
-	/* Find '.' which is used to combine namespace and key.
+	/* Find '.' which is used to concatenate namespace and key.
 	   eg.: [namespace].[key] */
 	index = 0;
 	while (name[index]) {
@@ -71,7 +81,13 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 	return 0;
 }
 
-/* Hash function */
+/**
+ * String hash function
+ *
+ * This hash function is DJB hash with mod.
+ *
+ * @return hash result
+ */
 static unsigned hash(const char *input) 
 {
 	unsigned hash = 5381;
@@ -86,6 +102,13 @@ static unsigned hash(const char *input)
 	return hash;
 }
 
+/**
+ * Copy data to key_entry
+ *
+ * Given member data, copy them to corresponding variables in key_entry.
+ *
+ * @return none.
+ */
 static void copy_key_entry(KEY_ENTRY *key_entry, const char *key, 
 	long long value_pos, size_t size)
 {
@@ -95,6 +118,15 @@ static void copy_key_entry(KEY_ENTRY *key_entry, const char *key,
 	key_entry->first_value_block_pos = value_pos;
 }
 
+/**
+ * Get a usable file position of key_list_page
+ *
+ * The function find a appropriate position of KEY_LIST_PAGE. Policy is:
+ * Priority 1: Get position from reclaimed key_list_page recorded in XATTR_PAGE
+ * Priority 2: Allocate a new position at EOF
+ *
+ * @return 0 if success, and usable position is stored in "usable_pos".
+ */
 int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *usable_pos)
 {
@@ -104,8 +136,9 @@ int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	int ret;
 	int ret_size;
 	KEY_LIST_PAGE empty_page;
-
-	if (xattr_page->reclaimed_key_list_page != 0) { /* Get reclaimed page if exist */
+	
+	/* First get reclaimed page if exist */
+	if (xattr_page->reclaimed_key_list_page != 0) { 
 		ret_pos = xattr_page->reclaimed_key_list_page;
 
 		FSEEK(meta_cache_entry->fptr, ret_pos, SEEK_SET);
@@ -129,7 +162,18 @@ errcode_handle:
 	return errcode;
 }
 
-
+/**
+ * Find key entry using binary search.
+ *
+ * Given a sorted key entry array "key_list", the task is to find the index of 
+ * string "key" in the array. There are some cases:
+ * Case 1: Hit the key entry. Target index is stored in "index".
+ * Case 2: Hit nothing and array is not full. "index" stores fitting index to be 
+ *         inserted.
+ * Case 3: Hit nothing but array is full. Then "index" is -1.
+ *
+ * @return 0 if entry is found. Otherwise return -1.
+ */
 int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key, 
 	int *index)
 {
@@ -171,6 +215,22 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 	return -1;
 }
 
+/**
+ * Find key entry in a cyclic key_list_page linked-list.
+ *
+ * Given first position of key_list_page "first_key_list_pos", the function aims
+ * to find out the target key string "key". If it is found, saved the key_list_page
+ * position and data, which is stored in "target_key_list_pos" and 
+ * "target_key_list_page", respectively. If key entry is not found:
+ * Case 1: Key entry not found and key entry can be inserted to some key_list_page.
+ *         Then "target_key_list_page" stores the key_list_page that have not been 
+ *         full. This key_list_page is the non-full page that first met when 
+ *         traversing the cyclic linked-list.
+ * Case 2: Key entry not found and unfortunately all key_list_page are full. Then 
+ *         the "target_key_list_page" stores the last page in cyclic linked-list.
+ *
+ * @return 0 if entry is found, 1 if entry not found. Return -1 on error.
+ */
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page, 
 	int *key_index, long long *target_key_list_pos, const char *key)
@@ -197,14 +257,13 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 	do {
 		FSEEK(meta_cache_entry->fptr, key_list_pos, SEEK_SET);
-		FREAD(&now_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);
-		
+		FREAD(&now_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);		
 		write_log(10, "Debug xattr: now in find_key_entry(), "
 			"key_list_pos = %lld, num_xattr = %d\n", 
 			key_list_pos, now_page.num_xattr);
 		
-		ret = key_binary_search(now_page.key_list, now_page.num_xattr, key, &index);
-		
+		ret = key_binary_search(now_page.key_list, now_page.num_xattr, 
+			key, &index);
 		if (ret == 0) { /* Hit the key */
 			hit_key_entry = TRUE;
 			break;
@@ -248,6 +307,18 @@ errcode_handle:
 
 }
 
+/**
+ * Get a usable file position of value_block.
+ *
+ * When asking a usable position to write value_block. This function first 
+ * find position in the link-list pointed by "replace_value_block_pos", which is 
+ * original value blocks pointed by a key entry. This is non-zero in REPLACE
+ * situation of insertxattr(). Second return a usable postion from reclaimed
+ * value blocks. If there are no reclaimed value blocks, then create a new 
+ * postion at EOF. A fitting position is stored in "usable_value_pos".
+ *
+ * @return 0 if success, otherwise negative error code.
+ */
 int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *replace_value_block_pos, 
 	long long *usable_value_pos)
@@ -295,6 +366,15 @@ errcode_handle:
 
 }
 
+/**
+ * Write value data.
+ *
+ * Write value data such that it in a linked-list. "first_value_pos" is the first
+ * value block position to write value data. The function will call 
+ * get_usable_value_filepos() when need extra value block positions to write value.
+ *
+ * @return 0 for success, otherwise negative error code.
+ */
 int write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	long long *replace_value_block_pos, long long first_value_pos, 
 	const char *value, size_t size)
@@ -343,7 +423,13 @@ errcode_handle:
 
 }
 
-
+/**
+ * Read value data.
+ *
+ * Read value data in linked-list. Value is stored in "value_buf".
+ *
+ * @return 0 for success, otherwise negative error code.
+ */
 int read_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, KEY_ENTRY *key_entry, 
 	char *value_buf)
 {
@@ -382,7 +468,15 @@ errcode_handle:
 
 }
 
-
+/**
+ * Recycle a value block linked-list
+ *
+ * In REPLACE situation of insert_xattr() or remove_xattr(), Perhaps some value
+ * blocks need to be reclaimed. The head position of this linked-list is passed in
+ * "replace_value_block_pos".
+ *
+ * @return 0 for success, otherwise negative error code.
+ */
 int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *replace_value_block_pos)
 {
@@ -420,7 +514,7 @@ errcode_handle:
 
 }
 
-/* A debugged function used to print key-value. It will be removed later. */
+/*** A debugged function used to print key-value. It will be removed later. ***/
 static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
 {
 	int i;
@@ -447,11 +541,21 @@ static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
  * Step 2: Write value data into linked-value_block
  * Step 3: Modify and write xattr header(xattr_page)
  *
+ * In Step 1, there are some cases:
+ * Case 1: hash_table[index] is never used, so just allocate a new page and insert 
+ *         to index 0.
+ * Case 2: At least one key_page in hash_table[index]. Find the key entry:
+ *       Case 2.1: Entry is found. Replace value or return error
+ *       Case 2.2: Entry not found, some key_pages are not full The new key can be 
+ *                 inserted to existed key_page.
+ *       Case 2.3: Entry not found, but all key_page are full. Allocate a new page 
+ *                 and insert to index 0.
+ *
  * @return 0 if success to set xattr, otherwise negative error code.
  */
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key, 
-	const char *value, const size_t size)
+	const char *value, const size_t size, const int flag)
 {
 	unsigned hash_entry;
 	NAMESPACE_PAGE *namespace_page;
@@ -473,6 +577,9 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 		
 	if (namespace_page->key_hash_table[hash_entry] == 0) { /* Allocate if no page */
+		if (flag == XATTR_REPLACE)
+			return -ENODATA;
+
 		/* Get key list pos from "gc list" or "end of file" */
 		ret_code = get_usable_key_list_filepos(meta_cache_entry, 
 			xattr_page, &target_key_list_pos);
@@ -481,17 +588,17 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		/* Assign the position */
 		namespace_page->key_hash_table[hash_entry] = target_key_list_pos; 
-		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE)); /* Init page */
+		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE)); 
 		target_key_list_page.next_list_pos = target_key_list_pos;
 		
 		replace_value_block_pos = 0;
 		ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
-			&replace_value_block_pos, &value_pos); /* Get first value block pos */
+			&replace_value_block_pos, &value_pos);
 		if (ret_code < 0)
 			return ret_code;
 		
-		now_key_entry = &(target_key_list_page.key_list[0]); /* index = 0 */
-		copy_key_entry(now_key_entry, key, value_pos, size); /* Copy entry */
+		now_key_entry = &(target_key_list_page.key_list[0]); 
+		copy_key_entry(now_key_entry, key, value_pos, size); 
 
 		(target_key_list_page.num_xattr)++; /* # of xattr += 1 */
 
@@ -511,6 +618,9 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				&target_key_list_pos, key);
 
 		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
+			
+			if (flag == XATTR_REPLACE)
+				return -ENODATA;
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
 				long long usable_pos;
@@ -519,6 +629,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 						xattr_page, &usable_pos);
 				if (ret_code < 0)
 					return ret_code;
+
 				/* Link to end of key_list  */
 				target_key_list_page.next_list_pos = usable_pos; 
 
@@ -553,16 +664,16 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 			/* Insert key into target_key_list */
 			replace_value_block_pos = 0;
 			ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
-				&replace_value_block_pos, &value_pos); /* Get first value block pos */
+				&replace_value_block_pos, &value_pos);
 			if (ret_code < 0)
 				return ret_code;
 			
 			now_key_entry = &(target_key_list_page.key_list[key_index]);
-			copy_key_entry(now_key_entry, key, value_pos, size); /* Copy entry */
-			(target_key_list_page.num_xattr)++; /* # of xattr += 1 */
+			copy_key_entry(now_key_entry, key, value_pos, size);
+			(target_key_list_page.num_xattr)++;
 			
 			FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
-			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  /* Write data */
+			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  
 				meta_cache_entry->fptr);
 			
 			/* In namespace, # of xattr += 1 */
@@ -571,20 +682,25 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				target_key_list_pos);
 
 		} else if (ret_code == 0) { /* Hit the key entry, REPLACE value */
+			
+			if (flag == XATTR_CREATE)
+				return -EEXIST;
+			
 			/* Replace the value size and then rewrite. */
 			now_key_entry = &(target_key_list_page.key_list[key_index]);
 			now_key_entry->value_size = size; 
 
 			replace_value_block_pos = now_key_entry->first_value_block_pos;
 			ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
-				&replace_value_block_pos, &value_pos); /* Get first value block pos */
+				&replace_value_block_pos, &value_pos);
 			if (ret_code < 0)
 				return ret_code;
 			
 			FSEEK(meta_cache_entry->fptr, target_key_list_pos, SEEK_SET);
-			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,  /* Write data */
+			FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1,
 				meta_cache_entry->fptr);	
 			write_log(10, "Debug setxattr: Hit the key. Replacing value success\n");
+
 		} else { /* Error */
 			return ret_code;
 		}
@@ -601,8 +717,6 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		&replace_value_block_pos);
 	if (ret_code < 0)
 		return ret_code;
-		
-	print_key(&target_key_list_page, meta_cache_entry);
 	
 	/* Step 3: Finally write xattr header(xattr_page) */
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
@@ -631,7 +745,6 @@ errcode_handle:
  * @return 0 if success to get xattr or to get needed buffer size, 
  *         and error code on error.
  */
-
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key, 
 	char *value_buf, const size_t size, size_t *actual_size)
@@ -680,6 +793,16 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	return 0; /* Success when size == 0 or finishing to read value */
 }
 
+/**
+ * Fill buffer with all names
+ *
+ * Fill the buffer "key_buf" with [name] = [namespace_prefix].[key]. actual_size
+ * record total size in the key buffer up to present. "size" is the parameter
+ * passed by FUSE listxattr(). If it is zero, just add "size" to "actual_size"
+ * rather than fill the key buffer.
+ *
+ * @return 0 if success, -1 when size is too small.
+ */
 static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf, 
 	const size_t size, size_t *actual_size, const char *namespace_prefix)
 {	
@@ -728,8 +851,6 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
  * @return 0 if success to fill the name buffer or to find out needed size, 
  *         otherwise return negative error code.
  */
-
-
 int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, char *key_buf, const size_t size, 
 	size_t *actual_size)

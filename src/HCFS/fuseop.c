@@ -20,6 +20,7 @@
 * 2015/4/30 ~  Jiahong changing to FUSE low-level interface
 * 2015/5/20 Jiahong Adding permission checking for operations
 * 2015/5/25, 5/26  Jiahong adding error handling
+* 2015/6/29 Kewei finished xattr operations.
 *
 **************************************************************************/
 
@@ -153,8 +154,10 @@ int check_permission(fuse_req_t req, struct stat *thisstat, char mode)
 	if (temp_context == NULL)
 		return -ENOMEM;
 
-	if (temp_context->uid == 0)  /*If this is the root grant any req */
+	if (temp_context->uid == 0) { /*If this is the root grant any req */
+		write_log(10, "root!!!\n");
 		return 0;
+	}
 
 	/* First check owner permission */
 	if (temp_context->uid == thisstat->st_uid) {
@@ -3830,7 +3833,7 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
 	const char *value, size_t size, int flag)
 {
-	/* TODO: Tmp ignore flags and permission of namespace */
+	/* TODO: Tmp ignore permission of namespace */
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
 	long long xattr_filepos;
@@ -3870,6 +3873,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+	
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
 		write_log(10, "Debug setxattr: Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
@@ -3878,6 +3882,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page)
+		goto error_handle;
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
 		&xattr_filepos);
 	if (retcode < 0)
@@ -3887,7 +3893,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	
 	/* Begin to Insert xattr */
 	retcode = insert_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
-		name_space, key, value, size);
+		name_space, key, value, size, flag);
 	if (retcode < 0)
 		goto error_handle;
 	
@@ -3970,6 +3976,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page)
+		goto error_handle;
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
 		&xattr_filepos);
 	if (retcode < 0)
@@ -3979,6 +3987,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	   size. If size is non-zero but too small, return error code ERANGE */	
 	if (size != 0) {
 		value = (char *) malloc(sizeof(char) * size);
+		if (!value)
+			goto error_handle;
 		memset(value, 0, sizeof(char) * size);
 	} else {
 		value = NULL;
@@ -4023,6 +4033,16 @@ error_handle:
 	return ;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_listxattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size
+*
+*       Summary: List all xattr in USER namespace. Reply needed size if 
+*                parameter "size" is zero. If size is fitted, reply buffer
+*                filled with all names separated by null character.
+*
+*************************************************************************/
 static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 {
 	XATTR_PAGE *xattr_page;
@@ -4055,6 +4075,8 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page)
+		goto error_handle;
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
 		&xattr_filepos);
 	if (retcode < 0)
@@ -4063,6 +4085,8 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	/* Allocate sufficient size */	
 	if (size != 0) {
 		key_buf = (char *) malloc(sizeof(char) * size);
+		if (!key_buf)
+			goto error_handle;
 		memset(key_buf, 0, sizeof(char) * size);
 	} else {
 		key_buf = NULL;
@@ -4106,6 +4130,15 @@ error_handle:
 	return ;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_removexattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, char *name
+*
+*       Summary: Remove a xattr and reclaim those resource if needed. Reply
+*                error if attribute is not found. 
+*
+*************************************************************************/
 static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
 {	
 	XATTR_PAGE *xattr_page;
@@ -4143,6 +4176,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page)
+		goto error_handle;
 	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
 		&xattr_filepos);
 	if (retcode < 0)
