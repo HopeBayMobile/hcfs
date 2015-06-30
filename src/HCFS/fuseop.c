@@ -3446,7 +3446,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
-	int init_api_interface(void);
+	init_api_interface();
 	init_meta_cache_headers();
 	lookup_init();
 	startup_finish_delete();
@@ -3807,6 +3807,15 @@ void run_alt(void)
 */
 
 /* Initiate FUSE */
+void* mount_multi_thread(void *ptr)
+{
+	fuse_session_loop_mt((struct fuse_session *)ptr);
+}
+void* mount_single_thread(void *ptr)
+{
+	fuse_session_loop((struct fuse_session *)ptr);
+}
+
 int hook_fuse(int argc, char **argv)
 {
 /*
@@ -3839,9 +3848,12 @@ int hook_fuse(int argc, char **argv)
 	fuse_set_signal_handlers(session);
 	fuse_session_add_chan(session, fuse_channel);
 	if (mt)
-		fuse_session_loop_mt(session);
+		pthread_create(&HCFS_mount, NULL, mount_multi_thread,
+				(void *)session);
 	else
-		fuse_session_loop(session);
+		pthread_create(&HCFS_mount, NULL, mount_single_thread,
+				(void *)session);
+	pthread_join(HCFS_mount, NULL);
 	fuse_session_remove_chan(fuse_channel);
 	fuse_remove_signal_handlers(session);
 	fuse_session_destroy(session);

@@ -21,6 +21,7 @@
 #include <time.h>
 #include <errno.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "macro.h"
 #include "global.h"
@@ -34,9 +35,9 @@ int init_api_interface(void)
 {
 	int ret, errcode;
 
+	write_log(10, "Starting API interface");
 	api_sock.addr.sun_family = AF_UNIX;
 	strcpy(api_sock.addr.sun_path, "/dev/shm/hcfs_reporter");
-	UNLINK(api_sock.addr.sun_path);
 	api_sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (api_sock.fd < 0) {
@@ -187,6 +188,7 @@ void api_module(void)
 
 		switch (api_code) {
 		case TERMINATE:
+			pthread_kill(HCFS_mount, SIGHUP);
 			hcfs_system->system_going_down = TRUE;
 			retcode = 0;
 			ret_len = sizeof(int);
