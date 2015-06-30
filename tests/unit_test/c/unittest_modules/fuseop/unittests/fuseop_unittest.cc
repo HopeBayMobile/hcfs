@@ -50,8 +50,20 @@ static void * _mount_test_fuse(void *ptr) {
 class fuseopEnvironment : public ::testing::Environment {
  public:
   pthread_t new_thread;
+  char *workpath, *tmppath;
 
   virtual void SetUp() {
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
+
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     sys_super_block = (SUPER_BLOCK_CONTROL *)
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
@@ -91,6 +103,12 @@ class fuseopEnvironment : public ::testing::Environment {
     free(sys_super_block);
     free(hcfs_system);
 
+    unlink("/tmp/testHCFS");
+    rmdir(tmppath);
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
   }
 };
 
