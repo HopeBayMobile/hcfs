@@ -409,7 +409,20 @@ error_handling:
 	return ret_val;
 }
 
-
+/************************************************************************
+*
+* Function name: fetch_xattr_page
+*        Inputs: META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+*                XATTR_PAGE *xattr_page, long long *xattr_pos
+*       Summary: Helper of xattr operation in FUSE. The function aims to 
+*                fetch xattr page and xattr file position and store them
+*                in "xattr_page" and "xattr_pos", respectively. Do NOT
+*                have to lock and unlock meta cache entry since it will 
+*                be locked and unlocked in caller function.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *xattr_pos)
 {

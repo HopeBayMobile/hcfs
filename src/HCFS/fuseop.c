@@ -885,7 +885,7 @@ a directory (for NFS) */
 	} else {
 		if (S_ISDIR((output_param.attr).st_mode))
 			ret_val = lookup_increase(this_inode, 1, D_ISDIR);
-	}
+	} /* TODO: symlink lookup_increase */
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -3371,6 +3371,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				tempstat.st_mode = S_IFDIR;
 			if (temp_page.dir_entries[count].d_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
+			/* TODO: add symlink case */
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],

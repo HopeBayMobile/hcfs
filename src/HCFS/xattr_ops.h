@@ -31,7 +31,7 @@
 /* Struct of VALUE_BLOCK. Value of an extened attr is stored using linked 
    VALUE_BLOCK, and it will be reclaimed if xattr is removed. */
 typedef struct {
-	char content[MAX_VALUE_BLOCK_SIZE];
+	char content[MAX_VALUE_BLOCK_SIZE]; /* Content is NOT null-terminated */
 	long long next_block_pos;
 } VALUE_BLOCK; 
 
@@ -39,8 +39,8 @@ typedef struct {
    offset pointing to first value block. */
 typedef struct {
 	unsigned key_size;
-	unsigned value_size; 
-	char key[MAX_KEY_SIZE];
+	unsigned value_size;
+	char key[MAX_KEY_SIZE]; /* Key is null-terminated string  */
 	long long first_value_block_pos;
 } KEY_ENTRY;
 
