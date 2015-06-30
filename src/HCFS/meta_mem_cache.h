@@ -68,6 +68,8 @@ to other entries.
 #include <stdlib.h>
 
 #include "fuseop.h"
+#include "dir_meta_defs.h"
+#include "file_meta_defs.h"
 
 typedef struct {
 	struct stat this_stat;

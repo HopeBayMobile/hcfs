@@ -165,6 +165,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 
 	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL)
@@ -237,6 +238,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0)

@@ -16,4 +16,9 @@
 #define TRUE 1
 #define FALSE 0
 
+#define CURRENT_META_VER 1  /* Defines the version of the current meta defs */
+
+/* TODO: Need to specify the range of meta version this code revision
+supports */
+
 #endif  /* GW20_SRC_GLOBAL_H_ */

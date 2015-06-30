@@ -87,6 +87,8 @@ errcode_handle:
 	return errcode;
 }
 
+/* TODO: need to make this multi-worker, and also need to make blocking
+in accept interruptable by system termination */
 void api_module(void)
 {
 	int fd1, size_msg, msg_len;
