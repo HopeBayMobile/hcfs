@@ -3472,6 +3472,7 @@ void hfuse_ll_destroy(void *userdata)
 
 	lookup_destroy();
 	hcfs_system->system_going_down = TRUE;
+	destroy_api_interface();
 }
 
 /************************************************************************

@@ -21,6 +21,7 @@
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
+#define TEST 2
 
 /* Message format for an API request:
 	(From the first byte)
@@ -42,10 +43,10 @@ typedef struct {
 
 SOCKET api_sock;
 
-pthread_t api_local_thread;  /* API thread (using local socket) */
+pthread_t api_local_thread[10];  /* API thread (using local socket) */
 
 int init_api_interface(void);
 int destroy_api_interface(void);
-void api_module(void);
+void api_module(void *index);
 
 #endif  /* GW20_API_INTERFACE_H_ */

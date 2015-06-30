@@ -20,8 +20,8 @@ void main(int argc, char **argv)
 	status = connect(fd, &addr, sizeof(addr));
 	printf("status is %d, err %s\n", status, strerror(errno));
 	printf("%s\n", argv[1]);
-	if (strcasecmp(argv[1], "terminate") == 0) {
-		code = 0;
+	if (strcasecmp(argv[1], "test") == 0) {
+		code = 2;
 		cmd_len = 0;
 	} else {
 		printf("command not supported\n");

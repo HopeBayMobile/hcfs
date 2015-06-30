@@ -33,7 +33,8 @@ be deleted */
 
 int init_api_interface(void)
 {
-	int ret, errcode;
+	int ret, errcode, count;
+	int *val;
 
 	write_log(10, "Starting API interface");
 	api_sock.addr.sun_family = AF_UNIX;
@@ -69,7 +70,14 @@ int init_api_interface(void)
 		goto errcode_handle;
 	}
 
-	pthread_create(&api_local_thread, NULL, (void *)api_module, NULL);
+	for (count = 0; count < 10; count++) {
+		write_log(10, "Starting up thread %d\n", count);
+		val = malloc(sizeof(int));
+		*val = count;
+		pthread_create(&(api_local_thread[count]), NULL,
+			(void *)api_module, (void *)val);
+		val = NULL;
+	}
 
 	return 0;
 
@@ -87,7 +95,7 @@ errcode_handle:
 	return errcode;
 }
 
-void api_module(void)
+void api_module(void *index)
 {
 	int fd1, size_msg, msg_len;
 	struct timespec timer;
@@ -101,6 +109,8 @@ void api_module(void)
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
+
+	write_log(10, "Startup index %d\n", *((int *)index));
 
 	while (hcfs_system->system_going_down == FALSE) {
 		fd1 = accept(api_sock.fd, NULL, NULL);
@@ -208,6 +218,13 @@ void api_module(void)
 			ret_len = strlen(buf)+1;
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, buf, strlen(buf)+1, 0);
+			break;
+		case TEST:
+			retcode = *((int *)index);
+			write_log(10, "Index is %d\n", retcode);
+			ret_len = sizeof(int);
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &retcode, sizeof(int), 0);
 			break;
 		default:
 			retcode = ENOTSUP;
