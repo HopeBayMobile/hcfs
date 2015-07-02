@@ -3817,6 +3817,151 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	fuse_reply_none(req);
 }
 
+/* tmp comment: fuse symlink operation */
+static void hfuse_ll_symlink(fuse_req_t req, const char *link, 
+	fuse_ino_t parent, const char *name)
+{
+	ino_t parent_inode;
+	ino_t self_inode;
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
+	DIR_ENTRY_PAGE dir_page;
+	unsigned long this_generation;
+	struct fuse_ctx *temp_context;
+	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
+	struct stat this_stat;
+	int ret_val;
+	int result_index;
+	int errcode;
+
+	parent_inode = (ino_t) parent;
+
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	
+	/* Error if parent is not a dir */
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Check whether "name" exists or not */
+	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
+	if (!parent_meta_cache_entry) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page, &result_index, 
+		name, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+	if (result_index >= 0) {
+		errcode = -EEXIST;
+		goto error_handle;
+	}
+	
+	/* Request a new inode from superblock */
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		errcode = -ENOMEM;
+		goto error_handle;
+	}
+
+	memset(&this_stat, 0, sizeof(struct stat));
+	this_stat.st_mode = S_IFLNK;
+	this_stat.st_nlink = 1;
+	this_stat.st_uid = temp_context->uid;
+	this_stat.st_gid = temp_context->gid;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+
+	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	if (self_inode < 1) {
+		errcode = -ENOSPC;
+		goto error_handle;
+	}
+	this_stat.st_ino = self_inode;
+
+	/* Write symlink meta */
+	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat, 
+		link, this_generation, name);
+	if (ret_val < 0) {	
+		meta_forget_inode(self_inode);
+		errcode = ret_val;
+		goto error_handle;
+	}
+
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry); /* Unlock parent */
+		
+	/* Reply fuse entry */
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	ret_val = lookup_increase(self_inode, 1, D_ISLNK);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+
+	fuse_reply_entry(req, &(tmp_param));
+	return;
+
+error_handle:
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry);
+	fuse_reply_err(req, -errcode);
+	return;	
+}
+
+static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
+{
+	ino_t this_inode;
+	SYMLINK_META_TYPE symlink_meta;
+	char thismetapath[METAPATHLEN];
+	char link_buffer[MAX_LINK_PATH];
+	FILE *this_fptr;
+	int errcode, ret, ret_size;
+	int ret_code;
+	
+	this_inode = (ino_t) ino;
+	
+	ret_code = fetch_meta_path(thismetapath, this_inode);
+	if (ret_code < 0) {
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	this_fptr = fopen(thismetapath, "r");
+	FSEEK(this_fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&symlink_meta, sizeof(SYMLINK_META_TYPE), 1, this_fptr);
+
+	memcpy(link_buffer, symlink_meta.link_path, 
+		sizeof(char) * symlink_meta.link_len);
+
+	fclose(this_fptr);
+	fuse_reply_readlink(req, link_buffer);
+	return;
+
+errcode_handle:
+	fclose(this_fptr);
+	fuse_reply_err(req, -errcode);
+	return;
+}
+
 /* Specify the functions used for the FUSE operations */
 static struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -3841,6 +3986,8 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.statfs = hfuse_ll_statfs,
 	.lookup = hfuse_ll_lookup,
 	.forget = hfuse_ll_forget,
+	.symlink = hfuse_ll_symlink,
+	.readlink = hfuse_ll_readlink,
 };
 
 /*

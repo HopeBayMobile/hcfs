@@ -36,4 +36,8 @@ int meta_forget_inode(ino_t self_inode);
 int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 			const char *selfname);
 
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
+	const struct stat *this_stat, const char *link, 
+	const unsigned long generation, const char *name);
+
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

@@ -406,3 +406,60 @@ error_handling:
 	meta_cache_unlock_entry(body_ptr);
 	return ret_val;
 }
+
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
+	const struct stat *this_stat, const char *link, 
+	const unsigned long generation, const char *name)
+{
+	SYMLINK_META_TYPE symlink_meta;
+	ino_t parent_inode, self_inode;
+	char thismetapath[METAPATHLEN];
+	FILE *this_fptr;
+	int ret_code;
+	int errcode, ret, ret_size;
+
+	parent_inode = parent_meta_cache_entry->inode_num;
+	self_inode = this_stat->st_ino;
+	
+	/* Prepare symlink meta */
+	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
+	symlink_meta.link_len = strlen(link);
+	symlink_meta.generation = generation;
+	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
+
+	/* Write meta data */
+	ret = fetch_meta_path(thismetapath, self_inode);
+	if (ret < 0) {
+		meta_cache_close_file(parent_meta_cache_entry);
+		return ret_code;
+	}
+	this_fptr = fopen(thismetapath, "w+");
+	FSEEK(this_fptr, 0, SEEK_SET);
+	FWRITE(this_stat, sizeof(struct stat), 1, this_fptr);
+	FWRITE(&symlink_meta, sizeof(SYMLINK_META_TYPE), 1, this_fptr);
+	fclose(this_fptr);
+	
+	/* Add entry to parent dir */	
+	ret_code = meta_cache_open_file(parent_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_close_file(parent_meta_cache_entry);
+		return ret_code;
+	}
+	
+	ret_code = dir_add_entry(parent_inode, self_inode, name,
+		this_stat->st_mode, parent_meta_cache_entry);	
+	if (ret_code < 0) {
+		meta_cache_close_file(parent_meta_cache_entry);
+		return ret_code;
+	}
+
+	meta_cache_close_file(parent_meta_cache_entry);
+	
+	return 0;
+
+errcode_handle:
+	meta_cache_close_file(parent_meta_cache_entry);
+	return errcode;
+}
+
+

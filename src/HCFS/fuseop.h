@@ -136,7 +136,7 @@ typedef struct {
 	long long next_xattr_page;
 	unsigned link_len;
 	unsigned long generation;
-	char link_path[MAX_LINK_PATH];
+	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
 } SYMLINK_META_TYPE;
 
 /*END META definition*/

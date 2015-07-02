@@ -362,6 +362,13 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 					goto errcode_handle;
 				}
 			}
+			if (S_ISLNK(body_ptr->this_stat.st_mode)) {
+				FSEEK(body_ptr->fptr, sizeof(struct stat), 
+					SEEK_SET);
+				FWRITE((body_ptr->symlink_meta), 
+					sizeof(SYMLINK_META_TYPE), 1, 
+					body_ptr->fptr);
+			}
 		}
 
 		body_ptr->meta_dirty = FALSE;
@@ -454,6 +461,8 @@ int free_single_meta_cache_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *entry_ptr)
 		free(entry_body->dir_meta);
 	if (entry_body->file_meta != NULL)
 		free(entry_body->file_meta);
+	if (entry_body->symlink_meta != NULL)
+		free(entry_body->symlink_meta);
 
 	if (entry_body->dir_entry_cache[0] != NULL)
 		free(entry_body->dir_entry_cache[0]);
@@ -1053,6 +1062,9 @@ int meta_cache_remove(ino_t this_inode)
 
 	if (body_ptr->file_meta != NULL)
 		free(body_ptr->file_meta);
+	
+	if (body_ptr->symlink_meta != NULL)
+		free(body_ptr->symlink_meta);
 
 	if (body_ptr->dir_entry_cache[0] != NULL)
 		free(body_ptr->dir_entry_cache[0]);
@@ -1421,3 +1433,83 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return 0;
 }
 
+int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+	const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+{
+	int ret;
+
+	write_log(10, "Debug meta cache update symbolic link data\n");
+
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(bptr->access_sem));
+
+	/* Update stat */
+	if (inode_stat != NULL) {
+		memcpy(&(bptr->this_stat), inode_stat, sizeof(struct stat));
+		bptr->stat_dirty = TRUE;
+	}
+
+	/* Update symlink_meta */
+	if (symlink_meta_ptr != NULL) {
+		if (bptr->symlink_meta == NULL) {
+			bptr->symlink_meta = malloc(sizeof(SYMLINK_META_TYPE));
+			if (bptr->symlink_meta == NULL)
+				return -ENOMEM;
+		}
+		memcpy((bptr->symlink_meta), symlink_meta_ptr, 
+			sizeof(SYMLINK_META_TYPE));
+		bptr->meta_dirty = TRUE;
+	}
+	
+	gettimeofday(&(bptr->last_access_time), NULL);
+
+	if (bptr->something_dirty == FALSE)
+		bptr->something_dirty = TRUE;
+	/* Write changes to meta file if write through is enabled */
+	if (META_CACHE_FLUSH_NOW == TRUE) {
+		ret = flush_single_entry(bptr);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	int ret, errcode;
+	size_t ret_size;
+
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (inode_stat != NULL)
+		memcpy(inode_stat, &(body_ptr->this_stat), sizeof(struct stat));
+
+	if (symlink_meta_ptr != NULL) {
+		if (body_ptr->symlink_meta == NULL) {
+			body_ptr->symlink_meta = malloc(sizeof(SYMLINK_META_TYPE));
+			if (body_ptr->symlink_meta == NULL)
+				return -ENOMEM;
+
+			ret = _open_file(body_ptr);
+
+			if (ret < 0)
+				return ret;
+
+			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+			FREAD(body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE),
+							1, body_ptr->fptr);
+		}
+
+		memcpy(symlink_meta_ptr, body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE));
+	}
+
+	gettimeofday(&(body_ptr->last_access_time), NULL);
+
+	return 0;
+
+errcode_handle:
+	meta_cache_close_file(body_ptr);
+	return errcode;
+}
