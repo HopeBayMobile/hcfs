@@ -22,6 +22,8 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "macro.h"
 #include "global.h"
@@ -30,18 +32,39 @@
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
+/* TODO: Perhaps should decrease the number of threads if loading not heavy */
 
 int init_api_interface(void)
 {
 	int ret, errcode, count;
 	int *val;
+	int sock_flag;
 
 	write_log(10, "Starting API interface");
-	api_sock.addr.sun_family = AF_UNIX;
-	strcpy(api_sock.addr.sun_path, "/dev/shm/hcfs_reporter");
-	api_sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (access(SOCK_PATH, F_OK) == 0)
+		unlink(SOCK_PATH);
+	api_server = malloc(sizeof(API_SERVER_TYPE));
+	if (api_server == NULL) {
+		errcode = ENOMEM;
+		write_log(0, "Socket error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
 
-	if (api_sock.fd < 0) {
+	sem_init(&(api_server->job_lock), 0, 1);
+	api_server->num_threads = 10;
+	api_server->last_update = 0;
+	memset(api_server->job_count, 0, sizeof(int) * PROCESS_WINDOW);
+	memset(api_server->job_totaltime, 0, sizeof(float) * PROCESS_WINDOW);
+	memset(api_server->local_thread, 0,
+			sizeof(pthread_t) * MAX_API_THREADS);
+
+	api_server->sock.addr.sun_family = AF_UNIX;
+	strcpy(api_server->sock.addr.sun_path, "/dev/shm/hcfs_reporter");
+	api_server->sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+	if (api_server->sock.fd < 0) {
 		errcode = errno;
 		write_log(0, "Socket error in %s. Code %d, %s\n",
 			__func__, errcode, strerror(errcode));
@@ -49,7 +72,8 @@ int init_api_interface(void)
 		goto errcode_handle;
 	}
 
-	ret = bind(api_sock.fd, (struct sockaddr *) &(api_sock.addr),
+	ret = bind(api_server->sock.fd,
+		(struct sockaddr *) &(api_server->sock.addr),
 		sizeof(struct sockaddr_un));
 
 	if (ret < 0) {
@@ -60,7 +84,11 @@ int init_api_interface(void)
 		goto errcode_handle;
 	}
 
-	ret = listen(api_sock.fd, 16);
+	sock_flag = fcntl(api_server->sock.fd, F_GETFL, 0);
+	sock_flag = sock_flag | O_NONBLOCK;
+	fcntl(api_server->sock.fd, F_SETFL, sock_flag);
+
+	ret = listen(api_server->sock.fd, 16);
 
 	if (ret < 0) {
 		errcode = errno;
@@ -70,15 +98,18 @@ int init_api_interface(void)
 		goto errcode_handle;
 	}
 
-	for (count = 0; count < 10; count++) {
-		write_log(10, "Starting up thread %d\n", count);
+	for (count = 0; count < INIT_API_THREADS; count++) {
+		write_log(10, "Starting up API thread %d\n", count);
 		val = malloc(sizeof(int));
 		*val = count;
-		pthread_create(&(api_local_thread[count]), NULL,
+		pthread_create(&(api_server->local_thread[count]), NULL,
 			(void *)api_module, (void *)val);
 		val = NULL;
 	}
 
+	/* TODO: fork a thread that monitor usage and control extra threads */
+	pthread_create(&(api_server->monitor_thread), NULL,
+			(void *)api_server_monitor, NULL);
 	return 0;
 
 errcode_handle:
@@ -87,9 +118,14 @@ errcode_handle:
 
 int destroy_api_interface(void)
 {
-	int ret, errcode;
+	int ret, errcode, count;
 
-	UNLINK(api_sock.addr.sun_path);
+	for (count = 0; count < api_server->num_threads; count++)
+		pthread_join(api_server->local_thread[count], NULL);
+	pthread_join(api_server->monitor_thread, NULL);
+	sem_destroy(&(api_server->job_lock));
+	free(api_server);
+	UNLINK(api_server->sock.addr.sun_path);
 	return 0;
 errcode_handle:
 	return errcode;
@@ -99,7 +135,9 @@ void api_module(void *index)
 {
 	int fd1, size_msg, msg_len;
 	struct timespec timer;
-	int retcode;
+	struct timeval start_time, end_time;
+	float elapsed_time;
+	int retcode, sel_index, count, cur_index;
 	
 	char buf[512];
 	char *largebuf;
@@ -113,8 +151,10 @@ void api_module(void *index)
 	write_log(10, "Startup index %d\n", *((int *)index));
 
 	while (hcfs_system->system_going_down == FALSE) {
-		fd1 = accept(api_sock.fd, NULL, NULL);
+		fd1 = accept(api_server->sock.fd, NULL, NULL);
 		if (fd1 < 0) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			nanosleep(&timer, NULL);  /* Sleep for 0.1 sec */
 			continue;
 		}
@@ -122,6 +162,8 @@ void api_module(void *index)
 		msg_index = 0;
 		largebuf = NULL;
 		buf_reused = FALSE;
+
+		gettimeofday(&start_time, NULL);
 
 		/* Read API code */
 		while (TRUE) {
@@ -220,8 +262,10 @@ void api_module(void *index)
 			send(fd1, buf, strlen(buf)+1, 0);
 			break;
 		case TEST:
-			retcode = *((int *)index);
-			write_log(10, "Index is %d\n", retcode);
+			sleep(10);
+			retcode = 0;
+			cur_index = *((int *)index);
+			write_log(10, "Index is %d\n", cur_index);
 			ret_len = sizeof(int);
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, &retcode, sizeof(int), 0);
@@ -241,6 +285,109 @@ return_message:
 		largebuf = NULL;
 		buf_reused = FALSE;
 		close(fd1);
+
+		/* Compute process time and update statistics */
+		gettimeofday(&end_time, NULL);
+		elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
+			- (start_time.tv_sec + start_time.tv_usec * 0.000001);
+		if (elapsed_time < 0)
+			elapsed_time = 0;
+		sem_wait(&(api_server->job_lock));
+		sel_index = end_time.tv_sec % PROCESS_WINDOW;
+		if (api_server->last_update < end_time.tv_sec) {
+			/* reset statistics */
+			count = end_time.tv_sec - api_server->last_update;
+			if (count > PROCESS_WINDOW)
+				count = PROCESS_WINDOW;
+			cur_index = sel_index;
+			while (count > 0) {
+				count--;
+				api_server->job_count[cur_index] = 0;
+				api_server->job_totaltime[cur_index] = 0;
+				if (count <= 0)
+					break;
+				cur_index--;
+				if (cur_index < 0)
+					cur_index = PROCESS_WINDOW - 1;
+			}
+
+			api_server->last_update = end_time.tv_sec;
+		}
+		api_server->job_count[sel_index] += 1;
+		api_server->job_totaltime[sel_index] += elapsed_time;
+		sem_post(&(api_server->job_lock));
+		write_log(10, "Updated API server process time, %f sec\n",
+			elapsed_time);
 	}
+	free(index);
 }
 
+void* api_server_monitor(void)
+{
+	int count, totalrefs, index;
+	float totaltime, ratio;
+	int *val;
+	struct timeval cur_time;
+	int sel_index, cur_index;
+
+	while (hcfs_system->system_going_down == FALSE) {
+		sleep(5);
+		sem_wait(&(api_server->job_lock));
+		gettimeofday(&cur_time, NULL);
+
+		sel_index = cur_time.tv_sec % PROCESS_WINDOW;
+		if (api_server->last_update < cur_time.tv_sec) {
+			/* reset statistics */
+			count = cur_time.tv_sec - api_server->last_update;
+			if (count > PROCESS_WINDOW)
+				count = PROCESS_WINDOW;
+			cur_index = sel_index;
+			while (count > 0) {
+				count--;
+				api_server->job_count[cur_index] = 0;
+				api_server->job_totaltime[cur_index] = 0;
+				if (count <= 0)
+					break;
+				cur_index--;
+				if (cur_index < 0)
+					cur_index = PROCESS_WINDOW - 1;
+			}
+
+			api_server->last_update = cur_time.tv_sec;
+		}
+
+
+		if (api_server->num_threads >= MAX_API_THREADS) {
+			/* TODO: Perhaps could check whether to decrease
+				number of threads */
+			sem_post(&(api_server->job_lock));
+			continue;
+		}
+
+		totaltime = 0;
+		totalrefs = 0;
+
+		for (count = 0; count < PROCESS_WINDOW; count++) {
+			totalrefs += api_server->job_count[count];
+			totaltime += api_server->job_totaltime[count];
+		}
+		ratio = api_server->num_threads / totaltime;
+		write_log(10, "Debug API monitor ref %d, time %f\n",
+			totalrefs, totaltime);
+
+		if (totalrefs > (INCREASE_RATIO * ratio)) {
+			/* Add one more thread */
+			val = malloc(sizeof(int));
+			index = api_server->num_threads;
+			*val = index;
+			api_server->num_threads++;
+			pthread_create(&(api_server->local_thread[index]), NULL,
+				(void *)api_module, (void *)val);
+			val = NULL;
+			write_log(10, "Added one more thread to %d\n", index+1);
+		}	
+
+		sem_post(&(api_server->job_lock));
+
+	}
+}

@@ -17,11 +17,19 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/uio.h>
+#include <semaphore.h>
+#include <time.h>
 
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
 #define TEST 2
+
+#define MAX_API_THREADS 32
+#define INIT_API_THREADS 10
+#define PROCESS_WINDOW 30
+#define INCREASE_RATIO 0.8
+#define SOCK_PATH "/dev/shm/hcfs_reporter"
 
 /* Message format for an API request:
 	(From the first byte)
@@ -41,12 +49,23 @@ typedef struct {
 	int fd;
 } SOCKET;
 
-SOCKET api_sock;
+typedef struct {
+	SOCKET sock;
+	/* API thread (using local socket) */
+	pthread_t local_thread[MAX_API_THREADS];
+	pthread_t monitor_thread;
+	int num_threads;
+	int job_count[PROCESS_WINDOW];
+	float job_totaltime[PROCESS_WINDOW];
+	time_t last_update;
+	sem_t job_lock;
+} API_SERVER_TYPE;
 
-pthread_t api_local_thread[10];  /* API thread (using local socket) */
+API_SERVER_TYPE *api_server;
 
 int init_api_interface(void);
 int destroy_api_interface(void);
 void api_module(void *index);
+void* api_server_monitor(void);
 
 #endif  /* GW20_API_INTERFACE_H_ */

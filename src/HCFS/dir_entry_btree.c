@@ -30,6 +30,7 @@
 #include "macro.h"
 
 /* TODO: How to integrate dir page reading / updating with mem cache? */
+/* TODO: Revisit how to reduce IO for node updating and GC */
 
 /************************************************************************
 *
