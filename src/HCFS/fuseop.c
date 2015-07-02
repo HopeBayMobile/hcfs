@@ -3846,6 +3846,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	xattr_page = NULL;
 	
 	if (size <= 0) {
+		write_log(10, "Debug setxattr: Cannot set key without value.\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
