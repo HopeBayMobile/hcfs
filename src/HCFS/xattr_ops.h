@@ -18,9 +18,9 @@
 #include "meta_mem_cache.h"
 
 #define MAX_KEY_SIZE 256 /* Max key length */
-#define MAX_VALUE_BLOCK_SIZE 8192 /* Max value size per block(8KB) */
-#define MAX_KEY_ENTRY_PER_LIST 55 /* Max key entry of the sorted array (55) */
-#define MAX_KEY_HASH_ENTRY 64 /* Max hash table entries (64) */
+#define MAX_VALUE_BLOCK_SIZE 3 /* Max value size per block(8KB) */
+#define MAX_KEY_ENTRY_PER_LIST 3 /* Max key entry of the sorted array (55) */
+#define MAX_KEY_HASH_ENTRY 2 /* Max hash table entries (64) */
 
 /* Define namespace of xattr */
 #define USER 0
@@ -87,6 +87,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page, 
-	int *key_index, long long *target_key_list_pos, const char *key);
+	int *key_index, long long *target_key_list_pos, const char *key,
+	KEY_LIST_PAGE *prev_page, long long *prev_pos);
 
 #endif

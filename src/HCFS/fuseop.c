@@ -3844,6 +3844,11 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	
 	this_inode = (ino_t) ino;
 	xattr_page = NULL;
+	
+	if (size <= 0) {
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
@@ -4194,8 +4199,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
 		free(xattr_page);
-	fuse_reply_err(req, 0);
 	write_log(10, "Debug removexattr: Remove key success\n");
+	fuse_reply_err(req, 0);
 	return ;
 
 error_handle:

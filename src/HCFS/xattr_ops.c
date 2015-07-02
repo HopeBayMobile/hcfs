@@ -216,27 +216,33 @@ int key_binary_search(KEY_ENTRY *key_list, unsigned num_xattr, const char *key,
 }
 
 /**
- * Find key entry in a cyclic key_list_page linked-list.
+ * Find key entry in a singly key_list_page linked list.
  *
  * Given first position of key_list_page "first_key_list_pos", the function aims
  * to find out the target key string "key". If it is found, saved the key_list_page
  * position and data, which is stored in "target_key_list_pos" and 
  * "target_key_list_page", respectively. If key entry is not found:
+ *
  * Case 1: Key entry not found and key entry can be inserted to some key_list_page.
  *         Then "target_key_list_page" stores the key_list_page that have not been 
  *         full. This key_list_page is the non-full page that first met when 
- *         traversing the cyclic linked-list.
+ *         traversing the singly-linked list.
  * Case 2: Key entry not found and unfortunately all key_list_page are full. Then 
- *         the "target_key_list_page" stores the last page in cyclic linked-list.
+ *         the "target_key_list_page" stores the last page in singly-linked list.
+ *
+ * The "prev_page" and "prev_pos" are previous key list page & position when 
+ * key entry is hit, which is used in remove_xattr(). These arguments will be ignored 
+ * when they are set as NULL. Don't care these two argument when key is not found.
  *
  * @return 0 if entry is found, 1 if entry not found. Return -1 on error.
  */
 int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	long long first_key_list_pos, KEY_LIST_PAGE *target_key_list_page, 
-	int *key_index, long long *target_key_list_pos, const char *key)
+	int *key_index, long long *target_key_list_pos, const char *key, 
+	KEY_LIST_PAGE *prev_page, long long *prev_pos)
 {	
 	long long key_list_pos, prev_key_list_pos;
-	KEY_LIST_PAGE now_page;
+	KEY_LIST_PAGE now_key_page, prev_key_page;
 	int ret;
 	int index;
 	char find_first_insert;
@@ -250,19 +256,21 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return 1;
 	}
 
-	memset(&now_page, 0, sizeof(KEY_LIST_PAGE));
+	memset(&now_key_page, 0, sizeof(KEY_LIST_PAGE));
 	key_list_pos = first_key_list_pos;
 	find_first_insert = FALSE; 
 	hit_key_entry = FALSE;
 
 	do {
+		memcpy(&prev_key_page, &now_key_page, sizeof(KEY_LIST_PAGE));
+		
 		FSEEK(meta_cache_entry->fptr, key_list_pos, SEEK_SET);
-		FREAD(&now_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);		
+		FREAD(&now_key_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);		
 		write_log(10, "Debug xattr: now in find_key_entry(), "
 			"key_list_pos = %lld, num_xattr = %d\n", 
-			key_list_pos, now_page.num_xattr);
+			key_list_pos, now_key_page.num_xattr);
 		
-		ret = key_binary_search(now_page.key_list, now_page.num_xattr, 
+		ret = key_binary_search(now_key_page.key_list, now_key_page.num_xattr, 
 			key, &index);
 		if (ret == 0) { /* Hit the key */
 			hit_key_entry = TRUE;
@@ -271,27 +279,32 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		
 		/* Record first page which can be inserted */
 		if ((find_first_insert == FALSE) && 
-			(now_page.num_xattr < MAX_KEY_ENTRY_PER_LIST)) { 
-			memcpy(target_key_list_page, &now_page, sizeof(KEY_LIST_PAGE));
+			(now_key_page.num_xattr < MAX_KEY_ENTRY_PER_LIST)) { 
+			memcpy(target_key_list_page, &now_key_page, sizeof(KEY_LIST_PAGE));
 			*key_index = index;
 			*target_key_list_pos = key_list_pos;
 			find_first_insert = TRUE; /* Just need the first one */
 		}
 		
 		prev_key_list_pos = key_list_pos;
-		key_list_pos = now_page.next_list_pos; /* Go to next page */
-	} while (key_list_pos != first_key_list_pos);
+		key_list_pos = now_key_page.next_list_pos; /* Go to next page */
+
+	} while (key_list_pos);
 	
-	/* Key has been exist, return 0 */
+	/* Key existed, return 0 */
 	if (hit_key_entry == TRUE) { 
-		memcpy(target_key_list_page, &now_page, sizeof(KEY_LIST_PAGE));
+		memcpy(target_key_list_page, &now_key_page, sizeof(KEY_LIST_PAGE));
 		*key_index = index;
 		*target_key_list_pos = key_list_pos;
+		if (prev_page != NULL)
+			memcpy(prev_page, &prev_key_page, sizeof(KEY_LIST_PAGE));
+		if (prev_pos != NULL)
+			*prev_pos = prev_key_list_pos;
 		return 0;
 	}
-	/* All key list are full, return the last page! */
+	/* Hit nothing, and all key list are full, return the last page! */
 	if ((hit_key_entry == FALSE) && (find_first_insert == FALSE)) {
-		memcpy(target_key_list_page, &now_page, sizeof(KEY_LIST_PAGE));
+		memcpy(target_key_list_page, &now_key_page, sizeof(KEY_LIST_PAGE));
 		*key_index = -1;
 		*target_key_list_pos = prev_key_list_pos;
 		return 1;
@@ -589,7 +602,6 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		/* Assign the position */
 		namespace_page->key_hash_table[hash_entry] = target_key_list_pos; 
 		memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE)); 
-		target_key_list_page.next_list_pos = target_key_list_pos;
 		
 		replace_value_block_pos = 0;
 		ret_code = get_usable_value_filepos(meta_cache_entry, xattr_page, 
@@ -615,7 +627,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
 				&target_key_list_page, &key_index, 
-				&target_key_list_pos, key);
+				&target_key_list_pos, key, NULL, NULL);
 
 		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
 			
@@ -640,7 +652,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 				/* New page at end of the linked-key_list */
 				memset(&target_key_list_page, 0, sizeof(KEY_LIST_PAGE));
 				target_key_list_pos = usable_pos; /* Move to next page pos */
-				target_key_list_page.next_list_pos = first_key_list_pos;
+				target_key_list_page.next_list_pos = 0;
 				key_index = 0;
 				write_log(10, "Debug setxattr: Allocate a new key_list_page,"
 					" usable_pos = %lld\n", usable_pos);
@@ -721,9 +733,11 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	/* Step 3: Finally write xattr header(xattr_page) */
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
-	write_log(10, "Debug setxattr: Now number of xattr = %d, and "
-		"reclaimed_value_block point to %lld\n", 
+	write_log(10, "Debug setxattr: Now number of xattr = %d, "
+		"now reclaimed_key_page point to %lld, "
+		"and reclaimed_value_block point to %lld\n", 
 		xattr_page->namespace_page[name_space].num_xattr, 
+		xattr_page->reclaimed_key_list_page, 
 		xattr_page->reclaimed_value_block);
 	return 0;
 
@@ -767,7 +781,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	first_key_list_pos = namespace_page->key_hash_table[hash_index];
 	ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
 			&target_key_list_page, &key_index, 
-			&target_key_list_pos, key);
+			&target_key_list_pos, key, NULL, NULL);
 	
 	if (ret_code < 0)
 		return ret_code;
@@ -899,7 +913,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 				if (ret < 0)
 					return -ERANGE;
 				pos = key_page.next_list_pos;
-			} while (pos != first_pos);
+			} while (pos);
 		}
 	}
 
@@ -923,10 +937,11 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE target_key_list_page;
-	KEY_LIST_PAGE first_key_list_page;
+	KEY_LIST_PAGE prev_key_list_page;
 	KEY_ENTRY tmp_key_buf[MAX_KEY_SIZE];
 	long long target_key_list_pos;
 	long long first_key_list_pos;
+	long long prev_key_list_pos;
 	long long first_value_pos;
 	int key_index;
 	int hash_index;
@@ -940,7 +955,8 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	first_key_list_pos = namespace_page->key_hash_table[hash_index];
 	ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
 			&target_key_list_page, &key_index, 
-			&target_key_list_pos, key);	
+			&target_key_list_pos, key, &prev_key_list_page, 
+			&prev_key_list_pos);
 	if (ret_code < 0) /* Error */
 		return ret_code;
 	if (ret_code > 0) /* Hit nothing */
@@ -949,8 +965,8 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	/* Record value block position, and reclaim them later. */
 	first_value_pos = target_key_list_page.key_list[key_index].first_value_block_pos;
 	
-	if (target_key_list_page.num_xattr > 1) { /* Don't need to be reclaimed. */
-		/* Just remove the key entry */
+	/* Don't need to be reclaimed. Just remove the key entry */
+	if (target_key_list_page.num_xattr > 1) { 
 		num_remaining = target_key_list_page.num_xattr - key_index - 1; 
 		memcpy(tmp_key_buf, &(target_key_list_page.key_list[key_index + 1]),
 			sizeof(KEY_ENTRY) * num_remaining);
@@ -966,58 +982,31 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		long long reclaim_key_list_pos;
 		KEY_LIST_PAGE tmp_list_page;
 		
-		/* Last page */
-		if (target_key_list_page.next_list_pos == first_key_list_pos) { 
-			/* Case 1: Last page == First page */
-			if (target_key_list_pos == target_key_list_page.next_list_pos) {
-				namespace_page->key_hash_table[hash_index] = 0;
-				FSEEK(meta_cache_entry->fptr, xattr_filepos, 
-					SEEK_SET);
-				FWRITE(xattr_page, sizeof(XATTR_PAGE), 
-					1, meta_cache_entry->fptr);
-				
-				reclaim_key_list_pos = target_key_list_pos;
+		/* Case 1: target_page == first_page */
+		if (target_key_list_pos == first_key_list_pos) {
 
-			} else { /* Case 2: Last page != First Page */
-				
-				FSEEK(meta_cache_entry->fptr, first_key_list_pos, 
+			namespace_page->key_hash_table[hash_index] = 
+				target_key_list_page.next_list_pos;
+			FSEEK(meta_cache_entry->fptr, xattr_filepos, 
 					SEEK_SET);
-				FREAD(&first_key_list_page, sizeof(KEY_LIST_PAGE), 
+			FWRITE(xattr_page, sizeof(XATTR_PAGE), 
 					1, meta_cache_entry->fptr);
-		
-				/* In xattr, assign new first page position */
-				namespace_page->key_hash_table[hash_index] = 
-					first_key_list_page.next_list_pos;
-				FSEEK(meta_cache_entry->fptr, xattr_filepos, 
-					SEEK_SET);
-				FWRITE(xattr_page, sizeof(XATTR_PAGE), 
-					1, meta_cache_entry->fptr);
-				
-				/* Write old first-page to the last position */
-				FSEEK(meta_cache_entry->fptr, target_key_list_pos, 
-					SEEK_SET);
-				FWRITE(&first_key_list_page, sizeof(KEY_LIST_PAGE), 
-					1, meta_cache_entry->fptr);
-				
-				/* Reclaim old first_page_pos */
-				reclaim_key_list_pos = first_key_list_pos;
-			}
 
-		} else {
-			KEY_LIST_PAGE next_key_list_page;
-			
-			reclaim_key_list_pos = target_key_list_page.next_list_pos;
-			
-			/* Read next page */
-			FSEEK(meta_cache_entry->fptr, 
-				target_key_list_page.next_list_pos, SEEK_SET);
-			FREAD(&next_key_list_page, sizeof(KEY_LIST_PAGE), 1, 
-				meta_cache_entry->fptr);
-			/* Write to now position */
-			FSEEK(meta_cache_entry->fptr, target_key_list_pos, 
+			/* Reclaimed page is current page. */
+			reclaim_key_list_pos = target_key_list_pos;
+
+		} else { /* Case 2: target_page is internal page */
+
+			prev_key_list_page.next_list_pos = 
+				target_key_list_page.next_list_pos;
+
+			FSEEK(meta_cache_entry->fptr, prev_key_list_pos, 
 				SEEK_SET);
-			FWRITE(&next_key_list_page, sizeof(KEY_LIST_PAGE), 
+			FWRITE(&prev_key_list_page, sizeof(KEY_LIST_PAGE), 
 				1, meta_cache_entry->fptr);
+
+			/* Reclaim current page */
+			reclaim_key_list_pos = target_key_list_pos;
 		}
 
 		/* Reclaim key page */
@@ -1042,8 +1031,10 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	(xattr_page->namespace_page[name_space].num_xattr)--;	
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
-	write_log(10, "Debug removexattr; Now reclaimed_key_page point to %lld, "
+	write_log(10, "Debug removexattr: Now number of xattr = %d, "
+		"now reclaimed_key_page point to %lld, "
 		"and reclaimed_value_block point to %lld\n", 
+		xattr_page->namespace_page[name_space].num_xattr, 
 		xattr_page->reclaimed_key_list_page, 
 		xattr_page->reclaimed_value_block);
 		
