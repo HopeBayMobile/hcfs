@@ -34,6 +34,15 @@
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
 
+/************************************************************************
+*
+* Function name: init_api_interface
+*        Inputs: None
+*       Summary: Initialize API server. The number of threads for accepting
+*                incoming requests is specified in the header file.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
 int init_api_interface(void)
 {
 	int ret, errcode, count;
@@ -131,6 +140,14 @@ errcode_handle:
 	return errcode;
 }
 
+/************************************************************************
+*
+* Function name: destroy_api_interface
+*        Inputs: None
+*       Summary: Destroy API server, and free resources.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
 int destroy_api_interface(void)
 {
 	int ret, errcode, count;
@@ -147,6 +164,16 @@ errcode_handle:
 	return errcode;
 }
 
+/************************************************************************
+*
+* Function name: api_module
+*        Inputs: void *index
+*       Summary: Worker thread function for accepting incoming API calls
+*                and process the requests. Will call other functions to
+*                process requests if not defined in this function.
+*  Return value: None
+*
+*************************************************************************/
 void api_module(void *index)
 {
 	int fd1;
@@ -271,6 +298,7 @@ void api_module(void *index)
 
 		switch (api_code) {
 		case TERMINATE:
+			/* Terminate the system */
 			pthread_kill(HCFS_mount, SIGHUP);
 			hcfs_system->system_going_down = TRUE;
 			retcode = 0;
@@ -279,6 +307,7 @@ void api_module(void *index)
 			send(fd1, &retcode, sizeof(int), 0);
 			break;
 		case VOLSTAT:
+			/* Returns the system statistics */
 			buf[0] = 0;
 			retcode = 0;
 			sem_wait(&(hcfs_system->access_sem));
@@ -293,6 +322,7 @@ void api_module(void *index)
 			send(fd1, buf, strlen(buf)+1, 0);
 			break;
 		case TESTAPI:
+			/* Simulate a long API call of 5 seconds */
 			sleep(5);
 			retcode = 0;
 			cur_index = *((int *)index);
@@ -301,7 +331,6 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, &retcode, sizeof(int), 0);
 			break;
-		/*TODO: Add echo operation that returns inputs to caller */
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
 			ret_len = arg_len;
@@ -370,7 +399,16 @@ return_message:
 	free(index);
 }
 
-void* api_server_monitor(void)
+/************************************************************************
+*
+* Function name: api_server_monitor
+*        Inputs: None
+*       Summary: Monitor thread for checking the current load of workers
+*                and increase the number of works if load is high.
+*  Return value: None
+*
+*************************************************************************/
+void api_server_monitor(void)
 {
 	int count, totalrefs, index;
 	float totaltime, ratio;
@@ -383,6 +421,7 @@ void* api_server_monitor(void)
 		sem_wait(&(api_server->job_lock));
 		gettimeofday(&cur_time, NULL);
 
+		/* Resets the statistics due to sliding window*/
 		sel_index = cur_time.tv_sec % PROCESS_WINDOW;
 		if (api_server->last_update < cur_time.tv_sec) {
 			/* reset statistics */
@@ -412,6 +451,8 @@ void* api_server_monitor(void)
 			continue;
 		}
 
+
+		/* Compute worker loading using the statistics */
 		totaltime = 0;
 		totalrefs = 0;
 

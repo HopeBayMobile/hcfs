@@ -67,6 +67,6 @@ API_SERVER_TYPE *api_server;
 int init_api_interface(void);
 int destroy_api_interface(void);
 void api_module(void *index);
-void* api_server_monitor(void);
+void api_server_monitor(void);
 
 #endif  /* GW20_API_INTERFACE_H_ */

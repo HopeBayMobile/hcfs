@@ -48,6 +48,7 @@ class init_api_interfaceTest : public ::testing::Test {
 
  };
 
+/* Testing whether init API server is correct */
 TEST_F(init_api_interfaceTest, TestIntegrity) {
 
   int ret_val;
@@ -66,6 +67,7 @@ TEST_F(init_api_interfaceTest, TestIntegrity) {
   EXPECT_EQ(1, ret_val);
  }
 
+/* Testing if can correctly cleanup the environment before init */
 TEST_F(init_api_interfaceTest, TestPreCleanup) {
 
   int ret_val;
@@ -118,6 +120,7 @@ class destroy_api_interfaceTest : public ::testing::Test {
 
  };
 
+/* Testing if destory process of API server runs correctly */
 TEST_F(destroy_api_interfaceTest, TestIntegrity) {
 
   int ret_val, errcode;
@@ -189,10 +192,9 @@ class api_moduleTest : public ::testing::Test {
     status = connect(fd, (sockaddr *)&addr, sizeof(addr));
     return status;
    }
-
-
  };
 
+/* Test a single API call */ 
 TEST_F(api_moduleTest, SingleTest) {
 
   int ret_val, errcode;
@@ -221,6 +223,7 @@ TEST_F(api_moduleTest, SingleTest) {
   ASSERT_EQ(0, errcode);
  }
 
+/* Test API call for checking system stat */
 TEST_F(api_moduleTest, StatTest) {
 
   int ret_val, errcode;
@@ -258,6 +261,7 @@ TEST_F(api_moduleTest, StatTest) {
   EXPECT_STREQ(ans_string, tmp_str);
  }
 
+/* Test API call correctness for a call with large arg size */
 TEST_F(api_moduleTest, LargeEchoTest) {
 
   int ret_val, errcode, count;
@@ -304,6 +308,7 @@ TEST_F(api_moduleTest, LargeEchoTest) {
   EXPECT_EQ(0, ret_val);
  }
 
+/* Test handling for unsupported API calls */
 TEST_F(api_moduleTest, InvalidCode) {
 
   int ret_val, errcode;
@@ -345,6 +350,7 @@ void* dummy_HCFS_thread(void *ptr) {
   return NULL;
  }
 
+/* Test system termination call */
 TEST_F(api_moduleTest, TerminateTest) {
 
   int ret_val, errcode;
@@ -458,6 +464,7 @@ class api_server_monitorTest : public ::testing::Test {
    }
  };
 
+/* Test if number of threads will increase under heavy loading */
 TEST_F(api_server_monitorTest, TestThreadIncrease) {
 
   int ret_val, errcode;
