@@ -23,7 +23,8 @@
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
-#define TEST 2
+#define TESTAPI 2
+#define ECHOTEST 3
 
 #define MAX_API_THREADS 32
 #define INIT_API_THREADS 10

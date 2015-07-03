@@ -61,7 +61,7 @@ int init_api_interface(void)
 			sizeof(pthread_t) * MAX_API_THREADS);
 
 	api_server->sock.addr.sun_family = AF_UNIX;
-	strcpy(api_server->sock.addr.sun_path, "/dev/shm/hcfs_reporter");
+	strcpy(api_server->sock.addr.sun_path, SOCK_PATH);
 	api_server->sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (api_server->sock.fd < 0) {
@@ -102,14 +102,29 @@ int init_api_interface(void)
 		write_log(10, "Starting up API thread %d\n", count);
 		val = malloc(sizeof(int));
 		*val = count;
-		pthread_create(&(api_server->local_thread[count]), NULL,
+		ret = pthread_create(&(api_server->local_thread[count]), NULL,
 			(void *)api_module, (void *)val);
+		if (ret != 0) {
+			errcode = ret;
+			write_log(0, "Thread create error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
 		val = NULL;
 	}
 
 	/* TODO: fork a thread that monitor usage and control extra threads */
-	pthread_create(&(api_server->monitor_thread), NULL,
+	ret = pthread_create(&(api_server->monitor_thread), NULL,
 			(void *)api_server_monitor, NULL);
+	if (ret != 0) {
+		errcode = ret;
+		write_log(0, "Thread create error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
 	return 0;
 
 errcode_handle:
@@ -124,8 +139,9 @@ int destroy_api_interface(void)
 		pthread_join(api_server->local_thread[count], NULL);
 	pthread_join(api_server->monitor_thread, NULL);
 	sem_destroy(&(api_server->job_lock));
-	free(api_server);
 	UNLINK(api_server->sock.addr.sun_path);
+	free(api_server);
+	api_server = NULL;
 	return 0;
 errcode_handle:
 	return errcode;
@@ -133,11 +149,13 @@ errcode_handle:
 
 void api_module(void *index)
 {
-	int fd1, size_msg, msg_len;
+	int fd1;
+	ssize_t size_msg, msg_len;
 	struct timespec timer;
 	struct timeval start_time, end_time;
 	float elapsed_time;
 	int retcode, sel_index, count, cur_index;
+	size_t to_recv, to_send, total_sent;
 	
 	char buf[512];
 	char *largebuf;
@@ -158,6 +176,7 @@ void api_module(void *index)
 			nanosleep(&timer, NULL);  /* Sleep for 0.1 sec */
 			continue;
 		}
+		write_log(10, "Processing API request\n");
 		msg_len = 0;
 		msg_index = 0;
 		largebuf = NULL;
@@ -183,6 +202,7 @@ void api_module(void *index)
 		memcpy(&api_code, &buf[msg_index], sizeof(unsigned int));
 		msg_index += sizeof(unsigned int);
 		msg_len -= sizeof(unsigned int);
+		write_log(10, "API code is %d\n", api_code);
 
 		/* Read total length of arguments */
 		while (TRUE) {
@@ -203,6 +223,8 @@ void api_module(void *index)
 		msg_index += sizeof(unsigned int);
 		msg_len -= sizeof(unsigned int);
 
+		write_log(10, "API arg len is %d\n", arg_len);
+
 		if (arg_len < 500) {
 			/* Reuse the preallocated buffer */
 			largebuf = &buf[msg_index];
@@ -221,10 +243,19 @@ void api_module(void *index)
 				memcpy(largebuf, &buf[msg_index], msg_len);
 		}
 
+		if (msg_len < 0)
+			msg_len = 0;
+
 		msg_index = 0;
 		while (TRUE) {
+			if (msg_len >= arg_len)
+				break;
+			if ((arg_len - msg_len) > 1024)
+				to_recv = 1024;
+			else
+				to_recv = arg_len - msg_len;
 			size_msg = recv(fd1, &largebuf[msg_len + msg_index],
-					1024, 0);
+					to_recv, 0);
 			if (size_msg <= 0)
 				break;
 			msg_len += size_msg;
@@ -261,14 +292,31 @@ void api_module(void *index)
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, buf, strlen(buf)+1, 0);
 			break;
-		case TEST:
-			sleep(10);
+		case TESTAPI:
+			sleep(5);
 			retcode = 0;
 			cur_index = *((int *)index);
 			write_log(10, "Index is %d\n", cur_index);
 			ret_len = sizeof(int);
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, &retcode, sizeof(int), 0);
+			break;
+		/*TODO: Add echo operation that returns inputs to caller */
+		case ECHOTEST:
+			/*Echos the arguments back to the caller*/
+			ret_len = arg_len;
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			total_sent = 0;
+			while (total_sent < ret_len) {
+				if ((ret_len - total_sent) > 1024)
+					to_send = 1024;
+				else
+					to_send = ret_len - total_sent;
+				size_msg = send(fd1, &largebuf[total_sent],
+					to_send, 0);
+				total_sent += size_msg;
+			}
+
 			break;
 		default:
 			retcode = ENOTSUP;
