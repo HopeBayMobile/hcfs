@@ -1481,6 +1481,8 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	int ret, errcode;
 	size_t ret_size;
 
+	write_log(10, "Debug meta cache lookup symbolic link data\n");
+	
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)

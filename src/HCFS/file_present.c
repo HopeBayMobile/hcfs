@@ -79,6 +79,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 	META_CACHE_ENTRY_STRUCT *temp_entry;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
+	SYMLINK_META_TYPE symlinkmeta;
 
 	/*First will try to lookup meta cache*/
 	if (this_inode > 0) {
@@ -111,6 +112,14 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 				*ret_gen = dirmeta.generation;
 			}
 			/* TODO: Add case for symlink */
+			if (S_ISLNK(returned_stat.st_mode)) {
+				ret_code = meta_cache_lookup_symlink_data(
+						this_inode, NULL, &symlinkmeta,
+						temp_entry);
+				if (ret_code < 0)
+					goto error_handling;
+				*ret_gen = symlinkmeta.generation;
+			}
 		}
 
 		ret_code = meta_cache_close_file(temp_entry);
@@ -302,14 +311,28 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
 				const char *selfname)
 {
 	int ret_val;
+	struct stat this_stat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
+	
+	ret_val = fetch_inode_stat(this_inode, &this_stat, NULL);
+	if (ret_val < 0)
+		return ret_val;
 
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
-
-	ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
+	
+	/* Remove entry */	
+	if (S_ISREG(this_stat.st_mode)) {
+		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
+		ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
 							S_IFREG, body_ptr);
+	}
+	if (S_ISLNK(this_stat.st_mode)) {
+		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
+		ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
+							S_IFLNK, body_ptr);
+	}
 	if (ret_val < 0)
 		goto error_handling;
 
@@ -411,12 +434,10 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link, 
 	const unsigned long generation, const char *name)
 {
+	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
-	char thismetapath[METAPATHLEN];
-	FILE *this_fptr;
 	int ret_code;
-	int errcode, ret, ret_size;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
@@ -427,19 +448,30 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.generation = generation;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 
-	/* Write meta data */
-	ret = fetch_meta_path(thismetapath, self_inode);
-	if (ret < 0) {
-		meta_cache_close_file(parent_meta_cache_entry);
+	/* Update self meta data */
+	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
+	if (self_meta_cache_entry == NULL)
+		return -ENOMEM;
+	
+	ret_code = meta_cache_update_symlink_data(self_inode, this_stat, 
+		&symlink_meta, self_meta_cache_entry);
+	if (ret_code < 0) {
+		write_log(10, "Debug symlink: Updating meta cache fail!\n");
+		meta_cache_close_file(self_meta_cache_entry);
+		meta_cache_unlock_entry(self_meta_cache_entry);
 		return ret_code;
 	}
-	this_fptr = fopen(thismetapath, "w+");
-	FSEEK(this_fptr, 0, SEEK_SET);
-	FWRITE(this_stat, sizeof(struct stat), 1, this_fptr);
-	FWRITE(&symlink_meta, sizeof(SYMLINK_META_TYPE), 1, this_fptr);
-	fclose(this_fptr);
 	
-	/* Add entry to parent dir */	
+	ret_code = meta_cache_close_file(self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		return ret_code;
+	}
+	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+	
+	/* Add entry to parent dir */
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
@@ -453,13 +485,11 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 		return ret_code;
 	}
 
-	meta_cache_close_file(parent_meta_cache_entry);
+	ret_code = meta_cache_close_file(parent_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
 	
 	return 0;
-
-errcode_handle:
-	meta_cache_close_file(parent_meta_cache_entry);
-	return errcode;
 }
 
 

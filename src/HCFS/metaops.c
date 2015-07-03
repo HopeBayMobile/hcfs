@@ -120,6 +120,8 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Load parent meta from meta cache */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -352,6 +354,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -1169,6 +1173,14 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		if (ret < 0)
 			return ret;
 		break;
+	
+	case D_ISLNK:
+		/*Need to delete the inode by moving it to "todelete" path*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0)
+			return ret;
+		break;
+
 	case D_ISREG:
 		ret = fetch_inode_stat(this_inode, &this_inode_stat, NULL);
 		if (ret < 0)
@@ -1360,8 +1372,10 @@ int startup_finish_delete()
 			}
 			if (S_ISREG(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG);
-			else
+			if (S_ISDIR(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISDIR);
+			if (S_ISLNK(tmpstat.st_mode))
+				ret = actual_delete_inode(tmp_ino, D_ISLNK);
 			/* TODO: add case for sym link here */
 
 			if (ret < 0) {

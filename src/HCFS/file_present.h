@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "meta_mem_cache.h"
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		unsigned long *ret_gen);
