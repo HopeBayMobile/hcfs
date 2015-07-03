@@ -23,7 +23,9 @@
 
 
 typedef struct {
-	DIR_META_TYPE FS_list_header;
+	long long root_entry_page;
+	long long entry_page_gc_list;
+	long long tree_walk_list_head;
 	unsigned long num_FS;
 	int FS_list_fh;
 	sem_t op_lock;
