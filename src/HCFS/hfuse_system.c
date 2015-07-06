@@ -179,6 +179,9 @@ int init_hfuse(void)
 	if (ret_val < 0)
 		return ret_val;
 
+	/* TODO: change this to either put a fake inode or remove inode
+		init. If remove, need to change super_block.c so that
+		alloc of inode starts from inode 2 */
 	/* Check if need to initialize the root meta file */
 	ret_val = fetch_meta_path(rootmetapath, 1);
 	if (ret_val < 0)

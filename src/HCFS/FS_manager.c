@@ -14,10 +14,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <semaphore.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "macro.h"
 #include "fuseop.h"
 #include "super_block.h"
+#include "global.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
 *
@@ -30,9 +39,9 @@
 *************************************************************************/
 int init_fs_manager(void)
 {
-	int ret, errcode;
-	DIR_ENTRY_PAGE tmp_page;
+	int errcode;
 	DIR_META_TYPE tmp_head;
+	ssize_t ret_ssize;
 
 	fs_mgr_path = malloc(sizeof(char) * (strlen(METAPATH)+100));
 	if (fs_mgr_path  == NULL) {
@@ -42,7 +51,7 @@ int init_fs_manager(void)
 	}
 	snprintf(fs_mgr_path, strlen(METAPATH)+100, "%s/fsmgr", METAPATH);
 
-	fs_mgr_head = malloc(sizeof(FS_MANAGER_HEAD_TYPE);
+	fs_mgr_head = malloc(sizeof(FS_MANAGER_HEAD_TYPE));
 	if (fs_mgr_head == NULL) {
 		errcode = -ENOMEM;
 		write_log(0, "Out of memory in %s.\n", __func__);
@@ -75,7 +84,7 @@ int init_fs_manager(void)
 		}
 		fs_mgr_head->num_FS = 0;
 
-		memset(&tmp_head, 0, sizeof(DIR_META_TYPE);
+		memset(&tmp_head, 0, sizeof(DIR_META_TYPE));
 
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 					sizeof(DIR_META_TYPE), 0);
@@ -128,6 +137,11 @@ ino_t _create_root_inode(void)
 	DIR_ENTRY_PAGE temppage;
 	mode_t self_mode;
 	FILE *metafptr;
+	char metapath[METAPATHLEN];
+	int ret, errcode;
+	size_t ret_size;
+	long ret_pos;
+	unsigned long this_gen;
 
 	memset(&this_stat, 0, sizeof(struct stat));
 	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
@@ -143,48 +157,53 @@ ino_t _create_root_inode(void)
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	root_inode = super_block_new_inode(&this_stat, NULL);
+	root_inode = super_block_new_inode(&this_stat, &this_gen);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");
 		return 0;
 	}
+	ret = fetch_meta_path(metapath, root_inode);
+
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	this_stat.st_ino = root_inode;
 
-		metafptr = fopen(rootmetapath, "w");
-		if (metafptr == NULL) {
-			write_log(0, "IO error in initializing system\n");
-			return -EIO;
-		}
+	metafptr = fopen(metapath, "w");
+	if (metafptr == NULL) {
+		write_log(0, "IO error in initializing filesystem\n");
+		errcode = -EIO;
+		goto errcode_handle;
+	}
 
-		FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
+	FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
+	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
+	FTELL(metafptr);
+	this_meta.generation = this_gen;
+	this_meta.root_entry_page = ret_pos;
+	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
-		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
-								metafptr);
+	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
-		FTELL(metafptr);
-		this_meta.root_entry_page = ret_pos;
-		this_meta.tree_walk_list_head = this_meta.root_entry_page;
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	ret = init_dir_page(&temppage, root_inode, 0,
+				this_meta.root_entry_page);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
-		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
-								metafptr);
-
-		ret = init_dir_page(&temppage, 1, 0,
-					this_meta.root_entry_page);
-		if (ret < 0) {
-			fclose(metafptr);
-			return ret;
-		}
-
-		FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1,
-								metafptr);
-		fclose(metafptr);
-		ret = super_block_mark_dirty(1);
-		if (ret < 0)
-			return ret;
+	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
+	fclose(metafptr);
+	metafptr = NULL;
+	ret = super_block_mark_dirty(root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
 	}
 	return root_inode;
 
@@ -193,12 +212,14 @@ errcode_handle:
 		fclose(metafptr);
 	return 0;
 }
+
 /************************************************************************
 *
 * Function name: add_filesystem
 *        Inputs: char *fsname, DIR_ENTRY *ret_entry
-*       Summary: Destroys the header for FS manager.
-*  Return value: None
+*       Summary: Creates the filesystem "fsname" if it does not exist.
+*                The root inode for the new FS is returned in ret_entry.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
@@ -207,13 +228,13 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	DIR_ENTRY temp_entry, overflow_entry;
 	DIR_META_TYPE tmp_head;
 	long long overflow_new_page;
-	int ret, errcode;
-	size_t ret_size;
+	int ret, errcode, ret_index;
 	char no_need_rewrite;
 	off_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 	ino_t new_FS_ino;
+	ssize_t ret_ssize;
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
@@ -228,27 +249,57 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
 				sizeof(DIR_META_TYPE), 0);
 
+	if (fs_mgr_head->num_FS <= 0) {
+		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE));
+		tmp_head.total_children = 0;
+		fs_mgr_head->num_FS = 0;
+		tmp_head.root_entry_page = sizeof(DIR_META_TYPE);
+		tmp_head.next_xattr_page = 0;
+		tmp_head.entry_page_gc_list = 0;
+		tmp_head.tree_walk_list_head = sizeof(DIR_META_TYPE);
+		tmp_head.generation = 0;
+		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
+		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
+			sizeof(DIR_META_TYPE), 0);
+		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+			sizeof(DIR_META_TYPE));
+	} else {
+
+		/* Initialize B-tree insertion by first loading the root of
+		*  the B-tree. */
+		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+			tmp_head.root_entry_page);
+	}
+	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
+		&ret_index, &tpage2);
+
+	if (ret >= 0) {
+		errcode = -EEXIST;
+		write_log(2, "Filesystem already exists\n");
+		goto errcode_handle;
+	}
+
+	if (ret != -ENOENT) {
+		write_log(0, "Unexpected error in checking FS manager\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	memset(&temp_entry, 0, sizeof(DIR_ENTRY));
 	memset(&overflow_entry, 0, sizeof(DIR_ENTRY));
-
-	/* TODO: ask for a new inode number from super inode */
 
 	new_FS_ino = _create_root_inode();
 
 	if (new_FS_ino == 0) {
-		/*TODO: Error handling */
+		write_log(0, "Error in creating root inode of filesystem\n");
+		errcode = -EIO;
+		goto errcode_handle;
+	}
 
 	temp_entry.d_ino = new_FS_ino;
 	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", fsname);
 
-	/* TODO: Check if there is no FS yet. If there is none, init
-		B-tree (truncate b-tree and write new root node) */
 
-	/* Initialize B-tree insertion by first loading the root of
-	*  the B-tree. */
-	PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-			tmp_head.root_entry_page);
-	
 	/* Recursive routine for B-tree insertion*/
 	/* Temp space for traversing the tree is allocated before calling */
 	ret = insert_dir_entry_btree(&temp_entry, &tpage,
@@ -273,14 +324,14 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		/* tpage contains the old root node now */
 
 		/*Need to create a new root node and write to disk*/
-		if (parent_meta.entry_page_gc_list != 0) {
+		if (tmp_head.entry_page_gc_list != 0) {
 			/*Reclaim node from gc list first*/
 			PREAD(fs_mgr_head->FS_list_fh, &new_root,
 				sizeof(DIR_ENTRY_PAGE),
 				tmp_head.entry_page_gc_list);
 
-			new_root.this_page_pos = parent_meta.entry_page_gc_list;
-			parent_meta.entry_page_gc_list = new_root.gc_list_next;
+			new_root.this_page_pos = tmp_head.entry_page_gc_list;
+			tmp_head.entry_page_gc_list = new_root.gc_list_next;
 		} else {
 			/* If cannot reclaim, extend the meta file */
 			memset(&new_root, 0, sizeof(DIR_ENTRY_PAGE));
@@ -289,21 +340,22 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 			new_root.this_page_pos = ret_pos;
 			if (new_root.this_page_pos == -1) {
 				errcode = errno;
-				logerr(errcode,
-					"IO error in adding dir entry");
-				meta_cache_close_file(body_ptr);
-				return -errcode;
+				write_log(0, "IO error in adding dir entry\n");
+				write_log(0, "Code %d, %s\n", errcode,
+						strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
 			}
 		}
 
 		/* Insert the new root to the head of tree_walk_list. This list
 		*  is for listing nodes in the B-tree in readdir operation. */
 		new_root.gc_list_next = 0;
-		new_root.tree_walk_next = parent_meta.tree_walk_list_head;
+		new_root.tree_walk_next = tmp_head.tree_walk_list_head;
 		new_root.tree_walk_prev = 0;
 
 		no_need_rewrite = FALSE;
-		if (parent_meta.tree_walk_list_head == tpage.this_page_pos) {
+		if (tmp_head.tree_walk_list_head == tpage.this_page_pos) {
 			tpage.tree_walk_prev = new_root.this_page_pos;
 		} else {
 			PREAD(fs_mgr_head->FS_list_fh, &tpage2,
@@ -321,7 +373,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		}
 
 
-		parent_meta.tree_walk_list_head = new_root.this_page_pos;
+		tmp_head.tree_walk_list_head = new_root.this_page_pos;
 
 		/* Initialize the new root node */
 		new_root.parent_page_pos = 0;
@@ -332,12 +384,12 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 							sizeof(DIR_ENTRY));
 		/* The two children of the new root is the old root and
 		*  the new node created by the overflow. */
-		new_root.child_page_pos[0] = parent_meta.root_entry_page;
+		new_root.child_page_pos[0] = tmp_head.root_entry_page;
 		new_root.child_page_pos[1] = overflow_new_page;
 
 		/* Set the root of B-tree to the new root, and write the
 		*  content of the new root the the meta file. */
-		parent_meta.root_entry_page = new_root.this_page_pos;
+		tmp_head.root_entry_page = new_root.this_page_pos;
 		PWRITE(fs_mgr_head->FS_list_fh, &new_root,
 			sizeof(DIR_ENTRY_PAGE), new_root.this_page_pos);
 
@@ -370,11 +422,42 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	write_log(10,
 		"Total filesystem is now %lld\n", tmp_head.total_children);
 
-	ret_entry->
+	memcpy(ret_entry, &temp_entry, sizeof(DIR_ENTRY));
 
+	/* TODO: return handling for backup database */
 	backup_FS_database();
-	return ret;
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return 0;
 
 errcode_handle:
+	sem_post(&(fs_mgr_head->op_lock));
+
 	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: delete_filesystem
+*        Inputs: char *fsname, DIR_ENTRY *ret_entry
+*       Summary: Delete the filesystem "fsname" if it is not mounted and
+*                is empty.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int delete_filesystem(char *fsname)
+{
+/*
+1. API layer receives a request for FS deletion. The name of the new filesystem is parsed and passed to filesystem manager.
+2. Filesystem manager checks if the FS name exists. If not, stop. Otherwise, it checks if the FS is mounted via mount manager
+3.If the FS is mounted, return as error. If not, continue to check if the FS is empty from the volume meta. If not, stop here.
+4. If the FS is empty, request the root inode to be deleted. For atomic operation, the system will write the request and response to a temp file in this operation.
+5. Filesystem manager deletes the info of the new filesystem from b-tree. At the completion of the update, the temp file in step 4 can be deleted, and the result can be returned to the caller. If operation failed at this step due to system crash, the operation will be resumed after system returns to normal.
+
+*/
+	return 0;
+}
+int backup_FS_database(void)
+{
+	return 0;
 }
