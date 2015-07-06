@@ -21,20 +21,17 @@
 /* Filesystem name ==> d_name in DIR_ENTRY */
 /* Filesystem root inode number ==> d_ino in DIR_ENTRY */
 
-
 typedef struct {
-	long long root_entry_page;
-	long long entry_page_gc_list;
-	long long tree_walk_list_head;
 	unsigned long num_FS;
 	int FS_list_fh;
 	sem_t op_lock;
 } FS_MANAGER_HEAD_TYPE;
 
-FS_MANAGER_HEAD_TYPE *fs_manager_head;
+FS_MANAGER_HEAD_TYPE *fs_mgr_head;
+char *fs_mgr_path;
 
 int init_fs_manager(void);
-int destroy_fs_manager(void);
+void destroy_fs_manager(void);
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry);
 int delete_filesystem(char *fsname);
 int check_filesystem(char *fsname, DIR_ENTRY *ret_entry);
