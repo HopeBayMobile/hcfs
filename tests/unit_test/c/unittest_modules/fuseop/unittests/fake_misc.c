@@ -11,6 +11,16 @@
 
 #include "fake_misc.h"
 
+int init_api_interface(void)
+{
+	return 0;
+}
+
+int destroy_api_interface(void)
+{
+	return 0;
+}
+
 ino_t lookup_pathname(const char *path, int *errcode)
 {
 	*errcode = 0;
