@@ -62,7 +62,7 @@ int init_api_interface(void)
 	}
 
 	sem_init(&(api_server->job_lock), 0, 1);
-	api_server->num_threads = 10;
+	api_server->num_threads = INIT_API_THREADS;
 	api_server->last_update = 0;
 	memset(api_server->job_count, 0, sizeof(int) * PROCESS_WINDOW);
 	memset(api_server->job_totaltime, 0, sizeof(float) * PROCESS_WINDOW);
