@@ -760,8 +760,8 @@ errcode_handle:
  *         and error code on error.
  */
 int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-	const long long xattr_filepos, const char name_space, const char *key, 
-	char *value_buf, const size_t size, size_t *actual_size)
+	const char name_space, const char *key, char *value_buf, 
+	const size_t size, size_t *actual_size)
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_ENTRY *key_entry;
@@ -769,7 +769,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	long long target_key_list_pos;
 	long long first_key_list_pos;
 	unsigned hash_index;
-	unsigned key_index;
+	int key_index;
 	int ret_code;
 
 	hash_index = hash(key); /* Hash the key */
@@ -820,7 +820,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf, 
 	const size_t size, size_t *actual_size, const char *namespace_prefix)
 {	
-	int key_index;
+	unsigned key_index;
 	char tmp_buf[MAX_KEY_SIZE + 50];
 	int key_size;
 	int namespace_len;
@@ -866,8 +866,7 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
  *         otherwise return negative error code.
  */
 int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-	const long long xattr_filepos, char *key_buf, const size_t size, 
-	size_t *actual_size)
+	char *key_buf, const size_t size, size_t *actual_size)
 {
 	NAMESPACE_PAGE *namespace_page;
 	KEY_LIST_PAGE key_page;

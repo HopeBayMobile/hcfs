@@ -3955,8 +3955,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	}
 	actual_size = 0;
 	
-	retcode = get_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
-		name_space, key, value, size, &actual_size);
+	retcode = get_xattr(meta_cache_entry, xattr_page, name_space, 
+		key, value, size, &actual_size);
 	if (retcode < 0) /* Error: ERANGE, ENOENT, or others */
 		goto error_handle;
 	
@@ -4053,8 +4053,8 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	}
 	actual_size = 0;
 	
-	retcode = list_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
-		key_buf, size, &actual_size);
+	retcode = list_xattr(meta_cache_entry, xattr_page, key_buf, size, 
+		&actual_size);
 	if (retcode < 0) /* Error: ERANGE or others */
 		goto error_handle;
 
