@@ -149,10 +149,9 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
-/* Other system-related resources */
-pthread_t reporter_thread;  /* Used by utility prototype */
-
 /* Functions for initializing HCFS */
+
+pthread_t HCFS_mount;
 int hook_fuse(int argc, char **argv);
 
 void set_timestamp_now(struct stat *thisstat, char mode);
