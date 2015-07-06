@@ -11,12 +11,13 @@ int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 	printf("Debug inode is %lld\n", body_ptr->inode_num);
 	switch(body_ptr->inode_num) {
 	case 14:
-		body_ptr->fptr = fopen("/tmp/hcfs_unittest_truncate", "w");
-		unlink("/tmp/hcfs_unittest_truncate");
+		body_ptr->fptr = fopen("/tmp/testHCFS/hcfs_unittest_truncate",
+			"w");
+		unlink("/tmp/testHCFS/hcfs_unittest_truncate");
 		break;
 	case 16:
-		body_ptr->fptr = fopen("/tmp/hcfs_unittest_write", "w");
-		unlink("/tmp/hcfs_unittest_write");
+		body_ptr->fptr = fopen("/tmp/testHCFS/hcfs_unittest_write", "w");
+		unlink("/tmp/testHCFS/hcfs_unittest_write");
 		break;
 	case 17:
 		body_ptr->fptr = fopen(readdir_metapath, "r");

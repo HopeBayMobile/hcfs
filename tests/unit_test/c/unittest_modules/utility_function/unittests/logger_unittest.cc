@@ -87,16 +87,14 @@ class write_logTest : public ::testing::Test {
    }
 
   virtual void TearDown() {
-    dup2(outfileno, fileno(stdout));
-    dup2(errfileno, fileno(stderr));
     if (logptr != NULL) {
       if (logptr->fptr != NULL) {
         fclose(logptr->fptr);
-      }
-      unlink(tmpfilename);
+       }
       sem_destroy(&(logptr->logsem));
       free(logptr);
-    }
+     }
+    unlink(tmpfilename);
    }
 
  };
@@ -113,14 +111,16 @@ TEST_F(write_logTest, LogWriteOK) {
 
   close_log();
 
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
+
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
-TEST_F(write_logTest, NoLog) {
+TEST_F(write_logTest, NoLogEntry) {
   int ret;
   FILE *fptr;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
@@ -132,28 +132,52 @@ TEST_F(write_logTest, NoLog) {
 
   close_log();
 
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
+
   fptr = fopen(tmpfilename, "r");
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
   EXPECT_EQ(EOF, ret);
  }
 TEST_F(write_logTest, NoLogWriteOK) {
-  int ret;
+  int ret, failed;
   FILE *fptr;
+  int errcode;
   char tmpstr[100], tmpstr1[100], tmpstr2[100];
 
-  fptr = fopen(tmpfilename, "w");
+  fptr = fopen(tmpfilename, "a+");
+  setbuf(fptr, NULL);
+  if (fptr == NULL)
+    failed = 1;
+  else
+    failed = 0;
+  ASSERT_EQ(0, failed);
 
-  dup2(fileno(fptr), fileno(stdout));
+  errcode = 0;
+  ret = dup2(fileno(fptr), fileno(stdout));
+  errcode = errno;
+  ASSERT_NE(-1, ret);
+  setbuf(stdout, NULL);
+  errcode = 0;
+  ret = dup2(fileno(fptr), fileno(stderr));
+  errcode = errno;
+  ASSERT_NE(-1, ret);
+  setbuf(stderr, NULL);
   LOG_LEVEL = 10;
   write_log(10, "Thisisatest");
   fclose(fptr);
 
+  dup2(outfileno, fileno(stdout));
+  dup2(errfileno, fileno(stderr));
+
   fptr = fopen(tmpfilename, "r");
+  failed = 0;
+  if (fptr == NULL)
+    failed = 1;
+  ASSERT_EQ(0, failed);
   ret = fscanf(fptr, "%s %s\t%s\n", tmpstr, tmpstr1, tmpstr2);
   fclose(fptr);
-  unlink(tmpfilename);
   ASSERT_EQ(3, ret);
   EXPECT_STREQ("Thisisatest", tmpstr2);
  }
