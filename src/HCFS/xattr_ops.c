@@ -257,6 +257,8 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	}
 
 	memset(&now_key_page, 0, sizeof(KEY_LIST_PAGE));
+	memset(&prev_key_page, 0, sizeof(KEY_LIST_PAGE));
+	prev_key_list_pos = 0;
 	key_list_pos = first_key_list_pos;
 	find_first_insert = FALSE; 
 	hit_key_entry = FALSE;
@@ -559,7 +561,7 @@ static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
  *         to index 0.
  * Case 2: At least one key_page in hash_table[index]. Find the key entry:
  *       Case 2.1: Entry is found. Replace value or return error
- *       Case 2.2: Entry not found, some key_pages are not full The new key can be 
+ *       Case 2.2: Entry not found, some key_pages are not full. The new key can be 
  *                 inserted to existed key_page.
  *       Case 2.3: Entry not found, but all key_page are full. Allocate a new page 
  *                 and insert to index 0.
@@ -776,7 +778,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 
 	if (namespace_page->key_hash_table[hash_index] == 0)
-		return -ENOENT;
+		return -ENODATA;
 	
 	first_key_list_pos = namespace_page->key_hash_table[hash_index];
 	ret_code = find_key_entry(meta_cache_entry, first_key_list_pos, 
@@ -787,7 +789,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 		return ret_code;
 	
 	if (ret_code > 0) /* Hit nothing */
-		return -ENOENT;
+		return -ENODATA;
 	
 	/* Else, key is found */
 	key_entry = &(target_key_list_page.key_list[key_index]);
