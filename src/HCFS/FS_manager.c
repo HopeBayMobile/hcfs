@@ -25,6 +25,7 @@
 #include "fuseop.h"
 #include "super_block.h"
 #include "global.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -126,6 +127,8 @@ void destroy_fs_manager(void)
 	sem_destroy(&(fs_mgr_head->op_lock));
 	free(fs_mgr_head);
 	free(fs_mgr_path);
+	fs_mgr_head = NULL;
+	fs_mgr_path = NULL;
 }
 
 /* Helper function for allocating a new inode as root */
@@ -236,15 +239,15 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	ino_t new_FS_ino;
 	ssize_t ret_ssize;
 
+	sem_wait(&(fs_mgr_head->op_lock));
+
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
-		write_log(0, "Name of new filesystem (%s) is too long\n",
+		write_log(2, "Name of new filesystem (%s) is too long\n",
 			fsname);
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-
-	sem_wait(&(fs_mgr_head->op_lock));
 
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
 				sizeof(DIR_META_TYPE), 0);
@@ -259,6 +262,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		tmp_head.tree_walk_list_head = sizeof(DIR_META_TYPE);
 		tmp_head.generation = 0;
 		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
+		tpage.this_page_pos = sizeof(DIR_META_TYPE);
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 			sizeof(DIR_META_TYPE), 0);
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
@@ -439,7 +443,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: delete_filesystem
-*        Inputs: char *fsname, DIR_ENTRY *ret_entry
+*        Inputs: char *fsname
 *       Summary: Delete the filesystem "fsname" if it is not mounted and
 *                is empty.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
@@ -447,16 +451,188 @@ errcode_handle:
 *************************************************************************/
 int delete_filesystem(char *fsname)
 {
-/*
-1. API layer receives a request for FS deletion. The name of the new filesystem is parsed and passed to filesystem manager.
-2. Filesystem manager checks if the FS name exists. If not, stop. Otherwise, it checks if the FS is mounted via mount manager
-3.If the FS is mounted, return as error. If not, continue to check if the FS is empty from the volume meta. If not, stop here.
-4. If the FS is empty, request the root inode to be deleted. For atomic operation, the system will write the request and response to a temp file in this operation.
-5. Filesystem manager deletes the info of the new filesystem from b-tree. At the completion of the update, the temp file in step 4 can be deleted, and the result can be returned to the caller. If operation failed at this step due to system crash, the operation will be resumed after system returns to normal.
+	/* TODO: temp file for atomic operation (see detailed design) */
 
-*/
+	DIR_ENTRY_PAGE tpage, tpage2;
+	DIR_ENTRY temp_entry;
+	DIR_META_TYPE tmp_head, roothead;
+	int ret, errcode, ret_index;
+	ino_t FS_root;
+	ssize_t ret_ssize;
+	size_t ret_size;
+	char thismetapath[400];
+	FILE *metafptr;
+	DIR_ENTRY temp_dir_entries[2*(MAX_DIR_ENTRIES_PER_PAGE+2)];
+	long long temp_child_page_pos[2*(MAX_DIR_ENTRIES_PER_PAGE+3)];
+
+	sem_wait(&(fs_mgr_head->op_lock));
+
+	if (strlen(fsname) > MAX_FILENAME_LEN) {
+		errcode = ENAMETOOLONG;
+		write_log(2, "Name of filesystem to delete (%s) is too long\n",
+			fsname);
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
+
+	if (fs_mgr_head->num_FS <= 0) {
+		errcode = -ENOENT;
+		write_log(2, "No filesystem exists\n");
+		goto errcode_handle;
+	}
+
+
+	/* Initialize B-tree deletion by first loading the root of
+	*  the B-tree. */
+	PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+		tmp_head.root_entry_page);
+
+	/* Check if the FS name exists. If not, return error */
+
+	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
+		&ret_index, &tpage2);
+
+	if (ret < 0) {
+		if (ret == -ENOENT)
+			write_log(2, "Filesystem does not exist\n");
+		else
+			write_log(0, "Error in deleting FS. Code %d, %s\n",
+				-ret, strerror(-ret));
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* Check if filesystem is mounted. If so, returns error */
+	ret = FS_is_mounted(fsname);
+
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	if (ret == TRUE) {
+		errcode = -EPERM;
+		write_log(2, "Cannot delete mounted filesystem\n");
+		goto errcode_handle;
+	}
+
+	/* Check if the filesystem is empty. If not, returns error */
+	memcpy(&temp_entry, &(tpage2.dir_entries[ret_index]),
+		sizeof(DIR_ENTRY));
+	FS_root = temp_entry.d_ino;
+
+	ret = fetch_meta_path(thismetapath, FS_root);
+	metafptr = NULL;
+	metafptr = fopen(thismetapath, "r");
+	if (metafptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO Error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&roothead, sizeof(DIR_META_TYPE), 1, metafptr);
+	fclose(metafptr);
+	metafptr = NULL;
+	if (roothead.total_children > 0) {
+		/* FS not empty */
+		errcode = -ENOTEMPTY;
+		write_log(2, "Filesystem is not empty.\n");
+		goto errcode_handle;
+	}
+
+	/* Delete root inode (follow ll_rmdir) */
+
+	ret = delete_inode_meta(FS_root);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	/* Delete FS from database */
+	ret = delete_dir_entry_btree(&temp_entry, &tpage,
+			fs_mgr_head->FS_list_fh, &tmp_head, temp_dir_entries,
+							temp_child_page_pos);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	return 0;
+errcode_handle:
+	if (metafptr != NULL)
+		fclose(metafptr);
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return errcode;
 }
+
+/************************************************************************
+*
+* Function name: check_filesystem
+*        Inputs: char *fsname, DIR_ENTRY *ret_entry
+*       Summary: This function checks whether the filesystem "fsname" exists.
+*                If so, the entry is returned via "ret_entry".
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+{
+	DIR_ENTRY_PAGE tpage, tpage2;
+	DIR_META_TYPE tmp_head;
+	int ret, errcode, ret_index;
+	ssize_t ret_ssize;
+
+	sem_wait(&(fs_mgr_head->op_lock));
+
+	if (strlen(fsname) > MAX_FILENAME_LEN) {
+		errcode = ENAMETOOLONG;
+		write_log(2, "Name of filesystem to delete (%s) is too long\n",
+			fsname);
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
+
+	if (fs_mgr_head->num_FS <= 0) {
+		errcode = -ENOENT;
+		write_log(2, "No filesystem exists\n");
+		goto errcode_handle;
+	}
+
+
+	/* Initialize B-tree searching by first loading the root of
+	*  the B-tree. */
+	PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+		tmp_head.root_entry_page);
+
+	/* Check if the FS name exists. If not, return error */
+
+	ret = search_dir_entry_btree(fsname, &tpage, fs_mgr_head->FS_list_fh,
+		&ret_index, &tpage2);
+
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	memcpy(ret_entry, &(tpage2.dir_entries[ret_index]),
+		sizeof(DIR_ENTRY));
+
+	return 0;
+errcode_handle:
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return errcode;
+}
+
+
 int backup_FS_database(void)
 {
 	return 0;

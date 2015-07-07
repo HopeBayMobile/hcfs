@@ -1,8 +1,11 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto -Wunused-variable
 
-hcfs: FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
-	$(CC) -g -o hcfs FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o
+	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o -lfuse -lcurl -pthread -lssl -lcrypto
+
+mount_manager.o: mount_manager.c mount_manager.h
+	$(CC) $(CFLAGS) -c mount_manager.c
 
 FS_manager.o: FS_manager.c FS_manager.h
 	$(CC) $(CFLAGS) -c FS_manager.c
