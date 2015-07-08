@@ -35,7 +35,8 @@ void destroy_fs_manager(void);
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry);
 int delete_filesystem(char *fsname);
 int check_filesystem(char *fsname, DIR_ENTRY *ret_entry);
-int list_filesystem(DIR_ENTRY *ret_entry, int *ret_num);
+int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
+		unsigned long *ret_num);
 
 int backup_FS_database(void);
 int restore_FS_database(void);

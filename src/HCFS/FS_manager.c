@@ -26,6 +26,7 @@
 #include "super_block.h"
 #include "global.h"
 #include "mount_manager.h"
+#include "hcfscurl.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -268,7 +269,6 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
 			sizeof(DIR_META_TYPE));
 	} else {
-
 		/* Initialize B-tree insertion by first loading the root of
 		*  the B-tree. */
 		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
@@ -562,6 +562,15 @@ int delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
+	tmp_head.total_children--;
+	write_log(10, "TOTAL CHILDREN is now %lld\n",
+					tmp_head.total_children);
+	/* Write head back */
+
+	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 0);
+
+	fs_mgr_head->num_FS--;
+
 	return 0;
 errcode_handle:
 	if (metafptr != NULL)
@@ -597,15 +606,14 @@ int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
-
 	if (fs_mgr_head->num_FS <= 0) {
 		errcode = -ENOENT;
 		write_log(2, "No filesystem exists\n");
 		goto errcode_handle;
 	}
 
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
 
 	/* Initialize B-tree searching by first loading the root of
 	*  the B-tree. */
@@ -632,8 +640,233 @@ errcode_handle:
 	return errcode;
 }
 
+/************************************************************************
+*
+* Function name: list_filesystem
+*        Inputs: int buf_num, DIR_ENTRY *ret_entry, int *ret_num
+*       Summary: List all filesystems in the buf "ret_entry" provided
+*                by the caller. "buf_num" indicates the number of entries.
+*                "ret_num" returns the total number of filesystems. If
+*                "buf_num" is smaller than "*ret_num", nothing is filled
+*                and the total number of filesystems is filled in "ret_num".
+*                Note that the return value of the function will be zero in
+*                this case. Caller can pass NULL for "ret_entry" and zero
+*                for "buf_num" to query the number of entries needed.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
+		unsigned long *ret_num)
+{
+	DIR_ENTRY_PAGE tpage;
+	DIR_META_TYPE tmp_head;
+	int errcode;
+	ssize_t ret_ssize;
+	unsigned long num_walked;
+	long long next_node_pos;
+	int count;
 
+	sem_wait(&(fs_mgr_head->op_lock));
+
+	if (fs_mgr_head->num_FS > buf_num) {
+		*ret_num = fs_mgr_head->num_FS;
+		return 0;
+	}
+
+	/* If no filesystem */
+	if (fs_mgr_head->num_FS <= 0) {
+		*ret_num = 0;
+		return 0;
+	}
+
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
+
+
+	/* Initialize B-tree walk by first loading the first node
+		of the tree walk. */
+	next_node_pos = tmp_head.tree_walk_list_head;
+
+	num_walked = 0;
+
+	while (next_node_pos != 0) {
+		PREAD(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
+				next_node_pos);
+		if ((num_walked + tpage.num_entries) > buf_num) {
+			/* Only compute the number of FS */
+			num_walked += tpage.num_entries;
+			next_node_pos = tpage.tree_walk_next;
+			continue;
+		}
+		for (count = 0; count < tpage.num_entries; count++) {
+			memcpy(&(ret_entry[num_walked]),
+				&(tpage.dir_entries[count]), sizeof(DIR_ENTRY));
+			num_walked++;
+		}
+	}
+
+	if ((fs_mgr_head->num_FS != num_walked) ||
+		(tmp_head.total_children != num_walked)) {
+		/* Number of FS is wrong. */
+		write_log(0, "Error in FS num. Recomputing\n");
+		fs_mgr_head->num_FS = num_walked;
+		if (tmp_head.total_children != num_walked) {
+			tmp_head.total_children = num_walked;
+			write_log(0, "Rewriting FS num in database\n");
+			PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
+		}
+	}
+
+	*ret_num = num_walked;
+
+	return 0;
+errcode_handle:
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: backup_FS_database
+*        Inputs: None
+*       Summary: Upload FS backup to backend.
+*          Note: Assume that the op_lock is locked when calling
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
 int backup_FS_database(void)
 {
+	FILE *fptr;
+	int ret, errcode;
+	CURL_HANDLE upload_handle;
+	char buf[4096];
+	size_t ret_size;
+	ssize_t ret_ssize;
+	off_t curpos;
+
+	/* Assume that the access lock is locked already */
+	fptr = NULL;
+	fptr = fopen("/tmp/FSmgr_upload", "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	curpos = 0;
+	ret_ssize = 0;
+	while (!feof(fptr)) {
+		PREAD(fs_mgr_head->FS_list_fh, buf, 4096, curpos);
+		if (ret_ssize <= 0)
+			break;
+		curpos += ret_ssize;
+		FWRITE(buf, 1, ret_ssize, fptr);
+	}
+
+	fclose(fptr);
+
+	fptr = NULL;
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+	ret = hcfs_init_backend(&upload_handle);
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		write_log(0, "Error in backing up FS database\n");
+		goto errcode_handle;
+	}
+	snprintf(upload_handle.id, 256, "FSmgr_upload");
+
+	fptr = fopen("/tmp/FSmgr_upload", "r");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	ret = hcfs_put_object(fptr, "FSmgr_backup", &upload_handle);
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		write_log(0, "Error in backing up FS database\n");
+		goto errcode_handle;
+	}
+
+	fclose(fptr);
+
+	unlink("/tmp/FSmgr_upload");
+	hcfs_destroy_backend(upload_handle.curl);
 	return 0;
+
+errcode_handle:
+	if (upload_handle.curl != NULL)
+		hcfs_destroy_backend(upload_handle.curl);
+
+	if (fptr != NULL)
+		fclose(fptr);
+
+	unlink("/tmp/FSmgr_upload");
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: restore_FS_database
+*        Inputs: None
+*       Summary: Download FS backup from backend.
+*          Note: Assume that FS manager is not started when calling this,
+*                but path to the filesystem database should be constructed.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int restore_FS_database(void)
+{
+	FILE *fptr;
+	int ret, errcode;
+	CURL_HANDLE download_handle;
+
+	/* Assume that FS manager is not started */
+
+	fptr = NULL;
+	memset(&download_handle, 0, sizeof(CURL_HANDLE));
+	ret = hcfs_init_backend(&download_handle);
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		write_log(0, "Error in restoring FS database\n");
+		goto errcode_handle;
+	}
+	snprintf(download_handle.id, 256, "FSmgr_download");
+
+	fptr = fopen(fs_mgr_path, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	ret = hcfs_get_object(fptr, "FSmgr_backup", &download_handle);
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		write_log(0, "Error in restoring FS database\n");
+		goto errcode_handle;
+	}
+
+	fclose(fptr);
+
+	hcfs_destroy_backend(download_handle.curl);
+	return 0;
+
+errcode_handle:
+	if (download_handle.curl != NULL)
+		hcfs_destroy_backend(download_handle.curl);
+
+	if (fptr != NULL)
+		fclose(fptr);
+
+	return errcode;
 }

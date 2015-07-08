@@ -391,7 +391,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	/* tpage might be invalid after calling delete_dir_entry_btree */
 
 	if (ret == 0) {
-		/* If the new entry is a subdir, decrease the hard link of
+		/* If the entry is a subdir, decrease the hard link of
 		*  the parent*/
 
 		if (child_mode & S_IFDIR)
