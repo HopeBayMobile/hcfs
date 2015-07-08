@@ -467,6 +467,8 @@ int delete_filesystem(char *fsname)
 
 	sem_wait(&(fs_mgr_head->op_lock));
 
+	metafptr = NULL;
+
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
 		write_log(2, "Name of filesystem to delete (%s) is too long\n",
@@ -475,15 +477,14 @@ int delete_filesystem(char *fsname)
 		goto errcode_handle;
 	}
 
-	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
-
 	if (fs_mgr_head->num_FS <= 0) {
 		errcode = -ENOENT;
 		write_log(2, "No filesystem exists\n");
 		goto errcode_handle;
 	}
 
+	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
+				sizeof(DIR_META_TYPE), 0);
 
 	/* Initialize B-tree deletion by first loading the root of
 	*  the B-tree. */

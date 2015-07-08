@@ -3,6 +3,7 @@
 #include <errno.h>
 #include "fuseop.h"
 #include "global.h"
+#include "hcfscurl.h"
 #include "FS_manager_unittest.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
@@ -20,7 +21,13 @@ int write_log(int level, char *format, ...)
 int search_dir_entry_btree(const char *target_name, DIR_ENTRY_PAGE *tnode,
 		int fh, int *result_index, DIR_ENTRY_PAGE *result_node)
 {
-	return -ENOENT;
+	if (entry_in_database == FALSE)
+		return -ENOENT;
+	result_node->num_entries = 1;
+	result_node->dir_entries[0].d_ino = fakeino;
+	strcpy((result_node->dir_entries[0]).d_name, target_name);
+	*result_index = 0;
+	return 0;
 }
 
 /* if returns 1, then there is an entry to be added to the parent */
@@ -82,6 +89,43 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 }
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
 						long long this_page_pos)
+{
+	return 0;
+}
+int hcfs_init_backend(CURL_HANDLE *curl_handle)
+{
+	return 200;
+}
+void hcfs_destroy_backend(CURL *curl)
+{
+	return 200;
+}
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+{
+	return 200;
+}
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+{
+	return 200;
+}
+int FS_is_mounted(char *fsname)
+{
+
+	return FALSE;
+}
+
+int delete_inode_meta(ino_t this_inode)
+{
+	char tmppath[100];
+
+	snprintf(tmppath, 100, "%s/meta%ld", METAPATH, this_inode);
+	unlink(tmppath);
+
+	return 0;
+}
+int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
+	int fh, DIR_META_TYPE *this_meta, DIR_ENTRY *tmp_entries,
+	long long *temp_child_page_pos)
 {
 	return 0;
 }
