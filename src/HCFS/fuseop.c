@@ -3900,6 +3900,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	this_inode = (ino_t) ino;
 	value = NULL;
 	xattr_page = NULL;
+	actual_size = 0;
 	
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
@@ -4017,6 +4018,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	this_inode = (ino_t) ino;
 	key_buf = NULL;
 	xattr_page = NULL;
+	actual_size = 0;
 	write_log(10, "Debug listxattr: Begin listxattr, given buffer size = %d\n",
 		 size);
 

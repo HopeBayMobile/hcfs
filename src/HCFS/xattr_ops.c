@@ -774,6 +774,8 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	int key_index;
 	int ret_code;
 
+	*actual_size = 0;
+
 	hash_index = hash(key); /* Hash the key */
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 
@@ -877,6 +879,8 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 	int ret, ret_size, errcode;
 	char namespace_prefix[30];
 
+	*actual_size = 0;
+
 	for (ns_count = 0; ns_count < 4; ns_count++) {
 		namespace_page = &(xattr_page->namespace_page[ns_count]);
 		if (namespace_page->num_xattr == 0)
@@ -896,8 +900,8 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 		case TRUSTED:
 			strcpy(namespace_prefix, "trusted");
 			break;
-		default:
-			break;
+		default: 
+			return -EOPNOTSUPP;
 		}
 
 		for (hash_count = 0; hash_count < MAX_KEY_HASH_ENTRY ; hash_count++) {
@@ -905,7 +909,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 			
 			first_pos = namespace_page->key_hash_table[hash_count];
 			pos = first_pos;
-			do {
+			while (pos) {
 				FSEEK(meta_cache_entry->fptr, pos, SEEK_SET);
 				FREAD(&key_page, sizeof(KEY_LIST_PAGE), 1, 
 					meta_cache_entry->fptr);
@@ -914,7 +918,7 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 				if (ret < 0)
 					return -ERANGE;
 				pos = key_page.next_list_pos;
-			} while (pos);
+			}
 		}
 	}
 
@@ -961,7 +965,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	if (ret_code < 0) /* Error */
 		return ret_code;
 	if (ret_code > 0) /* Hit nothing */
-		return -ENOENT;
+		return -ENODATA;
 	
 	/* Record value block position, and reclaim them later. */
 	first_value_pos = target_key_list_page.key_list[key_index].first_value_block_pos;
