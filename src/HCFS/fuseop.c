@@ -3798,6 +3798,12 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
+	
+	/* Reject if link path too long */
+	if (strlen(link) > MAX_LINK_PATH) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
 
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
 	if (ret_val < 0) {
@@ -3858,7 +3864,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 	this_stat.st_ino = self_inode;
 
-	/* Write symlink meta */
+	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat, 
 		link, this_generation, name);
 	if (ret_val < 0) {	

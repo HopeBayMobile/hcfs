@@ -430,6 +430,20 @@ error_handling:
 	return ret_val;
 }
 
+/************************************************************************
+*
+* Function name: symlink_update_meta
+*        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,                                                                                                                                    
+*                const struct stat *this_stat, const char *link, 
+*                const unsigned long generation, const char *name
+*       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
+*                and then use meta_cache_update_symlink() to update stat
+*                and symlink_meta. After updating self meta, add a new
+*                entry to parent dir.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const struct stat *this_stat, const char *link, 
 	const unsigned long generation, const char *name)
@@ -471,7 +485,9 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (ret_code < 0)
 		return ret_code;
 	
-	/* Add entry to parent dir */
+	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
+	   because it had been locked before calling this function. Just need to 
+	   open meta file. */
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
