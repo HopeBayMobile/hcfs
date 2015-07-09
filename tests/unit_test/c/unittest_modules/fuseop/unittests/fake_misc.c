@@ -612,12 +612,3 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	return 0;
 }
 
-int init_api_interface(void)
-{
-	return 0;
-}
-
-int destroy_api_interface(void)
-{
-	return 0;
-}
