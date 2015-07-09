@@ -437,11 +437,15 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	long long ret_size; 
 
 	this_inode = meta_cache_entry->inode_num;
-	if (this_inode <= 0)
+	if (this_inode <= 0) {
+		write_log(0, "Error: inode <= 0 in fetch_xattr_page()\n");
 		return -EINVAL;
+	}
 
-	if (xattr_page == NULL)
+	if (xattr_page == NULL) {
+		write_log(0, "Error: cannot allocate memory of xattr_page\n");
 		return -ENOMEM;
+	}
 
 	/* First lookup stat to confirm the file type. Do NOT need to lock entry */
 	ret_code = meta_cache_lookup_file_data(this_inode, &stat_data,
@@ -466,6 +470,9 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	}
 	/* TODO: case symlink */
 	
+	ret = meta_cache_open_file(meta_cache_entry);
+	if (ret < 0)
+		return ret_code;
 	/* Allocate a xattr page if it is first time to insert xattr */
 	if (*xattr_pos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
 		memset(xattr_page, 0, sizeof(XATTR_PAGE));

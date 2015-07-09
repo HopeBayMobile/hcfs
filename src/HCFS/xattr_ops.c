@@ -50,7 +50,8 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 		index++;
 	}
 	
-	if (name[index] != '.') /* No character '.', invalid args. */
+	/* No character '.' or namespace not supported, invalid args. */
+	if ((name[index] != '.') || (index > 15)) 
 		return -EOPNOTSUPP;
 	
 	key_len = strlen(name) - (index + 1);
@@ -411,8 +412,11 @@ int write_value_data(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xatt
 				sizeof(char) * MAX_VALUE_BLOCK_SIZE);	
 			ret_code = get_usable_value_filepos(meta_cache_entry, 
 				xattr_page, replace_value_block_pos, &next_pos);
-			if (ret_code < 0)
+			if (ret_code < 0) {
+				write_log(0, "Error in "
+					"get_usable_key_list_filepos()\n");
 				return ret_code;
+			}
 
 			tmp_value_block.next_block_pos = next_pos;
 			
@@ -592,8 +596,10 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	namespace_page = &(xattr_page->namespace_page[name_space]);
 		
 	if (namespace_page->key_hash_table[hash_entry] == 0) { /* Allocate if no page */
-		if (flag == XATTR_REPLACE)
+		if (flag == XATTR_REPLACE) {
+			write_log(2, "Error: Replace value but key did not exist\n");
 			return -ENODATA;
+		}
 
 		/* Get key list pos from "gc list" or "end of file" */
 		ret_code = get_usable_key_list_filepos(meta_cache_entry, 
@@ -633,8 +639,10 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
 			
-			if (flag == XATTR_REPLACE)
+			if (flag == XATTR_REPLACE) {
+				write_log(2, "Error: Replace value but key did not exist\n");
 				return -ENODATA;
+			}
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
 				long long usable_pos;
@@ -697,8 +705,10 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		} else if (ret_code == 0) { /* Hit the key entry, REPLACE value */
 			
-			if (flag == XATTR_CREATE)
+			if (flag == XATTR_CREATE) {
+				write_log(2, "Error: Create a new key but it existed\n");
 				return -EEXIST;
+			}
 			
 			/* Replace the value size and then rewrite. */
 			now_key_entry = &(target_key_list_page.key_list[key_index]);
@@ -790,8 +800,10 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	if (ret_code < 0)
 		return ret_code;
 	
-	if (ret_code > 0) /* Hit nothing */
+	if (ret_code > 0) { /* Hit nothing */
+		write_log(2, "Key %s not found in get_xattr()\n", key);
 		return -ENODATA;
+	}
 	
 	/* Else, key is found */
 	key_entry = &(target_key_list_page.key_list[key_index]);
@@ -800,8 +812,10 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 		return 0;
 
 	if (size > 0) {
-		if (size < *actual_size)
+		if (size < *actual_size) {
+			write_log(0, "Size of key buffer is too small\n");
 			return -ERANGE;
+		}
 		
 		ret_code = read_value_data(meta_cache_entry, key_entry, value_buf);
 		if (ret_code < 0)
@@ -848,7 +862,7 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
 			memcpy(&key_buf[*actual_size], tmp_buf, 
 				sizeof(char) * key_size);
 			
-			write_log(10, "key = %s\n", tmp_buf);
+			write_log(10, "Debug: list key = %s\n", tmp_buf);
 		}
 		
 		*actual_size += key_size;
@@ -915,8 +929,11 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 					meta_cache_entry->fptr);
 				ret = fill_buffer_with_key(&key_page, key_buf, size, 
 					actual_size, namespace_prefix);
-				if (ret < 0)
+				if (ret < 0) {
+					write_log(0, "Error: Size of buffer is "
+						"too small in list_xattr()\n");
 					return -ERANGE;
+				}
 				pos = key_page.next_list_pos;
 			}
 		}
