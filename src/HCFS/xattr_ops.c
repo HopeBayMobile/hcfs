@@ -533,21 +533,14 @@ errcode_handle:
 
 }
 
-/*** A debugged function used to print key-value. It will be removed later. ***/
-static void print_key(KEY_LIST_PAGE *key_page, META_CACHE_ENTRY_STRUCT *body)
+/*** A debugged function used to print key-value. ***/
+static void print_keys_to_log(KEY_LIST_PAGE *key_page)
 {
 	int i;
 	for (i = 0 ; i < key_page->num_xattr ; i++) {
-		long long pos = key_page->key_list[i].first_value_block_pos;
-		VALUE_BLOCK block;
-
-		fseek(body->fptr, pos, SEEK_SET);
-		fread(&block, sizeof(VALUE_BLOCK), 1, body->fptr);
-
-		write_log(10, "key[%d] = %s, len = %d, data = %s, data_pos = %lld\n", i, 
+		write_log(10, "Debug: key[%d] = %s, len = %d, data_pos = %lld\n", i, 
 			key_page->key_list[i].key, 
 			key_page->key_list[i].key_size,
-			block.content,
 			key_page->key_list[i].first_value_block_pos);
 	}
 }
@@ -745,6 +738,8 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	/* Step 3: Finally write xattr header(xattr_page) */
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	
+	print_keys_to_log(&target_key_list_page);
 	write_log(10, "Debug setxattr: Now number of xattr = %d, "
 		"now reclaimed_key_page point to %lld, "
 		"and reclaimed_value_block point to %lld\n", 
@@ -1000,6 +995,8 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 		FWRITE(&target_key_list_page, sizeof(KEY_LIST_PAGE), 1, 
 			meta_cache_entry->fptr);
 
+		print_keys_to_log(&target_key_list_page);
+
 	} else { /* Reclaim the key_list_page */
 		long long reclaim_key_list_pos;
 		KEY_LIST_PAGE tmp_list_page;
@@ -1053,6 +1050,7 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	(xattr_page->namespace_page[name_space].num_xattr)--;	
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+	
 	write_log(10, "Debug removexattr: Now number of xattr = %d, "
 		"now reclaimed_key_page point to %lld, "
 		"and reclaimed_value_block point to %lld\n", 

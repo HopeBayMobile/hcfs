@@ -61,6 +61,16 @@ TEST_F(parse_xattr_namespaceTest, NoKey)
 	EXPECT_EQ(-EINVAL, ret);
 }
 
+TEST_F(parse_xattr_namespaceTest, NamespaceTooLong)
+{
+	/* Run */
+	ret = parse_xattr_namespace("useruseruseruseruseruser.a", 
+		&name_space, key);
+
+	/* Verify */
+	EXPECT_EQ(-EOPNOTSUPP, ret);
+}
+
 TEST_F(parse_xattr_namespaceTest, NameTooLong)
 {
 	char name[300];
