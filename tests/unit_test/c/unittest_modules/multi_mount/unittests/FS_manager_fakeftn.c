@@ -94,6 +94,8 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
 }
 int hcfs_init_backend(CURL_HANDLE *curl_handle)
 {
+	if (failedcurlinit == TRUE)
+		return 404;
 	return 200;
 }
 void hcfs_destroy_backend(CURL *curl)
@@ -102,10 +104,16 @@ void hcfs_destroy_backend(CURL *curl)
 }
 int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
+	if (failedput == TRUE)
+		return 404;
+	fseek(fptr, 0, SEEK_SET);
+	fread(&headbuf, sizeof(DIR_META_TYPE), 1, fptr);
 	return 200;
 }
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
+	if (failedget == TRUE)
+		return 404;
 	return 200;
 }
 int FS_is_mounted(char *fsname)

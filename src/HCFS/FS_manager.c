@@ -705,6 +705,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 				&(tpage.dir_entries[count]), sizeof(DIR_ENTRY));
 			num_walked++;
 		}
+		next_node_pos = tpage.tree_walk_next;
 	}
 
 	if ((fs_mgr_head->num_FS != num_walked) ||
@@ -749,6 +750,8 @@ int backup_FS_database(void)
 	ssize_t ret_ssize;
 	off_t curpos;
 
+	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
+
 	/* Assume that the access lock is locked already */
 	fptr = NULL;
 	fptr = fopen("/tmp/FSmgr_upload", "w");
@@ -772,7 +775,6 @@ int backup_FS_database(void)
 	fclose(fptr);
 
 	fptr = NULL;
-	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
 	ret = hcfs_init_backend(&upload_handle);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;

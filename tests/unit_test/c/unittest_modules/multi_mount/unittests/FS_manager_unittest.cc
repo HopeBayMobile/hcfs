@@ -670,5 +670,438 @@ TEST_F(list_filesystemTest, NoFS) {
   EXPECT_EQ(0, retval);
  }  
 
-/* End of the test case for the function check_filesystem */
+TEST_F(list_filesystemTest, MoreFSthanBuf) {
+  int ret;
+  DIR_ENTRY tmp_entry[10];
+  unsigned long retval;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  fs_mgr_head->num_FS = 20;
+
+  ret = list_filesystem(10, tmp_entry, &retval);
+  EXPECT_EQ(0, ret);
+  EXPECT_EQ(20, retval);
+ }  
+
+TEST_F(list_filesystemTest, ReturnFSnumOnly) {
+  int ret;
+  DIR_ENTRY tmp_entry[10];
+  unsigned long retval;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 10;
+
+  ret = list_filesystem(0, NULL, &retval);
+  EXPECT_EQ(0, ret);
+  EXPECT_EQ(10, retval);
+ }  
+
+TEST_F(list_filesystemTest, ListFSOneNode) {
+  int ret;
+  DIR_ENTRY tmp_entry[10];
+  unsigned long retval;
+  DIR_META_TYPE tmphead;
+  DIR_ENTRY_PAGE tmppage;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 10;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 10;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
+  tmppage.num_entries = 10;
+  for (count = 0; count < 10; count++) {
+    tmppage.dir_entries[count].d_ino = 5 + count;
+    snprintf(tmppage.dir_entries[count].d_name, MAX_FILENAME_LEN,
+		"FS_%d", count);
+   }
+  pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
+		sizeof(DIR_META_TYPE));
+
+  ret = list_filesystem(10, tmp_entry, &retval);
+  EXPECT_EQ(0, ret);
+  EXPECT_EQ(10, retval);
+  for (count = 0; count < 10; count++) {
+    EXPECT_EQ(5+count, tmp_entry[count].d_ino);
+    EXPECT_STREQ(tmppage.dir_entries[count].d_name, tmp_entry[count].d_name);
+   }
+ }  
+
+TEST_F(list_filesystemTest, ListFSTwoNodes) {
+  int ret;
+  DIR_ENTRY tmp_entry[20];
+  unsigned long retval;
+  DIR_META_TYPE tmphead;
+  DIR_ENTRY_PAGE tmppage, tmppage2;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 20;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 20;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+
+  memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
+  tmppage.num_entries = 10;
+  for (count = 0; count < 10; count++) {
+    tmppage.dir_entries[count].d_ino = 5 + count;
+    snprintf(tmppage.dir_entries[count].d_name, MAX_FILENAME_LEN,
+		"FS_%d", count);
+   }
+  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+  pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
+		sizeof(DIR_META_TYPE));
+
+  memset(&tmppage2, 0, sizeof(DIR_ENTRY_PAGE));
+  tmppage2.num_entries = 10;
+  for (count = 0; count < 10; count++) {
+    tmppage2.dir_entries[count].d_ino = 100 + count;
+    snprintf(tmppage2.dir_entries[count].d_name, MAX_FILENAME_LEN,
+		"FS_%d", count);
+   }
+  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE);
+  pwrite(fs_mgr_head->FS_list_fh, &tmppage2, sizeof(DIR_ENTRY_PAGE),
+		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE));
+
+  ret = list_filesystem(20, tmp_entry, &retval);
+  EXPECT_EQ(0, ret);
+  EXPECT_EQ(20, retval);
+  for (count = 0; count < 10; count++) {
+    EXPECT_EQ(5+count, tmp_entry[count].d_ino);
+    EXPECT_STREQ(tmppage.dir_entries[count].d_name, tmp_entry[count].d_name);
+   }
+  for (count = 0; count < 0; count++) {
+    EXPECT_EQ(100+count, tmp_entry[count+10].d_ino);
+    EXPECT_STREQ(tmppage2.dir_entries[count].d_name,
+			tmp_entry[count+10].d_name);
+   }
+ }  
+
+TEST_F(list_filesystemTest, RecomputeNum) {
+  int ret;
+  DIR_ENTRY tmp_entry[20];
+  unsigned long retval;
+  DIR_META_TYPE tmphead;
+  DIR_ENTRY_PAGE tmppage, tmppage2;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 10;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 7;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+
+  memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
+  tmppage.num_entries = 10;
+  for (count = 0; count < 10; count++) {
+    tmppage.dir_entries[count].d_ino = 5 + count;
+    snprintf(tmppage.dir_entries[count].d_name, MAX_FILENAME_LEN,
+		"FS_%d", count);
+   }
+  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+  pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
+		sizeof(DIR_META_TYPE));
+
+  memset(&tmppage2, 0, sizeof(DIR_ENTRY_PAGE));
+  tmppage2.num_entries = 10;
+  for (count = 0; count < 10; count++) {
+    tmppage2.dir_entries[count].d_ino = 100 + count;
+    snprintf(tmppage2.dir_entries[count].d_name, MAX_FILENAME_LEN,
+		"FS_%d", count);
+   }
+  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE);
+  pwrite(fs_mgr_head->FS_list_fh, &tmppage2, sizeof(DIR_ENTRY_PAGE),
+		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE));
+
+  ret = list_filesystem(20, tmp_entry, &retval);
+  EXPECT_EQ(0, ret);
+  EXPECT_EQ(20, retval);
+  for (count = 0; count < 10; count++) {
+    EXPECT_EQ(5+count, tmp_entry[count].d_ino);
+    EXPECT_STREQ(tmppage.dir_entries[count].d_name, tmp_entry[count].d_name);
+   }
+  for (count = 0; count < 0; count++) {
+    EXPECT_EQ(100+count, tmp_entry[count+10].d_ino);
+    EXPECT_STREQ(tmppage2.dir_entries[count].d_name,
+			tmp_entry[count+10].d_name);
+   }
+
+  EXPECT_EQ(20, fs_mgr_head->num_FS);
+  pread(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  EXPECT_EQ(20, tmphead.total_children);
+ }  
+
+/* End of the test case for the function list_filesystem */
+
+/* Begin of the test case for the function backup_FS_database */
+
+class backup_FS_databaseTest : public ::testing::Test {
+ protected:
+  int count;
+  char tmpmgrpath[100];
+  FILE *fptr;
+  DIR_META_TYPE tmp_head;
+  virtual void SetUp() {
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    METAPATH = (char *)malloc(sizeof(char)*100);
+    snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    if (access(METAPATH, F_OK) != 0)
+      mkdir(METAPATH, 0700);
+    snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    if (access(tmpmgrpath, F_OK) == 0)
+      unlink(tmpmgrpath);
+    treesplit = FALSE;
+    failedcurlinit = FALSE;
+    failedput = FALSE;
+
+   }
+
+  virtual void TearDown() {
+    if (fs_mgr_head != NULL) {
+      if (fs_mgr_head->FS_list_fh >= 0)
+        close(fs_mgr_head->FS_list_fh);
+      free(fs_mgr_head);
+     }
+    if (fs_mgr_path != NULL)
+      free(fs_mgr_path);
+    unlink(tmpmgrpath);
+    rmdir(METAPATH);
+    rmdir("/tmp/testHCFS");
+    free(METAPATH);
+    free(hcfs_system);
+   }
+ };
+
+TEST_F(backup_FS_databaseTest, CannotCreate) {
+  int ret;
+
+  mknod("/tmp/FSmgr_upload", S_IFREG | 0400, 0);
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  ret = backup_FS_database();
+  EXPECT_EQ(-EACCES, ret);
+  unlink("/tmp/FSmgr_upload");
+ }
+
+TEST_F(backup_FS_databaseTest, UploadDone) {
+  int ret, errcode;
+  DIR_META_TYPE tmphead;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 20;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 20;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+
+  ret = backup_FS_database();
+  EXPECT_EQ(0, ret);
+  errcode = 0;
+  ret = access("/tmp/FSmgr_upload", F_OK);
+  if (ret < 0)
+    errcode = errno;
+  EXPECT_EQ(-1, ret);
+  EXPECT_EQ(ENOENT, errcode);
+  if (ret == 0)
+    unlink("/tmp/FSmgr_upload");
+  EXPECT_EQ(tmphead.total_children, headbuf.total_children);
+  EXPECT_EQ(tmphead.tree_walk_list_head, headbuf.tree_walk_list_head);
+
+ }
+
+TEST_F(backup_FS_databaseTest, FailedInit) {
+  int ret, errcode;
+  DIR_META_TYPE tmphead;
+
+  failedcurlinit = TRUE;
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 20;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 20;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+
+  ret = backup_FS_database();
+  EXPECT_EQ(-EIO, ret);
+
+  errcode = 0;
+  ret = access("/tmp/FSmgr_upload", F_OK);
+  if (ret < 0)
+    errcode = errno;
+  EXPECT_EQ(-1, ret);
+  EXPECT_EQ(ENOENT, errcode);
+  if (ret == 0)
+    unlink("/tmp/FSmgr_upload");
+
+ }
+
+TEST_F(backup_FS_databaseTest, FailedPut) {
+  int ret, errcode;
+  DIR_META_TYPE tmphead;
+
+  failedput = TRUE;
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+  fs_mgr_head->num_FS = 20;
+
+  memset(&tmphead, 0, sizeof(DIR_META_TYPE));
+  tmphead.total_children = 20;
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+
+  ret = backup_FS_database();
+  EXPECT_EQ(-EIO, ret);
+
+  errcode = 0;
+  ret = access("/tmp/FSmgr_upload", F_OK);
+  if (ret < 0)
+    errcode = errno;
+  EXPECT_EQ(-1, ret);
+  EXPECT_EQ(ENOENT, errcode);
+  if (ret == 0)
+    unlink("/tmp/FSmgr_upload");
+
+ }
+
+/* End of the test case for the function backup_FS_database */
+
+/* Begin of the test case for the function restore_FS_database */
+
+class restore_FS_databaseTest : public ::testing::Test {
+ protected:
+  int count;
+  char tmpmgrpath[100];
+  FILE *fptr;
+  DIR_META_TYPE tmp_head;
+  virtual void SetUp() {
+    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    METAPATH = (char *)malloc(sizeof(char)*100);
+    snprintf(METAPATH, 100, "/tmp/testHCFS/metapath");
+    if (access("/tmp/testHCFS", F_OK) != 0)
+      mkdir("/tmp/testHCFS", 0700);
+    if (access(METAPATH, F_OK) != 0)
+      mkdir(METAPATH, 0700);
+    snprintf(tmpmgrpath, 100, "%s/fsmgr", METAPATH);
+    if (access(tmpmgrpath, F_OK) == 0)
+      unlink(tmpmgrpath);
+    treesplit = FALSE;
+    failedcurlinit = FALSE;
+    failedget = FALSE;
+
+   }
+
+  virtual void TearDown() {
+    unlink(tmpmgrpath);
+    rmdir(METAPATH);
+    rmdir("/tmp/testHCFS");
+    free(METAPATH);
+    free(hcfs_system);
+   }
+ };
+
+TEST_F(restore_FS_databaseTest, CannotCreate) {
+  int ret;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  if (fs_mgr_head != NULL) {
+    if (fs_mgr_head->FS_list_fh >= 0)
+      close(fs_mgr_head->FS_list_fh);
+    free(fs_mgr_head);
+   }
+
+  chmod(tmpmgrpath, 0400);
+
+  ret = restore_FS_database();
+  EXPECT_EQ(-EACCES, ret);
+  chmod(fs_mgr_path, 0700);
+  if (fs_mgr_path != NULL)
+    free(fs_mgr_path);
+ }
+
+TEST_F(restore_FS_databaseTest, CurlInitFailed) {
+  int ret;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  if (fs_mgr_head != NULL) {
+    if (fs_mgr_head->FS_list_fh >= 0)
+      close(fs_mgr_head->FS_list_fh);
+    free(fs_mgr_head);
+   }
+
+  failedcurlinit = TRUE;
+  ret = restore_FS_database();
+  EXPECT_EQ(-EIO, ret);
+
+  if (fs_mgr_path != NULL)
+    free(fs_mgr_path);
+ }
+
+TEST_F(restore_FS_databaseTest, CurlGetFailed) {
+  int ret;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  if (fs_mgr_head != NULL) {
+    if (fs_mgr_head->FS_list_fh >= 0)
+      close(fs_mgr_head->FS_list_fh);
+    free(fs_mgr_head);
+   }
+
+  failedget = TRUE;
+  ret = restore_FS_database();
+  EXPECT_EQ(-EIO, ret);
+
+  if (fs_mgr_path != NULL)
+    free(fs_mgr_path);
+ }
+
+TEST_F(restore_FS_databaseTest, DownloadDone) {
+  int ret;
+
+  ret = init_fs_manager();
+  ASSERT_EQ(0, ret);
+
+  if (fs_mgr_head != NULL) {
+    if (fs_mgr_head->FS_list_fh >= 0)
+      close(fs_mgr_head->FS_list_fh);
+    free(fs_mgr_head);
+   }
+
+  ret = restore_FS_database();
+  EXPECT_EQ(0, ret);
+
+  if (fs_mgr_path != NULL)
+    free(fs_mgr_path);
+ }
+
+/* End of the test case for the function restore_FS_database */
 
