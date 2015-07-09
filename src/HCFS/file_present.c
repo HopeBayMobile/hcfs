@@ -443,7 +443,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	if (xattr_page == NULL)
 		return -ENOMEM;
 
-	/* First lookup stat to confirm the file type. */
+	/* First lookup stat to confirm the file type. Do NOT need to lock entry */
 	ret_code = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
 	if (ret_code < 0)

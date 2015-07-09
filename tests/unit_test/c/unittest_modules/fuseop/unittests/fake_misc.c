@@ -7,6 +7,7 @@
 #include "meta_mem_cache.h"
 #include "filetables.h"
 #include "hcfs_fromcloud.h"
+#include "xattr_ops.h"
 #include "global.h"
 
 #include "fake_misc.h"
@@ -560,6 +561,53 @@ int lookup_destroy()
 }
 
 int write_log(int level, char *format, ...)
+{
+	return 0;
+}
+
+int parse_xattr_namespace(const char *name, char *name_space, char *key)
+{
+	return 0;
+}
+
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+        const long long xattr_filepos, const char name_space, const char *key, 
+	const char *value, const size_t size, const int flag)
+{
+	return 0;
+}
+
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const char name_space, const char *key, char *value, const size_t size, 
+	size_t *actual_size)
+{
+	return 0;
+}
+
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	char *key_buf, const size_t size, size_t *actual_size)
+{
+	return 0;
+}
+
+int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+	const long long xattr_filepos, const char name_space, const char *key)
+{
+	return 0;
+}
+
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *xattr_pos)
+{
+	return 0;
+}
+
+int init_api_interface(void)
+{
+	return 0;
+}
+
+int destroy_api_interface(void)
 {
 	return 0;
 }

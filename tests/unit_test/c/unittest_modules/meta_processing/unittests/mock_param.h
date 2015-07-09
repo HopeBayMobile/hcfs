@@ -40,9 +40,12 @@ struct stat to_verified_stat;
 #define INO_DELETE_FILE_BLOCK 200000
 #define INO_DELETE_DIR 12345
 
-/* fetch_inode_stat() */
-#define INO_REGFILE 7
-#define INO_DIR 8
+/* fetch_inode_stat() & fetch_xattr_page() */
+#define INO_REGFILE 12213
+#define INO_DIR 9403
+#define INO_LINK 8234
+#define INO_DIR_XATTR_PAGE_EXIST 14423
+#define INO_REGFILE_XATTR_PAGE_EXIST 8904
 #define GENERATION_NUM 5
 
 /* mknod_update_meta() & mkdir_update_meta() */
