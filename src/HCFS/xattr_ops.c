@@ -110,7 +110,7 @@ static unsigned hash(const char *input)
  *
  * @return none.
  */
-static void copy_key_entry(KEY_ENTRY *key_entry, const char *key, 
+static inline void copy_key_entry(KEY_ENTRY *key_entry, const char *key, 
 	long long value_pos, size_t size)
 {
 	strcpy(key_entry->key, key);
@@ -147,6 +147,8 @@ int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			meta_cache_entry->fptr);
 		/* Reclaimed_list point to next key_list_page */
 		xattr_page->reclaimed_key_list_page = key_list_page.next_list_pos;
+		write_log(5, "Get reclaimed key page, pointing to %lld\n", 
+			ret_pos);
 
 	} else { /* No reclaimed page, return file pos of EOF */
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
@@ -154,6 +156,8 @@ int get_usable_key_list_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 		memset(&empty_page, 0, sizeof(KEY_LIST_PAGE));
 		FWRITE(&empty_page, sizeof(KEY_LIST_PAGE), 1, meta_cache_entry->fptr);
+		write_log(5, "Allocate a new key page, pointing to %lld\n", 
+			ret_pos);
 	}
 
 	*usable_pos = ret_pos;
@@ -295,7 +299,8 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	} while (key_list_pos);
 	
 	/* Key existed, return 0 */
-	if (hit_key_entry == TRUE) { 
+	if (hit_key_entry == TRUE) {
+		write_log(10, "Debug: key is found.\n");
 		memcpy(target_key_list_page, &now_key_page, sizeof(KEY_LIST_PAGE));
 		*key_index = index;
 		*target_key_list_pos = key_list_pos;
@@ -307,6 +312,7 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	}
 	/* Hit nothing, and all key list are full, return the last page! */
 	if ((hit_key_entry == FALSE) && (find_first_insert == FALSE)) {
+		write_log(10, "Debug: Key is NOT found and all key pages are full.\n");
 		memcpy(target_key_list_page, &now_key_page, sizeof(KEY_LIST_PAGE));
 		*key_index = -1;
 		*target_key_list_pos = prev_key_list_pos;
@@ -315,6 +321,8 @@ int find_key_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	/* Hit nothing, can insert into an entry but don't have to allocate
 	   a new page, return the page which can be inserted key. */
 	if ((hit_key_entry == FALSE) && (find_first_insert == TRUE)) {
+		write_log(10, "Debug: Key is NOT found and it can be inserted to "
+			"an existed key page.\n");
 		return 1;
 	}
 
@@ -353,6 +361,8 @@ int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FSEEK(meta_cache_entry->fptr, *replace_value_block_pos, SEEK_SET);
 		FREAD(&value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
 		*replace_value_block_pos = value_block.next_block_pos;
+		write_log(5, "Get original value block, pointing to %lld\n", 
+			*usable_value_pos);
 		return 0;
 	}
 
@@ -364,6 +374,8 @@ int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			SEEK_SET);
 		FREAD(&value_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
 		xattr_page->reclaimed_value_block = value_block.next_block_pos;
+		write_log(5, "Get reclaimed value block, pointing to %lld\n", 
+			*usable_value_pos);
 		return 0;
 	}
 
@@ -375,6 +387,8 @@ int get_usable_value_filepos(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	FWRITE(&empty_block, sizeof(VALUE_BLOCK), 1, meta_cache_entry->fptr);
 	
 	*usable_value_pos = ret_pos;
+	write_log(5, "Allocate a new value block, pointing to %lld\n", 
+		*usable_value_pos);
 	return 0;
 
 errcode_handle:
@@ -525,6 +539,9 @@ int reclaim_replace_value_block(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	
 	/* Link first reclaimed block to head block */
 	xattr_page->reclaimed_value_block = head_pos;
+	
+	write_log(5, "Debug: Now head of reclaimed value blocks points to %lld\n",
+		xattr_page->reclaimed_value_block);
 
 	return 0;
 
@@ -533,7 +550,7 @@ errcode_handle:
 
 }
 
-/*** A debugged function used to print key-value. ***/
+/*** A debugged function used to print key-value in a key page. ***/
 static void print_keys_to_log(KEY_LIST_PAGE *key_page)
 {
 	int i;
@@ -808,7 +825,7 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 
 	if (size > 0) {
 		if (size < *actual_size) {
-			write_log(0, "Size of key buffer is too small\n");
+			write_log(0, "Error: Size of key buffer is too small\n");
 			return -ERANGE;
 		}
 		
@@ -856,8 +873,6 @@ static int fill_buffer_with_key(const KEY_LIST_PAGE *key_page, char *key_buf,
 
 			memcpy(&key_buf[*actual_size], tmp_buf, 
 				sizeof(char) * key_size);
-			
-			write_log(10, "Debug: list key = %s\n", tmp_buf);
 		}
 		
 		*actual_size += key_size;

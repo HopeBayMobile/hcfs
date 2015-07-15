@@ -3818,7 +3818,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
-		write_log(0, "setxattr error: lock_entry fail\n");
+		write_log(0, "Error: setxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -3835,7 +3835,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "setxattr error: Permission denied (WRITE needed)\n");
+		write_log(0, "Error: setxattr Permission denied (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -3843,7 +3843,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
-		write_log(0, "Allocate memory error\n");
+		write_log(0, "Error: Allocate memory error\n");
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
@@ -3917,7 +3917,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
-		write_log(0, "getxattr error: lock_entry fail\n");
+		write_log(0, "Error: getxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -3933,7 +3933,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "getxattr error: Permission denied (READ needed)\n");
+		write_log(0, "Error: getxattr permission denied (READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -3941,7 +3941,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
-		write_log(0, "Allocate memory error\n");
+		write_log(0, "Error: Allocate memory error\n");
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
@@ -3955,7 +3955,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (size != 0) {
 		value = (char *) malloc(sizeof(char) * size);
 		if (!value) {
-			write_log(0, "Allocate memory error\n");
+			write_log(0, "Error: Allocate memory error\n");
 			retcode = -ENOMEM;
 			goto error_handle;
 		}
@@ -4034,7 +4034,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
-		write_log(0, "listxattr error: lock_entry fail\n");
+		write_log(0, "Error: listxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -4047,7 +4047,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
-		write_log(0, "Allocate memory error\n");
+		write_log(0, "Error: Allocate memory error\n");
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
@@ -4060,7 +4060,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	if (size != 0) {
 		key_buf = (char *) malloc(sizeof(char) * size);
 		if (!key_buf) {
-			write_log(0, "Allocate memory error\n");
+			write_log(0, "Error: Allocate memory error\n");
 			retcode = -ENOMEM;
 			goto error_handle;
 		}
@@ -4141,7 +4141,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {	
-		write_log(0, "removexattr error: lock_entry fail\n");
+		write_log(0, "Error: removexattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
@@ -4154,7 +4154,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
 	if (!xattr_page) {
-		write_log(0, "Allocate memory error\n");
+		write_log(0, "Error: Allocate memory error\n");
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
@@ -4167,7 +4167,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
 		name_space, key);
 	if (retcode < 0) { /* ENOENT or others */
-		write_log(0, "removexattr error: remove xattr fail\n");
+		write_log(0, "Error: removexattr remove xattr fail\n");
 		goto error_handle;
 	}
 	
