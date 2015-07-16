@@ -1779,3 +1779,45 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
 
 /* End of the test case for the function hfuse_ll_readdir */
 
+/* 
+	Unittest of hfuse_ll_setxattr()
+ */
+
+class hfuse_ll_setxattrTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_setxattrTest, SetKeyWithoutValue)
+{
+	int ret;
+	int errcode;
+
+	ret = setxattr("/tmp/test_fuse/testfile", "user.aaa", "", 0, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EINVAL, errcode);
+}
+
+TEST_F(hfuse_ll_setxattrTest, NamespaceInvalid)
+{
+	int ret;
+	int errcode;
+
+	ret = setxattr("/tmp/test_fuse/testfile", "aloha.aaa", "123", 3, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EOPNOTSUPP, errcode);
+}
+
+/*
+	End of unittest of hfuse_ll_setxattr()
+ */

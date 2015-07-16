@@ -577,7 +577,10 @@ int write_log(int level, char *format, ...)
 
 int parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
-	return 0;
+	if (!strcmp(name, "user"))
+		return 0;
+	else
+		return -EOPNOTSUPP;
 }
 
 int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 

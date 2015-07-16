@@ -148,3 +148,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
+{
+	return 0;
+}

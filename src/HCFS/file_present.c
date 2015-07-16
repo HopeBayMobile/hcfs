@@ -433,8 +433,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	DIR_META_TYPE dirmeta;
 	int errcode;
 	int ret;
-	long long ret_pos;
-	long long ret_size; 
+	long long ret_pos, ret_size;
 
 	this_inode = meta_cache_entry->inode_num;
 	if (this_inode <= 0) {
@@ -469,10 +468,16 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		*xattr_pos = dirmeta.next_xattr_page; /* Get xattr file position */
 	}
 	/* TODO: case symlink */
-	
-	ret = meta_cache_open_file(meta_cache_entry);
-	if (ret < 0)
+
+	/* It is used to prevent user from forgetting to open meta file */
+	ret_code = meta_cache_open_file(meta_cache_entry); 
+	if (ret_code < 0)
 		return ret_code;
+
+	ret_code = flush_single_entry(meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+
 	/* Allocate a xattr page if it is first time to insert xattr */
 	if (*xattr_pos == 0) { /* No xattr before. Allocate new XATTR_PAGE */
 		memset(xattr_page, 0, sizeof(XATTR_PAGE));
