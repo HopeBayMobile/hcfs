@@ -24,6 +24,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <fuse/fuse_opt.h>
+
 #include "params.h"
 
 /*BEGIN META definition*/
@@ -148,6 +150,8 @@ typedef struct {
 } SYSTEM_DATA_HEAD;
 
 SYSTEM_DATA_HEAD *hcfs_system;
+
+struct fuse_args global_fuse_args;
 
 /* Functions for initializing HCFS */
 

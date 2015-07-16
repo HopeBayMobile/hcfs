@@ -507,7 +507,9 @@ int delete_filesystem(char *fsname)
 	}
 
 	/* Check if filesystem is mounted. If so, returns error */
+	sem_wait(&(mount_mgr.mount_lock));
 	ret = FS_is_mounted(fsname);
+	sem_post(&(mount_mgr.mount_lock));
 
 	if (ret < 0) {
 		errcode = ret;
@@ -592,12 +594,21 @@ errcode_handle:
 *************************************************************************/
 int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 {
+	int ret;
+	/* This is the wrapper around check_filesytem_core, and
+	also locks FS manager lock */
+	sem_wait(&(fs_mgr_head->op_lock));
+
+	ret = check_filesystem_core(fsname, ret_entry);
+	sem_post(&(fs_mgr_head->op_lock));
+	return ret;
+}
+int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
+{
 	DIR_ENTRY_PAGE tpage, tpage2;
 	DIR_META_TYPE tmp_head;
 	int ret, errcode, ret_index;
 	ssize_t ret_ssize;
-
-	sem_wait(&(fs_mgr_head->op_lock));
 
 	if (strlen(fsname) > MAX_FILENAME_LEN) {
 		errcode = ENAMETOOLONG;
@@ -636,8 +647,6 @@ int check_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	return 0;
 errcode_handle:
-	sem_post(&(fs_mgr_head->op_lock));
-
 	return errcode;
 }
 

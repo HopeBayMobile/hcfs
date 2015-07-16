@@ -80,7 +80,8 @@ to zero (to save space in the long run).
 	4. in unmount, can pick either scanning lookup table for inodes
 to delete or list the folder.
 */
-
+/* TODO: Save global fuse arguments in global_fuse_args, to be called by
+mount manager */
 /* TODO: for mechanisms that needs timer, use per-process or per-thread
 cpu clock instead of using current time to avoid time changes due to
 ntpdate / ntpd or manual changes*/
