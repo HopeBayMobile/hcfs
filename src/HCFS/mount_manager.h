@@ -20,6 +20,7 @@
 #include <semaphore.h>
 
 #include "params.h"
+#include "fuseop.h"
 
 /*
 Binary search tree
@@ -72,7 +73,7 @@ int unmount_all(void);
 
 /* If is_unmount is set, FUSE destroy routine should not call
 unmount_event */
-int unmount_event(char *fsname); /* Called by FUSE destroy */
+void* unmount_event(void *fsnameptr); /* Called by FUSE destroy */
 int mount_status(char *fsname);
 
 /* Below are helper functions. Will not process lock / unlock in these

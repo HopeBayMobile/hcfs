@@ -3466,6 +3466,8 @@ void hfuse_ll_destroy(void *userdata)
 {
 	int dl_count;
 
+/* TODO: If "is_unmount" in userdata is TRUE, do not call unmount_event */
+/* TODO: fork a thread to call unmount_event */
 	release_meta_cache_headers();
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
@@ -3772,7 +3774,7 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 }
 
 /* Specify the functions used for the FUSE operations */
-static struct fuse_lowlevel_ops hfuse_ops = {
+struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
 	.mknod = hfuse_ll_mknod,
 	.mkdir = hfuse_ll_mkdir,
@@ -3849,6 +3851,11 @@ int hook_fuse(int argc, char **argv)
 	session = fuse_lowlevel_new(&args, &hfuse_ops, sizeof(hfuse_ops), NULL);
 	fuse_set_signal_handlers(session);
 	fuse_session_add_chan(session, fuse_channel);
+	if (mt)
+		hcfs_system->multi_thread = TRUE;
+	else
+		hcfs_system->multi_thread = FALSE;
+
 	if (mt)
 		pthread_create(&HCFS_mount, NULL, mount_multi_thread,
 				(void *)session);

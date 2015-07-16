@@ -10,14 +10,19 @@
 * 2015/7/15 Jiahong adding content
 *
 **************************************************************************/
+#define FUSE_USE_VERSION 29
 
 #include "mount_manager.h"
 
 #include <errno.h>
 #include <string.h>
+#include <signal.h>
 
+#include "fuse.h"
 #include "global.h"
 #include "FS_manager.h"
+
+extern struct fuse_lowlevel_ops hfuse_ops;
 
 /************************************************************************
 *
@@ -134,7 +139,7 @@ int insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info)
 	int ret;
 	MOUNT_NODE_T *next;
 
-	ret = strcmp(fsname, (node->mt_entry).f_name);
+	ret = strcmp(fsname, (node->mt_entry)->f_name);
 	if (ret == 0) {
 		/* Found the entry */
 		return -EEXIST;
@@ -185,14 +190,14 @@ should be handled in the unmount routines */
 /************************************************************************
 *
 * Function name: delete_mount
-*        Inputs: char *fsname, MOUNT_NODE_T *node
+*        Inputs: char *fsname, MOUNT_NODE_T **node
 *       Summary: Delete "fsname" in the mount database. If deleted, the node
 *                is not freed immediately, but will be returned via "node".
 *
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int delete_mount(char *fsname, MOUNT_NODE_T *ret_node)
+int delete_mount(char *fsname, MOUNT_NODE_T **ret_node)
 {
 	int ret, errcode;	
 	MOUNT_NODE_T *root;
@@ -241,7 +246,8 @@ void replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T *ret_node)
 	return replace_with_largest_child(node->rchild, ret_node);
 }
 
-int delete_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_NODE_T *ret_node)
+int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
+					MOUNT_NODE_T **ret_node)
 {
 	int ret;
 	MOUNT_NODE_T *next;
@@ -251,7 +257,7 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_NODE_T *ret_node)
 	/* Check if this is the one */
 	if (ret == 0) {
 		mount_mgr.num_mt_FS--;
-		ret_node = node;
+		*ret_node = node;
 		/* If no children, update parent and return */
 		if ((node->lchild == NULL) && (node->rchild == NULL)) {
 			if (node->parent == NULL) {
@@ -368,7 +374,7 @@ int destroy_mount_mgr(void)
 int FS_is_mounted(char *fsname)
 {
 	int ret;
-	MOUNT_T tmpinfo;
+	MOUNT_T *tmpinfo;
 
 	ret = search_mount(fsname, &tmpinfo);
 	if (ret == 0)
@@ -394,16 +400,19 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 	new_info->session_ptr = tmp_session;
 	new_info->chan_ptr = tmp_channel;
 	new_info->is_unmount = FALSE;
-
-	pthread_create(&(new_info->mt_thread), NULL, fuse_session_loop_mt,
-			(void *)new_info);
+	if (hcfs_system->multi_thread == TRUE)
+		pthread_create(&(new_info->mt_thread), NULL,
+			mount_multi_thread, (void *)new_info);
+	else
+		pthread_create(&(new_info->mt_thread), NULL,
+			mount_single_thread, (void *)new_info);
 	/* TODO: checking for failed mount */
 	return 0;
 }
 /* Helper for unmounting */
 int do_unmount_FS(MOUNT_T *mount_info)
 {
-	pthread_join(mount_info->mt_thread);
+	pthread_join(mount_info->mt_thread, NULL);
 	fuse_session_remove_chan(mount_info->chan_ptr);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
 	fuse_session_destroy(mount_info->session_ptr);
@@ -423,7 +432,7 @@ int do_unmount_FS(MOUNT_T *mount_info)
 int mount_FS(char *fsname, char *mp) {
 
 	int ret, errcode;
-	MOUNT_T tmp_info, *new_info;
+	MOUNT_T *tmp_info, *new_info;
 	DIR_ENTRY tmp_entry;
 
 	sem_wait(&(fs_mgr_head->op_lock));
@@ -464,14 +473,14 @@ int mount_FS(char *fsname, char *mp) {
 	}
 
 	new_info->f_ino = tmp_entry.d_ino;
-	strcpy(&(new_info->f_name), fsname);
+	strcpy((new_info->f_name), fsname);
 	new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 	if (new_info->f_mp == NULL) {
 		errcode = -ENOMEM;
 		write_log(0, "Out of memory in %s\n", __func__);
 		goto errcode_handle;
 	}
-	strcpy(&(new_info->f_mp), mp);
+	strcpy((new_info->f_mp), mp);
 
 	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
@@ -487,14 +496,14 @@ int mount_FS(char *fsname, char *mp) {
 		goto errcode_handle;
 	}
 
-	sem_post(&(fs_mgr_head->op_lock));
 	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
 
 errcode_handle:
-	sem_post(&(fs_mgr_head->op_lock));
 	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
 	return errcode;
 }
 
@@ -539,21 +548,137 @@ int unmount_FS(char *fsname)
 	free(ret_node->mt_entry);
 	free(ret_node);
 
-	sem_post(&(fs_mgr_head->op_lock));
 	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
 
 errcode_handle:
-	sem_post(&(fs_mgr_head->op_lock));
 	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
 	return errcode;
 }
-int unmount_all(void);
 
-/* If is_unmount is set, FUSE destroy routine should not call
-unmount_event */
-int unmount_event(char *fsname); /* Called by FUSE destroy */
-int mount_status(char *fsname);
+/************************************************************************
+*
+* Function name: unmount_event
+*        Inputs: void *fsnameptr
+*       Summary: Unmount filesystem "fsnameptr" from FUSE destroy routine.
+*
+*  Return value: None
+*
+*          Note: If is_unmount is set, FUSE destroy routine should not call
+*                unmount_event
+*************************************************************************/
+void* unmount_event(void *fsnameptr)
+{
+	int ret, errcode;
+	MOUNT_T *ret_info;
+	MOUNT_NODE_T *ret_node;
+	char *fsname;
 
+	fsname = (char *)fsnameptr;
+
+	sem_wait(&(fs_mgr_head->op_lock));
+	sem_wait(&(mount_mgr.mount_lock));
+
+	/* Need to unmount FUSE and set is_unmount */
+
+	ret = search_mount(fsname, &ret_info);
+	if (ret < 0) {
+		if (ret == -ENOENT)
+			write_log(2, "Unmount error: Not mounted\n");
+		else
+			write_log(0, "Unexpected error in unmounting.\n");
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	do_unmount_FS(ret_info);
+
+	ret = delete_mount(fsname, &ret_node);
+
+	free((ret_node->mt_entry)->f_mp);
+	free(ret_node->mt_entry);
+	free(ret_node);
+
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return NULL;
+
+errcode_handle:
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+	return NULL;
+}
+
+/************************************************************************
+*
+* Function name: mount_status
+*        Inputs: char *fsname
+*       Summary: Checks if "fsname" is mounted.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*************************************************************************/
+int mount_status(char *fsname)
+{
+	int ret;
+
+	sem_wait(&(fs_mgr_head->op_lock));
+	sem_wait(&(mount_mgr.mount_lock));
+	ret = FS_is_mounted(fsname);
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return ret;
+}
+
+/************************************************************************
+*
+* Function name: unmount_all
+*        Inputs: None
+*       Summary: Unmount all filesystems.
+*
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int unmount_all(void)
+{
+	int ret, errcode;
+	MOUNT_T *ret_info;
+	MOUNT_NODE_T *ret_node;
+	char fsname[MAX_FILENAME_LEN+1];
+
+	sem_wait(&(fs_mgr_head->op_lock));
+	sem_wait(&(mount_mgr.mount_lock));
+
+	/* Need to unmount FUSE and set is_unmount */
+	while (mount_mgr.root != NULL) {
+		/* If exists some FS */
+		strcpy(fsname, ((mount_mgr.root)->mt_entry)->f_name);
+		ret_info = (mount_mgr.root)->mt_entry;
+
+		ret_info->is_unmount = TRUE;
+		pthread_kill(ret_info->mt_thread, SIGHUP);
+		do_unmount_FS(ret_info);
+
+		ret = delete_mount(fsname, &ret_node);
+
+		free((ret_node->mt_entry)->f_mp);
+		free(ret_node->mt_entry);
+		free(ret_node);
+		write_log(5, "Unmounted filesystem %s\n", fsname);
+	}
+
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+
+	return 0;
+
+errcode_handle:
+	sem_post(&(mount_mgr.mount_lock));
+	sem_post(&(fs_mgr_head->op_lock));
+	return errcode;
+}
 
