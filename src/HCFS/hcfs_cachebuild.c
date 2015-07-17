@@ -31,6 +31,7 @@
 #include "fuseop.h"
 #include "super_block.h"
 #include "logger.h"
+#include "global.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -278,6 +279,8 @@ int build_cache_usage(void)
 		}
 
 		while (direntptr != NULL) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			errcode = 0;
 			ret = sscanf(temp_dirent.d_name, "block%ld_%lld",
 							&this_inode, &blockno);
@@ -353,6 +356,8 @@ int build_cache_usage(void)
 		}
 
 		closedir(dirptr);
+		if (hcfs_system->system_going_down == TRUE)
+			break;
 	}
 	return 0;
 }
