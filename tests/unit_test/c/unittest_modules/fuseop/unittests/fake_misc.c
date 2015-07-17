@@ -455,14 +455,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_ino = 18;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
+		break;
 	case 19:
 		inode_stat->st_ino = 19;
 		inode_stat->st_mode = S_IFREG | 0500;
 		inode_stat->st_atime = 100000;
+		break;
 	case 20:
 		inode_stat->st_ino = 20;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}

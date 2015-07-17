@@ -153,6 +153,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			inode_stat->st_ino = 20;
 			inode_stat->st_mode = S_IFREG | 0700;
 			inode_stat->st_atime = 100000;
+			break;
 		default:
 			break;
 		}
