@@ -1782,7 +1782,6 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
 /* 
 	Unittest of hfuse_ll_setxattr()
  */
-
 class hfuse_ll_setxattrTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -1799,7 +1798,8 @@ TEST_F(hfuse_ll_setxattrTest, SetKeyWithoutValue)
 	int ret;
 	int errcode;
 
-	ret = setxattr("/tmp/test_fuse/testfile", "user.aaa", "", 0, 0);
+	ret = setxattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa", "", 0, 0);
 	errcode = errno;
 
 	EXPECT_EQ(-1, ret);
@@ -1811,13 +1811,257 @@ TEST_F(hfuse_ll_setxattrTest, NamespaceInvalid)
 	int ret;
 	int errcode;
 
-	ret = setxattr("/tmp/test_fuse/testfile", "aloha.aaa", "123", 3, 0);
+	ret = setxattr("/tmp/test_fuse/testsetxattr", 
+		"aloha.aaa", "123", 3, 0);
 	errcode = errno;
 
 	EXPECT_EQ(-1, ret);
 	EXPECT_EQ(EOPNOTSUPP, errcode);
 }
 
+TEST_F(hfuse_ll_setxattrTest, PermissionDenied)
+{
+	int ret;
+	int errcode;
+	
+	ret = setxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
+		"user.aaa", "123", 3, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_setxattrTest, InsertXattrReturnFail)
+{
+	int ret;
+	int errcode;
+	
+	ret = setxattr("/tmp/test_fuse/testsetxattr_fail", 
+		"user.aaa", "123", 3, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_setxattrTest, InsertXattrSuccess)
+{
+	int ret;
+	int errcode;
+	
+	ret = setxattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa", "123", 3, 0);
+
+	EXPECT_EQ(0, ret);
+}
 /*
 	End of unittest of hfuse_ll_setxattr()
  */
+
+/* 
+	Unittest of hfuse_ll_getxattr()
+ */
+class hfuse_ll_getxattrTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_getxattrTest, NamespaceInvalid)
+{
+	int ret;
+	int errcode;
+	char buf[10];
+
+	ret = getxattr("/tmp/test_fuse/testsetxattr", 
+		"aloha.aaa", buf, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EOPNOTSUPP, errcode);
+}
+
+TEST_F(hfuse_ll_getxattrTest, PermissionDenied)
+{
+	int ret;
+	int errcode;
+	char buf[10];
+	
+	ret = getxattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
+		"user.aaa", buf, 0);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_getxattrTest, GetCorrectValueSizeSuccess)
+{
+	int ret;
+	int errcode;
+	char buf[10];
+	
+	ret = getxattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa", buf, 0);
+
+	EXPECT_EQ(CORRECT_VALUE_SIZE, ret);
+}
+
+TEST_F(hfuse_ll_getxattrTest, GetValueFail)
+{
+	int ret;
+	int errcode;
+	char buf[100];
+	
+	ret = getxattr("/tmp/test_fuse/testsetxattr_fail", 
+		"user.aaa", buf, 100);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_getxattrTest, GetValueSuccess)
+{
+	int ret;
+	int errcode;
+	char buf[100];
+	
+	ret = getxattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa", buf, 100);
+
+	EXPECT_EQ(0, ret);
+}
+/* 
+	End of unittest of hfuse_ll_getxattr()
+ */
+
+/* 
+	Unittest of hfuse_ll_listxattr()
+ */
+class hfuse_ll_listxattrTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_listxattrTest, GetCorrectValueSizeSuccess)
+{
+	int ret;
+	int errcode;
+	char buf[10];
+	
+	ret = listxattr("/tmp/test_fuse/testsetxattr", 
+		buf, 0);
+
+	EXPECT_EQ(CORRECT_VALUE_SIZE, ret);
+}
+
+TEST_F(hfuse_ll_listxattrTest, GetValueFail)
+{
+	int ret;
+	int errcode;
+	char buf[100];
+	
+	ret = listxattr("/tmp/test_fuse/testsetxattr_fail", 
+		buf, 100);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
+{
+	int ret;
+	int errcode;
+	char buf[100];
+	
+	ret = listxattr("/tmp/test_fuse/testsetxattr", 
+		buf, 100);
+
+	EXPECT_EQ(0, ret);
+}
+
+/* 
+	End of unittest of hfuse_ll_listxattr()
+ */
+
+/* 
+	Unittest of hfuse_ll_removexattr()
+ */
+class hfuse_ll_removexattrTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_removexattrTest, NamespaceInvalid)
+{
+	int ret;
+	int errcode;
+
+	ret = removexattr("/tmp/test_fuse/testsetxattr", 
+		"aloha.aaa");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EOPNOTSUPP, errcode);
+}
+
+TEST_F(hfuse_ll_removexattrTest, PermissionDenied)
+{
+	int ret;
+	int errcode;
+	
+	ret = removexattr("/tmp/test_fuse/testsetxattr_permissiondeny", 
+		"user.aaa");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_removexattrTest, RemoveXattrReturnFail)
+{
+	int ret;
+	int errcode;
+	
+	ret = removexattr("/tmp/test_fuse/testsetxattr_fail", 
+		"user.aaa");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
+{
+	int ret;
+	int errcode;
+	
+	ret = removexattr("/tmp/test_fuse/testsetxattr", 
+		"user.aaa");
+
+	EXPECT_EQ(0, ret);
+}
+/*
+	End of unittest of hfuse_ll_removexattr()
+ */
+

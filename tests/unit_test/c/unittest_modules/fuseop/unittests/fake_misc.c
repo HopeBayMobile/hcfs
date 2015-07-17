@@ -79,6 +79,15 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	if (strcmp(path, "/testlistdir") == 0) {
 		return 17;
 	}
+	if (strcmp(path, "/testsetxattr") == 0) {
+		return 18;
+	}
+	if (strcmp(path, "/testsetxattr_permissiondeny") == 0) {
+		return 19;
+	}
+	if (strcmp(path, "/testsetxattr_fail") == 0) {
+		return 20;
+	}
 
 	*errcode = -EACCES;
 	return 0;
@@ -155,6 +164,18 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 		if (strcmp(childname, "testlistdir") == 0) {
 			this_inode = 17;
 			this_type = D_ISDIR;
+		}
+		if (strcmp(childname, "testsetxattr") == 0) {
+			this_inode = 18;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testsetxattr_permissiondeny") == 0) {
+			this_inode = 19;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testsetxattr_fail") == 0) {
+			this_inode = 20;
+			this_type = D_ISREG;
 		}
 	}
 
@@ -430,6 +451,18 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 18:
+		inode_stat->st_ino = 18;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+	case 19:
+		inode_stat->st_ino = 19;
+		inode_stat->st_mode = S_IFREG | 0500;
+		inode_stat->st_atime = 100000;
+	case 20:
+		inode_stat->st_ino = 20;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
 	default:
 		break;
 	}
@@ -577,7 +610,7 @@ int write_log(int level, char *format, ...)
 
 int parse_xattr_namespace(const char *name, char *name_space, char *key)
 {
-	if (!strcmp(name, "user"))
+	if (!strcmp(name, "user.aaa"))
 		return 0;
 	else
 		return -EOPNOTSUPP;
@@ -587,6 +620,9 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
         const long long xattr_filepos, const char name_space, const char *key, 
 	const char *value, const size_t size, const int flag)
 {
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;
+
 	return 0;
 }
 
@@ -594,18 +630,37 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	const char name_space, const char *key, char *value, const size_t size, 
 	size_t *actual_size)
 {
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;	
+	
+	if (size == 0)
+		*actual_size = CORRECT_VALUE_SIZE;
+	else
+		strcpy(value, "hello!getxattr:)");
+
 	return 0;
 }
 
 int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	char *key_buf, const size_t size, size_t *actual_size)
 {
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;	
+	
+	if (size == 0)
+		*actual_size = CORRECT_VALUE_SIZE;
+	else
+		strcpy(key_buf, "hello!listxattr:)");
+
 	return 0;
 }
 
 int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
 	const long long xattr_filepos, const char name_space, const char *key)
 {
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;
+
 	return 0;
 }
 

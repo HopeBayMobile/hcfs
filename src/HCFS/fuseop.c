@@ -4125,6 +4125,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	int retcode;
 	char name_space;
 	char key[MAX_KEY_SIZE];
+	struct stat stat_data;
 
 	this_inode = (ino_t) ino;
 	xattr_page = NULL;
@@ -4150,6 +4151,18 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 	retcode = meta_cache_open_file(meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
+
+	/* Check permission */
+	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
+		NULL, NULL, 0, meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+	
+	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
+		write_log(0, "Error: removexattr Permission denied (WRITE needed)\n");
+		retcode = -EACCES;
+		goto error_handle;
+	}
 
 	/* Fetch xattr page. Allocate new page if need. */
 	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
