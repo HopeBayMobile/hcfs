@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = FS_manager_unittest
+TESTS = FS_manager_unittest mount_manager_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -54,6 +54,7 @@ clean :
 
 test : $(TESTS)
 	./FS_manager_unittest
+	./mount_manager_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -96,5 +97,20 @@ FS_manager_unittest.o : $(UNITTEST_DIR)/FS_manager_unittest.cc \
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/FS_manager_unittest.cc
 
 FS_manager_unittest : FS_manager.o FS_manager_fakeftn.o FS_manager_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+
+# unittest for mount_manager.c
+
+mount_manager.o : $(USER_DIR)/mount_manager.c $(USER_DIR)/mount_manager.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/mount_manager.c
+
+mount_manager_fakeftn.o : $(UNITTEST_DIR)/mount_manager_fakeftn.c
+	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/mount_manager_fakeftn.c
+
+mount_manager_unittest.o : $(UNITTEST_DIR)/mount_manager_unittest.cc \
+                     $(USER_DIR)/mount_manager.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mount_manager_unittest.cc
+
+mount_manager_unittest : mount_manager.o mount_manager_fakeftn.o mount_manager_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 

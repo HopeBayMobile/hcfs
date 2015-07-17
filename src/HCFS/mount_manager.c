@@ -70,7 +70,6 @@ int search_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T **mt_info)
 		/* Returns not found if being unmounted. */
 		if ((node->mt_entry)->is_unmount == TRUE)
 			return -ENOENT;
-
 		*mt_info = node->mt_entry;
 		return 0;
 	}
@@ -104,9 +103,11 @@ int insert_mount(char *fsname, MOUNT_T *mt_info)
 	int ret, errcode;	
 	MOUNT_NODE_T *root;
 
+	write_log(10, "Inserting FS %s\n", fsname);
 	root = mount_mgr.root;
 	if (root == NULL) {
 		/* Add to root */
+		write_log(10, "Creating new mount database\n");
 		mount_mgr.root = malloc(sizeof(MOUNT_NODE_T));
 		if (mount_mgr.root == NULL) {
 			errcode = -ENOMEM;
@@ -176,7 +177,7 @@ int insert_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T *mt_info)
 		}
 		(node->lchild)->lchild = NULL;
 		(node->lchild)->rchild = NULL;
-		(node->rchild)->parent = node;
+		(node->lchild)->parent = node;
 		(node->lchild)->mt_entry = mt_info;
 		mount_mgr.num_mt_FS++;
 		return 0;
@@ -209,6 +210,8 @@ int delete_mount(char *fsname, MOUNT_NODE_T **ret_node)
 		goto errcode_handle;
 	}
 
+	if (strcmp(fsname, "  25") == 0)
+		printf("Found\n");
 	ret = delete_mount_node(fsname, mount_mgr.root, ret_node);
 	if (ret < 0) {
 		errcode = ret;
@@ -221,25 +224,30 @@ errcode_handle:
 	return errcode;
 }
 
-void replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T *ret_node)
+void replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
 {
 	if (node->rchild == NULL) {
 
-		ret_node = node;
+		*ret_node = node;
 		/* If no children, update parent and return */
 		if (node->lchild == NULL) {
 			if (((node->parent)->lchild) == node)
 				(node->parent)->lchild = NULL;
-			else
+			else if (((node->parent)->rchild) == node)
 				(node->parent)->rchild = NULL;
+			else
+				write_log(10, "Unexpected Error\n");
 			return;
 		}
 
 		/* Replace self with left subtree */
+		node->lchild->parent = node->parent;
 		if (((node->parent)->lchild) == node)
 			(node->parent)->lchild = node->lchild;
-		else
+		else if (((node->parent)->rchild) == node)
 			(node->parent)->rchild = node->lchild;
+		else
+			write_log(10, "Unexpected Error\n");
 		return;
 	}
 
@@ -267,13 +275,16 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 			}
 			if (((node->parent)->lchild) == node)
 				(node->parent)->lchild = NULL;
-			else
+			else if (((node->parent)->rchild) == node)
 				(node->parent)->rchild = NULL;
+			else
+				write_log(10, "Unexpected Error\n");
 			return 0;
 		}
 
 		if (node->lchild == NULL) {
 			/* Replace self with right subtree */
+			node->rchild->parent = node->parent;
 			if (node->parent == NULL) {
 				/* This is the root */
 				mount_mgr.root = node->rchild;
@@ -281,13 +292,16 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 			}
 			if (((node->parent)->lchild) == node)
 				(node->parent)->lchild = node->rchild;
-			else
+			else if (((node->parent)->rchild) == node)
 				(node->parent)->rchild = node->rchild;
+			else
+				write_log(10, "Unexpected Error\n");
 			return 0;
 		}
 
 		if (node->rchild == NULL) {
 			/* Replace self with left subtree */
+			node->lchild->parent = node->parent;
 			if (node->parent == NULL) {
 				/* This is the root */
 				mount_mgr.root = node->lchild;
@@ -295,15 +309,25 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 			}
 			if (((node->parent)->lchild) == node)
 				(node->parent)->lchild = node->lchild;
-			else
+			else if (((node->parent)->rchild) == node)
 				(node->parent)->rchild = node->lchild;
+			else
+				write_log(10, "Unexpected Error\n");
 			return 0;
 		}
 
 
 		/* Delete this, but need to find the largest child to
 			replace */
-		replace_with_largest_child(node->lchild, ret_child);
+		replace_with_largest_child(node->lchild, &ret_child);
+		write_log(10, "Replacing node %s\n", node->mt_entry->f_name);
+		if (node->lchild != NULL)
+			node->lchild->parent = ret_child;
+		if (node->rchild != NULL)
+			node->rchild->parent = ret_child;
+		ret_child->lchild = node->lchild;
+		ret_child->rchild = node->rchild;
+		ret_child->parent = node->parent;
 		if (node->parent == NULL) {
 			/* This is the root */
 			mount_mgr.root = ret_child;
@@ -311,8 +335,10 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 		}
 		if (((node->parent)->lchild) == node)
 			(node->parent)->lchild = ret_child;
-		else
+		else if (((node->parent)->rchild) == node)
 			(node->parent)->rchild = ret_child;
+		else
+			write_log(10, "Unexpected Error\n");
 
 		return 0;
 	}
