@@ -756,6 +756,10 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
 	
+	ret_code = super_block_mark_dirty(meta_cache_entry->inode_num);
+	if (ret_code < 0)
+		return ret_code;
+	
 	print_keys_to_log(&target_key_list_page);
 	write_log(10, "Debug setxattr: Now number of xattr = %d, "
 		"now reclaimed_key_page point to %lld, "
@@ -1065,6 +1069,10 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	(xattr_page->namespace_page[name_space].num_xattr)--;	
 	FSEEK(meta_cache_entry->fptr, xattr_filepos, SEEK_SET);
 	FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+
+	ret_code = super_block_mark_dirty(meta_cache_entry->inode_num);
+	if (ret_code < 0)
+		return ret_code;
 	
 	write_log(10, "Debug removexattr: Now number of xattr = %d, "
 		"now reclaimed_key_page point to %lld, "
