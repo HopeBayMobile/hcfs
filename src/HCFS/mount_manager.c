@@ -210,8 +210,6 @@ int delete_mount(char *fsname, MOUNT_NODE_T **ret_node)
 		goto errcode_handle;
 	}
 
-	if (strcmp(fsname, "  25") == 0)
-		printf("Found\n");
 	ret = delete_mount_node(fsname, mount_mgr.root, ret_node);
 	if (ret < 0) {
 		errcode = ret;
@@ -224,31 +222,35 @@ errcode_handle:
 	return errcode;
 }
 
-void replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
+int replace_with_largest_child(MOUNT_NODE_T *node, MOUNT_NODE_T **ret_node)
 {
 	if (node->rchild == NULL) {
 
 		*ret_node = node;
 		/* If no children, update parent and return */
 		if (node->lchild == NULL) {
-			if (((node->parent)->lchild) == node)
+			if (((node->parent)->lchild) == node) {
 				(node->parent)->lchild = NULL;
-			else if (((node->parent)->rchild) == node)
+			} else if (((node->parent)->rchild) == node) {
 				(node->parent)->rchild = NULL;
-			else
-				write_log(10, "Unexpected Error\n");
-			return;
+			} else {
+				write_log(0, "Error in mount manager\n");
+				return -EIO;
+			}
+			return 0;
 		}
 
 		/* Replace self with left subtree */
 		node->lchild->parent = node->parent;
-		if (((node->parent)->lchild) == node)
+		if (((node->parent)->lchild) == node) {
 			(node->parent)->lchild = node->lchild;
-		else if (((node->parent)->rchild) == node)
+		} else if (((node->parent)->rchild) == node) {
 			(node->parent)->rchild = node->lchild;
-		else
-			write_log(10, "Unexpected Error\n");
-		return;
+		} else {
+			write_log(0, "Error in mount manager\n");
+			return -EIO;
+		}
+		return 0;
 	}
 
 	return replace_with_largest_child(node->rchild, ret_node);
@@ -273,12 +275,14 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 				mount_mgr.root = NULL;
 				return 0;
 			}
-			if (((node->parent)->lchild) == node)
+			if (((node->parent)->lchild) == node) {
 				(node->parent)->lchild = NULL;
-			else if (((node->parent)->rchild) == node)
+			} else if (((node->parent)->rchild) == node) {
 				(node->parent)->rchild = NULL;
-			else
-				write_log(10, "Unexpected Error\n");
+			} else {
+				write_log(0, "Error in mount manager\n");
+				return -EIO;
+			}
 			return 0;
 		}
 
@@ -290,12 +294,14 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 				mount_mgr.root = node->rchild;
 				return 0;
 			}
-			if (((node->parent)->lchild) == node)
+			if (((node->parent)->lchild) == node) {
 				(node->parent)->lchild = node->rchild;
-			else if (((node->parent)->rchild) == node)
+			} else if (((node->parent)->rchild) == node) {
 				(node->parent)->rchild = node->rchild;
-			else
-				write_log(10, "Unexpected Error\n");
+			} else {
+				write_log(0, "Error in mount manager\n");
+				return -EIO;
+			}
 			return 0;
 		}
 
@@ -307,19 +313,23 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 				mount_mgr.root = node->lchild;
 				return 0;
 			}
-			if (((node->parent)->lchild) == node)
+			if (((node->parent)->lchild) == node) {
 				(node->parent)->lchild = node->lchild;
-			else if (((node->parent)->rchild) == node)
+			} else if (((node->parent)->rchild) == node) {
 				(node->parent)->rchild = node->lchild;
-			else
-				write_log(10, "Unexpected Error\n");
+			} else {
+				write_log(0, "Error in mount manager\n");
+				return -EIO;
+			}
 			return 0;
 		}
 
 
 		/* Delete this, but need to find the largest child to
 			replace */
-		replace_with_largest_child(node->lchild, &ret_child);
+		ret = replace_with_largest_child(node->lchild, &ret_child);
+		if (ret < 0)
+			return ret;
 		write_log(10, "Replacing node %s\n", node->mt_entry->f_name);
 		if (node->lchild != NULL)
 			node->lchild->parent = ret_child;
@@ -333,12 +343,14 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 			mount_mgr.root = ret_child;
 			return 0;
 		}
-		if (((node->parent)->lchild) == node)
+		if (((node->parent)->lchild) == node) {
 			(node->parent)->lchild = ret_child;
-		else if (((node->parent)->rchild) == node)
+		} else if (((node->parent)->rchild) == node) {
 			(node->parent)->rchild = ret_child;
-		else
-			write_log(10, "Unexpected Error\n");
+		} else {
+			write_log(0, "Error in mount manager\n");
+			return -EIO;
+		}
 
 		return 0;
 	}
@@ -397,6 +409,8 @@ int destroy_mount_mgr(void)
 	return ret;
 }
 
+/* Returns TRUE if entry found, and FALSE is not found. Otherwise
+returns error number */
 int FS_is_mounted(char *fsname)
 {
 	int ret;
@@ -406,7 +420,10 @@ int FS_is_mounted(char *fsname)
 	if (ret == 0)
 		return TRUE;
 
-	return FALSE;
+	if (ret == -ENOENT)
+		return FALSE;
+
+	return ret;
 }
 
 /* Helper for mounting */
@@ -568,6 +585,7 @@ int unmount_FS(char *fsname)
 	pthread_kill(ret_info->mt_thread, SIGHUP);
 	do_unmount_FS(ret_info);
 
+	/* TODO: Error handling for failed unmount such as block mp */
 	ret = delete_mount(fsname, &ret_node);
 
 	free((ret_node->mt_entry)->f_mp);
@@ -645,7 +663,8 @@ errcode_handle:
 *        Inputs: char *fsname
 *       Summary: Checks if "fsname" is mounted.
 *
-*  Return value: 0 if successful. Otherwise returns negation of error code.
+*  Return value: TRUE if found. FALSE if not found.
+*                On error, returns negation of error code.
 *************************************************************************/
 int mount_status(char *fsname)
 {

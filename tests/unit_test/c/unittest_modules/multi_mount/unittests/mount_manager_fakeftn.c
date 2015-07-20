@@ -4,7 +4,7 @@
 #include "fuseop.h"
 #include "global.h"
 #include "hcfscurl.h"
-#include "FS_manager_unittest.h"
+#include "mount_manager_unittest.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -70,11 +70,12 @@ void fuse_session_destroy(struct fuse_session *ptr)
 
 void fuse_unmount(char *mp, struct fuse_chan *ptr2)
 {
-	return NULL;
+	return;
 }
 
 int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 {
-	return NULL;
+	ret_entry->d_ino = 100;
+	return FS_CORE_FAILED;
 }
 

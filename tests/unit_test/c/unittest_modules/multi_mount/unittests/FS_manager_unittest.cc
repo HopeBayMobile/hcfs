@@ -11,6 +11,7 @@
 #include <sys/types.h>
 extern "C" {
 #include "FS_manager.h"
+#include "mount_manager.h"
 #include "fuseop.h"
 #include "global.h"
 #include "params.h"
@@ -361,6 +362,7 @@ class delete_filesystemTest : public ::testing::Test {
     if (access(tmpmgrpath, F_OK) == 0)
       unlink(tmpmgrpath);
     treesplit = FALSE;
+    sem_init(&(mount_mgr.mount_lock), 0, 1);
 
    }
 
