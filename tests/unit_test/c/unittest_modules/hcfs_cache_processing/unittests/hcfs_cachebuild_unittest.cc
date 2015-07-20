@@ -203,13 +203,17 @@ TEST_F(insert_cache_usage_nodeTest, InsertSuccess)
 class build_cache_usageTest : public BaseClassForCacheUsageArray {
 protected:
 	std::vector<CACHE_USAGE_NODE *> answer_node_list;
-	
+	std::vector<int> answer_node_num_block;
+
 	void SetUp()
 	{
 		BaseClassForCacheUsageArray::SetUp();
 
 		init_mock_system_config();
-		mkdir(BLOCKPATH, 0700);
+		if (!access(BLOCKPATH, F_OK))
+			delete_mock_dir(BLOCKPATH);
+		else
+			mkdir(BLOCKPATH, 0700);
 	}
 	void TearDown()
 	{
@@ -229,11 +233,11 @@ protected:
 			int num_block_per_node;
 			int node_id = times * 100 + rand() % 50;
 
-			srand(time(NULL));
 			num_block_per_node = rand() % 50;
 			answer_node = (CACHE_USAGE_NODE *)malloc(sizeof(CACHE_USAGE_NODE));
 			memset(answer_node, 0, sizeof(CACHE_USAGE_NODE));
 			answer_node->this_inode = node_id;
+			
 			/* Generate a mock block data */
 			for (int block_id = 0 ; block_id < num_block_per_node ; block_id++) {
 				char path[500];
@@ -261,6 +265,7 @@ protected:
 			}
 			/* Record the answer */
 			answer_node_list.push_back(answer_node);
+			answer_node_num_block.push_back(num_block_per_node);
 		}
 	}
 	void delete_mock_dir(const char *path)
@@ -319,6 +324,9 @@ TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 		CACHE_USAGE_NODE *now_node;
 		ino_t node_id = ans_node->this_inode;
 		bool found_node = false;
+		bool expected_found_ans;
+		
+		expected_found_ans = (answer_node_num_block[i] > 0 ? true : false);
 		now_node = inode_cache_usage_hash[node_id % CACHE_USAGE_NUM_ENTRIES];
 		while (now_node != NULL) {
 			if (now_node->this_inode == node_id) {
@@ -327,7 +335,11 @@ TEST_F(build_cache_usageTest, BuildCacheUsageSuccess)
 			}
 			now_node = now_node->next_node;
 		}
-		ASSERT_EQ(true, found_node) << "inode = " << node_id;
+
+		ASSERT_EQ(expected_found_ans, found_node) << "inode = " << node_id << 
+			", num_block = " << answer_node_num_block[i];
+		if (found_node == false)
+			continue;
 		ASSERT_EQ(now_node->clean_cache_size, ans_node->clean_cache_size);
 		ASSERT_EQ(now_node->dirty_cache_size, ans_node->dirty_cache_size);
 		ASSERT_EQ(now_node->last_access_time, ans_node->last_access_time);
