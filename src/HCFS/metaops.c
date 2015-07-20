@@ -369,9 +369,6 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	if (ret < 0)
 		return ret;
 
-	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-
 	/* Drop all cached pages first before deleting */
 	/* TODO: Future changes could remove this limitation if can update cache
 	*  with each node change in b-tree*/
@@ -381,6 +378,10 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		errcode = ret;
 		goto errcode_handle;
 	}
+
+	/* Read root node */
+	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
+	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Recursive B-tree deletion routine*/
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,

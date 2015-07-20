@@ -339,6 +339,7 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 
 	/* Sync meta */
+	/* TODO Right now, may not set meta_dirty to TRUE if only changes pages */
 	if (body_ptr->meta_dirty == TRUE) {
 		if (S_ISREG(body_ptr->this_stat.st_mode)) {
 			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
@@ -351,16 +352,6 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 				FWRITE((body_ptr->dir_meta),
 						sizeof(DIR_META_TYPE),
 							1, body_ptr->fptr);
-				ret = _cache_sync(body_ptr, 0);
-				if (ret < 0) {
-					errcode = ret;
-					goto errcode_handle;
-				}
-				ret = _cache_sync(body_ptr, 1);
-				if (ret < 0) {
-					errcode = ret;
-					goto errcode_handle;
-				}
 			}
 			if (S_ISLNK(body_ptr->this_stat.st_mode)) {
 				FSEEK(body_ptr->fptr, sizeof(struct stat), 
@@ -369,11 +360,24 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 					sizeof(SYMLINK_META_TYPE), 1, 
 					body_ptr->fptr);
 			}
+			/* TODO: Symlinks */
 		}
 
 		body_ptr->meta_dirty = FALSE;
 	}
 
+	if (S_ISDIR(body_ptr->this_stat.st_mode)) {
+		ret = _cache_sync(body_ptr, 0);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+		ret = _cache_sync(body_ptr, 1);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
 
 	/* Update stat info in super inode no matter what so that meta file
 		get pushed to cloud */
