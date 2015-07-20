@@ -3,6 +3,7 @@
 
 #include "mock_param.h"
 
+#include "xattr_ops.h"
 #include "meta_mem_cache.h"
 #include "params.h"
 
@@ -16,6 +17,11 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 			dir_meta_ptr->total_children = 0;
 		else
 			dir_meta_ptr->total_children = 20;
+
+		if (this_inode == INO_DIR)
+			dir_meta_ptr->next_xattr_page = 0;
+		if (this_inode == INO_DIR_XATTR_PAGE_EXIST)
+			dir_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
 	}
 
 	return 0;
@@ -65,14 +71,20 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	if (inode_stat) {
 		inode_stat->st_ino = this_inode;
 		inode_stat->st_size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
-		if (this_inode == INO_REGFILE)
+		if (this_inode == INO_REGFILE || this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
 			inode_stat->st_mode = S_IFREG;
-		else if (this_inode == INO_DIR)
+		else if (this_inode == INO_DIR || this_inode == INO_DIR_XATTR_PAGE_EXIST)
 			inode_stat->st_mode = S_IFDIR;
+		else
+			inode_stat->st_mode = S_IFLNK;
 	}
 
 	if(file_meta_ptr) {
 		file_meta_ptr->generation = GENERATION_NUM;
+		if (this_inode == INO_REGFILE)
+			file_meta_ptr->next_xattr_page = 0;
+		if (this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
+			file_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
 	}
 
 	return 0;
@@ -86,6 +98,7 @@ int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
 		return 0;
 	else if (this_inode == INO_META_CACHE_UPDATE_FILE_FAIL)
 		return -1;
+	return 0;
 }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
@@ -135,3 +148,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
+{
+	return 0;
+}
