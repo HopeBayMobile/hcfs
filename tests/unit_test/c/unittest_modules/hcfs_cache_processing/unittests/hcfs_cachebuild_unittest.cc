@@ -7,6 +7,8 @@
 extern "C" {
 #include "mock_params.h"
 #include "hcfs_cachebuild.h"
+#include "fuseop.h"
+#include "global.h"
 }
 
 /* A base class used to be derived from those need to mock cache_usage_node */
@@ -15,7 +17,9 @@ class BaseClassForCacheUsageArray : public ::testing::Test {
 protected:
 	void SetUp()
 	{
-
+		hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
+		memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
@@ -34,6 +38,9 @@ protected:
 
 			inode_cache_usage_hash[index] = NULL;
 		}
+
+		if (hcfs_system)
+			free(hcfs_system);
 	}
 	
 	void generate_mock_cache_node(const int num_node)
@@ -101,6 +108,8 @@ class return_cache_usage_nodeTest : public BaseClassForCacheUsageArray {
 protected:
 	virtual void SetUp()
 	{
+		BaseClassForCacheUsageArray::SetUp();
+
 		ASSERT_EQ(0, cache_usage_hash_init());	
 		num_inode = 100000;
 	}

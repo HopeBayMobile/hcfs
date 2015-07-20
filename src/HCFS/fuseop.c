@@ -20,6 +20,7 @@
 * 2015/4/30 ~  Jiahong changing to FUSE low-level interface
 * 2015/5/20 Jiahong Adding permission checking for operations
 * 2015/5/25, 5/26  Jiahong adding error handling
+* 2015/6/29 Kewei finished xattr operations.
 *
 **************************************************************************/
 
@@ -64,6 +65,7 @@
 #include "lookup_count.h"
 #include "logger.h"
 #include "macro.h"
+#include "xattr_ops.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -882,7 +884,7 @@ a directory (for NFS) */
 	} else {
 		if (S_ISDIR((output_param.attr).st_mode))
 			ret_val = lookup_increase(this_inode, 1, D_ISDIR);
-	}
+	} /* TODO: symlink lookup_increase */
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -3368,6 +3370,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 				tempstat.st_mode = S_IFDIR;
 			if (temp_page.dir_entries[count].d_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
+			/* TODO: add symlink case */
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
@@ -3770,6 +3773,434 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	fuse_reply_none(req);
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_setxattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, char *name, char *value,
+*                size_t size, int flag
+*       Summary: Set extended attribute when given (name, value) pair. It
+*                creates new attribute when name is not found. On the 
+*                other hand, if attribute exists, it replaces the old 
+*                value with new value.
+*
+*************************************************************************/
+static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
+	const char *value, size_t size, int flag)
+{
+	/* TODO: Tmp ignore permission of namespace */
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	XATTR_PAGE *xattr_page;
+	long long xattr_filepos;
+	char key[MAX_KEY_SIZE];
+	char name_space;
+	int retcode;
+	struct stat stat_data;
+	ino_t this_inode;
+	
+	this_inode = (ino_t) ino;
+	xattr_page = NULL;
+	
+	if (size <= 0) {
+		write_log(0, "Cannot set key without value.\n");
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
+
+	/* Parse input name and separate it into namespace and key */
+	retcode = parse_xattr_namespace(name, &name_space, key);
+	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n", 
+		name_space, key, flag);
+	if (retcode < 0) {
+		fuse_reply_err(req, -retcode);
+		return;
+	}
+	
+	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {	
+		write_log(0, "Error: setxattr lock_entry fail\n");
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	/* Open the meta file and set exclusive lock to it */
+	retcode = meta_cache_open_file(meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+
+	/* Check permission */
+	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
+		NULL, NULL, 0, meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+	
+	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
+		write_log(0, "Error: setxattr Permission denied (WRITE needed)\n");
+		retcode = -EACCES;
+		goto error_handle;
+	}
+
+	/* Fetch xattr page. Allocate new page if need. */
+	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page) {
+		write_log(0, "Error: Allocate memory error\n");
+		retcode = -ENOMEM;
+		goto error_handle;
+	}
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+		&xattr_filepos);
+	if (retcode < 0)
+		goto error_handle;
+	write_log(10, "Debug setxattr: fetch xattr_page, xattr_page = %lld\n", 
+		xattr_filepos);
+	
+	/* Begin to Insert xattr */
+	retcode = insert_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
+		name_space, key, value, size, flag);
+	if (retcode < 0)
+		goto error_handle;
+	
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	write_log(5, "setxattr operation success\n");
+	fuse_reply_err(req, 0);
+	return ;
+		
+error_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	fuse_reply_err(req, -retcode);
+	return ;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_ll_getxattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, char *name, size_t size
+*
+*       Summary: Get the value of corresponding name if name has existed.
+*                If name is not found, reply error.
+*
+*************************************************************************/
+static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
+	size_t size)
+{	
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	XATTR_PAGE *xattr_page;
+	struct stat stat_data;
+	long long xattr_filepos;
+	char key[MAX_KEY_SIZE];
+	char name_space;
+	int retcode;
+	ino_t this_inode;
+	size_t actual_size;
+	char *value;
+	
+	this_inode = (ino_t) ino;
+	value = NULL;
+	xattr_page = NULL;
+	actual_size = 0;
+	
+	/* Parse input name and separate it into namespace and key */
+	retcode = parse_xattr_namespace(name, &name_space, key);
+	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n", 
+		name_space, key, size);
+	if (retcode < 0) {
+		fuse_reply_err(req, -retcode);
+		return;
+	}
+	
+	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {	
+		write_log(0, "Error: getxattr lock_entry fail\n");
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	/* Open the meta file and set exclusive lock to it */
+	retcode = meta_cache_open_file(meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+
+	/* Check permission */
+	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
+		NULL, NULL, 0, meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
+		write_log(0, "Error: getxattr permission denied (READ needed)\n");
+		retcode = -EACCES;
+		goto error_handle;
+	}
+
+	/* Fetch xattr page. Allocate new page if need. */
+	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page) {
+		write_log(0, "Error: Allocate memory error\n");
+		retcode = -ENOMEM;
+		goto error_handle;
+	}
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+		&xattr_filepos);
+	if (retcode < 0)
+		goto error_handle;
+	
+	/* Get xattr if size is sufficient. If size is zero, return actual needed 
+	   size. If size is non-zero but too small, return error code ERANGE */	
+	if (size != 0) {
+		value = (char *) malloc(sizeof(char) * size);
+		if (!value) {
+			write_log(0, "Error: Allocate memory error\n");
+			retcode = -ENOMEM;
+			goto error_handle;
+		}
+		memset(value, 0, sizeof(char) * size);
+	} else {
+		value = NULL;
+	}
+	actual_size = 0;
+	
+	retcode = get_xattr(meta_cache_entry, xattr_page, name_space, 
+		key, value, size, &actual_size);
+	if (retcode < 0) /* Error: ERANGE, ENOENT, or others */
+		goto error_handle;
+	
+	/* Close & unlock meta */	
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	
+	if (size <= 0) { /* Reply with needed buffer size */
+		write_log(5, "Get xattr needed size of %s\n", 
+				name);
+		fuse_reply_xattr(req, actual_size);
+
+	} else { /* Reply with value of given key */
+		write_log(5, "Get xattr value %s success\n", 
+				value);
+		fuse_reply_buf(req, value, actual_size);
+	}
+	
+	/* Free memory */
+	if (xattr_page)
+		free(xattr_page);
+	if (value)
+		free(value);
+	return ;
+
+error_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	if (value)
+		free(value);
+	fuse_reply_err(req, -retcode);
+	return ;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_ll_listxattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size
+*
+*       Summary: List all xattr in USER namespace. Reply needed size if 
+*                parameter "size" is zero. If size is fitted, reply buffer
+*                filled with all names separated by null character.
+*
+*************************************************************************/
+static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
+{
+	XATTR_PAGE *xattr_page;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	ino_t this_inode;
+	long long xattr_filepos; 
+	int retcode;
+	char *key_buf;
+	size_t actual_size;
+		
+	
+	this_inode = (ino_t) ino;
+	key_buf = NULL;
+	xattr_page = NULL;
+	actual_size = 0;
+	write_log(10, "Debug listxattr: Begin listxattr, given buffer size = %d\n",
+		 size);
+
+	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {	
+		write_log(0, "Error: listxattr lock_entry fail\n");
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	/* Open the meta file and set exclusive lock to it */
+	retcode = meta_cache_open_file(meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+
+	/* Fetch xattr page. Allocate new page if need. */
+	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page) {
+		write_log(0, "Error: Allocate memory error\n");
+		retcode = -ENOMEM;
+		goto error_handle;
+	}
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+		&xattr_filepos);
+	if (retcode < 0)
+		goto error_handle;
+	
+	/* Allocate sufficient size */	
+	if (size != 0) {
+		key_buf = (char *) malloc(sizeof(char) * size);
+		if (!key_buf) {
+			write_log(0, "Error: Allocate memory error\n");
+			retcode = -ENOMEM;
+			goto error_handle;
+		}
+		memset(key_buf, 0, sizeof(char) * size);
+	} else {
+		key_buf = NULL;
+	}
+	actual_size = 0;
+	
+	retcode = list_xattr(meta_cache_entry, xattr_page, key_buf, size, 
+		&actual_size);
+	if (retcode < 0) /* Error: ERANGE or others */
+		goto error_handle;
+
+	/* Close & unlock meta */
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	
+	if (size <= 0) { /* Reply needed size */
+		write_log(5, "listxattr: Reply needed size = %d\n", 
+			actual_size);
+		fuse_reply_xattr(req, actual_size);
+	
+	} else { /* Reply list */
+		write_log(5, "listxattr operation success\n");
+		fuse_reply_buf(req, key_buf, actual_size);
+	}
+	
+	/* Free memory */	
+	if (xattr_page)
+		free(xattr_page);
+	if (key_buf)
+		free(key_buf);
+	return ;
+
+error_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	if (key_buf)
+		free(key_buf);
+	fuse_reply_err(req, -retcode);
+	return ;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_ll_removexattr
+*        Inputs: fuse_req_t req, fuse_ino_t ino, char *name
+*
+*       Summary: Remove a xattr and reclaim those resource if needed. Reply
+*                error if attribute is not found. 
+*
+*************************************************************************/
+static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
+{	
+	XATTR_PAGE *xattr_page;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	ino_t this_inode;
+	long long xattr_filepos; 
+	int retcode;
+	char name_space;
+	char key[MAX_KEY_SIZE];
+	struct stat stat_data;
+
+	this_inode = (ino_t) ino;
+	xattr_page = NULL;
+
+	/* Parse input name and separate it into namespace and key */
+	retcode = parse_xattr_namespace(name, &name_space, key);
+	write_log(10, "Debug removexattr: namespace = %d, key = %s\n", 
+		name_space, key);
+	if (retcode < 0) {
+		fuse_reply_err(req, -retcode);
+		return;
+	}
+
+	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {	
+		write_log(0, "Error: removexattr lock_entry fail\n");
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	
+	/* Open the meta file and set exclusive lock to it */
+	retcode = meta_cache_open_file(meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+
+	/* Check permission */
+	retcode = meta_cache_lookup_file_data(this_inode, &stat_data,
+		NULL, NULL, 0, meta_cache_entry);
+	if (retcode < 0)
+		goto error_handle;
+	
+	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
+		write_log(0, "Error: removexattr Permission denied (WRITE needed)\n");
+		retcode = -EACCES;
+		goto error_handle;
+	}
+
+	/* Fetch xattr page. Allocate new page if need. */
+	xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+	if (!xattr_page) {
+		write_log(0, "Error: Allocate memory error\n");
+		retcode = -ENOMEM;
+		goto error_handle;
+	}
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+		&xattr_filepos);
+	if (retcode < 0)
+		goto error_handle;
+	
+	/* Remove xattr */
+	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
+		name_space, key);
+	if (retcode < 0) { /* ENOENT or others */
+		write_log(0, "Error: removexattr remove xattr fail\n");
+		goto error_handle;
+	}
+	
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	write_log(5, "Remove key success\n");
+	fuse_reply_err(req, 0);
+	return ;
+
+error_handle:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	if (xattr_page)
+		free(xattr_page);
+	fuse_reply_err(req, -retcode);
+	return ;
+}
+
 /* Specify the functions used for the FUSE operations */
 static struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -3794,6 +4225,10 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.statfs = hfuse_ll_statfs,
 	.lookup = hfuse_ll_lookup,
 	.forget = hfuse_ll_forget,
+	.setxattr = hfuse_ll_setxattr,
+	.getxattr = hfuse_ll_getxattr,
+	.listxattr = hfuse_ll_listxattr,
+	.removexattr = hfuse_ll_removexattr,
 };
 
 /*
