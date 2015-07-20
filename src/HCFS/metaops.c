@@ -495,6 +495,13 @@ int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
+		if (S_ISREG(tmpstat.st_mode))
+			tpage.dir_entries[count].d_type = D_ISREG;
+		if (S_ISLNK(tmpstat.st_mode))
+			tpage.dir_entries[count].d_type = D_ISLNK;
+		if (S_ISDIR(tmpstat.st_mode))
+			tpage.dir_entries[count].d_type = D_ISDIR;
+
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
