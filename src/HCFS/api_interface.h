@@ -25,6 +25,8 @@
 #define VOLSTAT 1
 #define TESTAPI 2
 #define ECHOTEST 3
+#define CREATEFS 4
+#define MOUNTFS 5
 
 #define MAX_API_THREADS 32
 #define INIT_API_THREADS 10

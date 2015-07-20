@@ -66,6 +66,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "xattr_ops.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -410,7 +411,7 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 	if (ino == 1)
 		return tmpptr->f_ino;
 	else
-		return (ino_t) ino);
+		return (ino_t) ino;
 }
 
 /************************************************************************
@@ -3318,7 +3319,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	gettimeofday(&tmp_time1, NULL);
 
-	thisinode = real_ino(req, ino);
+	this_inode = real_ino(req, ino);
 
 /*TODO: Need to include symlinks*/
 	write_log(10, "DEBUG readdir entering readdir, ");
@@ -3493,17 +3494,12 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 *************************************************************************/
 void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 {
-	write_log(10, "Data passed in is %s\n", (char *) userdata);
+	MOUNT_T *tmpptr;
 
-	pthread_attr_init(&prefetch_thread_attr);
-	pthread_attr_setdetachstate(&prefetch_thread_attr,
-						PTHREAD_CREATE_DETACHED);
-	init_api_interface();
-	init_meta_cache_headers();
-	lookup_init();
-	startup_finish_delete();
-	lookup_increase(1, 1, D_ISDIR);
-	/* return ((void*) sys_super_block); */
+	tmpptr = (MOUNT_T *)userdata;
+	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
+
+	lookup_increase(tmpptr->f_ino, 1, D_ISDIR);
 }
 
 /************************************************************************
@@ -3513,20 +3509,26 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 *       Summary: Destroy a FUSE mount
 *
 *************************************************************************/
+/* TODO: Do we want to check for inode to delete when each FS is unmounted
+(by changing routine in lookup_destroy), or wait until all FS is unmounted?
+What may happen if a FS is unmounted then mounted, but in unmount the lookup
+count is not decreased?
+*/
 void hfuse_ll_destroy(void *userdata)
 {
-	int dl_count;
+	MOUNT_T *tmpptr;
+	pthread_t tmp_thread;
+	pthread_attr_t tmpattr;
 
-/* TODO: If "is_unmount" in userdata is TRUE, do not call unmount_event */
-/* TODO: fork a thread to call unmount_event */
-	release_meta_cache_headers();
-	sync();
-	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
-		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
+	tmpptr = (MOUNT_T *)userdata;
+	write_log(10, "Unmounting FS with root inode %ld\n", tmpptr->f_ino);
 
-	lookup_destroy();
-	hcfs_system->system_going_down = TRUE;
-	destroy_api_interface();
+	if (tmpptr->is_unmount == FALSE) {
+		/* Fork a thread to handle unmount in mount manager */
+		pthread_attr_setdetachstate(&tmpattr, PTHREAD_CREATE_DETACHED);
+		pthread_create(&tmp_thread, &tmpattr, unmount_event,
+				(void *)tmpptr->f_name);
+	}
 }
 
 /************************************************************************
@@ -4301,9 +4303,11 @@ void* mount_single_thread(void *ptr)
 int hook_fuse(int argc, char **argv)
 {
 	char *mount;
-	int mt, fg;
+	int mt, fg, dl_count;
 
-	global_fuse_args = FUSE_ARGS_INIT(argc, argv);
+	struct fuse_args tmp_args = FUSE_ARGS_INIT(argc, argv);
+
+	memcpy(&global_fuse_args, &tmp_args, sizeof(struct fuse_args));
 
 	fuse_parse_cmdline(&global_fuse_args, &mount, &mt, &fg);
 
@@ -4312,10 +4316,28 @@ int hook_fuse(int argc, char **argv)
 	else
 		hcfs_system->multi_thread = FALSE;
 
+	write_log(10, "Multi threading value is %d\n",
+				hcfs_system->multi_thread);
+	pthread_attr_init(&prefetch_thread_attr);
+	pthread_attr_setdetachstate(&prefetch_thread_attr,
+						PTHREAD_CREATE_DETACHED);
+	init_api_interface();
+	init_meta_cache_headers();
+	lookup_init();
+	startup_finish_delete();
+
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
 	destroy_mount_mgr();
 	destroy_fs_manager();
+	release_meta_cache_headers();
+	sync();
+	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
+		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
+
+	lookup_destroy();
+	destroy_api_interface();
+
 	fuse_opt_free_args(&global_fuse_args);
 
 	return 0;

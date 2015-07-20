@@ -164,6 +164,20 @@ errcode_handle:
 	return errcode;
 }
 
+int create_FS_handle(int arg_len, char *largebuf)
+{
+	DIR_ENTRY tmp_entry;
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = add_filesystem(buf, &tmp_entry);
+
+	free(buf);
+	return ret;
+}
 /************************************************************************
 *
 * Function name: api_module
@@ -333,6 +347,7 @@ void api_module(void *index)
 			break;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
+			retcode = 0;
 			ret_len = arg_len;
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			total_sent = 0;
@@ -346,6 +361,14 @@ void api_module(void *index)
 				total_sent += size_msg;
 			}
 
+			break;
+		case CREATEFS:
+			retcode = create_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
 			break;
 		default:
 			retcode = ENOTSUP;
