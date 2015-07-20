@@ -111,7 +111,6 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 					goto error_handling;
 				*ret_gen = dirmeta.generation;
 			}
-			/* TODO: Add case for symlink */
 			if (S_ISLNK(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_symlink_data(
 						this_inode, NULL, &symlinkmeta,
@@ -470,7 +469,6 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_update_symlink_data(self_inode, this_stat, 
 		&symlink_meta, self_meta_cache_entry);
 	if (ret_code < 0) {
-		write_log(10, "Debug symlink: Updating meta cache fail!\n");
 		meta_cache_close_file(self_meta_cache_entry);
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		return ret_code;

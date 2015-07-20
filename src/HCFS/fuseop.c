@@ -877,14 +877,13 @@ a directory (for NFS) */
 	write_log(10,
 		"Debug lookup inode %ld, gen %ld\n", this_inode, this_gen);
 
-	if (S_ISREG((output_param.attr).st_mode)) {
+	if (S_ISREG((output_param.attr).st_mode))
 		ret_val = lookup_increase(this_inode, 1, D_ISREG);
-	} else {
-		if (S_ISDIR((output_param.attr).st_mode))
-			ret_val = lookup_increase(this_inode, 1, D_ISDIR);
-		if (S_ISLNK((output_param.attr).st_mode))
-			ret_val = lookup_increase(this_inode, 1, D_ISLNK);
-	}
+	if (S_ISDIR((output_param.attr).st_mode))
+		ret_val = lookup_increase(this_inode, 1, D_ISDIR);
+	if (S_ISLNK((output_param.attr).st_mode))
+		ret_val = lookup_increase(this_inode, 1, D_ISLNK);
+
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -3366,12 +3365,14 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 								count++) {
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
+
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
 			if (temp_page.dir_entries[count].d_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
 			if (temp_page.dir_entries[count].d_type == D_ISLNK)
 				tempstat.st_mode = S_IFLNK;
+
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
@@ -3792,15 +3793,17 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int errcode;
 
 	parent_inode = (ino_t) parent;
-	
+
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
+		write_log(0, "File name is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
-	
+
 	/* Reject if link path too long */
-	if (strlen(link) > MAX_LINK_PATH) {
+	if (strlen(link) >= MAX_LINK_PATH) {
+		write_log(0, "Link path is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
@@ -3810,7 +3813,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-	
+
 	/* Error if parent is not a dir */
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -3830,7 +3833,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
 	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page, &result_index, 
 		name, parent_meta_cache_entry);
 	if (ret_val < 0) {
@@ -3838,19 +3840,21 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 	if (result_index >= 0) {
+		write_log(0, "File %s existed\n", name);
 		errcode = -EEXIST;
 		goto error_handle;
 	}
-	
+
 	/* Prepare stat and request a new inode from superblock */
 	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
 	if (temp_context == NULL) {
+		write_log(0, "Memory allocation error in symlink()\n");
 		errcode = -ENOMEM;
 		goto error_handle;
 	}
 
 	memset(&this_stat, 0, sizeof(struct stat));
-	this_stat.st_mode = S_IFLNK;
+	this_stat.st_mode = S_IFLNK | 0777;
 	this_stat.st_nlink = 1;
 	this_stat.st_size = strlen(link);
 	this_stat.st_uid = temp_context->uid;
@@ -3884,7 +3888,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, -ret_val);
 		return;	
 	}
-		
+
 	/* Reply fuse entry */
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
@@ -3895,13 +3899,12 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
 	}
-	
+
 	write_log(10, "Debug symlink: symlink operation success\n");
 	fuse_reply_entry(req, &(tmp_param));
 	return;
 
 error_handle:
-	write_log(10, "Debug symlink: symlink operation fail!\n");
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	fuse_reply_err(req, -errcode);
@@ -3916,7 +3919,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	struct stat symlink_stat;
 	char link_buffer[MAX_LINK_PATH];
 	int ret_code;
-	
+
 	this_inode = (ino_t) ino;
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -3924,21 +3927,24 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
+
+	/* Get stat and meta */	
 	ret_code = meta_cache_lookup_symlink_data(this_inode, &symlink_stat, 
 		&symlink_meta, meta_cache_entry);
 	if (ret_code < 0) {
-		write_log(10, "Debug readlink: Lookup symlink fail!\n");
+		write_log(0, "readlink() lookup symlink meta fail\n");
+		meta_cache_close_file(meta_cache_entry);
 		meta_cache_unlock_entry(meta_cache_entry);
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
 
+	/* Update access time */
 	set_timestamp_now(&symlink_stat, ATIME);
 	ret_code = meta_cache_update_symlink_data(this_inode, &symlink_stat, NULL,
 		 meta_cache_entry);
 	if (ret_code < 0) {
-		write_log(10, "Debug readlink: Set access time fail!\n");
+		write_log(0, "readlink() update symlink meta fail\n");
 		meta_cache_close_file(meta_cache_entry);
 		meta_cache_unlock_entry(meta_cache_entry);
 		fuse_reply_err(req, -ret_code);
@@ -3951,17 +3957,17 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		fuse_reply_err(req, -ret_code);
 		return;	
 	}
-		
+
 	ret_code = meta_cache_unlock_entry(meta_cache_entry);
 	if (ret_code < 0) {
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
-		
+
 	memcpy(link_buffer, symlink_meta.link_path, sizeof(char) * 
 		symlink_meta.link_len);
 
-	write_log(10, "Debug readlink: Lookup symlink success\n");
+	write_log(5, "Debug readlink: Lookup symlink success\n");
 	fuse_reply_readlink(req, link_buffer);
 	return;
 }

@@ -1384,7 +1384,6 @@ int startup_finish_delete()
 				ret = actual_delete_inode(tmp_ino, D_ISDIR);
 			if (S_ISLNK(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK);
-			/* TODO: add case for sym link here */
 
 			if (ret < 0) {
 				closedir(dirp);

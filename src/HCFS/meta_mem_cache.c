@@ -360,7 +360,6 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 					sizeof(SYMLINK_META_TYPE), 1, 
 					body_ptr->fptr);
 			}
-			/* TODO: Symlinks */
 		}
 
 		body_ptr->meta_dirty = FALSE;
