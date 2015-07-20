@@ -217,7 +217,13 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 						break;
 					sleep(1);
 					(*seconds_slept)++;
+					if (hcfs_system->system_going_down
+						== TRUE)
+						break;
 				}
+				if (hcfs_system->system_going_down == TRUE)
+					break;
+
 				gettimeofday(&currenttime, NULL);
 				timediff = currenttime.tv_sec -
 							builttime->tv_sec;
@@ -240,6 +246,8 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				if (ret_size < 1)
 					break;
 			}
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			page_index++;
 		}
 
@@ -386,6 +394,8 @@ void run_cache_loop(void)
 			if (ret < 0)
 				sleep(10);
 		}
+		if (hcfs_system->system_going_down == TRUE)
+			break;
 
 		while (hcfs_system->systemdata.cache_size < CACHE_SOFT_LIMIT) {
 			gettimeofday(&currenttime, NULL);
