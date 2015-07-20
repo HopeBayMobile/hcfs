@@ -179,6 +179,14 @@ int init_hfuse(void)
 	if (ret_val < 0)
 		return ret_val;
 
+	ret_val = init_fs_manager();
+	if (ret_val < 0)
+		return ret_val;
+
+	ret_val = init_mount_mgr();
+	if (ret_val < 0)
+		return ret_val;
+
 	/* TODO: change this to either put a fake inode or remove inode
 		init. If remove, need to change super_block.c so that
 		alloc of inode starts from inode 2 */
