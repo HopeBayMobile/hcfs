@@ -282,6 +282,21 @@ TEST_F(dir_remove_entryTest, RemoveRegFileSuccess)
 	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
+
+TEST_F(dir_remove_entryTest, RemoveSymlinkSuccess) 
+{
+	/* Mock data */
+	sem_wait(&(body_ptr->access_sem));
+	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+	
+	/* Run tested function */
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFLNK, body_ptr));
+
+	/* Verify */
+	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	sem_post(&(body_ptr->access_sem));
+}
 /*
 	End of unittest for dir_remove_entry()
  */
@@ -1066,6 +1081,11 @@ protected:
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	EXPECT_EQ(-1, actual_delete_inode(INO_DELETE_DIR, D_ISDIR));
+}
+
+TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess)
+{
+	EXPECT_EQ(-2, actual_delete_inode(INO_DELETE_LNK, D_ISLNK));
 }
 
 TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
