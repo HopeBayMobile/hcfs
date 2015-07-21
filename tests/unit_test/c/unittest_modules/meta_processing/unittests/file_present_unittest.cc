@@ -61,6 +61,35 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 	EXPECT_EQ(GENERATION_NUM, gen);	
 }
 
+TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
+{
+	struct stat inode_stat;
+	unsigned long gen;
+	ino_t inode = INO_DIR;
+
+	gen = 0;
+
+	/* Run */
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
+
+	/* Verify */
+	EXPECT_EQ(GENERATION_NUM, gen);	
+}
+
+TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
+{
+	struct stat inode_stat;
+	unsigned long gen;
+	ino_t inode = INO_LINK;
+
+	gen = 0;
+
+	/* Run */
+	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
+
+	/* Verify */
+	EXPECT_EQ(GENERATION_NUM, gen);	
+}
 /*
 	End of unittest of fetch_inode_stat()
  */
@@ -151,19 +180,37 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	Unittest of unlink_update_meta()
  */
 
-TEST(unlink_update_metaTest, FailTo_dir_remove_entry)
+TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 {
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
-	ino_t self_inode = 1;
+	ino_t self_inode = INO_REGFILE;
 
 	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
 		self_inode, "\0"));
 }
 
-TEST(unlink_update_metaTest, FunctionWorkSuccess)
+TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 {
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
-	ino_t self_inode = 1;
+	ino_t self_inode = INO_REGFILE;
+
+	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
+		self_inode, "\0"));
+}
+
+TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
+{
+	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
+	ino_t self_inode = INO_LINK;
+
+	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
+		self_inode, "\0"));
+}
+
+TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
+{
+	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
+	ino_t self_inode = INO_LINK;
 
 	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
 		self_inode, "\0"));
@@ -336,4 +383,60 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 }
 /*
  	End of unittest of fetch_xattr_page()
+ */
+
+/*
+	Unittest of symlink_update_meta()
+ */
+class symlink_update_metaTest : public ::testing::Test {
+protected:
+	META_CACHE_ENTRY_STRUCT *mock_parent_entry;
+	void SetUp()
+	{
+		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	}
+
+	void TearDown()
+	{
+		if (mock_parent_entry)
+			free(mock_parent_entry);
+	}
+};
+
+TEST_F(symlink_update_metaTest, AddDirEntryFail)
+{
+	struct stat mock_stat;
+
+	mock_stat.st_ino = 123;
+	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
+
+	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat, 
+		"link_not_used", 12, "name_not_used"));
+}
+
+TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
+{
+	struct stat mock_stat;
+
+	mock_stat.st_ino = 123;
+	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
+
+	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat, 
+		"update_symlink_data_fail", 12, "name_not_used"));
+}
+
+TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
+{
+	struct stat mock_stat;
+
+	mock_stat.st_ino = 123;
+	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
+
+	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat, 
+		"link_not_used", 12, "name_not_used"));
+
+}
+/*
+	End of unittest of symlink_update_meta()
  */
