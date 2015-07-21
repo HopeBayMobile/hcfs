@@ -20,6 +20,7 @@
 * 2015/4/30 ~  Jiahong changing to FUSE low-level interface
 * 2015/5/20 Jiahong Adding permission checking for operations
 * 2015/5/25, 5/26  Jiahong adding error handling
+* 2015/7/7 Kewei began to add ops about symbolic link
 *
 **************************************************************************/
 
@@ -3900,7 +3901,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, -ret_val);
 	}
 
-	write_log(10, "Debug symlink: symlink operation success\n");
+	write_log(5, "Debug symlink: symlink operation success\n");
 	fuse_reply_entry(req, &(tmp_param));
 	return;
 
@@ -3917,7 +3918,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
 	struct stat symlink_stat;
-	char link_buffer[MAX_LINK_PATH];
+	char link_buffer[MAX_LINK_PATH + 1];
 	int ret_code;
 
 	this_inode = (ino_t) ino;
@@ -3966,8 +3967,9 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 
 	memcpy(link_buffer, symlink_meta.link_path, sizeof(char) * 
 		symlink_meta.link_len);
+	link_buffer[symlink_meta.link_len] = '\0';
 
-	write_log(5, "Debug readlink: Lookup symlink success\n");
+	write_log(5, "Readlink: Lookup symlink success. Link to %s\n", link_buffer);
 	fuse_reply_readlink(req, link_buffer);
 	return;
 }

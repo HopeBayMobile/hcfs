@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/9 Jiahong added header for this file, and revising coding style.
+* 2015/7/8 Kewei added meta cache processing about symlink.
 *
 **************************************************************************/
 #include "meta_mem_cache.h"
