@@ -1,6 +1,7 @@
 extern "C" {
 #include "fuseop.h"
 #include "file_present.h"
+#include "meta_mem_cache.h"
 #include <errno.h>
 }
 #include "gtest/gtest.h"
@@ -205,4 +206,134 @@ TEST(rmdir_update_metaTest, FunctionWorkSuccess)
 
 /*
 	End of unittest of rmdir_update_meta()
+ */
+
+/*
+ 	Unittest of fetch_xattr_page()
+ */
+class fetch_xattr_pageTest : public ::testing::Test {
+protected:
+	META_CACHE_ENTRY_STRUCT *mock_meta_entry;
+	XATTR_PAGE *mock_xattr_page;
+	const char *mock_meta_path;
+
+	void SetUp()
+	{
+		mock_meta_entry = (META_CACHE_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+
+		mock_xattr_page = (XATTR_PAGE *) malloc(sizeof(XATTR_PAGE));
+		memset(mock_xattr_page, 0, sizeof(XATTR_PAGE));
+
+		mock_meta_path = "/tmp/mock_meta";
+		if (!access(mock_meta_path, F_OK))
+			unlink(mock_meta_path);
+
+		mock_meta_entry->fptr = fopen(mock_meta_path, "wr+");
+		fseek(mock_meta_entry->fptr, 0, SEEK_SET);
+		fwrite(&mock_xattr_page, sizeof(XATTR_PAGE),
+			1, mock_meta_entry->fptr);
+	}
+
+	void TearDown()
+	{
+		if (mock_meta_entry->fptr)
+			fclose(mock_meta_entry->fptr);
+
+		if (!access(mock_meta_path, F_OK))
+			unlink(mock_meta_path);
+
+		if (mock_meta_entry)
+			free(mock_meta_entry);
+
+		if (mock_xattr_page)
+			free(mock_xattr_page);
+	}
+};
+
+TEST_F(fetch_xattr_pageTest, InodeNumLessThanZero_FetchFail)
+{
+	int ret;
+
+	mock_meta_entry->inode_num = 0;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, NULL);
+
+	EXPECT_EQ(-EINVAL, ret);
+}
+
+TEST_F(fetch_xattr_pageTest, XattrPageNULL)
+{
+	int ret;
+
+	mock_meta_entry->inode_num = 1;
+	ret = fetch_xattr_page(mock_meta_entry, NULL, NULL);
+
+	EXPECT_EQ(-ENOMEM, ret);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchRegFileXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+
+	mock_meta_entry->inode_num = INO_REGFILE;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+	XATTR_PAGE expected_xattr_page;
+
+	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
+
+	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
+	
+	mock_meta_entry->inode_num = INO_REGFILE_XATTR_PAGE_EXIST;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+		sizeof(XATTR_PAGE)));
+}
+
+TEST_F(fetch_xattr_pageTest, FetchDirXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+
+	mock_meta_entry->inode_num = INO_DIR;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+	XATTR_PAGE expected_xattr_page;
+
+	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
+
+	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
+	
+	mock_meta_entry->inode_num = INO_DIR_XATTR_PAGE_EXIST;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+		sizeof(XATTR_PAGE)));
+}
+/*
+ 	End of unittest of fetch_xattr_page()
  */

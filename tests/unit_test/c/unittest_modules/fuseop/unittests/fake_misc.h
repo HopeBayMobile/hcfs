@@ -24,3 +24,5 @@ time_t updated_atime;
 time_t updated_mtime;
 struct timespec updated_atim;
 struct timespec updated_mtim;
+
+#define CORRECT_VALUE_SIZE 24269

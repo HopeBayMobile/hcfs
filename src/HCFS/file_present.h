@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "meta_mem_cache.h"
+#include "xattr_ops.h"
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		unsigned long *ret_gen);
@@ -40,5 +41,8 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
 	const struct stat *this_stat, const char *link, 
 	const unsigned long generation, const char *name);
+
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *xattr_pos);
 
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */
