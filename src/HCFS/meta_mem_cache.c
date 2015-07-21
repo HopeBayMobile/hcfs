@@ -1437,6 +1437,16 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 	return 0;
 }
 
+/************************************************************************
+*
+* Function name: meta_cache_update_symlink_data
+*        Inputs: ino_t this_inode, const struct stat *inode_stat,
+*                const SYMLINK_META_TYPE *symlink_meta_ptr, 
+*                META_CACHE_ENTRY_STRUCT *bptr
+*       Summary: Update symlink stat or meta data in memory cache.
+*  Return value: 0 if successful, otherwise return negative error code.
+*
+*************************************************************************/
 int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
 	const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
 {
@@ -1468,6 +1478,7 @@ int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_st
 
 	if (bptr->something_dirty == FALSE)
 		bptr->something_dirty = TRUE;
+
 	/* Write changes to meta file if write through is enabled */
 	if (META_CACHE_FLUSH_NOW == TRUE) {
 		ret = flush_single_entry(bptr);
@@ -1478,7 +1489,17 @@ int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_st
 	return 0;
 }
 
-
+/************************************************************************
+*
+* Function name: meta_cache_lookup_symlink_data
+*        Inputs: ino_t this_inode, const struct stat *inode_stat,
+*                const SYMLINK_META_TYPE *symlink_meta_ptr, 
+*                META_CACHE_ENTRY_STRUCT *bptr
+*       Summary: Lookup symlink stat or meta data in memory cache. If 
+*                meta is not in memory, then read it from disk.
+*  Return value: 0 if successful, otherwise return negative error code.
+*
+*************************************************************************/
 int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
