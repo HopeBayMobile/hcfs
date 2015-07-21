@@ -62,7 +62,6 @@
 #include "filetables.h"
 #include "hcfs_cacheops.h"
 #include "hcfs_fromcloud.h"
-#include "lookup_count.h"
 #include "logger.h"
 #include "macro.h"
 #include "xattr_ops.h"
@@ -83,8 +82,6 @@ to zero (to save space in the long run).
 	4. in unmount, can pick either scanning lookup table for inodes
 to delete or list the folder.
 */
-/* TODO: Save global fuse arguments in global_fuse_args, to be called by
-mount manager */
 /* TODO: for mechanisms that needs timer, use per-process or per-thread
 cpu clock instead of using current time to avoid time changes due to
 ntpdate / ntpd or manual changes*/
@@ -481,6 +478,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	struct fuse_entry_param tmp_param;
 	struct stat parent_stat;
 	unsigned long this_generation;
+	MOUNT_T *tmpptr;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -573,7 +571,11 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-	ret_code = lookup_increase(self_inode, 1, D_ISREG);
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
+				1, D_ISREG);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
@@ -604,6 +606,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	struct fuse_entry_param tmp_param;
 	struct stat parent_stat;
 	unsigned long this_gen;
+	MOUNT_T *tmpptr;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -676,7 +679,11 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.generation = this_gen;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-	ret_code = lookup_increase(self_inode, 1, D_ISDIR);
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
+				1, D_ISDIR);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
@@ -742,7 +749,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
-	ret_val = unlink_update_meta(parent_inode, this_inode, selfname);
+	ret_val = unlink_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0)
 		ret_val = -ret_val;
@@ -811,7 +818,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
-	ret_val = rmdir_update_meta(parent_inode, this_inode, selfname);
+	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0)
 		ret_val = -ret_val;
@@ -841,11 +848,12 @@ a directory (for NFS) */
 	struct fuse_entry_param output_param;
 	unsigned long this_gen;
 	struct stat parent_stat;
+	MOUNT_T *tmpptr;
+
+	parent_inode = real_ino(req, parent);
 
 	write_log(10, "Debug lookup parent %ld, name %s\n",
 			parent_inode, selfname);
-
-	parent_inode = real_ino(req, parent);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -900,11 +908,15 @@ a directory (for NFS) */
 	write_log(10,
 		"Debug lookup inode %ld, gen %ld\n", this_inode, this_gen);
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	if (S_ISREG((output_param.attr).st_mode)) {
-		ret_val = lookup_increase(this_inode, 1, D_ISREG);
+		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
+				1, D_ISREG);
 	} else {
 		if (S_ISDIR((output_param.attr).st_mode))
-			ret_val = lookup_increase(this_inode, 1, D_ISDIR);
+			ret_val = lookup_increase(tmpptr->lookup_table,
+					this_inode, 1, D_ISDIR);
 	} /* TODO: symlink lookup_increase */
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1212,9 +1224,10 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 		if (S_ISDIR(old_target_mode)) {
 			/* Deferring actual deletion to forget */
-			ret_val = mark_inode_delete(old_target_inode);
+			ret_val = mark_inode_delete(req, old_target_inode);
 		} else {
-			ret_val = decrease_nlink_inode_file(old_target_inode);
+			ret_val = decrease_nlink_inode_file(req,
+					old_target_inode);
 		}
 		old_target_ptr = NULL;
 		if (ret_val < 0) {
@@ -1886,7 +1899,6 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
-	/*TODO: Need to check permission here*/
 	ino_t thisinode;
 	long long fh;
 	int ret_val;
@@ -3499,7 +3511,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	tmpptr = (MOUNT_T *)userdata;
 	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
 
-	lookup_increase(tmpptr->f_ino, 1, D_ISDIR);
+	lookup_increase(tmpptr->lookup_table, tmpptr->f_ino, 1, D_ISDIR);
 }
 
 /************************************************************************
@@ -3509,26 +3521,12 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 *       Summary: Destroy a FUSE mount
 *
 *************************************************************************/
-/* TODO: Do we want to check for inode to delete when each FS is unmounted
-(by changing routine in lookup_destroy), or wait until all FS is unmounted?
-What may happen if a FS is unmounted then mounted, but in unmount the lookup
-count is not decreased?
-*/
 void hfuse_ll_destroy(void *userdata)
 {
 	MOUNT_T *tmpptr;
-	pthread_t tmp_thread;
-	pthread_attr_t tmpattr;
 
 	tmpptr = (MOUNT_T *)userdata;
 	write_log(10, "Unmounting FS with root inode %ld\n", tmpptr->f_ino);
-
-	if (tmpptr->is_unmount == FALSE) {
-		/* Fork a thread to handle unmount in mount manager */
-		pthread_attr_setdetachstate(&tmpattr, PTHREAD_CREATE_DETACHED);
-		pthread_create(&tmp_thread, &tmpattr, unmount_event,
-				(void *)tmpptr->f_name);
-	}
 }
 
 /************************************************************************
@@ -3806,12 +3804,15 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	char to_delete;
 	char d_type;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	thisinode = real_ino(req, ino);
 
 	amount = (int) nlookup;
 
-	current_val = lookup_decrease(thisinode, amount,
+	current_val = lookup_decrease(tmpptr->lookup_table, thisinode, amount,
 					&d_type, &to_delete);
 
 	if (current_val < 0) {
@@ -4293,37 +4294,50 @@ struct fuse_lowlevel_ops hfuse_ops = {
 /* Initiate FUSE */
 void* mount_multi_thread(void *ptr)
 {
-	fuse_session_loop_mt((struct fuse_session *)ptr);
+	struct fuse_session *session_ptr;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) ptr;
+
+	session_ptr = tmpptr->session_ptr;
+	fuse_session_loop_mt(session_ptr);
+	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
+			tmpptr->is_unmount);
+
+	if (tmpptr->is_unmount == FALSE)
+		unmount_event(tmpptr->f_name);
+
+	lookup_destroy(tmpptr->lookup_table);
 }
 void* mount_single_thread(void *ptr)
 {
-	fuse_session_loop((struct fuse_session *)ptr);
+	struct fuse_session *session_ptr;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) ptr;
+
+	session_ptr = tmpptr->session_ptr;
+	fuse_session_loop(session_ptr);
+	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
+			tmpptr->is_unmount);
+
+	if (tmpptr->is_unmount == FALSE)
+		unmount_event(tmpptr->f_name);
+
+	lookup_destroy(tmpptr->lookup_table);
 }
 
 int hook_fuse(int argc, char **argv)
 {
-	char *mount;
-	int mt, fg, dl_count;
+	int dl_count;
 
-	struct fuse_args tmp_args = FUSE_ARGS_INIT(argc, argv);
-
-	memcpy(&global_fuse_args, &tmp_args, sizeof(struct fuse_args));
-
-	fuse_parse_cmdline(&global_fuse_args, &mount, &mt, &fg);
-
-	if (mt)
-		hcfs_system->multi_thread = TRUE;
-	else
-		hcfs_system->multi_thread = FALSE;
-
-	write_log(10, "Multi threading value is %d\n",
-				hcfs_system->multi_thread);
+	global_argc = argc;
+	global_argv = argv;
 	pthread_attr_init(&prefetch_thread_attr);
 	pthread_attr_setdetachstate(&prefetch_thread_attr,
 						PTHREAD_CREATE_DETACHED);
 	init_api_interface();
 	init_meta_cache_headers();
-	lookup_init();
 	startup_finish_delete();
 
 	while (hcfs_system->system_going_down == FALSE)
@@ -4335,10 +4349,7 @@ int hook_fuse(int argc, char **argv)
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(download_curl_handles[dl_count].curl);
 
-	lookup_destroy();
 	destroy_api_interface();
-
-	fuse_opt_free_args(&global_fuse_args);
 
 	return 0;
 }

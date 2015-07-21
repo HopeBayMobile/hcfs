@@ -38,6 +38,7 @@
 #include "hfuse_system.h"
 #include "macro.h"
 #include "logger.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -590,7 +591,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: decrease_nlink_inode_file
-*        Inputs: ino_t this_inode
+*        Inputs: fuse_req_t req, ino_t this_inode
 *       Summary: For a regular file pointed by "this_inode", decrease its
 *                reference count. If the count drops to zero, delete the
 *                file as well.
@@ -598,7 +599,7 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int decrease_nlink_inode_file(ino_t this_inode)
+int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 {
 	struct stat this_inode_stat;
 	int ret_val;
@@ -620,7 +621,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 
-		ret_val = mark_inode_delete(this_inode);
+		ret_val = mark_inode_delete(req, this_inode);
 
 	} else {
 		/* If it is still referenced, update the meta file. */
@@ -1224,14 +1225,17 @@ errcode_handle:
 }
 
 /* Mark inode as to delete on disk and lookup count table */
-int mark_inode_delete(ino_t this_inode)
+int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 {
 	int ret;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	ret = disk_markdelete(this_inode);
 	if (ret < 0)
 		return ret;
-	ret = lookup_markdelete(this_inode);
+	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
 	return ret;
 }
 

@@ -36,16 +36,19 @@ to delete or list the folder.
 /************************************************************************
 *
 * Function name: lookup_init
-*        Inputs: None
+*        Inputs: Array of lookup head "lookup_table"
 *        Output: 0 if successful, otherwise negation of error code.
 *       Summary: Initialize the inode lookup count table
 *
 *************************************************************************/
 
-int lookup_init()
+int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
 {
 	int count;
 	int ret_val, errcode;
+
+	if (lookup_table == NULL)
+		return -ENOMEM;
 
 	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 		ret_val = sem_init(&(lookup_table[count].entry_sem), 0, 1);
@@ -62,7 +65,8 @@ int lookup_init()
 /************************************************************************
 *
 * Function name: lookup_increase
-*        Inputs: ino_t this_inode, int amount
+*        Inputs: LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+*                int amount, char d_type
 *        Output: The updated lookup count if successful, or negation of
 *                error code if not.
 *       Summary: Increase the inode lookup count for this_inode, creating
@@ -70,7 +74,8 @@ int lookup_init()
 *
 *************************************************************************/
 
-int lookup_increase(ino_t this_inode, int amount, char d_type)
+int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+				int amount, char d_type)
 {
 	int index;
 	int ret_val, errcode;
@@ -79,6 +84,10 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 
 	write_log(10, "Debug lookup increase for inode %ld, amount %d\n",
 			this_inode, amount);
+
+	if (lookup_table == NULL)
+		return -ENOMEM;
+
 	index = this_inode % NUM_LOOKUP_ENTRIES;
 
 	ret_val = sem_wait(&(lookup_table[index].entry_sem));
@@ -134,7 +143,8 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 /************************************************************************
 *
 * Function name: lookup_decrease
-*        Inputs: ino_t this_inode, int amount, char *dtype, char *need_delete
+*        Inputs: LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+*                int amount, char *d_type, char *need_delete
 *        Output: The updated lookup count if successful, or negation of error
 *                code if not.
 *       Summary: Decrease the inode lookup count for this_inode. If lookup
@@ -143,8 +153,8 @@ int lookup_increase(ino_t this_inode, int amount, char d_type)
 *
 *************************************************************************/
 
-int lookup_decrease(ino_t this_inode, int amount,
-			char *d_type, char *need_delete)
+int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+			int amount, char *d_type, char *need_delete)
 {
 	int index;
 	int ret_val, result_lookup, errcode;
@@ -154,8 +164,11 @@ int lookup_decrease(ino_t this_inode, int amount,
 	write_log(10, "Debug lookup decrease for inode %ld, amount %d\n",
 			this_inode, amount);
 
+	if (lookup_table == NULL)
+		return -ENOMEM;
+
 	if (need_delete == NULL)
-		return -1;
+		return -EPERM;
 
 	*need_delete = FALSE;
 	index = this_inode % NUM_LOOKUP_ENTRIES;
@@ -223,13 +236,13 @@ int lookup_decrease(ino_t this_inode, int amount,
 /************************************************************************
 *
 * Function name: lookup_markdelete
-*        Inputs: ino_t this_inode
+*        Inputs: LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode
 *        Output: 0 if successful, or negation of error code if not.
 *       Summary: Mark inode "this_inode" as to_delete.
 *
 *************************************************************************/
 
-int lookup_markdelete(ino_t this_inode)
+int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 {
 	int index;
 	int ret_val, result_lookup, errcode;
@@ -238,6 +251,9 @@ int lookup_markdelete(ino_t this_inode)
 
 	write_log(10, "Debug lookup markdelete for inode %ld\n",
 			this_inode);
+
+	if (lookup_table == NULL)
+		return -ENOMEM;
 
 	index = this_inode % NUM_LOOKUP_ENTRIES;
 
@@ -289,20 +305,23 @@ int lookup_markdelete(ino_t this_inode)
 /************************************************************************
 *
 * Function name: lookup_destroy
-*        Inputs: None
+*        Inputs: LOOKUP_HEAD_TYPE *lookup_table
 *        Output: 0 if successful, otherwise -1.
 *       Summary: Destroys the lookup count table, and delete inodes if
 *                needed.
 *
 *************************************************************************/
 
-int lookup_destroy()
+int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table)
 {
 	int count;
 	int ret_val, errcode;
-	LOOKUP_NODE_TYPE *ptr;
+	LOOKUP_NODE_TYPE *ptr, *oldptr;
 
 	write_log(10, "Debug lookup destroy\n");
+	if (lookup_table == NULL)
+		return -ENOMEM;
+
 	for (count = 0; count < NUM_LOOKUP_ENTRIES; count++) {
 		ret_val = sem_wait(&(lookup_table[count].entry_sem));
 
@@ -324,8 +343,12 @@ int lookup_destroy()
 			if (ret_val == 1)
 				actual_delete_inode(ptr->this_inode,
 						ptr->d_type);
+			oldptr = ptr;
 			ptr = ptr->next;
+			free(oldptr);
 		}
+
+		lookup_table[count].head = NULL;
 
 		ret_val = sem_post(&(lookup_table[count].entry_sem));
 

@@ -431,19 +431,27 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 {
 	struct fuse_chan *tmp_channel;
 	struct fuse_session *tmp_session;
+	char *mount;
+	int mt, fg;
+
+	struct fuse_args tmp_args = FUSE_ARGS_INIT(global_argc, global_argv);
+
+	memcpy(&(new_info->mount_args), &tmp_args, sizeof(struct fuse_args));
+
+	fuse_parse_cmdline(&(new_info->mount_args), &mount, &mt, &fg);
 
 	/* f_ino, f_name, f_mp are filled before calling this function */
 	/* global_fuse_args is stored in fuseop.h */
-	tmp_channel = fuse_mount(mp, &global_fuse_args);
-	tmp_session = fuse_lowlevel_new(&global_fuse_args,
-			&hfuse_ops, sizeof(hfuse_ops), NULL);
+	tmp_channel = fuse_mount(mp, &(new_info->mount_args));
+	tmp_session = fuse_lowlevel_new(&(new_info->mount_args),
+			&hfuse_ops, sizeof(hfuse_ops), (void *) new_info);
 	fuse_set_signal_handlers(tmp_session);
 	fuse_session_add_chan(tmp_session, tmp_channel);
 	gettimeofday(&(new_info->mt_time), NULL);
 	new_info->session_ptr = tmp_session;
 	new_info->chan_ptr = tmp_channel;
 	new_info->is_unmount = FALSE;
-	if (hcfs_system->multi_thread == TRUE)
+	if (mt == TRUE)
 		pthread_create(&(new_info->mt_thread), NULL,
 			mount_multi_thread, (void *)new_info);
 	else
@@ -460,6 +468,8 @@ int do_unmount_FS(MOUNT_T *mount_info)
 	fuse_remove_signal_handlers(mount_info->session_ptr);
 	fuse_session_destroy(mount_info->session_ptr);
 	fuse_unmount(mount_info->f_mp, mount_info->chan_ptr);
+	fuse_opt_free_args(&(mount_info->mount_args));
+
 	return 0;
 }
 
@@ -517,6 +527,7 @@ int mount_FS(char *fsname, char *mp) {
 
 	new_info->f_ino = tmp_entry.d_ino;
 	strcpy((new_info->f_name), fsname);
+	new_info->f_mp = NULL;
 	new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
 	if (new_info->f_mp == NULL) {
 		errcode = -ENOMEM;
@@ -524,6 +535,20 @@ int mount_FS(char *fsname, char *mp) {
 		goto errcode_handle;
 	}
 	strcpy((new_info->f_mp), mp);
+
+	new_info->lookup_table = NULL;
+	new_info->lookup_table = malloc(sizeof(LOOKUP_HEAD_TYPE)
+				* NUM_LOOKUP_ENTRIES);
+	if (new_info->lookup_table == NULL) {
+		errcode = -ENOMEM;
+		write_log(0, "Out of memory in %s\n", __func__);
+		goto errcode_handle;
+	}
+	ret = lookup_init(new_info->lookup_table);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
@@ -545,6 +570,13 @@ int mount_FS(char *fsname, char *mp) {
 	return 0;
 
 errcode_handle:
+	if (new_info != NULL) {
+		if (new_info->f_mp != NULL)
+			free(new_info->f_mp);
+		if (new_info->lookup_table != NULL)
+			free(new_info->lookup_table);
+		free(new_info);
+	}
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 	return errcode;
@@ -606,27 +638,24 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: unmount_event
-*        Inputs: void *fsnameptr
-*       Summary: Unmount filesystem "fsnameptr" from FUSE destroy routine.
+*        Inputs: char *fsname
+*       Summary: Unmount filesystem "fsname" when exiting FUSE loop.
 *
 *  Return value: None
 *
-*          Note: If is_unmount is set, FUSE destroy routine should not call
-*                unmount_event
+*          Note: If is_unmount is set, should not call this when exiting
+*                FUSE loop
 *************************************************************************/
-void* unmount_event(void *fsnameptr)
+int unmount_event(char *fsname)
 {
 	int ret, errcode;
 	MOUNT_T *ret_info;
 	MOUNT_NODE_T *ret_node;
-	char *fsname;
 
-	fsname = (char *)fsnameptr;
+	write_log(10, "Unmounting FS %s\n", fsname);
 
 	sem_wait(&(fs_mgr_head->op_lock));
 	sem_wait(&(mount_mgr.mount_lock));
-
-	/* Need to unmount FUSE and set is_unmount */
 
 	ret = search_mount(fsname, &ret_info);
 	if (ret < 0) {
@@ -649,12 +678,12 @@ void* unmount_event(void *fsnameptr)
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
 
-	return NULL;
+	return ret;
 
 errcode_handle:
 	sem_post(&(mount_mgr.mount_lock));
 	sem_post(&(fs_mgr_head->op_lock));
-	return NULL;
+	return errcode;
 }
 
 /************************************************************************

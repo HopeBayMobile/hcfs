@@ -143,7 +143,6 @@ typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
 	char system_going_down;
-	char multi_thread;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;
@@ -152,6 +151,8 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
+int global_argc;
+char **global_argv;
 struct fuse_args global_fuse_args;
 
 /* Functions for initializing HCFS */

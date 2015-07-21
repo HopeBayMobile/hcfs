@@ -158,16 +158,7 @@ errcode_handle:
 *************************************************************************/
 int init_hfuse(void)
 {
-	int ret_val, ret, errcode;
-	size_t ret_size;
-	long ret_pos;
-	char rootmetapath[METAPATHLEN];
-	ino_t root_inode;
-	struct stat this_stat;
-	DIR_META_TYPE this_meta;
-	DIR_ENTRY_PAGE temppage;
-	mode_t self_mode;
-	FILE *metafptr;
+	int ret_val;
 
 	ret_val = super_block_init();
 	if (ret_val < 0)
@@ -187,80 +178,7 @@ int init_hfuse(void)
 	if (ret_val < 0)
 		return ret_val;
 
-	/* TODO: change this to either put a fake inode or remove inode
-		init. If remove, need to change super_block.c so that
-		alloc of inode starts from inode 2 */
-	/* Check if need to initialize the root meta file */
-	ret_val = fetch_meta_path(rootmetapath, 1);
-	if (ret_val < 0)
-		return ret_val;
-
-	if (access(rootmetapath, F_OK) != 0) {
-		memset(&this_stat, 0, sizeof(struct stat));
-		memset(&this_meta, 0, sizeof(DIR_META_TYPE));
-		memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
-
-		self_mode = S_IFDIR | 0777;
-		this_stat.st_mode = self_mode;
-
-		/*One pointed by the parent, another by self*/
-		this_stat.st_nlink = 2;
-		this_stat.st_uid = getuid();
-		this_stat.st_gid = getgid();
-		this_stat.st_atime = time(NULL);
-		this_stat.st_mtime = this_stat.st_atime;
-		this_stat.st_ctime = this_stat.st_ctime;
-
-		root_inode = super_block_new_inode(&this_stat, NULL);
-		/*TODO: put error handling here if root_inode is not 1
-					(cannot initialize system)*/
-		if (root_inode != 1) {
-			write_log(0, "Error initializing system\n");
-			return -EPERM;
-		}
-
-		this_stat.st_ino = 1;
-
-		metafptr = fopen(rootmetapath, "w");
-		if (metafptr == NULL) {
-			write_log(0, "IO error in initializing system\n");
-			return -EIO;
-		}
-
-		FWRITE(&this_stat, sizeof(struct stat), 1, metafptr);
-
-
-		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
-								metafptr);
-
-		FTELL(metafptr);
-		this_meta.root_entry_page = ret_pos;
-		this_meta.tree_walk_list_head = this_meta.root_entry_page;
-		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-
-		FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1,
-								metafptr);
-
-		ret = init_dir_page(&temppage, 1, 0,
-					this_meta.root_entry_page);
-		if (ret < 0) {
-			fclose(metafptr);
-			return ret;
-		}
-
-		FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1,
-								metafptr);
-		fclose(metafptr);
-		ret = super_block_mark_dirty(1);
-		if (ret < 0)
-			return ret;
-	}
 	return 0;
-
-errcode_handle:
-	if (metafptr != NULL)
-		fclose(metafptr);
-	return errcode;
 }
 
 /* Helper function to initialize curl handles for downloading objects */

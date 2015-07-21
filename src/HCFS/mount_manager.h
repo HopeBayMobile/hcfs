@@ -21,6 +21,7 @@
 
 #include "params.h"
 #include "fuseop.h"
+#include "lookup_count.h"
 
 /*
 Binary search tree
@@ -42,6 +43,8 @@ typedef struct {
 	struct fuse_session *session_ptr;
 	struct fuse_chan *chan_ptr;
 	char is_unmount;
+	LOOKUP_HEAD_TYPE *lookup_table;
+	struct fuse_args mount_args;
 } MOUNT_T;
 
 struct mount_node_template {
@@ -73,7 +76,7 @@ int unmount_all(void);
 
 /* If is_unmount is set, FUSE destroy routine should not call
 unmount_event */
-void* unmount_event(void *fsnameptr); /* Called by FUSE destroy */
+int unmount_event(char *fsname);
 int mount_status(char *fsname);
 
 /* Below are helper functions. Will not process lock / unlock in these

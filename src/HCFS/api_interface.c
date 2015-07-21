@@ -178,6 +178,28 @@ int create_FS_handle(int arg_len, char *largebuf)
 	free(buf);
 	return ret;
 }
+int mount_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf, *mpbuf;
+	int ret;
+	int fsname_len, mp_len;
+
+	memcpy(&fsname_len, largebuf, sizeof(int));
+
+	buf = malloc(fsname_len + 10);
+	mp_len = arg_len - sizeof(int) - fsname_len;
+	mpbuf = malloc(mp_len + 10);
+	memcpy(buf, &(largebuf[sizeof(int)]), fsname_len);
+	memcpy(mpbuf, &(largebuf[sizeof(int) + fsname_len]), mp_len);
+	buf[fsname_len] = 0;
+	mpbuf[mp_len] = 
+	ret = mount_FS(buf, mpbuf);
+
+	free(buf);
+	free(mpbuf);
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -364,6 +386,14 @@ void api_module(void *index)
 			break;
 		case CREATEFS:
 			retcode = create_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case MOUNTFS:
+			retcode = mount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(unsigned int), 0);

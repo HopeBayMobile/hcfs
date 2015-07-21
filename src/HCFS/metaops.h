@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fuse/fuse_lowlevel.h>
 
 #include "fuseop.h"
 #include "meta_mem_cache.h"
@@ -35,7 +36,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr);
-int decrease_nlink_inode_file(ino_t this_inode);
+int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode);
 int delete_inode_meta(ino_t this_inode);
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
 						long long this_page_pos);
@@ -47,7 +48,7 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page);
 
 int actual_delete_inode(ino_t this_inode, char d_type);
-int mark_inode_delete(ino_t this_inode);
+int mark_inode_delete(fuse_req_t req, ino_t this_inode);
 
 int disk_markdelete(ino_t this_inode);
 int disk_cleardelete(ino_t this_inode);
