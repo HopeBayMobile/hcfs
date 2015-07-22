@@ -3941,6 +3941,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
+		write_log(0, "readlink() lock meta cache entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}

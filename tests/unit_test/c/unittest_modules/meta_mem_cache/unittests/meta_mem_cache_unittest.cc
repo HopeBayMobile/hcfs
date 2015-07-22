@@ -1743,7 +1743,8 @@ TEST_F(meta_cache_lookup_symlink_dataTest, LookupStatSuccess)
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
-	meta_cache_lookup_symlink_data(1, &verified_stat, NULL, body_ptr);
+	EXPECT_EQ(0, meta_cache_lookup_symlink_data(1, &verified_stat, 
+		NULL, body_ptr));
 	sem_post(&body_ptr->access_sem);
 
 	/* Verify */	
@@ -1760,7 +1761,8 @@ TEST_F(meta_cache_lookup_symlink_dataTest, LookupSymlinkMetaSuccess)
 
 	/* Run */
 	sem_wait(&body_ptr->access_sem);
-	meta_cache_lookup_symlink_data(1, NULL, &verified_meta, body_ptr);
+	EXPECT_EQ(0, meta_cache_lookup_symlink_data(1, NULL, &verified_meta, 
+		body_ptr));
 	sem_post(&body_ptr->access_sem);
 
 	/* Verify */	

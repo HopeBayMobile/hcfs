@@ -177,6 +177,10 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 			this_inode = 20;
 			this_type = D_ISREG;
 		}
+		if (strcmp(childname, "testsymlink") == 0) {
+			this_inode = 21;
+			this_type = D_ISLNK;
+		}
 	}
 
 	if (parent == 6) {
@@ -384,7 +388,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return 0;
 }
 
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *gen)
 {
 	switch (this_inode) {
 	case 1:
@@ -466,6 +470,11 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 21:
+		inode_stat->st_ino = 21;
+		inode_stat->st_mode = S_IFLNK | 0700;
+		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}
@@ -477,6 +486,9 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		memcpy(inode_stat, &updated_root, sizeof(struct stat));
 	if (this_inode != 1 && before_update_file_data == FALSE)
 		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
+
+	if (gen)
+		*gen = 10;
 
 	return 0;
 }
@@ -635,12 +647,14 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;	
-	
-	if (size == 0)
-		*actual_size = CORRECT_VALUE_SIZE;
-	else
-		strcpy(value, "hello!getxattr:)");
 
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!getxattr:)";
+		strcpy(value, ans);
+		*actual_size = strlen(ans);
+	}
 	return 0;
 }
 
@@ -649,12 +663,14 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;	
-	
-	if (size == 0)
-		*actual_size = CORRECT_VALUE_SIZE;
-	else
-		strcpy(key_buf, "hello!listxattr:)");
 
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!listxattr:)";
+		strcpy(key_buf, ans);
+		*actual_size = strlen(ans);
+	}
 	return 0;
 }
 
@@ -673,3 +689,12 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	return 0;
 }
 
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
+	const struct stat *this_stat, const char *link, 
+	const unsigned long generation, const char *name)
+{
+	if (!strcmp("update_meta_fail", link))
+		return -1;
+
+	return 0;
+}
