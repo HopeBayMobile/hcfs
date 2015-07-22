@@ -200,6 +200,90 @@ int mount_FS_handle(int arg_len, char *largebuf)
 	return ret;
 }
 
+int unmount_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = unmount_FS(buf);
+
+	free(buf);
+	return ret;
+}
+
+int mount_status_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = mount_status(buf);
+
+	free(buf);
+	return ret;
+}
+
+int delete_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = delete_filesystem(buf);
+
+	free(buf);
+	return ret;
+}
+
+int check_FS_handle(int arg_len, char *largebuf)
+{
+	DIR_ENTRY temp_entry;
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = check_filesystem(buf, &temp_entry);
+	write_log(10, "Debug check FS %s returns %d\n", buf, ret);
+
+	free(buf);
+	return ret;
+}
+
+int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
+{
+	unsigned long num_entries, temp;
+	int ret;
+
+	ret = list_filesystem(0, NULL, &num_entries);
+
+	write_log(10, "Debug list FS num FS %ld\n", num_entries);
+	if (ret < 0)
+		return ret;
+	*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
+	ret = list_filesystem(num_entries, *entryarray, &temp);
+	write_log(10, "Debug list FS %d, %ld\n", ret, temp);
+	*ret_entries = num_entries;
+	return ret;
+}
+
+int unmount_all_handle(void)
+{
+	int ret;
+
+	ret = unmount_all();
+
+	return ret;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -224,7 +308,11 @@ void api_module(void *index)
 	char *largebuf;
 	char buf_reused;
 	int msg_index;
+	unsigned long num_entries;
 	unsigned int api_code, arg_len, ret_len;
+
+	DIR_ENTRY *entryarray;
+	char *tmpptr;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -335,7 +423,7 @@ void api_module(void *index)
 		switch (api_code) {
 		case TERMINATE:
 			/* Terminate the system */
-			pthread_kill(HCFS_mount, SIGHUP);
+			unmount_all();
 			hcfs_system->system_going_down = TRUE;
 			retcode = 0;
 			ret_len = sizeof(int);
@@ -392,8 +480,68 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
+		case DELETEFS:
+			retcode = delete_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKFS:
+			retcode = check_FS_handle(arg_len, largebuf);
+			write_log(10, "retcode is %d\n", retcode);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case LISTFS:
+			/*Echos the arguments back to the caller*/
+			retcode = list_FS_handle(&entryarray, &num_entries);
+			tmpptr = (char *) entryarray;
+			ret_len = sizeof(DIR_ENTRY) * num_entries;
+			write_log(10, "Debug listFS return size %d\n", ret_len);
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			total_sent = 0;
+			while (total_sent < ret_len) {
+				if ((ret_len - total_sent) > 1024)
+					to_send = 1024;
+				else
+					to_send = ret_len - total_sent;
+				size_msg = send(fd1, &tmpptr[total_sent],
+					to_send, 0);
+				total_sent += size_msg;
+			}
+			free(entryarray);
+			break;
 		case MOUNTFS:
 			retcode = mount_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case UNMOUNTFS:
+			retcode = unmount_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKMOUNT:
+			retcode = mount_status_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case UNMOUNTALL:
+			retcode = unmount_all_handle();
 			if (retcode == 0) {
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(unsigned int), 0);

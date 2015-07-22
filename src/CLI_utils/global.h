@@ -29,6 +29,5 @@
 #define LISTFS 8
 #define UNMOUNTFS 9
 #define CHECKMOUNT 10
-#define UNMOUNTALL 11
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

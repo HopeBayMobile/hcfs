@@ -159,7 +159,6 @@ struct fuse_args global_fuse_args;
 void* mount_multi_thread(void *ptr);
 void* mount_single_thread(void *ptr);
 
-pthread_t HCFS_mount;
 int hook_fuse(int argc, char **argv);
 
 void set_timestamp_now(struct stat *thisstat, char mode);

@@ -681,12 +681,14 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 
 	if (fs_mgr_head->num_FS > buf_num) {
 		*ret_num = fs_mgr_head->num_FS;
+		sem_post(&(fs_mgr_head->op_lock));
 		return 0;
 	}
 
 	/* If no filesystem */
 	if (fs_mgr_head->num_FS <= 0) {
 		*ret_num = 0;
+		sem_post(&(fs_mgr_head->op_lock));
 		return 0;
 	}
 
@@ -731,6 +733,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	}
 
 	*ret_num = num_walked;
+	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
 errcode_handle:
