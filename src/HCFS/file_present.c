@@ -530,6 +530,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	struct stat stat_data;
 	FILE_META_TYPE filemeta;
 	DIR_META_TYPE dirmeta;
+	SYMLINK_META_TYPE symlinkmeta;
 	int errcode;
 	int ret;
 	long long ret_pos, ret_size;
@@ -566,7 +567,13 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 			return ret_code;
 		*xattr_pos = dirmeta.next_xattr_page; /* Get xattr file position */
 	}
-	/* TODO: case symlink */
+	if (S_ISLNK(stat_data.st_mode)) {
+		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL, &symlinkmeta,
+				meta_cache_entry);
+		if (ret_code < 0)
+			return ret_code;
+		*xattr_pos = symlinkmeta.next_xattr_page; /* Get xattr file position */
+	}
 
 	/* It is used to prevent user from forgetting to open meta file */
 	ret_code = meta_cache_open_file(meta_cache_entry); 
@@ -592,6 +599,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 				&filemeta, NULL, 0, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
+			write_log(10, "Debug: A new xattr page in regfile meta\n");
 		}
 		if (S_ISDIR(stat_data.st_mode)) {
 			dirmeta.next_xattr_page = *xattr_pos;
@@ -599,9 +607,16 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 				&dirmeta, NULL, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
+			write_log(10, "Debug: A new xattr page in dir meta\n");
 		}
-		/* TODO: case symlink */
-
+		if (S_ISLNK(stat_data.st_mode)) {
+			symlinkmeta.next_xattr_page = *xattr_pos;
+			ret_code = meta_cache_update_symlink_data(this_inode, NULL, 
+				&symlinkmeta, meta_cache_entry);
+			if (ret_code < 0)
+				return ret_code;
+			write_log(10, "Debug: A new xattr page in symlink meta\n");
+		}
 	} else { /* xattr has been existed. Just read it. */
 		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
 		FREAD(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);	

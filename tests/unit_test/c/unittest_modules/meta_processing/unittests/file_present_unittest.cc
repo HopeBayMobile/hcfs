@@ -80,7 +80,7 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 {
 	struct stat inode_stat;
 	unsigned long gen;
-	ino_t inode = INO_LINK;
+	ino_t inode = INO_LNK;
 
 	gen = 0;
 
@@ -201,7 +201,7 @@ TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 {
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
-	ino_t self_inode = INO_LINK;
+	ino_t self_inode = INO_LNK;
 
 	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
 		self_inode, "\0"));
@@ -210,7 +210,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 {
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
-	ino_t self_inode = INO_LINK;
+	ino_t self_inode = INO_LNK;
 
 	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
 		self_inode, "\0"));
@@ -374,6 +374,38 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
 	
 	mock_meta_entry->inode_num = INO_DIR_XATTR_PAGE_EXIST;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+		sizeof(XATTR_PAGE)));
+}
+
+TEST_F(fetch_xattr_pageTest, FetchSymlinkXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+
+	mock_meta_entry->inode_num = INO_LNK;
+	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(sizeof(XATTR_PAGE), xattr_pos);
+}
+
+TEST_F(fetch_xattr_pageTest, FetchExistSymlinkXattrSuccess)
+{
+	int ret;
+	long long xattr_pos;
+	XATTR_PAGE expected_xattr_page;
+
+	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
+
+	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
+	
+	mock_meta_entry->inode_num = INO_LNK_XATTR_PAGE_EXIST;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
 	EXPECT_EQ(0, ret);
