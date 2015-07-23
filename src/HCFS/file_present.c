@@ -314,7 +314,7 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
 	int ret_val;
 	struct stat this_stat;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-	
+
 	ret_val = fetch_inode_stat(this_inode, &this_stat, NULL);
 	if (ret_val < 0)
 		return ret_val;
@@ -322,8 +322,8 @@ int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
-	
-	/* Remove entry */	
+
+	/* Remove entry */
 	if (S_ISREG(this_stat.st_mode)) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
 		ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
@@ -435,7 +435,7 @@ error_handling:
 *
 * Function name: symlink_update_meta
 *        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
-*                const struct stat *this_stat, const char *link, 
+*                const struct stat *this_stat, const char *link,
 *                const unsigned long generation, const char *name
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
 *                and then use meta_cache_update_symlink() to update stat
@@ -445,8 +445,8 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
-	const struct stat *this_stat, const char *link, 
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+	const struct stat *this_stat, const char *link,
 	const unsigned long generation, const char *name)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
@@ -456,7 +456,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
-	
+
 	/* Prepare symlink meta */
 	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
 	symlink_meta.link_len = strlen(link);
@@ -467,15 +467,15 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
 	if (self_meta_cache_entry == NULL)
 		return -ENOMEM;
-	
-	ret_code = meta_cache_update_symlink_data(self_inode, this_stat, 
+
+	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
 		&symlink_meta, self_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(self_meta_cache_entry);
 		meta_cache_unlock_entry(self_meta_cache_entry);
 		return ret_code;
 	}
-	
+
 	ret_code = meta_cache_close_file(self_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_unlock_entry(self_meta_cache_entry);
@@ -484,18 +484,18 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
-	
+
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
-	   because it had been locked before calling this function. Just need to 
+	   because it had been locked before calling this function. Just need to
 	   open meta file. */
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
 		return ret_code;
 	}
-	
+
 	ret_code = dir_add_entry(parent_inode, self_inode, name,
-		this_stat->st_mode, parent_meta_cache_entry);	
+		this_stat->st_mode, parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
 		return ret_code;
@@ -504,25 +504,25 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
-	
+
 	return 0;
 }
 
 /************************************************************************
 *
 * Function name: fetch_xattr_page
-*        Inputs: META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+*        Inputs: META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 *                XATTR_PAGE *xattr_page, long long *xattr_pos
-*       Summary: Helper of xattr operation in FUSE. The function aims to 
+*       Summary: Helper of xattr operation in FUSE. The function aims to
 *                fetch xattr page and xattr file position and store them
 *                in "xattr_page" and "xattr_pos", respectively. Do NOT
-*                have to lock and unlock meta cache entry since it will 
+*                have to lock and unlock meta cache entry since it will
 *                be locked and unlocked in caller function.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, long long *xattr_pos)
 {
 	int ret_code;
@@ -546,30 +546,30 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return -ENOMEM;
 	}
 
-	/* First lookup stat to confirm the file type. Do NOT need to 
+	/* First lookup stat to confirm the file type. Do NOT need to
 	   lock entry */
 	ret_code = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
-	
+
 	/* Get metadata by case */
 	if (S_ISREG(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_file_data(this_inode, NULL, 
+		ret_code = meta_cache_lookup_file_data(this_inode, NULL,
 			&filemeta, NULL, 0, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = filemeta.next_xattr_page;
 	}
 	if (S_ISDIR(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_dir_data(this_inode, NULL, 
+		ret_code = meta_cache_lookup_dir_data(this_inode, NULL,
 			&dirmeta, NULL, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
 		*xattr_pos = dirmeta.next_xattr_page;
 	}
 	if (S_ISLNK(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL, 
+		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL,
 			&symlinkmeta, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
@@ -577,7 +577,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	}
 
 	/* It is used to prevent user from forgetting to open meta file */
-	ret_code = meta_cache_open_file(meta_cache_entry); 
+	ret_code = meta_cache_open_file(meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
 
@@ -591,7 +591,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
 		FTELL(meta_cache_entry->fptr);
 		*xattr_pos = ret_pos;
-		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, 
+		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1,
 			meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
@@ -606,7 +606,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		}
 		if (S_ISDIR(stat_data.st_mode)) {
 			dirmeta.next_xattr_page = *xattr_pos;
-			ret_code = meta_cache_update_dir_data(this_inode, NULL, 
+			ret_code = meta_cache_update_dir_data(this_inode, NULL,
 				&dirmeta, NULL, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
@@ -614,7 +614,7 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		}
 		if (S_ISLNK(stat_data.st_mode)) {
 			symlinkmeta.next_xattr_page = *xattr_pos;
-			ret_code = meta_cache_update_symlink_data(this_inode, 
+			ret_code = meta_cache_update_symlink_data(this_inode,
 				NULL, &symlinkmeta, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
@@ -623,12 +623,12 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		}
 	} else { /* xattr has been existed. Just read it. */
 		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
-		FREAD(xattr_page, sizeof(XATTR_PAGE), 1, 
+		FREAD(xattr_page, sizeof(XATTR_PAGE), 1,
 			meta_cache_entry->fptr);
 	}
 
 	return 0;
 
 errcode_handle:
-	return errcode;	
+	return errcode;
 }

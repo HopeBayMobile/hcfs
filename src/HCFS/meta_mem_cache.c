@@ -36,7 +36,7 @@
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
 		return -1; \
-	} 
+	}
 /* TODO: Consider whether want to use write-back mode for meta caching */
 
 META_CACHE_HEADER_STRUCT *meta_mem_cache;
@@ -355,10 +355,10 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 							1, body_ptr->fptr);
 			}
 			if (S_ISLNK(body_ptr->this_stat.st_mode)) {
-				FSEEK(body_ptr->fptr, sizeof(struct stat), 
+				FSEEK(body_ptr->fptr, sizeof(struct stat),
 					SEEK_SET);
-				FWRITE((body_ptr->symlink_meta), 
-					sizeof(SYMLINK_META_TYPE), 1, 
+				FWRITE((body_ptr->symlink_meta),
+					sizeof(SYMLINK_META_TYPE), 1,
 					body_ptr->fptr);
 			}
 		}
@@ -1066,7 +1066,7 @@ int meta_cache_remove(ino_t this_inode)
 
 	if (body_ptr->file_meta != NULL)
 		free(body_ptr->file_meta);
-	
+
 	if (body_ptr->symlink_meta != NULL)
 		free(body_ptr->symlink_meta);
 
@@ -1373,7 +1373,7 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 * Function name: meta_cache_close_file
 *        Inputs: META_CACHE_ENTRY_STRUCT *target_ptr
 *       Summary: Flush dirty cached content to meta file and close it.
-*  Return value: 0 if successful, and negation of error code if there is 
+*  Return value: 0 if successful, and negation of error code if there is
 *                an error.
 *
 *************************************************************************/
@@ -1441,15 +1441,15 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 *
 * Function name: meta_cache_update_symlink_data
 *        Inputs: ino_t this_inode, const struct stat *inode_stat,
-*                const SYMLINK_META_TYPE *symlink_meta_ptr, 
+*                const SYMLINK_META_TYPE *symlink_meta_ptr,
 *                META_CACHE_ENTRY_STRUCT *bptr
 *       Summary: Update symlink stat or meta data in memory cache.
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int meta_cache_update_symlink_data(ino_t this_inode, 
-	const struct stat *inode_stat, 
-	const SYMLINK_META_TYPE *symlink_meta_ptr, 
+int meta_cache_update_symlink_data(ino_t this_inode,
+	const struct stat *inode_stat,
+	const SYMLINK_META_TYPE *symlink_meta_ptr,
 	META_CACHE_ENTRY_STRUCT *bptr)
 {
 	int ret;
@@ -1471,11 +1471,11 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 			if (bptr->symlink_meta == NULL)
 				return -ENOMEM;
 		}
-		memcpy((bptr->symlink_meta), symlink_meta_ptr, 
+		memcpy((bptr->symlink_meta), symlink_meta_ptr,
 			sizeof(SYMLINK_META_TYPE));
 		bptr->meta_dirty = TRUE;
 	}
-	
+
 	gettimeofday(&(bptr->last_access_time), NULL);
 
 	if (bptr->something_dirty == FALSE)
@@ -1495,9 +1495,9 @@ int meta_cache_update_symlink_data(ino_t this_inode,
 *
 * Function name: meta_cache_lookup_symlink_data
 *        Inputs: ino_t this_inode, const struct stat *inode_stat,
-*                const SYMLINK_META_TYPE *symlink_meta_ptr, 
+*                const SYMLINK_META_TYPE *symlink_meta_ptr,
 *                META_CACHE_ENTRY_STRUCT *bptr
-*       Summary: Lookup symlink stat or meta data in memory cache. If 
+*       Summary: Lookup symlink stat or meta data in memory cache. If
 *                meta is not in memory, then read it from disk.
 *  Return value: 0 if successful, otherwise return negative error code.
 *
@@ -1509,7 +1509,7 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	size_t ret_size;
 
 	write_log(10, "Debug meta cache lookup symbolic link data\n");
-	
+
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (inode_stat != NULL)
@@ -1517,7 +1517,7 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 
 	if (symlink_meta_ptr != NULL) {
 		if (body_ptr->symlink_meta == NULL) {
-			body_ptr->symlink_meta = 
+			body_ptr->symlink_meta =
 				malloc(sizeof(SYMLINK_META_TYPE));
 			if (body_ptr->symlink_meta == NULL)
 				return -ENOMEM;
@@ -1532,7 +1532,7 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 							1, body_ptr->fptr);
 		}
 
-		memcpy(symlink_meta_ptr, body_ptr->symlink_meta, 
+		memcpy(symlink_meta_ptr, body_ptr->symlink_meta,
 			sizeof(SYMLINK_META_TYPE));
 	}
 
