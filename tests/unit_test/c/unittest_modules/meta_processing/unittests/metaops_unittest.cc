@@ -8,6 +8,8 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fuse/fuse_lowlevel.h>
+
 extern "C" {
 #include "mock_param.h"
 
@@ -480,6 +482,7 @@ TEST_F(delete_inode_metaTest, Error_MetaFileNotExist)
  */
 class decrease_nlink_inode_fileTest : public ::testing::Test {
 protected:
+	fuse_req_t req1;
 	virtual void SetUp() 
 	{
 		/* Mock user-defined parameters */
@@ -505,12 +508,12 @@ protected:
 
 TEST_F(decrease_nlink_inode_fileTest, InodeStillReferenced) 
 {
-	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
+	EXPECT_EQ(0, decrease_nlink_inode_file(req1, INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
 }
 
 TEST_F(decrease_nlink_inode_fileTest, meta_cache_lock_entryFail)
 {
-	EXPECT_EQ(-ENOMEM, decrease_nlink_inode_file(INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL));
+	EXPECT_EQ(-ENOMEM, decrease_nlink_inode_file(req1, INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL));
 }
 
 TEST_F(decrease_nlink_inode_fileTest, MarkBlockFilesToDel) 
@@ -525,7 +528,7 @@ TEST_F(decrease_nlink_inode_fileTest, MarkBlockFilesToDel)
 	fclose(tmp_file);
 	
 	/* Test */
-	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
+	EXPECT_EQ(0, decrease_nlink_inode_file(req1, INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
 	
 	/* Verify */
 	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);

@@ -1,3 +1,5 @@
+#include "api_interface_unittest.h"
+
 #include <stdio.h>
 #include <semaphore.h>
 #include <stdlib.h>
@@ -337,44 +339,13 @@ TEST_F(api_moduleTest, InvalidCode) {
   ASSERT_EQ(ENOTSUP, errcode);
  }
 
-void* dummy_HCFS_thread(void *ptr) {
-  sigset_t *sigsetptr;
-  int ret_sig, ret_val;
-
-  printf("Start of dummy\n");
-  sigsetptr = (sigset_t *) ptr;
-  ret_val = sigismember(sigsetptr, SIGHUP);
-  printf("dummy sig status %d\n", ret_val);
-  sigwait(sigsetptr, &ret_sig);
-  printf("Finishing this thread\n");
-  return NULL;
- }
-
 /* Test system termination call */
 TEST_F(api_moduleTest, TerminateTest) {
 
   int ret_val, errcode;
   unsigned int code, cmd_len, size_msg;
-  sigset_t sigset, testset;
-  struct timespec waittime;
-  struct timeval curtime;
-  struct sigaction newact, oldact;
 
-  memset(&newact, 0, sizeof(struct sigaction));
-  newact.sa_handler = SIG_IGN;
-  sigaction(SIGHUP, NULL, &oldact);
-  sigemptyset(&sigset);
-  sigaddset(&sigset, SIGHUP);
-  ret_val = pthread_sigmask(SIG_BLOCK, &sigset, NULL);
-  ret_val = pthread_sigmask(SIG_BLOCK, NULL, &testset);
-  ASSERT_EQ(0, ret_val);
-  ret_val = sigismember(&testset, SIGHUP);
-  ASSERT_EQ(1, ret_val);
-  ret_val = sigismember(&sigset, SIGHUP);
-  ASSERT_EQ(1, ret_val);
-
-  pthread_create(&HCFS_mount, NULL, dummy_HCFS_thread, (void *)&sigset);
-
+  UNMOUNTEDALL = FALSE;
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
   ret_val = access(SOCK_PATH, F_OK);
@@ -397,16 +368,333 @@ TEST_F(api_moduleTest, TerminateTest) {
   ASSERT_EQ(sizeof(unsigned int), ret_val);
   ASSERT_EQ(0, errcode);
   ASSERT_EQ(TRUE, hcfs_system->system_going_down);
-  gettimeofday(&curtime, NULL);
-  waittime.tv_sec = curtime.tv_sec + 10;
-  waittime.tv_nsec = 0;
-  ret_val = pthread_timedjoin_np(HCFS_mount, NULL, &waittime);
-  EXPECT_EQ(0, ret_val);
-  if (ret_val < 0)
-    pthread_kill(HCFS_mount, SIGKILL);
-  pthread_sigmask(SIG_UNBLOCK, &sigset, NULL);
-  sigaction(SIGHUP, &oldact, NULL);
+  ASSERT_EQ(TRUE, UNMOUNTEDALL);
+ }
 
+/* Test CREATEFS API call */ 
+TEST_F(api_moduleTest, CreateFSTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+
+  CREATEDFS = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = CREATEFS;
+  cmd_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, CREATEDFS);
+  EXPECT_STREQ("123456789", recvFSname);
+ }
+/* Test DELETEFS API call */ 
+TEST_F(api_moduleTest, DeleteFSTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+
+  DELETEDFS = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = DELETEFS;
+  cmd_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, DELETEDFS);
+  EXPECT_STREQ("123456789", recvFSname);
+ }
+/* Test CHECKFS API call */ 
+TEST_F(api_moduleTest, CheckFSTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+
+  CHECKEDFS = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = CHECKFS;
+  cmd_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, CHECKEDFS);
+  EXPECT_STREQ("123456789", recvFSname);
+ }
+/* Test LISTFS API call */ 
+TEST_F(api_moduleTest, ListFSTestNoFS) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+  DIR_ENTRY tmp_entry;
+
+  LISTEDFS = FALSE;
+  numlistedFS = 0;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = LISTFS;
+  cmd_len = 0;
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, size_msg);
+  ASSERT_EQ(TRUE, LISTEDFS);
+ }
+
+/* Test LISTFS API call */ 
+TEST_F(api_moduleTest, ListFSTestOneFS) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+  DIR_ENTRY tmp_entry;
+
+  LISTEDFS = FALSE;
+  numlistedFS = 1;
+
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+
+  code = LISTFS;
+  cmd_len = 0;
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(DIR_ENTRY), size_msg);
+  ret_val = recv(fd, &tmp_entry, sizeof(DIR_ENTRY), 0);
+  ASSERT_EQ(sizeof(DIR_ENTRY), ret_val);
+  ASSERT_STREQ("test123", tmp_entry.d_name);
+  ASSERT_EQ(TRUE, LISTEDFS);
+ }
+
+/* Test MOUNTFS API call */ 
+TEST_F(api_moduleTest, MountFSTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+  char mpstr[10];
+  int fsname_len;
+
+  MOUNTEDFS = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = MOUNTFS;
+  cmd_len = 20 + sizeof(int);
+  fsname_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  snprintf(mpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &fsname_len, sizeof(int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  size_msg=send(fd, mpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, MOUNTEDFS);
+  EXPECT_STREQ("123456789", recvFSname);
+  EXPECT_STREQ("123456789", recvmpname);
+ }
+
+/* Test UNMOUNTFS API call */ 
+TEST_F(api_moduleTest, UnmountFSTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+  int fsname_len;
+
+  UNMOUNTEDFS = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = UNMOUNTFS;
+  cmd_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, UNMOUNTEDFS);
+  EXPECT_STREQ("123456789", recvFSname);
+ }
+
+/* Test CHECKMOUNT API call */ 
+TEST_F(api_moduleTest, CheckMountTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char tmpstr[10];
+  int fsname_len;
+
+  CHECKEDMOUNT = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = CHECKMOUNT;
+  cmd_len = 10;
+  snprintf(tmpstr, 10, "123456789");
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+
+  size_msg=send(fd, tmpstr, 10, 0);
+  ASSERT_EQ(10, size_msg);
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, CHECKEDMOUNT);
+  EXPECT_STREQ("123456789", recvFSname);
+ }
+
+/* Test UNMOUNTALL API call */ 
+TEST_F(api_moduleTest, UnmountAllTest) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+
+  UNMOUNTEDALL = FALSE;
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+  code = UNMOUNTALL;
+  cmd_len = 0;
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+  ASSERT_EQ(TRUE, UNMOUNTEDALL);
  }
 
 /* End of the test case for the function api_module */

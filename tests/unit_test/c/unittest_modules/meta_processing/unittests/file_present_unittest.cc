@@ -7,6 +7,7 @@ extern "C" {
 #include "gtest/gtest.h"
 #include "mock_param.h"
 
+fuse_req_t req1;
 /*
 	Unittest of meta_forget_inode()
  */
@@ -156,7 +157,7 @@ TEST(unlink_update_metaTest, FailTo_dir_remove_entry)
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
 	ino_t self_inode = 1;
 
-	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
+	EXPECT_EQ(-1, unlink_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
 }
 
@@ -165,7 +166,7 @@ TEST(unlink_update_metaTest, FunctionWorkSuccess)
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
 	ino_t self_inode = 1;
 
-	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
+	EXPECT_EQ(0, unlink_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
 }
 
@@ -182,7 +183,7 @@ TEST(rmdir_update_metaTest, ChildrenNonempty)
 	ino_t self_inode = INO_CHILDREN_IS_NONEMPTY;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
 }
 
@@ -191,7 +192,7 @@ TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
 
-	EXPECT_EQ(-1, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(-1, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
 }
 
@@ -200,7 +201,7 @@ TEST(rmdir_update_metaTest, FunctionWorkSuccess)
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
 
-	EXPECT_EQ(0, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(0, rmdir_update_meta(req1, parent_inode, 
 		self_inode, "\0"));
 }
 

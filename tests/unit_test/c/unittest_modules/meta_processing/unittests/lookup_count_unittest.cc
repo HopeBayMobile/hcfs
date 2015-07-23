@@ -11,13 +11,14 @@ extern "C" {
 /*
 	Unittest of lookup_init()
  */
+LOOKUP_HEAD_TYPE lookup_table[NUM_LOOKUP_ENTRIES];
 
 TEST(lookup_initTest, InitLookupTableSuccess)
 {
 	int val;
 
 	/* Run  */
-	EXPECT_EQ(0, lookup_init());
+	EXPECT_EQ(0, lookup_init(lookup_table));
 
 	/* Verify */
 	for (int i = 0; i < NUM_LOOKUP_ENTRIES; i++) {
@@ -113,7 +114,7 @@ TEST_F(lookup_increaseTest, InsertOneNode_InEmptyTable)
 	expected_node.next = NULL;
 
 	/* Run */
-	ret_count = lookup_increase(expected_node.this_inode, 
+	ret_count = lookup_increase(lookup_table, expected_node.this_inode,
 		expected_node.lookup_count, expected_node.d_type);
 
 	/* Verify: find the entry and compare with expected answer */
@@ -142,7 +143,7 @@ TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
 	expected_node.next = NULL;
 
 	/* Run */
-	ret_count = lookup_increase(expected_node.this_inode, 
+	ret_count = lookup_increase(lookup_table, expected_node.this_inode,
 		expected_node.lookup_count, expected_node.d_type);
 
 	/* Verify: find the entry and compare with expected answer */
@@ -173,13 +174,15 @@ TEST_F(lookup_increaseTest, IncreaseManyNode)
 	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
 		unsigned  init_amount = inode;
 
-		ret_count = lookup_increase(inode, init_amount, expected_type);
+		ret_count = lookup_increase(lookup_table,
+			inode, init_amount, expected_type);
 		/* Verify */
 		EXPECT_EQ(init_amount, ret_count);
 	}
 
 	for (ino_t inode = 1 ; inode <= num_insert_node ; inode++) {
-		ret_count = lookup_increase(inode, add_amount, expected_type);
+		ret_count = lookup_increase(lookup_table,
+			inode, add_amount, expected_type);
 		/* Verify */
 		EXPECT_EQ(inode + add_amount, ret_count);
 	}
@@ -213,7 +216,8 @@ TEST_F(lookup_decreaseTest, Arg_need_delete_IsNull)
 	char d_type;
 
 	/* Run */
-	EXPECT_EQ(-1, lookup_decrease(inode, amount, &d_type, NULL));
+	EXPECT_EQ(-1, lookup_decrease(lookup_table,
+				inode, amount, &d_type, NULL));
 }
 
 TEST_F(lookup_decreaseTest, DecreaseInode_ButNotFound)
@@ -224,7 +228,8 @@ TEST_F(lookup_decreaseTest, DecreaseInode_ButNotFound)
 	char d_type;
 
 	/* Run */
-	EXPECT_EQ(-EINVAL, lookup_decrease(inode, amount, &d_type, &need_delete));
+	EXPECT_EQ(-EINVAL, lookup_decrease(lookup_table,
+				inode, amount, &d_type, &need_delete));
 }
 
 TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsPositiveNumber)
@@ -244,7 +249,8 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsPositiveNumber)
 	expected_count = inode - amount;
 
 	/* Run */
-	EXPECT_EQ(expected_count, lookup_decrease(inode, amount, &d_type, &need_delete));
+	EXPECT_EQ(expected_count, lookup_decrease(lookup_table,
+				inode, amount, &d_type, &need_delete));
 
 	/* Verify */
 	ptr = find_lookup_entry(inode);
@@ -268,7 +274,8 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsZero)
 	amount = inode;
 
 	/* Run */
-	EXPECT_EQ(0, lookup_decrease(inode, amount, &d_type, &need_delete));
+	EXPECT_EQ(0, lookup_decrease(lookup_table,
+			inode, amount, &d_type, &need_delete));
 
 	/* Verify */
 	ptr = find_lookup_entry(inode);
@@ -290,7 +297,8 @@ TEST_F(lookup_decreaseTest, DecreaseInodeSuccess_CountIsNegativeNumber)
 	amount = inode * 2;
 
 	/* Run */
-	EXPECT_EQ(0, lookup_decrease(inode, amount, &d_type, &need_delete));
+	EXPECT_EQ(0, lookup_decrease(lookup_table,
+			inode, amount, &d_type, &need_delete));
 
 	/* Verify */
 	ptr = find_lookup_entry(inode);
@@ -320,9 +328,11 @@ TEST_F(lookup_markdeleteTest, MarkDeleteFail_LookupEntryNotFound)
 	inode_markdelete = NUM_LOOKUP_ENTRIES * 3 + 100;
 
 	/* Run 3 times */
-	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete));
-	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 1));
-	EXPECT_EQ(-EINVAL, lookup_markdelete(inode_markdelete + 2));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(lookup_table, inode_markdelete));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(lookup_table,
+				inode_markdelete + 1));
+	EXPECT_EQ(-EINVAL, lookup_markdelete(lookup_table,
+				inode_markdelete + 2));
 }
 
 TEST_F(lookup_markdeleteTest, MarkDeleteSuccess)
@@ -336,7 +346,7 @@ TEST_F(lookup_markdeleteTest, MarkDeleteSuccess)
 	/* Run many times */
 	for (ino_t inode = 0; inode < num_insert_inode; inode++) 
 		// All vars not_delete is set as FALSE before running
-		EXPECT_EQ(0, lookup_markdelete(inode));
+		EXPECT_EQ(0, lookup_markdelete(lookup_table, inode));
 
 	/* Verify */
 	for (ino_t inode = 0; inode < num_insert_inode; inode++) {
@@ -376,7 +386,7 @@ protected:
 TEST_F(lookup_destroyTest, DestroyEmptyTableSuccess)
 {
 	/* Run */
-	EXPECT_EQ(0, lookup_destroy());
+	EXPECT_EQ(0, lookup_destroy(lookup_table));
 }
 
 TEST_F(lookup_destroyTest, DestroyTableSuccess)
@@ -390,7 +400,7 @@ TEST_F(lookup_destroyTest, DestroyTableSuccess)
 	memset(check_actual_delete_table, FALSE, num_insert_inode * sizeof(char));
 
 	/* Run */
-	EXPECT_EQ(0, lookup_destroy());
+	EXPECT_EQ(0, lookup_destroy(lookup_table));
 	
 	/* Verify */
 	for (ino_t inode = 0; inode < num_insert_inode; inode++) {

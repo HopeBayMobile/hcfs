@@ -1,3 +1,5 @@
+#define FUSE_USE_VERSION 29
+
 #include <stdio.h>
 #include <semaphore.h>
 #include <stdlib.h>
@@ -15,6 +17,9 @@
 #include <utime.h>
 #include <math.h>
 #include <dirent.h>
+
+#include <fuse/fuse_lowlevel.h>
+
 extern "C" {
 #include "fuseop.h"
 #include "global.h"
@@ -22,16 +27,22 @@ extern "C" {
 #include "filetables.h"
 #include "utils.h"
 #include "super_block.h"
+#include "mount_manager.h"
 }
 #include "gtest/gtest.h"
 
 #include "fake_misc.h"
 
 SYSTEM_CONF_STRUCT system_config;
+extern struct fuse_lowlevel_ops hfuse_ops;
 
-static void * _mount_test_fuse(void *ptr) {
+static void _mount_test_fuse(MOUNT_T *tmpmount) {
   char **argv;
   int ret_val;
+  struct fuse_chan *tmp_channel;
+  struct fuse_session *tmp_session;
+  int mt, fg;
+  char *mount;
 
   argv = (char **) malloc(sizeof(char *)*3);
   argv[0] = (char *) malloc(sizeof(char)*100);
@@ -43,14 +54,31 @@ static void * _mount_test_fuse(void *ptr) {
   snprintf(argv[2],90,"-d");
   ret_val = mkdir("/tmp/test_fuse",0777);
   printf("created return %d\n",ret_val);
-  hook_fuse(3,argv);
-  return NULL;
+//  hook_fuse(3, argv);
+  struct fuse_args tmp_args = FUSE_ARGS_INIT(3, argv);
+
+  memset(tmpmount, 0, sizeof(MOUNT_T));
+  tmpmount->f_ino = 1;
+  fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
+  tmp_channel = fuse_mount(mount, &tmp_args);
+  tmp_session = fuse_lowlevel_new(&tmp_args,
+			&hfuse_ops, sizeof(hfuse_ops), (void *) tmpmount);
+  fuse_set_signal_handlers(tmp_session);
+  fuse_session_add_chan(tmp_session, tmp_channel);
+  tmpmount->session_ptr = tmp_session;
+  tmpmount->chan_ptr = tmp_channel;
+  tmpmount->is_unmount = FALSE;
+  pthread_create(&(tmpmount->mt_thread), NULL,
+			mount_multi_thread, (void *) tmpmount);
+  sleep(5);
+  return;
 }
 
 class fuseopEnvironment : public ::testing::Environment {
  public:
   pthread_t new_thread;
   char *workpath, *tmppath;
+  MOUNT_T tmpmount;
 
   virtual void SetUp() {
     workpath = NULL;
@@ -82,8 +110,7 @@ class fuseopEnvironment : public ::testing::Environment {
     system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
     memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
 
-    pthread_create(&new_thread, NULL, &_mount_test_fuse, NULL);
-    sleep(5);
+    _mount_test_fuse(&tmpmount);
   }
 
   virtual void TearDown() {
@@ -95,6 +122,14 @@ class fuseopEnvironment : public ::testing::Environment {
     else
      wait(NULL);
     sleep(1);
+    pthread_join(tmpmount.mt_thread, NULL);
+    pthread_join(new_thread, NULL);
+    fuse_session_remove_chan(tmpmount.chan_ptr);
+    fuse_remove_signal_handlers(tmpmount.session_ptr);
+    fuse_session_destroy(tmpmount.session_ptr);
+    fuse_unmount(tmpmount.f_mp, tmpmount.chan_ptr);
+    fuse_opt_free_args(&(tmpmount.mount_args));
+
     ret_val = rmdir("/tmp/test_fuse");
     tmp_err = errno;
     printf("delete return %d\n",ret_val);

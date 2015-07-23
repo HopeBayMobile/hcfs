@@ -773,7 +773,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 
 	parent_inode = real_ino(req, parent);
-
+	write_log(10, "Debug rmdir: name %s, parent %ld\n", selfname,
+			parent_inode);
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -818,6 +819,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
+	write_log(10, "Debug rmdir: name %s, %ld\n", temp_dentry.d_name,
+			this_inode);
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0)

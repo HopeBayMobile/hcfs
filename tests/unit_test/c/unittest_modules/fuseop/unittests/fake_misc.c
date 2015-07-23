@@ -1,8 +1,13 @@
+#define FUSE_USE_VERSION 29
+
 #include <sys/types.h>
 #include <string.h>
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
+
+#include <stdarg.h>
+#include <fuse/fuse_lowlevel.h>
 
 #include "meta_mem_cache.h"
 #include "filetables.h"
@@ -499,7 +504,8 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int unlink_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
+			char *selfname)
 {
 	if (this_inode == 4)
 		before_mknod_created = TRUE;
@@ -511,8 +517,10 @@ int meta_forget_inode(ino_t self_inode)
 	return 0;
 }
 
-int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
+			char *selfname)
 {
+	printf("Debug fake rmdir, inode %ld\n", this_inode);
 	if (this_inode == 6)
 		before_mkdir_created = TRUE;
 	return 0;
@@ -608,6 +616,11 @@ int lookup_destroy()
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }
 
@@ -669,6 +682,21 @@ int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *xattr_pos)
+{
+	return 0;
+}
+
+int unmount_event(char *fsname)
+{
+	return 0;
+}
+
+int destroy_mount_mgr(void)
+{
+	return 0;
+}
+
+void destroy_fs_manager(void)
 {
 	return 0;
 }

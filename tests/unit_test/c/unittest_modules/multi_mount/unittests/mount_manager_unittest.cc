@@ -647,7 +647,6 @@ TEST_F(unmount_eventTest, UnmountMountedFS) {
   char fsname[10];
   sigset_t sigset, testset;
   struct sigaction newact, oldact;
-  pthread_t tmp_thread;
 
   build_tree(1);
   mount_mgr.num_mt_FS = 1;
@@ -675,8 +674,8 @@ TEST_F(unmount_eventTest, UnmountMountedFS) {
   EXPECT_EQ(1, mount_mgr.num_mt_FS);
 
   pthread_kill(mount_mgr.root->mt_entry->mt_thread, SIGHUP);
-  pthread_create(&tmp_thread, NULL, unmount_event, (void *)fsname);
-  pthread_join(tmp_thread, NULL);
+  ret_val = unmount_event(fsname);
+  EXPECT_EQ(0, ret_val);
   EXPECT_EQ(0, mount_mgr.num_mt_FS);
 
   if (mount_mgr.root == NULL)

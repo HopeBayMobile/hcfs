@@ -43,6 +43,8 @@
 #include "filetables.h"
 #include "macro.h"
 #include "logger.h"
+#include "mount_manager.h"
+#include "FS_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

@@ -5,6 +5,7 @@
 #include "global.h"
 #include "hcfscurl.h"
 #include "mount_manager_unittest.h"
+#include "lookup_count.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -68,6 +69,14 @@ void fuse_session_destroy(struct fuse_session *ptr)
 	return;
 }
 
+void fuse_parse_cmdline(struct fuse_args *ptr, char **mp, int *mt, int *fg)
+{
+	return;
+}
+void fuse_opt_free_args(struct fuse_args *ptr)
+{
+	return;
+}
 void fuse_unmount(char *mp, struct fuse_chan *ptr2)
 {
 	return;
@@ -77,5 +86,10 @@ int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 {
 	ret_entry->d_ino = 100;
 	return FS_CORE_FAILED;
+}
+
+int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
+{
+	return 0;
 }
 

@@ -268,8 +268,10 @@ int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
 	write_log(10, "Debug list FS num FS %ld\n", num_entries);
 	if (ret < 0)
 		return ret;
-	*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
-	ret = list_filesystem(num_entries, *entryarray, &temp);
+	if (num_entries > 0) {
+		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
+		ret = list_filesystem(num_entries, *entryarray, &temp);
+	}
 	write_log(10, "Debug list FS %d, %ld\n", ret, temp);
 	*ret_entries = num_entries;
 	return ret;
@@ -514,7 +516,8 @@ void api_module(void *index)
 					to_send, 0);
 				total_sent += size_msg;
 			}
-			free(entryarray);
+			if (num_entries > 0)
+				free(entryarray);
 			break;
 		case MOUNTFS:
 			retcode = mount_FS_handle(arg_len, largebuf);
