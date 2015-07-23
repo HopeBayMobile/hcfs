@@ -3843,8 +3843,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page, &result_index, 
-		name, parent_meta_cache_entry);
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page, 
+		&result_index, name, parent_meta_cache_entry);
 	if (ret_val < 0) {
 		errcode = ret_val;
 		goto error_handle;
@@ -3959,8 +3959,8 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 
 	/* Update access time */
 	set_timestamp_now(&symlink_stat, ATIME);
-	ret_code = meta_cache_update_symlink_data(this_inode, &symlink_stat, NULL,
-		 meta_cache_entry);
+	ret_code = meta_cache_update_symlink_data(this_inode, &symlink_stat, 
+		NULL, meta_cache_entry);
 	if (ret_code < 0) {
 		write_log(0, "readlink() update symlink meta fail\n");
 		meta_cache_close_file(meta_cache_entry);
@@ -3986,7 +3986,8 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 		symlink_meta.link_len);
 	link_buffer[symlink_meta.link_len] = '\0';
 
-	write_log(5, "Readlink: Lookup symlink success. Link to %s\n", link_buffer);
+	write_log(5, "Readlink: Lookup symlink success. Link to %s\n", 
+		link_buffer);
 	fuse_reply_readlink(req, link_buffer);
 	return;
 }
@@ -4053,7 +4054,8 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		goto error_handle;
 	
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: setxattr Permission denied (WRITE needed)\n");
+		write_log(0, "Error: setxattr Permission denied "
+			"(WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -4151,7 +4153,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "Error: getxattr permission denied (READ needed)\n");
+		write_log(0, "Error: getxattr permission denied "
+			"(READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -4168,8 +4171,9 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	
-	/* Get xattr if size is sufficient. If size is zero, return actual needed 
-	   size. If size is non-zero but too small, return error code ERANGE */	
+	/* Get xattr if size is sufficient. If size is zero, return actual 
+	   needed size. If size is non-zero but too small, return error code 
+	   ERANGE */	
 	if (size != 0) {
 		value = (char *) malloc(sizeof(char) * size);
 		if (!value) {
@@ -4246,8 +4250,8 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	key_buf = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
-	write_log(10, "Debug listxattr: Begin listxattr, given buffer size = %d\n",
-		 size);
+	write_log(10, "Debug listxattr: Begin listxattr, "
+		"given buffer size = %d\n", size);
 
 	/* Lock the meta cache entry and use it to find pos of xattr page */	
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
@@ -4334,7 +4338,8 @@ error_handle:
 *                error if attribute is not found. 
 *
 *************************************************************************/
-static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
+static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, 
+	const char *name)
 {	
 	XATTR_PAGE *xattr_page;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
@@ -4377,7 +4382,8 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 		goto error_handle;
 	
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: removexattr Permission denied (WRITE needed)\n");
+		write_log(0, "Error: removexattr Permission denied"
+			" (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}

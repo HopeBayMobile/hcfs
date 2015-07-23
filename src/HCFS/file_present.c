@@ -434,7 +434,7 @@ error_handling:
 /************************************************************************
 *
 * Function name: symlink_update_meta
-*        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,                                                                                                                                    
+*        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *                const struct stat *this_stat, const char *link, 
 *                const unsigned long generation, const char *name
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
@@ -546,7 +546,8 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		return -ENOMEM;
 	}
 
-	/* First lookup stat to confirm the file type. Do NOT need to lock entry */
+	/* First lookup stat to confirm the file type. Do NOT need to 
+	   lock entry */
 	ret_code = meta_cache_lookup_file_data(this_inode, &stat_data,
 		NULL, NULL, 0, meta_cache_entry);
 	if (ret_code < 0)
@@ -554,25 +555,25 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	
 	/* Get metadata by case */
 	if (S_ISREG(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_file_data(this_inode, NULL, &filemeta,
-				NULL, 0, meta_cache_entry);
+		ret_code = meta_cache_lookup_file_data(this_inode, NULL, 
+			&filemeta, NULL, 0, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
-		*xattr_pos = filemeta.next_xattr_page; /* Get xattr file position */
+		*xattr_pos = filemeta.next_xattr_page;
 	}
 	if (S_ISDIR(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_dir_data(this_inode, NULL, &dirmeta,
-				NULL, meta_cache_entry);
+		ret_code = meta_cache_lookup_dir_data(this_inode, NULL, 
+			&dirmeta, NULL, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
-		*xattr_pos = dirmeta.next_xattr_page; /* Get xattr file position */
+		*xattr_pos = dirmeta.next_xattr_page;
 	}
 	if (S_ISLNK(stat_data.st_mode)) {
-		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL, &symlinkmeta,
-				meta_cache_entry);
+		ret_code = meta_cache_lookup_symlink_data(this_inode, NULL, 
+			&symlinkmeta, meta_cache_entry);
 		if (ret_code < 0)
 			return ret_code;
-		*xattr_pos = symlinkmeta.next_xattr_page; /* Get xattr file position */
+		*xattr_pos = symlinkmeta.next_xattr_page;
 	}
 
 	/* It is used to prevent user from forgetting to open meta file */
@@ -590,16 +591,18 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		FSEEK(meta_cache_entry->fptr, 0, SEEK_END);
 		FTELL(meta_cache_entry->fptr);
 		*xattr_pos = ret_pos;
-		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);
+		FWRITE(xattr_page, sizeof(XATTR_PAGE), 1, 
+			meta_cache_entry->fptr);
 
 		/* Update xattr filepos in meta cache */
 		if (S_ISREG(stat_data.st_mode)) {
 			filemeta.next_xattr_page = *xattr_pos;
-			ret_code = meta_cache_update_file_data(this_inode, NULL, 
+			ret_code = meta_cache_update_file_data(this_inode, NULL,
 				&filemeta, NULL, 0, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
-			write_log(10, "Debug: A new xattr page in regfile meta\n");
+			write_log(10, "Debug: A new xattr page in "
+				"regfile meta\n");
 		}
 		if (S_ISDIR(stat_data.st_mode)) {
 			dirmeta.next_xattr_page = *xattr_pos;
@@ -611,15 +614,17 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 		}
 		if (S_ISLNK(stat_data.st_mode)) {
 			symlinkmeta.next_xattr_page = *xattr_pos;
-			ret_code = meta_cache_update_symlink_data(this_inode, NULL, 
-				&symlinkmeta, meta_cache_entry);
+			ret_code = meta_cache_update_symlink_data(this_inode, 
+				NULL, &symlinkmeta, meta_cache_entry);
 			if (ret_code < 0)
 				return ret_code;
-			write_log(10, "Debug: A new xattr page in symlink meta\n");
+			write_log(10, "Debug: A new xattr page in symlink"
+				" meta\n");
 		}
 	} else { /* xattr has been existed. Just read it. */
 		FSEEK(meta_cache_entry->fptr, *xattr_pos, SEEK_SET);
-		FREAD(xattr_page, sizeof(XATTR_PAGE), 1, meta_cache_entry->fptr);	
+		FREAD(xattr_page, sizeof(XATTR_PAGE), 1, 
+			meta_cache_entry->fptr);
 	}
 
 	return 0;

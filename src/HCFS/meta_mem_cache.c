@@ -1447,8 +1447,10 @@ int meta_cache_drop_pages(META_CACHE_ENTRY_STRUCT *body_ptr)
 *  Return value: 0 if successful, otherwise return negative error code.
 *
 *************************************************************************/
-int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
-	const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+int meta_cache_update_symlink_data(ino_t this_inode, 
+	const struct stat *inode_stat, 
+	const SYMLINK_META_TYPE *symlink_meta_ptr, 
+	META_CACHE_ENTRY_STRUCT *bptr)
 {
 	int ret;
 
@@ -1515,7 +1517,8 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 
 	if (symlink_meta_ptr != NULL) {
 		if (body_ptr->symlink_meta == NULL) {
-			body_ptr->symlink_meta = malloc(sizeof(SYMLINK_META_TYPE));
+			body_ptr->symlink_meta = 
+				malloc(sizeof(SYMLINK_META_TYPE));
 			if (body_ptr->symlink_meta == NULL)
 				return -ENOMEM;
 
@@ -1529,7 +1532,8 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 							1, body_ptr->fptr);
 		}
 
-		memcpy(symlink_meta_ptr, body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE));
+		memcpy(symlink_meta_ptr, body_ptr->symlink_meta, 
+			sizeof(SYMLINK_META_TYPE));
 	}
 
 	gettimeofday(&(body_ptr->last_access_time), NULL);
