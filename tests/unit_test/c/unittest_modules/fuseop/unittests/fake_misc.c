@@ -372,7 +372,7 @@ void sleep_on_cache_full(void)
 }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-	mode_t child_mode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -557,7 +557,7 @@ void hcfs_destroy_backend(CURL *curl)
 	return;
 }
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	ino_t new_inode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
