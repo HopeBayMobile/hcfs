@@ -4201,6 +4201,19 @@ error_handle:
 	return ;
 }
 
+
+static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino, 
+	fuse_ino_t newparent, const char *newname)
+{
+	
+}
+
+static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
+	const char *name, mode_t mode, struct fuse_file_info *fi)
+{
+
+}
+
 /* Specify the functions used for the FUSE operations */
 static struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -4229,6 +4242,8 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
+	.link = hfuse_ll_link,
+	.create = hfuse_ll_create,
 };
 
 /*
