@@ -288,7 +288,7 @@ TEST_F(meta_cache_drop_pagesTest, SuccessDropAllPages)
  */
 class meta_cache_push_dir_pageTest : public ::testing::Test {
 	protected:
-		char *dir_meta_path;
+		const char *dir_meta_path;
 
 		virtual void SetUp() 
 		{
@@ -525,7 +525,7 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 	bool is_removed[num_entry];
 
 	/* Generate mock data */
-	for (int i=0 ; i<num_entry ; i++) {
+	for (int i = 0 ; i < num_entry ; i++) {
 		ino_list[i] = index_list[i%num_test_buckets] + 
 				NUM_META_MEM_CACHE_HEADERS*(i/num_test_buckets); /* Generate inode number */
 		/* Init lptr */
@@ -550,7 +550,7 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 	/* Test */
 	int random_i;
 	int lookup_index;
-	for (int i=0 ; i<num_entry ; i++) {
+	for (int i = 0 ; i < num_entry ; i++) {
 		random_i = (i+7) % num_entry;  /* Random start position */
 		EXPECT_EQ(0, meta_cache_remove(ino_list[random_i]));
 		is_removed[random_i] = true;
@@ -576,7 +576,7 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 
 class meta_cache_update_file_dataTest : public BaseClassWithMetaCacheEntry {	
 protected:
-	char *mock_file_meta;
+	const char *mock_file_meta;
 
 	void SetUp()
 	{
@@ -693,7 +693,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupSuccess)
 
 TEST_F(meta_cache_lookup_file_dataTest, LookupFileMeta_ReadSuccess)
 {
-	char *file_meta_path = "/tmp/mock_file_meta";
+	const char *file_meta_path = "/tmp/mock_file_meta";
 	FILE_META_TYPE expected_meta, actual_meta;
 
 	/* Generate mock file meta and write to meta file */
@@ -720,7 +720,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupFileMeta_ReadSuccess)
 
 TEST_F(meta_cache_lookup_file_dataTest, LookupBlockPage_ReadSuccess)
 {
-	char *file_meta_path = "/tmp/mock_file_meta";
+	const char *file_meta_path = "/tmp/mock_file_meta";
 	BLOCK_ENTRY_PAGE expected_block_page, actual_block_page;
 	unsigned page_pos;
 	
@@ -758,7 +758,7 @@ TEST_F(meta_cache_lookup_file_dataTest, LookupBlockPage_ReadSuccess)
 
 class meta_cache_update_dir_dataTest : public BaseClassWithMetaCacheEntry {
 protected:
-	char *mock_dir_meta;
+	const char *mock_dir_meta;
 	DIR_ENTRY_PAGE test_dir_entry_page;
 
 	void SetUp()
@@ -930,7 +930,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupMeta_ReadMetaSuccess)
 {
 	DIR_META_TYPE empty_dir_meta;
 	DIR_META_TYPE test_dir_meta = {5566, 7788, 93, 80, 41, 6};
-	char *mock_dir_meta_path = "/tmp/dir_meta_path";
+	const char *mock_dir_meta_path = "/tmp/dir_meta_path";
 	
 	/* Mock data */
 	body_ptr->fptr= fopen(mock_dir_meta_path, "wr+");
@@ -1005,7 +1005,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupOnlyDirPage_Hit_Cache_1)
 TEST_F(meta_cache_lookup_dir_dataTest, LookupDirPage_LoadWithBothCacheEmpty)
 {
 	DIR_ENTRY_PAGE expected_dir_page, actual_dir_page;
-	char *dir_meta_path = "/tmp/mock_dir_meta";
+	const char *dir_meta_path = "/tmp/mock_dir_meta";
 
 	/* Mock a expected_dir_page and write to dir meta */
 	init_dir_entry_page(&expected_dir_page);
@@ -1041,7 +1041,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupDirPage_LoadWith_Cache_0_Nonempty__
 {
 	DIR_ENTRY_PAGE expected_dir_page, actual_dir_page;
 	DIR_ENTRY_PAGE cache_0_dir_page;
-	char *dir_meta_path = "/tmp/mock_dir_meta";
+	const char *dir_meta_path = "/tmp/mock_dir_meta";
 
 	/* Mock a expected_dir_page and write to dir meta */
 	init_dir_entry_page(&expected_dir_page);
@@ -1083,7 +1083,7 @@ TEST_F(meta_cache_lookup_dir_dataTest, LookupDirPage_LoadWith_BothCacheNonEmpty)
 {
 	DIR_ENTRY_PAGE expected_dir_page, actual_dir_page;
 	DIR_ENTRY_PAGE cache_0_dir_page, cache_1_dir_page;
-	char *dir_meta_path = "/tmp/mock_dir_meta";
+	const char *dir_meta_path = "/tmp/mock_dir_meta";
 
 	/* Mock a expected_dir_page and write to dir meta */
 	init_dir_entry_page(&expected_dir_page);
@@ -1154,6 +1154,8 @@ class flush_single_entryTest : public ::testing::Test {
 				free(body_ptr->file_meta);	
 			if (body_ptr->dir_meta)
 				free(body_ptr->dir_meta);
+			if (body_ptr->symlink_meta)
+				free(body_ptr->symlink_meta);
 			if (body_ptr->dir_entry_cache[0])
 				free(body_ptr->dir_entry_cache[0]);
 			if (body_ptr->dir_entry_cache[1])
@@ -1235,6 +1237,43 @@ TEST_F(flush_single_entryTest, FlushFileMeta)
 	/* Free resource */	
 	free(body_ptr->file_meta);
 	body_ptr->file_meta = NULL;
+}
+
+TEST_F(flush_single_entryTest, FlushSymlinkMeta)
+{
+	struct stat verified_stat;
+	SYMLINK_META_TYPE verified_symlink_meta;
+	SYMLINK_META_TYPE expected_symlink_meta = {0, 17, 12, "hello! I am kewei"};
+	
+	/* Mock data */	
+	body_ptr->stat_dirty = TRUE;
+	body_ptr->meta_dirty = TRUE;
+	body_ptr->something_dirty = TRUE;
+	body_ptr->symlink_meta = (SYMLINK_META_TYPE *)malloc(sizeof(SYMLINK_META_TYPE));
+	test_file_stat->st_mode = S_IFLNK;
+	memcpy(&(body_ptr->this_stat), test_file_stat, sizeof(struct stat));
+	memcpy(body_ptr->symlink_meta, &expected_symlink_meta, sizeof(SYMLINK_META_TYPE));
+
+	/* Run */
+	sem_wait(&(body_ptr->access_sem));
+	ASSERT_EQ(0, flush_single_entry(body_ptr));
+	sem_post(&(body_ptr->access_sem));
+
+	/* Verify */
+	fseek(body_ptr->fptr, 0, SEEK_SET);
+	fread(&verified_stat, sizeof(struct stat), 1, body_ptr->fptr);
+	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fread(&verified_symlink_meta, sizeof(SYMLINK_META_TYPE), 1, body_ptr->fptr);
+
+	EXPECT_EQ(0, memcmp(&verified_stat, &(body_ptr->this_stat), sizeof(struct stat)));
+	EXPECT_EQ(0, memcmp(&verified_symlink_meta, body_ptr->symlink_meta, sizeof(SYMLINK_META_TYPE)));
+	EXPECT_EQ(FALSE, body_ptr->stat_dirty);
+	EXPECT_EQ(FALSE, body_ptr->meta_dirty);
+	EXPECT_EQ(FALSE, body_ptr->something_dirty);
+
+	/* Free */
+	free(body_ptr->symlink_meta);
+	body_ptr->symlink_meta = NULL;
 }
 
 TEST_F(flush_single_entryTest, FlushDirMeta)
@@ -1336,6 +1375,7 @@ class SomeEntryInMetaMemCacheArray : public ::testing::Test {
 			lptr->next = NULL;
 			lptr->body.dir_meta = NULL;
 			lptr->body.file_meta = NULL;
+			lptr->body.symlink_meta = NULL;
 			lptr->body.dir_entry_cache[0] = NULL;
 			lptr->body.dir_entry_cache[1] = NULL;
 			gettimeofday(&(lptr->body.last_access_time), NULL);
@@ -1575,7 +1615,7 @@ TEST_F(meta_cache_close_fileTest, FILEpointerIsNull)
 
 TEST_F(meta_cache_close_fileTest, CloseSuccess)
 {
-	char *meta_path = "/tmp/mock_meta_path";
+	const char *meta_path = "/tmp/mock_meta_path";
 
 	body_ptr->fptr = fopen(meta_path, "w+");
 	body_ptr->meta_opened = TRUE;
@@ -1595,4 +1635,140 @@ TEST_F(meta_cache_close_fileTest, CloseSuccess)
 
 /*
 	End of unittest of meta_cache_close_file()
+ */
+
+/*
+	Unittest of meta_cache_update_symlink_data()
+ */
+class meta_cache_update_symlink_dataTest : public BaseClassWithMetaCacheEntry {
+protected:
+	const char *mock_file_meta;
+
+	void SetUp()
+	{
+		mock_file_meta = "/tmp/mock_symlink_meta";
+
+		BaseClassWithMetaCacheEntry::SetUp();
+
+		body_ptr->fptr = fopen(mock_file_meta, "w+");
+		body_ptr->meta_opened = TRUE;
+		truncate(mock_file_meta, sizeof(struct stat) + 
+			sizeof(SYMLINK_META_TYPE));
+	}
+
+	void TearDown()
+	{
+		fclose(body_ptr->fptr);
+		unlink(mock_file_meta);
+		
+		BaseClassWithMetaCacheEntry::TearDown();
+	}
+};
+
+TEST_F(meta_cache_update_symlink_dataTest, UpdateStatSuccess)
+{
+	struct stat expected_stat;
+
+	expected_stat.st_mode = S_IFLNK;
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	EXPECT_EQ(0, meta_cache_update_symlink_data(1, &expected_stat, 
+		NULL, body_ptr));
+	sem_post(&body_ptr->access_sem);
+
+	/* Verify */
+	EXPECT_EQ(0, memcmp(&expected_stat, &body_ptr->this_stat, 
+		sizeof(struct stat)));
+}
+
+TEST_F(meta_cache_update_symlink_dataTest, UpdateSymlinkMetaSuccess)
+{
+	SYMLINK_META_TYPE expected_meta = {0, 12, 15, "hello! kewei"};
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	EXPECT_EQ(0, meta_cache_update_symlink_data(1, NULL,
+		&expected_meta, body_ptr));
+	sem_post(&body_ptr->access_sem);
+
+	/* Verify */
+	EXPECT_EQ(0, memcmp(&expected_meta, body_ptr->symlink_meta, 
+		sizeof(SYMLINK_META_TYPE)));
+}
+/*
+	End of unittest of meta_cache_update_symlink_data()
+ */
+
+/*
+	Unittest of meta_cache_lookup_symlink_data()
+ */
+class meta_cache_lookup_symlink_dataTest : public BaseClassWithMetaCacheEntry {
+protected:
+	const char *mock_file_meta;
+	struct stat expected_stat;
+	SYMLINK_META_TYPE expected_meta;
+
+	void SetUp()
+	{
+		mock_file_meta = "/tmp/mock_symlink_meta";
+		memset(&expected_stat, 0, sizeof(struct stat));
+		memset(&expected_meta, 0, sizeof(SYMLINK_META_TYPE));
+		expected_stat.st_mode = S_IFLNK;
+		expected_meta = SYMLINK_META_TYPE{1, 6, 4, "hello!"};
+
+		BaseClassWithMetaCacheEntry::SetUp();
+
+		body_ptr->fptr = fopen(mock_file_meta, "w+");
+		body_ptr->meta_opened = TRUE;
+		truncate(mock_file_meta, sizeof(struct stat) + 
+			sizeof(SYMLINK_META_TYPE));
+		
+	}
+
+	void TearDown()
+	{
+		fclose(body_ptr->fptr);
+		unlink(mock_file_meta);
+		
+		BaseClassWithMetaCacheEntry::TearDown();
+	}
+};
+
+TEST_F(meta_cache_lookup_symlink_dataTest, LookupStatSuccess)
+{
+	struct stat verified_stat;
+
+	memcpy(&body_ptr->this_stat, &expected_stat, sizeof(struct stat));
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	EXPECT_EQ(0, meta_cache_lookup_symlink_data(1, &verified_stat, 
+		NULL, body_ptr));
+	sem_post(&body_ptr->access_sem);
+
+	/* Verify */	
+	EXPECT_EQ(0, memcmp(&expected_stat, &verified_stat, 
+		sizeof(struct stat)));
+}
+
+TEST_F(meta_cache_lookup_symlink_dataTest, LookupSymlinkMetaSuccess)
+{
+	SYMLINK_META_TYPE verified_meta;
+
+	fseek(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
+	fwrite(&expected_meta, 1, sizeof(SYMLINK_META_TYPE), body_ptr->fptr);
+
+	/* Run */
+	sem_wait(&body_ptr->access_sem);
+	EXPECT_EQ(0, meta_cache_lookup_symlink_data(1, NULL, &verified_meta, 
+		body_ptr));
+	sem_post(&body_ptr->access_sem);
+
+	/* Verify */	
+	EXPECT_EQ(0, memcmp(&expected_meta, &verified_meta,
+		sizeof(SYMLINK_META_TYPE)));
+}
+/*
+	End of unittest of meta_cache_lookup_symlink_data()
  */

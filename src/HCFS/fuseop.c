@@ -21,6 +21,7 @@
 * 2015/5/20 Jiahong Adding permission checking for operations
 * 2015/5/25, 5/26  Jiahong adding error handling
 * 2015/6/29 Kewei finished xattr operations.
+* 2015/7/7 Kewei began to add ops about symbolic link
 *
 **************************************************************************/
 
@@ -687,7 +688,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
 			const char *selfname)
 {
-	ino_t this_inode;
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
@@ -724,11 +724,10 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
 		return;
 	}
 
-	this_inode = temp_dentry.d_ino;
-	ret_val = unlink_update_meta(parent_inode, this_inode, selfname);
-
+	ret_val = unlink_update_meta(parent_inode, &temp_dentry);
 	if (ret_val < 0)
 		ret_val = -ret_val;
+
 	fuse_reply_err(req, ret_val);
 }
 
@@ -879,12 +878,13 @@ a directory (for NFS) */
 	write_log(10,
 		"Debug lookup inode %ld, gen %ld\n", this_inode, this_gen);
 
-	if (S_ISREG((output_param.attr).st_mode)) {
+	if (S_ISREG((output_param.attr).st_mode))
 		ret_val = lookup_increase(this_inode, 1, D_ISREG);
-	} else {
-		if (S_ISDIR((output_param.attr).st_mode))
-			ret_val = lookup_increase(this_inode, 1, D_ISDIR);
-	} /* TODO: symlink lookup_increase */
+	if (S_ISDIR((output_param.attr).st_mode))
+		ret_val = lookup_increase(this_inode, 1, D_ISDIR);
+	if (S_ISLNK((output_param.attr).st_mode))
+		ret_val = lookup_increase(this_inode, 1, D_ISLNK);
+
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1178,7 +1178,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		the old target */
 	if (old_target_inode > 0) {
 		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
-				self_inode, parent2_ptr);
+				self_inode, self_mode, parent2_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -3366,11 +3366,14 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 								count++) {
 			memset(&tempstat, 0, sizeof(struct stat));
 			tempstat.st_ino = temp_page.dir_entries[count].d_ino;
+
 			if (temp_page.dir_entries[count].d_type == D_ISDIR)
 				tempstat.st_mode = S_IFDIR;
 			if (temp_page.dir_entries[count].d_type == D_ISREG)
 				tempstat.st_mode = S_IFREG;
-			/* TODO: add symlink case */
+			if (temp_page.dir_entries[count].d_type == D_ISLNK)
+				tempstat.st_mode = S_IFLNK;
+
 			nextentry_pos = temp_page.this_page_pos *
 				(MAX_DIR_ENTRIES_PER_PAGE + 1) + (count+1);
 			entry_size = fuse_add_direntry(req, &buf[buf_pos],
@@ -3563,7 +3566,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EPERM);
 			return;
-		}			
+		}
 
 		newstat.st_mode = attr->st_mode;
 		attr_changed = TRUE;
@@ -3575,7 +3578,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EPERM);
 			return;
-		}			
+		}
 
 		newstat.st_uid = attr->st_uid;
 		attr_changed = TRUE;
@@ -3599,7 +3602,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 				fuse_reply_err(req, EPERM);
 				return;
 			}
-		}			
+		}
 
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
@@ -3614,7 +3617,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EPERM);
 			return;
-		}			
+		}
 
 		newstat.st_atime = attr->st_atime;
 		memcpy(&(newstat.st_atim), &(attr->st_atim),
@@ -3631,7 +3634,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EPERM);
 			return;
-		}			
+		}
 		newstat.st_mtime = attr->st_mtime;
 		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
 			sizeof(struct timespec));
@@ -3651,7 +3654,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EACCES);
 			return;
-		}			
+		}
 		newstat.st_atime = (time_t)(timenow.tv_sec);
 		memcpy(&(newstat.st_atim), &timenow,
 			sizeof(struct timespec));
@@ -3669,7 +3672,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			meta_cache_unlock_entry(body_ptr);
 			fuse_reply_err(req, EACCES);
 			return;
-		}			
+		}
 		newstat.st_mtime = (time_t)(timenow.tv_sec);
 		memcpy(&(newstat.st_mtim), &timenow,
 			sizeof(struct timespec));
@@ -3775,16 +3778,230 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 
 /************************************************************************
 *
+* Function name: hfuse_ll_symlink
+*        Inputs: fuse_req_t req, const char *link, fuse_ino_t parent,
+*                const char *name
+*       Summary: Make a symbolic link "name", which links to "link".
+*
+*************************************************************************/
+static void hfuse_ll_symlink(fuse_req_t req, const char *link,
+	fuse_ino_t parent, const char *name)
+{
+	ino_t parent_inode;
+	ino_t self_inode;
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
+	DIR_ENTRY_PAGE dir_page;
+	unsigned long this_generation;
+	struct fuse_ctx *temp_context;
+	struct fuse_entry_param tmp_param;
+	struct stat parent_stat;
+	struct stat this_stat;
+	int ret_val;
+	int result_index;
+	int errcode;
+
+	parent_inode = (ino_t) parent;
+
+	/* Reject if name too long */
+	if (strlen(name) > MAX_FILENAME_LEN) {
+		write_log(0, "File name is too long\n");
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Reject if link path too long */
+	if (strlen(link) >= MAX_LINK_PATH) {
+		write_log(0, "Link path is too long\n");
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Error if parent is not a dir */
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Check whether "name" exists or not */
+	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
+	if (!parent_meta_cache_entry) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
+		&result_index, name, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+	if (result_index >= 0) {
+		write_log(0, "File %s existed\n", name);
+		errcode = -EEXIST;
+		goto error_handle;
+	}
+
+	/* Prepare stat and request a new inode from superblock */
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		write_log(0, "Memory allocation error in symlink()\n");
+		errcode = -ENOMEM;
+		goto error_handle;
+	}
+
+	memset(&this_stat, 0, sizeof(struct stat));
+	this_stat.st_mode = S_IFLNK | 0777;
+	this_stat.st_nlink = 1;
+	this_stat.st_size = strlen(link);
+	this_stat.st_uid = temp_context->uid;
+	this_stat.st_gid = temp_context->gid;
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+
+	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	if (self_inode < 1) {
+		errcode = -ENOSPC;
+		goto error_handle;
+	}
+	this_stat.st_ino = self_inode;
+
+	/* Write symlink meta and add new entry to parent */
+	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
+		link, this_generation, name);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		errcode = ret_val;
+		goto error_handle;
+	}
+
+	ret_val = meta_cache_close_file(parent_meta_cache_entry);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(parent_meta_cache_entry);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	ret_val = meta_cache_unlock_entry(parent_meta_cache_entry);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Reply fuse entry */
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	ret_val = lookup_increase(self_inode, 1, D_ISLNK);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+
+	write_log(5, "Debug symlink: symlink operation success\n");
+	fuse_reply_entry(req, &(tmp_param));
+	return;
+
+error_handle:
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry);
+	fuse_reply_err(req, -errcode);
+	return;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_ll_readlink
+*        Inputs: fuse_req_t req, fuse_ino_t ino
+*       Summary: Read symbolic link target path and reply to fuse.
+*
+*************************************************************************/
+static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
+{
+	ino_t this_inode;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	SYMLINK_META_TYPE symlink_meta;
+	struct stat symlink_stat;
+	char link_buffer[MAX_LINK_PATH + 1];
+	int ret_code;
+
+	this_inode = (ino_t) ino;
+
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {
+		write_log(0, "readlink() lock meta cache entry fail\n");
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	/* Get stat and meta */
+	ret_code = meta_cache_lookup_symlink_data(this_inode, &symlink_stat,
+		&symlink_meta, meta_cache_entry);
+	if (ret_code < 0) {
+		write_log(0, "readlink() lookup symlink meta fail\n");
+		meta_cache_close_file(meta_cache_entry);
+		meta_cache_unlock_entry(meta_cache_entry);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	/* Update access time */
+	set_timestamp_now(&symlink_stat, ATIME);
+	ret_code = meta_cache_update_symlink_data(this_inode, &symlink_stat,
+		NULL, meta_cache_entry);
+	if (ret_code < 0) {
+		write_log(0, "readlink() update symlink meta fail\n");
+		meta_cache_close_file(meta_cache_entry);
+		meta_cache_unlock_entry(meta_cache_entry);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	ret_code = meta_cache_close_file(meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	ret_code = meta_cache_unlock_entry(meta_cache_entry);
+	if (ret_code < 0) {
+		fuse_reply_err(req, -ret_code);
+		return;
+	}
+
+	memcpy(link_buffer, symlink_meta.link_path, sizeof(char) *
+		symlink_meta.link_len);
+	link_buffer[symlink_meta.link_len] = '\0';
+
+	write_log(5, "Readlink: Lookup symlink success. Link to %s\n",
+		link_buffer);
+	fuse_reply_readlink(req, link_buffer);
+	return;
+}
+
+/************************************************************************
+*
 * Function name: hfuse_ll_setxattr
 *        Inputs: fuse_req_t req, fuse_ino_t ino, char *name, char *value,
 *                size_t size, int flag
 *       Summary: Set extended attribute when given (name, value) pair. It
-*                creates new attribute when name is not found. On the 
-*                other hand, if attribute exists, it replaces the old 
+*                creates new attribute when name is not found. On the
+*                other hand, if attribute exists, it replaces the old
 *                value with new value.
 *
 *************************************************************************/
-static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
+static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	const char *value, size_t size, int flag)
 {
 	/* TODO: Tmp ignore permission of namespace */
@@ -3796,10 +4013,10 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	int retcode;
 	struct stat stat_data;
 	ino_t this_inode;
-	
+
 	this_inode = (ino_t) ino;
 	xattr_page = NULL;
-	
+
 	if (size <= 0) {
 		write_log(0, "Cannot set key without value.\n");
 		fuse_reply_err(req, EINVAL);
@@ -3808,21 +4025,21 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n", 
+	write_log(10, "Debug setxattr: namespace = %d, key = %s, flag = %d\n",
 		name_space, key, flag);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
-	
-	/* Lock the meta cache entry and use it to find pos of xattr page */	
+
+	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {	
+	if (meta_cache_entry == NULL) {
 		write_log(0, "Error: setxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
+
 	/* Open the meta file and set exclusive lock to it */
 	retcode = meta_cache_open_file(meta_cache_entry);
 	if (retcode < 0)
@@ -3833,9 +4050,10 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
-	
+
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: setxattr Permission denied (WRITE needed)\n");
+		write_log(0, "Error: setxattr Permission denied "
+			"(WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -3847,19 +4065,19 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
-	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
-	write_log(10, "Debug setxattr: fetch xattr_page, xattr_page = %lld\n", 
+	write_log(10, "Debug setxattr: fetch xattr_page, xattr_page = %lld\n",
 		xattr_filepos);
-	
+
 	/* Begin to Insert xattr */
-	retcode = insert_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
+	retcode = insert_xattr(meta_cache_entry, xattr_page, xattr_filepos,
 		name_space, key, value, size, flag);
 	if (retcode < 0)
 		goto error_handle;
-	
+
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
@@ -3867,7 +4085,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	write_log(5, "setxattr operation success\n");
 	fuse_reply_err(req, 0);
 	return ;
-		
+
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
@@ -3886,9 +4104,9 @@ error_handle:
 *                If name is not found, reply error.
 *
 *************************************************************************/
-static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name, 
+static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	size_t size)
-{	
+{
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	XATTR_PAGE *xattr_page;
 	struct stat stat_data;
@@ -3899,29 +4117,29 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	ino_t this_inode;
 	size_t actual_size;
 	char *value;
-	
+
 	this_inode = (ino_t) ino;
 	value = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
-	
+
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n", 
+	write_log(10, "Debug getxattr: namespace = %d, key = %s, size = %d\n",
 		name_space, key, size);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
-	
-	/* Lock the meta cache entry and use it to find pos of xattr page */	
+
+	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {	
+	if (meta_cache_entry == NULL) {
 		write_log(0, "Error: getxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
+
 	/* Open the meta file and set exclusive lock to it */
 	retcode = meta_cache_open_file(meta_cache_entry);
 	if (retcode < 0)
@@ -3933,7 +4151,8 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 	if (retcode < 0)
 		goto error_handle;
 	if (check_permission(req, &stat_data, 4) < 0) { /* READ perm needed */
-		write_log(0, "Error: getxattr permission denied (READ needed)\n");
+		write_log(0, "Error: getxattr permission denied "
+			"(READ needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -3945,13 +4164,14 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
-	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
-	
-	/* Get xattr if size is sufficient. If size is zero, return actual needed 
-	   size. If size is non-zero but too small, return error code ERANGE */	
+
+	/* Get xattr if size is sufficient. If size is zero, return actual
+	   needed size. If size is non-zero but too small, return error code
+	   ERANGE */
 	if (size != 0) {
 		value = (char *) malloc(sizeof(char) * size);
 		if (!value) {
@@ -3964,27 +4184,27 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		value = NULL;
 	}
 	actual_size = 0;
-	
-	retcode = get_xattr(meta_cache_entry, xattr_page, name_space, 
+
+	retcode = get_xattr(meta_cache_entry, xattr_page, name_space,
 		key, value, size, &actual_size);
 	if (retcode < 0) /* Error: ERANGE, ENOENT, or others */
 		goto error_handle;
-	
-	/* Close & unlock meta */	
+
+	/* Close & unlock meta */
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
-	
+
 	if (size <= 0) { /* Reply with needed buffer size */
-		write_log(5, "Get xattr needed size of %s\n", 
+		write_log(5, "Get xattr needed size of %s\n",
 				name);
 		fuse_reply_xattr(req, actual_size);
 
 	} else { /* Reply with value of given key */
-		write_log(5, "Get xattr value %s success\n", 
+		write_log(5, "Get xattr value %s success\n",
 				value);
 		fuse_reply_buf(req, value, actual_size);
 	}
-	
+
 	/* Free memory */
 	if (xattr_page)
 		free(xattr_page);
@@ -4008,7 +4228,7 @@ error_handle:
 * Function name: hfuse_ll_listxattr
 *        Inputs: fuse_req_t req, fuse_ino_t ino, size_t size
 *
-*       Summary: List all xattr in USER namespace. Reply needed size if 
+*       Summary: List all xattr in USER namespace. Reply needed size if
 *                parameter "size" is zero. If size is fitted, reply buffer
 *                filled with all names separated by null character.
 *
@@ -4018,27 +4238,27 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	XATTR_PAGE *xattr_page;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	ino_t this_inode;
-	long long xattr_filepos; 
+	long long xattr_filepos;
 	int retcode;
 	char *key_buf;
 	size_t actual_size;
-		
-	
+
+
 	this_inode = (ino_t) ino;
 	key_buf = NULL;
 	xattr_page = NULL;
 	actual_size = 0;
-	write_log(10, "Debug listxattr: Begin listxattr, given buffer size = %d\n",
-		 size);
+	write_log(10, "Debug listxattr: Begin listxattr, "
+		"given buffer size = %d\n", size);
 
-	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {	
+	if (meta_cache_entry == NULL) {
 		write_log(0, "Error: listxattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
+
 	/* Open the meta file and set exclusive lock to it */
 	retcode = meta_cache_open_file(meta_cache_entry);
 	if (retcode < 0)
@@ -4051,12 +4271,12 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
-	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
-	
-	/* Allocate sufficient size */	
+
+	/* Allocate sufficient size */
 	if (size != 0) {
 		key_buf = (char *) malloc(sizeof(char) * size);
 		if (!key_buf) {
@@ -4069,8 +4289,8 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		key_buf = NULL;
 	}
 	actual_size = 0;
-	
-	retcode = list_xattr(meta_cache_entry, xattr_page, key_buf, size, 
+
+	retcode = list_xattr(meta_cache_entry, xattr_page, key_buf, size,
 		&actual_size);
 	if (retcode < 0) /* Error: ERANGE or others */
 		goto error_handle;
@@ -4078,18 +4298,18 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 	/* Close & unlock meta */
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
-	
+
 	if (size <= 0) { /* Reply needed size */
-		write_log(5, "listxattr: Reply needed size = %d\n", 
+		write_log(5, "listxattr: Reply needed size = %d\n",
 			actual_size);
 		fuse_reply_xattr(req, actual_size);
-	
+
 	} else { /* Reply list */
 		write_log(5, "listxattr operation success\n");
 		fuse_reply_buf(req, key_buf, actual_size);
 	}
-	
-	/* Free memory */	
+
+	/* Free memory */
 	if (xattr_page)
 		free(xattr_page);
 	if (key_buf)
@@ -4113,15 +4333,16 @@ error_handle:
 *        Inputs: fuse_req_t req, fuse_ino_t ino, char *name
 *
 *       Summary: Remove a xattr and reclaim those resource if needed. Reply
-*                error if attribute is not found. 
+*                error if attribute is not found.
 *
 *************************************************************************/
-static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *name)
-{	
+static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
+	const char *name)
+{
 	XATTR_PAGE *xattr_page;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
 	ino_t this_inode;
-	long long xattr_filepos; 
+	long long xattr_filepos;
 	int retcode;
 	char name_space;
 	char key[MAX_KEY_SIZE];
@@ -4132,21 +4353,21 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 
 	/* Parse input name and separate it into namespace and key */
 	retcode = parse_xattr_namespace(name, &name_space, key);
-	write_log(10, "Debug removexattr: namespace = %d, key = %s\n", 
+	write_log(10, "Debug removexattr: namespace = %d, key = %s\n",
 		name_space, key);
 	if (retcode < 0) {
 		fuse_reply_err(req, -retcode);
 		return;
 	}
 
-	/* Lock the meta cache entry and use it to find pos of xattr page */	
+	/* Lock the meta cache entry and use it to find pos of xattr page */
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
-	if (meta_cache_entry == NULL) {	
+	if (meta_cache_entry == NULL) {
 		write_log(0, "Error: removexattr lock_entry fail\n");
 		fuse_reply_err(req, ENOMEM);
 		return;
 	}
-	
+
 	/* Open the meta file and set exclusive lock to it */
 	retcode = meta_cache_open_file(meta_cache_entry);
 	if (retcode < 0)
@@ -4157,9 +4378,10 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 		NULL, NULL, 0, meta_cache_entry);
 	if (retcode < 0)
 		goto error_handle;
-	
+
 	if (check_permission(req, &stat_data, 2) < 0) { /* WRITE perm needed */
-		write_log(0, "Error: removexattr Permission denied (WRITE needed)\n");
+		write_log(0, "Error: removexattr Permission denied"
+			" (WRITE needed)\n");
 		retcode = -EACCES;
 		goto error_handle;
 	}
@@ -4171,19 +4393,19 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino, const char *nam
 		retcode = -ENOMEM;
 		goto error_handle;
 	}
-	retcode = fetch_xattr_page(meta_cache_entry, xattr_page, 
+	retcode = fetch_xattr_page(meta_cache_entry, xattr_page,
 		&xattr_filepos);
 	if (retcode < 0)
 		goto error_handle;
-	
+
 	/* Remove xattr */
-	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos, 
+	retcode = remove_xattr(meta_cache_entry, xattr_page, xattr_filepos,
 		name_space, key);
 	if (retcode < 0) { /* ENOENT or others */
 		write_log(0, "Error: removexattr remove xattr fail\n");
 		goto error_handle;
 	}
-	
+
 	meta_cache_close_file(meta_cache_entry);
 	meta_cache_unlock_entry(meta_cache_entry);
 	if (xattr_page)
@@ -4238,6 +4460,8 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.statfs = hfuse_ll_statfs,
 	.lookup = hfuse_ll_lookup,
 	.forget = hfuse_ll_forget,
+	.symlink = hfuse_ll_symlink,
+	.readlink = hfuse_ll_readlink,
 	.setxattr = hfuse_ll_setxattr,
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,

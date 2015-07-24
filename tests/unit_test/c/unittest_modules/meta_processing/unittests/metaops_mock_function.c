@@ -222,6 +222,8 @@ int super_block_to_delete(ino_t this_inode)
 {
 	if (this_inode == INO_DELETE_DIR)
 		return -1;
+	if (this_inode == INO_DELETE_LNK)
+		return -2;
 	return 0;
 }
 
