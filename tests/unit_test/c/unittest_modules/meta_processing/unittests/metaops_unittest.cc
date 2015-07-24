@@ -34,7 +34,9 @@ TEST(init_dir_pageTest, InitOK)
 {
         long long pos = 1000;
 
-	DIR_ENTRY_PAGE *temppage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
+	DIR_ENTRY_PAGE *temppage;
+
+	temppage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
 	
 	/* Run tested function */
 	EXPECT_EQ(0, init_dir_page(temppage, self_inode, parent_inode, pos));
@@ -70,7 +72,8 @@ class dir_add_entryTest : public ::testing::Test {
 
 		virtual void SetUp() 
 		{
-                       	strcpy(mock_metaname, "/tmp/mock_meta_used_in_dir_add_entry"); 
+                       	strcpy(mock_metaname, 
+				"/tmp/mock_meta_used_in_dir_add_entry"); 
 			self_name = "selfname";
 			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(
 				sizeof(META_CACHE_ENTRY_STRUCT));
@@ -350,7 +353,8 @@ protected:
 	virtual void SetUp() {
 		new_inode = 6;
 
-		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		body_ptr = (META_CACHE_ENTRY_STRUCT*)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
 		memset(&to_verified_stat, 0, sizeof(struct stat));
 	}
@@ -359,22 +363,34 @@ protected:
 	}
 };
 
-TEST_F(change_dir_entry_inodeTest, ChangeOK) 
+TEST_F(change_dir_entry_inodeTest, ChangeREGOK) 
 {	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, "/mock/target/name", 
-		new_inode, body_ptr));
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFREG, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFLNK, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeDIROK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, DirEntryNotFound) 
 {
 	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
-		"/mock/target/name", new_inode, body_ptr));
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFail) 
 {
 	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, 
-		"/mock/target/name", new_inode, body_ptr));
+		"/mock/target/name", new_inode, S_IFREG, body_ptr));
 }
 /*
 	End of unittest for change_parent_inode()

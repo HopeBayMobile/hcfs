@@ -155,8 +155,10 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
 	return 0;
 }
 
-int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
-        const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+int meta_cache_update_symlink_data(ino_t this_inode, 
+	const struct stat *inode_stat, 
+	const SYMLINK_META_TYPE *symlink_meta_ptr, 
+	META_CACHE_ENTRY_STRUCT *bptr)
 {
 	char buf[5000];
 

@@ -9,6 +9,7 @@
 *
 * Revision History
 * 2015/2/5 Jiahong added header for this file, and revising coding style.
+* 2015/7/24 Kewei Modified function unlink_update_meta().
 *
 **************************************************************************/
 
@@ -30,8 +31,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen);
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
-			const char *selfname);
+int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry);
 
 int meta_forget_inode(ino_t self_inode);
 

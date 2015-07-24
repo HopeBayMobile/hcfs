@@ -372,7 +372,7 @@ void sleep_on_cache_full(void)
 }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -511,9 +511,9 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry)
 {
-	if (this_inode == 4)
+	if (this_entry->d_ino == 4)
 		before_mknod_created = TRUE;
 	return 0;
 }

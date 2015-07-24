@@ -10,7 +10,8 @@
 * Revision History
 * 2015/2/5 Jiahong added header for this file, and revising coding style.
 * 2015/6/2 Jiahong added error handling
-* 2015/6/16 Kewei added function fetch_xattr_page()
+* 2015/6/16 Kewei added function fetch_xattr_page().
+* 2015/7/9 Kewei added function symlink_update_meta().
 *
 **************************************************************************/
 
@@ -301,38 +302,39 @@ error_handling:
 *
 * Function name: unlink_update_meta
 *        Inputs: ino_t parent_inode, ino_t this_inode, char *selfname
-*       Summary: Helper of "hfuse_unlink" function. Will delete "this_inode"
-*                (with name "selfname" from its parent "parent_inode".
-*                Also will decrease the reference count for "this_inode".
+*       Summary: Helper of "hfuse_unlink" function. It removes the inode
+*                and name recorded in "this_entry" from "parent_inode".
+*                Also will decrease the reference count for the inode.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode,
-				const char *selfname)
+int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry)
 {
 	int ret_val;
-	struct stat this_stat;
+	ino_t this_inode;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
-	ret_val = fetch_inode_stat(this_inode, &this_stat, NULL);
-	if (ret_val < 0)
-		return ret_val;
+	this_inode = this_entry->d_ino;
 
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
 	/* Remove entry */
-	if (S_ISREG(this_stat.st_mode)) {
+	if (this_entry->d_type == D_ISREG) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
-							S_IFREG, body_ptr);
+		ret_val = dir_remove_entry(parent_inode, this_inode, 
+			this_entry->d_name, S_IFREG, body_ptr);
 	}
-	if (S_ISLNK(this_stat.st_mode)) {
+	if (this_entry->d_type == D_ISLNK) {
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, selfname,
-							S_IFLNK, body_ptr);
+		ret_val = dir_remove_entry(parent_inode, this_inode, 
+			this_entry->d_name, S_IFLNK, body_ptr);
+	}
+	if (this_entry->d_type == D_ISDIR) {
+		write_log(0, "Error in unlink_update_meta(): unlink a dir.\n");
+		ret_val = -EISDIR;
 	}
 	if (ret_val < 0)
 		goto error_handling;

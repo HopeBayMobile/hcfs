@@ -470,15 +470,15 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *        Inputs: ino_t self_inode, char *targetname,
 *                ino_t new_inode, struct stat *thisstat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
-*       Summary: For a directory "self_inode", change the inode of entry
-*                "targetname" to "new_inode. "thisstat" is the inode stat
-*                of "self_inode".
+*       Summary: For a directory "self_inode", change the inode and mode
+*                of entry "targetname" to "new_inode" and "new_mode".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+		ino_t new_inode, mode_t new_mode,
+		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
 	int count;
@@ -495,12 +495,18 @@ int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
-		if (S_ISREG(tmpstat.st_mode))
+		if (S_ISREG(new_mode)) {
+			write_log(10, "Debug: change to type REG\n");
 			tpage.dir_entries[count].d_type = D_ISREG;
-		if (S_ISLNK(tmpstat.st_mode))
+		}
+		if (S_ISLNK(new_mode)) {
+			write_log(10, "Debug: change to type LNK\n");
 			tpage.dir_entries[count].d_type = D_ISLNK;
-		if (S_ISDIR(tmpstat.st_mode))
+		}
+		if (S_ISDIR(new_mode)) {
+			write_log(10, "Debug: change to type DIR\n");
 			tpage.dir_entries[count].d_type = D_ISDIR;
+		}
 
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,

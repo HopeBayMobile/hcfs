@@ -58,7 +58,7 @@ TEST(fetch_inode_statTest, FetchRegFileGenerationSuccess)
 	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
 
 	/* Verify */
-	EXPECT_EQ(GENERATION_NUM, gen);	
+	EXPECT_EQ(GENERATION_NUM, gen);
 }
 
 TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
@@ -73,7 +73,7 @@ TEST(fetch_inode_statTest, FetchDirGenerationSuccess)
 	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
 
 	/* Verify */
-	EXPECT_EQ(GENERATION_NUM, gen);	
+	EXPECT_EQ(GENERATION_NUM, gen);
 }
 
 TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
@@ -88,7 +88,7 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 	EXPECT_EQ(0, fetch_inode_stat(inode, &inode_stat, &gen));
 
 	/* Verify */
-	EXPECT_EQ(GENERATION_NUM, gen);	
+	EXPECT_EQ(GENERATION_NUM, gen);
 }
 /*
 	End of unittest of fetch_inode_stat()
@@ -103,7 +103,7 @@ TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
 		"\0", NULL, 0));
 }
 
@@ -115,7 +115,7 @@ TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFREG;
 
-	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0));
 }
 
@@ -144,7 +144,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", NULL, 0));
 }
 
@@ -156,7 +156,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFDIR;
 
-	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0));
 }
 
@@ -168,7 +168,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 
 	tmp_stat.st_mode = S_IFDIR;
 
-	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode, 
+	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0));
 }
 
@@ -182,38 +182,50 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 
 TEST(unlink_update_metaTest, FailTo_dir_remove_entry_RegfileMeta)
 {
+	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
-	ino_t self_inode = INO_REGFILE;
 
-	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
-		self_inode, "\0"));
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_REGFILE;
+	mock_entry.d_type = D_ISREG;
+
+	EXPECT_EQ(-1, unlink_update_meta(parent_inode, &mock_entry));
 }
 
 TEST(unlink_update_metaTest, UnlinkUpdateRegfileMetaSuccess)
 {
+	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
-	ino_t self_inode = INO_REGFILE;
 
-	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
-		self_inode, "\0"));
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_REGFILE;
+	mock_entry.d_type = D_ISREG;
+
+	EXPECT_EQ(0, unlink_update_meta(parent_inode, &mock_entry));
 }
 
 TEST(unlink_update_metaTest, FailTo_dir_remove_entry_SymlinkMeta)
 {
+	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
-	ino_t self_inode = INO_LNK;
 
-	EXPECT_EQ(-1, unlink_update_meta(parent_inode, 
-		self_inode, "\0"));
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_LNK;
+	mock_entry.d_type = D_ISLNK;
+
+	EXPECT_EQ(-1, unlink_update_meta(parent_inode, &mock_entry));
 }
 
 TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
 {
+	DIR_ENTRY mock_entry;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
-	ino_t self_inode = INO_LNK;
 
-	EXPECT_EQ(0, unlink_update_meta(parent_inode, 
-		self_inode, "\0"));
+	memset(&mock_entry, 0, sizeof(DIR_ENTRY));
+	mock_entry.d_ino = INO_LNK;
+	mock_entry.d_type = D_ISLNK;
+
+	EXPECT_EQ(0, unlink_update_meta(parent_inode, &mock_entry));
 }
 
 /*
@@ -225,29 +237,29 @@ TEST(unlink_update_metaTest, UnlinkUpdateSymlinkMetaSuccess)
  */
 
 TEST(rmdir_update_metaTest, ChildrenNonempty)
-{	
+{
 	ino_t self_inode = INO_CHILDREN_IS_NONEMPTY;
 	ino_t parent_inode = 1;
 
-	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(-ENOTEMPTY, rmdir_update_meta(parent_inode,
 		self_inode, "\0"));
 }
 
 TEST(rmdir_update_metaTest, FailTo_dir_remove_entry)
-{	
+{
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_FAIL;
 
-	EXPECT_EQ(-1, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(-1, rmdir_update_meta(parent_inode,
 		self_inode, "\0"));
 }
 
 TEST(rmdir_update_metaTest, FunctionWorkSuccess)
-{	
+{
 	ino_t self_inode = INO_CHILDREN_IS_EMPTY;
 	ino_t parent_inode = INO_DIR_REMOVE_ENTRY_SUCCESS;
 
-	EXPECT_EQ(0, rmdir_update_meta(parent_inode, 
+	EXPECT_EQ(0, rmdir_update_meta(parent_inode,
 		self_inode, "\0"));
 }
 
@@ -339,14 +351,15 @@ TEST_F(fetch_xattr_pageTest, FetchExistRegFileXattrSuccess)
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
 
 	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
-	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
-	
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1,
+		mock_meta_entry->fptr);
+
 	mock_meta_entry->inode_num = INO_REGFILE_XATTR_PAGE_EXIST;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
-	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page,
 		sizeof(XATTR_PAGE)));
 }
 
@@ -371,14 +384,15 @@ TEST_F(fetch_xattr_pageTest, FetchExistDirXattrSuccess)
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
 
 	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
-	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
-	
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1,
+		mock_meta_entry->fptr);
+
 	mock_meta_entry->inode_num = INO_DIR_XATTR_PAGE_EXIST;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
-	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page,
 		sizeof(XATTR_PAGE)));
 }
 
@@ -403,14 +417,15 @@ TEST_F(fetch_xattr_pageTest, FetchExistSymlinkXattrSuccess)
 	memset(&expected_xattr_page, 'k', sizeof(XATTR_PAGE));
 
 	fseek(mock_meta_entry->fptr, sizeof(XATTR_PAGE), SEEK_SET);
-	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1, mock_meta_entry->fptr);
-	
+	fwrite(&expected_xattr_page, sizeof(XATTR_PAGE), 1,
+		mock_meta_entry->fptr);
+
 	mock_meta_entry->inode_num = INO_LNK_XATTR_PAGE_EXIST;
 	ret = fetch_xattr_page(mock_meta_entry, mock_xattr_page, &xattr_pos);
 
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(sizeof(XATTR_PAGE) , xattr_pos);
-	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page, 
+	EXPECT_EQ(0, memcmp(&expected_xattr_page, mock_xattr_page,
 		sizeof(XATTR_PAGE)));
 }
 /*
@@ -443,7 +458,7 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
-	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat, 
+	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used"));
 }
 
@@ -454,7 +469,7 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
-	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat, 
+	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"update_symlink_data_fail", 12, "name_not_used"));
 }
 
@@ -465,7 +480,7 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 	mock_stat.st_ino = 123;
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
-	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat, 
+	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
 		"link_not_used", 12, "name_not_used"));
 
 }

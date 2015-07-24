@@ -688,7 +688,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
 			const char *selfname)
 {
-	ino_t this_inode;
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
@@ -725,11 +724,10 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent_inode,
 		return;
 	}
 
-	this_inode = temp_dentry.d_ino;
-	ret_val = unlink_update_meta(parent_inode, this_inode, selfname);
-
+	ret_val = unlink_update_meta(parent_inode, &temp_dentry);
 	if (ret_val < 0)
 		ret_val = -ret_val;
+
 	fuse_reply_err(req, ret_val);
 }
 
@@ -1180,7 +1178,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		the old target */
 	if (old_target_inode > 0) {
 		ret_val = change_dir_entry_inode(parent_inode2, selfname2,
-				self_inode, parent2_ptr);
+				self_inode, self_mode, parent2_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
