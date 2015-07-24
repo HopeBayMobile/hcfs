@@ -325,9 +325,36 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 			*result_index = 0;
 			break;
 		}
+		if (strcmp(childname,"testsymlink_exist_in_symlink") == 0) {
+			result_page->dir_entries[0].d_ino = 14;
+			*result_index = 1;
+			break;
+		}
+		if (strcmp(childname,"testsymlink_not_exist_in_symlink") == 0) {
+			*result_index = -1;
+			break;
+		}
 		break;
 	default:
 		break;
 	}
+	return 0;
+}
+
+
+int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+        const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+{
+	return 0;
+}
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+        SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	char *target = "I_am_target_link";
+
+	strcpy(symlink_meta_ptr->link_path, target);
+	symlink_meta_ptr->link_len = strlen(target);
+
 	return 0;
 }

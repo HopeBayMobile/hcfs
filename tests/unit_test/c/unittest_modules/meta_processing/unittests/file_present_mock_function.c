@@ -71,15 +71,17 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 	if (inode_stat) {
 		inode_stat->st_ino = this_inode;
 		inode_stat->st_size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
-		if (this_inode == INO_REGFILE || this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
+		if (this_inode == INO_REGFILE || 
+			this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
 			inode_stat->st_mode = S_IFREG;
-		else if (this_inode == INO_DIR || this_inode == INO_DIR_XATTR_PAGE_EXIST)
+		else if (this_inode == INO_DIR || 
+			this_inode == INO_DIR_XATTR_PAGE_EXIST)
 			inode_stat->st_mode = S_IFDIR;
 		else
 			inode_stat->st_mode = S_IFLNK;
 	}
 
-	if(file_meta_ptr) {
+	if (file_meta_ptr) {
 		file_meta_ptr->generation = GENERATION_NUM;
 		if (this_inode == INO_REGFILE)
 			file_meta_ptr->next_xattr_page = 0;
@@ -152,3 +154,34 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *meta_cache_entry)
 {
 	return 0;
 }
+
+int meta_cache_update_symlink_data(ino_t this_inode, 
+	const struct stat *inode_stat, 
+	const SYMLINK_META_TYPE *symlink_meta_ptr, 
+	META_CACHE_ENTRY_STRUCT *bptr)
+{
+	char buf[5000];
+
+	memset(buf, 0, 5000);
+	memcpy(buf, symlink_meta_ptr->link_path, symlink_meta_ptr->link_len);
+
+	if (!strcmp("update_symlink_data_fail", buf))
+		return -1;
+
+	return 0;
+}
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+        SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	if (symlink_meta_ptr) {
+		symlink_meta_ptr->generation = GENERATION_NUM;
+
+		if (this_inode == INO_LNK)
+			symlink_meta_ptr->next_xattr_page = 0;
+		if (this_inode == INO_LNK_XATTR_PAGE_EXIST)
+			symlink_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
+	}
+	return 0;
+}
+

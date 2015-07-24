@@ -120,6 +120,8 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Load parent meta from meta cache */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -352,6 +354,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -466,15 +470,15 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *        Inputs: ino_t self_inode, char *targetname,
 *                ino_t new_inode, struct stat *thisstat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
-*       Summary: For a directory "self_inode", change the inode of entry
-*                "targetname" to "new_inode. "thisstat" is the inode stat
-*                of "self_inode".
+*       Summary: For a directory "self_inode", change the inode and mode
+*                of entry "targetname" to "new_inode" and "new_mode".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+		ino_t new_inode, mode_t new_mode,
+		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
 	int count;
@@ -491,6 +495,19 @@ int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
+		if (S_ISREG(new_mode)) {
+			write_log(10, "Debug: change to type REG\n");
+			tpage.dir_entries[count].d_type = D_ISREG;
+		}
+		if (S_ISLNK(new_mode)) {
+			write_log(10, "Debug: change to type LNK\n");
+			tpage.dir_entries[count].d_type = D_ISLNK;
+		}
+		if (S_ISDIR(new_mode)) {
+			write_log(10, "Debug: change to type DIR\n");
+			tpage.dir_entries[count].d_type = D_ISDIR;
+		}
+
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
@@ -1170,6 +1187,14 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		if (ret < 0)
 			return ret;
 		break;
+	
+	case D_ISLNK:
+		/*Need to delete the inode by moving it to "todelete" path*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0)
+			return ret;
+		break;
+
 	case D_ISREG:
 		ret = fetch_inode_stat(this_inode, &this_inode_stat, NULL);
 		if (ret < 0)
@@ -1361,9 +1386,10 @@ int startup_finish_delete()
 			}
 			if (S_ISREG(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG);
-			else
+			if (S_ISDIR(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISDIR);
-			/* TODO: add case for sym link here */
+			if (S_ISLNK(tmpstat.st_mode))
+				ret = actual_delete_inode(tmp_ino, D_ISLNK);
 
 			if (ret < 0) {
 				closedir(dirp);
