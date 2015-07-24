@@ -4427,7 +4427,128 @@ error_handle:
 static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino, 
 	fuse_ino_t newparent, const char *newname)
 {
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
+	META_CACHE_ENTRY_STRUCT *link_meta_cache_entry;
+	DIR_ENTRY_PAGE dir_page;
+	struct stat parent_stat, link_stat;
+	struct fuse_entry_param tmp_param;
+	int result_index;
+	int ret_val, errcode;
+	unsigned long this_generation;
+	ino_t parent_inode, link_inode;
+
+	parent_inode = (ino_t) newparent;
+	link_inode = (ino_t) ino;
+
+	/* Reject if name too long */
+	if (strlen(newname) > MAX_FILENAME_LEN) {
+		write_log(0, "File name is too long\n");
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Error if parent is not a dir */
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Check whether "newname" exists or not */
+	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
+	if (!parent_meta_cache_entry) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
+		&result_index, newname, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+	if (result_index >= 0) {
+		write_log(0, "File %s existed\n", newname);
+		errcode = -EEXIST;
+		goto error_handle;
+	}
+
+	/* Increase nlink and add "newname" to parent dir */
+	link_meta_cache_entry = meta_cache_lock_entry(link_inode);
+	if (!link_meta_cache_entry) {
+		errcode = -ENOMEM;
+		goto error_handle;
+	}
+	ret_val = meta_cache_lookup_file_data(link_inode, &link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+	if (ret_val < 0) {
+		meta_cache_close_file(link_meta_cache_entry);
+		meta_cache_unlock_entry(link_meta_cache_entry);
+		errcode = ret_val;
+		goto error_handle;
+	}
+	link_stat.st_nlink++; /* nlink++ */
+	ret_val = meta_cache_update_file_data(link_inode, &link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+	if (ret_val < 0) {
+		meta_cache_close_file(link_meta_cache_entry);
+		meta_cache_unlock_entry(link_meta_cache_entry);
+		errcode = ret_val;
+		goto error_handle;
+	}
+	ret_val = dir_add_entry(parent_inode, link_inode, newname, 
+		link_stat.st_mode, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		link_stat.st_nlink--; /* Recover nlink */
+		meta_cache_update_file_data(link_inode, &link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+		meta_cache_close_file(link_meta_cache_entry);
+		meta_cache_unlock_entry(link_meta_cache_entry);
+		errcode = ret_val;
+		goto error_handle;
+	}	
+	meta_cache_close_file(link_meta_cache_entry);
+	meta_cache_unlock_entry(link_meta_cache_entry);
+
+	/* Unlock parent */
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry);
 	
+	/* Reply fuse entry */
+	ret_val = fetch_inode_stat(link_inode, &link_stat, &this_generation);
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) link_inode;
+	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
+	if (S_ISREG(link_stat.st_mode))
+		ret_val = lookup_increase(link_inode, 1, D_ISREG);
+	if (S_ISDIR(link_stat.st_mode))
+		ret_val = lookup_increase(link_inode, 1, D_ISDIR);
+	if (S_ISLNK(link_stat.st_mode))
+		ret_val = lookup_increase(link_inode, 1, D_ISLNK);
+	if (ret_val < 0) {
+		//meta_forget_inode(this_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+
+	fuse_reply_entry(req, &(tmp_param));
+
+error_handle:
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry);
+	fuse_reply_err(req, -errcode);
+	return;
 }
 
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
@@ -4467,7 +4588,7 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
 	.link = hfuse_ll_link,
-	.create = hfuse_ll_create,
+	//.create = hfuse_ll_create,
 };
 
 /*
