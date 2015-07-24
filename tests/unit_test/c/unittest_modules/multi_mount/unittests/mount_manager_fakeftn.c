@@ -7,11 +7,18 @@
 #include "mount_manager_unittest.h"
 #include "lookup_count.h"
 
+struct fuse_chan {
+	int test
+} tmpchan;
 extern SYSTEM_CONF_STRUCT system_config;
 
 struct fuse_lowlevel_ops {
 	int test;
 } hfuse_ops;
+
+struct fuse_session {
+	int test;
+} tmpsession;
 
 int write_log(int level, char *format, ...)
 {
@@ -25,13 +32,13 @@ int write_log(int level, char *format, ...)
 
 struct fuse_chan* fuse_mount(char *mp, struct fuse_args *args)
 {
-	return NULL;
+	return &tmpchan;
 }
 
 struct fuse_session* fuse_lowlevel_new(struct fuse_args *args,
 	struct fuse_lowlevel_ops *fuse_ops, size_t size, void *ptr)
 {
-	return NULL;
+	return &tmpsession;
 }
 
 void fuse_set_signal_handlers(struct fuse_session *ptr)

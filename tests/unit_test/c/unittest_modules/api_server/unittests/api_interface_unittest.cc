@@ -705,7 +705,7 @@ class api_server_monitorTest : public ::testing::Test {
 
  protected:
   int count;
-  int fd[10];
+  int fd[20];
   int status;
   struct sockaddr_un addr;
 
@@ -714,22 +714,26 @@ class api_server_monitorTest : public ::testing::Test {
     hcfs_system->system_going_down = FALSE;
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
-    for (count = 0; count < 10; count++)
+    for (count = 0; count < 20; count++)
       fd[count] = 0;
    }
 
   virtual void TearDown() {
 
-    for (count = 0; count < 10; count++) {
+    for (count = 0; count < 20; count++) {
       if (fd[count] != 0)
         close(fd[count]);
      }
     hcfs_system->system_going_down = TRUE;
 
     if (api_server != NULL) {
+      /* Adding lock wait before terminating to prevent last sec
+         thread changes */
+      sem_wait(&(api_server->job_lock));
       for (count = 0; count < api_server->num_threads; count++)
         pthread_join(api_server->local_thread[count], NULL);
       pthread_join(api_server->monitor_thread, NULL);
+      sem_post(&(api_server->job_lock));
       sem_destroy(&(api_server->job_lock));
       free(api_server);
       api_server = NULL;
@@ -742,7 +746,7 @@ class api_server_monitorTest : public ::testing::Test {
   int connect_sock() {
     addr.sun_family = AF_UNIX;
     strcpy(addr.sun_path, SOCK_PATH);
-    for (count = 0; count < 10; count++) {
+    for (count = 0; count < 20; count++) {
       fd[count] = socket(AF_UNIX, SOCK_STREAM, 0);
       status = connect(fd[count], (sockaddr *)&addr, sizeof(addr));
       if (status != 0)
@@ -769,14 +773,14 @@ TEST_F(api_server_monitorTest, TestThreadIncrease) {
   code = TESTAPI;
   cmd_len = 0;
   printf("Start sending\n");
-  for (count1 = 0; count1 < 10; count1++) {
+  for (count1 = 0; count1 < 20; count1++) {
     size_msg=send(fd[count1], &code, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), size_msg);
     size_msg=send(fd[count1], &cmd_len, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), size_msg);
    }
   printf("Start recv\n");
-  for (count1 = 0; count1 < 10; count1++) {
+  for (count1 = 0; count1 < 20; count1++) {
     ret_val = recv(fd[count1], &size_msg, sizeof(unsigned int), 0);
     ASSERT_EQ(sizeof(unsigned int), ret_val);
     ASSERT_EQ(sizeof(unsigned int), size_msg);

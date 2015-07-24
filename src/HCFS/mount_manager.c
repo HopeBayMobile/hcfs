@@ -409,7 +409,7 @@ int destroy_mount_mgr(void)
 	return ret;
 }
 
-/* Returns TRUE if entry found, and FALSE is not found. Otherwise
+/* Returns 0 if entry found, and -ENOENT is not found. Otherwise
 returns error number */
 int FS_is_mounted(char *fsname)
 {
@@ -417,11 +417,6 @@ int FS_is_mounted(char *fsname)
 	MOUNT_T *tmpinfo;
 
 	ret = search_mount(fsname, &tmpinfo);
-	if (ret == 0)
-		return TRUE;
-
-	if (ret == -ENOENT)
-		return FALSE;
 
 	return ret;
 }
@@ -443,9 +438,16 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 	/* f_ino, f_name, f_mp are filled before calling this function */
 	/* global_fuse_args is stored in fuseop.h */
 	tmp_channel = fuse_mount(mp, &(new_info->mount_args));
+	if (tmp_channel == NULL) {
+		write_log(10, "Unable to create channel in mounting\n");
+		goto errcode_handle;
+	}
 	tmp_session = fuse_lowlevel_new(&(new_info->mount_args),
 			&hfuse_ops, sizeof(hfuse_ops), (void *) new_info);
-	fuse_set_signal_handlers(tmp_session);
+	if (tmp_session == NULL) {
+		write_log(10, "Unable to create session in mounting\n");
+		goto errcode_handle;
+	}
 	fuse_session_add_chan(tmp_session, tmp_channel);
 	gettimeofday(&(new_info->mt_time), NULL);
 	new_info->session_ptr = tmp_session;
@@ -459,13 +461,18 @@ int do_mount_FS(char *mp, MOUNT_T *new_info)
 			mount_single_thread, (void *)new_info);
 	/* TODO: checking for failed mount */
 	return 0;
+errcode_handle:
+	write_log(2, "Error in mounting %s\n", new_info->f_name);
+	if (tmp_channel != NULL)
+		fuse_unmount(mp, tmp_channel);
+	return -EACCES;
 }
 /* Helper for unmounting */
 int do_unmount_FS(MOUNT_T *mount_info)
 {
 	pthread_join(mount_info->mt_thread, NULL);
-	fuse_session_remove_chan(mount_info->chan_ptr);
 	fuse_remove_signal_handlers(mount_info->session_ptr);
+	fuse_session_remove_chan(mount_info->chan_ptr);
 	fuse_session_destroy(mount_info->session_ptr);
 	fuse_unmount(mount_info->f_mp, mount_info->chan_ptr);
 	fuse_opt_free_args(&(mount_info->mount_args));
@@ -614,7 +621,9 @@ int unmount_FS(char *fsname)
 
 
 	ret_info->is_unmount = TRUE;
+	fuse_set_signal_handlers(ret_info->session_ptr);
 	pthread_kill(ret_info->mt_thread, SIGHUP);
+
 	do_unmount_FS(ret_info);
 
 	/* TODO: Error handling for failed unmount such as block mp */
@@ -692,7 +701,7 @@ errcode_handle:
 *        Inputs: char *fsname
 *       Summary: Checks if "fsname" is mounted.
 *
-*  Return value: TRUE if found. FALSE if not found.
+*  Return value: 0 if found. -ENOENT if not found.
 *                On error, returns negation of error code.
 *************************************************************************/
 int mount_status(char *fsname)
@@ -734,6 +743,7 @@ int unmount_all(void)
 		ret_info = (mount_mgr.root)->mt_entry;
 
 		ret_info->is_unmount = TRUE;
+		fuse_set_signal_handlers(ret_info->session_ptr);
 		pthread_kill(ret_info->mt_thread, SIGHUP);
 		do_unmount_FS(ret_info);
 

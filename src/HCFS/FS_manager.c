@@ -511,12 +511,12 @@ int delete_filesystem(char *fsname)
 	ret = FS_is_mounted(fsname);
 	sem_post(&(mount_mgr.mount_lock));
 
-	if (ret < 0) {
+	if ((ret < 0) && (ret != -ENOENT)) {
 		errcode = ret;
 		goto errcode_handle;
 	}
 
-	if (ret == TRUE) {
+	if (ret == 0) {
 		errcode = -EPERM;
 		write_log(2, "Cannot delete mounted filesystem\n");
 		goto errcode_handle;
@@ -573,6 +573,7 @@ int delete_filesystem(char *fsname)
 	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 0);
 
 	fs_mgr_head->num_FS--;
+	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
 errcode_handle:

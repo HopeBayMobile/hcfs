@@ -119,7 +119,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int FS_is_mounted(char *fsname)
 {
 
-	return FALSE;
+	return -ENOENT;
 }
 
 int delete_inode_meta(ino_t this_inode)

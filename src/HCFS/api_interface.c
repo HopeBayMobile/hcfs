@@ -152,9 +152,13 @@ int destroy_api_interface(void)
 {
 	int ret, errcode, count;
 
+	/* Adding lock wait before terminating to prevent last sec
+	thread changes */
+	sem_wait(&(api_server->job_lock));
 	for (count = 0; count < api_server->num_threads; count++)
 		pthread_join(api_server->local_thread[count], NULL);
 	pthread_join(api_server->monitor_thread, NULL);
+	sem_post(&(api_server->job_lock));
 	sem_destroy(&(api_server->job_lock));
 	UNLINK(api_server->sock.addr.sun_path);
 	free(api_server);
@@ -296,6 +300,8 @@ int unmount_all_handle(void)
 *  Return value: None
 *
 *************************************************************************/
+/* TODO: Better error handling so that broken pipe arising from clients
+not following protocol won't crash the system */
 void api_module(void *index)
 {
 	int fd1;
@@ -614,15 +620,21 @@ return_message:
 *************************************************************************/
 void api_server_monitor(void)
 {
-	int count, totalrefs, index;
+	int count, totalrefs, index, ret;
 	float totaltime, ratio;
 	int *val;
 	struct timeval cur_time;
 	int sel_index, cur_index;
+	struct timespec waittime;
+	waittime.tv_sec = 1;
+	waittime.tv_nsec = 0;
 
 	while (hcfs_system->system_going_down == FALSE) {
 		sleep(5);
-		sem_wait(&(api_server->job_lock));
+		/* Using timed wait to handle system shutdown event */
+		ret = sem_timedwait(&(api_server->job_lock), &waittime);
+		if (ret < 0)
+			continue;
 		gettimeofday(&cur_time, NULL);
 
 		/* Resets the statistics due to sliding window*/

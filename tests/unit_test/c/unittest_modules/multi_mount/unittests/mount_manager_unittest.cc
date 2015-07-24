@@ -446,7 +446,7 @@ TEST_F(FS_is_mountedTest, EmptyDatabase) {
 
   mount_mgr.root = NULL;
   ret = FS_is_mounted("anyFS");
-  EXPECT_EQ(FALSE, ret);
+  EXPECT_EQ(-ENOENT, ret);
 
  }
 
@@ -459,7 +459,7 @@ TEST_F(FS_is_mountedTest, MultipleFSFound) {
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
     ret = FS_is_mounted(fsname);
-    EXPECT_EQ(TRUE, ret);
+    EXPECT_EQ(0, ret);
    }
 
  }
@@ -472,7 +472,7 @@ TEST_F(FS_is_mountedTest, MultipleFSNotFound) {
   for (count = 100; count < 200; count++) {
     snprintf(fsname, 10, "%4d", count);
     ret = FS_is_mounted(fsname);
-    EXPECT_EQ(FALSE, ret);
+    EXPECT_EQ(-ENOENT, ret);
    }
 
  }
@@ -716,7 +716,7 @@ TEST_F(mount_statusTest, EmptyDatabase) {
 
   mount_mgr.root = NULL;
   ret = mount_status("anyFS");
-  EXPECT_EQ(FALSE, ret);
+  EXPECT_EQ(-ENOENT, ret);
 
  }
 
@@ -729,7 +729,7 @@ TEST_F(mount_statusTest, MultipleFSFound) {
   for (count = 0; count < 100; count++) {
     snprintf(fsname, 10, "%4d", count);
     ret = mount_status(fsname);
-    EXPECT_EQ(TRUE, ret);
+    EXPECT_EQ(0, ret);
    }
 
  }
@@ -742,7 +742,7 @@ TEST_F(mount_statusTest, MultipleFSNotFound) {
   for (count = 100; count < 200; count++) {
     snprintf(fsname, 10, "%4d", count);
     ret = mount_status(fsname);
-    EXPECT_EQ(FALSE, ret);
+    EXPECT_EQ(-ENOENT, ret);
    }
 
  }
