@@ -114,6 +114,7 @@ class fuseopEnvironment : public ::testing::Environment {
 
 ::testing::Environment* const fuseop_env = ::testing::AddGlobalTestEnvironment(new fuseopEnvironment);
 
+
 /* Begin of the test case for the function hfuse_getattr */
 
 class hfuse_getattrTest : public ::testing::Test {
@@ -150,7 +151,6 @@ TEST_F(hfuse_getattrTest, TestRoot) {
   ASSERT_EQ(ret_val, 0);
   EXPECT_EQ(tempstat.st_atime, 100000);
 }
-
 /* End of the test case for the function hfuse_getattr */
 
 /* Begin of the test case for the function hfuse_mknod */
@@ -2219,4 +2219,109 @@ TEST_F(hfuse_ll_readlinkTest, ReadLinkSuccess)
 }
 /*
 	End of unittest of hfuse_ll_readlink()
+ */
+
+/*
+	Unittest of hfuse_ll_link()
+ */
+class hfuse_ll_linkTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_linkTest, OldlinkNotExists)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/old_link_not_exists",
+		"/tmp/test_fuse/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOENT, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, NewlinkExists)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testlink");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, NewlinkNameTooLong)
+{
+	int ret;
+	int errcode;
+	char linkname[MAX_FILENAME_LEN + 50];
+
+	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
+	errcode = 0;
+	memset(linkname, 0, MAX_FILENAME_LEN + 50);
+	memset(linkname, 'a', MAX_FILENAME_LEN + 40);
+	memcpy(linkname, "/tmp/test_fuse/", 15);
+
+	ret = link("/tmp/test_fuse/testlink", linkname);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, ParentDirPermissionDenied)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testlink_dir_perm_denied/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EACCES, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, ParentIsNotDir)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testfile/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOTDIR, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, link_update_metaFail)
+{
+	int ret;
+	int errcode;
+	char hardlink[500] = "/tmp/test_fuse/aaaa";
+
+	ret = link("/tmp/test_fuse/testlink", hardlink);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(123, errcode);
+}
+
+/*
+	End of unittest of hfuse_ll_link()
  */

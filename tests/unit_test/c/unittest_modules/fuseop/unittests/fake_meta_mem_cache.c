@@ -336,6 +336,7 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		}
 		break;
 	default:
+		*result_index = -1;
 		break;
 	}
 	return 0;

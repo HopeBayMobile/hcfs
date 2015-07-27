@@ -660,6 +660,8 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	}
 
 	link_stat->st_nlink++; /* Hard link ++ */
+	write_log(10, "Debug: inode %lld has %lld links\n", 
+		link_inode, link_stat->st_nlink);
 
 	/* Update only stat */
 	link_meta_cache_entry = meta_cache_lock_entry(link_inode);

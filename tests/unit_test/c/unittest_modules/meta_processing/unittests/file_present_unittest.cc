@@ -491,8 +491,78 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 /*
 	Unittest of link_update_meta()
  */
+class link_update_metaTest : public ::testing::Test {
+protected:
+	META_CACHE_ENTRY_STRUCT *mock_parent_entry;
+	void SetUp()
+	{
+		mock_parent_entry = (META_CACHE_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	}
 
+	void TearDown()
+	{
+		if (mock_parent_entry)
+			free(mock_parent_entry);
+	}
+};
 
+TEST_F(link_update_metaTest, HardlinkToDirFail)
+{
+	ino_t link_inode;
+	struct stat link_stat;
+	unsigned long gen;
+
+	link_inode = INO_DIR;
+
+	EXPECT_EQ(-EISDIR, link_update_meta(link_inode, "new_name_not_used",
+		&link_stat, &gen, mock_parent_entry));
+}
+
+TEST_F(link_update_metaTest, UpdateMetaFail)
+{
+	ino_t link_inode;
+	struct stat link_stat;
+	unsigned long gen;
+
+	link_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
+
+	EXPECT_EQ(-1, link_update_meta(link_inode, "new_name_not_used",
+		&link_stat, &gen, mock_parent_entry));
+}
+
+TEST_F(link_update_metaTest, AddEntryToParentDirFail)
+{
+	ino_t link_inode;
+	struct stat link_stat;
+	unsigned long gen;
+
+	link_inode = INO_REGFILE;
+	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
+
+	EXPECT_EQ(-1, link_update_meta(link_inode, "new_name_not_used",
+		&link_stat, &gen, mock_parent_entry));
+
+	/* Verify */
+	EXPECT_EQ(1, link_stat.st_nlink); // Set to 1 in fetch_inode_stat()
+}
+
+TEST_F(link_update_metaTest, UpdateMetaSuccess)
+{
+	ino_t link_inode;
+	struct stat link_stat;
+	unsigned long gen;
+
+	link_inode = INO_REGFILE;
+	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
+
+	EXPECT_EQ(0, link_update_meta(link_inode, "new_name_not_used",
+		&link_stat, &gen, mock_parent_entry));
+
+	/* Verify */
+	EXPECT_EQ(GENERATION_NUM, gen);
+	EXPECT_EQ(2, link_stat.st_nlink); // Set to 1 in fetch_inode_stat()
+}
 /*
 	End of unittest of link_update_meta()
  */
