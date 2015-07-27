@@ -574,14 +574,31 @@ static void *upload_loop_thread_function(void *ptr)
 	return NULL;
 }
 
-TEST(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
+class upload_loopTest : public ::testing::Test {
+protected:
+	FILE *mock_file_meta;
+	
+	void SetUp()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+		mock_file_meta = fopen(MOCK_META_PATH, "w+");
+	}
+
+	void TearDown()
+	{
+		if (!access(MOCK_META_PATH, F_OK))
+			unlink(MOCK_META_PATH);
+	}
+};
+
+TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 {
 	pthread_t thread_id;
 	int shm_key, shm_key2;
 	struct stat empty_stat;
 	DIR_META_TYPE empty_meta;
 	BLOCK_ENTRY_PAGE mock_block_page;
-	FILE *mock_file_meta;
 
 	init_upload_control();
 	init_sync_control();
@@ -589,7 +606,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	/* Write something into meta, int the unittest, only test
 	   the case that upload dir meta because regfile case has
 	   been tested in sync_single_inodeTest(). */
-	mock_file_meta = fopen(MOCK_META_PATH, "w+");
 	memset(&empty_stat, 0, sizeof(struct stat));
 	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
 	fseek(mock_file_meta, 0, SEEK_SET);
@@ -656,8 +672,6 @@ TEST(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	for (int i = 0 ; i < shm_test_data->num_inode ; i++) {
 		EXPECT_EQ(shm_test_data->to_handle_inode[i], shm_verified_data->record_handle_inode[i]);
 	}
-
-	unlink(MOCK_META_PATH);
 }
 
 /*

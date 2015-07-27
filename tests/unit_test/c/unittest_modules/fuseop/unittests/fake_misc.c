@@ -182,6 +182,10 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 			this_inode = 20;
 			this_type = D_ISREG;
 		}
+		if (strcmp(childname, "testsymlink") == 0) {
+			this_inode = 21;
+			this_type = D_ISLNK;
+		}
 	}
 
 	if (parent == 6) {
@@ -373,7 +377,7 @@ void sleep_on_cache_full(void)
 }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -389,7 +393,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return 0;
 }
 
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *gen)
 {
 	switch (this_inode) {
 	case 1:
@@ -471,6 +475,11 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 21:
+		inode_stat->st_ino = 21;
+		inode_stat->st_mode = S_IFLNK | 0700;
+		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}
@@ -482,6 +491,9 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		memcpy(inode_stat, &updated_root, sizeof(struct stat));
 	if (this_inode != 1 && before_update_file_data == FALSE)
 		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
+
+	if (gen)
+		*gen = 10;
 
 	return 0;
 }
@@ -504,10 +516,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int unlink_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
-			char *selfname)
+int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
+			const DIR_ENTRY *this_entry)
 {
-	if (this_inode == 4)
+	if (this_entry->d_ino == 4)
 		before_mknod_created = TRUE;
 	return 0;
 }
@@ -553,7 +565,7 @@ void hcfs_destroy_backend(CURL *curl)
 	return;
 }
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	ino_t new_inode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -648,12 +660,14 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;	
-	
-	if (size == 0)
-		*actual_size = CORRECT_VALUE_SIZE;
-	else
-		strcpy(value, "hello!getxattr:)");
 
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!getxattr:)";
+		strcpy(value, ans);
+		*actual_size = strlen(ans);
+	}
 	return 0;
 }
 
@@ -662,12 +676,14 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;	
-	
-	if (size == 0)
-		*actual_size = CORRECT_VALUE_SIZE;
-	else
-		strcpy(key_buf, "hello!listxattr:)");
 
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!listxattr:)";
+		strcpy(key_buf, ans);
+		*actual_size = strlen(ans);
+	}
 	return 0;
 }
 
@@ -698,6 +714,16 @@ int destroy_mount_mgr(void)
 
 void destroy_fs_manager(void)
 {
+	return 0;
+}
+
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
+	const struct stat *this_stat, const char *link, 
+	const unsigned long generation, const char *name)
+{
+	if (!strcmp("update_meta_fail", link))
+		return -1;
+
 	return 0;
 }
 

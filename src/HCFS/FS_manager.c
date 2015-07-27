@@ -194,7 +194,7 @@ ino_t _create_root_inode(void)
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
-	ret = init_dir_page(&temppage, root_inode, 0,
+	ret = init_dir_page(&temppage, root_inode, root_inode,
 				this_meta.root_entry_page);
 	if (ret < 0) {
 		errcode = ret;

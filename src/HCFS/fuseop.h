@@ -40,6 +40,9 @@
 /* WARNING: MIN_DIR_ENTRIES_PER_PAGE must be smaller than
 *  MAX_DIR_ENTRIES_PER_PAGE/2 */
 
+/* Max length of link path pointed by symbolic link */
+#define MAX_LINK_PATH 4096
+
 /* Number of pointers in a pointer page */
 #define POINTERS_PER_PAGE 1024
 
@@ -129,6 +132,14 @@ typedef struct {
 	long long quadruple_indirect;
 	unsigned long generation;
 } FILE_META_TYPE;
+
+/* Defining the structure of symbolic link meta */
+typedef struct {
+	long long next_xattr_page;
+	unsigned link_len;
+	unsigned long generation;
+	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
+} SYMLINK_META_TYPE;
 
 /*END META definition*/
 

@@ -93,6 +93,7 @@ class fuseopEnvironment : public ::testing::Environment {
      }
 
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+    sem_init(&(hcfs_system->access_sem), 0, 1);
     sys_super_block = (SUPER_BLOCK_CONTROL *)
 				malloc(sizeof(SUPER_BLOCK_CONTROL));
     memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
@@ -1224,6 +1225,8 @@ TEST_F(hfuse_readTest, ReadCloudContent) {
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 15, 0);
   fake_block_status = ST_CLOUD;
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
 
   fptr = fopen("/tmp/test_fuse/testread", "r");
   ASSERT_NE(fptr != NULL, 0);
@@ -1250,6 +1253,8 @@ TEST_F(hfuse_readTest, ReadCloudWaitCache) {
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 15, 0);
   fake_block_status = ST_CLOUD;
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
 
   fptr = fopen("/tmp/test_fuse/testread", "r");
   ASSERT_NE(fptr != NULL, 0);
@@ -1390,6 +1395,8 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudContent) {
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 16, 0);
   fake_block_status = ST_CLOUD;
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
 
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
   ASSERT_NE(fptr != NULL, 0);
@@ -1423,6 +1430,8 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
   test_fetch_from_backend = TRUE;
   fetch_block_path(temppath, 16, 0);
   fake_block_status = ST_CLOUD;
+  snprintf(tempbuf, 100, "This is a test data");
+  tmp_len = strlen(tempbuf);
 
   ASSERT_EQ(hcfs_system->systemdata.cache_size, 5000000);
   fptr = fopen("/tmp/test_fuse/testwrite", "r+");
@@ -1465,6 +1474,18 @@ TEST_F(hfuse_ll_statfsTest, SmallSysStat) {
 
   struct statfs tmpstat;
   int ret_val;
+  int ret;
+
+  if (sys_super_block == NULL)
+    ret = 1;
+  else
+    ret = 0;
+  ASSERT_EQ(0, ret);
+  if (hcfs_system == NULL)
+    ret = 1;
+  else
+    ret = 0;
+  ASSERT_EQ(0, ret);
 
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
 
@@ -1967,11 +1988,14 @@ TEST_F(hfuse_ll_getxattrTest, GetValueSuccess)
 	int ret;
 	int errcode;
 	char buf[100];
+	const char *ans = "hello!getxattr:)";
 	
 	ret = getxattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa", buf, 100);
+	buf[ret] = '\0';
 
-	EXPECT_EQ(0, ret);
+	EXPECT_EQ(strlen(ans), ret);
+	EXPECT_STREQ(ans, buf);
 }
 /* 
 	End of unittest of hfuse_ll_getxattr()
@@ -2022,11 +2046,14 @@ TEST_F(hfuse_ll_listxattrTest, GetValueSuccess)
 	int ret;
 	int errcode;
 	char buf[100];
+	const char *ans = "hello!listxattr:)";
 	
 	ret = listxattr("/tmp/test_fuse/testsetxattr", 
 		buf, 100);
+	buf[ret] = '\0';
 
-	EXPECT_EQ(0, ret);
+	EXPECT_EQ(strlen(ans), ret);
+	EXPECT_STREQ(ans, buf);
 }
 
 /* 
@@ -2089,8 +2116,7 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrReturnFail)
 TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 {
 	int ret;
-	int errcode;
-	
+
 	ret = removexattr("/tmp/test_fuse/testsetxattr", 
 		"user.aaa");
 
@@ -2100,3 +2126,153 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 	End of unittest of hfuse_ll_removexattr()
  */
 
+/*
+	Unittest of hfuse_ll_symlink()
+ */
+class hfuse_ll_symlinkTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_symlinkTest, FileExists)
+{
+	int ret;
+	int errcode;
+
+	errcode = 0;
+	ret = symlink("name_not_used", "/tmp/test_fuse/testsymlink");
+	errcode = errno;	
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_symlinkTest, SelfNameTooLong)
+{
+	int ret;
+	int errcode;
+	char selfname[MAX_FILENAME_LEN + 50];
+
+	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
+	errcode = 0;
+	memset(selfname, 0, MAX_FILENAME_LEN + 50);
+	memset(selfname, 'a', MAX_FILENAME_LEN + 40);
+	memcpy(selfname, "/tmp/test_fuse/", 15);
+
+	ret = symlink("haha", selfname);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_symlinkTest, LinkPathTooLong)
+{
+	int ret;
+	int errcode;
+	char link_path[MAX_LINK_PATH + 1];
+
+	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
+	errcode = 0;
+	memset(link_path, 0, MAX_LINK_PATH + 1);
+	memset(link_path, 'a', MAX_LINK_PATH);
+
+	ret = symlink(link_path, "/tmp/test_fuse/selfname_not_exists");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_symlinkTest, FileExistInSymlink)
+{
+	int ret;
+	int errcode;
+
+	errcode = 0;
+
+	ret = symlink("not_used", 
+		"/tmp/test_fuse/testsymlink_exist_in_symlink");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_symlinkTest, UpdateMetaFail)
+{
+	int ret;
+	int errcode;
+
+	errcode = 0;
+
+	ret = symlink("update_meta_fail", 
+		"/tmp/test_fuse/testsymlink_not_exist_in_symlink");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(1, errcode);
+}
+
+TEST_F(hfuse_ll_symlinkTest, SymlinkSuccess)
+{
+	int ret;
+
+	ret = symlink("update_meta_success", 
+		"/tmp/test_fuse/testsymlink_not_exist_in_symlink");
+
+	EXPECT_EQ(0, ret);
+}
+/*
+	End of unittest of hfuse_ll_symlink()
+ */
+
+/*
+	Unittest of hfuse_ll_readlink()
+ */
+class hfuse_ll_readlinkTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_readlinkTest, FileNotExist)
+{
+	char buf[100];
+	int ret;
+	int errcode;
+
+	ret = readlink("/tmp/test_fuse/test_readlink_not_exist", buf, 100);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOENT, errcode);
+}
+
+TEST_F(hfuse_ll_readlinkTest, ReadLinkSuccess)
+{
+	char buf[100];
+	char *ans = "I_am_target_link";
+	int ret;
+	int errcode;
+
+	ret = readlink("/tmp/test_fuse/testsymlink", buf, 100);
+	buf[ret] = '\0';
+
+	EXPECT_EQ(strlen(ans), ret);
+	EXPECT_STREQ(ans, buf);
+}
+/*
+	End of unittest of hfuse_ll_readlink()
+ */
