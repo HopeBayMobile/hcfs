@@ -634,3 +634,63 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 errcode_handle:
 	return errcode;
 }
+
+
+int link_update_meta(ino_t link_inode, const char *newname,
+	struct stat *link_stat, unsigned long *generation,
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+{
+	META_CACHE_ENTRY_STRUCT *link_meta_cache_entry;
+	struct link_stat;
+	int ret_val;
+	ino_t parent_inode;
+
+	parent_inode = parent_meta_cache_entry->inode_num;
+
+	/* Fetch stat and generation */
+	ret_val = fetch_inode_stat(link_inode, link_stat, generation);
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Hard link to dir is not allowed */
+	if (S_ISDIR(link_stat->st_mode))
+		return -EISDIR;
+
+	link_stat->st_nlink++; /* Hard link ++ */
+
+	/* Update only stat */
+	link_meta_cache_entry = meta_cache_lock_entry(link_inode);
+	if (!link_meta_cache_entry)
+		return -ENOMEM;
+	ret_val = meta_cache_update_file_data(link_inode, link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+	if (ret_val < 0)
+		goto error_handle;
+
+	/* Add entry to this dir */
+	ret_val = dir_add_entry(parent_inode, link_inode, newname, 
+		link_stat->st_mode, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		link_stat->st_nlink--; /* Recover nlink */
+		meta_cache_update_file_data(link_inode, link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+		goto error_handle;
+	}
+
+	/* Unlock meta cache entry */
+	ret_val = meta_cache_close_file(link_meta_cache_entry);
+	if (ret_val < 0) {	
+		meta_cache_unlock_entry(link_meta_cache_entry);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(link_meta_cache_entry);
+	if (ret_val < 0)
+		return ret_val;
+
+	return 0;
+
+error_handle:
+	meta_cache_close_file(link_meta_cache_entry);
+	meta_cache_unlock_entry(link_meta_cache_entry);
+	return ret_val;
+}
