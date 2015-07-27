@@ -487,3 +487,12 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 /*
 	End of unittest of symlink_update_meta()
  */
+
+/*
+	Unittest of link_update_meta()
+ */
+
+
+/*
+	End of unittest of link_update_meta()
+ */

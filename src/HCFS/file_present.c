@@ -132,8 +132,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 
 		ret_code = meta_cache_unlock_entry(temp_entry);
 
-		if (ret_code == 0) {
+		if ((ret_code == 0) && (inode_stat != NULL)) {
 			memcpy(inode_stat, &returned_stat, sizeof(struct stat));
+			write_log(10, "fetch_inode_stat get inode %lld\n", 
+				inode_stat->st_ino);
 			return 0;
 		}
 
@@ -143,8 +145,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		return -ENOENT;
 	}
 
-	write_log(10, "fetch_inode_stat %lld\n", inode_stat->st_ino);
-
+	write_log(10, "fetch_inode_stat get only generation %lld\n", *ret_gen);
 	return 0;
 
 error_handling:
@@ -653,8 +654,10 @@ int link_update_meta(ino_t link_inode, const char *newname,
 		return ret_val;
 
 	/* Hard link to dir is not allowed */
-	if (S_ISDIR(link_stat->st_mode))
+	if (S_ISDIR(link_stat->st_mode)) {
+		write_log(0, "Hard link to a dir is not allowed.\n");
 		return -EISDIR;
+	}
 
 	link_stat->st_nlink++; /* Hard link ++ */
 
