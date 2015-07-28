@@ -4474,7 +4474,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Checking permission */
-	ret_val = check_permission(req, &parent_stat, 3);
+	ret_val = check_permission(req, &parent_stat, 3); /* W+X */
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -4528,6 +4528,8 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		ret_val = lookup_increase(link_inode, 1, D_ISREG);
 	if (S_ISLNK(link_stat.st_mode))
 		ret_val = lookup_increase(link_inode, 1, D_ISLNK);
+	if (S_ISDIR(link_stat.st_mode))
+		ret_val = -EISDIR;
 	if (ret_val < 0) {
 		write_log(0, "Fail to increase lookup count\n");
 		fuse_reply_err(req, -ret_val);

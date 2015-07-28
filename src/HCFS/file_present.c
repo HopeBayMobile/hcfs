@@ -636,7 +636,23 @@ errcode_handle:
 	return errcode;
 }
 
-
+/************************************************************************
+*
+* Function name: link_update_meta
+*        Inputs: ino_t link_inode, const char *newname,
+*                struct stat *link_stat, unsigned long *generation,
+*                META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry
+*       Summary: Helper of link operation in FUSE. Given the inode numebr
+*                "link_inode", this function will increase link number 
+*                and add a new entry to parent dir. This function will 
+*                also fetch inode stat and generation and store them in 
+*                "link_stat" and "generation", respectively. Do NOT need
+*                to unlock parent meta cache entry since it will be 
+*                handled by caller.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
 int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
@@ -657,6 +673,13 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	if (S_ISDIR(link_stat->st_mode)) {
 		write_log(0, "Hard link to a dir is not allowed.\n");
 		return -EISDIR;
+	}
+
+	/* Check number of links */
+	if (link_stat->st_nlink >= MAX_HARD_LINK) {
+		write_log(0, "Too many links for this file, now %ld links",
+			link_stat->st_nlink);
+		return -EMLINK;
 	}
 
 	link_stat->st_nlink++; /* Hard link ++ */

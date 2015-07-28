@@ -2313,13 +2313,23 @@ TEST_F(hfuse_ll_linkTest, link_update_metaFail)
 {
 	int ret;
 	int errcode;
-	char hardlink[500] = "/tmp/test_fuse/aaaa";
+	char hardlink[500] = "/tmp/test_fuse/new_link_update_meta_fail";
 
 	ret = link("/tmp/test_fuse/testlink", hardlink);
 	errcode = errno;
 
 	EXPECT_EQ(-1, ret);
 	EXPECT_EQ(123, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, LinkSuccess)
+{
+	int ret;
+	char hardlink[500] = "/tmp/test_fuse/xxxxxxx";
+
+	ret = link("/tmp/test_fuse/testlink", hardlink);
+
+	EXPECT_EQ(0, ret);
 }
 
 /*

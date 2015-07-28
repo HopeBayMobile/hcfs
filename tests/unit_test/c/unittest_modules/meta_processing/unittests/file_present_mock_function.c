@@ -90,6 +90,9 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 			file_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
 	}
 
+	if (this_inode == INO_TOO_MANY_LINKS)
+		inode_stat->st_nlink = MAX_HARD_LINK;
+
 	return 0;
 }
 

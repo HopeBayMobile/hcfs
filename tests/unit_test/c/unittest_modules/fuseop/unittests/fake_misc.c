@@ -487,6 +487,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 		inode_stat->st_ino = 22;
 		inode_stat->st_mode = S_IFREG | 0700;
 		inode_stat->st_atime = 100000;
+		inode_stat->st_nlink = 1;
 		break;
 	case 23:
 		inode_stat->st_ino = 23;
@@ -724,7 +725,12 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation, 
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
-	if (strcmp(newname, "new_link_update_meta_fail"))
+	memset(link_stat, 0, sizeof(struct stat));
+	*generation = 5;
+	link_stat->st_ino = link_inode;
+	link_stat->st_mode = S_IFREG;
+
+	if (!strcmp(newname, "new_link_update_meta_fail"))
 		return -123;
 	else
 		return 0;

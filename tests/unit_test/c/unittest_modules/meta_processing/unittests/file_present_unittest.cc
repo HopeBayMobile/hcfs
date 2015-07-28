@@ -519,6 +519,18 @@ TEST_F(link_update_metaTest, HardlinkToDirFail)
 		&link_stat, &gen, mock_parent_entry));
 }
 
+TEST_F(link_update_metaTest, TooManyLinks)
+{
+	ino_t link_inode;
+	struct stat link_stat;
+	unsigned long gen;
+
+	link_inode = INO_TOO_MANY_LINKS;
+
+	EXPECT_EQ(-EMLINK, link_update_meta(link_inode, "new_name_not_used",
+		&link_stat, &gen, mock_parent_entry));
+}
+
 TEST_F(link_update_metaTest, UpdateMetaFail)
 {
 	ino_t link_inode;
