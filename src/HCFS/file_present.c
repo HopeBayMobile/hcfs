@@ -688,8 +688,10 @@ int link_update_meta(ino_t link_inode, const char *newname,
 
 	/* Update only stat */
 	link_meta_cache_entry = meta_cache_lock_entry(link_inode);
-	if (!link_meta_cache_entry)
+	if (!link_meta_cache_entry) {
+		write_log(0, "Lock entry fails in %s\n", __func__);
 		return -ENOMEM;
+	}
 	ret_val = meta_cache_update_file_data(link_inode, link_stat,
 			NULL, NULL, 0, link_meta_cache_entry);
 	if (ret_val < 0)

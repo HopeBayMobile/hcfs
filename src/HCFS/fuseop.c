@@ -4548,7 +4548,107 @@ error_handle:
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	const char *name, mode_t mode, struct fuse_file_info *fi)
 {
+	int ret_val;
+	struct stat parent_stat, this_stat;
+	ino_t parent_inode, self_inode;
+	mode_t self_mode;
+	int file_flags;
+	struct fuse_ctx *temp_context;
+	struct fuse_entry_param tmp_param;
+	unsigned long this_generation;
+	long long fh;
 
+	parent_inode = (ino_t) parent;
+
+	write_log(10,
+		"DEBUG parent %ld, name %s mode %d\n", parent, name, mode);
+
+	/* Reject if not creating a regular file */
+	if (!S_ISREG(mode)) {
+		fuse_reply_err(req, EPERM);
+		return;
+	}
+
+	/* Reject if name too long */
+	if (strlen(name) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Check parent type */
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	memset(&this_stat, 0, sizeof(struct stat));
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
+	this_stat.st_size = 0;
+	this_stat.st_blksize = MAX_BLOCK_SIZE;
+	this_stat.st_blocks = 0;
+	this_stat.st_dev = 0;
+	this_stat.st_nlink = 1;
+	/*Use the uid and gid of the fuse caller*/
+	this_stat.st_uid = temp_context->uid;
+	this_stat.st_gid = temp_context->gid;
+	/* Use the current time for timestamps */
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	/* If cannot get new inode number, error is ENOSPC */
+	if (self_inode < 1) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+	this_stat.st_ino = self_inode;
+	ret_val = mknod_update_meta(self_inode, parent_inode, name,
+			&this_stat, this_generation);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Prepare stat data to be replied */
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	ret_val = lookup_increase(self_inode, 1, D_ISREG);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* In create operation, flag is O_WRONLY when opening */
+	file_flags = fi->flags;
+	fh = open_fh(self_inode, file_flags);
+	if (fh < 0) {
+		fuse_reply_err(req, ENFILE);
+		return;
+	}
+	fi->fh = fh;
+	fuse_reply_create(req, &tmp_param, fi);
+	return;
 }
 
 /* Specify the functions used for the FUSE operations */
@@ -4582,7 +4682,7 @@ static struct fuse_lowlevel_ops hfuse_ops = {
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
 	.link = hfuse_ll_link,
-	//.create = hfuse_ll_create,
+	.create = hfuse_ll_create,
 };
 
 /*
