@@ -401,7 +401,7 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 	if (ret_val < 0)
 		return ret_val;
 
-	write_log(10, "TOTAL CHILDREN is now %ld\n", tempmeta.total_children);
+	write_log(10, "TOTAL CHILDREN is now %lld\n", tempmeta.total_children);
 
 	if (tempmeta.total_children > 0)
 		return -ENOTEMPTY;
