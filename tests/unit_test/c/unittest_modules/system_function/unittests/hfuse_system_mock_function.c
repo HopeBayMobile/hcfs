@@ -120,3 +120,12 @@ int close_log(void)
 {
 	return 0;
 }
+int init_mount_mgr(void)
+{
+	return 0;
+}
+int init_fs_manager(void)
+{
+	return 0;
+}
+

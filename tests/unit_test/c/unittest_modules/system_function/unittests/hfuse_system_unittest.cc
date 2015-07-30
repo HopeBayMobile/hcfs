@@ -149,43 +149,16 @@ protected:
 	}
 };
 
-TEST_F(init_hfuseTest, RootMetaPathAlreadyExist)
+TEST_F(init_hfuseTest, RunTest)
 {
-	mknod("/tmp/root_meta_path", 0700, S_IFREG);
-	
+
 	/* Run function */
 	EXPECT_EQ(0, init_hfuse());
 	
 	/* Remove */
-	unlink("/tmp/root_meta_path");
 	unlink(HCFSSYSTEM);
 }
 
-TEST_F(init_hfuseTest, CreateRootMetaPathSuccess)
-{
-	FILE *meta_ptr;
-	struct stat result_stat;
-	DIR_META_TYPE result_meta;
-
-	/* Run function */
-	ASSERT_EQ(0, init_hfuse());
-	
-	/* Check_answer */
-	meta_ptr = fopen("/tmp/root_meta_path", "r+");
-	ASSERT_TRUE( NULL != meta_ptr );
-	fseek(meta_ptr, 0, SEEK_SET);
-	fread(&result_stat, sizeof(struct stat), 1, meta_ptr);
-	fseek(meta_ptr, sizeof(struct stat), SEEK_SET);
-	fread(&result_meta, sizeof(DIR_META_TYPE), 1, meta_ptr);
-	EXPECT_EQ(getuid(), result_stat.st_uid);
-	EXPECT_EQ(getgid(), result_stat.st_gid);
-	EXPECT_EQ(1, result_stat.st_ino);
-	EXPECT_EQ(sizeof(DIR_META_TYPE) + sizeof(struct stat), result_meta.root_entry_page);
-	
-	/* Remove */
-	unlink("/tmp/root_meta_path");
-	unlink(HCFSSYSTEM);
-}
 
 /*
 	End of unittest of init_hfuse()

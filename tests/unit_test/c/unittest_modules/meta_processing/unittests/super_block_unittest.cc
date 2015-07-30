@@ -870,7 +870,7 @@ protected:
 	void SetUp()
 	{
 		InitSuperBlockBaseClass::SetUp();
-		expected_stat.st_ino = 1;
+		expected_stat.st_ino = 2;
 		expected_stat.st_mode = S_IFDIR;
 		expected_stat.st_dev = 5;
 		expected_stat.st_nlink = 6;
@@ -890,17 +890,18 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation);
-	EXPECT_EQ(1, ret_node); // ret_node == 1 since system is empty
+	/* Inode 1 is reserved, so start from 2 */
+	EXPECT_EQ(2, ret_node); // ret_node == 2 since system is empty
 
 	/* Verify */	
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-		sizeof(SUPER_BLOCK_HEAD));
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(1, sys_super_block->head.num_total_inodes); // Just a new inode
 	EXPECT_EQ(1, sys_super_block->head.num_active_inodes); // the inode is active
 
-	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(1, sb_entry.generation); // It is first time to be created
 	EXPECT_EQ(1, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
@@ -919,7 +920,8 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 	num_reclaimed = 150;
 	memset(&sb_entry, 0, sizeof(SUPER_BLOCK_ENTRY));
 	sb_entry.generation = 1;
-	for (ino_t inode = 1 ; inode <= num_reclaimed ; inode++) {
+	/* New inode number starts from 2 */
+	for (ino_t inode = 2 ; inode <= num_reclaimed ; inode++) {
 		sb_entry.this_index = inode;
 		if (inode < num_reclaimed)
 			sb_entry.util_ll_next = inode + 1;
@@ -934,26 +936,26 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 	sys_super_block->head.num_inode_reclaimed = num_reclaimed;
 	sys_super_block->head.num_total_inodes = num_reclaimed;
 	sys_super_block->head.last_reclaimed_inode = num_reclaimed;
-	sys_super_block->head.first_reclaimed_inode = 1;
+	sys_super_block->head.first_reclaimed_inode = 2;
 	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 	
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation);
-	EXPECT_EQ(1, ret_node); // ret_node == 1 since first_reclaimed = 1
+	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-		sizeof(SUPER_BLOCK_HEAD));
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(num_reclaimed, sb_head.num_total_inodes); // num_total_inodes doesn't change
 	EXPECT_EQ(num_reclaimed - 1, sb_head.num_inode_reclaimed); // one node is used now
 	EXPECT_EQ(num_reclaimed, sb_head.last_reclaimed_inode); // last reclaimed is the same
-	EXPECT_EQ(2, sb_head.first_reclaimed_inode); // first reclaimed is now inode == 2
+	EXPECT_EQ(3, sb_head.first_reclaimed_inode); // first reclaimed is now inode == 3
 	EXPECT_EQ(1, sb_head.num_active_inodes); // a node return and be active now
 
-	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(2, sb_entry.generation); // generation++
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 
@@ -972,23 +974,24 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	sb_entry.generation = 1;
 	sb_entry.util_ll_next = 0;
 	pwrite(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-		sizeof(SUPER_BLOCK_HEAD)); // Write entry
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
+		// Write entry
 
 	sys_super_block->head.num_inode_reclaimed = 1;
 	sys_super_block->head.num_total_inodes = 1; // Just one inode
-	sys_super_block->head.last_reclaimed_inode = 1;
-	sys_super_block->head.first_reclaimed_inode = 1;
+	sys_super_block->head.last_reclaimed_inode = 2;
+	sys_super_block->head.first_reclaimed_inode = 2;
 	pwrite(sys_super_block->iofptr, &sys_super_block->head, 
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 
 	/* Run */
 	ret_node = super_block_new_inode(&expected_stat, &generation);
-	EXPECT_EQ(1, ret_node); // ret_node == 1 since first_reclaimed = 1
+	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
 	pread(sys_super_block->iofptr, &sb_head, sizeof(SUPER_BLOCK_HEAD), 0);
 	pread(sys_super_block->iofptr, &sb_entry, sizeof(SUPER_BLOCK_ENTRY), 
-		sizeof(SUPER_BLOCK_HEAD));
+		sizeof(SUPER_BLOCK_HEAD) + sizeof(SUPER_BLOCK_ENTRY));
 
 	EXPECT_EQ(1, sb_head.num_total_inodes); // num_total_inodes doesn't change
 	EXPECT_EQ(0, sb_head.num_inode_reclaimed); // No reclaimed inode now
@@ -996,7 +999,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 	EXPECT_EQ(0, sb_head.first_reclaimed_inode); // No reclaimed inode now
 	EXPECT_EQ(1, sb_head.num_active_inodes); // a node return and be active now
 
-	EXPECT_EQ(1, sb_entry.this_index); // inode == 1
+	EXPECT_EQ(2, sb_entry.this_index); // inode == 1
 	EXPECT_EQ(2, sb_entry.generation); // generation++
 	EXPECT_EQ(2, generation);
 	EXPECT_EQ(0, memcmp(&expected_stat, &sb_entry.inode_stat, 

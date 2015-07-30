@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/6/10 Jiahong created this file.
+* 2015/7/21 Jiahong moving API codes to global.h
 *
 **************************************************************************/
 
@@ -19,12 +20,6 @@
 #include <sys/uio.h>
 #include <semaphore.h>
 #include <time.h>
-
-/* List of API codes */
-#define TERMINATE 0
-#define VOLSTAT 1
-#define TESTAPI 2
-#define ECHOTEST 3
 
 #define MAX_API_THREADS 32
 #define INIT_API_THREADS 10
