@@ -58,3 +58,8 @@ FUSE
 CURL
 OPENSSL
 
+Required by Dev
+---------------
+libattr1-dev
+libcurl4-openssl-dev	
+libssl-dev
