@@ -2,7 +2,7 @@
 ----------
 
 #### **Starting HCFS**
-1. Build HCFS by using "make".
+1. Build HCFS by using "make" under 'src/HCFS'.
 
 2. Use './hcfs' if no parameter is needed. If needs to add options
 (e.g. -oallow_other,big_writes to allow CIFS sharing and write in
