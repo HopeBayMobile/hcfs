@@ -1,10 +1,12 @@
 #include <sys/stat.h>
 #include <stdio.h>
+#include <fuse/fuse_lowlevel.h>
 
 #include "mock_param.h"
 
 #include "meta_mem_cache.h"
 #include "params.h"
+#include "mount_manager.h"
 
 /* Global vars*/
 int DELETE_DIR_ENTRY_BTREE_RESULT = 1;
@@ -285,7 +287,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 	return 0;
 }
 
-int lookup_markdelete(ino_t this_inode)
+int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 {
 	return 0;
 }
@@ -299,4 +301,9 @@ int write_log(int level, char *format, ...)
 {
 	return 0;
 }
+MOUNT_T tmpmount;
 
+void* fuse_req_userdata(fuse_req_t req)
+{
+	return &tmpmount;
+}

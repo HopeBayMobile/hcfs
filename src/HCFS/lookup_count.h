@@ -29,12 +29,12 @@ typedef struct {
 	LOOKUP_NODE_TYPE *head;
 } LOOKUP_HEAD_TYPE;
 
-LOOKUP_HEAD_TYPE lookup_table[NUM_LOOKUP_ENTRIES];
+int lookup_init(LOOKUP_HEAD_TYPE *lookup_table);
+int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+				int amount, char d_type);
+int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
+			int amount, char *d_type, char *need_delete);
+int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode);
 
-int lookup_init();
-int lookup_increase(ino_t this_inode, int amount, char d_type);
-int lookup_decrease(ino_t this_inode, int amount, char *d_type,
-				char *need_delete);
-int lookup_markdelete(ino_t this_inode);
+int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table);
 
-int lookup_destroy();

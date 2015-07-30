@@ -301,15 +301,17 @@ error_handling:
 /************************************************************************
 *
 * Function name: unlink_update_meta
-*        Inputs: ino_t parent_inode, ino_t this_inode, char *selfname
-*       Summary: Helper of "hfuse_unlink" function. It removes the inode
+*        Inputs: fuse_req_t req, ino_t parent_inode,
+*                const DIR_ENTRY *this_entry
+*       Summary: Helper of "hfuse_ll_unlink" function. It removes the inode
 *                and name recorded in "this_entry" from "parent_inode".
 *                Also will decrease the reference count for the inode.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
-int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry)
+int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
+			const DIR_ENTRY *this_entry)
 {
 	int ret_val;
 	ino_t this_inode;
@@ -348,7 +350,7 @@ int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry)
 	if (ret_val < 0)
 		return ret_val;
 
-	ret_val = decrease_nlink_inode_file(this_inode);
+	ret_val = decrease_nlink_inode_file(req, this_inode);
 
 	return ret_val;
 
@@ -362,7 +364,8 @@ error_handling:
 /************************************************************************
 *
 * Function name: rmdir_update_meta
-*        Inputs: ino_t parent_inode, ino_t this_inode, char *selfname
+*        Inputs: fuse_req_t req, ino_t parent_inode, ino_t this_inode,
+*                char *selfname
 *       Summary: Helper of "hfuse_rmdir" function. Will first check if
 *                the directory pointed by "this_inode" is indeed empty.
 *                If so, the name of "this_inode", "selfname", will be
@@ -372,7 +375,7 @@ error_handling:
 *                appropriate error code.
 *
 *************************************************************************/
-int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
+int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			const char *selfname)
 {
 	DIR_META_TYPE tempmeta;
@@ -423,7 +426,7 @@ int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
 		return ret_val;
 
 	/* Deferring actual deletion to forget */
-	ret_val = mark_inode_delete(this_inode);
+	ret_val = mark_inode_delete(req, this_inode);
 
 	return ret_val;
 

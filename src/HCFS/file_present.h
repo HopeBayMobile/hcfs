@@ -19,6 +19,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fuse/fuse_lowlevel.h>
+
 #include "meta_mem_cache.h"
 #include "xattr_ops.h"
 
@@ -31,11 +33,12 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
 			struct stat *this_stat, unsigned long this_gen);
-int unlink_update_meta(ino_t parent_inode, const DIR_ENTRY *this_entry);
+int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
+			const DIR_ENTRY *this_entry);
 
 int meta_forget_inode(ino_t self_inode);
 
-int rmdir_update_meta(ino_t parent_inode, ino_t this_inode,
+int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			const char *selfname);
 
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 

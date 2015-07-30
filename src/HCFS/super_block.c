@@ -946,7 +946,8 @@ ino_t super_block_new_inode(struct stat *in_stat,
 		/* If need to append a new super inode and add total
 		*  inode count*/
 		sys_super_block->head.num_total_inodes++;
-		this_inode = sys_super_block->head.num_total_inodes;
+		this_inode = sys_super_block->head.num_total_inodes + 1;
+		/* Inode starts from 2 */
 		this_generation = 1;
 	}
 	sys_super_block->head.num_active_inodes++;

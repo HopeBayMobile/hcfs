@@ -152,9 +152,13 @@ int destroy_api_interface(void)
 {
 	int ret, errcode, count;
 
+	/* Adding lock wait before terminating to prevent last sec
+	thread changes */
+	sem_wait(&(api_server->job_lock));
 	for (count = 0; count < api_server->num_threads; count++)
 		pthread_join(api_server->local_thread[count], NULL);
 	pthread_join(api_server->monitor_thread, NULL);
+	sem_post(&(api_server->job_lock));
 	sem_destroy(&(api_server->job_lock));
 	UNLINK(api_server->sock.addr.sun_path);
 	free(api_server);
@@ -162,6 +166,128 @@ int destroy_api_interface(void)
 	return 0;
 errcode_handle:
 	return errcode;
+}
+
+int create_FS_handle(int arg_len, char *largebuf)
+{
+	DIR_ENTRY tmp_entry;
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = add_filesystem(buf, &tmp_entry);
+
+	free(buf);
+	return ret;
+}
+int mount_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf, *mpbuf;
+	int ret;
+	int fsname_len, mp_len;
+
+	memcpy(&fsname_len, largebuf, sizeof(int));
+
+	buf = malloc(fsname_len + 10);
+	mp_len = arg_len - sizeof(int) - fsname_len;
+	mpbuf = malloc(mp_len + 10);
+	memcpy(buf, &(largebuf[sizeof(int)]), fsname_len);
+	memcpy(mpbuf, &(largebuf[sizeof(int) + fsname_len]), mp_len);
+	buf[fsname_len] = 0;
+	mpbuf[mp_len] = 
+	ret = mount_FS(buf, mpbuf);
+
+	free(buf);
+	free(mpbuf);
+	return ret;
+}
+
+int unmount_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = unmount_FS(buf);
+
+	free(buf);
+	return ret;
+}
+
+int mount_status_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = mount_status(buf);
+
+	free(buf);
+	return ret;
+}
+
+int delete_FS_handle(int arg_len, char *largebuf)
+{
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = delete_filesystem(buf);
+
+	free(buf);
+	return ret;
+}
+
+int check_FS_handle(int arg_len, char *largebuf)
+{
+	DIR_ENTRY temp_entry;
+	char *buf;
+	int ret;
+
+	buf = malloc(arg_len + 10);
+	memcpy(buf, largebuf, arg_len);
+	buf[arg_len] = 0;
+	ret = check_filesystem(buf, &temp_entry);
+	write_log(10, "Debug check FS %s returns %d\n", buf, ret);
+
+	free(buf);
+	return ret;
+}
+
+int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
+{
+	unsigned long num_entries, temp;
+	int ret;
+
+	ret = list_filesystem(0, NULL, &num_entries);
+
+	write_log(10, "Debug list FS num FS %ld\n", num_entries);
+	if (ret < 0)
+		return ret;
+	if (num_entries > 0) {
+		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
+		ret = list_filesystem(num_entries, *entryarray, &temp);
+	}
+	write_log(10, "Debug list FS %d, %ld\n", ret, temp);
+	*ret_entries = num_entries;
+	return ret;
+}
+
+int unmount_all_handle(void)
+{
+	int ret;
+
+	ret = unmount_all();
+
+	return ret;
 }
 
 /************************************************************************
@@ -174,6 +300,8 @@ errcode_handle:
 *  Return value: None
 *
 *************************************************************************/
+/* TODO: Better error handling so that broken pipe arising from clients
+not following protocol won't crash the system */
 void api_module(void *index)
 {
 	int fd1;
@@ -188,7 +316,11 @@ void api_module(void *index)
 	char *largebuf;
 	char buf_reused;
 	int msg_index;
+	unsigned long num_entries;
 	unsigned int api_code, arg_len, ret_len;
+
+	DIR_ENTRY *entryarray;
+	char *tmpptr;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -299,7 +431,7 @@ void api_module(void *index)
 		switch (api_code) {
 		case TERMINATE:
 			/* Terminate the system */
-			pthread_kill(HCFS_mount, SIGHUP);
+			unmount_all();
 			hcfs_system->system_going_down = TRUE;
 			retcode = 0;
 			ret_len = sizeof(int);
@@ -333,6 +465,7 @@ void api_module(void *index)
 			break;
 		case ECHOTEST:
 			/*Echos the arguments back to the caller*/
+			retcode = 0;
 			ret_len = arg_len;
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			total_sent = 0;
@@ -346,6 +479,83 @@ void api_module(void *index)
 				total_sent += size_msg;
 			}
 
+			break;
+		case CREATEFS:
+			retcode = create_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case DELETEFS:
+			retcode = delete_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKFS:
+			retcode = check_FS_handle(arg_len, largebuf);
+			write_log(10, "retcode is %d\n", retcode);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case LISTFS:
+			/*Echos the arguments back to the caller*/
+			retcode = list_FS_handle(&entryarray, &num_entries);
+			tmpptr = (char *) entryarray;
+			ret_len = sizeof(DIR_ENTRY) * num_entries;
+			write_log(10, "Debug listFS return size %d\n", ret_len);
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			total_sent = 0;
+			while (total_sent < ret_len) {
+				if ((ret_len - total_sent) > 1024)
+					to_send = 1024;
+				else
+					to_send = ret_len - total_sent;
+				size_msg = send(fd1, &tmpptr[total_sent],
+					to_send, 0);
+				total_sent += size_msg;
+			}
+			if (num_entries > 0)
+				free(entryarray);
+			break;
+		case MOUNTFS:
+			retcode = mount_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case UNMOUNTFS:
+			retcode = unmount_FS_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKMOUNT:
+			retcode = mount_status_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case UNMOUNTALL:
+			retcode = unmount_all_handle();
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
 			break;
 		default:
 			retcode = ENOTSUP;
@@ -410,15 +620,21 @@ return_message:
 *************************************************************************/
 void api_server_monitor(void)
 {
-	int count, totalrefs, index;
+	int count, totalrefs, index, ret;
 	float totaltime, ratio;
 	int *val;
 	struct timeval cur_time;
 	int sel_index, cur_index;
+	struct timespec waittime;
+	waittime.tv_sec = 1;
+	waittime.tv_nsec = 0;
 
 	while (hcfs_system->system_going_down == FALSE) {
 		sleep(5);
-		sem_wait(&(api_server->job_lock));
+		/* Using timed wait to handle system shutdown event */
+		ret = sem_timedwait(&(api_server->job_lock), &waittime);
+		if (ret < 0)
+			continue;
 		gettimeofday(&cur_time, NULL);
 
 		/* Resets the statistics due to sliding window*/

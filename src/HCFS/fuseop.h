@@ -24,6 +24,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <fuse/fuse_opt.h>
+
 #include "params.h"
 
 /*BEGIN META definition*/
@@ -160,9 +162,14 @@ typedef struct {
 
 SYSTEM_DATA_HEAD *hcfs_system;
 
-/* Functions for initializing HCFS */
+int global_argc;
+char **global_argv;
+struct fuse_args global_fuse_args;
 
-pthread_t HCFS_mount;
+/* Functions for initializing HCFS */
+void* mount_multi_thread(void *ptr);
+void* mount_single_thread(void *ptr);
+
 int hook_fuse(int argc, char **argv);
 
 void set_timestamp_now(struct stat *thisstat, char mode);
