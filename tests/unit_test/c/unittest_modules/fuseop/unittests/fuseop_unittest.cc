@@ -2391,3 +2391,119 @@ TEST_F(hfuse_ll_linkTest, LinkSuccess)
 /*
 	End of unittest of hfuse_ll_link()
  */
+
+/*
+	Unittest of hfuse_ll_create()
+ */
+class hfuse_ll_createTest : public ::testing::Test {
+protected:
+	int fd;
+
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+		if (fd > 0)
+			close(fd);
+	}
+};
+
+TEST_F(hfuse_ll_createTest, NameTooLong)
+{
+	char name[MAX_FILENAME_LEN + 100];
+	int errcode;
+
+	memset(name, 0, MAX_FILENAME_LEN + 100);
+	memset(name, 'a', MAX_FILENAME_LEN + 90);
+	memcpy(name, "/tmp/test_fuse/", 15);
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, ParentIsNotDir)
+{
+	char *name = "/tmp/test_fuse/testfile/creat_test";
+	int errcode;
+
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENOTDIR, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
+{
+	char *name = "/tmp/test_fuse/testlink_dir_perm_denied/creat_test";
+	int errcode;
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_super_block_new_inode = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENOSPC, errcode);
+	
+	fail_super_block_new_inode = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_mknod_update_meta = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(1, errcode);
+	fail_mknod_update_meta = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, open_fhFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_open_files = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENFILE, errcode);
+	fail_open_files = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, CreateSuccess)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_GT(fd, 0);
+}
+/*
+	End of unittest of hfuse_ll_create()
+ */

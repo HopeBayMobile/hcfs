@@ -4506,7 +4506,18 @@ error_handle:
 	return ;
 }
 
-
+/************************************************************************
+*
+* Function name: hfuse_ll_link
+*        Inputs: fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, 
+*                const char *newname
+*
+*       Summary: Make a hard link for inode "ino". The hard link is named
+*                as "newname" and is added to parent dir "newparent". Type
+*                dir is not allowed to make a hard link. Besides, hard link
+*                over FS is also not allowed, which is handled by kernel.
+*
+*************************************************************************/
 static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino, 
 	fuse_ino_t newparent, const char *newname)
 {
@@ -4518,9 +4529,10 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	int ret_val, errcode;
 	unsigned long this_generation;
 	ino_t parent_inode, link_inode;
+	MOUNT_T *tmpptr;
 
-	parent_inode = (ino_t) newparent;
-	link_inode = (ino_t) ino;
+	parent_inode = real_ino(req, newparent);
+	link_inode = real_ino(req, ino);
 
 	/* Reject if name too long */
 	if (strlen(newname) > MAX_FILENAME_LEN) {
@@ -4549,6 +4561,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	/* Checking permission */
 	ret_val = check_permission(req, &parent_stat, 3); /* W+X */
 	if (ret_val < 0) {
+		write_log(0, "Permission denied. W+X is needed\n");
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
@@ -4593,14 +4606,18 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 	
 	/* Reply fuse entry */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) link_inode;
 	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
 	if (S_ISREG(link_stat.st_mode))
-		ret_val = lookup_increase(link_inode, 1, D_ISREG);
+		ret_val = lookup_increase(tmpptr->lookup_table, 
+			link_inode, 1, D_ISREG);
 	if (S_ISLNK(link_stat.st_mode))
-		ret_val = lookup_increase(link_inode, 1, D_ISLNK);
+		ret_val = lookup_increase(tmpptr->lookup_table, 
+			link_inode, 1, D_ISLNK);
 	if (S_ISDIR(link_stat.st_mode))
 		ret_val = -EISDIR;
 	if (ret_val < 0) {
@@ -4608,6 +4625,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret_val);
 	}
 
+	write_log(10, "Debug: Hard link %s is created successfully\n", newname);
 	fuse_reply_entry(req, &(tmp_param));
 	return;
 
@@ -4618,6 +4636,19 @@ error_handle:
 	return;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_create
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *name, 
+*                mode_t mode, struct fuse_file_info *fi 
+*
+*       Summary: Create a regular file named as "name" if it does not 
+*                exist in dir "parent". If it exists, it will be truncated 
+*                to size = 0. After creating the file, this function will
+*                create a file handle and store it in "fi->fh". Finally
+*                reply the fuse entry about the file and fuse file info "fi". 
+*
+*************************************************************************/
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	const char *name, mode_t mode, struct fuse_file_info *fi)
 {
@@ -4630,8 +4661,9 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	struct fuse_entry_param tmp_param;
 	unsigned long this_generation;
 	long long fh;
+	MOUNT_T *tmpptr;
 
-	parent_inode = (ino_t) parent;
+	parent_inode = real_ino(req, parent);
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, name, mode);
@@ -4701,11 +4733,13 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Prepare stat data to be replied */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-	ret_val = lookup_increase(self_inode, 1, D_ISREG);
+	ret_val = lookup_increase(tmpptr->lookup_table, self_inode, 1, D_ISREG);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);

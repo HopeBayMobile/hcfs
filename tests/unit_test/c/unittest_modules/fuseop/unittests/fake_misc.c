@@ -496,7 +496,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 		break;
 	case 23:
 		inode_stat->st_ino = 23;
-		inode_stat->st_mode = S_IFDIR | 0400;
+		inode_stat->st_mode = S_IFDIR | 0600;
 		inode_stat->st_atime = 100000;
 		break;
 	default:
