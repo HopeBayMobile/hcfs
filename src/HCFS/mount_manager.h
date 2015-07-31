@@ -8,6 +8,7 @@
 * Revision History
 * 2015/7/7 Jiahong created this file
 * 2015/7/15 Jiahong adding most content
+* 2015/7/31 Jiahong adding data structure for FS statistics
 *
 **************************************************************************/
 
@@ -35,6 +36,12 @@ Pointers to the FUSE session and channel used for this mount
 */
 
 typedef struct {
+	long long system_size;
+	long long num_inodes;
+	sem_t lock;
+} FS_STAT_T;
+
+typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
 	char *f_mp;
@@ -44,6 +51,7 @@ typedef struct {
 	struct fuse_chan *chan_ptr;
 	char is_unmount;
 	LOOKUP_HEAD_TYPE *lookup_table;
+	FS_STAT_T FS_stat;
 	struct fuse_args mount_args;
 } MOUNT_T;
 

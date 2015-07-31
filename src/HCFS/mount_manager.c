@@ -557,6 +557,8 @@ int mount_FS(char *fsname, char *mp) {
 		goto errcode_handle;
 	}
 
+	sem_init(&((new_info->FS_stat).lock), 0, 1);
+
 	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
 		errcode = ret;

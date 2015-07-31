@@ -305,14 +305,14 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 /************************************************************************
 *
 * Function name: lookup_destroy
-*        Inputs: LOOKUP_HEAD_TYPE *lookup_table
+*        Inputs: LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr
 *        Output: 0 if successful, otherwise -1.
 *       Summary: Destroys the lookup count table, and delete inodes if
 *                needed.
 *
 *************************************************************************/
 
-int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table)
+int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 {
 	int count;
 	int ret_val, errcode;
@@ -340,9 +340,14 @@ int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table)
 				ptr->this_inode);
 			ret_val = disk_checkdelete(ptr->this_inode);
 
-			if (ret_val == 1)
+			if (ret_val == 1) {
 				actual_delete_inode(ptr->this_inode,
 						ptr->d_type);
+				sem_wait(&((tmpptr->FS_stat).lock);
+				(tmpptr->FS_stat).num_inodes--;
+				sem_post(&((tmpptr->FS_stat).lock);
+			}
+
 			oldptr = ptr;
 			ptr = ptr->next;
 			free(oldptr);

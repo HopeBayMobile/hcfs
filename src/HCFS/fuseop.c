@@ -1669,6 +1669,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 * Function name: hfuse_ll_truncate
 *        Inputs: ino_t this_inode, struct stat *filestat,
 *                off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr
+*                fuse_req_t req
 *       Summary: Truncate the regular file pointed by "this_inode"
 *                to size "offset".
 *  Return value: 0 if successful. Otherwise returns the negation of the
@@ -1677,7 +1678,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 *
 *************************************************************************/
 int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
-	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr)
+	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
 {
 /* If truncate file smaller, do not truncate metafile, but instead set the
 *  affected entries to ST_TODELETE (which will be changed to ST_NONE once
@@ -1697,6 +1698,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	int last_index;
 	long long temp_trunc_size;
 	ssize_t ret_ssize;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	write_log(10, "Debug truncate: offset %ld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
@@ -1878,6 +1882,13 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
+
+	sem_wait(&((tmpptr->FS_stat).lock);
+	(tmpptr->FS_stat).system_size +=
+			(long long) (offset - filestat->st_size);
+	sem_post(&((tmpptr->FS_stat).lock);
+
+
 	filestat->st_size = offset;
 	filestat->st_mtime = time(NULL);
 
@@ -3005,6 +3016,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	struct stat temp_stat;
 	int ret, errcode;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	thisinode = real_ino(req, ino);
 
@@ -3099,6 +3113,12 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		change_system_meta((long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0, 0);
 
+		sem_wait(&((tmpptr->FS_stat).lock);
+		(tmpptr->FS_stat).system_size +=
+				(long long) ((offset + total_bytes_written)
+						- temp_stat.st_size);
+		sem_post(&((tmpptr->FS_stat).lock);
+
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
 	}
@@ -3133,6 +3153,10 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
+	long long system_size, num_inodes;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	/* TODO: Different statistics for different filesystems */
 	write_log(10, "Debug statfs\n");
@@ -3145,39 +3169,42 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&(hcfs_system->access_sem));
+	sem_wait(&((tmpptr->FS_stat).lock);
+
+	system_size = (tmpptr->FS_stat).system_size;
+	num_inodes = (tmpptr->FS_stat).num_inodes;
+
+	sem_post(&((tmpptr->FS_stat).lock);
+
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (hcfs_system->systemdata.system_size > (50*powl(1024, 3)))
-		buf->f_blocks = (((hcfs_system->systemdata.system_size - 1)
+	if (system_size > (50*powl(1024, 3)))
+		buf->f_blocks = (((system_size - 1)
 						/ 4096) + 1) * 2;
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
-	if (hcfs_system->systemdata.system_size == 0)
+	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
 		buf->f_bfree = buf->f_blocks -
-			(((hcfs_system->systemdata.system_size - 1)
+			(((system_size - 1)
 						/ 4096) + 1);
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
-	sem_post(&(hcfs_system->access_sem));
 
 	write_log(10, "Debug statfs, checking inodes\n");
 
-	super_block_share_locking();
-	if (sys_super_block->head.num_active_inodes > 1000000)
-		buf->f_files = (sys_super_block->head.num_active_inodes * 2);
+	if (num_inodes > 1000000)
+		buf->f_files = (num_inodes * 2);
 	else
 		buf->f_files = 2000000;
 
-	buf->f_ffree = buf->f_files - sys_super_block->head.num_active_inodes;
+	buf->f_ffree = buf->f_files - num_inodes;
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
 	buf->f_favail = buf->f_ffree;
-	super_block_share_release();
 	buf->f_namemax = MAX_FILENAME_LEN;
 
 	write_log(10, "Debug statfs, returning info\n");
@@ -3603,7 +3630,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		}
 
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
-				attr->st_size, &body_ptr);
+				attr->st_size, &body_ptr, req);
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
@@ -3838,8 +3865,12 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if ((current_val == 0) && (to_delete == TRUE))
+	if ((current_val == 0) && (to_delete == TRUE)) {
 		actual_delete_inode(thisinode, d_type);
+		sem_wait(&((tmpptr->FS_stat).lock);
+		(tmpptr->FS_stat).num_inodes--;
+		sem_post(&((tmpptr->FS_stat).lock);
+	}
 
 	fuse_reply_none(req);
 }
@@ -4544,7 +4575,7 @@ void* mount_multi_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
 
-	lookup_destroy(tmpptr->lookup_table);
+	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
 void* mount_single_thread(void *ptr)
 {
@@ -4561,7 +4592,7 @@ void* mount_single_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
 
-	lookup_destroy(tmpptr->lookup_table);
+	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
 
 int hook_fuse(int argc, char **argv)
@@ -4576,7 +4607,8 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
-
+	/* TODO: Ensure that the above is finished before any operation
+		can start */
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
 	destroy_mount_mgr();
