@@ -150,6 +150,7 @@ class fuseopEnvironment : public ::testing::Environment {
 
 ::testing::Environment* const fuseop_env = ::testing::AddGlobalTestEnvironment(new fuseopEnvironment);
 
+
 /* Begin of the test case for the function hfuse_getattr */
 
 class hfuse_getattrTest : public ::testing::Test {
@@ -186,7 +187,6 @@ TEST_F(hfuse_getattrTest, TestRoot) {
   ASSERT_EQ(ret_val, 0);
   EXPECT_EQ(tempstat.st_atime, 100000);
 }
-
 /* End of the test case for the function hfuse_getattr */
 
 /* Begin of the test case for the function hfuse_mknod */
@@ -2275,4 +2275,235 @@ TEST_F(hfuse_ll_readlinkTest, ReadLinkSuccess)
 }
 /*
 	End of unittest of hfuse_ll_readlink()
+ */
+
+/*
+	Unittest of hfuse_ll_link()
+ */
+class hfuse_ll_linkTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(hfuse_ll_linkTest, OldlinkNotExists)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/old_link_not_exists",
+		"/tmp/test_fuse/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOENT, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, NewlinkExists)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testlink");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EEXIST, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, NewlinkNameTooLong)
+{
+	int ret;
+	int errcode;
+	char linkname[MAX_FILENAME_LEN + 50];
+
+	/* Mock path "/tmp/test_fuse/aaaaaaaaaaa...." */
+	errcode = 0;
+	memset(linkname, 0, MAX_FILENAME_LEN + 50);
+	memset(linkname, 'a', MAX_FILENAME_LEN + 40);
+	memcpy(linkname, "/tmp/test_fuse/", 15);
+
+	ret = link("/tmp/test_fuse/testlink", linkname);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, ParentDirPermissionDenied)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testlink_dir_perm_denied/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(EACCES, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, ParentIsNotDir)
+{
+	int ret;
+	int errcode;
+
+	ret = link("/tmp/test_fuse/testlink",
+		"/tmp/test_fuse/testfile/new_link");
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(ENOTDIR, errcode);
+
+}
+
+TEST_F(hfuse_ll_linkTest, link_update_metaFail)
+{
+	int ret;
+	int errcode;
+	char hardlink[500] = "/tmp/test_fuse/new_link_update_meta_fail";
+
+	ret = link("/tmp/test_fuse/testlink", hardlink);
+	errcode = errno;
+
+	EXPECT_EQ(-1, ret);
+	EXPECT_EQ(123, errcode);
+}
+
+TEST_F(hfuse_ll_linkTest, LinkSuccess)
+{
+	int ret;
+	char hardlink[500] = "/tmp/test_fuse/xxxxxxx";
+
+	ret = link("/tmp/test_fuse/testlink", hardlink);
+
+	EXPECT_EQ(0, ret);
+}
+
+/*
+	End of unittest of hfuse_ll_link()
+ */
+
+/*
+	Unittest of hfuse_ll_create()
+ */
+class hfuse_ll_createTest : public ::testing::Test {
+protected:
+	int fd;
+
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+		if (fd > 0)
+			close(fd);
+	}
+};
+
+TEST_F(hfuse_ll_createTest, NameTooLong)
+{
+	char name[MAX_FILENAME_LEN + 100];
+	int errcode;
+
+	memset(name, 0, MAX_FILENAME_LEN + 100);
+	memset(name, 'a', MAX_FILENAME_LEN + 90);
+	memcpy(name, "/tmp/test_fuse/", 15);
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENAMETOOLONG, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, ParentIsNotDir)
+{
+	char *name = "/tmp/test_fuse/testfile/creat_test";
+	int errcode;
+
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENOTDIR, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, ParentPermissionDenied)
+{
+	char *name = "/tmp/test_fuse/testlink_dir_perm_denied/creat_test";
+	int errcode;
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(EACCES, errcode);
+}
+
+TEST_F(hfuse_ll_createTest, super_block_new_inodeFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_super_block_new_inode = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENOSPC, errcode);
+	
+	fail_super_block_new_inode = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, mknod_update_metaFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_mknod_update_meta = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(1, errcode);
+	fail_mknod_update_meta = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, open_fhFail)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fail_open_files = TRUE;
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_EQ(-1, fd);
+	EXPECT_EQ(ENFILE, errcode);
+	fail_open_files = FALSE;
+}
+
+TEST_F(hfuse_ll_createTest, CreateSuccess)
+{
+	char *name = "/tmp/test_fuse/creat_test";
+	int errcode;
+
+	fd = creat(name, 0777);
+	errcode = errno;
+
+	EXPECT_GT(fd, 0);
+}
+/*
+	End of unittest of hfuse_ll_create()
  */
