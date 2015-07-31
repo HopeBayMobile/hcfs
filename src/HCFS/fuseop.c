@@ -4509,7 +4509,7 @@ error_handle:
 /************************************************************************
 *
 * Function name: hfuse_ll_link
-*        Inputs: fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent, 
+*        Inputs: fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent,
 *                const char *newname
 *
 *       Summary: Make a hard link for inode "ino". The hard link is named
@@ -4518,7 +4518,7 @@ error_handle:
 *                over FS is also not allowed, which is handled by kernel.
 *
 *************************************************************************/
-static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino, 
+static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	fuse_ino_t newparent, const char *newname)
 {
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
@@ -4561,7 +4561,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	/* Checking permission */
 	ret_val = check_permission(req, &parent_stat, 3); /* W+X */
 	if (ret_val < 0) {
-		write_log(0, "Permission denied. W+X is needed\n");
+		write_log(0, "Dir permission denied. W+X is needed\n");
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
@@ -4585,7 +4585,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Increase nlink and add "newname" to parent dir */
-	ret_val = link_update_meta(link_inode, newname, &link_stat, 
+	ret_val = link_update_meta(link_inode, newname, &link_stat,
 		&this_generation, parent_meta_cache_entry);
 	if (ret_val < 0) {
 		errcode = ret_val;
@@ -4604,7 +4604,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
-	
+
 	/* Reply fuse entry */
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4613,10 +4613,10 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	tmp_param.ino = (fuse_ino_t) link_inode;
 	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
 	if (S_ISREG(link_stat.st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, 
+		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISREG);
 	if (S_ISLNK(link_stat.st_mode))
-		ret_val = lookup_increase(tmpptr->lookup_table, 
+		ret_val = lookup_increase(tmpptr->lookup_table,
 			link_inode, 1, D_ISLNK);
 	if (S_ISDIR(link_stat.st_mode))
 		ret_val = -EISDIR;
@@ -4639,14 +4639,14 @@ error_handle:
 /************************************************************************
 *
 * Function name: hfuse_ll_create
-*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *name, 
-*                mode_t mode, struct fuse_file_info *fi 
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *name,
+*                mode_t mode, struct fuse_file_info *fi
 *
-*       Summary: Create a regular file named as "name" if it does not 
-*                exist in dir "parent". If it exists, it will be truncated 
+*       Summary: Create a regular file named as "name" if it does not
+*                exist in dir "parent". If it exists, it will be truncated
 *                to size = 0. After creating the file, this function will
 *                create a file handle and store it in "fi->fh". Finally
-*                reply the fuse entry about the file and fuse file info "fi". 
+*                reply the fuse entry about the file and fuse file info "fi".
 *
 *************************************************************************/
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
@@ -4694,6 +4694,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	/* Checking permission */
 	ret_val = check_permission(req, &parent_stat, 3);
 	if (ret_val < 0) {
+		write_log(0, "Dir permission denied. W+X is needed\n");
 		fuse_reply_err(req, -ret_val);
 		return;
 	}

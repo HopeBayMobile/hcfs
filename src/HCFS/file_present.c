@@ -134,7 +134,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 
 		if ((ret_code == 0) && (inode_stat != NULL)) {
 			memcpy(inode_stat, &returned_stat, sizeof(struct stat));
-			write_log(10, "fetch_inode_stat get inode %lld\n", 
+			write_log(10, "fetch_inode_stat get inode %lld\n",
 				inode_stat->st_ino);
 			return 0;
 		}
@@ -327,12 +327,12 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	/* Remove entry */
 	if (this_entry->d_type == D_ISREG) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, 
+		ret_val = dir_remove_entry(parent_inode, this_inode,
 			this_entry->d_name, S_IFREG, body_ptr);
 	}
 	if (this_entry->d_type == D_ISLNK) {
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, 
+		ret_val = dir_remove_entry(parent_inode, this_inode,
 			this_entry->d_name, S_IFLNK, body_ptr);
 	}
 	if (this_entry->d_type == D_ISDIR) {
@@ -646,11 +646,11 @@ errcode_handle:
 *                struct stat *link_stat, unsigned long *generation,
 *                META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry
 *       Summary: Helper of link operation in FUSE. Given the inode numebr
-*                "link_inode", this function will increase link number 
-*                and add a new entry to parent dir. This function will 
-*                also fetch inode stat and generation and store them in 
+*                "link_inode", this function will increase link number
+*                and add a new entry to parent dir. This function will
+*                also fetch inode stat and generation and store them in
 *                "link_stat" and "generation", respectively. Do NOT need
-*                to unlock parent meta cache entry since it will be 
+*                to unlock parent meta cache entry since it will be
 *                handled by caller.
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
@@ -686,7 +686,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	}
 
 	link_stat->st_nlink++; /* Hard link ++ */
-	write_log(10, "Debug: inode %lld has %lld links\n", 
+	write_log(10, "Debug: inode %lld has %lld links\n",
 		link_inode, link_stat->st_nlink);
 
 	/* Update only stat */
@@ -701,7 +701,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 		goto error_handle;
 
 	/* Add entry to this dir */
-	ret_val = dir_add_entry(parent_inode, link_inode, newname, 
+	ret_val = dir_add_entry(parent_inode, link_inode, newname,
 		link_stat->st_mode, parent_meta_cache_entry);
 	if (ret_val < 0) {
 		link_stat->st_nlink--; /* Recover nlink */
@@ -712,7 +712,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 
 	/* Unlock meta cache entry */
 	ret_val = meta_cache_close_file(link_meta_cache_entry);
-	if (ret_val < 0) {	
+	if (ret_val < 0) {
 		meta_cache_unlock_entry(link_meta_cache_entry);
 		return ret_val;
 	}
