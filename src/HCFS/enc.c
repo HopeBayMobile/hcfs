@@ -1,4 +1,28 @@
 #include "enc.h"
+/*
+int b64encode(char** b64text, unsigned char* input,
+	      unsigned int input_length){
+	// base64 -> memmory IO chain
+	BIO *mem, *b64;
+	BUF_MEM* buffer;
+	b64 = BIO_new(BIO_f_base64());
+	mem = BIO_new(BIO_s_mem());
+	mem = BIO_push(b64, mem);
+	//Ignore newlines
+	BIO_set_flags(mem, BIO_FLAGS_BASE64_NO_NL);
+
+	BIO_write(mem, input, input_length);
+	BIO_flush(mem);
+	char *tmp;
+	long availiable_len = BIO_get_mem_data(mem, &tmp);
+	*b64text = calloc(availiable_len, sizeof(char));
+	memcpy(*b64text, tmp, availiable_len);
+	BIO_get_mem_ptr(mem, &buffer);
+	BIO_set_close(mem, BIO_CLOSE);
+	BIO_free_all(mem);
+	return 0;
+}
+*/
 
 /************************************************************************
  * *
@@ -216,4 +240,15 @@ int main(void){
 	printf("dec[0]: %d\n", output_2[0]);
 	printf("dec[1]: %d\n", output_2[1]);
 
+	char* b64_input = "hello world!!\n";
+	int b64_input_len = strlen(b64_input);
+	int tmp = b64_input_len % 3;
+	if(tmp != 0)
+		tmp = (3-tmp);
+	int out_len = 0;
+	char* b64_output = calloc(1+(b64_input_len+tmp)*4/3, sizeof(char));
+	b64encode_str(b64_input, b64_output, &out_len, b64_input_len);
+	printf("%d %d\n", 1+(b64_input_len+tmp)*4/3, out_len);
+	printf("%s\n", b64_output);
+	free(b64_output);
 }
