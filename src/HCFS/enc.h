@@ -7,8 +7,16 @@
 
 int generate_random_key(unsigned char*);
 
+int generate_random_bytes(unsigned char*, unsigned int);
+
 int aes_gcm_encrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
 			   unsigned char*);
 
 int aes_gcm_decrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
+			   unsigned char*);
+
+int aes_gcm_encrypt(unsigned char*, unsigned char*, unsigned int,
+			   unsigned char*);
+
+int aes_gcm_decrypt(unsigned char*, unsigned char*, unsigned int,
 			   unsigned char*);

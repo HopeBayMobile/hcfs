@@ -1,38 +1,56 @@
 #include "enc.h"
 
-
 /************************************************************************
  * *
- * * Function name: generate a random encryption key
- * *        Inputs: unsigned char* key, which points to a buffer which
- *		    length should equals KEY_SIZE
- * *       Summary: generate a random key for encryption
+ * * Function name: generate_random_bytes
+ * *        Inputs: unsigned char* bytes: points to a buffer which
+ *		    length should equals length
+ *		    unsigned int length
+ * *       Summary: generate some random bytes
+ * *                https://www.openssl.org/docs/crypto/RAND_bytes.html
  * *
- * *  Return value: 0 if successful. Otherwise returns error code.
+ * *  Return value: 0 if successful.
+ *                  -1 if length <= 0.
+ *                  -2 if random function not supported
+ *                  -3 if some openssl error occurs, use ERR_get_error to get
+ *                  error code
  * *
  * *************************************************************************/
-int generate_random_key(unsigned char* key){
-	memset(key, 0, KEY_SIZE);
-	int rand_success = RAND_bytes(key, KEY_SIZE);
+int generate_random_bytes(unsigned char* bytes, unsigned int length){
+	if(length <= 0)
+		return -1;
+
+	memset(bytes, 0, length);
+	int rand_success = RAND_bytes(bytes, length);
 	/* RAND_bytes() returns 1 on success, 0 otherwise. The error code can
 	 * be obtained by ERR_get_error.
-	 * return -1 if not supported by the current RAND
-	 * method.
+	 * return -1 if not supported by the current RAND method.
 	 * https://www.openssl.org/docs/crypto/RAND_bytes.html
 	 */
-	if(rand_success == 1){
-		return 0;
-	}
 	switch(rand_success){
 	case 1:
 		return 0;
 		break;
 	case -1:
-		return -1;
+		return -2;
 		break;
 	default:
-		return -2;
+		return -3;
 	}
+}
+
+/************************************************************************
+ * *
+ * * Function name: generate_random_aes_key
+ * *        Inputs: unsigned char* key: points to a buffer which
+ *		    length should equals KEY_SIZE
+ * *       Summary: generate a random key for encryption
+ * *
+ * *  Return value: See get_random_bytes
+ * *
+ * *************************************************************************/
+int generate_random_key(unsigned char* key){
+	return generate_random_bytes(key, KEY_SIZE);
 }
 
 /************************************************************************
