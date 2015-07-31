@@ -1232,6 +1232,8 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 				sem_post(&(hcfs_system->access_sem));
 			}
 		}
+		/* TODO: Change size of data here for each FS (or
+			in the places where this function is called)*/
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
 		sync_hcfs_system_data(FALSE);
@@ -1394,6 +1396,9 @@ int startup_finish_delete()
 				ret = actual_delete_inode(tmp_ino, D_ISDIR);
 			if (S_ISLNK(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK);
+
+			/* TODO: Directly decrease num of inodes
+			in the xattr of root inode. */
 
 			if (ret < 0) {
 				closedir(dirp);

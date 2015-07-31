@@ -36,5 +36,5 @@ int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 			int amount, char *d_type, char *need_delete);
 int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode);
 
-int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table);
+int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr);
 
