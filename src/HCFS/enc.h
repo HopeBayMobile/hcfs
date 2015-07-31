@@ -1,7 +1,5 @@
 #include <string.h>
 #include <openssl/evp.h>
-#include <openssl/buffer.h>
-#include <openssl/bio.h>
 #include <openssl/rand.h>
 #include "b64encode.h"
 #define IV_SIZE 12

@@ -1,28 +1,4 @@
 #include "enc.h"
-/*
-int b64encode(char** b64text, unsigned char* input,
-	      unsigned int input_length){
-	// base64 -> memmory IO chain
-	BIO *mem, *b64;
-	BUF_MEM* buffer;
-	b64 = BIO_new(BIO_f_base64());
-	mem = BIO_new(BIO_s_mem());
-	mem = BIO_push(b64, mem);
-	//Ignore newlines
-	BIO_set_flags(mem, BIO_FLAGS_BASE64_NO_NL);
-
-	BIO_write(mem, input, input_length);
-	BIO_flush(mem);
-	char *tmp;
-	long availiable_len = BIO_get_mem_data(mem, &tmp);
-	*b64text = calloc(availiable_len, sizeof(char));
-	memcpy(*b64text, tmp, availiable_len);
-	BIO_get_mem_ptr(mem, &buffer);
-	BIO_set_close(mem, BIO_CLOSE);
-	BIO_free_all(mem);
-	return 0;
-}
-*/
 
 /************************************************************************
  * *
