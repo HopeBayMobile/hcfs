@@ -1,3 +1,6 @@
+#ifndef GW20_HCFS_ENC_H_
+#define GW20_HCFS_ENC_H_
+
 #include <string.h>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
@@ -24,3 +27,4 @@ int aes_gcm_decrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
 
 int expect_b64_encode_length(unsigned int);
 
+#endif

@@ -17,4 +17,6 @@
 int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 						int *outlen, int inputlen);
 
+int b64decode_str(char *inputstr, unsigned char *outputstr,
+						int *outlen, int inputlen);
 #endif  /* GW20_HCFS_B64ENCODE_H_ */

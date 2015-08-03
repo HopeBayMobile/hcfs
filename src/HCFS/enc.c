@@ -234,6 +234,7 @@ int main(void){
 
 	char* b64_input = "hello world!!\n";
 	int b64_input_len = strlen(b64_input);
+	printf("%d\n", b64_input_len);
 	int tmp = expect_b64_encode_length(b64_input_len);
 	int out_len = 0;
 	char* b64_output = calloc(tmp, sizeof(char));
@@ -241,5 +242,12 @@ int main(void){
 		      &out_len, b64_input_len);
 	printf("%d %d\n", tmp, out_len);
 	printf("%s\n", b64_output);
+	char* b64_back = calloc(out_len, sizeof(char));
+	ret = b64decode_str(b64_output, b64_back ,&out_len, strlen(b64_output));
+	printf("%d\n", ret);
+	b64_back = realloc(b64_back, out_len);
+	printf("%s", b64_back);
+	printf("%d\n", out_len);
 	free(b64_output);
+	free(b64_back);
 }
