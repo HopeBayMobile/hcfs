@@ -293,8 +293,8 @@ void dump_S3_list_body(FILE *fptr)
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
-				CURL_HANDLE *curl_handle)
+int hcfs_get_auth_swift(char *swift_user, char *swift_pass, 
+	char *swift_url, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
