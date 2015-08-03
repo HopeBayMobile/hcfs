@@ -22,3 +22,5 @@ int aes_gcm_encrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
 int aes_gcm_decrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
 			   unsigned char*);
 
+int expect_b64_encode_length(unsigned int);
+

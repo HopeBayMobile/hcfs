@@ -2,6 +2,22 @@
 
 /************************************************************************
  * *
+ * * Function name: expect_b64_encode_length
+ * *        Inputs: int length
+ * *       Summary: Calculate how many bytes will be after encode
+ * *
+ * *  Return value: bytes expected
+ * *
+ * *************************************************************************/
+int expect_b64_encode_length(unsigned int length){
+	int tmp = length % 3;
+	tmp = (tmp == 0)? tmp : (3-tmp);
+	// 1 is for b64encode_str puts '\0' in the end
+	return  1+(length+tmp)*4/3;
+}
+
+/************************************************************************
+ * *
  * * Function name: generate_random_bytes
  * *        Inputs: unsigned char* bytes: points to a buffer which
  *		    length should equals length
@@ -218,13 +234,12 @@ int main(void){
 
 	char* b64_input = "hello world!!\n";
 	int b64_input_len = strlen(b64_input);
-	int tmp = b64_input_len % 3;
-	if(tmp != 0)
-		tmp = (3-tmp);
+	int tmp = expect_b64_encode_length(b64_input_len);
 	int out_len = 0;
-	char* b64_output = calloc(1+(b64_input_len+tmp)*4/3, sizeof(char));
-	b64encode_str(b64_input, b64_output, &out_len, b64_input_len);
-	printf("%d %d\n", 1+(b64_input_len+tmp)*4/3, out_len);
+	char* b64_output = calloc(tmp, sizeof(char));
+	b64encode_str((unsigned char*)b64_input, (unsigned char*)b64_output,
+		      &out_len, b64_input_len);
+	printf("%d %d\n", tmp, out_len);
 	printf("%s\n", b64_output);
 	free(b64_output);
 }
