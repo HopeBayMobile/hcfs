@@ -19,7 +19,7 @@ CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 
 	/* "let_retry" is used to test retry connection */
 	if (let_retry == TRUE) {
-		retcode = 503;
+		retcode = 503; /* 503 will make caller retry */
 		let_retry = FALSE;
 	} else {
 		retcode = 200;
