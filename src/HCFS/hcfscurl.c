@@ -83,7 +83,7 @@ int parse_swift_auth_header(FILE *fptr)
 	char to_stop;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%19s %19s %19s\n",
+	ret_val = fscanf(fptr, "%19s %19s %19[^\r\n]\n",
 			httpcode, retcode, retstatus);
 	if (ret_val < 3)
 		return -1;
