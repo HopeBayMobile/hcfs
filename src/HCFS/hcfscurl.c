@@ -120,6 +120,8 @@ int parse_swift_auth_header(FILE *fptr)
 	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);
 
+	write_log(10, "Header info: %s, %s\n", swift_url_string,
+				swift_auth_string);
 	return retcodenum;
 
 errcode_handle:
@@ -412,7 +414,7 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 
 /************************************************************************
 *
-* Function name: hcfs_init_swift_backend
+* Function name: hcfs_init_S3_backend
 *        Inputs: CURL_HANDLE *curl_handle
 *       Summary: Initialize S3 backend for the curl handle "curl_handel".
 *  Return value: Return code from request (HTTP return code), or -1 if error.
@@ -1239,6 +1241,7 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
 
+	write_log(10, "Debug start listing container\n");
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_list_container(curl_handle);
