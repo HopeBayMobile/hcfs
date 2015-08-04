@@ -21,14 +21,24 @@ CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 	va_list alist;
 	FILE *fptr;
 	char buf[500];
+	int retcode;
 
+	/* "let_retry" is used to test retry connection */
+	if (let_retry == TRUE) { 
+		retcode = 503;
+		let_retry = FALSE;
+	} else {
+		retcode = 200;
+	}
+
+	memset(buf, 0, 500);
 	if (write_auth_header_flag == TRUE)
-		strcpy(buf, "HTTP/1.1 200 OK\n"
+		sprintf(buf, "HTTP/1.1 %d OK\n"
 		"X-Storage-Url: http://127.0.0.1/fake\n"
-		"X-Auth-Token: hello_swift_auth_string\n");
+		"X-Auth-Token: hello_swift_auth_string\n", retcode);
 	if (write_list_header_flag == TRUE)
-		strcpy(buf, "http/1.1 200 OK\n"
-		"X-Container-Object-Count: 5566\n");
+		sprintf(buf, "http/1.1 %d OK\n"
+		"X-Container-Object-Count: 5566\n", retcode);
 
 	va_start(alist, option);
 	fptr = va_arg(alist, FILE *);
@@ -48,6 +58,11 @@ void curl_slist_free_all(struct curl_slist * list)
 
 int write_log(int level, char *format, ...)
 {
+	va_list args;
+	va_start (args, format);
+	//vprintf (format, args);
+	va_end (args);
+	
 	return 0;
 }
 
@@ -69,8 +84,16 @@ CURL *curl_easy_init()
 	return 1;
 }
 
-void curl_easy_cleanup(CURL * handle)
+void curl_easy_cleanup(CURL *handle)
 {
+	switch (CURRENT_BACKEND) {
+	case SWIFT:
+		swift_destroy = FALSE;
+		break;
+	case S3:
+		s3_destroy = FALSE;
+		break;
+	}
 }
 
 void HMAC_CTX_init(HMAC_CTX *ctx)

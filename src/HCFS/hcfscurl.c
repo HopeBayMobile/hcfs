@@ -457,7 +457,7 @@ int hcfs_S3_reauth(CURL_HANDLE *curl_handle)
 {
 
 	if (curl_handle->curl != NULL)
-		hcfs_destroy_swift_backend(curl_handle->curl);
+		hcfs_destroy_S3_backend(curl_handle->curl);
 
 	return hcfs_init_S3_backend(curl_handle);
 }
@@ -1226,6 +1226,7 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
 
+	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_list_container(curl_handle);
@@ -1281,6 +1282,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int ret_val, num_retries;
 	int ret, errcode;
 
+	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_put_object(fptr, objname, curl_handle);
@@ -1343,6 +1345,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int ret_val, num_retries;
 	int ret, errcode;
 
+	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle);
@@ -1404,6 +1407,7 @@ int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle)
 {
 	int ret_val, num_retries;
 
+	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_delete_object(objname, curl_handle);
@@ -1472,8 +1476,8 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	unsigned char S3_signature[200];
 	int ret_val, ret, errcode;
 	unsigned char resource[200];
-	int num_retries;
 	long ret_pos;
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/s3puthead%s.tmp", curl_handle->id);
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
@@ -1592,13 +1596,13 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	CURL *curl;
 	char header_filename[100];
 	int ret_val, ret, errcode;
-	int num_retries;
 
 	unsigned char date_string[100];
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
 	unsigned char resource[200];
+	int num_retries;
 
 	sprintf(header_filename, "/run/shm/s3gethead%s.tmp", curl_handle->id);
 
