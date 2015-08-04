@@ -1,30 +1,24 @@
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include <openssl/hmac.h>
-//#include "global.h"
 
-//#ifdef __CURL_CURL_H
-//#undef __CURL_TYPECHECK_GCC_H
-
-//#define curl_easy_setopt my_curl
-//URLcode curl_easy_setopt(CURL *handle, CURLoption option, int parameter)
 #undef curl_easy_setopt
 CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 {
-	if ((write_auth_header_flag == FALSE) && 
+	if ((write_auth_header_flag == FALSE) &&
 		(write_list_header_flag == FALSE))
 		return CURLE_OK;
 
 	if (option != CURLOPT_WRITEHEADER)
 		return CURLE_OK;
-	
+
 	va_list alist;
 	FILE *fptr;
 	char buf[500];
 	int retcode;
 
 	/* "let_retry" is used to test retry connection */
-	if (let_retry == TRUE) { 
+	if (let_retry == TRUE) {
 		retcode = 503;
 		let_retry = FALSE;
 	} else {
@@ -62,7 +56,7 @@ int write_log(int level, char *format, ...)
 	va_start (args, format);
 	//vprintf (format, args);
 	va_end (args);
-	
+
 	return 0;
 }
 
@@ -70,7 +64,7 @@ CURLcode curl_easy_perform(CURL *easy_handle)
 {
 	if (http_perform_retry_fail == TRUE)
 		return -2;
-	
+
 	return CURLE_OK;
 }
 
@@ -103,10 +97,12 @@ void HMAC_CTX_init(HMAC_CTX *ctx)
 int HMAC_Init_ex(HMAC_CTX *ctx, const void *key, int key_len,
 	const EVP_MD *md, ENGINE *impl)
 {
+	return 0;
 }
 
 int HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len)
 {
+	return 0;
 }
 
 int HMAC_Final(HMAC_CTX *ctx, unsigned char *md, unsigned int *len)
@@ -124,7 +120,7 @@ const EVP_MD *EVP_sha1(void)
 {
 }
 
-int b64encode_str(unsigned char *inputstr, unsigned char *outputstr, 
+int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 	int *outlen, int inputlen)
 {
 	strcpy(outputstr, "test_b64encode");
