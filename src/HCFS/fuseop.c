@@ -3877,11 +3877,21 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		fuse_reply_err(req, ENAMETOOLONG);
 		return;
 	}
+	if (strlen(name) <= 0) {
+		write_log(0, "Lack for file name\n");
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
 
 	/* Reject if link path too long */
 	if (strlen(link) >= MAX_LINK_PATH) {
 		write_log(0, "Link path is too long\n");
 		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+	if (strlen(link) <= 0) {
+		write_log(0, "Lack for link target\n");
+		fuse_reply_err(req, EINVAL);
 		return;
 	}
 
@@ -4496,6 +4506,259 @@ error_handle:
 	return ;
 }
 
+/************************************************************************
+*
+* Function name: hfuse_ll_link
+*        Inputs: fuse_req_t req, fuse_ino_t ino, fuse_ino_t newparent,
+*                const char *newname
+*
+*       Summary: Make a hard link for inode "ino". The hard link is named
+*                as "newname" and is added to parent dir "newparent". Type
+*                dir is not allowed to make a hard link. Besides, hard link
+*                over FS is also not allowed, which is handled by kernel.
+*
+*************************************************************************/
+static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
+	fuse_ino_t newparent, const char *newname)
+{
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry;
+	DIR_ENTRY_PAGE dir_page;
+	struct stat parent_stat, link_stat;
+	struct fuse_entry_param tmp_param;
+	int result_index;
+	int ret_val, errcode;
+	unsigned long this_generation;
+	ino_t parent_inode, link_inode;
+	MOUNT_T *tmpptr;
+
+	parent_inode = real_ino(req, newparent);
+	link_inode = real_ino(req, ino);
+
+	/* Reject if name too long */
+	if (strlen(newname) > MAX_FILENAME_LEN) {
+		write_log(0, "File name is too long\n");
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+	if (strlen(newname) <= 0) {
+		write_log(0, "Lack for hard link name\n");
+		fuse_reply_err(req, EINVAL);
+		return;
+	}
+
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Error if parent is not a dir */
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3); /* W+X */
+	if (ret_val < 0) {
+		write_log(0, "Dir permission denied. W+X is needed\n");
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Check whether "newname" exists or not */
+	parent_meta_cache_entry = meta_cache_lock_entry(parent_inode);
+	if (!parent_meta_cache_entry) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+	ret_val = meta_cache_seek_dir_entry(parent_inode, &dir_page,
+		&result_index, newname, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+	if (result_index >= 0) {
+		write_log(0, "File %s existed\n", newname);
+		errcode = -EEXIST;
+		goto error_handle;
+	}
+
+	/* Increase nlink and add "newname" to parent dir */
+	ret_val = link_update_meta(link_inode, newname, &link_stat,
+		&this_generation, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		errcode = ret_val;
+		goto error_handle;
+	}
+
+	/* Unlock parent */
+	ret_val = meta_cache_close_file(parent_meta_cache_entry);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(parent_meta_cache_entry);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	ret_val = meta_cache_unlock_entry(parent_meta_cache_entry);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Reply fuse entry */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) link_inode;
+	memcpy(&(tmp_param.attr), &link_stat, sizeof(struct stat));
+	if (S_ISREG(link_stat.st_mode))
+		ret_val = lookup_increase(tmpptr->lookup_table,
+			link_inode, 1, D_ISREG);
+	if (S_ISLNK(link_stat.st_mode))
+		ret_val = lookup_increase(tmpptr->lookup_table,
+			link_inode, 1, D_ISLNK);
+	if (S_ISDIR(link_stat.st_mode))
+		ret_val = -EISDIR;
+	if (ret_val < 0) {
+		write_log(0, "Fail to increase lookup count\n");
+		fuse_reply_err(req, -ret_val);
+	}
+
+	write_log(10, "Debug: Hard link %s is created successfully\n", newname);
+	fuse_reply_entry(req, &(tmp_param));
+	return;
+
+error_handle:
+	meta_cache_close_file(parent_meta_cache_entry);
+	meta_cache_unlock_entry(parent_meta_cache_entry);
+	fuse_reply_err(req, -errcode);
+	return;
+}
+
+/************************************************************************
+*
+* Function name: hfuse_ll_create
+*        Inputs: fuse_req_t req, fuse_ino_t parent, const char *name,
+*                mode_t mode, struct fuse_file_info *fi
+*
+*       Summary: Create a regular file named as "name" if it does not
+*                exist in dir "parent". If it exists, it will be truncated
+*                to size = 0. After creating the file, this function will
+*                create a file handle and store it in "fi->fh". Finally
+*                reply the fuse entry about the file and fuse file info "fi".
+*
+*************************************************************************/
+static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
+	const char *name, mode_t mode, struct fuse_file_info *fi)
+{
+	int ret_val;
+	struct stat parent_stat, this_stat;
+	ino_t parent_inode, self_inode;
+	mode_t self_mode;
+	int file_flags;
+	struct fuse_ctx *temp_context;
+	struct fuse_entry_param tmp_param;
+	unsigned long this_generation;
+	long long fh;
+	MOUNT_T *tmpptr;
+
+	parent_inode = real_ino(req, parent);
+
+	write_log(10,
+		"DEBUG parent %ld, name %s mode %d\n", parent, name, mode);
+
+	/* Reject if not creating a regular file */
+	if (!S_ISREG(mode)) {
+		fuse_reply_err(req, EPERM);
+		return;
+	}
+
+	/* Reject if name too long */
+	if (strlen(name) > MAX_FILENAME_LEN) {
+		fuse_reply_err(req, ENAMETOOLONG);
+		return;
+	}
+
+	/* Check parent type */
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+	if (!S_ISDIR(parent_stat.st_mode)) {
+		fuse_reply_err(req, ENOTDIR);
+		return;
+	}
+
+	/* Checking permission */
+	ret_val = check_permission(req, &parent_stat, 3);
+	if (ret_val < 0) {
+		write_log(0, "Dir permission denied. W+X is needed\n");
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	temp_context = (struct fuse_ctx *) fuse_req_ctx(req);
+	if (temp_context == NULL) {
+		fuse_reply_err(req, ENOMEM);
+		return;
+	}
+
+	memset(&this_stat, 0, sizeof(struct stat));
+	self_mode = mode | S_IFREG;
+	this_stat.st_mode = self_mode;
+	this_stat.st_size = 0;
+	this_stat.st_blksize = MAX_BLOCK_SIZE;
+	this_stat.st_blocks = 0;
+	this_stat.st_dev = 0;
+	this_stat.st_nlink = 1;
+	/*Use the uid and gid of the fuse caller*/
+	this_stat.st_uid = temp_context->uid;
+	this_stat.st_gid = temp_context->gid;
+	/* Use the current time for timestamps */
+	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
+	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	/* If cannot get new inode number, error is ENOSPC */
+	if (self_inode < 1) {
+		fuse_reply_err(req, ENOSPC);
+		return;
+	}
+	this_stat.st_ino = self_inode;
+	ret_val = mknod_update_meta(self_inode, parent_inode, name,
+			&this_stat, this_generation);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* Prepare stat data to be replied */
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
+	tmp_param.generation = this_generation;
+	tmp_param.ino = (fuse_ino_t) self_inode;
+	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+	ret_val = lookup_increase(tmpptr->lookup_table, self_inode, 1, D_ISREG);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+	/* In create operation, flag is O_WRONLY when opening */
+	file_flags = fi->flags;
+	fh = open_fh(self_inode, file_flags);
+	if (fh < 0) {
+		fuse_reply_err(req, ENFILE);
+		return;
+	}
+	fi->fh = fh;
+	fuse_reply_create(req, &tmp_param, fi);
+	return;
+}
+
 /* Specify the functions used for the FUSE operations */
 struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
@@ -4526,6 +4789,8 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
+	.link = hfuse_ll_link,
+	.create = hfuse_ll_create,
 };
 
 /* Initiate FUSE */

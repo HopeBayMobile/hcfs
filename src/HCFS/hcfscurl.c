@@ -80,9 +80,10 @@ int parse_swift_auth_header(FILE *fptr)
 	long ret_num;
 	int retcodenum, ret_val;
 	int ret, errcode;
+	char to_stop;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%19s %19s %19s\n",
+	ret_val = fscanf(fptr, "%19s %19s %19[^\r\n]\n",
 			httpcode, retcode, retstatus);
 	if (ret_val < 3)
 		return -1;
@@ -93,16 +94,28 @@ int parse_swift_auth_header(FILE *fptr)
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
 
-	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
-			swift_url_string);
+	to_stop = FALSE;
 
-	if (ret_val < 2)
-		return -1;
+	while (to_stop == FALSE) {
+		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
+		if (ret_val < 2)
+			return -1;
+		if (strcmp(temp_string, "X-Storage-Url:") == 0) {
+			strcpy(swift_url_string, temp_string2);
+			to_stop = TRUE;
+		}
+	}
 
-	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
-			temp_string2);
-	if (ret_val < 2)
-		return -1;
+        to_stop = FALSE;
+
+        while (to_stop == FALSE) {
+                ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
+                if (ret_val < 2)
+                        return -1;
+                if (strcmp(temp_string, "X-Auth-Token:") == 0) {
+                        to_stop = TRUE;
+                }
+        }
 
 	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);

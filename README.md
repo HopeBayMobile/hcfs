@@ -1,8 +1,10 @@
 Repository for Gateway 2.0 HCFS
 ===============================
 
-Latest version under HCFS_revision/
-
+Latest source code under 'src/HCFS'.
+Latest unittest code under 'tests/unit_test' (run the script
+run_unittests for all unittests).
+Latest source code for command-line utilities under 'src/CLI_utils'.
 
 Config file
 -----------
