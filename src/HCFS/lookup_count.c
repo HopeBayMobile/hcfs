@@ -338,15 +338,12 @@ int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 		while (ptr != NULL) {
 			write_log(10, "Debug check delete %ld\n",
 				ptr->this_inode);
-			ret_val = disk_checkdelete(ptr->this_inode);
+			ret_val = disk_checkdelete(ptr->this_inode,
+						tmpptr->f_ino);
 
-			if (ret_val == 1) {
+			if (ret_val == 1)
 				actual_delete_inode(ptr->this_inode,
-						ptr->d_type);
-				sem_wait(&((tmpptr->FS_stat).lock);
-				(tmpptr->FS_stat).num_inodes--;
-				sem_post(&((tmpptr->FS_stat).lock);
-			}
+					ptr->d_type, tmpptr->f_ino, tmpptr);
 
 			oldptr = ptr;
 			ptr = ptr->next;

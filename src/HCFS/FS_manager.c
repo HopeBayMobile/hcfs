@@ -202,6 +202,12 @@ ino_t _create_root_inode(void)
 	}
 
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
+	ret = update_FS_statistics(metapath, 0, 1);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	fclose(metafptr);
 	metafptr = NULL;
 	ret = super_block_mark_dirty(root_inode);

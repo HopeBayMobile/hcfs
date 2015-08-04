@@ -1165,14 +1165,17 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 /************************************************************************
 *
 * Function name: actual_delete_inode
-*        Inputs: ino_t this_inode, char d_type
+*        Inputs: ino_t this_inode, char d_type, ino_t root_inode
+*                MOUNT_T *mptr
 *       Summary: Delete the inode "this_inode" and the data blocks if this
-*                is a regular file as well.
+*                is a regular file as well. "mptr" points to the mounted FS
+*                structure if the FS is mounted (NULL if not).
 *  Return value: 0 if successful. Otherwise returns
 *                negation of error code.
 *
 *************************************************************************/
-int actual_delete_inode(ino_t this_inode, char d_type)
+int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
+			MOUNT_T *mptr)
 {
 	char thisblockpath[400];
 	int ret, errcode;
@@ -1180,6 +1183,16 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	long long total_blocks;
 	off_t cache_block_size;
 	struct stat this_inode_stat;
+	long long tmp_system_size, tmp_num_inodes;
+	char rootpath[METAPATHLEN];
+
+	if (mptr == NULL) {
+		ret = fetch_meta_path(rootpath, root_inode);
+		if (ret < 0)
+			return ret;
+		read_FS_statistics(rootpath, &tmp_system_size,
+					&tmp_num_inodes);
+	}
 
 	switch (d_type) {
 	case D_ISDIR:
@@ -1187,6 +1200,10 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
 			return ret;
+		if (mptr == NULL)
+			tmp_num_inodes--;
+		else
+			change_mount_stat(mptr, 0, -1);
 		break;
 	
 	case D_ISLNK:
@@ -1194,6 +1211,10 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
 			return ret;
+		if (mptr == NULL)
+			tmp_num_inodes--;
+		else
+			change_mount_stat(mptr, 0, -1);
 		break;
 
 	case D_ISREG:
@@ -1238,13 +1259,24 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
+		if (mptr != NULL) {
+			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
+		} else {
+			tmp_num_inodes--;
+			tmp_system_size -= this_inode_stat.st_size;
+		}
+
 
 		break;
 	default:
 		break;
 	}
-	
-	ret = disk_cleardelete(this_inode);
+
+	if (mptr == NULL)
+		update_FS_statistics(rootpath, tmp_system_size,
+					tmp_num_inodes);
+
+	ret = disk_cleardelete(this_inode, root_inode);
 	return ret;
 
 errcode_handle:
@@ -1259,7 +1291,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret = disk_markdelete(this_inode);
+	ret = disk_markdelete(this_inode, tmpptr->f_ino);
 	if (ret < 0)
 		return ret;
 	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
@@ -1267,7 +1299,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 }
 
 /* Mark inode as to delete on disk */
-int disk_markdelete(ino_t this_inode)
+int disk_markdelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int ret, errcode;
@@ -1278,8 +1310,8 @@ int disk_markdelete(ino_t this_inode)
 		MKDIR(pathname, 0700);
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
 
 	if (access(pathname, F_OK) != 0) {
 		MKNOD(pathname, S_IFREG | 0700, 0);
@@ -1292,7 +1324,7 @@ errcode_handle:
 }
 
 /* Clear inode as to delete on disk */
-int disk_cleardelete(ino_t this_inode)
+int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int ret, errcode;
@@ -1306,8 +1338,8 @@ int disk_cleardelete(ino_t this_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
 
 	if (access(pathname, F_OK) == 0) {
 		UNLINK(pathname);
@@ -1320,7 +1352,7 @@ errcode_handle:
 }
 
 /* Check if inode is marked as to delete on disk */
-int disk_checkdelete(ino_t this_inode)
+int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int errcode;
@@ -1335,8 +1367,8 @@ int disk_checkdelete(ino_t this_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1353,7 +1385,7 @@ int startup_finish_delete()
 	struct stat tmpstat;
 	char pathname[200];
 	int ret_val;
-	ino_t tmp_ino;
+	ino_t tmp_ino, root_inode;
 	int errcode, ret;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
@@ -1383,7 +1415,8 @@ int startup_finish_delete()
 	}
 
 	while (tmpptr != NULL) {
-		ret_val = sscanf(tmpent.d_name, "inode%ld", &tmp_ino);
+		ret_val = sscanf(tmpent.d_name, "inode%ld_%ld", &tmp_ino,
+					&root_inode);
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
 			if (ret < 0) {
@@ -1391,14 +1424,14 @@ int startup_finish_delete()
 				return ret;
 			}
 			if (S_ISREG(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISREG);
+				ret = actual_delete_inode(tmp_ino, D_ISREG,
+						root_inode, NULL);
 			if (S_ISDIR(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISDIR);
+				ret = actual_delete_inode(tmp_ino, D_ISDIR,
+						root_inode, NULL);
 			if (S_ISLNK(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISLNK);
-
-			/* TODO: Directly decrease num of inodes
-			in the xattr of root inode. */
+				ret = actual_delete_inode(tmp_ino, D_ISLNK,
+						root_inode, NULL);
 
 			if (ret < 0) {
 				closedir(dirp);

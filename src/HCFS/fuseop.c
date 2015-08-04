@@ -582,6 +582,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+
 	fuse_reply_entry(req, &(tmp_param));
 }
 
@@ -689,6 +695,11 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
 		return;
+	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
 	}
 
 	fuse_reply_entry(req, &(tmp_param));
@@ -1883,11 +1894,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
 
-	sem_wait(&((tmpptr->FS_stat).lock);
-	(tmpptr->FS_stat).system_size +=
-			(long long) (offset - filestat->st_size);
-	sem_post(&((tmpptr->FS_stat).lock);
-
+	ret = change_mount_stat(tmpptr, 
+			(long long) (offset - filestat->st_size), 0);
+	if (ret < 0)
+		return ret;
 
 	filestat->st_size = offset;
 	filestat->st_mtime = time(NULL);
@@ -3112,12 +3122,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0, 0);
-
-		sem_wait(&((tmpptr->FS_stat).lock);
-		(tmpptr->FS_stat).system_size +=
-				(long long) ((offset + total_bytes_written)
-						- temp_stat.st_size);
-		sem_post(&((tmpptr->FS_stat).lock);
+		ret = change_mount_stat(tmpptr,
+			(long long) ((offset + total_bytes_written)
+						- temp_stat.st_size), 0);
+		if (ret < 0) {
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			fuse_reply_err(req, -ret);
+			return;
+		}
 
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
@@ -3169,12 +3183,12 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&((tmpptr->FS_stat).lock);
+	sem_wait(&((tmpptr->FS_stat).lock));
 
 	system_size = (tmpptr->FS_stat).system_size;
 	num_inodes = (tmpptr->FS_stat).num_inodes;
 
-	sem_post(&((tmpptr->FS_stat).lock);
+	sem_post(&((tmpptr->FS_stat).lock));
 
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
@@ -3865,12 +3879,8 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	if ((current_val == 0) && (to_delete == TRUE)) {
-		actual_delete_inode(thisinode, d_type);
-		sem_wait(&((tmpptr->FS_stat).lock);
-		(tmpptr->FS_stat).num_inodes--;
-		sem_post(&((tmpptr->FS_stat).lock);
-	}
+	if ((current_val == 0) && (to_delete == TRUE))
+		actual_delete_inode(thisinode, d_type, tmpptr->f_ino, tmpptr);
 
 	fuse_reply_none(req);
 }
@@ -4008,6 +4018,11 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
         ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
                                 1, D_ISLNK);
 
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);

@@ -27,6 +27,7 @@
 #include "fuseop.h"
 #include "meta_mem_cache.h"
 #include "filetables.h"
+#include "mount_manager.h"
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
@@ -47,12 +48,13 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page);
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page);
 
-int actual_delete_inode(ino_t this_inode, char d_type);
+int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
+			MOUNT_T *mptr);
 int mark_inode_delete(fuse_req_t req, ino_t this_inode);
 
-int disk_markdelete(ino_t this_inode);
-int disk_cleardelete(ino_t this_inode);
-int disk_checkdelete(ino_t this_inode);
+int disk_markdelete(ino_t this_inode, ino_t root_inode);
+int disk_cleardelete(ino_t this_inode, ino_t root_inode);
+int disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int startup_finish_delete();
 
 int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
