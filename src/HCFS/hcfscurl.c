@@ -80,9 +80,10 @@ int parse_swift_auth_header(FILE *fptr)
 	long ret_num;
 	int retcodenum, ret_val;
 	int ret, errcode;
+	char to_stop;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%19s %19s %19s\n",
+	ret_val = fscanf(fptr, "%19s %19s %19[^\r\n]\n",
 			httpcode, retcode, retstatus);
 	if (ret_val < 3)
 		return -1;
@@ -93,20 +94,34 @@ int parse_swift_auth_header(FILE *fptr)
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
 
-	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
-			swift_url_string);
+	to_stop = FALSE;
 
-	if (ret_val < 2)
-		return -1;
+	while (to_stop == FALSE) {
+		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
+		if (ret_val < 2)
+			return -1;
+		if (strcmp(temp_string, "X-Storage-Url:") == 0) {
+			strcpy(swift_url_string, temp_string2);
+			to_stop = TRUE;
+		}
+	}
 
-	ret_val = fscanf(fptr, "%1023s %1023s\n", temp_string,
-			temp_string2);
-	if (ret_val < 2)
-		return -1;
+        to_stop = FALSE;
+
+        while (to_stop == FALSE) {
+                ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
+                if (ret_val < 2)
+                        return -1;
+                if (strcmp(temp_string, "X-Auth-Token:") == 0) {
+                        to_stop = TRUE;
+                }
+        }
 
 	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);
 
+	write_log(10, "Header info: %s, %s\n", swift_url_string,
+				swift_auth_string);
 	return retcodenum;
 
 errcode_handle:
@@ -399,7 +414,7 @@ int hcfs_init_swift_backend(CURL_HANDLE *curl_handle)
 
 /************************************************************************
 *
-* Function name: hcfs_init_swift_backend
+* Function name: hcfs_init_S3_backend
 *        Inputs: CURL_HANDLE *curl_handle
 *       Summary: Initialize S3 backend for the curl handle "curl_handel".
 *  Return value: Return code from request (HTTP return code), or -1 if error.
@@ -1227,6 +1242,7 @@ int hcfs_list_container(CURL_HANDLE *curl_handle)
 	int ret_val, num_retries;
 
 	num_retries = 0;
+	write_log(10, "Debug start listing container\n");
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_list_container(curl_handle);
