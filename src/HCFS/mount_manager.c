@@ -18,7 +18,7 @@
 #include <string.h>
 #include <signal.h>
 
-#include "fuse.h"
+#include "fuseop.h"
 #include "global.h"
 #include "FS_manager.h"
 
@@ -793,7 +793,11 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 
 	sem_wait(&((mptr->FS_stat).lock));
 	(mptr->FS_stat).system_size += system_size_delta;
+	if ((mptr->FS_stat).system_size < 0)
+		(mptr->FS_stat).system_size = 0;
 	(mptr->FS_stat).num_inodes += num_inodes_delta;
+	if ((mptr->FS_stat).num_inodes < 0)
+		(mptr->FS_stat).num_inodes = 0;
 	ret = update_FS_statistics(mptr->rootpath,
 			(mptr->FS_stat).system_size,
 			(mptr->FS_stat).num_inodes);
