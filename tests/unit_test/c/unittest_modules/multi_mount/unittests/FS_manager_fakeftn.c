@@ -138,3 +138,10 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 	return 0;
 }
 
+int update_FS_statistics(char *pathname, long long system_size,
+		long long num_inodes)
+{
+	return 0;
+}
+
+
