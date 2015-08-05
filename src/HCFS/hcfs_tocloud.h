@@ -87,5 +87,6 @@ int schedule_sync_meta(FILE *metafptr, int which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void upload_loop(void);
-
+int update_backend_stat(ino_t root_inode, long long system_size_delta,
+			long long num_inodes_delta);
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

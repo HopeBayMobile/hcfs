@@ -199,6 +199,7 @@ static inline int _upload_terminate_thread(int index)
 				if ((tmp_entry->status == ST_LtoC) &&
 							(is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
+					tmp_entry->uploaded = TRUE;
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
@@ -215,6 +216,7 @@ static inline int _upload_terminate_thread(int index)
 					if ((tmp_entry->status == ST_TODELETE)
 						&& (is_delete == TRUE)) {
 						tmp_entry->status = ST_NONE;
+						tmp_entry->uploaded = FALSE;
 						FSEEK(metafptr, page_filepos,
 								SEEK_SET);
 						FWRITE(&temppage, tmp_size,
@@ -406,6 +408,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	FILE *metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
+	SYMLINK_META_TYPE tempsymmeta;
+	DIR_META_TYPE tempdirmeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int which_curl;
 	long long page_pos, e_index, which_page, current_page;
@@ -422,6 +426,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	size_t ret_size;
 	char sync_error;
 	int count1;
+	long long upload_seq;
+	ino_t root_inode;
+	long long size_last_upload;
+	long long size_diff;
 
 	sync_error = FALSE;
 	time_to_sleep.tv_sec = 0;
@@ -459,6 +467,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		tmp_size = tempfilestat.st_size;
+		size_last_upload = tempfilemeta.size_last_upload;
+		size_diff = tmp_size - size_last_upload;
+		root_inode = tempfilemeta.root_inode;
+		upload_seq = tempfilemeta.upload_seq;
 
 		/* Check if need to sync past the current size */
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
@@ -627,6 +639,40 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	flock(fileno(metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(thismetapath, F_OK)) {
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+
+		if ((ptr->this_mode) & S_IFREG) {
+			tempfilestat.size_last_upload = tempfilestat.st_size;
+			tempfilemeta.upload_seq++;
+			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE),
+				1, metafptr);
+		}
+
+		if ((ptr->this_mode) & S_IFDIR) {
+			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
+				1, metafptr);
+			root_inode = tempdirmeta.root_inode;
+			upload_seq = tempdirmeta.upload_seq;
+			tempdirmeta.upload_seq++;
+			size_diff = 0;
+			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+			FWRITE(&tempdirmeta, sizeof(DIR_META_TYPE),
+				1, metafptr);
+		}
+
+		if ((ptr->this_mode) & S_IFLNK) {
+			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
+				1, metafptr);
+			root_inode = tempsymmeta.root_inode;
+			upload_seq = tempsymmeta.upload_seq;
+			size_diff = 0;
+			tempsymmeta.upload_seq++;
+			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+			FWRITE(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
+				1, metafptr);
+		}
+
 		ret = schedule_sync_meta(metafptr, which_curl);
 		if (ret < 0)
 			sync_error = TRUE;
@@ -658,9 +704,18 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sync_error = sync_ctl.threads_error[count1];
 			sem_post(&(sync_ctl.sync_op_sem));
 		}
-		if (sync_error == TRUE)
+		if (sync_error == TRUE) {
 			write_log(10, "Sync inode %ld to backend incomplete.\n",
 				ptr->inode);
+			/* TODO: Revert info re last upload if upload
+				fails */
+		} else {
+			/* Upload successfully. Update FS stat in backend */
+			if (upload_seq == 0)
+				update_backend_stat(root_inode, size_diff, 1);
+			else if (size_diff != 0)
+				update_backend_stat(root_inode, size_diff, 0);
+		}
 		super_block_update_transit(ptr->inode, FALSE, sync_error);
 	} else {
 		flock(fileno(metafptr), LOCK_UN);

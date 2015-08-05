@@ -550,10 +550,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation);
+			&this_stat, this_generation, tmpptr->f_ino);
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -572,8 +574,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISREG);
@@ -671,10 +671,13 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
-			selfname, &this_stat, this_gen);
+			selfname, &this_stat, this_gen, tmpptr->f_ino);
 
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -686,8 +689,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.generation = this_gen;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISDIR);
@@ -3984,11 +3985,14 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		errcode = -ENOSPC;
 		goto error_handle;
 	}
+
+        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-		link, this_generation, name);
+		link, this_generation, name, tmpptr->f_ino);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		errcode = ret_val;
@@ -4012,8 +4016,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
-
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
         ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
                                 1, D_ISLNK);

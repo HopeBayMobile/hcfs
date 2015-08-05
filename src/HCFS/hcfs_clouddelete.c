@@ -276,6 +276,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	FILE *metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
+	DIR_META_TYPE tempdirmeta;
+	SYMLINK_META_TYPE tempsymmeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int curl_id;
 	long long current_index;
@@ -292,12 +294,16 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char mlock;
+	long long system_size_change;
+	long long upload_seq;
+	ino_t root_inode;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	mlock = FALSE;
 	this_inode = ptr->inode;
+	system_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
 
@@ -310,12 +316,39 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
+	if ((ptr->this_mode) & S_IFDIR) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+
+		root_inode = tempdirmeta.root_inode;
+		upload_seq = tempdirmeta.upload_seq;
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+	}
+
+	if ((ptr->this_mode) & S_IFLNK) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
+
+		root_inode = tempsymmeta.root_inode;
+		upload_seq = tempsymmeta.upload_seq;
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+	}
 	
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		system_size_change = tempfilemeta.size_last_upload;
+		root_inode = tempfilemeta.root_inode;
+		upload_seq = tempfilemeta.upload_seq;
 
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
@@ -356,10 +389,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			block_status =
-				temppage.block_entries[current_index].status;
+				temppage.block_entries[current_index].uploaded;
 
-			if ((block_status != ST_LDISK) &&
-						(block_status != ST_NONE)) {
+			/* Delete backend object if uploaded */
+			if (block_status == TRUE) {
 				flock(fileno(metafptr), LOCK_UN);
 				mlock = FALSE;
 				sem_wait(&(delete_ctl.delete_queue_sem));
@@ -465,6 +498,10 @@ errcode_handle:
 		else
 			break;
 	}
+	/* Update FS stat in the backend if updated previously */
+	if (upload_seq > 0)
+		update_backend_stat(root_inode, -system_size_change, -1);
+
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
