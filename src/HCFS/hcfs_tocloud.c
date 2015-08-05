@@ -642,7 +642,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
 		if ((ptr->this_mode) & S_IFREG) {
-			tempfilestat.size_last_upload = tempfilestat.st_size;
+			tempfilemeta.size_last_upload = tempfilestat.st_size;
 			tempfilemeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE),
