@@ -213,12 +213,37 @@ int aes_gcm_decrypt_fix_iv(unsigned char* output, unsigned char* input,
 	return aes_gcm_decrypt_core(output, input, input_length, key, iv);
 }
 
+unsigned char* get_key(){
+	// it should be replaced by user's password
+	const char* user_pass = "this is hopebay testing";
+	unsigned char md_value[EVP_MAX_MD_SIZE];
+	unsigned int md_len;
+	unsigned char *ret = (unsigned char*)calloc(KEY_SIZE,
+						    sizeof(unsigned char));
+	if (!ret) return NULL;
+	const EVP_MD *m;
+	EVP_MD_CTX ctx;
+	m = EVP_sha256();
+	if (!m) return NULL;
+	EVP_DigestInit(&ctx, m);
+	unsigned char* salt = (unsigned
+			       char*)"oluik.354jhmnk,";
+	PKCS5_PBKDF2_HMAC(user_pass,
+			  strlen(user_pass), salt,
+			  strlen((char*)salt), 3,
+			  m, KEY_SIZE, ret);
+	EVP_DigestFinal(&ctx, md_value,
+			&md_len);
+	return ret;
+}
+
 int main(void){
-	unsigned char key[KEY_SIZE];
+	//unsigned char key[KEY_SIZE];
 	unsigned char input[1024] = {1};
 	unsigned char output[1024+TAG_SIZE] = {0};
 	unsigned char output_2[1024] = {0};
-	generate_random_key(key);
+	//generate_random_key(key);
+	unsigned char* key = get_key();
 	printf("key: %d\n", key[31]);
 	int ret = aes_gcm_encrypt_fix_iv(output, input, 1024, key);
 	printf("enc result: %d\n", output[31]);
@@ -250,4 +275,6 @@ int main(void){
 	printf("%d\n", out_len);
 	free(b64_output);
 	free(b64_back);
+	free(key);
 }
+
