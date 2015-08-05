@@ -14,6 +14,7 @@
 #include "hcfs_fromcloud.h"
 #include "xattr_ops.h"
 #include "global.h"
+#include "mount_manager.h"
 
 #include "fake_misc.h"
 
@@ -727,3 +728,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	return 0;
 }
 
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta)
+{
+	return 0;
+}
