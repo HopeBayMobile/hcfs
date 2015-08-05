@@ -6,6 +6,8 @@
 #define META_PROCESSING_MOCK_PARAMS_H_
 /* Parameters for mock functions */
 
+#define ROOT_INODE 543783
+
 /* System statistics */
 #define MOCK_SYSTEM_SIZE 1048576
 #define MOCK_CACHE_SIZE 1048576
