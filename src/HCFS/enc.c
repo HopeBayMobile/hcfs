@@ -213,8 +213,12 @@ int aes_gcm_decrypt_fix_iv(unsigned char* output, unsigned char* input,
 	return aes_gcm_decrypt_core(output, input, input_length, key, iv);
 }
 
+/*
+ * This function only for deceloping upload to cloud.
+ * In the future, it should be reimplemented considering
+ * key management specs
+ */
 unsigned char* get_key(){
-	// it should be replaced by user's password
 	const char* user_pass = "this is hopebay testing";
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
@@ -237,44 +241,51 @@ unsigned char* get_key(){
 	return ret;
 }
 
+
+FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
+			   unsigned char** data){
+	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
+			       in_fd);
+	unsigned char* new_data = calloc(read_count+TAG_SIZE,
+					 sizeof(unsigned char));
+	aes_gcm_encrypt_fix_iv(new_data, buf, read_count, key);
+	free(buf);
+	*data = new_data;
+	return fmemopen(new_data, read_count+TAG_SIZE, "r");
+}
+
+
+FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
+			   unsigned char** data){
+	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
+			       in_fd);
+	unsigned char* new_data = calloc(read_count-TAG_SIZE,
+					 sizeof(unsigned char));
+	aes_gcm_decrypt_fix_iv(new_data, buf, read_count, key);
+	free(buf);
+	*data = new_data;
+	return fmemopen(new_data, read_count-TAG_SIZE, "r");
+}
+
+
 int main(void){
-	//unsigned char key[KEY_SIZE];
-	unsigned char input[1024] = {1};
-	unsigned char output[1024+TAG_SIZE] = {0};
-	unsigned char output_2[1024] = {0};
-	//generate_random_key(key);
+	FILE* f = fopen("./enc.c", "r");
 	unsigned char* key = get_key();
 	printf("key: %d\n", key[31]);
-	int ret = aes_gcm_encrypt_fix_iv(output, input, 1024, key);
-	printf("enc result: %d\n", output[31]);
-	int i = 0;
-	for(i = 0; i<TAG_SIZE; i++){
-		printf("%d ", output[i]);
-	}
-	printf("\n");
-	ret = aes_gcm_decrypt_fix_iv(output_2, output, 1024+TAG_SIZE, key);
-	printf("dec result: %d\n", ret);
-	printf("dec[0]: %d\n", output_2[0]);
-	printf("dec[1]: %d\n", output_2[1]);
-
-	char* b64_input = "hello world!!\n";
-	int b64_input_len = strlen(b64_input);
-	printf("%d\n", b64_input_len);
-	int tmp = expect_b64_encode_length(b64_input_len);
-	int out_len = 0;
-	char* b64_output = calloc(tmp, sizeof(char));
-	b64encode_str((unsigned char*)b64_input, (unsigned char*)b64_output,
-		      &out_len, b64_input_len);
-	printf("%d %d\n", tmp, out_len);
-	printf("%s\n", b64_output);
-	char* b64_back = calloc(out_len, sizeof(char));
-	ret = b64decode_str(b64_output, b64_back ,&out_len, strlen(b64_output));
-	printf("%d\n", ret);
-	b64_back = realloc(b64_back, out_len);
-	printf("%s", b64_back);
-	printf("%d\n", out_len);
-	free(b64_output);
-	free(b64_back);
+	unsigned char* data = NULL;
+	unsigned char* data2 = NULL;
+	FILE* new_f = transform_encrypt_fd(f, key, &data);
+	FILE* new_f_f = transform_decrypt_fd(new_f, key, &data2);
+	unsigned char buf[MAX_ENC_DATA] = {0};
+	fread(buf, sizeof(unsigned char), MAX_ENC_DATA, new_f_f);
+	//printf("%s", buf);
+	fclose(f);
+	fclose(new_f);
+	fclose(new_f_f);
+	free(data);
 	free(key);
+	free(data2);
 }
 

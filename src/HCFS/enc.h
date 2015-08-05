@@ -8,6 +8,7 @@
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32
+#define MAX_ENC_DATA 3145728
 
 int generate_random_key(unsigned char*);
 
@@ -28,5 +29,9 @@ int aes_gcm_decrypt_fix_iv(unsigned char*, unsigned char*, unsigned int,
 int expect_b64_encode_length(unsigned int);
 
 unsigned char* get_key();
+
+FILE* transform_encrypt_fd(FILE*, unsigned char*, unsigned char**);
+
+FILE* transform_decrypt_fd(FILE*, unsigned char*, unsigned char**);
 
 #endif
