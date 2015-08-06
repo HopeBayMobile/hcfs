@@ -24,6 +24,7 @@ class uploadEnvironment : public ::testing::Environment {
 
 //    hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
 
     workpath = NULL;
     tmppath = NULL;
@@ -355,7 +356,7 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 
 	/* Run tested function */
 	init_sync_control();
-	
+
 	/* Generate threads */
 	for (int i = 0 ; i < num_threads ; i++) {
 		int idle_thread = -1;
@@ -419,7 +420,7 @@ protected:
 		pthread_cancel(sync_ctl.sync_handler_thread);
 		pthread_join(sync_ctl.sync_handler_thread, &res);
 	}
-	void write_mock_meta_file(char *metapath, int total_page, char block_status)
+	void write_mock_meta_file(char *metapath, int total_page, unsigned char block_status)
 	{
 		struct stat mock_stat;
 		FILE_META_TYPE mock_file_meta;
@@ -432,7 +433,7 @@ protected:
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
 		
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
-		
+
 		for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
 			mock_block_page.block_entries[i].status = block_status;
 		mock_block_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
@@ -493,9 +494,10 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 		
 	/* Run tested function */
 	init_upload_control();
+	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(2);
-	
+
 	/* Verify */
 	EXPECT_EQ(num_total_blocks, objname_counter);
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
@@ -511,8 +513,9 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
 	while (!feof(metaptr)) {
 		fread(&block_page, sizeof(BLOCK_ENTRY_PAGE), 1, metaptr); // Linearly read block meta
-		for (int i = 0 ; i < block_page.num_entries ; i++)
+		for (int i = 0 ; i < block_page.num_entries ; i++) {
 			ASSERT_EQ(ST_BOTH, block_page.block_entries[i].status); // Check status
+		}
 	}
 	fclose(metaptr);
 	unlink(metapath);
@@ -583,6 +586,7 @@ protected:
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
+
 	}
 
 	void TearDown()
@@ -663,7 +667,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	
 	sleep(3);
 	hcfs_system->system_going_down = TRUE; // Let upload_loop() exit
-	sleep(1);
+	pthread_join(thread_id, NULL);
 
 	/* Verify */
 	EXPECT_EQ(shm_test_data->num_inode, shm_verified_data->record_inode_counter);

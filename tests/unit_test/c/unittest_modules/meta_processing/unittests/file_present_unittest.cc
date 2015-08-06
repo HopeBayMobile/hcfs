@@ -105,7 +105,7 @@ TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
 	ino_t parent_inode = 1;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0));
+		"\0", NULL, 0, 1));
 }
 
 TEST(mknod_update_metaTest, FailTo_dir_add_entry)
@@ -117,7 +117,7 @@ TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 	tmp_stat.st_mode = S_IFREG;
 
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0));
+		"\0", &tmp_stat, 0, 1));
 }
 
 TEST(mknod_update_metaTest, FunctionWorkSuccess)
@@ -129,7 +129,7 @@ TEST(mknod_update_metaTest, FunctionWorkSuccess)
 	tmp_stat.st_mode = S_IFREG;
 
 	EXPECT_EQ(0, mknod_update_meta(self_inode, parent_inode,
-		"not_used", &tmp_stat, 0));
+		"not_used", &tmp_stat, 0, 1));
 }
 
 /*
@@ -146,7 +146,7 @@ TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
 	ino_t parent_inode = 1;
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0));
+		"\0", NULL, 0, 1));
 }
 
 TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
@@ -158,7 +158,7 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 	tmp_stat.st_mode = S_IFDIR;
 
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0));
+		"\0", &tmp_stat, 0, 1));
 }
 
 TEST(mkdir_update_metaTest, FunctionWorkSuccess)
@@ -170,7 +170,7 @@ TEST(mkdir_update_metaTest, FunctionWorkSuccess)
 	tmp_stat.st_mode = S_IFDIR;
 
 	EXPECT_EQ(0, mkdir_update_meta(self_inode, parent_inode,
-		"\0", &tmp_stat, 0));
+		"\0", &tmp_stat, 0, 1));
 }
 
 /*
@@ -464,7 +464,7 @@ TEST_F(symlink_update_metaTest, AddDirEntryFail)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_FAIL;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used"));
+		"link_not_used", 12, "name_not_used", 1));
 }
 
 TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
@@ -475,7 +475,7 @@ TEST_F(symlink_update_metaTest, SymlinkUpdateDataFail)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(-1, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"update_symlink_data_fail", 12, "name_not_used"));
+		"update_symlink_data_fail", 12, "name_not_used", 1));
 }
 
 TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
@@ -486,7 +486,7 @@ TEST_F(symlink_update_metaTest, UpdateMetaSuccess)
 	mock_parent_entry->inode_num = INO_DIR_ADD_ENTRY_SUCCESS;
 
 	EXPECT_EQ(0, symlink_update_meta(mock_parent_entry, &mock_stat,
-		"link_not_used", 12, "name_not_used"));
+		"link_not_used", 12, "name_not_used", 1));
 
 }
 /*

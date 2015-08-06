@@ -11,6 +11,7 @@
 * 2015/5/14 Jiahong changed code so that process will terminate with fuse
 *           unmount.
 * 2015/6/5 Jiahong added error handling.
+* 2015/8/5 Jiahong added routines for updating FS statistics
 *
 **************************************************************************/
 
@@ -316,7 +317,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
-	if ((ptr->this_mode) & S_IFDIR) {
+	if (S_ISDIR(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
@@ -328,7 +329,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = FALSE;
 	}
 
-	if ((ptr->this_mode) & S_IFLNK) {
+	if (S_ISLNK(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
@@ -340,7 +341,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		mlock = FALSE;
 	}
 	
-	if ((ptr->this_mode) & S_IFREG) {
+	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);

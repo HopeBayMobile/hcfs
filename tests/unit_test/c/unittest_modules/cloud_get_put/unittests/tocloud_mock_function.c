@@ -61,6 +61,8 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int readsize1, readsize2;
 	char filebuf1[4096], filebuf2[4096];
 
+	if (strncmp(objname, "FSstat", 6) == 0)
+		return 200;
 	sprintf(objectpath, "/tmp/testHCFS/%s", objname);
 	if (access(objectpath, F_OK) < 0) {
 		if (access(MOCK_META_PATH, F_OK) < 0)
@@ -161,3 +163,9 @@ int write_log(int level, char *format, ...)
 	va_end(alist);
 	return 0;
 }
+
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+{
+	return 200;
+}
+

@@ -12,6 +12,7 @@
 * 2015/5/14 Jiahong changed code so that process will terminate with fuse
 *           unmount.
 * 2015/6/4, 6/5 Jiahong added error handling.
+* 2015/8/5, 8/6 Jiahong added routines for updating FS statistics
 *
 **************************************************************************/
 
@@ -372,6 +373,41 @@ void init_upload_control(void)
 			(void *)&collect_finished_upload_threads, NULL);
 }
 
+void init_sync_stat_control(void)
+{
+	char FS_stat_path[METAPATHLEN];
+	char fname[METAPATHLEN];
+	DIR *dirp;
+	struct dirent tmp_entry, *tmpptr;
+	int ret, errcode;
+
+	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+	if (access(FS_stat_path, F_OK) == -1) {
+		MKDIR(FS_stat_path, 0700);
+	} else {
+		dirp = opendir(FS_stat_path);
+		tmpptr = NULL;
+		ret = readdir_r(dirp, &tmp_entry, &tmpptr);
+		/* Delete all previously cached FS stat */
+		while ((ret == 0) && (tmpptr != NULL)) {
+			if (strncmp(tmp_entry.d_name, "FSstat", 6) == 0) {
+				snprintf(fname, METAPATHLEN - 1, "%s/%s",
+					FS_stat_path, tmp_entry.d_name);
+				unlink(fname);
+			}
+			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
+		}
+		closedir(dirp);
+	}
+
+	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
+	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
+	hcfs_init_backend(&(sync_stat_ctl.statcurl));
+errcode_handle:
+	/* TODO: better error handling here if init failed */
+	return;
+}
+
 static inline int _select_upload_thread(char is_block, char is_delete,
 				ino_t this_inode, long long block_count,
 					off_t page_pos, long long e_index)
@@ -535,7 +571,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				break;
 			}
-
 			tmp_entry = &(temppage.block_entries[e_index]);
 			block_status = tmp_entry->status;
 
@@ -641,7 +676,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (!access(thismetapath, F_OK)) {
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
-		if ((ptr->this_mode) & S_IFREG) {
+		if (S_ISREG(ptr->this_mode)) {
+			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
+				1, metafptr);
 			tempfilemeta.size_last_upload = tempfilestat.st_size;
 			tempfilemeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
@@ -649,7 +686,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				1, metafptr);
 		}
 
-		if ((ptr->this_mode) & S_IFDIR) {
+		if (S_ISDIR(ptr->this_mode)) {
 			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
 				1, metafptr);
 			root_inode = tempdirmeta.root_inode;
@@ -661,7 +698,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				1, metafptr);
 		}
 
-		if ((ptr->this_mode) & S_IFLNK) {
+		if (S_ISLNK(ptr->this_mode)) {
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
 				1, metafptr);
 			root_inode = tempsymmeta.root_inode;
@@ -1092,6 +1129,7 @@ void upload_loop(void)
 
 	init_upload_control();
 	init_sync_control();
+	init_sync_stat_control();
 	is_start_check = TRUE;
 	
 	write_log(2, "Start upload loop\n");
@@ -1183,3 +1221,85 @@ void upload_loop(void)
 	pthread_join(sync_ctl.sync_handler_thread, NULL);
 }
 
+/************************************************************************
+*
+* Function name: update_backend_stat
+*        Inputs: ino_t root_inode, long long system_size_delta,
+*                long long num_inodes_delta
+*       Summary: Updates per-FS statistics stored in the backend.
+*  Return value: 0 if successful, or negation of error code.
+*
+*************************************************************************/
+int update_backend_stat(ino_t root_inode, long long system_size_delta,
+			long long num_inodes_delta)
+{
+	int ret, errcode;
+	char fname[METAPATHLEN];
+	char objname[METAPATHLEN];
+	FILE *fptr;
+	long long system_size, num_inodes;
+
+	write_log(10, "Debug entering update backend stat\n");
+
+	sem_wait(&(sync_stat_ctl.stat_op_sem));
+
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%ld", METAPATH,
+				root_inode);
+	snprintf(objname, METAPATHLEN - 1, "FSstat%ld", root_inode);
+	if (access(fname, F_OK) == -1) {
+		/* Download the object first if any */
+		fptr = fopen(fname, "w");
+		if (fptr == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl));
+		if ((ret >= 200) && (ret <= 299)) {
+			ret = 0;
+			errcode = 0;
+		} else if (ret != 404) {
+			errcode = -EIO;
+			goto errcode_handle;
+		} else {
+			/* Not found, init a new one */
+			write_log(10, "Debug update stat: nothing stored\n");
+			fseek(fptr, 0, SEEK_SET);
+			system_size = 0;
+			num_inodes = 0;
+			fwrite(&system_size, sizeof(long long), 1, fptr);
+			fwrite(&num_inodes, sizeof(long long), 1, fptr);
+		}
+		fclose(fptr);
+	}
+	fptr = fopen(fname, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	fread(&system_size, sizeof(long long), 1, fptr);
+	fread(&num_inodes, sizeof(long long), 1, fptr);
+	system_size += system_size_delta;
+	num_inodes += num_inodes_delta;
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&system_size, sizeof(long long), 1, fptr);
+	fwrite(&num_inodes, sizeof(long long), 1, fptr);
+	fseek(fptr, 0, SEEK_SET);
+	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl));
+	if ((ret < 200) || (ret > 299)) {
+		errcode = -EIO;
+		goto errcode_handle;
+	}
+
+	sem_post(&(sync_stat_ctl.stat_op_sem));
+	return 0;
+
+errcode_handle:
+	sem_post(&(sync_stat_ctl.stat_op_sem));
+	return errcode;
+}

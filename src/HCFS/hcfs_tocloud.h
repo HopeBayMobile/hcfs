@@ -69,6 +69,12 @@ typedef struct {
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
 
+typedef struct {
+	sem_t stat_op_sem;
+	CURL_HANDLE statcurl;
+} STAT_OP_T;
+
+STAT_OP_T sync_stat_ctl;
 UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
@@ -78,6 +84,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);
 void init_sync_control(void);
+void init_sync_stat_control(void);
 void sync_single_inode(SYNC_THREAD_TYPE *ptr);
 void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
