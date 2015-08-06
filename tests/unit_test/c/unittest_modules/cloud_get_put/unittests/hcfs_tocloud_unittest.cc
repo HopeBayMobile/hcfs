@@ -682,3 +682,68 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	End of unittest of upload_loop()
  */
 
+/* Begin of the test case for the function init_sync_stat_control */
+
+class init_sync_stat_controlTest : public ::testing::Test {
+ protected:
+  int count;
+  char tmpmgrpath[100];
+  virtual void SetUp() {
+    METAPATH = (char *) malloc(METAPATHLEN);
+    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
+    if (access(METAPATH, F_OK) < 0)
+      mkdir(METAPATH, 0744);
+
+   }
+
+  virtual void TearDown() {
+     rmdir(METAPATH);
+     free(METAPATH);
+   }
+
+ };
+
+TEST_F(init_sync_stat_controlTest, EmptyInit) {
+  char tmppath[METAPATHLEN];
+  int ret;
+
+  snprintf(tmppath, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
+  ret = access(tmppath, F_OK);
+  ASSERT_NE(0, ret);
+  init_sync_stat_control();
+
+  /* Verify */
+  ret = access(tmppath, F_OK);
+  EXPECT_EQ(0, ret);
+
+  /* Cleanup */
+  rmdir(tmppath);
+ }
+/* End of the test case for the function update_backend_stat */
+
+/* Begin of the test case for the function update_backend_stat */
+
+class update_backend_statTest : public ::testing::Test {
+ protected:
+  int count;
+  char tmpmgrpath[100];
+  virtual void SetUp() {
+    METAPATH = (char *) malloc(METAPATHLEN);
+    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
+    if (access(METAPATH, F_OK) < 0)
+      mkdir(METAPATH, 0744);
+
+   }
+
+  virtual void TearDown() {
+     rmdir(METAPATH);
+     free(METAPATH);
+   }
+
+ };
+
+TEST_F(update_backend_statTest, EmptyStat) {
+
+ }
+/* End of the test case for the function update_backend_stat */
+
