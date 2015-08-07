@@ -39,6 +39,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/file.h>
+#include <sys/types.h>
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -47,6 +48,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "fuseop.h"
 #include "logger.h"
 #include "macro.h"
+#include "metaops.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -375,17 +377,25 @@ void init_upload_control(void)
 
 void init_sync_stat_control(void)
 {
-	char FS_stat_path[METAPATHLEN];
-	char fname[METAPATHLEN];
+	char *FS_stat_path, *fname;
 	DIR *dirp;
 	struct dirent tmp_entry, *tmpptr;
 	int ret, errcode;
 
+	FS_stat_path = (char *) malloc(METAPATHLEN);
+	fname = (char *) malloc(METAPATHLEN);
 	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
 	if (access(FS_stat_path, F_OK) == -1) {
 		MKDIR(FS_stat_path, 0700);
 	} else {
 		dirp = opendir(FS_stat_path);
+		if (dirp == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
 		tmpptr = NULL;
 		ret = readdir_r(dirp, &tmp_entry, &tmpptr);
 		/* Delete all previously cached FS stat */
@@ -403,8 +413,14 @@ void init_sync_stat_control(void)
 	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
 	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
 	hcfs_init_backend(&(sync_stat_ctl.statcurl));
+
+	free(FS_stat_path);
+	free(fname);
+	return;
 errcode_handle:
 	/* TODO: better error handling here if init failed */
+	free(FS_stat_path);
+	free(fname);
 	return;
 }
 
@@ -1285,7 +1301,11 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	fread(&system_size, sizeof(long long), 1, fptr);
 	fread(&num_inodes, sizeof(long long), 1, fptr);
 	system_size += system_size_delta;
+	if (system_size < 0)
+		system_size = 0;
 	num_inodes += num_inodes_delta;
+	if (num_inodes < 0)
+		num_inodes = 0;
 	fseek(fptr, 0, SEEK_SET);
 	fwrite(&system_size, sizeof(long long), 1, fptr);
 	fwrite(&num_inodes, sizeof(long long), 1, fptr);

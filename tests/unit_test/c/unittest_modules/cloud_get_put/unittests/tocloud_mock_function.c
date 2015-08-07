@@ -166,6 +166,17 @@ int write_log(int level, char *format, ...)
 
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 {
+	long long sys_size, num_ino;
+
+	if (no_backend_stat == TRUE)
+		return 404;
+
+	sys_size = 7687483;
+	num_ino = 34334;
+	fseek(fptr, 0, SEEK_SET);
+	fwrite(&sys_size, sizeof(long long), 1, fptr);
+	fwrite(&num_ino, sizeof(long long), 1, fptr);
+
 	return 200;
 }
 
