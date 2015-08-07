@@ -1185,6 +1185,7 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	struct stat this_inode_stat;
 	META_CACHE_ENTRY_STRUCT *file_meta_cache;
 	FILE_META_TYPE file_meta;
+	BLOCK_ENTRY_PAGE tmppage;
 	FILE *metafptr;
 	long long e_index, which_page;
 	size_t ret_size;
