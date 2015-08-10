@@ -1189,7 +1189,11 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	FILE *metafptr;
 	long long e_index, which_page;
 	size_t ret_size;
+	struct timeval start_time, end_time;
+	float elapsed_time;
+	char block_status;
 
+	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
 		/*Need to delete the inode by moving it to "todelete" path*/
@@ -1209,8 +1213,8 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		/* Flush meta cache */
 		file_meta_cache = meta_cache_lock_entry(this_inode);
 		if (!file_meta_cache) {
-			write_log(0, "Fail to delete regfile since out of "
-				"memory in %s\n", __func__);
+			write_log(0, "Fail to delete regfile in %s\n", 
+				__func__);
 			return -ENOMEM;
 		}
 		ret = flush_single_entry(file_meta_cache);
@@ -1232,13 +1236,13 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 			errcode = errno;
 			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
+			fclose(metafptr);
 			return errcode;
 		}
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
 		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
-
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1247,7 +1251,7 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 			total_blocks = 0;
 		else
 			total_blocks = ((this_inode_stat.st_size - 1) /
-							MAX_BLOCK_SIZE) + 1;
+				MAX_BLOCK_SIZE) + 1;
 
 		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
@@ -1258,8 +1262,8 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 				page_pos = seek_page2(&file_meta, metafptr,
 					which_page, 0);
 				if (page_pos <= 0) {
-					count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
-					flock(fileno(metafptr), LOCK_UN);
+					count += (MAX_BLOCK_ENTRIES_PER_PAGE 
+						- 1);
 					continue;
 				}
 				current_page = which_page;
@@ -1268,7 +1272,10 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 					1, metafptr);
 			}
 
-			if (tmppage.block_entries[e_index].status == ST_NONE)
+			/* Skip if block does not exist */
+			block_status = tmppage.block_entries[e_index].status;
+			if ((block_status == ST_NONE) || 
+				(block_status == ST_CLOUD))
 				continue;
 
 			ret = fetch_block_path(thisblockpath, this_inode,
@@ -1300,14 +1307,21 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
 			return ret;
-
 		break;
 
 	default:
 		break;
 	}
-	
-	ret = disk_cleardelete(this_inode);
+
+	/* unlink markdelete tag because it has been deleted */
+	ret = disk_cleardelete(this_inode); 
+
+	gettimeofday(&end_time, NULL);
+	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
+		- (start_time.tv_sec + start_time.tv_usec * 0.000001);
+	write_log(10, "Debug: Elapsed time = %f in %s\n",
+		elapsed_time, __func__);
+
 	return ret;
 
 errcode_handle:
