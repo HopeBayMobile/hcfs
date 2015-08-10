@@ -36,7 +36,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 *************************************************************************/
 int search_mount(char *fsname, MOUNT_T **mt_info)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -100,7 +100,7 @@ int search_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T **mt_info)
 *************************************************************************/
 int insert_mount(char *fsname, MOUNT_T *mt_info)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	write_log(10, "Inserting FS %s\n", fsname);
@@ -200,7 +200,7 @@ should be handled in the unmount routines */
 *************************************************************************/
 int delete_mount(char *fsname, MOUNT_NODE_T **ret_node)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -489,8 +489,8 @@ int do_unmount_FS(MOUNT_T *mount_info)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int mount_FS(char *fsname, char *mp) {
-
+int mount_FS(char *fsname, char *mp)
+{
 	int ret, errcode;
 	MOUNT_T *tmp_info, *new_info;
 	DIR_ENTRY tmp_entry;

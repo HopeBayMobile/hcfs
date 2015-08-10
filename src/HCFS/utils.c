@@ -108,9 +108,9 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 	snprintf(tempname, METAPATHLEN, "%s/todelete/sub_%d",
 				METAPATH, sub_dir);
-	if (access(tempname, F_OK) == -1) {
+	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
-	}
+
 	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%ld",
 			METAPATH, sub_dir, this_inode);
 	return 0;
@@ -258,7 +258,7 @@ int read_system_config(char *config_path)
 		}
 
 		if (strlen(tempbuf) > 170) {
-			write_log(0, 
+			write_log(0,
 				"Length of option value exceeds limit.");
 			write_log(0, "(Limit: 170 chars). Exiting.\n");
 			return -1;
@@ -307,7 +307,7 @@ int read_system_config(char *config_path)
 			}
 			if (temp_val < 0) {
 				fclose(fptr);
-				write_log(0, 
+				write_log(0,
 					"Log level cannot be less than zero.");
 				return -1;
 			}
@@ -600,7 +600,7 @@ int validate_system_config(void)
 	fptr = fopen(pathname, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, 
+		write_log(0,
 			"Error when testing cache dir writing. Code %d, %s\n",
 				errcode, strerror(errcode));
 		return -1;

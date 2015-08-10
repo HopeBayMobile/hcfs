@@ -439,7 +439,8 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			return;
 		}
 
-		write_log(10, "Debug getattr return inode %ld\n", tmp_stat.st_ino);
+		write_log(10, "Debug getattr return inode %ld\n",
+				tmp_stat.st_ino);
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
@@ -1300,6 +1301,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	int entry_index)
 {
 	int ret_val;
+
 	while (((block_page)->block_entries[entry_index].status == ST_CLOUD) ||
 		((block_page)->block_entries[entry_index].status == ST_CtoL)) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
@@ -1895,7 +1897,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
 
-	ret = change_mount_stat(tmpptr, 
+	ret = change_mount_stat(tmpptr,
 			(long long) (offset - filestat->st_size), 0);
 	if (ret < 0)
 		return ret;
@@ -1989,6 +1991,7 @@ int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 		off_t this_page_fpos)
 {
 	int ret;
+
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	if (fh_ptr->meta_cache_ptr == NULL)
 		return -ENOMEM;
@@ -2372,7 +2375,8 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
-				write_log(2, "Debug read: cannot open block file.");
+				write_log(2,
+					"Debug read: cannot open block file.");
 				write_log(2, " Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
@@ -2608,6 +2612,7 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 		FH_ENTRY *fh_ptr, off_t this_page_fpos)
 {
 	int ret;
+
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
 		write_log(10,
@@ -3488,10 +3493,12 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			write_log(10, "Debug readdir entry %s, %ld\n",
 				temp_page.dir_entries[count].d_name,
 				tempstat.st_ino);
-			write_log(10, "Debug readdir entry size %ld\n", entry_size);
+			write_log(10, "Debug readdir entry size %ld\n",
+				entry_size);
 			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
-				write_log(10, "Readdir breaks, next offset %ld, ",
+				write_log(10,
+					"Readdir breaks, next offset %ld, ",
 					nextentry_pos);
 				write_log(10, "file pos %lld, entry %d\n",
 					temp_page.this_page_pos, (count+1));
@@ -3518,7 +3525,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	}
 	gettimeofday(&tmp_time2, NULL);
 
-	write_log(0, "readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+	write_log(0, "readdir elapse %f\n",
+			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	fuse_reply_buf(req, buf, buf_pos);
@@ -3529,7 +3537,6 @@ errcode_handle:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -3909,9 +3916,9 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int ret_val;
 	int result_index;
 	int errcode;
-        MOUNT_T *tmpptr;
+	MOUNT_T *tmpptr;
 
-        parent_inode = real_ino(req, parent);
+	parent_inode = real_ino(req, parent);
 
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
@@ -3996,7 +4003,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		goto error_handle;
 	}
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_stat.st_ino = self_inode;
 
@@ -4027,8 +4034,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
-        ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
-                                1, D_ISLNK);
+	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
+				1, D_ISLNK);
 
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -4048,7 +4055,6 @@ error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -4067,7 +4073,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	char link_buffer[MAX_LINK_PATH + 1];
 	int ret_code;
 
-        this_inode = real_ino(req, ino);
+	this_inode = real_ino(req, ino);
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -4119,7 +4125,6 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	write_log(5, "Readlink: Lookup symlink success. Link to %s\n",
 		link_buffer);
 	fuse_reply_readlink(req, link_buffer);
-	return;
 }
 
 /************************************************************************
@@ -4216,7 +4221,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		free(xattr_page);
 	write_log(5, "setxattr operation success\n");
 	fuse_reply_err(req, 0);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4224,7 +4229,6 @@ error_handle:
 	if (xattr_page)
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4342,7 +4346,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		free(xattr_page);
 	if (value)
 		free(value);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4352,7 +4356,6 @@ error_handle:
 	if (value)
 		free(value);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4445,7 +4448,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		free(xattr_page);
 	if (key_buf)
 		free(key_buf);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4455,7 +4458,6 @@ error_handle:
 	if (key_buf)
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4543,7 +4545,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		free(xattr_page);
 	write_log(5, "Remove key success\n");
 	fuse_reply_err(req, 0);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4551,7 +4553,6 @@ error_handle:
 	if (xattr_page)
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4681,7 +4682,6 @@ error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -4805,7 +4805,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 	fi->fh = fh;
 	fuse_reply_create(req, &tmp_param, fi);
-	return;
 }
 
 /* Specify the functions used for the FUSE operations */
@@ -4843,7 +4842,7 @@ struct fuse_lowlevel_ops hfuse_ops = {
 };
 
 /* Initiate FUSE */
-void* mount_multi_thread(void *ptr)
+void *mount_multi_thread(void *ptr)
 {
 	struct fuse_session *session_ptr;
 	MOUNT_T *tmpptr;
@@ -4860,7 +4859,7 @@ void* mount_multi_thread(void *ptr)
 
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
-void* mount_single_thread(void *ptr)
+void *mount_single_thread(void *ptr)
 {
 	struct fuse_session *session_ptr;
 	MOUNT_T *tmpptr;

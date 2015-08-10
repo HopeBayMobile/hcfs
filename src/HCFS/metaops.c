@@ -45,7 +45,8 @@ extern SYSTEM_CONF_STRUCT system_config;
 static inline void logerr(int errcode, char *msg)
 {
 	if (errcode > 0)
-		write_log(0, "%s. Code %d, %s\n", msg, errcode, strerror(errcode));
+		write_log(0, "%s. Code %d, %s\n", msg, errcode,
+				strerror(errcode));
 	else
 		write_log(0, "%s.\n", msg);
 }
@@ -143,7 +144,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
 
 	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-	
+
 	/* Drop all cached pages first before inserting */
 	/* TODO: Future changes could remove this limitation if can update
 	*  cache with each node change in b-tree*/
@@ -545,7 +546,7 @@ int delete_inode_meta(ino_t this_inode)
 	ret = fetch_todelete_path(todelete_metapath, this_inode);
 	if (ret < 0)
 		return ret;
-	
+
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -623,7 +624,8 @@ int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	/* Only fetch inode stat here. Can be replaced by meta_cache_lookup_file_data() */
+	/* Only fetch inode stat here. Can be replaced by
+		meta_cache_lookup_file_data() */
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
@@ -660,7 +662,7 @@ static inline long long longpow(long long base, int power)
 
 	tmp = 1;
 
-	for (count=0; count < power; count++)
+	for (count = 0; count < power; count++)
 		tmp = tmp * base;
 
 	return tmp;
@@ -669,6 +671,7 @@ static inline long long longpow(long long base, int power)
 int _check_page_level(long long page_index)
 {
 	long long tmp_index;
+
 	if (page_index == 0)
 		return 0;   /*direct page (id 0)*/
 
@@ -726,7 +729,6 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		break;
 	default:
 		return 0;
-		break;
 	}
 
 	tmp_ptr_index = tmp_page_index;
@@ -738,7 +740,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		if (tmp_pos != tmp_target_pos)
 			return 0;
 		FREAD(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1, fptr);
-		
+
 		if (count == 0)
 			break;
 
@@ -769,7 +771,7 @@ errcode_handle:
 *                "hint_page" is used for quickly finding the position of
 *                the new page. This should be the page index before the
 *                function call, or 0 if this is the first relevant call.
-*  Return value: File pos of the page if successful. Otherwise returns 
+*  Return value: File pos of the page if successful. Otherwise returns
 *                negation of error code.
 *                If file pos is 0, the page is not found.
 *
@@ -939,7 +941,6 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		break;
 	default:
 		return 0;
-		break;
 	}
 
 	tmp_ptr_index = tmp_page_index;
@@ -951,7 +952,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		if (tmp_pos != tmp_target_pos)
 			return 0;
 		FREAD(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
-		
+
 		if (count == 0)
 			break;
 
@@ -1205,7 +1206,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		else
 			change_mount_stat(mptr, 0, -1);
 		break;
-	
+
 	case D_ISLNK:
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
@@ -1234,9 +1235,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			total_blocks = 0;
 		else
 			total_blocks = ((this_inode_stat.st_size-1) /
-							MAX_BLOCK_SIZE) + 1;
+					MAX_BLOCK_SIZE) + 1;
 
-		
+
 		for (count = 0; count < total_blocks; count++) {
 			ret = fetch_block_path(thisblockpath, this_inode,
 						count);
@@ -1306,16 +1307,14 @@ int disk_markdelete(ino_t this_inode, ino_t root_inode)
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
-	if (access(pathname, F_OK) != 0) {
+	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
-	}
 
 	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
 					METAPATH, this_inode, root_inode);
 
-	if (access(pathname, F_OK) != 0) {
+	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
-	}
 
 	return 0;
 
@@ -1341,9 +1340,8 @@ int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
 					METAPATH, this_inode, root_inode);
 
-	if (access(pathname, F_OK) == 0) {
+	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
-	}
 
 	return 0;
 
@@ -1378,7 +1376,7 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 
 /* At system startup, scan to delete markers on disk to determine if
 there are inodes to be deleted. */
-int startup_finish_delete()
+int startup_finish_delete(void)
 {
 	DIR *dirp;
 	struct dirent tmpent, *tmpptr;

@@ -4,7 +4,7 @@
 *
 * File Name: file_present.h
 * Abstract: The c header file for meta processing involving regular
-*           files and directories in HCFS. "file_present" means 
+*           files and directories in HCFS. "file_present" means
 *           "file-level presentation".
 *
 * Revision History
@@ -43,11 +43,11 @@ int meta_forget_inode(ino_t self_inode);
 int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			const char *selfname);
 
-int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
-	const struct stat *this_stat, const char *link, 
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
+	const struct stat *this_stat, const char *link,
 	const unsigned long generation, const char *name, ino_t root_ino);
 
-int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 	XATTR_PAGE *xattr_page, long long *xattr_pos);
 
 int link_update_meta(ino_t link_inode, const char *newname,

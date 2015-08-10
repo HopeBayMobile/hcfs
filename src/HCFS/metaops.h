@@ -36,7 +36,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
 int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode);
-int change_dir_entry_inode(ino_t self_inode, char *targetname, ino_t new_inode, 
+int change_dir_entry_inode(ino_t self_inode, char *targetname, ino_t new_inode,
 			mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
 int delete_inode_meta(ino_t this_inode);
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,
@@ -55,7 +55,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode);
 int disk_markdelete(ino_t this_inode, ino_t root_inode);
 int disk_cleardelete(ino_t this_inode, ino_t root_inode);
 int disk_checkdelete(ino_t this_inode, ino_t root_inode);
-int startup_finish_delete();
+int startup_finish_delete(void);
 
 int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
 #endif /* GW20_HCFS_METAOPS_H_ */

@@ -35,7 +35,7 @@
 		int sem_val; \
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
-		return -1; \
+			return -1; \
 	}
 /* TODO: Consider whether want to use write-back mode for meta caching */
 
@@ -340,7 +340,8 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 
 	/* Sync meta */
-	/* TODO Right now, may not set meta_dirty to TRUE if only changes pages */
+	/* TODO Right now, may not set meta_dirty to TRUE if only changes
+			pages */
 	if (body_ptr->meta_dirty == TRUE) {
 		if (S_ISREG(body_ptr->this_stat.st_mode)) {
 			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
@@ -1112,6 +1113,7 @@ static inline int _expire_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr,
 							int cindex)
 {
 	int ret;
+
 	ret = flush_single_entry(&(lptr->body));
 	if (ret < 0)
 		goto errhandle;

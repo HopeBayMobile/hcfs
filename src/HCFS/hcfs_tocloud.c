@@ -19,8 +19,8 @@
 /*
 TODO: Will need to check mod time of meta file and not upload meta for
 	every block status change.
-TODO: Need to consider how to better handle meta deletion after sync, then recreate
-(perhaps due to reusing inode.) Potential race conditions:
+TODO: Need to consider how to better handle meta deletion after sync, then
+recreate (perhaps due to reusing inode.) Potential race conditions:
 1. Create a file, sync, then delete right after meta is being uploaded.
 (already a todo in sync_single_inode)
 2. If the meta is being deleted, but the inode of the meta is reused and a new
@@ -148,9 +148,9 @@ static inline int _upload_terminate_thread(int index)
 	/* Find the sync-inode correspond to the block-inode */
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == 
+		if (sync_ctl.threads_in_use[count1] ==
 			upload_ctl.upload_threads[index].inode)
-					break; 
+			break;
 	}
 	/* Check whether the sync-inode-thread raise error or not. */
 	if (count1 < MAX_SYNC_CONCURRENCY) {
@@ -176,7 +176,7 @@ static inline int _upload_terminate_thread(int index)
 
 	need_delete_object = FALSE;
 
-	/* Perhaps the file is deleted already. If not, modify the block 
+	/* Perhaps the file is deleted already. If not, modify the block
 	  status in file meta. */
 	if (access(thismetapath, F_OK) == 0) {
 		metafptr = fopen(thismetapath, "r+");
@@ -244,8 +244,8 @@ static inline int _upload_terminate_thread(int index)
 		}
 	}
 
-	/* If file is deleted or block already deleted, create deleted-thread to 
-	   delete cloud block data. */
+	/* If file is deleted or block already deleted, create deleted-thread
+	   to delete cloud block data. */
 	if ((access(thismetapath, F_OK) == -1) || (need_delete_object)) {
 		sem_wait(&(delete_ctl.delete_queue_sem));
 		sem_wait(&(delete_ctl.delete_op_sem));
@@ -273,7 +273,7 @@ static inline int _upload_terminate_thread(int index)
 
 		delete_ctl.threads_created[which_curl] = TRUE;
 	}
-	
+
 	/* Finally reclaim the uploaded-thread. */
 	upload_ctl.threads_in_use[index] = FALSE;
 	upload_ctl.threads_created[index] = FALSE;
@@ -330,7 +330,7 @@ void collect_finished_upload_threads(void *ptr)
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 		}
-				
+
 		sem_post(&(upload_ctl.upload_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 		continue;
@@ -421,7 +421,6 @@ errcode_handle:
 	/* TODO: better error handling here if init failed */
 	free(FS_stat_path);
 	free(fname);
-	return;
 }
 
 static inline int _select_upload_thread(char is_block, char is_delete,
@@ -511,7 +510,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
-	
+
 	/* Upload block if mode == S_IFREG */
 	if ((ptr->this_mode) & S_IFREG) {
 		flock(fileno(metafptr), LOCK_EX);
@@ -788,7 +787,6 @@ errcode_handle:
 	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 	super_block_update_transit(ptr->inode, FALSE, TRUE);
-	return;
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
@@ -809,7 +807,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 				errcode, strerror(errcode));
 		return -errcode;
 	}
-		
+
 	ret_val = hcfs_put_object(fptr, objname, curl_handle);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
@@ -920,7 +918,7 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	topen = FALSE;
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.tmp",
 			upload_ctl.upload_threads[which_curl].inode);
-	
+
 	/* Find a appropriate copied-meta name */
 	count = 0;
 	while (TRUE) {
@@ -953,7 +951,7 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	}
 
 	topen = TRUE;
-	
+
 	/* Copy meta file */
 	FSEEK(metafptr, 0, SEEK_SET);
 	while (!feof(metafptr)) {
@@ -1008,7 +1006,7 @@ int dispatch_upload_block(int which_curl)
 
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%ld_%lld.tmp",
 				upload_ptr->inode, upload_ptr->blockno);
-	
+
 	/* Find a appropriate dispatch-name */
 	count = 0;
 	while (TRUE) {
@@ -1030,7 +1028,7 @@ int dispatch_upload_block(int which_curl)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	
+
 	/* Open source block (origin block in blockpath) */
 	ret = fetch_block_path(thisblockpath,
 			upload_ptr->inode, upload_ptr->blockno);
@@ -1147,7 +1145,7 @@ void upload_loop(void)
 	init_sync_control();
 	init_sync_stat_control();
 	is_start_check = TRUE;
-	
+
 	write_log(2, "Start upload loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
@@ -1168,11 +1166,11 @@ void upload_loop(void)
 		}
 
 		is_start_check = FALSE;
-		
+
 		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
 		super_block_exclusive_locking();
-		if (ino_check == 0) 
+		if (ino_check == 0)
 			ino_check = sys_super_block->head.first_dirty_inode;
 		ino_sync = 0;
 		if (ino_check != 0) {

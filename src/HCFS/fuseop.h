@@ -178,8 +178,8 @@ char **global_argv;
 struct fuse_args global_fuse_args;
 
 /* Functions for initializing HCFS */
-void* mount_multi_thread(void *ptr);
-void* mount_single_thread(void *ptr);
+void *mount_multi_thread(void *ptr);
+void *mount_single_thread(void *ptr);
 
 int hook_fuse(int argc, char **argv);
 

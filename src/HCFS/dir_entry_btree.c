@@ -105,7 +105,7 @@ int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 *                returning the tree node with the target index in the node
 *                ("result_node" and "result_index"). "fh" is the file
 *                handle for the meta file.
-*  Return value: Target index in the node if found. If not found, returns 
+*  Return value: Target index in the node if found. If not found, returns
 *                -ENOENT. If error, return negation of error code;
 *
 *************************************************************************/
@@ -653,7 +653,7 @@ elements into two, using the median as the new parent item. */
 	ssize_t ret_ssize;
 
 	/* Index out of bound */
-	if(selected_child > tnode->num_entries || selected_child < 0)
+	if (selected_child > tnode->num_entries || selected_child < 0)
 		return -1;
 	/* Leaf node needs not rebalance */
 	if (tnode->child_page_pos[selected_child] <= 0)

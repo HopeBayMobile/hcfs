@@ -311,8 +311,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
-			errcode, strerror(errcode));\
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
 		goto errcode_handle;
 	}
 
@@ -340,7 +340,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 	}
-	
+
 	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
@@ -506,7 +506,6 @@ errcode_handle:
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
-	return;
 }
 
 /************************************************************************
@@ -632,15 +631,16 @@ void *delete_loop(void *arg)
 	while (hcfs_system->system_going_down == FALSE) {
 		if (inode_to_check == 0)
 			sleep(5);
-		
+
 		/* Get the first to-delete inode if inode_to_check is none. */
 		sem_wait(&(dsync_ctl.dsync_queue_sem));
 		super_block_share_locking();
 		if (inode_to_check == 0)
 			inode_to_check =
 				sys_super_block->head.first_to_delete_inode;
-		
-		/* Find next to-delete inode if inode_to_check is not the last one. */
+
+		/* Find next to-delete inode if inode_to_check is not the
+			last one. */
 		inode_to_dsync = 0;
 		if (inode_to_check != 0) {
 			inode_to_dsync = inode_to_check;
@@ -658,7 +658,8 @@ void *delete_loop(void *arg)
 		}
 		super_block_share_release();
 
-		/* Delete the meta/block of inode_to_dsync if it finish dsynced. */
+		/* Delete the meta/block of inode_to_dsync if it
+			finish dsynced. */
 		if (inode_to_dsync != 0) {
 			sem_wait(&(dsync_ctl.dsync_op_sem));
 			/*First check if this inode is actually being

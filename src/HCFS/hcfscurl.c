@@ -97,7 +97,8 @@ int parse_swift_auth_header(FILE *fptr)
 	to_stop = FALSE;
 
 	while (to_stop == FALSE) {
-		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
+		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string,
+					temp_string2);
 		if (ret_val < 2)
 			return -1;
 		if (strcmp(temp_string, "X-Storage-Url:") == 0) {
@@ -106,16 +107,16 @@ int parse_swift_auth_header(FILE *fptr)
 		}
 	}
 
-        to_stop = FALSE;
+	to_stop = FALSE;
 
-        while (to_stop == FALSE) {
-                ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string, temp_string2);
-                if (ret_val < 2)
-                        return -1;
-                if (strcmp(temp_string, "X-Auth-Token:") == 0) {
-                        to_stop = TRUE;
-                }
-        }
+	while (to_stop == FALSE) {
+		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string,
+					temp_string2);
+		if (ret_val < 2)
+			return -1;
+		if (strcmp(temp_string, "X-Auth-Token:") == 0)
+			to_stop = TRUE;
+	}
 
 	sprintf(swift_auth_string, "%s %s", temp_string,
 			temp_string2);
@@ -1125,19 +1126,14 @@ int _swift_http_can_retry(int code)
 	switch (code) {
 	case 401:
 		return TRUE;
-		break;
 	case 408:
 		return TRUE;
-		break;
 	case 500:
 		return TRUE;
-		break;
 	case 503:
 		return TRUE;
-		break;
 	case 504:
 		return TRUE;
-		break;
 	default:
 		break;
 	}
@@ -1149,16 +1145,12 @@ int _S3_http_can_retry(int code)
 	switch (code) {
 	case 408:
 		return TRUE;
-		break;
 	case 500:
 		return TRUE;
-		break;
 	case 503:
 		return TRUE;
-		break;
 	case 504:
 		return TRUE;
-		break;
 	default:
 		break;
 	}
