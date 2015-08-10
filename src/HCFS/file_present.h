@@ -50,4 +50,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
 	XATTR_PAGE *xattr_page, long long *xattr_pos);
 
+int link_update_meta(ino_t link_inode, const char *newname,
+	struct stat *link_stat, unsigned long *generation,
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry);
+
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

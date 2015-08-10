@@ -66,6 +66,9 @@ struct stat to_verified_stat;
 #define INO_CHILDREN_IS_EMPTY 5
 #define INO_CHILDREN_IS_NONEMPTY 6
 
+/* link_update_meta() */
+#define INO_TOO_MANY_LINKS 279348
+
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0
 	INO_SEEK_DIR_ENTRY_NOTFOUND - meta_cache_seek_dir_entry() return 0 and result_index<0
