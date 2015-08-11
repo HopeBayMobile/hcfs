@@ -1031,6 +1031,7 @@ int meta_cache_remove(ino_t this_inode)
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr, *prev_ptr;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char found_entry;
+	int ret;
 
 	index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
@@ -1060,6 +1061,14 @@ int meta_cache_remove(ino_t this_inode)
 	sem_wait(&((current_ptr->body).access_sem));
 
 	body_ptr = &(current_ptr->body);
+
+	/* Flush dirty data */
+	ret = flush_single_entry(body_ptr);
+	if (ret < 0) {
+		sem_post(&((current_ptr->body).access_sem));
+		sem_post(&(meta_mem_cache[index].header_sem));
+		return ret;
+	}
 
 	if (body_ptr->dir_meta != NULL)
 		free(body_ptr->dir_meta);

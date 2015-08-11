@@ -529,7 +529,10 @@ TEST_F(meta_cache_removeTest, RemoveAll)
 		ino_list[i] = index_list[i%num_test_buckets] + 
 				NUM_META_MEM_CACHE_HEADERS*(i/num_test_buckets); /* Generate inode number */
 		/* Init lptr */
-		lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+		lptr = (META_CACHE_LOOKUP_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+		memset(lptr, 0, sizeof(META_CACHE_LOOKUP_ENTRY_STRUCT));
+		lptr->body.something_dirty = FALSE;
 		sem_init(&(lptr->body.access_sem), 0, 1);
 		lptr->inode_num = ino_list[i];
 		lptr->next = NULL;

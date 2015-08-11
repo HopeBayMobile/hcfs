@@ -594,7 +594,6 @@ int delete_inode_meta(ino_t this_inode)
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 	}
-	ret = meta_cache_remove(this_inode);
 	return ret;
 
 errcode_handle:
@@ -1175,14 +1174,29 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 int actual_delete_inode(ino_t this_inode, char d_type)
 {
 	char thisblockpath[400];
+	char thismetapath[400];
 	int ret, errcode;
 	long long count;
 	long long total_blocks;
+	long long current_page;
+	long long page_pos;
 	off_t cache_block_size;
 	struct stat this_inode_stat;
+	FILE_META_TYPE file_meta;
+	BLOCK_ENTRY_PAGE tmppage;
+	FILE *metafptr;
+	long long e_index, which_page;
+	size_t ret_size;
+	struct timeval start_time, end_time;
+	float elapsed_time;
+	char block_status;
 
+	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
@@ -1190,6 +1204,9 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		break;
 	
 	case D_ISLNK:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
@@ -1197,14 +1214,27 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		break;
 
 	case D_ISREG:
-		ret = fetch_inode_stat(this_inode, &this_inode_stat, NULL);
+		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
 
-		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0)
+		/* Open meta */
+		ret = fetch_meta_path(thismetapath, this_inode);
+		if (ret < 0) 
 			return ret;
+
+		metafptr = fopen(thismetapath, "r+");
+		if (metafptr == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			fclose(metafptr);
+			return errcode;
+		}
+		flock(fileno(metafptr), LOCK_EX);
+		FSEEK(metafptr, 0, SEEK_SET);
+		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1212,15 +1242,41 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		if (this_inode_stat.st_size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((this_inode_stat.st_size-1) /
-							MAX_BLOCK_SIZE) + 1;
+			total_blocks = ((this_inode_stat.st_size - 1) /
+				MAX_BLOCK_SIZE) + 1;
 
-		
+		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
+			e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+			which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+			if (current_page != which_page) {
+				page_pos = seek_page2(&file_meta, metafptr,
+					which_page, 0);
+				if (page_pos <= 0) {
+					count += (MAX_BLOCK_ENTRIES_PER_PAGE 
+						- 1);
+					continue;
+				}
+				current_page = which_page;
+				FSEEK(metafptr, page_pos, SEEK_SET);
+				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 
+					1, metafptr);
+			}
+
+			/* Skip if block does not exist */
+			block_status = tmppage.block_entries[e_index].status;
+			if ((block_status == ST_NONE) || 
+				(block_status == ST_CLOUD))
+				continue;
+
 			ret = fetch_block_path(thisblockpath, this_inode,
-						count);
-			if (ret < 0)
-				return ret;
+					count);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
@@ -1237,15 +1293,32 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 
+		fclose(metafptr);
+		flock(fileno(metafptr), LOCK_UN);
+		/*Need to delete the meta. Move the meta file to "todelete"*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0)
+			return ret;
 		break;
+
 	default:
 		break;
 	}
-	
-	ret = disk_cleardelete(this_inode);
+
+	/* unlink markdelete tag because it has been deleted */
+	ret = disk_cleardelete(this_inode); 
+
+	gettimeofday(&end_time, NULL);
+	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
+		- (start_time.tv_sec + start_time.tv_usec * 0.000001);
+	write_log(10, "Debug: Elapsed time = %f in %s\n",
+		elapsed_time, __func__);
+
 	return ret;
 
 errcode_handle:
+	fclose(metafptr);
+	flock(fileno(metafptr), LOCK_UN);
 	return errcode;
 }
 

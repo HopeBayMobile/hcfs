@@ -121,7 +121,8 @@ int meta_cache_remove(ino_t this_inode)
 
 	/* Remove todel file here */
 	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
-	unlink(metapath);
+	if (!access(metapath, F_OK))
+		unlink(metapath);
 
 	return 0;
 }
@@ -282,7 +283,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		inode_stat->st_size = NUM_BLOCKS * MAX_BLOCK_SIZE;
 	} else {
 		inode_stat->st_size = 0;
-		inode_stat->st_mode = (this_inode % 2 ? S_IFREG : S_IFDIR);
+		inode_stat->st_mode = (this_inode % 2 ? S_IFLNK : S_IFDIR);
 	}
 	return 0;
 }
@@ -306,4 +307,9 @@ MOUNT_T tmpmount;
 void* fuse_req_userdata(fuse_req_t req)
 {
 	return &tmpmount;
+}
+
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
 }
