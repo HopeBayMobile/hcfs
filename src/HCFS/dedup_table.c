@@ -435,8 +435,8 @@ int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
 	int compare_result, match;
 	DDT_BTREE_NODE temp_node, largest_child_node;
 	DDT_BTREE_EL largest_child_el;
-    int errcode;
-    ssize_t ret_ssize;
+	int errcode;
+	ssize_t ret_ssize;
 
 	// Init status
 	match = FALSE;

@@ -2,7 +2,7 @@
 *
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
-* File Name: ddt.h
+* File Name: dedup_table.h
 * Abstract: The c header file for data dedup table.
 *
 * Revision History
