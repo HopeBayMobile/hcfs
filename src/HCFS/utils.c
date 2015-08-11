@@ -108,9 +108,9 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 	snprintf(tempname, METAPATHLEN, "%s/todelete/sub_%d",
 				METAPATH, sub_dir);
-	if (access(tempname, F_OK) == -1) {
+	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
-	}
+
 	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%ld",
 			METAPATH, sub_dir, this_inode);
 	return 0;
@@ -258,7 +258,7 @@ int read_system_config(char *config_path)
 		}
 
 		if (strlen(tempbuf) > 170) {
-			write_log(0, 
+			write_log(0,
 				"Length of option value exceeds limit.");
 			write_log(0, "(Limit: 170 chars). Exiting.\n");
 			return -1;
@@ -307,7 +307,7 @@ int read_system_config(char *config_path)
 			}
 			if (temp_val < 0) {
 				fclose(fptr);
-				write_log(0, 
+				write_log(0,
 					"Log level cannot be less than zero.");
 				return -1;
 			}
@@ -600,7 +600,7 @@ int validate_system_config(void)
 	fptr = fopen(pathname, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, 
+		write_log(0,
 			"Error when testing cache dir writing. Code %d, %s\n",
 				errcode, strerror(errcode));
 		return -1;
@@ -804,5 +804,93 @@ int change_system_meta(long long system_size_delta,
 	sem_post(&(hcfs_system->access_sem));
 
 	return 0;
+}
+
+/************************************************************************
+*
+* Function name: update_FS_statistics
+*        Inputs: char *pathname, long long system_size,
+*                long long num_inodes
+*       Summary: Update per-FS statistics to the meta file of root inode.
+*                "pathname" is the path for the meta file.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int update_FS_statistics(char *pathname, long long system_size,
+		long long num_inodes)
+{
+	int ret, errcode;
+	long long tmp_system_size, tmp_num_inodes;
+
+	tmp_system_size = system_size;
+	tmp_num_inodes = num_inodes;
+	ret = setxattr(pathname, "user.system_size",
+		(void *) &tmp_system_size, sizeof(long long), 0);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	ret = setxattr(pathname, "user.num_inodes",
+		(void *) &tmp_num_inodes, sizeof(long long), 0);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: read_FS_statistics
+*        Inputs: char *pathname, long long *system_size_ptr,
+*                long long *num_inodes_ptr
+*       Summary: Read per-FS statistics from the meta file of root inode.
+*                "pathname" is the path for the meta file.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int read_FS_statistics(char *pathname, long long *system_size_ptr,
+		long long *num_inodes_ptr)
+{
+	int ret, errcode;
+	long long tmp_system_size, tmp_num_inodes;
+
+	ret = getxattr(pathname, "user.system_size",
+		(void *) &tmp_system_size, sizeof(long long));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	ret = getxattr(pathname, "user.num_inodes",
+		(void *) &tmp_num_inodes, sizeof(long long));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n",
+			__func__, errcode, strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+
+	*system_size_ptr = tmp_system_size;
+	*num_inodes_ptr = tmp_num_inodes;
+	return 0;
+
+errcode_handle:
+	return errcode;
 }
 

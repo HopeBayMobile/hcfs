@@ -11,6 +11,7 @@
 * 2015/5/14 Jiahong changed code so that process will terminate with fuse
 *           unmount.
 * 2015/6/5 Jiahong added error handling.
+* 2015/8/5 Jiahong added routines for updating FS statistics
 *
 **************************************************************************/
 
@@ -276,6 +277,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	FILE *metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
+	DIR_META_TYPE tempdirmeta;
+	SYMLINK_META_TYPE tempsymmeta;
 	BLOCK_ENTRY_PAGE temppage;
 	int curl_id;
 	long long current_index;
@@ -292,30 +295,61 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
 	char mlock;
+	long long system_size_change;
+	long long upload_seq;
+	ino_t root_inode;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	mlock = FALSE;
 	this_inode = ptr->inode;
+	system_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
 
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
-			errcode, strerror(errcode));\
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+			errcode, strerror(errcode));
 		goto errcode_handle;
 	}
 
 	setbuf(metafptr, NULL);
-	
-	if ((ptr->this_mode) & S_IFREG) {
+	if (S_ISDIR(ptr->this_mode)) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
+
+		root_inode = tempdirmeta.root_inode;
+		upload_seq = tempdirmeta.upload_seq;
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+	}
+
+	if (S_ISLNK(ptr->this_mode)) {
+		flock(fileno(metafptr), LOCK_EX);
+		mlock = TRUE;
+		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
+
+		root_inode = tempsymmeta.root_inode;
+		upload_seq = tempsymmeta.upload_seq;
+		flock(fileno(metafptr), LOCK_UN);
+		mlock = FALSE;
+	}
+
+	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		system_size_change = tempfilemeta.size_last_upload;
+		root_inode = tempfilemeta.root_inode;
+		upload_seq = tempfilemeta.upload_seq;
 
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
@@ -356,10 +390,10 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			block_status =
-				temppage.block_entries[current_index].status;
+				temppage.block_entries[current_index].uploaded;
 
-			if ((block_status != ST_LDISK) &&
-						(block_status != ST_NONE)) {
+			/* Delete backend object if uploaded */
+			if (block_status == TRUE) {
 				flock(fileno(metafptr), LOCK_UN);
 				mlock = FALSE;
 				sem_wait(&(delete_ctl.delete_queue_sem));
@@ -465,10 +499,13 @@ errcode_handle:
 		else
 			break;
 	}
+	/* Update FS stat in the backend if updated previously */
+	if (upload_seq > 0)
+		update_backend_stat(root_inode, -system_size_change, -1);
+
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
-	return;
 }
 
 /************************************************************************
@@ -594,15 +631,16 @@ void *delete_loop(void *arg)
 	while (hcfs_system->system_going_down == FALSE) {
 		if (inode_to_check == 0)
 			sleep(5);
-		
+
 		/* Get the first to-delete inode if inode_to_check is none. */
 		sem_wait(&(dsync_ctl.dsync_queue_sem));
 		super_block_share_locking();
 		if (inode_to_check == 0)
 			inode_to_check =
 				sys_super_block->head.first_to_delete_inode;
-		
-		/* Find next to-delete inode if inode_to_check is not the last one. */
+
+		/* Find next to-delete inode if inode_to_check is not the
+			last one. */
 		inode_to_dsync = 0;
 		if (inode_to_check != 0) {
 			inode_to_dsync = inode_to_check;
@@ -620,7 +658,8 @@ void *delete_loop(void *arg)
 		}
 		super_block_share_release();
 
-		/* Delete the meta/block of inode_to_dsync if it finish dsynced. */
+		/* Delete the meta/block of inode_to_dsync if it
+			finish dsynced. */
 		if (inode_to_dsync != 0) {
 			sem_wait(&(dsync_ctl.dsync_op_sem));
 			/*First check if this inode is actually being

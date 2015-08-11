@@ -18,7 +18,7 @@
 #include <string.h>
 #include <signal.h>
 
-#include "fuse.h"
+#include "fuseop.h"
 #include "global.h"
 #include "FS_manager.h"
 
@@ -36,7 +36,7 @@ extern struct fuse_lowlevel_ops hfuse_ops;
 *************************************************************************/
 int search_mount(char *fsname, MOUNT_T **mt_info)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -100,7 +100,7 @@ int search_mount_node(char *fsname, MOUNT_NODE_T *node, MOUNT_T **mt_info)
 *************************************************************************/
 int insert_mount(char *fsname, MOUNT_T *mt_info)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	write_log(10, "Inserting FS %s\n", fsname);
@@ -200,7 +200,7 @@ should be handled in the unmount routines */
 *************************************************************************/
 int delete_mount(char *fsname, MOUNT_NODE_T **ret_node)
 {
-	int ret, errcode;	
+	int ret, errcode;
 	MOUNT_NODE_T *root;
 
 	root = mount_mgr.root;
@@ -489,8 +489,8 @@ int do_unmount_FS(MOUNT_T *mount_info)
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int mount_FS(char *fsname, char *mp) {
-
+int mount_FS(char *fsname, char *mp)
+{
 	int ret, errcode;
 	MOUNT_T *tmp_info, *new_info;
 	DIR_ENTRY tmp_entry;
@@ -533,6 +533,11 @@ int mount_FS(char *fsname, char *mp) {
 	}
 
 	new_info->f_ino = tmp_entry.d_ino;
+	ret = fetch_meta_path(new_info->rootpath, new_info->f_ino);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 	strcpy((new_info->f_name), fsname);
 	new_info->f_mp = NULL;
 	new_info->f_mp = malloc((sizeof(char) * strlen(mp)) + 10);
@@ -557,6 +562,10 @@ int mount_FS(char *fsname, char *mp) {
 		goto errcode_handle;
 	}
 
+	sem_init(&((new_info->FS_stat).lock), 0, 1);
+	ret = read_FS_statistics(new_info->rootpath,
+			&((new_info->FS_stat).system_size),
+			&((new_info->FS_stat).num_inodes));
 	ret = do_mount_FS(mp, new_info);
 	if (ret < 0) {
 		errcode = ret;
@@ -766,3 +775,33 @@ errcode_handle:
 	return errcode;
 }
 
+/************************************************************************
+*
+* Function name: change_mount_stat
+*        Inputs: MOUNT_T *mptr, long long system_size_delta,
+*                long long num_inodes_delta
+*       Summary: Update the per-FS statistics in the mount table
+*                for the mount pointed by "mptr". Also sync the content
+*                to the xattr of the root meta file.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta)
+{
+	int ret;
+
+	sem_wait(&((mptr->FS_stat).lock));
+	(mptr->FS_stat).system_size += system_size_delta;
+	if ((mptr->FS_stat).system_size < 0)
+		(mptr->FS_stat).system_size = 0;
+	(mptr->FS_stat).num_inodes += num_inodes_delta;
+	if ((mptr->FS_stat).num_inodes < 0)
+		(mptr->FS_stat).num_inodes = 0;
+	ret = update_FS_statistics(mptr->rootpath,
+			(mptr->FS_stat).system_size,
+			(mptr->FS_stat).num_inodes);
+	sem_post(&((mptr->FS_stat).lock));
+
+	return ret;
+}

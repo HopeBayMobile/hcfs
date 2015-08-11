@@ -35,6 +35,7 @@ extern "C" {
 
 SYSTEM_CONF_STRUCT system_config;
 extern struct fuse_lowlevel_ops hfuse_ops;
+MOUNT_T unittest_mount;
 
 static void _mount_test_fuse(MOUNT_T *tmpmount) {
   char **argv;
@@ -59,6 +60,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
 
   memset(tmpmount, 0, sizeof(MOUNT_T));
   tmpmount->f_ino = 1;
+  sem_init(&((tmpmount->FS_stat).lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
   tmp_session = fuse_lowlevel_new(&tmp_args,
@@ -78,7 +80,6 @@ class fuseopEnvironment : public ::testing::Environment {
  public:
   pthread_t new_thread;
   char *workpath, *tmppath;
-  MOUNT_T tmpmount;
 
   virtual void SetUp() {
     workpath = NULL;
@@ -111,7 +112,7 @@ class fuseopEnvironment : public ::testing::Environment {
     system_fh_table.entry_table = (FH_ENTRY *) malloc(sizeof(FH_ENTRY) * 100);
     memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) * 100);
 
-    _mount_test_fuse(&tmpmount);
+    _mount_test_fuse(&unittest_mount);
   }
 
   virtual void TearDown() {
@@ -123,13 +124,13 @@ class fuseopEnvironment : public ::testing::Environment {
     else
      wait(NULL);
     sleep(1);
-    pthread_join(tmpmount.mt_thread, NULL);
+    pthread_join(unittest_mount.mt_thread, NULL);
     pthread_join(new_thread, NULL);
-    fuse_session_remove_chan(tmpmount.chan_ptr);
-    fuse_remove_signal_handlers(tmpmount.session_ptr);
-    fuse_session_destroy(tmpmount.session_ptr);
-    fuse_unmount(tmpmount.f_mp, tmpmount.chan_ptr);
-    fuse_opt_free_args(&(tmpmount.mount_args));
+    fuse_session_remove_chan(unittest_mount.chan_ptr);
+    fuse_remove_signal_handlers(unittest_mount.session_ptr);
+    fuse_session_destroy(unittest_mount.session_ptr);
+    fuse_unmount(unittest_mount.f_mp, unittest_mount.chan_ptr);
+    fuse_opt_free_args(&(unittest_mount.mount_args));
 
     ret_val = rmdir("/tmp/test_fuse");
     tmp_err = errno;
@@ -1458,10 +1459,12 @@ class hfuse_ll_statfsTest : public ::testing::Test {
  protected:
 
   virtual void SetUp() {
+    unittest_mount.FS_stat.system_size = 12800000;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
     sys_super_block->head.num_active_inodes = 10000;
+    unittest_mount.FS_stat.num_inodes = 10000;
     before_update_file_data = TRUE;
     root_updated = FALSE;
   }
@@ -1508,6 +1511,8 @@ TEST_F(hfuse_ll_statfsTest, EmptySysStat) {
   hcfs_system->systemdata.cache_size = 0;
   hcfs_system->systemdata.cache_blocks = 0;
   sys_super_block->head.num_active_inodes = 0;
+  unittest_mount.FS_stat.system_size = 0;
+  unittest_mount.FS_stat.num_inodes = 0;
 
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
 
@@ -1530,6 +1535,7 @@ TEST_F(hfuse_ll_statfsTest, BorderStat) {
   hcfs_system->systemdata.system_size = 4096;
   hcfs_system->systemdata.cache_size = 0;
   hcfs_system->systemdata.cache_blocks = 0;
+  unittest_mount.FS_stat.system_size = 4096;
 
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
 
@@ -1552,6 +1558,8 @@ TEST_F(hfuse_ll_statfsTest, LargeSysStat) {
 
   hcfs_system->systemdata.system_size = 50*powl(1024,3) + 1;
   sys_super_block->head.num_active_inodes = 2000000;
+  unittest_mount.FS_stat.system_size = 50*powl(1024,3) + 1;
+  unittest_mount.FS_stat.num_inodes = 2000000;
 
   sys_blocks = ((50*powl(1024,3) + 1 - 1) / 4096) + 1;
   ret_val = statfs("/tmp/test_fuse/testfile", &tmpstat);
