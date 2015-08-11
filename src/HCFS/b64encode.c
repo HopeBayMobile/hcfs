@@ -100,95 +100,33 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 
 static
 char decode_table(char c){
-	char retcode = -1;
-	switch(c){
-	case 'A':
-	case 'B':
-	case 'C':
-	case 'D':
-	case 'E':
-	case 'F':
-	case 'G':
-	case 'H':
-	case 'I':
-	case 'J':
-	case 'K':
-	case 'L':
-	case 'M':
-	case 'N':
-	case 'O':
-	case 'P':
-	case 'Q':
-	case 'R':
-	case 'S':
-	case 'T':
-	case 'U':
-	case 'V':
-	case 'W':
-	case 'X':
-	case 'Y':
-	case 'Z':
-		retcode = c - 'A';
-		break;
-	case 'a':
-	case 'b':
-	case 'c':
-	case 'd':
-	case 'e':
-	case 'f':
-	case 'g':
-	case 'h':
-	case 'i':
-	case 'j':
-	case 'k':
-	case 'l':
-	case 'm':
-	case 'n':
-	case 'o':
-	case 'p':
-	case 'q':
-	case 'r':
-	case 's':
-	case 't':
-	case 'u':
-	case 'v':
-	case 'w':
-	case 'x':
-	case 'y':
-	case 'z':
-		retcode = c - 'a' + 26;
-		break;
-	case '0':
-	case '1':
-	case '2':
-	case '3':
-	case '4':
-	case '5':
-	case '6':
-	case '7':
-	case '8':
-	case '9':
-		retcode = c - '0' + 52;
-		break;
-	case '+':
-		retcode = 62;
-		break;
-	case '/':
-		retcode = 63;
-		break;
-	case '\n':
-	case '\r':
-	case '\t':
-	case ' ':
-	case '=':
-	case '\0':
-		retcode = 64; // ignore
-		break;
-	default:
-		retcode = -1;
-		break;
+	if(c >= 'A' && c <= 'Z')
+		return c - 'A';
+	else if( c >= 'a' && c <= 'z')
+		return c - 'a' + 26;
+	else if(c >= '0' && c <= '9')
+		return c - '0' + 52;
+	else{
+		switch(c){
+		case '+':
+			return 62;
+			break;
+		case '/':
+			return 63;
+			break;
+		case '\n':
+		case '\r':
+		case '\t':
+		case ' ':
+		case '=':
+		case '\0':
+			return 64; // ignore
+			break;
+		default:
+			return -1;
+			break;
+		}
 	}
-	return retcode;
 }
 
 

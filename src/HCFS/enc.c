@@ -241,7 +241,8 @@ unsigned char* get_key(){
 	return ret;
 }
 
-
+/* TODO: error handling
+ */
 FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
 			   unsigned char** data){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
@@ -255,7 +256,8 @@ FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
 	return fmemopen(new_data, read_count+TAG_SIZE, "r");
 }
 
-
+/* TODO: error handling
+ */
 FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
 			   unsigned char** data){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
@@ -271,21 +273,41 @@ FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
 
 
 int main(void){
-	FILE* f = fopen("./enc.c", "r");
-	unsigned char* key = get_key();
-	printf("key: %d\n", key[31]);
-	unsigned char* data = NULL;
-	unsigned char* data2 = NULL;
-	FILE* new_f = transform_encrypt_fd(f, key, &data);
-	FILE* new_f_f = transform_decrypt_fd(new_f, key, &data2);
-	unsigned char buf[MAX_ENC_DATA] = {0};
-	fread(buf, sizeof(unsigned char), MAX_ENC_DATA, new_f_f);
+	int ret = 0;
+	char* b64_input = "hello world!!\n";
+	int b64_input_len = strlen(b64_input);
+	printf("%d\n", b64_input_len);
+	int tmp = expect_b64_encode_length(b64_input_len);
+	int out_len = 0;
+	char* b64_output = calloc(tmp, sizeof(char));
+	b64encode_str((unsigned char*)b64_input, (unsigned char*)b64_output,
+		      &out_len, b64_input_len);
+	printf("%d %d\n", tmp, out_len);
+	printf("%s\n", b64_output);
+	char* b64_back = calloc(out_len, sizeof(char));
+	ret = b64decode_str(b64_output, b64_back ,&out_len, strlen(b64_output));
+	printf("%d\n", ret);
+	b64_back = realloc(b64_back, out_len);
+	printf("%s", b64_back);
+	printf("%d\n", out_len);
+	free(b64_output);
+	free(b64_back);
+
+	//FILE* f = fopen("./enc.c", "r");
+	//unsigned char* key = get_key();
+	//printf("key: %d\n", key[31]);
+	//unsigned char* data = NULL;
+	//unsigned char* data2 = NULL;
+	//FILE* new_f = transform_encrypt_fd(f, key, &data);
+	//FILE* new_f_f = transform_decrypt_fd(new_f, key, &data2);
+	//unsigned char buf[MAX_ENC_DATA] = {0};
+	//fread(buf, sizeof(unsigned char), MAX_ENC_DATA, new_f_f);
 	//printf("%s", buf);
-	fclose(f);
-	fclose(new_f);
-	fclose(new_f_f);
-	free(data);
-	free(key);
-	free(data2);
+	//fclose(f);
+	//fclose(new_f);
+	//fclose(new_f_f);
+	//free(data);
+	//free(key);
+	//free(data2);
 }
 
