@@ -1063,6 +1063,8 @@ TEST_F(seek_page2Test, QuadrupleIndirectPageSuccess)
 
 class actual_delete_inodeTest : public ::testing::Test {
 protected:
+	FILE *meta_fp;
+
 	void SetUp()
 	{
 		char markdelete_path[100];
@@ -1191,10 +1193,13 @@ TEST_F(actual_delete_inodeTest, mptr_is_null_DeleteSymlinkSuccess)
 
 TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 {
-	FILE *tmp_fp;
 	char thisblockpath[100];
 	char thismetapath[100];
 	bool block_file_existed;
+	BLOCK_ENTRY_PAGE block_entry_page;
+	struct stat mock_stat;
+	FILE_META_TYPE mock_meta;
+	FILE *tmp_fp;
 	ino_t mock_inode = INO_DELETE_FILE_BLOCK;
 	MOUNT_T mount_t;
 	ino_t mock_root;
@@ -1215,15 +1220,30 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	}
 	
 	// make mock meta file so that delete_inode_meta() will success
+	/* Make mock meta file. Add truncated size */
+	memset(&block_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
+	memset(&mock_stat, 0, sizeof(struct stat));
+	memset(&mock_meta, 0, sizeof(FILE_META_TYPE));
+	for (int i = 0; i < NUM_BLOCKS; i++)
+		block_entry_page.block_entries[i].status = ST_LDISK;
+	mock_stat.st_size = NUM_BLOCKS * MAX_BLOCK_SIZE + TRUNC_SIZE;
+	mock_stat.st_ino = mock_inode;
+	mock_meta.direct = sizeof(struct stat) + sizeof(FILE_META_TYPE);
+
 	fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
-	mknod(thismetapath, S_IFREG, 0); 
-	
+	meta_fp = fopen(thismetapath, "w+");
+	fseek(meta_fp, 0, SEEK_SET);
+	fwrite(&mock_stat, sizeof(struct stat), 1, meta_fp);
+	fwrite(&mock_meta, sizeof(FILE_META_TYPE), 1, meta_fp);
+	fwrite(&block_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta_fp);
+	fclose(meta_fp);
+
 	/* Run */
 	EXPECT_EQ(0, actual_delete_inode(mock_inode, D_ISREG,
 		mock_root, &mount_t));
 	
 	/* Verify if block files are removed correctly */
-	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS, 
+	EXPECT_EQ(MOCK_SYSTEM_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS - TRUNC_SIZE,
 		hcfs_system->systemdata.system_size);
 	EXPECT_EQ(MOCK_CACHE_SIZE - MOCK_BLOCK_SIZE*NUM_BLOCKS, 
 		hcfs_system->systemdata.cache_size);
@@ -1244,6 +1264,7 @@ TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)
 	
 	/* Free resource */
 	free(hcfs_system);
+	unlink(thismetapath);
 }
 
 /*
@@ -1406,17 +1427,24 @@ protected:
 			char pathname[200];
 			sprintf(pathname, "testpatterns/markdelete/inode%d_%d",
 				i, ROOT_INODE);
-			unlink(pathname);
+			if (!access(pathname, F_OK))
+				unlink(pathname);
+			
+			fetch_meta_path(pathname, i);
+			if (!access(pathname, F_OK))
+				unlink(pathname);
 		}
 		rmdir("testpatterns/markdelete");
-
-		unlink(TO_DELETE_METAPATH);
+		
+		if (!access(TO_DELETE_METAPATH, F_OK))
+			unlink(TO_DELETE_METAPATH);
 	}
 };
 
 TEST_F(startup_finish_deleteTest, Dir_markdelete_NotCreateYet)
 {
 	METAPATH = "\0";
+	num_inode = 0;
 
 	EXPECT_EQ(-ENOENT, startup_finish_delete());
 }
@@ -1439,7 +1467,7 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 		mknod(pathname, S_IFREG | 0700, 0);
 
 		fetch_meta_path(pathname, i);
-		mknod(pathname, S_IFREG, 0); // a mock markdelete-inode
+		mknod(pathname, S_IFREG, 0); // This mock metafile which will be renamed later
 	}
 
 	/* Run */

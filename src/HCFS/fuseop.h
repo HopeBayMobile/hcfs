@@ -43,7 +43,7 @@
 /* Max length of link path pointed by symbolic link */
 #define MAX_LINK_PATH 4096
 
-/*  */
+/* Hard link limit */
 #define MAX_HARD_LINK 65000
 
 /* Number of pointers in a pointer page */

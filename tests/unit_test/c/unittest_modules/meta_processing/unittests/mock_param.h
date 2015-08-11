@@ -42,6 +42,7 @@ struct stat to_verified_stat;
 #define INO_DELETE_FILE_BLOCK 200000
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
+#define TRUNC_SIZE 65536
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213
