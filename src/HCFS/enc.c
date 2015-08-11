@@ -271,7 +271,7 @@ FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
 	return fmemopen(new_data, read_count-TAG_SIZE, "r");
 }
 
-
+/*
 int main(void){
 	int ret = 0;
 	char* b64_input = "hello world!!\n";
@@ -310,4 +310,4 @@ int main(void){
 	//free(key);
 	//free(data2);
 }
-
+*/
