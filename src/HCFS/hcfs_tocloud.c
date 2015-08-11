@@ -1252,9 +1252,12 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	char objname[METAPATHLEN];
 	FILE *fptr;
 	long long system_size, num_inodes;
+	char is_fopen;
+	size_t ret_size;
 
 	write_log(10, "Debug entering update backend stat\n");
 
+	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
 
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%ld", METAPATH,
@@ -1270,6 +1273,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			errcode = -errcode;
 			goto errcode_handle;
 		}
+		is_fopen = TRUE;
 		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl));
 		if ((ret >= 200) && (ret <= 299)) {
 			ret = 0;
@@ -1287,6 +1291,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			fwrite(&num_inodes, sizeof(long long), 1, fptr);
 		}
 		fclose(fptr);
+		is_fopen = FALSE;
 	}
 	fptr = fopen(fname, "r+");
 	if (fptr == NULL) {
@@ -1296,18 +1301,19 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	fread(&system_size, sizeof(long long), 1, fptr);
-	fread(&num_inodes, sizeof(long long), 1, fptr);
+	is_fopen = TRUE;
+	FREAD(&system_size, sizeof(long long), 1, fptr);
+	FREAD(&num_inodes, sizeof(long long), 1, fptr);
 	system_size += system_size_delta;
 	if (system_size < 0)
 		system_size = 0;
 	num_inodes += num_inodes_delta;
 	if (num_inodes < 0)
 		num_inodes = 0;
-	fseek(fptr, 0, SEEK_SET);
-	fwrite(&system_size, sizeof(long long), 1, fptr);
-	fwrite(&num_inodes, sizeof(long long), 1, fptr);
-	fseek(fptr, 0, SEEK_SET);
+	FSEEK(fptr, 0, SEEK_SET);
+	FWRITE(&system_size, sizeof(long long), 1, fptr);
+	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
+	FSEEK(fptr, 0, SEEK_SET);
 	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl));
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
@@ -1315,9 +1321,14 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	}
 
 	sem_post(&(sync_stat_ctl.stat_op_sem));
+	fclose(fptr);
+	is_fopen = FALSE;
+
 	return 0;
 
 errcode_handle:
 	sem_post(&(sync_stat_ctl.stat_op_sem));
+	if (is_fopen == TRUE)
+		fclose(fptr);
 	return errcode;
 }
