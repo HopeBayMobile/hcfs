@@ -18,7 +18,7 @@
 #include <unistd.h>
 #include <semaphore.h>
 
-#include "file_meta_defs.h"
+#include "fuseop.h"
 
 void sleep_on_cache_full(void);
 void notify_sleep_on_cache(void);

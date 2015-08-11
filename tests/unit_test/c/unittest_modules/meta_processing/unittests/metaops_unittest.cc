@@ -8,6 +8,8 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <fuse/fuse_lowlevel.h>
+
 extern "C" {
 #include "mock_param.h"
 
@@ -34,7 +36,9 @@ TEST(init_dir_pageTest, InitOK)
 {
         long long pos = 1000;
 
-	DIR_ENTRY_PAGE *temppage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
+	DIR_ENTRY_PAGE *temppage;
+
+	temppage = (DIR_ENTRY_PAGE*)malloc(sizeof(DIR_ENTRY_PAGE));
 	
 	/* Run tested function */
 	EXPECT_EQ(0, init_dir_page(temppage, self_inode, parent_inode, pos));
@@ -70,7 +74,8 @@ class dir_add_entryTest : public ::testing::Test {
 
 		virtual void SetUp() 
 		{
-                       	strcpy(mock_metaname, "/tmp/mock_meta_used_in_dir_add_entry"); 
+                       	strcpy(mock_metaname, 
+				"/tmp/mock_meta_used_in_dir_add_entry"); 
 			self_name = "selfname";
 			body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(
 				sizeof(META_CACHE_ENTRY_STRUCT));
@@ -282,6 +287,21 @@ TEST_F(dir_remove_entryTest, RemoveRegFileSuccess)
 	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
 	sem_post(&(body_ptr->access_sem));
 }
+
+TEST_F(dir_remove_entryTest, RemoveSymlinkSuccess) 
+{
+	/* Mock data */
+	sem_wait(&(body_ptr->access_sem));
+	DELETE_DIR_ENTRY_BTREE_RESULT = 1;
+	
+	/* Run tested function */
+	EXPECT_EQ(0, dir_remove_entry(parent_inode, self_inode, self_name, S_IFLNK, body_ptr));
+
+	/* Verify */
+	EXPECT_EQ(TOTAL_CHILDREN_NUM - 1, to_verified_meta.total_children);
+	EXPECT_EQ(LINK_NUM, to_verified_stat.st_nlink);
+	sem_post(&(body_ptr->access_sem));
+}
 /*
 	End of unittest for dir_remove_entry()
  */
@@ -335,7 +355,8 @@ protected:
 	virtual void SetUp() {
 		new_inode = 6;
 
-		body_ptr = (META_CACHE_ENTRY_STRUCT*)malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+		body_ptr = (META_CACHE_ENTRY_STRUCT*)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 		memset(&to_verified_meta, 0, sizeof(FILE_META_TYPE));
 		memset(&to_verified_stat, 0, sizeof(struct stat));
 	}
@@ -344,22 +365,34 @@ protected:
 	}
 };
 
-TEST_F(change_dir_entry_inodeTest, ChangeOK) 
+TEST_F(change_dir_entry_inodeTest, ChangeREGOK) 
 {	
-	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, "/mock/target/name", 
-		new_inode, body_ptr));
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFREG, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeLNKOK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFLNK, body_ptr));
+}
+
+TEST_F(change_dir_entry_inodeTest, ChangeDIROK) 
+{	
+	EXPECT_EQ(0, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_OK, 
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, DirEntryNotFound) 
 {
 	EXPECT_EQ(-ENOENT, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_NOTFOUND, 
-		"/mock/target/name", new_inode, body_ptr));
+		"/mock/target/name", new_inode, S_IFDIR, body_ptr));
 }
 
 TEST_F(change_dir_entry_inodeTest, ChangeFail) 
 {
 	EXPECT_EQ(-1, change_dir_entry_inode(INO_SEEK_DIR_ENTRY_FAIL, 
-		"/mock/target/name", new_inode, body_ptr));
+		"/mock/target/name", new_inode, S_IFREG, body_ptr));
 }
 /*
 	End of unittest for change_parent_inode()
@@ -480,6 +513,7 @@ TEST_F(delete_inode_metaTest, Error_MetaFileNotExist)
  */
 class decrease_nlink_inode_fileTest : public ::testing::Test {
 protected:
+	fuse_req_t req1;
 	virtual void SetUp() 
 	{
 		/* Mock user-defined parameters */
@@ -505,12 +539,12 @@ protected:
 
 TEST_F(decrease_nlink_inode_fileTest, InodeStillReferenced) 
 {
-	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
+	EXPECT_EQ(0, decrease_nlink_inode_file(req1, INO_LOOKUP_DIR_DATA_OK_WITH_STLINK_2));
 }
 
 TEST_F(decrease_nlink_inode_fileTest, meta_cache_lock_entryFail)
 {
-	EXPECT_EQ(-ENOMEM, decrease_nlink_inode_file(INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL));
+	EXPECT_EQ(-ENOMEM, decrease_nlink_inode_file(req1, INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL));
 }
 
 TEST_F(decrease_nlink_inode_fileTest, MarkBlockFilesToDel) 
@@ -525,7 +559,7 @@ TEST_F(decrease_nlink_inode_fileTest, MarkBlockFilesToDel)
 	fclose(tmp_file);
 	
 	/* Test */
-	EXPECT_EQ(0, decrease_nlink_inode_file(INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
+	EXPECT_EQ(0, decrease_nlink_inode_file(req1, INO_LOOKUP_DIR_DATA_OK_WITH_NoBlocksToDel));
 	
 	/* Verify */
 	EXPECT_EQ(MOCK_SYSTEM_SIZE, hcfs_system->systemdata.system_size);
@@ -1066,6 +1100,11 @@ protected:
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	EXPECT_EQ(-1, actual_delete_inode(INO_DELETE_DIR, D_ISDIR));
+}
+
+TEST_F(actual_delete_inodeTest, DeleteSymlinkSuccess)
+{
+	EXPECT_EQ(-2, actual_delete_inode(INO_DELETE_LNK, D_ISLNK));
 }
 
 TEST_F(actual_delete_inodeTest, DeleteRegFileSuccess)

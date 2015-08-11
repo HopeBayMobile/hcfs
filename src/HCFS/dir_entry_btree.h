@@ -13,7 +13,7 @@
 #ifndef GW20_HCFS_DIR_ENTRY_BTREE_H_
 #define GW20_HCFS_DIR_ENTRY_BTREE_H_
 
-#include "dir_meta_defs.h"
+#include "fuseop.h"
 
 int dentry_binary_search(const DIR_ENTRY *entry_array, const int num_entries,
 			const DIR_ENTRY *new_entry, int *index_to_insert);

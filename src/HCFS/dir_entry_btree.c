@@ -30,6 +30,8 @@
 #include "macro.h"
 
 /* TODO: How to integrate dir page reading / updating with mem cache? */
+/* TODO: Revisit how to reduce IO for node updating and GC */
+/* TODO: Remove doubly linked list struct for tree_walk (no use) */
 
 /************************************************************************
 *
@@ -215,6 +217,8 @@ int insert_dir_entry_btree(DIR_ENTRY *new_entry, DIR_ENTRY_PAGE *tnode,
 							sizeof(DIR_ENTRY));
 
 			(tnode->num_entries)++;
+			write_log(10, "Insert node. %d, %ld\n",
+				tnode->num_entries, tnode->this_page_pos);
 			PWRITE(fh, tnode, sizeof(DIR_ENTRY_PAGE),
 							tnode->this_page_pos);
 			return 0; /*Insertion completed*/
@@ -648,7 +652,7 @@ elements into two, using the median as the new parent item. */
 	int errcode;
 	ssize_t ret_ssize;
 
-	/* Index out of bound */	
+	/* Index out of bound */
 	if(selected_child > tnode->num_entries || selected_child < 0)
 		return -1;
 	/* Leaf node needs not rebalance */

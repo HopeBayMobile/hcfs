@@ -39,10 +39,15 @@ struct stat to_verified_stat;
 /* actual_delete_inode() */
 #define INO_DELETE_FILE_BLOCK 200000
 #define INO_DELETE_DIR 12345
+#define INO_DELETE_LNK 13142
 
-/* fetch_inode_stat() */
-#define INO_REGFILE 7
-#define INO_DIR 8
+/* fetch_inode_stat() & fetch_xattr_page() */
+#define INO_REGFILE 12213
+#define INO_DIR 9403
+#define INO_LNK 8234
+#define INO_DIR_XATTR_PAGE_EXIST 14423
+#define INO_LNK_XATTR_PAGE_EXIST 23345
+#define INO_REGFILE_XATTR_PAGE_EXIST 8904
 #define GENERATION_NUM 5
 
 /* mknod_update_meta() & mkdir_update_meta() */
@@ -58,6 +63,9 @@ struct stat to_verified_stat;
 #define INO_DIR_REMOVE_ENTRY_FAIL 4
 #define INO_CHILDREN_IS_EMPTY 5
 #define INO_CHILDREN_IS_NONEMPTY 6
+
+/* link_update_meta() */
+#define INO_TOO_MANY_LINKS 279348
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

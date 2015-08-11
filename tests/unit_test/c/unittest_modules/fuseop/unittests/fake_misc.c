@@ -1,15 +1,31 @@
+#define FUSE_USE_VERSION 29
+
 #include <sys/types.h>
 #include <string.h>
 #include <curl/curl.h>
 #include <errno.h>
 #include <fcntl.h>
 
+#include <stdarg.h>
+#include <fuse/fuse_lowlevel.h>
+
 #include "meta_mem_cache.h"
 #include "filetables.h"
 #include "hcfs_fromcloud.h"
+#include "xattr_ops.h"
 #include "global.h"
 
 #include "fake_misc.h"
+
+int init_api_interface(void)
+{
+	return 0;
+}
+
+int destroy_api_interface(void)
+{
+	return 0;
+}
 
 ino_t lookup_pathname(const char *path, int *errcode)
 {
@@ -67,6 +83,15 @@ ino_t lookup_pathname(const char *path, int *errcode)
 	}
 	if (strcmp(path, "/testlistdir") == 0) {
 		return 17;
+	}
+	if (strcmp(path, "/testsetxattr") == 0) {
+		return 18;
+	}
+	if (strcmp(path, "/testsetxattr_permissiondeny") == 0) {
+		return 19;
+	}
+	if (strcmp(path, "/testsetxattr_fail") == 0) {
+		return 20;
 	}
 
 	*errcode = -EACCES;
@@ -143,6 +168,30 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 		}
 		if (strcmp(childname, "testlistdir") == 0) {
 			this_inode = 17;
+			this_type = D_ISDIR;
+		}
+		if (strcmp(childname, "testsetxattr") == 0) {
+			this_inode = 18;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testsetxattr_permissiondeny") == 0) {
+			this_inode = 19;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testsetxattr_fail") == 0) {
+			this_inode = 20;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testsymlink") == 0) {
+			this_inode = 21;
+			this_type = D_ISLNK;
+		}
+		if (strcmp(childname, "testlink") == 0) {
+			this_inode = 22;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testlink_dir_perm_denied") == 0) {
+			this_inode = 23;
 			this_type = D_ISDIR;
 		}
 	}
@@ -336,7 +385,7 @@ void sleep_on_cache_full(void)
 }
 
 int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
-			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -352,7 +401,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 	return 0;
 }
 
-int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
+int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *gen)
 {
 	switch (this_inode) {
 	case 1:
@@ -419,6 +468,37 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		inode_stat->st_mode = S_IFDIR | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 18:
+		inode_stat->st_ino = 18;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 19:
+		inode_stat->st_ino = 19;
+		inode_stat->st_mode = S_IFREG | 0500;
+		inode_stat->st_atime = 100000;
+		break;
+	case 20:
+		inode_stat->st_ino = 20;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 21:
+		inode_stat->st_ino = 21;
+		inode_stat->st_mode = S_IFLNK | 0700;
+		inode_stat->st_atime = 100000;
+		break;
+	case 22:
+		inode_stat->st_ino = 22;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		inode_stat->st_nlink = 1;
+		break;
+	case 23:
+		inode_stat->st_ino = 23;
+		inode_stat->st_mode = S_IFDIR | 0600;
+		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}
@@ -430,6 +510,9 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat)
 		memcpy(inode_stat, &updated_root, sizeof(struct stat));
 	if (this_inode != 1 && before_update_file_data == FALSE)
 		memcpy(inode_stat, &updated_stat, sizeof(struct stat));
+
+	if (gen)
+		*gen = 10;
 
 	return 0;
 }
@@ -452,9 +535,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int unlink_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
+			const DIR_ENTRY *this_entry)
 {
-	if (this_inode == 4)
+	if (this_entry->d_ino == 4)
 		before_mknod_created = TRUE;
 	return 0;
 }
@@ -464,8 +548,10 @@ int meta_forget_inode(ino_t self_inode)
 	return 0;
 }
 
-int rmdir_update_meta(ino_t parent_inode, ino_t this_inode, char *selfname)
+int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
+			char *selfname)
 {
+	printf("Debug fake rmdir, inode %ld\n", this_inode);
 	if (this_inode == 6)
 		before_mkdir_created = TRUE;
 	return 0;
@@ -498,7 +584,7 @@ void hcfs_destroy_backend(CURL *curl)
 	return;
 }
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+	ino_t new_inode, mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
 }
@@ -561,5 +647,119 @@ int lookup_destroy()
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
+}
+
+int parse_xattr_namespace(const char *name, char *name_space, char *key)
+{
+	if (!strcmp(name, "user.aaa"))
+		return 0;
+	else
+		return -EOPNOTSUPP;
+}
+
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	const char name_space, const char *key, 
+	const char *value, const size_t size, const int flag)
+{
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;
+
+	return 0;
+}
+
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
+	const char name_space, const char *key, char *value, const size_t size, 
+	size_t *actual_size)
+{
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;	
+
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!getxattr:)";
+		strcpy(value, ans);
+		*actual_size = strlen(ans);
+	}
+	return 0;
+}
+
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, char *key_buf, 
+	const size_t size, size_t *actual_size)
+{
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;	
+
+	if (size == 0) {
+		*actual_size = CORRECT_VALUE_SIZE;
+	} else {
+		char *ans = "hello!listxattr:)";
+		strcpy(key_buf, ans);
+		*actual_size = strlen(ans);
+	}
+	return 0;
+}
+
+int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	const char name_space, const char *key)
+{
+	if (meta_cache_entry->inode_num == 20)
+		return -EEXIST;
+
+	return 0;
+}
+
+int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, long long *xattr_pos)
+{
+	return 0;
+}
+
+int unmount_event(char *fsname)
+{
+	return 0;
+}
+
+int destroy_mount_mgr(void)
+{
+	return 0;
+}
+
+void destroy_fs_manager(void)
+{
+	return 0;
+}
+
+int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry, 
+	const struct stat *this_stat, const char *link, 
+	const unsigned long generation, const char *name)
+{
+	if (!strcmp("update_meta_fail", link))
+		return -1;
+
+	return 0;
+}
+
+int link_update_meta(ino_t link_inode, const char *newname,
+	struct stat *link_stat, unsigned long *generation, 
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+{
+	memset(link_stat, 0, sizeof(struct stat));
+	*generation = 5;
+	link_stat->st_ino = link_inode;
+	link_stat->st_mode = S_IFREG;
+
+	if (!strcmp(newname, "new_link_update_meta_fail"))
+		return -123;
+	else
+		return 0;
 }

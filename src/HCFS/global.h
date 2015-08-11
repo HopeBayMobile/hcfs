@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/2/11 Jiahong added header for this file and revised coding style.
+* 2015/7/21 Jiahong moving API codes to global.h
 *
 **************************************************************************/
 
@@ -16,9 +17,22 @@
 #define TRUE 1
 #define FALSE 0
 
-#define CURRENT_META_VER 1  /* Defines the version of the current meta defs */
+/* Defines the version of the current meta defs */
+#define CURRENT_META_VER 1
+#define BACKWARD_COMPATIBILITY 1
 
-/* TODO: Need to specify the range of meta version this code revision
-supports */
+/* List of API codes */
+#define TERMINATE 0
+#define VOLSTAT 1
+#define TESTAPI 2
+#define ECHOTEST 3
+#define CREATEFS 4
+#define MOUNTFS 5
+#define DELETEFS 6
+#define CHECKFS 7
+#define LISTFS 8
+#define UNMOUNTFS 9
+#define CHECKMOUNT 10
+#define UNMOUNTALL 11
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

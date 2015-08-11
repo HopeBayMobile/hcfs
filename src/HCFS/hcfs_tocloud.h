@@ -22,7 +22,7 @@
 #include <curl/curl.h>
 
 #include "hcfscurl.h"
-#include "file_meta_defs.h"
+#include "fuseop.h"
 
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16

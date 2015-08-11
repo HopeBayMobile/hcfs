@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "file_meta_defs.h"
+#include "fuseop.h"
 
 typedef struct {
 	ino_t this_inode;

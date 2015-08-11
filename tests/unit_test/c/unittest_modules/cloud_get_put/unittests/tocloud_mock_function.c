@@ -18,7 +18,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%d_%d", this_inode, block_num);
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%d_%d",
+		this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -66,27 +67,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 		if (access(MOCK_META_PATH, F_OK) < 0)
 			return 0;
 	}
-/*	objptr = fopen(objectpath, "r");
-	if (objptr == NULL) {
-		objptr = fopen(MOCK_META_PATH, "r");
-		if (objptr == NULL)
-			return 0;
-	}*/
-/*	while (!feof(fptr) || !feof(objptr)) {  // Check file content
-		readsize1 = fread(filebuf1, 1, 4096, fptr);
-		readsize2 = fread(filebuf2, 1, 4096, objptr);
-		if ((readsize1 > 0) && (readsize1 == readsize2)){
-			if (memcmp(filebuf1, filebuf2, readsize1)) {
-				printf("content diff\n");
-				return 0;
-			}
-		} else {
-			printf("size1=%d, size2=%d\n", readsize1, readsize2);
-			return 0;
-		}
-	}
-*/
-	//fclose(objptr);
+
 	sem_wait(&objname_counter_sem);
 	strcpy(objname_list[objname_counter], objname);
 	objname_counter++;
@@ -126,7 +107,8 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 		inode_ptr->util_ll_next = 0;
 		sys_super_block->head.first_dirty_inode = 0;
 	} else {
-		inode_ptr->util_ll_next = shm_test_data->to_handle_inode[shm_test_data->tohandle_counter];
+		inode_ptr->util_ll_next = 
+			shm_test_data->to_handle_inode[shm_test_data->tohandle_counter];
 		shm_test_data->tohandle_counter++;
 	}
 	return 0;
@@ -157,7 +139,7 @@ int write_log(int level, char *format, ...)
 	va_list alist;
 
 	va_start(alist, format);
-	vprintf(format, alist);
+	//vprintf(format, alist);
 	va_end(alist);
 	return 0;
 }

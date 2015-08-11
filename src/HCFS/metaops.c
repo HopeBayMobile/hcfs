@@ -38,6 +38,7 @@
 #include "hfuse_system.h"
 #include "macro.h"
 #include "logger.h"
+#include "mount_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -120,6 +121,8 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Load parent meta from meta cache */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -352,6 +355,8 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		temp_entry.d_type = D_ISREG;
 	if (S_ISDIR(child_mode))
 		temp_entry.d_type = D_ISDIR;
+	if (S_ISLNK(child_mode))
+		temp_entry.d_type = D_ISLNK;
 
 	/* Initialize B-tree deletion by first loading the root of B-tree */
 	ret = meta_cache_lookup_dir_data(parent_inode, &parent_stat,
@@ -365,9 +370,6 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	if (ret < 0)
 		return ret;
 
-	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
-	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-
 	/* Drop all cached pages first before deleting */
 	/* TODO: Future changes could remove this limitation if can update cache
 	*  with each node change in b-tree*/
@@ -377,6 +379,10 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		errcode = ret;
 		goto errcode_handle;
 	}
+
+	/* Read root node */
+	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
+	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
 
 	/* Recursive B-tree deletion routine*/
 	ret = delete_dir_entry_btree(&temp_entry, &tpage,
@@ -391,7 +397,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	/* tpage might be invalid after calling delete_dir_entry_btree */
 
 	if (ret == 0) {
-		/* If the new entry is a subdir, decrease the hard link of
+		/* If the entry is a subdir, decrease the hard link of
 		*  the parent*/
 
 		if (child_mode & S_IFDIR)
@@ -465,15 +471,15 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *        Inputs: ino_t self_inode, char *targetname,
 *                ino_t new_inode, struct stat *thisstat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
-*       Summary: For a directory "self_inode", change the inode of entry
-*                "targetname" to "new_inode. "thisstat" is the inode stat
-*                of "self_inode".
+*       Summary: For a directory "self_inode", change the inode and mode
+*                of entry "targetname" to "new_inode" and "new_mode".
 *  Return value: 0 if successful. Otherwise returns the negation of the
 *                appropriate error code.
 *
 *************************************************************************/
 int change_dir_entry_inode(ino_t self_inode, char *targetname,
-		ino_t new_inode, META_CACHE_ENTRY_STRUCT *body_ptr)
+		ino_t new_inode, mode_t new_mode,
+		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	DIR_ENTRY_PAGE tpage;
 	int count;
@@ -490,6 +496,19 @@ int change_dir_entry_inode(ino_t self_inode, char *targetname,
 		if (ret_val < 0)
 			return ret_val;
 		tpage.dir_entries[count].d_ino = new_inode;
+		if (S_ISREG(new_mode)) {
+			write_log(10, "Debug: change to type REG\n");
+			tpage.dir_entries[count].d_type = D_ISREG;
+		}
+		if (S_ISLNK(new_mode)) {
+			write_log(10, "Debug: change to type LNK\n");
+			tpage.dir_entries[count].d_type = D_ISLNK;
+		}
+		if (S_ISDIR(new_mode)) {
+			write_log(10, "Debug: change to type DIR\n");
+			tpage.dir_entries[count].d_type = D_ISDIR;
+		}
+
 		set_timestamp_now(&tmpstat, MTIME | CTIME);
 		ret_val = meta_cache_update_dir_data(self_inode, &tmpstat,
 					NULL, &tpage, body_ptr);
@@ -589,7 +608,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: decrease_nlink_inode_file
-*        Inputs: ino_t this_inode
+*        Inputs: fuse_req_t req, ino_t this_inode
 *       Summary: For a regular file pointed by "this_inode", decrease its
 *                reference count. If the count drops to zero, delete the
 *                file as well.
@@ -597,7 +616,7 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int decrease_nlink_inode_file(ino_t this_inode)
+int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 {
 	struct stat this_inode_stat;
 	int ret_val;
@@ -619,7 +638,7 @@ int decrease_nlink_inode_file(ino_t this_inode)
 		meta_cache_close_file(body_ptr);
 		meta_cache_unlock_entry(body_ptr);
 
-		ret_val = mark_inode_delete(this_inode);
+		ret_val = mark_inode_delete(req, this_inode);
 
 	} else {
 		/* If it is still referenced, update the meta file. */
@@ -1169,6 +1188,14 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		if (ret < 0)
 			return ret;
 		break;
+	
+	case D_ISLNK:
+		/*Need to delete the inode by moving it to "todelete" path*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0)
+			return ret;
+		break;
+
 	case D_ISREG:
 		ret = fetch_inode_stat(this_inode, &this_inode_stat, NULL);
 		if (ret < 0)
@@ -1223,14 +1250,17 @@ errcode_handle:
 }
 
 /* Mark inode as to delete on disk and lookup count table */
-int mark_inode_delete(ino_t this_inode)
+int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 {
 	int ret;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	ret = disk_markdelete(this_inode);
 	if (ret < 0)
 		return ret;
-	ret = lookup_markdelete(this_inode);
+	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
 	return ret;
 }
 
@@ -1360,9 +1390,10 @@ int startup_finish_delete()
 			}
 			if (S_ISREG(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISREG);
-			else
+			if (S_ISDIR(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISDIR);
-			/* TODO: add case for sym link here */
+			if (S_ISLNK(tmpstat.st_mode))
+				ret = actual_delete_inode(tmp_ino, D_ISLNK);
 
 			if (ret < 0) {
 				closedir(dirp);

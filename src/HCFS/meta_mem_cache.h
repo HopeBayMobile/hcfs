@@ -68,8 +68,6 @@ to other entries.
 #include <stdlib.h>
 
 #include "fuseop.h"
-#include "dir_meta_defs.h"
-#include "file_meta_defs.h"
 
 typedef struct {
 	struct stat this_stat;
@@ -77,6 +75,7 @@ typedef struct {
 	char stat_dirty;
 	DIR_META_TYPE *dir_meta;  /* Only used if inode is a dir */
 	FILE_META_TYPE *file_meta;  /* Only used if inode is a reg file */
+	SYMLINK_META_TYPE *symlink_meta; /* Only used if inode is a symlink */
 	char meta_dirty;
 
 	/*index 0 means newer entry, index 1 means older.
@@ -144,6 +143,13 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 int meta_cache_remove(ino_t this_inode);
 int meta_cache_push_dir_page(META_CACHE_ENTRY_STRUCT *body_ptr,
 				const DIR_ENTRY_PAGE *temppage);
+
+
+int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
+	const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr);
+
+int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
+	SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *body_ptr);
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode);
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr);
