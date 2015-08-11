@@ -14,6 +14,7 @@
 #include "hcfs_fromcloud.h"
 #include "xattr_ops.h"
 #include "global.h"
+#include "mount_manager.h"
 
 #include "fake_misc.h"
 
@@ -517,8 +518,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 	return 0;
 }
 
-int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat)
+int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	if (fail_mknod_update_meta == TRUE)
 		return -1;
@@ -526,8 +529,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat)
+int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	if (fail_mkdir_update_meta == TRUE)
 		return -1;
@@ -746,6 +751,12 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (!strcmp("update_meta_fail", link))
 		return -1;
 
+	return 0;
+}
+
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta)
+{
 	return 0;
 }
 

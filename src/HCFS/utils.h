@@ -38,4 +38,10 @@ off_t check_file_size(const char *path);
 int change_system_meta(long long system_size_delta,
 		long long cache_size_delta, long long cache_blocks_delta);
 
+int update_FS_statistics(char *pathname, long long system_size,
+		long long num_inodes);
+
+int read_FS_statistics(char *pathname, long long *system_size_ptr,
+		long long *num_inodes_ptr);
+
 #endif  /* GW20_SRC_UTILS_H_ */

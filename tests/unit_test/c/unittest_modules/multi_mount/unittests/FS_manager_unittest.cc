@@ -76,7 +76,7 @@ TEST_F(init_fs_managerTest, InitFSManager) {
   EXPECT_EQ(0, ret);
   ASSERT_GE(fs_mgr_head->FS_list_fh, -1);
   testlen = lseek(fs_mgr_head->FS_list_fh, 0, SEEK_END);
-  EXPECT_EQ(sizeof(DIR_META_TYPE), testlen);
+  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, testlen);
  }
 
 TEST_F(init_fs_managerTest, OpenFSManager) {
@@ -84,10 +84,13 @@ TEST_F(init_fs_managerTest, OpenFSManager) {
   off_t testlen;
   FILE *fptr;
   DIR_META_TYPE tmp_head;
+  unsigned char testuuid[20], verifyuuid[16];
 
+  snprintf((char *)testuuid, 20, "1234567890abcdef");
   if (access(tmpmgrpath, F_OK) == 0)
     unlink(tmpmgrpath);
   fptr = fopen(tmpmgrpath, "a+");
+  fwrite(testuuid, 1, 16, fptr);
   fwrite(&tmp_head, sizeof(DIR_META_TYPE), 1, fptr);
   fclose(fptr);
 
@@ -105,7 +108,11 @@ TEST_F(init_fs_managerTest, OpenFSManager) {
   EXPECT_EQ(0, ret);
   ASSERT_GE(fs_mgr_head->FS_list_fh, -1);
   testlen = lseek(fs_mgr_head->FS_list_fh, 0, SEEK_END);
-  EXPECT_EQ(sizeof(DIR_META_TYPE), testlen);
+  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, testlen);
+  lseek(fs_mgr_head->FS_list_fh, 0, SEEK_SET);
+  read(fs_mgr_head->FS_list_fh, verifyuuid, 16);
+  ret = strncmp((char *) verifyuuid, (char *) testuuid, 16);
+  EXPECT_EQ(0, ret);
  }
 
 /* End of the test case for the function init_fs_manager */
@@ -223,14 +230,14 @@ TEST_F(add_filesystemTest, AddOneFS) {
   EXPECT_EQ(1, fs_mgr_head->num_FS);
   EXPECT_EQ(2, tmp_entry.d_ino);
   EXPECT_STREQ("testFS", tmp_entry.d_name);
-  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 0);
+  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 16);
   EXPECT_EQ(sizeof(DIR_META_TYPE), retsize);
-  EXPECT_EQ(sizeof(DIR_META_TYPE), tmpmeta.root_entry_page);
-  EXPECT_EQ(sizeof(DIR_META_TYPE), tmpmeta.tree_walk_list_head);
+  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, tmpmeta.root_entry_page);
+  EXPECT_EQ(sizeof(DIR_META_TYPE) + 16, tmpmeta.tree_walk_list_head);
   EXPECT_EQ(1, tmpmeta.total_children);
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
-			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE));
+			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE) + 16);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(2, tmppage.dir_entries[0].d_ino);
@@ -291,16 +298,16 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
 
   EXPECT_EQ(3, fs_mgr_head->num_FS);
-  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 0);
+  retsize = pread(fs_mgr_head->FS_list_fh, &tmpmeta, sizeof(DIR_META_TYPE), 16);
   EXPECT_EQ(sizeof(DIR_META_TYPE), retsize);
-  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE),
+  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE) + 16,
       tmpmeta.root_entry_page);
-  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE),
+  EXPECT_EQ(sizeof(DIR_META_TYPE)+2*sizeof(DIR_ENTRY_PAGE) + 16,
       tmpmeta.tree_walk_list_head);
   EXPECT_EQ(3, tmpmeta.total_children);
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
-			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE));
+			sizeof(DIR_ENTRY_PAGE), sizeof(DIR_META_TYPE) + 16);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(2, tmppage.dir_entries[0].d_ino);
@@ -308,7 +315,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
 			sizeof(DIR_ENTRY_PAGE),
-			sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE));
+			sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE) + 16);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(4, tmppage.dir_entries[0].d_ino);
@@ -316,7 +323,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   retsize = pread(fs_mgr_head->FS_list_fh, &tmppage,
 			sizeof(DIR_ENTRY_PAGE),
-			sizeof(DIR_META_TYPE)+ 2*sizeof(DIR_ENTRY_PAGE));
+			sizeof(DIR_META_TYPE)+ 2*sizeof(DIR_ENTRY_PAGE) + 16);
   EXPECT_EQ(sizeof(DIR_ENTRY_PAGE), retsize);
   EXPECT_EQ(1, tmppage.num_entries);
   EXPECT_EQ(3, tmppage.dir_entries[0].d_ino);
@@ -714,9 +721,9 @@ TEST_F(list_filesystemTest, ListFSOneNode) {
 
   memset(&tmphead, 0, sizeof(DIR_META_TYPE));
   tmphead.total_children = 10;
-  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE) + 16;
 
-  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 16);
   memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
   tmppage.num_entries = 10;
   for (count = 0; count < 10; count++) {
@@ -725,7 +732,7 @@ TEST_F(list_filesystemTest, ListFSOneNode) {
 		"FS_%d", count);
    }
   pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
-		sizeof(DIR_META_TYPE));
+		sizeof(DIR_META_TYPE) + 16);
 
   ret = list_filesystem(10, tmp_entry, &retval);
   EXPECT_EQ(0, ret);
@@ -749,9 +756,9 @@ TEST_F(list_filesystemTest, ListFSTwoNodes) {
 
   memset(&tmphead, 0, sizeof(DIR_META_TYPE));
   tmphead.total_children = 20;
-  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE) + 16;
 
-  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 16);
 
   memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
   tmppage.num_entries = 10;
@@ -760,9 +767,9 @@ TEST_F(list_filesystemTest, ListFSTwoNodes) {
     snprintf(tmppage.dir_entries[count].d_name, MAX_FILENAME_LEN,
 		"FS_%d", count);
    }
-  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE) + 16;
   pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
-		sizeof(DIR_META_TYPE));
+		sizeof(DIR_META_TYPE) + 16);
 
   memset(&tmppage2, 0, sizeof(DIR_ENTRY_PAGE));
   tmppage2.num_entries = 10;
@@ -771,9 +778,9 @@ TEST_F(list_filesystemTest, ListFSTwoNodes) {
     snprintf(tmppage2.dir_entries[count].d_name, MAX_FILENAME_LEN,
 		"FS_%d", count);
    }
-  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE);
+  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE) + 16;
   pwrite(fs_mgr_head->FS_list_fh, &tmppage2, sizeof(DIR_ENTRY_PAGE),
-		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE));
+		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE) + 16);
 
   ret = list_filesystem(20, tmp_entry, &retval);
   EXPECT_EQ(0, ret);
@@ -802,9 +809,9 @@ TEST_F(list_filesystemTest, RecomputeNum) {
 
   memset(&tmphead, 0, sizeof(DIR_META_TYPE));
   tmphead.total_children = 7;
-  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
+  tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE) + 16;
 
-  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 16);
 
   memset(&tmppage, 0, sizeof(DIR_ENTRY_PAGE));
   tmppage.num_entries = 10;
@@ -813,9 +820,9 @@ TEST_F(list_filesystemTest, RecomputeNum) {
     snprintf(tmppage.dir_entries[count].d_name, MAX_FILENAME_LEN,
 		"FS_%d", count);
    }
-  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE);
+  tmppage.tree_walk_next = sizeof(DIR_META_TYPE) + sizeof(DIR_ENTRY_PAGE) + 16;
   pwrite(fs_mgr_head->FS_list_fh, &tmppage, sizeof(DIR_ENTRY_PAGE),
-		sizeof(DIR_META_TYPE));
+		sizeof(DIR_META_TYPE) + 16);
 
   memset(&tmppage2, 0, sizeof(DIR_ENTRY_PAGE));
   tmppage2.num_entries = 10;
@@ -824,9 +831,9 @@ TEST_F(list_filesystemTest, RecomputeNum) {
     snprintf(tmppage2.dir_entries[count].d_name, MAX_FILENAME_LEN,
 		"FS_%d", count);
    }
-  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE);
+  tmppage2.tree_walk_prev = sizeof(DIR_META_TYPE) + 16;
   pwrite(fs_mgr_head->FS_list_fh, &tmppage2, sizeof(DIR_ENTRY_PAGE),
-		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE));
+		sizeof(DIR_META_TYPE)+sizeof(DIR_ENTRY_PAGE) + 16);
 
   ret = list_filesystem(20, tmp_entry, &retval);
   EXPECT_EQ(0, ret);
@@ -842,7 +849,7 @@ TEST_F(list_filesystemTest, RecomputeNum) {
    }
 
   EXPECT_EQ(20, fs_mgr_head->num_FS);
-  pread(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  pread(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 16);
   EXPECT_EQ(20, tmphead.total_children);
  }  
 
@@ -895,9 +902,6 @@ TEST_F(backup_FS_databaseTest, CannotCreate) {
   mknod("/tmp/FSmgr_upload", S_IFREG | 0400, 0);
 
   ret = init_fs_manager();
-  ASSERT_EQ(0, ret);
-
-  ret = backup_FS_database();
   EXPECT_EQ(-EACCES, ret);
   unlink("/tmp/FSmgr_upload");
  }
@@ -935,7 +939,6 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
 
-  failedcurlinit = TRUE;
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
   fs_mgr_head->num_FS = 20;
@@ -945,6 +948,7 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
   tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  failedcurlinit = TRUE;
 
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
@@ -964,7 +968,6 @@ TEST_F(backup_FS_databaseTest, FailedPut) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
 
-  failedput = TRUE;
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
   fs_mgr_head->num_FS = 20;
@@ -974,6 +977,7 @@ TEST_F(backup_FS_databaseTest, FailedPut) {
   tmphead.tree_walk_list_head = sizeof(DIR_META_TYPE);
 
   pwrite(fs_mgr_head->FS_list_fh, &tmphead, sizeof(DIR_META_TYPE), 0);
+  failedput = TRUE;
 
   ret = backup_FS_database();
   EXPECT_EQ(-EIO, ret);
@@ -1013,6 +1017,7 @@ class restore_FS_databaseTest : public ::testing::Test {
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedget = FALSE;
+    failedput = FALSE;
 
    }
 

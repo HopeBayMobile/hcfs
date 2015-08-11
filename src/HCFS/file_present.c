@@ -158,7 +158,7 @@ error_handling:
 *
 * Function name: mknod_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat
+*                struct stat *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mknod" function. Will save the inode stat
 *                of the newly create regular file to meta cache, and also
 *                add this new entry to its parent.
@@ -168,7 +168,8 @@ error_handling:
 *************************************************************************/
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen)
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	int ret_val;
 	FILE_META_TYPE this_meta;
@@ -178,6 +179,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
+	this_meta.root_inode = root_ino;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL)
@@ -226,7 +228,7 @@ error_handling:
 *
 * Function name: mkdir_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat
+*                struct stat *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mkdir" function. Will save the inode stat
 *                of the newly create directory object to meta cache, and also
 *                add this new entry to its parent.
@@ -236,7 +238,8 @@ error_handling:
 *************************************************************************/
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen)
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
@@ -251,6 +254,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
+	this_meta.root_inode = root_ino;
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0)
@@ -445,6 +449,7 @@ error_handling:
 *        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *                const struct stat *this_stat, const char *link,
 *                const unsigned long generation, const char *name
+*                ino_t root_ino
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
 *                and then use meta_cache_update_symlink() to update stat
 *                and symlink_meta. After updating self meta, add a new
@@ -455,7 +460,7 @@ error_handling:
 *************************************************************************/
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name)
+	const unsigned long generation, const char *name, ino_t root_ino)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
@@ -469,6 +474,8 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
 	symlink_meta.link_len = strlen(link);
 	symlink_meta.generation = generation;
+	symlink_meta.metaver = CURRENT_META_VER;
+	symlink_meta.root_inode = root_ino;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 
 	/* Update self meta data */

@@ -118,7 +118,11 @@ int init_fs_manager(void)
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
 					sizeof(DIR_META_TYPE), 16);
 
-		backup_FS_database();
+		ret = backup_FS_database();
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	} else {
 		fs_mgr_head->FS_list_fh = open(fs_mgr_path, O_RDWR);
 
@@ -221,6 +225,7 @@ ino_t _create_root_inode(void)
 	this_meta.generation = this_gen;
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	this_meta.root_inode = root_inode;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
@@ -233,6 +238,12 @@ ino_t _create_root_inode(void)
 	}
 
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
+	ret = update_FS_statistics(metapath, 0, 1);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	fclose(metafptr);
 	metafptr = NULL;
 	ret = super_block_mark_dirty(root_inode);
