@@ -21,7 +21,7 @@ int compute_hash(char *path, unsigned char *output) {
 	FILE *ptr;
 	const int buf_size = 16384;
 	char *buf;
-	int byte_read;
+	int bytes_read;
 	SHA256_CTX ctx;
 
 	// Initialize
@@ -33,12 +33,14 @@ int compute_hash(char *path, unsigned char *output) {
 	ptr = fopen(path, "r");
 
 	while ((bytes_read = fread(buf, 1, buf_size, ptr))) {
-		SHA256_Update(&ctx, buf, byte_read);
+		SHA256_Update(&ctx, buf, bytes_read);
 	}
 
 	SHA256_Final(output, &ctx);
 
 	fclose(ptr);
 	free(buf);
+
+	return 0;
 }
 
