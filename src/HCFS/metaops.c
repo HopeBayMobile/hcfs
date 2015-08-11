@@ -594,7 +594,6 @@ int delete_inode_meta(ino_t this_inode)
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 	}
-	ret = meta_cache_remove(this_inode);
 	return ret;
 
 errcode_handle:
@@ -1183,7 +1182,6 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	long long page_pos;
 	off_t cache_block_size;
 	struct stat this_inode_stat;
-	META_CACHE_ENTRY_STRUCT *file_meta_cache;
 	FILE_META_TYPE file_meta;
 	BLOCK_ENTRY_PAGE tmppage;
 	FILE *metafptr;
@@ -1196,6 +1194,9 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
@@ -1203,6 +1204,9 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		break;
 	
 	case D_ISLNK:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
@@ -1210,21 +1214,9 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		break;
 
 	case D_ISREG:
-		/* Flush meta cache */
-		file_meta_cache = meta_cache_lock_entry(this_inode);
-		if (!file_meta_cache) {
-			write_log(0, "Fail to delete regfile in %s\n", 
-				__func__);
-			return -ENOMEM;
-		}
-		ret = flush_single_entry(file_meta_cache);
-		if (ret < 0) {
-			meta_cache_close_file(file_meta_cache);
-			meta_cache_unlock_entry(file_meta_cache);
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
 			return ret;
-		}
-		meta_cache_close_file(file_meta_cache);
-		meta_cache_unlock_entry(file_meta_cache);
 
 		/* Open meta */
 		ret = fetch_meta_path(thismetapath, this_inode);

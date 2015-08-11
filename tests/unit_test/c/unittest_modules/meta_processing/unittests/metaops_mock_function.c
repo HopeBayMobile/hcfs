@@ -121,7 +121,8 @@ int meta_cache_remove(ino_t this_inode)
 
 	/* Remove todel file here */
 	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
-	unlink(metapath);
+	if (!access(metapath, F_OK))
+		unlink(metapath);
 
 	return 0;
 }
