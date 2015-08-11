@@ -3927,7 +3927,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 	if (strlen(name) <= 0) {
-		write_log(0, "Lack for file name\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -3939,7 +3938,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 	if (strlen(link) <= 0) {
-		write_log(0, "Lack for link target\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -4590,7 +4588,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 	if (strlen(newname) <= 0) {
-		write_log(0, "Lack for hard link name\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
