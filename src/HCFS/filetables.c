@@ -54,7 +54,7 @@ int init_system_fh_table(void)
 	}
 	memset(system_fh_table.entry_table, 0, sizeof(FH_ENTRY) *
 							MAX_OPEN_FILE_ENTRIES);
-	
+
 	system_fh_table.last_available_index = 0;
 
 	sem_init(&(system_fh_table.fh_table_sem), 0, 1);

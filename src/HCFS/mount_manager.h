@@ -22,7 +22,7 @@
 
 #include "params.h"
 #include "fuseop.h"
-#include "lookup_count.h"
+#include "lookup_count_types.h"
 
 /*
 Binary search tree
@@ -44,6 +44,7 @@ typedef struct {
 typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
+	char rootpath[METAPATHLEN];
 	char *f_mp;
 	struct timeval mt_time;
 	pthread_t mt_thread;
@@ -102,6 +103,8 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node);
 int delete_mount(char *fsname, MOUNT_NODE_T **ret_node);
 
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta);
 
 #endif  /* GW20_HCFS_MOUNT_MANAGER_H_ */
 

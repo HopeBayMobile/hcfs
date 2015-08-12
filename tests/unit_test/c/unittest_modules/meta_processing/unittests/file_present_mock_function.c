@@ -70,6 +70,7 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 {
 	if (inode_stat) {
 		inode_stat->st_ino = this_inode;
+		inode_stat->st_nlink = 1;
 		inode_stat->st_size = NUM_BLOCKS * MOCK_BLOCK_SIZE;
 		if (this_inode == INO_REGFILE || 
 			this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
@@ -88,6 +89,9 @@ int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
 		if (this_inode == INO_REGFILE_XATTR_PAGE_EXIST)
 			file_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
 	}
+
+	if (this_inode == INO_TOO_MANY_LINKS)
+		inode_stat->st_nlink = MAX_HARD_LINK;
 
 	return 0;
 }

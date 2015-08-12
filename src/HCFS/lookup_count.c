@@ -12,15 +12,15 @@
 **************************************************************************/
 
 /* HOWTO: 1. in lookup_count, add a field "to_delete". rmdir, unlink
-will first mark this as true and if in forget() the count is dropped
-to zero, the inode is deleted.
-          2. to allow inode deletion fixes due to system crashing, a subfolder
-will be created so that the inode number of inodes to be deleted can be
-touched here, and removed when actually deleted.
-          3. in lookup_decrease, should delete nodes when lookup drops
-to zero (to save space in the long run).
-          4. in unmount, can pick either scanning lookup table for inodes
-to delete or list the folder.
+* will first mark this as true and if in forget() the count is dropped
+* to zero, the inode is deleted.
+*          2. to allow inode deletion fixes due to system crashing, a subfolder
+* will be created so that the inode number of inodes to be deleted can be
+* touched here, and removed when actually deleted.
+*           3. in lookup_decrease, should delete nodes when lookup drops
+* to zero (to save space in the long run).
+*           4. in unmount, can pick either scanning lookup table for inodes
+* to delete or list the folder.
 */
 
 #include "lookup_count.h"
@@ -82,8 +82,13 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
+#ifdef ARM_32bit_
+	write_log(10, "Debug lookup increase for inode %lld, amount %d\n",
+			this_inode, amount);
+#else
 	write_log(10, "Debug lookup increase for inode %ld, amount %d\n",
 			this_inode, amount);
+#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -126,7 +131,8 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 		lookup_table[index].head = ptr;
 	}
 
-	write_log(10, "Debug lookup increase lookup now %d\n", ptr->lookup_count);
+	write_log(10, "Debug lookup increase lookup now %d\n",
+				ptr->lookup_count);
 
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
@@ -161,8 +167,13 @@ int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
+#ifdef ARM_32bit_
+	write_log(10, "Debug lookup decrease for inode %lld, amount %d\n",
+			this_inode, amount);
+#else
 	write_log(10, "Debug lookup decrease for inode %ld, amount %d\n",
 			this_inode, amount);
+#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -249,8 +260,13 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
+#ifdef ARM_32bit_
+	write_log(10, "Debug lookup markdelete for inode %lld\n",
+			this_inode);
+#else
 	write_log(10, "Debug lookup markdelete for inode %ld\n",
 			this_inode);
+#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -283,13 +299,13 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 		ret_val = sem_post(&(lookup_table[index].entry_sem));
 		if (ret_val < 0) {  /* Unlock */
 			errcode = errno;
-			write_log(0, "Error in %s. Code %d, %s\n", __func__, 
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
 		}
 		result_lookup = -EINVAL;
 		return result_lookup;
 	}
-	
+
 	ret_val = sem_post(&(lookup_table[index].entry_sem));
 
 	if (ret_val < 0) {
@@ -336,17 +352,19 @@ int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 		ptr = lookup_table[count].head;
 
 		while (ptr != NULL) {
+#ifdef ARM_32bit_
+			write_log(10, "Debug check delete %lld\n",
+				ptr->this_inode);
+#else
 			write_log(10, "Debug check delete %ld\n",
 				ptr->this_inode);
-			ret_val = disk_checkdelete(ptr->this_inode);
+#endif
+			ret_val = disk_checkdelete(ptr->this_inode,
+						tmpptr->f_ino);
 
-			if (ret_val == 1) {
+			if (ret_val == 1)
 				actual_delete_inode(ptr->this_inode,
-						ptr->d_type);
-				sem_wait(&((tmpptr->FS_stat).lock);
-				(tmpptr->FS_stat).num_inodes--;
-				sem_post(&((tmpptr->FS_stat).lock);
-			}
+					ptr->d_type, tmpptr->f_ino, tmpptr);
 
 			oldptr = ptr;
 			ptr = ptr->next;

@@ -24,10 +24,13 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "macro.h"
 #include "global.h"
 #include "params.h"
+#include "FS_manager.h"
+#include "mount_manager.h"
 #include "fuseop.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
@@ -196,7 +199,7 @@ int mount_FS_handle(int arg_len, char *largebuf)
 	memcpy(buf, &(largebuf[sizeof(int)]), fsname_len);
 	memcpy(mpbuf, &(largebuf[sizeof(int) + fsname_len]), mp_len);
 	buf[fsname_len] = 0;
-	mpbuf[mp_len] = 
+	mpbuf[mp_len] = 0;
 	ret = mount_FS(buf, mpbuf);
 
 	free(buf);
@@ -311,7 +314,7 @@ void api_module(void *index)
 	float elapsed_time;
 	int retcode, sel_index, count, cur_index;
 	size_t to_recv, to_send, total_sent;
-	
+
 	char buf[512];
 	char *largebuf;
 	char buf_reused;
@@ -626,6 +629,7 @@ void api_server_monitor(void)
 	struct timeval cur_time;
 	int sel_index, cur_index;
 	struct timespec waittime;
+
 	waittime.tv_sec = 1;
 	waittime.tv_nsec = 0;
 
@@ -690,7 +694,7 @@ void api_server_monitor(void)
 				(void *)api_module, (void *)val);
 			val = NULL;
 			write_log(10, "Added one more thread to %d\n", index+1);
-		}	
+		}
 
 		sem_post(&(api_server->job_lock));
 

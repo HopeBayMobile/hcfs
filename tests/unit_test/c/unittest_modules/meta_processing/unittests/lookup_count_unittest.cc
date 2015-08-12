@@ -385,13 +385,16 @@ protected:
 
 TEST_F(lookup_destroyTest, DestroyEmptyTableSuccess)
 {
+	MOUNT_T mount_t;
+
 	/* Run */
-	EXPECT_EQ(0, lookup_destroy(lookup_table));
+	EXPECT_EQ(0, lookup_destroy(lookup_table, &mount_t));
 }
 
 TEST_F(lookup_destroyTest, DestroyTableSuccess)
 {
 	unsigned num_insert_inode;
+	MOUNT_T mount_t;
 
 	/* Insert many inodes */
 	num_insert_inode = NUM_LOOKUP_ENTRIES * 3;
@@ -400,7 +403,7 @@ TEST_F(lookup_destroyTest, DestroyTableSuccess)
 	memset(check_actual_delete_table, FALSE, num_insert_inode * sizeof(char));
 
 	/* Run */
-	EXPECT_EQ(0, lookup_destroy(lookup_table));
+	EXPECT_EQ(0, lookup_destroy(lookup_table, &mount_t));
 	
 	/* Verify */
 	for (ino_t inode = 0; inode < num_insert_inode; inode++) {

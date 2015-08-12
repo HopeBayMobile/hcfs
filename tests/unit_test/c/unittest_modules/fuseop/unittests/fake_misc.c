@@ -14,6 +14,7 @@
 #include "hcfs_fromcloud.h"
 #include "xattr_ops.h"
 #include "global.h"
+#include "mount_manager.h"
 
 #include "fake_misc.h"
 
@@ -185,6 +186,14 @@ int lookup_dir(ino_t parent, char *childname, DIR_ENTRY *dentry)
 		if (strcmp(childname, "testsymlink") == 0) {
 			this_inode = 21;
 			this_type = D_ISLNK;
+		}
+		if (strcmp(childname, "testlink") == 0) {
+			this_inode = 22;
+			this_type = D_ISREG;
+		}
+		if (strcmp(childname, "testlink_dir_perm_denied") == 0) {
+			this_inode = 23;
+			this_type = D_ISDIR;
 		}
 	}
 
@@ -480,6 +489,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 		inode_stat->st_mode = S_IFLNK | 0700;
 		inode_stat->st_atime = 100000;
 		break;
+	case 22:
+		inode_stat->st_ino = 22;
+		inode_stat->st_mode = S_IFREG | 0700;
+		inode_stat->st_atime = 100000;
+		inode_stat->st_nlink = 1;
+		break;
+	case 23:
+		inode_stat->st_ino = 23;
+		inode_stat->st_mode = S_IFDIR | 0600;
+		inode_stat->st_atime = 100000;
+		break;
 	default:
 		break;
 	}
@@ -498,8 +518,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat, unsigned long *g
 	return 0;
 }
 
-int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat)
+int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	if (fail_mknod_update_meta == TRUE)
 		return -1;
@@ -507,8 +529,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
 	return 0;
 }
 
-int mkdir_update_meta(ino_t self_inode, ino_t parent_inode, char *selfname,
-						struct stat *this_stat)
+int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
+			const char *selfname,
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	if (fail_mkdir_update_meta == TRUE)
 		return -1;
@@ -644,8 +668,9 @@ int parse_xattr_namespace(const char *name, char *name_space, char *key)
 		return -EOPNOTSUPP;
 }
 
-int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-        const long long xattr_filepos, const char name_space, const char *key, 
+int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	const char name_space, const char *key, 
 	const char *value, const size_t size, const int flag)
 {
 	if (meta_cache_entry->inode_num == 20)
@@ -654,7 +679,7 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 	return 0;
 }
 
-int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
+int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	const char name_space, const char *key, char *value, const size_t size, 
 	size_t *actual_size)
 {
@@ -671,8 +696,9 @@ int get_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page,
 	return 0;
 }
 
-int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-	char *key_buf, const size_t size, size_t *actual_size)
+int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, 
+	XATTR_PAGE *xattr_page, char *key_buf, 
+	const size_t size, size_t *actual_size)
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;	
@@ -687,8 +713,9 @@ int list_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page
 	return 0;
 }
 
-int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_page, 
-	const long long xattr_filepos, const char name_space, const char *key)
+int remove_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
+	XATTR_PAGE *xattr_page, const long long xattr_filepos, 
+	const char name_space, const char *key)
 {
 	if (meta_cache_entry->inode_num == 20)
 		return -EEXIST;
@@ -727,3 +754,23 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	return 0;
 }
 
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta)
+{
+	return 0;
+}
+
+int link_update_meta(ino_t link_inode, const char *newname,
+	struct stat *link_stat, unsigned long *generation, 
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+{
+	memset(link_stat, 0, sizeof(struct stat));
+	*generation = 5;
+	link_stat->st_ino = link_inode;
+	link_stat->st_mode = S_IFREG;
+
+	if (!strcmp(newname, "new_link_update_meta_fail"))
+		return -123;
+	else
+		return 0;
+}

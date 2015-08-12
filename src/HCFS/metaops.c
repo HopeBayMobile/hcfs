@@ -39,13 +39,16 @@
 #include "macro.h"
 #include "logger.h"
 #include "mount_manager.h"
+#include "lookup_count.h"
+#include "super_block.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
 static inline void logerr(int errcode, char *msg)
 {
 	if (errcode > 0)
-		write_log(0, "%s. Code %d, %s\n", msg, errcode, strerror(errcode));
+		write_log(0, "%s. Code %d, %s\n", msg, errcode,
+				strerror(errcode));
 	else
 		write_log(0, "%s.\n", msg);
 }
@@ -80,7 +83,7 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 /************************************************************************
 *
 * Function name: dir_add_entry
-*        Inputs: ino_t parent_inode, ino_t child_inode, char *childname,
+*        Inputs: ino_t parent_inode, ino_t child_inode, const char *childname,
 *                mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Add a directory entry with name "childname", inode number
 *                "child_inode", and mode "child_mode" to the directory
@@ -90,7 +93,7 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
@@ -143,7 +146,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 	FSEEK(body_ptr->fptr, parent_meta.root_entry_page, SEEK_SET);
 
 	FREAD(&tpage, sizeof(DIR_ENTRY_PAGE), 1, body_ptr->fptr);
-	
+
 	/* Drop all cached pages first before inserting */
 	/* TODO: Future changes could remove this limitation if can update
 	*  cache with each node change in b-tree*/
@@ -317,7 +320,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: dir_remove_entry
-*        Inputs: ino_t parent_inode, ino_t child_inode, char *childname,
+*        Inputs: ino_t parent_inode, ino_t child_inode, const char *childname,
 *                mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Remove a directory entry with name "childname", inode number
 *                "child_inode", and mode "child_mode" from the directory
@@ -327,7 +330,8 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
+			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
@@ -468,7 +472,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 /************************************************************************
 *
 * Function name: change_dir_entry_inode
-*        Inputs: ino_t self_inode, char *targetname,
+*        Inputs: ino_t self_inode, const char *targetname,
 *                ino_t new_inode, struct stat *thisstat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: For a directory "self_inode", change the inode and mode
@@ -477,7 +481,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *                appropriate error code.
 *
 *************************************************************************/
-int change_dir_entry_inode(ino_t self_inode, char *targetname,
+int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		ino_t new_inode, mode_t new_mode,
 		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -545,7 +549,7 @@ int delete_inode_meta(ino_t this_inode)
 	ret = fetch_todelete_path(todelete_metapath, this_inode);
 	if (ret < 0)
 		return ret;
-	
+
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -594,7 +598,6 @@ int delete_inode_meta(ino_t this_inode)
 		flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 	}
-	ret = meta_cache_remove(this_inode);
 	return ret;
 
 errcode_handle:
@@ -623,7 +626,8 @@ int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode)
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 
 	body_ptr = meta_cache_lock_entry(this_inode);
-	/* Only fetch inode stat here. Can be replaced by meta_cache_lookup_file_data() */
+	/* Only fetch inode stat here. Can be replaced by
+		meta_cache_lookup_file_data() */
 	if (body_ptr == NULL)
 		return -ENOMEM;
 
@@ -660,7 +664,7 @@ static inline long long longpow(long long base, int power)
 
 	tmp = 1;
 
-	for (count=0; count < power; count++)
+	for (count = 0; count < power; count++)
 		tmp = tmp * base;
 
 	return tmp;
@@ -669,6 +673,7 @@ static inline long long longpow(long long base, int power)
 int _check_page_level(long long page_index)
 {
 	long long tmp_index;
+
 	if (page_index == 0)
 		return 0;   /*direct page (id 0)*/
 
@@ -726,7 +731,6 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		break;
 	default:
 		return 0;
-		break;
 	}
 
 	tmp_ptr_index = tmp_page_index;
@@ -738,7 +742,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		if (tmp_pos != tmp_target_pos)
 			return 0;
 		FREAD(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1, fptr);
-		
+
 		if (count == 0)
 			break;
 
@@ -769,7 +773,7 @@ errcode_handle:
 *                "hint_page" is used for quickly finding the position of
 *                the new page. This should be the page index before the
 *                function call, or 0 if this is the first relevant call.
-*  Return value: File pos of the page if successful. Otherwise returns 
+*  Return value: File pos of the page if successful. Otherwise returns
 *                negation of error code.
 *                If file pos is 0, the page is not found.
 *
@@ -939,7 +943,6 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		break;
 	default:
 		return 0;
-		break;
 	}
 
 	tmp_ptr_index = tmp_page_index;
@@ -951,7 +954,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 		if (tmp_pos != tmp_target_pos)
 			return 0;
 		FREAD(&tmp_ptr_page, sizeof(PTR_ENTRY_PAGE), 1, body_ptr->fptr);
-		
+
 		if (count == 0)
 			break;
 
@@ -1165,46 +1168,98 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 /************************************************************************
 *
 * Function name: actual_delete_inode
-*        Inputs: ino_t this_inode, char d_type
+*        Inputs: ino_t this_inode, char d_type, ino_t root_inode
+*                MOUNT_T *mptr
 *       Summary: Delete the inode "this_inode" and the data blocks if this
-*                is a regular file as well.
+*                is a regular file as well. "mptr" points to the mounted FS
+*                structure if the FS is mounted (NULL if not).
 *  Return value: 0 if successful. Otherwise returns
 *                negation of error code.
 *
 *************************************************************************/
-int actual_delete_inode(ino_t this_inode, char d_type)
+int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
+			MOUNT_T *mptr)
 {
 	char thisblockpath[400];
+	char thismetapath[400];
 	int ret, errcode;
 	long long count;
 	long long total_blocks;
+	long long current_page;
+	long long page_pos;
 	off_t cache_block_size;
 	struct stat this_inode_stat;
+        FILE_META_TYPE file_meta;
+        BLOCK_ENTRY_PAGE tmppage;
+        FILE *metafptr;
+        long long e_index, which_page;
+        size_t ret_size;
+        struct timeval start_time, end_time;
+        float elapsed_time;
+        char block_status;
+	long long tmp_system_size, tmp_num_inodes;
+	char rootpath[METAPATHLEN];
 
+	if (mptr == NULL) {
+		ret = fetch_meta_path(rootpath, root_inode);
+		if (ret < 0)
+			return ret;
+		read_FS_statistics(rootpath, &tmp_system_size,
+					&tmp_num_inodes);
+	}
+
+	gettimeofday(&start_time, NULL);
 	switch (d_type) {
 	case D_ISDIR:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
 			return ret;
+		if (mptr == NULL)
+			tmp_num_inodes--;
+		else
+			change_mount_stat(mptr, 0, -1);
 		break;
-	
+
 	case D_ISLNK:
+		ret = meta_cache_remove(this_inode);
+		if (ret < 0)
+			return ret;
 		/*Need to delete the inode by moving it to "todelete" path*/
 		ret = delete_inode_meta(this_inode);
 		if (ret < 0)
 			return ret;
+		if (mptr == NULL)
+			tmp_num_inodes--;
+		else
+			change_mount_stat(mptr, 0, -1);
 		break;
 
 	case D_ISREG:
-		ret = fetch_inode_stat(this_inode, &this_inode_stat, NULL);
+		ret = meta_cache_remove(this_inode);
 		if (ret < 0)
 			return ret;
 
-		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0)
+		/* Open meta */
+		ret = fetch_meta_path(thismetapath, this_inode);
+		if (ret < 0) 
 			return ret;
+
+		metafptr = fopen(thismetapath, "r+");
+		if (metafptr == NULL) {
+			errcode = errno;
+			write_log(0, "IO error in %s. Code %d, %s\n",
+				__func__, errcode, strerror(errcode));
+			fclose(metafptr);
+			return errcode;
+		}
+		flock(fileno(metafptr), LOCK_EX);
+		FSEEK(metafptr, 0, SEEK_SET);
+		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
+		FREAD(&file_meta, sizeof(FILE_META_TYPE), 1, metafptr);
 
 		/*Need to delete blocks as well*/
 		/* TODO: Perhaps can move the actual block deletion to the
@@ -1212,15 +1267,41 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		if (this_inode_stat.st_size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((this_inode_stat.st_size-1) /
-							MAX_BLOCK_SIZE) + 1;
+			total_blocks = ((this_inode_stat.st_size - 1) /
+				MAX_BLOCK_SIZE) + 1;
 
-		
+		current_page = -1;
 		for (count = 0; count < total_blocks; count++) {
+			e_index = count % MAX_BLOCK_ENTRIES_PER_PAGE;
+			which_page = count / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+			if (current_page != which_page) {
+				page_pos = seek_page2(&file_meta, metafptr,
+					which_page, 0);
+				if (page_pos <= 0) {
+					count += (MAX_BLOCK_ENTRIES_PER_PAGE 
+						- 1);
+					continue;
+				}
+				current_page = which_page;
+				FSEEK(metafptr, page_pos, SEEK_SET);
+				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 
+					1, metafptr);
+			}
+
+			/* Skip if block does not exist */
+			block_status = tmppage.block_entries[e_index].status;
+			if ((block_status == ST_NONE) || 
+				(block_status == ST_CLOUD))
+				continue;
+
 			ret = fetch_block_path(thisblockpath, this_inode,
-						count);
-			if (ret < 0)
-				return ret;
+					count);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
@@ -1238,16 +1319,44 @@ int actual_delete_inode(ino_t this_inode, char d_type)
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
+		if (mptr != NULL) {
+			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
+		} else {
+			tmp_num_inodes--;
+			tmp_system_size -= this_inode_stat.st_size;
+		}
 
+
+		fclose(metafptr);
+		flock(fileno(metafptr), LOCK_UN);
+		/*Need to delete the meta. Move the meta file to "todelete"*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0)
+			return ret;
 		break;
+
 	default:
 		break;
 	}
-	
-	ret = disk_cleardelete(this_inode);
+
+	if (mptr == NULL)
+		update_FS_statistics(rootpath, tmp_system_size,
+					tmp_num_inodes);
+
+	/* unlink markdelete tag because it has been deleted */
+	ret = disk_cleardelete(this_inode, root_inode); 
+
+	gettimeofday(&end_time, NULL);
+	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
+		- (start_time.tv_sec + start_time.tv_usec * 0.000001);
+	write_log(10, "Debug: Elapsed time = %f in %s\n",
+		elapsed_time, __func__);
+
 	return ret;
 
 errcode_handle:
+	fclose(metafptr);
+	flock(fileno(metafptr), LOCK_UN);
 	return errcode;
 }
 
@@ -1259,7 +1368,7 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret = disk_markdelete(this_inode);
+	ret = disk_markdelete(this_inode, tmpptr->f_ino);
 	if (ret < 0)
 		return ret;
 	ret = lookup_markdelete(tmpptr->lookup_table, this_inode);
@@ -1267,23 +1376,26 @@ int mark_inode_delete(fuse_req_t req, ino_t this_inode)
 }
 
 /* Mark inode as to delete on disk */
-int disk_markdelete(ino_t this_inode)
+int disk_markdelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int ret, errcode;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
 
-	if (access(pathname, F_OK) != 0) {
+	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
-	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
+#endif
 
-	if (access(pathname, F_OK) != 0) {
+	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
-	}
 
 	return 0;
 
@@ -1292,7 +1404,7 @@ errcode_handle:
 }
 
 /* Clear inode as to delete on disk */
-int disk_cleardelete(ino_t this_inode)
+int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int ret, errcode;
@@ -1306,12 +1418,16 @@ int disk_cleardelete(ino_t this_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
+#endif
 
-	if (access(pathname, F_OK) == 0) {
+	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
-	}
 
 	return 0;
 
@@ -1320,7 +1436,7 @@ errcode_handle:
 }
 
 /* Check if inode is marked as to delete on disk */
-int disk_checkdelete(ino_t this_inode)
+int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 {
 	char pathname[200];
 	int errcode;
@@ -1335,8 +1451,13 @@ int disk_checkdelete(ino_t this_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%ld",
-						METAPATH, this_inode);
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
+	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
+					METAPATH, this_inode, root_inode);
+#endif
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1346,14 +1467,14 @@ int disk_checkdelete(ino_t this_inode)
 
 /* At system startup, scan to delete markers on disk to determine if
 there are inodes to be deleted. */
-int startup_finish_delete()
+int startup_finish_delete(void)
 {
 	DIR *dirp;
 	struct dirent tmpent, *tmpptr;
 	struct stat tmpstat;
 	char pathname[200];
 	int ret_val;
-	ino_t tmp_ino;
+	ino_t tmp_ino, root_inode;
 	int errcode, ret;
 
 	snprintf(pathname, 200, "%s/markdelete", METAPATH);
@@ -1383,7 +1504,13 @@ int startup_finish_delete()
 	}
 
 	while (tmpptr != NULL) {
-		ret_val = sscanf(tmpent.d_name, "inode%ld", &tmp_ino);
+#ifdef ARM_32bit_
+		ret_val = sscanf(tmpent.d_name, "inode%lld_%lld", &tmp_ino,
+					&root_inode);
+#else
+		ret_val = sscanf(tmpent.d_name, "inode%ld_%ld", &tmp_ino,
+					&root_inode);
+#endif
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
 			if (ret < 0) {
@@ -1391,11 +1518,14 @@ int startup_finish_delete()
 				return ret;
 			}
 			if (S_ISREG(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISREG);
+				ret = actual_delete_inode(tmp_ino, D_ISREG,
+						root_inode, NULL);
 			if (S_ISDIR(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISDIR);
+				ret = actual_delete_inode(tmp_ino, D_ISDIR,
+						root_inode, NULL);
 			if (S_ISLNK(tmpstat.st_mode))
-				ret = actual_delete_inode(tmp_ino, D_ISLNK);
+				ret = actual_delete_inode(tmp_ino, D_ISLNK,
+						root_inode, NULL);
 
 			/* TODO: Directly decrease num of inodes
 			in the xattr of root inode. */

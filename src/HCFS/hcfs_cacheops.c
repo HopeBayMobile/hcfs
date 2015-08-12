@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/time.h>
 #include <time.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -36,6 +37,8 @@
 #include "hfuse_system.h"
 #include "logger.h"
 #include "macro.h"
+#include "metaops.h"
+#include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -311,7 +314,8 @@ void run_cache_loop(void)
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
-			if (nonempty_cache_hash_entries <= 0) { // All empty
+			if (nonempty_cache_hash_entries <= 0) {
+				/* All empty */
 				ret = build_cache_usage();
 				if (ret < 0) {
 					write_log(0, "Error in cache mgmt.\n");
@@ -323,7 +327,7 @@ void run_cache_loop(void)
 				skip_recent = TRUE;
 				do_something = FALSE;
 			}
-			
+
 			/* End of hash table. Restart at index 0 */
 			if (e_index >= CACHE_USAGE_NUM_ENTRIES) {
 				if ((do_something == FALSE) &&

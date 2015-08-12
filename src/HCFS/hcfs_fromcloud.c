@@ -33,6 +33,7 @@
 #include "hfuse_system.h"
 #include "logger.h"
 #include "macro.h"
+#include "utils.h"
 
 /************************************************************************
 *
@@ -51,7 +52,11 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	char idname[256];
 	int ret, errcode;
 
+#ifdef ARM_32bit_
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+#else
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+#endif
 
 	sem_wait(&download_curl_sem);
 	FSEEK(fptr, 0, SEEK_SET);
@@ -169,7 +174,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		ret = fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		ret = fetch_from_cloud(blockfptr, ptr->this_inode,
+					ptr->block_no);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -213,5 +219,4 @@ errcode_handle:
 	if (mopen == TRUE)
 		fclose(metafptr);
 	free(ptr);
-	return;
 }
