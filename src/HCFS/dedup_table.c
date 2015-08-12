@@ -34,13 +34,13 @@ int initialize_ddt_meta() {
 
 	FILE *fptr;
 	int fd;
-	char *ddt_meta_file = "ddt_meta_0";
+	char *ddt_meta_file = "ddt/btree_meta_0";
 	DDT_BTREE_META ddt_meta;
 	int errcode;
 	ssize_t ret_ssize;
 
 
-	fptr = fopen(ddt_meta_file, "w+");
+	fptr = fopen(ddt_meta_file, "w");
 	fd = fileno(fptr);
 
 	// Init meta struct
@@ -51,10 +51,55 @@ int initialize_ddt_meta() {
 
 	PWRITE(fd, &ddt_meta, sizeof(DDT_BTREE_META), 0);
 
-	return fd;
+	fclose(fptr);
+
+	return 0;
 
 errcode_handle:
 	return errcode;
+}
+
+
+/************************************************************************
+*
+* Function name: get_btree_meta
+*        Inputs: unsigned char *key, DDT_BTREE_NODE *root,
+*                DDT_BTREE_META this_meta
+*       Summary: Get the metadata of a tree. Also return the root node
+*                (root) and the metadata(this_meta) of this tree.
+*  Return value: File pointer to btree file
+*
+*************************************************************************/
+FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
+				DDT_BTREE_META *this_meta) {
+
+	char *meta_path = "ddt/btree_meta_0";
+	FILE *fptr;
+	int fd;
+	int errcode;
+	ssize_t ret_ssize;
+
+
+	// Initialize tree if not existed
+	if (access(meta_path, R_OK|W_OK) < 0) {
+		printf("No metafile found\n");
+	    initialize_ddt_meta();
+	}
+
+	// Open file
+	fptr = fopen(meta_path, "r+");
+	fd = fileno(fptr);
+
+	// Copy metadata
+	PREAD(fd, this_meta, sizeof(DDT_BTREE_META), 0);
+	if (this_meta->tree_root > 0) {
+		PREAD(fd, root, sizeof(DDT_BTREE_NODE), this_meta->tree_root);
+	}
+
+	return fptr;
+
+errcode_handle:
+	return NULL;
 }
 
 
@@ -77,14 +122,17 @@ int search_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
 	int search_idx;
 	int cmpare_result;
 	DDT_BTREE_NODE temp_node;
-	int ret_val;
 	int errcode;
 	ssize_t ret_ssize;
 
+	if (tnode->num_el == 0) {
+		printf("Encounter invalid node\n");
+		return -1;
+	}
+
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 		cmpare_result = memcmp(key, tnode->ddt_btree_el[search_idx].obj_id,
- 					   	 //SHA256_DIGEST_LENGTH);
- 					   	 4);
+ 					   	 SHA256_DIGEST_LENGTH);
 		if (cmpare_result == 0) {
 			memcpy(result_node, tnode, sizeof(DDT_BTREE_NODE));
 			*result_idx = search_idx;
@@ -96,7 +144,7 @@ int search_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
 
 	// this node is leaf
 	if (tnode->is_leaf) {
-		printf("%s", "Key doesn't existed");
+		printf("Key doesn't existed\n");
 		return -1;
 	}
 
@@ -123,6 +171,7 @@ errcode_handle:
 *************************************************************************/
 int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 
+	int search_idx, tmp_idx;
 	DDT_BTREE_NODE temp_node;
 	int errcode;
 	ssize_t ret_ssize;
@@ -131,19 +180,27 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 
 	// this node is leaf
 	if (tnode->is_leaf) {
-		for (int i = 0; i < tnode->num_el; i++) {
-		   	printf("In leaf - %s\n", tnode->ddt_btree_el[i].obj_id);
+		for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
+			printf("Leaf - ");
+			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
+				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
+			}
+			printf(" with refcounf (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
 		}
 		return 0;
 	}
 
-	for (int i = 0; i < tnode->num_el + 1; i++) {
+	for (search_idx = 0; search_idx < tnode->num_el + 1; search_idx++) {
 		if (!tnode->is_leaf) {
-			PREAD(fd, &temp_node, sizeof(DDT_BTREE_NODE), tnode->child_node_pos[i]);
+			PREAD(fd, &temp_node, sizeof(DDT_BTREE_NODE), tnode->child_node_pos[search_idx]);
 			traverse_ddt_btree(&temp_node, fd);
 		}
-		if (i < tnode->num_el) {
-			printf("Internal - %s\n", tnode->ddt_btree_el[i].obj_id);
+		if (search_idx < tnode->num_el) {
+			printf("Node - ");
+			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
+				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
+			}
+			printf(" with refcounf (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
 		}
 	}
 
@@ -192,7 +249,7 @@ int insert_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd, DDT_BTRE
 		LSEEK(fd, 0, SEEK_END);
 		new_root.this_node_pos = ret_pos;
 		// Write new node to disk
-		PWRITE(fd, &new_root, sizeof(DDT_BTREE_EL), new_root.this_node_pos);
+		PWRITE(fd, &new_root, sizeof(DDT_BTREE_NODE), new_root.this_node_pos);
 
 		// Update btree meta and write to disk
 		this_meta->total_el += 1;
@@ -443,8 +500,7 @@ int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
 
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 		compare_result = memcmp(key, tnode->ddt_btree_el[search_idx].obj_id,
-						//SHA256_DIGEST_LENGTH);
-						4);
+						SHA256_DIGEST_LENGTH);
 		if (compare_result == 0) {
 			match = TRUE;
 			break;
@@ -795,54 +851,34 @@ errcode_handle:
 	return errcode;
 }
 
-// Main function to test
-int main() {
 
-	int fd;
-	DDT_BTREE_META this_meta;
-	DDT_BTREE_NODE tree_root;
+/************************************************************************
+*
+* Function name: increase_el_refcount
+*        Inputs: DDT_BTREE_NODE *tnode, int s_idx, int fd
+*       Summary: Increase the refcount of a specific element
+*  Return value: 0 if operation was successful, -1 if not.
+*
+*************************************************************************/
+int increase_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd) {
+
 	int errcode;
 	ssize_t ret_ssize;
 
-	// init test data
-	unsigned char testdata0[] = "0000";
-	unsigned char testdata1[] = "1111";
-	unsigned char testdata2[] = "2222";
-	unsigned char testdata3[] = "3333";
-	unsigned char testdata4[] = "4444";
-	unsigned char testdata5[] = "5555";
-	unsigned char testdata6[] = "6666";
-	unsigned char testdata7[] = "7777";
-	unsigned char testdata8[] = "8888";
-	unsigned char testdata9[] = "9999";
+	if (s_idx < 0 || s_idx >= tnode->num_el) {
+		printf("Search index out of bound\n");
+		return -1;
+	}
 
-	// Initialize table
-	fd = initialize_ddt_meta();
+	// Increase the refcount
+	tnode->ddt_btree_el[s_idx].refcount += 1;
 
-	PREAD(fd, &this_meta, sizeof(DDT_BTREE_META), 0);
-
-	memset(&tree_root, 0, sizeof(DDT_BTREE_NODE));
-
-	insert_ddt_btree(testdata0, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata1, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata2, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata3, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata4, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata5, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata6, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata7, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata8, &tree_root, fd, &this_meta);
-	insert_ddt_btree(testdata9, &tree_root, fd, &this_meta);
-
-	delete_ddt_btree(testdata3, &tree_root, fd, &this_meta);
-	delete_ddt_btree(testdata4, &tree_root, fd, &this_meta);
-	delete_ddt_btree(testdata6, &tree_root, fd, &this_meta);
-	delete_ddt_btree(testdata7, &tree_root, fd, &this_meta);
-
-	traverse_ddt_btree(&tree_root, fd);
+	// Update to disk
+	PWRITE(fd, tnode, sizeof(DDT_BTREE_NODE), tnode->this_node_pos);
 
 	return 0;
 
 errcode_handle:
 	return errcode;
 }
+

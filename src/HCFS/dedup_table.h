@@ -12,6 +12,8 @@
 
 #include <openssl/sha.h>
 
+#include <stdio.h>
+
 /*
  * The structure of ddt is a combination of hash table and btree. Each node
  * of hash table contains a pointer to the root of a independent btree.
@@ -53,11 +55,18 @@ typedef struct {
 } DDT_BTREE_META;
 
 
-int search_ddt_btree_el(unsigned char *search_key, DDT_BTREE_NODE *tnode);
+int initialize_ddt_meta();
+
+FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
+				DDT_BTREE_META *this_meta);
+
+int search_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+				DDT_BTREE_NODE *result_node, int *result_idx);
 
 int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd);
 
-int insert_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_META *this_meta);
+int insert_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+				DDT_BTREE_META *this_meta);
 
 int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
 				DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_META *this_meta);
@@ -73,3 +82,5 @@ int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE *result
 
 int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				DDT_BTREE_META *this_meta);
+
+int increase_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd);
