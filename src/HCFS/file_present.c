@@ -132,8 +132,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 
 		ret_code = meta_cache_unlock_entry(temp_entry);
 
-		if (ret_code == 0) {
+		if ((ret_code == 0) && (inode_stat != NULL)) {
 			memcpy(inode_stat, &returned_stat, sizeof(struct stat));
+			write_log(10, "fetch_inode_stat get inode %lld\n",
+				inode_stat->st_ino);
 			return 0;
 		}
 
@@ -143,8 +145,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		return -ENOENT;
 	}
 
-	write_log(10, "fetch_inode_stat %lld\n", inode_stat->st_ino);
-
+	write_log(10, "fetch_inode_stat get only generation %lld\n", *ret_gen);
 	return 0;
 
 error_handling:
@@ -157,7 +158,7 @@ error_handling:
 *
 * Function name: mknod_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat
+*                struct stat *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mknod" function. Will save the inode stat
 *                of the newly create regular file to meta cache, and also
 *                add this new entry to its parent.
@@ -167,7 +168,8 @@ error_handling:
 *************************************************************************/
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen)
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	int ret_val;
 	FILE_META_TYPE this_meta;
@@ -176,6 +178,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
 
 	this_meta.generation = this_gen;
+	this_meta.root_inode = root_ino;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL)
@@ -224,7 +227,7 @@ error_handling:
 *
 * Function name: mkdir_update_meta
 *        Inputs: ino_t self_inode, ino_t parent_inode, char *selfname,
-*                struct stat *this_stat
+*                struct stat *this_stat, ino_t root_ino
 *       Summary: Helper of "hfuse_mkdir" function. Will save the inode stat
 *                of the newly create directory object to meta cache, and also
 *                add this new entry to its parent.
@@ -234,7 +237,8 @@ error_handling:
 *************************************************************************/
 int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,
-			struct stat *this_stat, unsigned long this_gen)
+			struct stat *this_stat, unsigned long this_gen,
+			ino_t root_ino)
 {
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
@@ -248,6 +252,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
+	this_meta.root_inode = root_ino;
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0)
@@ -326,12 +331,12 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	/* Remove entry */
 	if (this_entry->d_type == D_ISREG) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, 
+		ret_val = dir_remove_entry(parent_inode, this_inode,
 			this_entry->d_name, S_IFREG, body_ptr);
 	}
 	if (this_entry->d_type == D_ISLNK) {
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
-		ret_val = dir_remove_entry(parent_inode, this_inode, 
+		ret_val = dir_remove_entry(parent_inode, this_inode,
 			this_entry->d_name, S_IFLNK, body_ptr);
 	}
 	if (this_entry->d_type == D_ISDIR) {
@@ -442,6 +447,7 @@ error_handling:
 *        Inputs: META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 *                const struct stat *this_stat, const char *link,
 *                const unsigned long generation, const char *name
+*                ino_t root_ino
 *       Summary: Helper of "hfuse_ll_symlink". First prepare symlink_meta
 *                and then use meta_cache_update_symlink() to update stat
 *                and symlink_meta. After updating self meta, add a new
@@ -452,7 +458,7 @@ error_handling:
 *************************************************************************/
 int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	const struct stat *this_stat, const char *link,
-	const unsigned long generation, const char *name)
+	const unsigned long generation, const char *name, ino_t root_ino)
 {
 	META_CACHE_ENTRY_STRUCT *self_meta_cache_entry;
 	SYMLINK_META_TYPE symlink_meta;
@@ -466,6 +472,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
 	symlink_meta.link_len = strlen(link);
 	symlink_meta.generation = generation;
+	symlink_meta.root_inode = root_ino;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 
 	/* Update self meta data */
@@ -636,4 +643,93 @@ int fetch_xattr_page(META_CACHE_ENTRY_STRUCT *meta_cache_entry,
 
 errcode_handle:
 	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: link_update_meta
+*        Inputs: ino_t link_inode, const char *newname,
+*                struct stat *link_stat, unsigned long *generation,
+*                META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry
+*       Summary: Helper of link operation in FUSE. Given the inode numebr
+*                "link_inode", this function will increase link number
+*                and add a new entry to parent dir. This function will
+*                also fetch inode stat and generation and store them in
+*                "link_stat" and "generation", respectively. Do NOT need
+*                to unlock parent meta cache entry since it will be
+*                handled by caller.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int link_update_meta(ino_t link_inode, const char *newname,
+	struct stat *link_stat, unsigned long *generation,
+	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
+{
+	META_CACHE_ENTRY_STRUCT *link_meta_cache_entry;
+	struct link_stat;
+	int ret_val;
+	ino_t parent_inode;
+
+	parent_inode = parent_meta_cache_entry->inode_num;
+
+	/* Fetch stat and generation */
+	ret_val = fetch_inode_stat(link_inode, link_stat, generation);
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Hard link to dir is not allowed */
+	if (S_ISDIR(link_stat->st_mode)) {
+		write_log(0, "Hard link to a dir is not allowed.\n");
+		return -EISDIR;
+	}
+
+	/* Check number of links */
+	if (link_stat->st_nlink >= MAX_HARD_LINK) {
+		write_log(0, "Too many links for this file, now %ld links",
+			link_stat->st_nlink);
+		return -EMLINK;
+	}
+
+	link_stat->st_nlink++; /* Hard link ++ */
+	write_log(10, "Debug: inode %lld has %lld links\n",
+		link_inode, link_stat->st_nlink);
+
+	/* Update only stat */
+	link_meta_cache_entry = meta_cache_lock_entry(link_inode);
+	if (!link_meta_cache_entry) {
+		write_log(0, "Lock entry fails in %s\n", __func__);
+		return -ENOMEM;
+	}
+	ret_val = meta_cache_update_file_data(link_inode, link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+	if (ret_val < 0)
+		goto error_handle;
+
+	/* Add entry to this dir */
+	ret_val = dir_add_entry(parent_inode, link_inode, newname,
+		link_stat->st_mode, parent_meta_cache_entry);
+	if (ret_val < 0) {
+		link_stat->st_nlink--; /* Recover nlink */
+		meta_cache_update_file_data(link_inode, link_stat,
+			NULL, NULL, 0, link_meta_cache_entry);
+		goto error_handle;
+	}
+
+	/* Unlock meta cache entry */
+	ret_val = meta_cache_close_file(link_meta_cache_entry);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(link_meta_cache_entry);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(link_meta_cache_entry);
+	if (ret_val < 0)
+		return ret_val;
+
+	return 0;
+
+error_handle:
+	meta_cache_close_file(link_meta_cache_entry);
+	meta_cache_unlock_entry(link_meta_cache_entry);
+	return ret_val;
 }

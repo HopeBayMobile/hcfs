@@ -251,13 +251,14 @@ int main(int argc, char **argv)
 	sprintf(curl_handle.id, "main");
 	ret_val = hcfs_init_backend(&curl_handle);
 	if ((ret_val < 200) || (ret_val > 299)) {
-		write_log(0, "Error in connecting to backend. Code %d\n", ret_val);
+		write_log(0, "Error in connecting to backend. Code %d\n",
+				ret_val);
 		write_log(0, "Backend %d\n", CURRENT_BACKEND);
 		exit(-1);
 	}
 
 	ret_val = hcfs_list_container(&curl_handle);
-	if ((ret_val < 200) || (ret_val > 299)) {
+	if (((ret_val < 200) || (ret_val > 299)) && (ret_val != 404)) {
 		write_log(0, "Error in connecting to backend\n");
 		exit(-1);
 	}

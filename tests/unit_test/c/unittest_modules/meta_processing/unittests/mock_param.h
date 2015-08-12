@@ -6,6 +6,8 @@
 #define META_PROCESSING_MOCK_PARAMS_H_
 /* Parameters for mock functions */
 
+#define ROOT_INODE 543783
+
 /* System statistics */
 #define MOCK_SYSTEM_SIZE 1048576
 #define MOCK_CACHE_SIZE 1048576
@@ -40,6 +42,7 @@ struct stat to_verified_stat;
 #define INO_DELETE_FILE_BLOCK 200000
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
+#define TRUNC_SIZE 65536
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213
@@ -63,6 +66,9 @@ struct stat to_verified_stat;
 #define INO_DIR_REMOVE_ENTRY_FAIL 4
 #define INO_CHILDREN_IS_EMPTY 5
 #define INO_CHILDREN_IS_NONEMPTY 6
+
+/* link_update_meta() */
+#define INO_TOO_MANY_LINKS 279348
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

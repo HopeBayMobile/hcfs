@@ -169,7 +169,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		ret = fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		ret = fetch_from_cloud(blockfptr, ptr->this_inode,
+					ptr->block_no);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -213,5 +214,4 @@ errcode_handle:
 	if (mopen == TRUE)
 		fclose(metafptr);
 	free(ptr);
-	return;
 }

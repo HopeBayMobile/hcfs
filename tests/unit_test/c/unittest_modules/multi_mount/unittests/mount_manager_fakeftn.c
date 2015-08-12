@@ -1,3 +1,5 @@
+#define FUSE_USE_VERSION 29
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
@@ -12,10 +14,14 @@ struct fuse_chan {
 } tmpchan;
 extern SYSTEM_CONF_STRUCT system_config;
 
-struct fuse_lowlevel_ops {
-	int test;
-} hfuse_ops;
+void temp_init(void *userdata, struct fuse_conn_info *conn)
+{
+	return;
+}
 
+struct fuse_lowlevel_ops hfuse_ops = {
+	.init = temp_init,
+};
 struct fuse_session {
 	int test;
 } tmpsession;
@@ -30,20 +36,18 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-struct fuse_chan* fuse_mount(char *mp, struct fuse_args *args)
+struct fuse_chan* fuse_mount(const char *mp, struct fuse_args *args)
 {
 	return &tmpchan;
 }
-
 struct fuse_session* fuse_lowlevel_new(struct fuse_args *args,
-	struct fuse_lowlevel_ops *fuse_ops, size_t size, void *ptr)
+	const struct fuse_lowlevel_ops *fuse_ops, size_t size, void *ptr)
 {
 	return &tmpsession;
 }
-
-void fuse_set_signal_handlers(struct fuse_session *ptr)
+int fuse_set_signal_handlers(struct fuse_session *ptr)
 {
-	return;
+	return 0;
 }
 
 void fuse_session_add_chan(struct fuse_session *ptr, struct fuse_chan *ptr2)
@@ -76,15 +80,15 @@ void fuse_session_destroy(struct fuse_session *ptr)
 	return;
 }
 
-void fuse_parse_cmdline(struct fuse_args *ptr, char **mp, int *mt, int *fg)
+int fuse_parse_cmdline(struct fuse_args *ptr, char **mp, int *mt, int *fg)
 {
-	return;
+	return 0;
 }
 void fuse_opt_free_args(struct fuse_args *ptr)
 {
 	return;
 }
-void fuse_unmount(char *mp, struct fuse_chan *ptr2)
+void fuse_unmount(const char *mp, struct fuse_chan *ptr2)
 {
 	return;
 }
@@ -96,6 +100,21 @@ int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 }
 
 int lookup_init(LOOKUP_HEAD_TYPE *lookup_table)
+{
+	return 0;
+}
+
+int fetch_meta_path(char *pathname, ino_t this_inode)
+{
+	return 0;
+}
+int update_FS_statistics(char *pathname, long long system_size,
+		long long num_inodes)
+{
+	return 0;
+}
+int read_FS_statistics(char *pathname, long long *system_size_ptr,
+		long long *num_inodes_ptr)
 {
 	return 0;
 }

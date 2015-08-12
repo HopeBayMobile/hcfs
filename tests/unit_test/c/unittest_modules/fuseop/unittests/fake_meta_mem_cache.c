@@ -293,6 +293,8 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 		int *result_index, const char *childname,
 		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	*result_index = -1;
+
 	switch (this_inode) {
 	case 1:
 		if (strcmp(childname,"testfile") == 0) {
@@ -342,8 +344,10 @@ int meta_cache_seek_dir_entry(ino_t this_inode, DIR_ENTRY_PAGE *result_page,
 }
 
 
-int meta_cache_update_symlink_data(ino_t this_inode, const struct stat *inode_stat,
-        const SYMLINK_META_TYPE *symlink_meta_ptr, META_CACHE_ENTRY_STRUCT *bptr)
+int meta_cache_update_symlink_data(ino_t this_inode,
+	const struct stat *inode_stat,
+        const SYMLINK_META_TYPE *symlink_meta_ptr,
+	META_CACHE_ENTRY_STRUCT *bptr)
 {
 	return 0;
 }
@@ -358,3 +362,4 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 
 	return 0;
 }
+
