@@ -10,6 +10,7 @@
 * 2015/2/11 Jiahong moved some functions to hfuse_system.h.
 * 2015/5/11 Jiahong modifying file meta for new block indexing / searching
 * 2015/6/1 Jiahong adding structure for logger.
+* 2015/6/30 Jiahong moved dir and file meta defs to other files
 *
 **************************************************************************/
 
@@ -43,7 +44,7 @@
 /* Max length of link path pointed by symbolic link */
 #define MAX_LINK_PATH 4096
 
-/*  */
+/* Hard link limit */
 #define MAX_HARD_LINK 65000
 
 /* Number of pointers in a pointer page */
@@ -91,6 +92,9 @@ typedef struct {
 	long long entry_page_gc_list;
 	long long tree_walk_list_head;
 	unsigned long generation;
+	unsigned long long metaver;
+	ino_t root_inode;
+	long long upload_seq;
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
@@ -112,6 +116,7 @@ typedef struct {
 /* Defining one block status entry in meta files */
 typedef struct {
 	unsigned char status;
+	unsigned char uploaded;
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
@@ -134,6 +139,10 @@ typedef struct {
 	long long triple_indirect;
 	long long quadruple_indirect;
 	unsigned long generation;
+	unsigned long long metaver;
+	ino_t root_inode;
+	long long upload_seq;
+	long long size_last_upload;
 } FILE_META_TYPE;
 
 /* Defining the structure of symbolic link meta */
@@ -142,6 +151,9 @@ typedef struct {
 	unsigned link_len;
 	unsigned long generation;
 	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
+	unsigned long long metaver;
+	ino_t root_inode;
+	long long upload_seq;
 } SYMLINK_META_TYPE;
 
 /*END META definition*/
@@ -170,8 +182,8 @@ char **global_argv;
 struct fuse_args global_fuse_args;
 
 /* Functions for initializing HCFS */
-void* mount_multi_thread(void *ptr);
-void* mount_single_thread(void *ptr);
+void *mount_multi_thread(void *ptr);
+void *mount_single_thread(void *ptr);
 
 int hook_fuse(int argc, char **argv);
 

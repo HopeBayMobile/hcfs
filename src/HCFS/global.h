@@ -17,6 +17,10 @@
 #define TRUE 1
 #define FALSE 0
 
+/* Defines the version of the current meta defs */
+#define CURRENT_META_VER 1
+#define BACKWARD_COMPATIBILITY 1
+
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1

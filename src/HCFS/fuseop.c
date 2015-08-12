@@ -439,7 +439,8 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			return;
 		}
 
-		write_log(10, "Debug getattr return inode %ld\n", tmp_stat.st_ino);
+		write_log(10, "Debug getattr return inode %ld\n",
+				tmp_stat.st_ino);
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
@@ -550,10 +551,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mknod_update_meta(self_inode, parent_inode, selfname,
-			&this_stat, this_generation);
+			&this_stat, this_generation, tmpptr->f_ino);
 
 	/* TODO: May need to delete from super block and parent if failed. */
 	if (ret_code < 0) {
@@ -573,8 +576,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISREG);
 	if (ret_code < 0) {
@@ -582,6 +583,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_code);
 		return;
 	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+
 	fuse_reply_entry(req, &(tmp_param));
 }
 
@@ -665,10 +672,13 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	ret_code = mkdir_update_meta(self_inode, parent_inode,
-			selfname, &this_stat, this_gen);
+			selfname, &this_stat, this_gen, tmpptr->f_ino);
 
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
@@ -681,14 +691,17 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
-
 	ret_code = lookup_increase(tmpptr->lookup_table, self_inode,
 				1, D_ISDIR);
 	if (ret_code < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_code);
 		return;
+	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
 	}
 
 	fuse_reply_entry(req, &(tmp_param));
@@ -1288,6 +1301,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	int entry_index)
 {
 	int ret_val;
+
 	while (((block_page)->block_entries[entry_index].status == ST_CLOUD) ||
 		((block_page)->block_entries[entry_index].status == ST_CtoL)) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
@@ -1669,6 +1683,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 * Function name: hfuse_ll_truncate
 *        Inputs: ino_t this_inode, struct stat *filestat,
 *                off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr
+*                fuse_req_t req
 *       Summary: Truncate the regular file pointed by "this_inode"
 *                to size "offset".
 *  Return value: 0 if successful. Otherwise returns the negation of the
@@ -1677,7 +1692,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 *
 *************************************************************************/
 int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
-	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr)
+	off_t offset, META_CACHE_ENTRY_STRUCT **body_ptr, fuse_req_t req)
 {
 /* If truncate file smaller, do not truncate metafile, but instead set the
 *  affected entries to ST_TODELETE (which will be changed to ST_NONE once
@@ -1697,6 +1712,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	int last_index;
 	long long temp_trunc_size;
 	ssize_t ret_ssize;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	write_log(10, "Debug truncate: offset %ld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
@@ -1878,6 +1896,12 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
+
+	ret = change_mount_stat(tmpptr,
+			(long long) (offset - filestat->st_size), 0);
+	if (ret < 0)
+		return ret;
+
 	filestat->st_size = offset;
 	filestat->st_mtime = time(NULL);
 
@@ -1967,6 +1991,7 @@ int read_lookup_meta(FH_ENTRY *fh_ptr, BLOCK_ENTRY_PAGE *temppage,
 		off_t this_page_fpos)
 {
 	int ret;
+
 	fh_ptr->meta_cache_ptr = meta_cache_lock_entry(fh_ptr->thisinode);
 	if (fh_ptr->meta_cache_ptr == NULL)
 		return -ENOMEM;
@@ -2350,7 +2375,8 @@ size_t _read_block(char *buf, size_t size, long long bindex,
 			} else {
 			/* Some exception that block file is deleted in
 			*  the middle of the status check*/
-				write_log(2, "Debug read: cannot open block file.");
+				write_log(2,
+					"Debug read: cannot open block file.");
 				write_log(2, " Perhaps replaced?\n");
 				fh_ptr->opened_block = -1;
 			}
@@ -2586,6 +2612,7 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 		FH_ENTRY *fh_ptr, off_t this_page_fpos)
 {
 	int ret;
+
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
 		write_log(10,
@@ -3005,6 +3032,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	struct stat temp_stat;
 	int ret, errcode;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	thisinode = real_ino(req, ino);
 
@@ -3098,6 +3128,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0, 0);
+		ret = change_mount_stat(tmpptr,
+			(long long) ((offset + total_bytes_written)
+						- temp_stat.st_size), 0);
+		if (ret < 0) {
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+			fuse_reply_err(req, -ret);
+			return;
+		}
 
 		temp_stat.st_size = (offset + total_bytes_written);
 		temp_stat.st_blocks = (temp_stat.st_size+511) / 512;
@@ -3133,6 +3173,10 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 {
 	struct statvfs *buf;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
+	long long system_size, num_inodes;
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	/* TODO: Different statistics for different filesystems */
 	write_log(10, "Debug statfs\n");
@@ -3145,39 +3189,42 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&(hcfs_system->access_sem));
+	sem_wait(&((tmpptr->FS_stat).lock));
+
+	system_size = (tmpptr->FS_stat).system_size;
+	num_inodes = (tmpptr->FS_stat).num_inodes;
+
+	sem_post(&((tmpptr->FS_stat).lock));
+
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
-	if (hcfs_system->systemdata.system_size > (50*powl(1024, 3)))
-		buf->f_blocks = (((hcfs_system->systemdata.system_size - 1)
+	if (system_size > (50*powl(1024, 3)))
+		buf->f_blocks = (((system_size - 1)
 						/ 4096) + 1) * 2;
 	else
 		buf->f_blocks = (25*powl(1024, 2));
 
-	if (hcfs_system->systemdata.system_size == 0)
+	if (system_size == 0)
 		buf->f_bfree = buf->f_blocks;
 	else
 		buf->f_bfree = buf->f_blocks -
-			(((hcfs_system->systemdata.system_size - 1)
+			(((system_size - 1)
 						/ 4096) + 1);
 	if (buf->f_bfree < 0)
 		buf->f_bfree = 0;
 	buf->f_bavail = buf->f_bfree;
-	sem_post(&(hcfs_system->access_sem));
 
 	write_log(10, "Debug statfs, checking inodes\n");
 
-	super_block_share_locking();
-	if (sys_super_block->head.num_active_inodes > 1000000)
-		buf->f_files = (sys_super_block->head.num_active_inodes * 2);
+	if (num_inodes > 1000000)
+		buf->f_files = (num_inodes * 2);
 	else
 		buf->f_files = 2000000;
 
-	buf->f_ffree = buf->f_files - sys_super_block->head.num_active_inodes;
+	buf->f_ffree = buf->f_files - num_inodes;
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
 	buf->f_favail = buf->f_ffree;
-	super_block_share_release();
 	buf->f_namemax = MAX_FILENAME_LEN;
 
 	write_log(10, "Debug statfs, returning info\n");
@@ -3446,10 +3493,12 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			write_log(10, "Debug readdir entry %s, %ld\n",
 				temp_page.dir_entries[count].d_name,
 				tempstat.st_ino);
-			write_log(10, "Debug readdir entry size %ld\n", entry_size);
+			write_log(10, "Debug readdir entry size %ld\n",
+				entry_size);
 			if (entry_size > (size - buf_pos)) {
 				meta_cache_unlock_entry(body_ptr);
-				write_log(10, "Readdir breaks, next offset %ld, ",
+				write_log(10,
+					"Readdir breaks, next offset %ld, ",
 					nextentry_pos);
 				write_log(10, "file pos %lld, entry %d\n",
 					temp_page.this_page_pos, (count+1));
@@ -3476,7 +3525,8 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	}
 	gettimeofday(&tmp_time2, NULL);
 
-	write_log(0, "readdir elapse %f\n", (tmp_time2.tv_sec - tmp_time1.tv_sec)
+	write_log(0, "readdir elapse %f\n",
+			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
 	fuse_reply_buf(req, buf, buf_pos);
@@ -3487,7 +3537,6 @@ errcode_handle:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -3603,7 +3652,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		}
 
 		ret_val = hfuse_ll_truncate(this_inode, &newstat,
-				attr->st_size, &body_ptr);
+				attr->st_size, &body_ptr, req);
 		if (ret_val < 0) {
 			meta_cache_close_file(body_ptr);
 			meta_cache_unlock_entry(body_ptr);
@@ -3839,7 +3888,7 @@ static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	if ((current_val == 0) && (to_delete == TRUE))
-		actual_delete_inode(thisinode, d_type);
+		actual_delete_inode(thisinode, d_type, tmpptr->f_ino, tmpptr);
 
 	fuse_reply_none(req);
 }
@@ -3867,9 +3916,9 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int ret_val;
 	int result_index;
 	int errcode;
-        MOUNT_T *tmpptr;
+	MOUNT_T *tmpptr;
 
-        parent_inode = real_ino(req, parent);
+	parent_inode = real_ino(req, parent);
 
 	/* Reject if name too long */
 	if (strlen(name) > MAX_FILENAME_LEN) {
@@ -3878,7 +3927,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 	if (strlen(name) <= 0) {
-		write_log(0, "Lack for file name\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -3890,7 +3938,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 	if (strlen(link) <= 0) {
-		write_log(0, "Lack for link target\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -3953,11 +4000,14 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		errcode = -ENOSPC;
 		goto error_handle;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	this_stat.st_ino = self_inode;
 
 	/* Write symlink meta and add new entry to parent */
 	ret_val = symlink_update_meta(parent_meta_cache_entry, &this_stat,
-		link, this_generation, name);
+		link, this_generation, name, tmpptr->f_ino);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		errcode = ret_val;
@@ -3982,11 +4032,14 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
 
-        tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+	ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
+				1, D_ISLNK);
 
-        ret_val = lookup_increase(tmpptr->lookup_table, self_inode,
-                                1, D_ISLNK);
-
+	if (ret_val < 0) {
+		meta_forget_inode(self_inode);
+		fuse_reply_err(req, -ret_val);
+	}
+	ret_val = change_mount_stat(tmpptr, 0, 1);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -4000,7 +4053,6 @@ error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -4019,7 +4071,7 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	char link_buffer[MAX_LINK_PATH + 1];
 	int ret_code;
 
-        this_inode = real_ino(req, ino);
+	this_inode = real_ino(req, ino);
 
 	meta_cache_entry = meta_cache_lock_entry(this_inode);
 	if (meta_cache_entry == NULL) {
@@ -4071,7 +4123,6 @@ static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 	write_log(5, "Readlink: Lookup symlink success. Link to %s\n",
 		link_buffer);
 	fuse_reply_readlink(req, link_buffer);
-	return;
 }
 
 /************************************************************************
@@ -4168,7 +4219,7 @@ static void hfuse_ll_setxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		free(xattr_page);
 	write_log(5, "setxattr operation success\n");
 	fuse_reply_err(req, 0);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4176,7 +4227,6 @@ error_handle:
 	if (xattr_page)
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4294,7 +4344,7 @@ static void hfuse_ll_getxattr(fuse_req_t req, fuse_ino_t ino, const char *name,
 		free(xattr_page);
 	if (value)
 		free(value);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4304,7 +4354,6 @@ error_handle:
 	if (value)
 		free(value);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4397,7 +4446,7 @@ static void hfuse_ll_listxattr(fuse_req_t req, fuse_ino_t ino, size_t size)
 		free(xattr_page);
 	if (key_buf)
 		free(key_buf);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4407,7 +4456,6 @@ error_handle:
 	if (key_buf)
 		free(key_buf);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4495,7 +4543,7 @@ static void hfuse_ll_removexattr(fuse_req_t req, fuse_ino_t ino,
 		free(xattr_page);
 	write_log(5, "Remove key success\n");
 	fuse_reply_err(req, 0);
-	return ;
+	return;
 
 error_handle:
 	meta_cache_close_file(meta_cache_entry);
@@ -4503,7 +4551,6 @@ error_handle:
 	if (xattr_page)
 		free(xattr_page);
 	fuse_reply_err(req, -retcode);
-	return ;
 }
 
 /************************************************************************
@@ -4541,7 +4588,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 	if (strlen(newname) <= 0) {
-		write_log(0, "Lack for hard link name\n");
 		fuse_reply_err(req, EINVAL);
 		return;
 	}
@@ -4633,7 +4679,6 @@ error_handle:
 	meta_cache_close_file(parent_meta_cache_entry);
 	meta_cache_unlock_entry(parent_meta_cache_entry);
 	fuse_reply_err(req, -errcode);
-	return;
 }
 
 /************************************************************************
@@ -4724,9 +4769,11 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 	this_stat.st_ino = self_inode;
 	ret_val = mknod_update_meta(self_inode, parent_inode, name,
-			&this_stat, this_generation);
+			&this_stat, this_generation, tmpptr->f_ino);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
 		fuse_reply_err(req, -ret_val);
@@ -4734,7 +4781,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Prepare stat data to be replied */
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
@@ -4756,7 +4802,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 	fi->fh = fh;
 	fuse_reply_create(req, &tmp_param, fi);
-	return;
 }
 
 /* Specify the functions used for the FUSE operations */
@@ -4794,7 +4839,7 @@ struct fuse_lowlevel_ops hfuse_ops = {
 };
 
 /* Initiate FUSE */
-void* mount_multi_thread(void *ptr)
+void *mount_multi_thread(void *ptr)
 {
 	struct fuse_session *session_ptr;
 	MOUNT_T *tmpptr;
@@ -4809,9 +4854,9 @@ void* mount_multi_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
 
-	lookup_destroy(tmpptr->lookup_table);
+	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
-void* mount_single_thread(void *ptr)
+void *mount_single_thread(void *ptr)
 {
 	struct fuse_session *session_ptr;
 	MOUNT_T *tmpptr;
@@ -4826,7 +4871,7 @@ void* mount_single_thread(void *ptr)
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
 
-	lookup_destroy(tmpptr->lookup_table);
+	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
 
 int hook_fuse(int argc, char **argv)
@@ -4841,7 +4886,8 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
-
+	/* TODO: Ensure that the above is finished before any operation
+		can start */
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
 	destroy_mount_mgr();

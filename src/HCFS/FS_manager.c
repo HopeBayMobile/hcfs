@@ -19,6 +19,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 
 #include "macro.h"
@@ -41,9 +42,10 @@ extern SYSTEM_CONF_STRUCT system_config;
 *************************************************************************/
 int init_fs_manager(void)
 {
-	int errcode;
+	int errcode, fd, ret;
 	DIR_META_TYPE tmp_head;
 	ssize_t ret_ssize;
+	struct timeval tmptime;
 
 	fs_mgr_path = malloc(sizeof(char) * (strlen(METAPATH)+100));
 	if (fs_mgr_path  == NULL) {
@@ -88,9 +90,39 @@ int init_fs_manager(void)
 
 		memset(&tmp_head, 0, sizeof(DIR_META_TYPE));
 
-		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-					sizeof(DIR_META_TYPE), 0);
+		gettimeofday(&tmptime, NULL);
+		fd = open("/dev/urandom", O_RDONLY);
 
+		if (fd < 0) {
+			errcode = EIO;
+			write_log(0, "Error opening random device\n");
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+
+		/* Generate system UUID */
+		ret = read(fd, fs_mgr_head->sys_uuid, 16);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "IO error reading random device. (%s)\n",
+				strerror(errcode));
+			errcode = -errcode;
+			close(fd);
+			goto errcode_handle;
+		}
+		close(fd);
+
+		PWRITE(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid,
+					16, 0);
+
+		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
+					sizeof(DIR_META_TYPE), 16);
+
+		ret = backup_FS_database();
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	} else {
 		fs_mgr_head->FS_list_fh = open(fs_mgr_path, O_RDWR);
 
@@ -102,8 +134,11 @@ int init_fs_manager(void)
 			goto errcode_handle;
 		}
 
+		PREAD(fs_mgr_head->FS_list_fh, fs_mgr_head->sys_uuid,
+					16, 0);
+
 		PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-					sizeof(DIR_META_TYPE), 0);
+					sizeof(DIR_META_TYPE), 16);
 		fs_mgr_head->num_FS = tmp_head.total_children;
 	}
 
@@ -190,6 +225,7 @@ ino_t _create_root_inode(void)
 	this_meta.generation = this_gen;
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	this_meta.root_inode = root_inode;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
@@ -202,6 +238,12 @@ ino_t _create_root_inode(void)
 	}
 
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
+	ret = update_FS_statistics(metapath, 0, 1);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
 	fclose(metafptr);
 	metafptr = NULL;
 	ret = super_block_mark_dirty(root_inode);
@@ -251,23 +293,23 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	}
 
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
+				sizeof(DIR_META_TYPE), 16);
 
 	if (fs_mgr_head->num_FS <= 0) {
 		ftruncate(fs_mgr_head->FS_list_fh, sizeof(DIR_META_TYPE));
 		tmp_head.total_children = 0;
 		fs_mgr_head->num_FS = 0;
-		tmp_head.root_entry_page = sizeof(DIR_META_TYPE);
+		tmp_head.root_entry_page = sizeof(DIR_META_TYPE) + 16;
 		tmp_head.next_xattr_page = 0;
 		tmp_head.entry_page_gc_list = 0;
-		tmp_head.tree_walk_list_head = sizeof(DIR_META_TYPE);
+		tmp_head.tree_walk_list_head = sizeof(DIR_META_TYPE) + 16;
 		tmp_head.generation = 0;
 		memset(&tpage, 0, sizeof(DIR_ENTRY_PAGE));
-		tpage.this_page_pos = sizeof(DIR_META_TYPE);
+		tpage.this_page_pos = sizeof(DIR_META_TYPE) + 16;
 		PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-			sizeof(DIR_META_TYPE), 0);
+			sizeof(DIR_META_TYPE), 16);
 		PWRITE(fs_mgr_head->FS_list_fh, &tpage, sizeof(DIR_ENTRY_PAGE),
-			sizeof(DIR_META_TYPE));
+			tpage.this_page_pos);
 	} else {
 		/* Initialize B-tree insertion by first loading the root of
 		*  the B-tree. */
@@ -421,7 +463,7 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 
 	/* Write head back */
 
-	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 0);
+	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	write_log(10,
 		"Total filesystem is now %lld\n", tmp_head.total_children);
@@ -484,7 +526,7 @@ int delete_filesystem(char *fsname)
 	}
 
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
+				sizeof(DIR_META_TYPE), 16);
 
 	/* Initialize B-tree deletion by first loading the root of
 	*  the B-tree. */
@@ -570,7 +612,7 @@ int delete_filesystem(char *fsname)
 					tmp_head.total_children);
 	/* Write head back */
 
-	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 0);
+	PWRITE(fs_mgr_head->FS_list_fh, &tmp_head, sizeof(DIR_META_TYPE), 16);
 
 	fs_mgr_head->num_FS--;
 	sem_post(&(fs_mgr_head->op_lock));
@@ -626,7 +668,7 @@ int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry)
 	}
 
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
+				sizeof(DIR_META_TYPE), 16);
 
 	/* Initialize B-tree searching by first loading the root of
 	*  the B-tree. */
@@ -694,7 +736,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	}
 
 	PREAD(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
+				sizeof(DIR_META_TYPE), 16);
 
 
 	/* Initialize B-tree walk by first loading the first node
@@ -729,7 +771,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 			tmp_head.total_children = num_walked;
 			write_log(0, "Rewriting FS num in database\n");
 			PWRITE(fs_mgr_head->FS_list_fh, &tmp_head,
-				sizeof(DIR_META_TYPE), 0);
+				sizeof(DIR_META_TYPE), 16);
 		}
 	}
 

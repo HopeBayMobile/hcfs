@@ -10,9 +10,9 @@
 *
 * Revision History
 * 2015/2/6  Jiahong added header for this file, and revising coding style.
-* 2015/5/26 Kewei added some error handling about function 
+* 2015/5/26 Kewei added some error handling about function
 *           super_block_reclaim_fullscan() & super_block_share_release(),
-*           and besides modified macro SB_ENTRY_SIZE & SB_HEAD_SIZE to avoid 
+*           and besides modified macro SB_ENTRY_SIZE & SB_HEAD_SIZE to avoid
 *           comparing between signed and unsigned integers.
 * 2015/5/27 Jiahong working on improving error handling
 * 2015/5/28 Jiahong resolving merges
@@ -571,13 +571,14 @@ int super_block_delete(ino_t this_inode)
 			return ret_val;
 		}
 	}
-	
+
 	/* Add to unclaimed_list file */
 	temp = this_inode;
 	ret_val = fseek(sys_super_block->unclaimed_list_fptr, 0, SEEK_END);
 	if (ret_val < 0) {
 		errcode = errno;
-		write_log(0, "Error in writing to unclaimed list. Code %d, %s\n",
+		write_log(0,
+			"Error in writing to unclaimed list. Code %d, %s\n",
 				errcode, strerror(errcode));
 		super_block_exclusive_release();
 		return -errcode;
@@ -687,7 +688,7 @@ int super_block_reclaim(void)
 			super_block_exclusive_release();
 			return -EIO;
 		}
-			
+
 		write_log(0, "Warning: wrong number of items read in ");
 		write_log(0, "inode reclaiming.\n");
 		num_unclaimed = ret_items;
@@ -807,7 +808,7 @@ int super_block_reclaim_fullscan(void)
 		if ((tempentry.status == TO_BE_RECLAIMED) ||
 				((tempentry.inode_stat.st_ino == 0) &&
 					(tempentry.status != TO_BE_DELETED))) {
-	
+
 			/* Modify status and reclaim the entry. */
 			tempentry.status = RECLAIMED;
 			sys_super_block->head.num_inode_reclaimed++;
@@ -825,12 +826,13 @@ int super_block_reclaim_fullscan(void)
 			if (retsize < SB_ENTRY_SIZE)
 				break;
 
-			if (first_reclaimed == 0) /* Record first reclaimed node */ 
+			/* Record first reclaimed node */
+			if (first_reclaimed == 0)
 				first_reclaimed = tempentry.this_index;
 
 			/* Save previous and now reclaimed inode */
 			old_last_reclaimed = last_reclaimed;
-			last_reclaimed = tempentry.this_index;	
+			last_reclaimed = tempentry.this_index;
 			/* Connect previous and now reclaimed entry by setting
 			   prev_entry.util_ll_next = now */
 			if (old_last_reclaimed > 0) {
@@ -880,7 +882,7 @@ int super_block_reclaim_fullscan(void)
 	}
 
 	ftruncate(fileno(sys_super_block->unclaimed_list_fptr), 0);
-	
+
 	super_block_exclusive_release();
 
 	/* TODO: Consider how to handle failure in reclaim_fullscan
@@ -1246,10 +1248,11 @@ int super_block_share_locking(void)
 *************************************************************************/
 int super_block_share_release(void)
 {
-	sem_wait(&(sys_super_block->share_CR_lock_sem));	
-	if (sys_super_block->share_counter == 0) { 
+	sem_wait(&(sys_super_block->share_CR_lock_sem));
+	if (sys_super_block->share_counter == 0) {
 		sem_post(&(sys_super_block->share_CR_lock_sem));
-		return -1; /* Return error if share_counter==0 before decreasing */
+		return -1;
+		/* Return error if share_counter==0 before decreasing */
 	}
 	sys_super_block->share_counter--;
 	if (sys_super_block->share_counter == 0)

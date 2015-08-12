@@ -810,3 +810,37 @@ TEST_F(unmount_allTest, UnmountAll) {
 
 /* End of the test case for the function unmount_all */
 
+/* Begin of the test case for the function change_mount_stat */
+
+class change_mount_statTest : public ::testing::Test {
+ protected:
+  MOUNT_T tmp_mount;
+  virtual void SetUp() {
+    memset(&tmp_mount, 0, sizeof(MOUNT_T));
+    sem_init(&(tmp_mount.FS_stat.lock), 0, 1);
+   }
+
+  virtual void TearDown() {
+   }
+ };
+
+TEST_F(change_mount_statTest, TestChange) {
+  int ret;
+
+  tmp_mount.FS_stat.system_size = 100000;
+  tmp_mount.FS_stat.num_inodes = 123;
+
+  ret = change_mount_stat(&tmp_mount, 123456, 789);
+
+  ASSERT_EQ(0, ret);
+  EXPECT_EQ(100000 + 123456, tmp_mount.FS_stat.system_size);
+  EXPECT_EQ(123 + 789, tmp_mount.FS_stat.num_inodes);
+
+  ret = change_mount_stat(&tmp_mount, -1234560, -7890);
+  ASSERT_EQ(0, ret);
+  EXPECT_EQ(0, tmp_mount.FS_stat.system_size);
+  EXPECT_EQ(0, tmp_mount.FS_stat.num_inodes);
+ }
+
+/* End of the test case for the function change_mount_stat */
+

@@ -35,7 +35,7 @@
 		int sem_val; \
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
-		return -1; \
+			return -1; \
 	}
 /* TODO: Consider whether want to use write-back mode for meta caching */
 
@@ -340,7 +340,8 @@ int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 	}
 
 	/* Sync meta */
-	/* TODO Right now, may not set meta_dirty to TRUE if only changes pages */
+	/* TODO Right now, may not set meta_dirty to TRUE if only changes
+			pages */
 	if (body_ptr->meta_dirty == TRUE) {
 		if (S_ISREG(body_ptr->this_stat.st_mode)) {
 			FSEEK(body_ptr->fptr, sizeof(struct stat), SEEK_SET);
@@ -1031,6 +1032,7 @@ int meta_cache_remove(ino_t this_inode)
 	META_CACHE_LOOKUP_ENTRY_STRUCT *current_ptr, *prev_ptr;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char found_entry;
+	int ret;
 
 	index = hash_inode_to_meta_cache(this_inode);
 /*First lock corresponding header*/
@@ -1060,6 +1062,15 @@ int meta_cache_remove(ino_t this_inode)
 	sem_wait(&((current_ptr->body).access_sem));
 
 	body_ptr = &(current_ptr->body);
+
+	/* TODO: How to handle deletion error due to failed flush */
+	/* Flush dirty data */
+	ret = flush_single_entry(body_ptr);
+	if (ret < 0) {
+		sem_post(&((current_ptr->body).access_sem));
+		sem_post(&(meta_mem_cache[index].header_sem));
+		return ret;
+	}
 
 	if (body_ptr->dir_meta != NULL)
 		free(body_ptr->dir_meta);
@@ -1112,6 +1123,7 @@ static inline int _expire_entry(META_CACHE_LOOKUP_ENTRY_STRUCT *lptr,
 							int cindex)
 {
 	int ret;
+
 	ret = flush_single_entry(&(lptr->body));
 	if (ret < 0)
 		goto errhandle;

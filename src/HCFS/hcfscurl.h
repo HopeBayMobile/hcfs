@@ -38,8 +38,8 @@ sem_t download_curl_sem;
 
 /* Swift collections */
 
-int hcfs_get_auth_swift(char *swift_user, char *swift_pass, char *swift_url,
-						CURL_HANDLE *curl_handle);
+int hcfs_get_auth_swift(char *swift_user, char *swift_pass,
+	char *swift_url, CURL_HANDLE *curl_handle);
 int hcfs_init_swift_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_swift_backend(CURL *curl);
 int hcfs_swift_list_container(CURL_HANDLE *curl_handle);
