@@ -228,7 +228,8 @@ unsigned char* get_key(){
 	const EVP_MD *m;
 	EVP_MD_CTX ctx;
 	m = EVP_sha256();
-	if (!m) return NULL;
+	if (!m)
+		return NULL;
 	EVP_DigestInit(&ctx, m);
 	unsigned char* salt = (unsigned
 			       char*)"oluik.354jhmnk,";
@@ -243,6 +244,17 @@ unsigned char* get_key(){
 
 /* TODO: error handling
  */
+/************************************************************************
+ * *
+ * * Function name: transform_encrypt_fd
+ * *        Inputs: FILE* in_fd, open with 'r' mode
+ *		    unsigned char* key
+ *		    unsigned char** data
+ * *       Summary: Encrypt content read from in_fd, and return a new fd
+ * *
+ * *  Return value: File*
+ * *
+ * *************************************************************************/
 FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
 			   unsigned char** data){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
@@ -258,8 +270,7 @@ FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
 
 /* TODO: error handling
  */
-FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
-			   unsigned char** data){
+void decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
 			       in_fd);
@@ -267,8 +278,9 @@ FILE* transform_decrypt_fd(FILE* in_fd, unsigned char* key,
 					 sizeof(unsigned char));
 	aes_gcm_decrypt_fix_iv(new_data, buf, read_count, key);
 	free(buf);
-	*data = new_data;
-	return fmemopen(new_data, read_count-TAG_SIZE, "r");
+	fwrite(new_data, sizeof(unsigned char), read_count-TAG_SIZE,
+	       decrypt_to_fd);
+	free(new_data);
 }
 
 /*
@@ -293,21 +305,17 @@ int main(void){
 	free(b64_output);
 	free(b64_back);
 
-	//FILE* f = fopen("./enc.c", "r");
-	//unsigned char* key = get_key();
-	//printf("key: %d\n", key[31]);
-	//unsigned char* data = NULL;
-	//unsigned char* data2 = NULL;
-	//FILE* new_f = transform_encrypt_fd(f, key, &data);
-	//FILE* new_f_f = transform_decrypt_fd(new_f, key, &data2);
-	//unsigned char buf[MAX_ENC_DATA] = {0};
-	//fread(buf, sizeof(unsigned char), MAX_ENC_DATA, new_f_f);
-	//printf("%s", buf);
-	//fclose(f);
-	//fclose(new_f);
-	//fclose(new_f_f);
-	//free(data);
-	//free(key);
-	//free(data2);
+	FILE* f = fopen("./enc.c", "r");
+	unsigned char* key = get_key();
+	printf("key: %d\n", key[31]);
+	unsigned char* data = NULL;
+	FILE* new_f = transform_encrypt_fd(f, key, &data);
+	FILE* new_f_f = fopen("/tmp/test", "w");
+	decrypt_to_fd(new_f_f, key, new_f);
+	fclose(f);
+	fclose(new_f);
+	fclose(new_f_f);
+	free(data);
+	free(key);
 }
 */

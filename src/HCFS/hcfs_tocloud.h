@@ -22,6 +22,7 @@
 #include <curl/curl.h>
 
 #include "hcfscurl.h"
+#include "enc.h"
 
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16

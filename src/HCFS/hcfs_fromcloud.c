@@ -27,6 +27,7 @@
 #include <curl/curl.h>
 
 #include "params.h"
+#include "enc.h"
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
@@ -70,8 +71,13 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 						which_curl_handle);
 	sprintf(idname, "download_thread_%d", which_curl_handle);
 	strcpy(download_curl_handles[which_curl_handle].id, idname);
-	status = hcfs_get_object(fptr, objname,
+	FILE* get_fptr = fmemopen(NULL, MAX_ENC_DATA, "w+");
+	status = hcfs_get_object(get_fptr, objname,
 			&(download_curl_handles[which_curl_handle]));
+	unsigned char* key = get_key();
+	decrypt_to_fd(fptr, key, get_fptr);
+	fclose(get_fptr);
+	free(key);
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
