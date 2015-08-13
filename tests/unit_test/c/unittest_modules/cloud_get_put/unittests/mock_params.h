@@ -21,6 +21,8 @@ char **objname_list;
 int objname_counter;
 sem_t objname_counter_sem;
 
+char no_backend_stat;
+
 char upload_ctl_todelete_blockno[100];
 SYSTEM_CONF_STRUCT system_config;
 

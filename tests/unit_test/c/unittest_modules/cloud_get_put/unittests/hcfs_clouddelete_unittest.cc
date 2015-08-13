@@ -239,8 +239,10 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fwrite(&tmp_file_meta, sizeof(FILE_META_TYPE), 1, meta); // Write file_meta_type
-	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++)
+	for (int i = 0 ; i < MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
 		tmp_blockentry_page.block_entries[i].status = ST_CLOUD;
+		tmp_blockentry_page.block_entries[i].uploaded = 1;
+	}
 	tmp_blockentry_page.num_entries = MAX_BLOCK_ENTRIES_PER_PAGE;
 	for (int page_num = 0 ; page_num < total_page ; page_num++) {
 		fwrite(&tmp_blockentry_page, sizeof(BLOCK_ENTRY_PAGE), 1, meta); // Write block page

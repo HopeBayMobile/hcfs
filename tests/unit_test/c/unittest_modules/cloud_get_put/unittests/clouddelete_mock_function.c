@@ -101,3 +101,9 @@ int write_log(int level, char *format, ...)
 {
 	return 0;
 }
+
+int update_backend_stat(ino_t root_inode, long long system_size_delta,
+			long long num_inodes_delta)
+{
+	return 0;
+}

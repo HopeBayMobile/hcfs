@@ -8,6 +8,7 @@
 * Revision History
 * 2015/7/7 Jiahong created this file
 * 2015/7/15 Jiahong adding most content
+* 2015/7/31 Jiahong adding data structure for FS statistics
 *
 **************************************************************************/
 
@@ -21,7 +22,7 @@
 
 #include "params.h"
 #include "fuseop.h"
-#include "lookup_count.h"
+#include "lookup_count_types.h"
 
 /*
 Binary search tree
@@ -35,8 +36,15 @@ Pointers to the FUSE session and channel used for this mount
 */
 
 typedef struct {
+	long long system_size;
+	long long num_inodes;
+	sem_t lock;
+} FS_STAT_T;
+
+typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
+	char rootpath[METAPATHLEN];
 	char *f_mp;
 	struct timeval mt_time;
 	pthread_t mt_thread;
@@ -44,6 +52,7 @@ typedef struct {
 	struct fuse_chan *chan_ptr;
 	char is_unmount;
 	LOOKUP_HEAD_TYPE *lookup_table;
+	FS_STAT_T FS_stat;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
@@ -94,6 +103,8 @@ int delete_mount_node(char *fsname, MOUNT_NODE_T *node,
 					MOUNT_NODE_T **ret_node);
 int delete_mount(char *fsname, MOUNT_NODE_T **ret_node);
 
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
+				long long num_inodes_delta);
 
 #endif  /* GW20_HCFS_MOUNT_MANAGER_H_ */
 

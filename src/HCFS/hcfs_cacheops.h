@@ -18,6 +18,8 @@
 #include <unistd.h>
 #include <semaphore.h>
 
+#include "fuseop.h"
+
 void sleep_on_cache_full(void);
 void notify_sleep_on_cache(void);
 void run_cache_loop(void);

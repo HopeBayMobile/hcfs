@@ -23,7 +23,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define FTRUNCATE(A, B)\
@@ -36,7 +36,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define SETXATTR(A, B, C, D, E)\
@@ -49,7 +49,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define LSEEK(A, B, C)\
@@ -62,7 +62,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define FTELL(A)\
@@ -75,7 +75,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define UNLINK(A)\
@@ -88,8 +88,8 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
-	} 
+		} \
+	}
 
 #define MKDIR(A, B)\
 	{\
@@ -101,7 +101,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define MKNOD(A, B, C)\
@@ -114,7 +114,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define FREAD(A, B, C, D)\
@@ -126,7 +126,7 @@
 			write_log(0, "IO error in %s.\n", __func__);\
 			errcode = -EIO;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define FWRITE(A, B, C, D)\
@@ -138,7 +138,7 @@
 			write_log(0, "IO error in %s.\n", __func__);\
 			errcode = -EIO;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define PREAD(A, B, C, D)\
@@ -151,7 +151,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define PWRITE(A, B, C, D)\
@@ -164,7 +164,7 @@
 				errcode, strerror(errcode));\
 			errcode = -errcode;\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define ATOL(A)\
@@ -177,12 +177,12 @@
 			write_log(0, "Conversion error in %s. Code %d, %s\n",\
 				__func__, errcode, strerror(errcode));\
 			goto errcode_handle;\
-		}\
+		} \
 		if ((endptr != 0) && (*endptr != '\0')) {\
 			write_log(0, "Conversion error in %s.\n",\
 				__func__);\
 			goto errcode_handle;\
-		}\
+		} \
 	}
 
 #define HTTP_PERFORM_RETRY(A)\
@@ -196,8 +196,8 @@
 					continue;\
 			} else {\
 				break;\
-			}\
-		}\
+			} \
+		} \
 	}
 
 #endif  /* GW20_HCFS_MACRO_H_ */

@@ -121,7 +121,8 @@ int meta_cache_remove(ino_t this_inode)
 
 	/* Remove todel file here */
 	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
-	unlink(metapath);
+	if (!access(metapath, F_OK))
+		unlink(metapath);
 
 	return 0;
 }
@@ -222,10 +223,10 @@ int delete_dir_entry_btree(DIR_ENTRY *to_delete_entry, DIR_ENTRY_PAGE *tnode,
 /* mock functions - super_block.c*/
 int super_block_to_delete(ino_t this_inode)
 {
-	if (this_inode == INO_DELETE_DIR)
+	/*if (this_inode == INO_DELETE_DIR)
 		return -1;
 	if (this_inode == INO_DELETE_LNK)
-		return -2;
+		return -2;*/
 	return 0;
 }
 
@@ -282,7 +283,7 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		inode_stat->st_size = NUM_BLOCKS * MAX_BLOCK_SIZE;
 	} else {
 		inode_stat->st_size = 0;
-		inode_stat->st_mode = (this_inode % 2 ? S_IFREG : S_IFDIR);
+		inode_stat->st_mode = (this_inode % 2 ? S_IFLNK : S_IFDIR);
 	}
 	return 0;
 }
@@ -305,5 +306,28 @@ MOUNT_T tmpmount;
 
 void* fuse_req_userdata(fuse_req_t req)
 {
+	tmpmount.f_ino = ROOT_INODE;
 	return &tmpmount;
+}
+
+int read_FS_statistics(char *pathname, long long *system_size_ptr, 
+	long long *num_inodes_ptr)
+{
+	return 0;
+}
+int update_FS_statistics(char *pathname, long long system_size, 
+	long long num_inodes)
+{
+	return 0;
+}
+
+int change_mount_stat(MOUNT_T *mptr, long long system_size_delta, 
+	long long num_inodes_delta)
+{
+	return 0;
+}
+
+int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
 }

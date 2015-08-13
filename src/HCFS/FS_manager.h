@@ -24,6 +24,7 @@
 typedef struct {
 	unsigned long num_FS;
 	int FS_list_fh;
+	unsigned char sys_uuid[16];
 	sem_t op_lock;
 } FS_MANAGER_HEAD_TYPE;
 

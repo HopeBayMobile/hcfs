@@ -61,7 +61,6 @@ typedef struct {
 
 	/* This defines the number of inodes that are currently being used */
 	long long num_active_inodes;
-	long long total_system_size;
 } SUPER_BLOCK_HEAD;
 
 /* SUPER_BLOCK_CONTROL defines the structure for controling super block */

@@ -293,7 +293,8 @@ int build_cache_usage(void)
 				}
 				continue;
 			}
-			ret = fetch_block_path(thisblockpath, this_inode, blockno);
+			ret = fetch_block_path(thisblockpath, this_inode,
+						blockno);
 			if (ret < 0) {
 				errcode = ret;
 				break;
