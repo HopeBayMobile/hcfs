@@ -36,6 +36,7 @@ typedef struct {
 	char is_delete;
 	int which_curl;
 	char tempfilename[400];
+	char objname[400];
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
@@ -80,7 +81,7 @@ UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
-				CURL_HANDLE *curl_handle, char *filename);
+				CURL_HANDLE *curl_handle, char *filename, char *meta_objname);
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);

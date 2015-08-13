@@ -25,16 +25,16 @@
 
 
 // Mock function - to ignore logger
-int write_log(int level, char *format, ...) {
-    return 0;
-}
+//int write_log(int level, char *format, ...) {
+//	return 0;
+//}
 
 
 int initialize_ddt_meta() {
 
 	FILE *fptr;
 	int fd;
-	char *ddt_meta_file = "ddt/btree_meta_0";
+	char *ddt_meta_file = "/tmp/btree_meta_0";
 	DDT_BTREE_META ddt_meta;
 	int errcode;
 	ssize_t ret_ssize;
@@ -73,7 +73,7 @@ errcode_handle:
 FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta) {
 
-	char *meta_path = "ddt/btree_meta_0";
+	char *meta_path = "/tmp/btree_meta_0";
 	FILE *fptr;
 	int fd;
 	int errcode;
@@ -185,7 +185,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
 				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
 			}
-			printf(" with refcounf (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
+			printf(" with refcount (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
 		}
 		return 0;
 	}
@@ -200,7 +200,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
 				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
 			}
-			printf(" with refcounf (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
+			printf(" with refcount (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
 		}
 	}
 
@@ -328,7 +328,7 @@ errcode_handle:
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element, DDT_BTREE_NODE *tnode,
+static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element, DDT_BTREE_NODE *tnode,
 				int fd, DDT_BTREE_META *this_meta) {
 
 	int search_idx;
@@ -336,7 +336,6 @@ int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element, DDT_BTREE_NODE *tnode,
 	DDT_BTREE_NODE temp_node;
     int errcode;
     ssize_t ret_ssize;
-	off_t ret_pos;
 
 
 	// To find which index we should insert or go deeper
@@ -403,7 +402,7 @@ errcode_handle:
 *  Return value: 0 if split was successful, or -1 if not.
 *
 *************************************************************************/
-int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NODE *cnode,
+static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NODE *cnode,
 				int fd, DDT_BTREE_META *this_meta) {
 
 	int el_per_child, median;
@@ -570,7 +569,7 @@ errcode_handle:
 *  Return value: 0 if operation was successful, or -1 if not.
 *
 *************************************************************************/
-int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE *result_node,
+static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE *result_node,
 			DDT_BTREE_EL *result_el, DDT_BTREE_META *this_meta) {
 	// To find the largest child for tnode
 
@@ -621,7 +620,7 @@ errcode_handle:
 *  Return value: 0 if operation was successful, or -1 if not.
 *
 *************************************************************************/
-int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
+static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				DDT_BTREE_META *this_meta) {
 
 	int selected_sibling;
@@ -882,3 +881,42 @@ errcode_handle:
 	return errcode;
 }
 
+int compute_hash(char *path, unsigned char *output) {
+
+	FILE *fptr;
+	const int buf_size = 16384;
+	char *buf;
+	int bytes_read;
+	SHA256_CTX ctx;
+
+	// Initialize
+	SHA256_Init(&ctx);
+	buf = malloc(buf_size);
+	bytes_read = 0;
+
+	// Open file
+	fptr = fopen(path, "r");
+
+	while ((bytes_read = fread(buf, 1, buf_size, fptr))) {
+		SHA256_Update(&ctx, buf, bytes_read);
+	}
+
+	SHA256_Final(output, &ctx);
+
+	fclose(fptr);
+	free(buf);
+
+	return 0;
+}
+
+
+int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH], char output_str[65]) {
+
+	int i;
+
+	for (i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+		sprintf(output_str+(i*2), "%02x", hash[i]);
+	}
+
+	output_str[64] = 0;
+}

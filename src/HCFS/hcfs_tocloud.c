@@ -33,6 +33,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 #include <unistd.h>
 #include <time.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
@@ -40,6 +41,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <openssl/sha.h>
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -49,6 +51,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "logger.h"
 #include "macro.h"
 #include "metaops.h"
+#include "dedup_table.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -790,15 +793,21 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-			CURL_HANDLE *curl_handle, char *filename)
+			CURL_HANDLE *curl_handle, char *filename, char *meta_objname)
 {
-	char objname[1000];
-	FILE *fptr;
+	char objname[400];
+	char hash_key_str[65];
+	unsigned char hash_key[SHA256_DIGEST_LENGTH];
+	FILE *fptr, *ddt_fptr;
 	int ret_val, errcode, ret;
+	int ddt_fd;
+	int result_idx;
+	DDT_BTREE_NODE tree_root, result_node;
+	DDT_BTREE_META ddt_meta;
 
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
-	write_log(10, "Debug datasync: objname %s, inode %ld, block %lld\n",
-					objname, this_inode, block_no);
+
+	write_log(10, "Debug datasync: inode %ld, block %lld\n",
+					this_inode, block_no);
 	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
@@ -808,13 +817,47 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		return -errcode;
 	}
 
-	ret_val = hcfs_put_object(fptr, objname, curl_handle);
-	/* Already retried in get object if necessary */
-	if ((ret_val >= 200) && (ret_val <= 299))
-		ret = 0;
-	else
-		ret = -EIO;
+	// Compute hash of block
+	compute_hash(filename, hash_key);
+
+	// Get objname - Object named by hash key
+	hash_to_string(hash_key, hash_key_str);
+	sprintf(objname, "data_%s", hash_key_str);
+
+	// Copy new objname to update_thread
+	strcpy(meta_objname, objname);
+
+	// Get dedup table meta
+	ddt_fptr = get_btree_meta(hash_key, &tree_root, &ddt_meta);
+	ddt_fd = fileno(ddt_fptr);
+
+	// Check if upload is needed
+	ret = search_ddt_btree(hash_key, &tree_root, ddt_fd,
+	                &result_node, &result_idx);
+	if (ret == 0) {
+		// Find a same hash in cloud
+		// Just increase the refcount of the origin block
+		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
+						objname);
+		increase_el_refcount(&result_node, result_idx, ddt_fd);
+	} else {
+		// New hash key - Start to upload object
+		ret_val = hcfs_put_object(fptr, objname, curl_handle);
+		/* Already retried in get object if necessary */
+		if ((ret_val >= 200) && (ret_val <= 299))
+			ret = 0;
+		else
+			ret = -EIO;
+
+		// Upload finished - Need to update dedup table
+		if (ret == 0) {
+			insert_ddt_btree(hash_key, &tree_root, ddt_fd, &ddt_meta);
+		}
+	}
+
+	fclose(ddt_fptr);
 	fclose(fptr);
+
 	return ret;
 }
 
@@ -856,7 +899,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
 				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
+						thread_ptr->tempfilename, thread_ptr->objname);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
