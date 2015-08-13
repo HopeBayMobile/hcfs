@@ -87,8 +87,12 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 # hcfs_fromcloud testing
 
+enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
+
 hcfs_fromcloud.o : $(USER_DIR)/hcfs_fromcloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_fromcloud.c
 
 hcfs_fromcloud_unittest.o : $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc \
@@ -99,8 +103,8 @@ hcfs_fromcloud_unittest.o : $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc \
 fromcloud_mock_function.o : $(UNITTEST_DIR)/fromcloud_mock_function.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fromcloud_mock_function.c
 
-hcfs_fromcloud_unittest : fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcloud_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+hcfs_fromcloud_unittest : enc.o fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcloud_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
 
 # hcfs_tocloud testing
 
@@ -116,8 +120,8 @@ hcfs_tocloud_unittest.o : $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc \
 tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_mock_function.c
 
-hcfs_tocloud_unittest : tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+hcfs_tocloud_unittest : enc.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
 
 # hcfs_clouddelete testing
 
