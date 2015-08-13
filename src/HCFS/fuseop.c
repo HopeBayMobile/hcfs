@@ -104,13 +104,13 @@ ntpdate / ntpd or manual changes*/
 /*   file handles */
 
 /* TODO: Need to be able to perform actual operations according to type of
-/*   folders (cached, non-cached, local) */
+	folders (cached, non-cached, local) */
 /* TODO: Push actual operations to other source files, especially no actual
-/*   file handling in this file */
+	file handling in this file */
 /* TODO: Multiple paths for read / write / other ops for different folder
-/*   policies. Policies to be determined at file or dir open. */
+	policies. Policies to be determined at file or dir open. */
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
-changes */
+	changes */
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
@@ -437,11 +437,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	struct timeval tmp_time1, tmp_time2;
 	struct stat tmp_stat;
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug getattr inode %lld\n", ino);
-#else
 	write_log(10, "Debug getattr inode %ld\n", ino);
-#endif
 	hit_inode = real_ino(req, ino);
 
 #ifdef ARM_32bit_
@@ -505,13 +501,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	unsigned long this_generation;
 	MOUNT_T *tmpptr;
 
-#ifdef ARM_32bit_
-	write_log(10,
-		"DEBUG parent %lld, name %s mode %d\n", parent, selfname, mode);
-#else
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
-#endif
 	gettimeofday(&tmp_time1, NULL);
 
 	/* Reject if not creating a regular file */
@@ -1987,11 +1978,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	struct stat this_stat;
 	int file_flags;
 
-#ifdef ARM_32bit_
 	write_log(10, "Debug open inode %ld\n", ino);
-#else
-	write_log(10, "Debug open inode %lld\n", ino);
-#endif
 
 	thisinode = real_ino(req, ino);
 
@@ -4788,10 +4775,12 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 #ifdef ARM_32bit_
 	write_log(10,
-		"DEBUG parent %lld, name %s mode %d\n", parent, name, mode);
+		"DEBUG parent %lld, name %s mode %d\n", parent_inode,
+		name, mode);
 #else
 	write_log(10,
-		"DEBUG parent %ld, name %s mode %d\n", parent, name, mode);
+		"DEBUG parent %ld, name %s mode %d\n", parent_inode,
+		name, mode);
 #endif
 
 	/* Reject if not creating a regular file */

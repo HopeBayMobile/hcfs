@@ -190,7 +190,11 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
+#ifdef ARM_32bit_
+			sprintf(path, "/tmp/testHCFS/data_%lld_%d",inode, i);
+#else
 			sprintf(path, "/tmp/testHCFS/data_%d_%d",inode, i);
+#endif
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);

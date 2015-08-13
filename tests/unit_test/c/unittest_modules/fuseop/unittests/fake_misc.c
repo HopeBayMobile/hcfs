@@ -556,7 +556,6 @@ int meta_forget_inode(ino_t self_inode)
 int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			char *selfname)
 {
-	printf("Debug fake rmdir, inode %ld\n", this_inode);
 	if (this_inode == 6)
 		before_mkdir_created = TRUE;
 	return 0;
