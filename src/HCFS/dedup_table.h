@@ -22,6 +22,9 @@
  * by hash function, and then put it to the btree.
  */
 
+// Hash key size
+#define SHA256_STRING_LENGTH 65
+
 // Define the upper/lower bound of btree elements
 #define MAX_EL_PER_NODE 3
 #define MIN_EL_PER_NODE 1
@@ -55,7 +58,7 @@ typedef struct {
 } DDT_BTREE_META;
 
 
-int initialize_ddt_meta();
+int initialize_ddt_meta(char *meta_path);
 
 FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta);

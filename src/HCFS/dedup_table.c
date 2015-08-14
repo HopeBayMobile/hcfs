@@ -30,17 +30,16 @@
 //}
 
 
-int initialize_ddt_meta() {
+int initialize_ddt_meta(char *meta_path) {
 
 	FILE *fptr;
 	int fd;
-	char *ddt_meta_file = "/tmp/btree_meta_0";
 	DDT_BTREE_META ddt_meta;
 	int errcode;
 	ssize_t ret_ssize;
 
 
-	fptr = fopen(ddt_meta_file, "w");
+	fptr = fopen(meta_path, "w");
 	fd = fileno(fptr);
 
 	// Init meta struct
@@ -73,17 +72,22 @@ errcode_handle:
 FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta) {
 
-	char *meta_path = "/tmp/btree_meta_0";
+	char *meta_dir_path = "/tmp";
+	char meta_path[1000];
 	FILE *fptr;
 	int fd;
 	int errcode;
 	ssize_t ret_ssize;
 
 
+	// Get metafile name by hash key
+	sprintf(meta_path, "%s/ddt_meta_%02x",
+					meta_dir_path, key[SHA256_DIGEST_LENGTH-1]);
+
 	// Initialize tree if not existed
 	if (access(meta_path, R_OK|W_OK) < 0) {
 		printf("No metafile found\n");
-	    initialize_ddt_meta();
+	    initialize_ddt_meta(meta_path);
 	}
 
 	// Open file
@@ -334,8 +338,8 @@ static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element, DDT_BTREE_NODE 
 	int search_idx;
 	int compare_result;
 	DDT_BTREE_NODE temp_node;
-    int errcode;
-    ssize_t ret_ssize;
+	int errcode;
+	ssize_t ret_ssize;
 
 
 	// To find which index we should insert or go deeper
@@ -910,7 +914,8 @@ int compute_hash(char *path, unsigned char *output) {
 }
 
 
-int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH], char output_str[65]) {
+int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH],
+				char output_str[SHA256_STRING_LENGTH]) {
 
 	int i;
 

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>
+#include <openssl/sha.h>
 
 #include "hcfscurl.h"
 #include "fuseop.h"
@@ -36,7 +37,7 @@ typedef struct {
 	char is_delete;
 	int which_curl;
 	char tempfilename[400];
-	char objname[400];
+	unsigned char hash_key[SHA256_DIGEST_LENGTH];
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
@@ -81,7 +82,7 @@ UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
-				CURL_HANDLE *curl_handle, char *filename, char *meta_objname);
+				CURL_HANDLE *curl_handle, char *filename, unsigned char *hash_in_meta);
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);

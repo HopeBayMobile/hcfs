@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <openssl/sha.h>
 
 #include <fuse/fuse_opt.h>
 
@@ -117,6 +118,7 @@ typedef struct {
 typedef struct {
 	unsigned char status;
 	unsigned char uploaded;
+	unsigned char objname[SHA256_DIGEST_LENGTH];
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */

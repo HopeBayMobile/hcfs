@@ -148,6 +148,10 @@ static inline int _upload_terminate_thread(int index)
 		return ret;
 	}
 
+	printf("HASH -  %02x\n", upload_ctl.upload_threads[index].hash_key[SHA256_DIGEST_LENGTH-1]);
+	printf("Tempfilename -  %s\n", upload_ctl.upload_threads[index].tempfilename);
+	printf("Thread id -  %d\n", index);
+
 	/* Find the sync-inode correspond to the block-inode */
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -206,6 +210,9 @@ static inline int _upload_terminate_thread(int index)
 							(is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
+					memcpy(tmp_entry->objname, upload_ctl.upload_threads[index].hash_key,
+									SHA256_DIGEST_LENGTH);
+					printf("OBJ -  %02x\n", tmp_entry->objname[SHA256_DIGEST_LENGTH-1]);
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
@@ -586,11 +593,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				write_log(0, "IO error in %s.\n",
 					__func__);
 				sync_error = TRUE;
+				printf("I?O ERROR lol\n");
 				flock(fileno(metafptr), LOCK_UN);
 				break;
 			}
 			tmp_entry = &(temppage.block_entries[e_index]);
 			block_status = tmp_entry->status;
+			printf("block_status - %d\n", block_status);
 
 			if (((block_status == ST_LDISK) ||
 				(block_status == ST_LtoC)) &&
@@ -635,6 +644,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 							page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
+				printf("dispatch block ret - %d\n", ret);
 				if (ret < 0)
 					sync_error = TRUE;
 				/*TODO: Maybe should also first copy block
@@ -729,6 +739,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
+		printf("schedule sync meta ret - %d\n", ret);
 		if (ret < 0)
 			sync_error = TRUE;
 		flock(fileno(metafptr), LOCK_UN);
@@ -793,7 +804,7 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-			CURL_HANDLE *curl_handle, char *filename, char *meta_objname)
+			CURL_HANDLE *curl_handle, char *filename, unsigned char *hash_in_meta)
 {
 	char objname[400];
 	char hash_key_str[65];
@@ -825,7 +836,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	sprintf(objname, "data_%s", hash_key_str);
 
 	// Copy new objname to update_thread
-	strcpy(meta_objname, objname);
+	memcpy(hash_in_meta, hash_key, SHA256_DIGEST_LENGTH);
 
 	// Get dedup table meta
 	ddt_fptr = get_btree_meta(hash_key, &tree_root, &ddt_meta);
@@ -899,7 +910,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
 				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename, thread_ptr->objname);
+						thread_ptr->tempfilename, thread_ptr->hash_key);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
