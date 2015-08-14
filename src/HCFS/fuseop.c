@@ -2604,6 +2604,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 				fh_ptr, fh_ptr->thisinode, &errcode);
 		if ((this_bytes_read == 0) && (errcode < 0)) {
 			fuse_reply_err(req, -errcode);
+			free(buf);
 			return;
 		}
 
@@ -2619,6 +2620,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		if (fh_ptr->meta_cache_ptr == NULL) {
 			fuse_reply_err(req, -ENOMEM);
+			free(buf);
 			return;
 		}
 
@@ -2633,6 +2635,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			fuse_reply_err(req, -ret);
+			free(buf);
 			return;
 		}
 
@@ -2645,6 +2648,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			fuse_reply_err(req, -ret);
+			free(buf);
 			return;
 		}
 

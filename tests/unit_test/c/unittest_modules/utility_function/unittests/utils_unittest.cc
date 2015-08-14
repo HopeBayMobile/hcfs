@@ -127,16 +127,16 @@ TEST_F(fetch_meta_pathTest, SubDirMod) {
 
   ASSERT_EQ(0,fetch_meta_path(pathname,NUMSUBDIR));
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_0/meta%lld", NUMSUBDIR);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_0/meta%d", NUMSUBDIR);
   EXPECT_STREQ(expected_pathname,pathname);
 
   ASSERT_EQ(0,fetch_meta_path(pathname, (2*NUMSUBDIR)-1));
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_%lld/meta%lld", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_%d/meta%d", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
 
   EXPECT_STREQ(expected_pathname,pathname);
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_%lld", NUMSUBDIR-1);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/sub_%d", NUMSUBDIR-1);
   rmdir(expected_pathname);
   rmdir("/tmp/testmeta/metapath/sub_0");
   rmdir(METAPATH);
@@ -258,16 +258,16 @@ TEST_F(fetch_todelete_pathTest, SubDirMod) {
 
   ASSERT_EQ(0,fetch_todelete_path(pathname,NUMSUBDIR));
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_0/meta%lld", NUMSUBDIR);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_0/meta%d", NUMSUBDIR);
   EXPECT_STREQ(expected_pathname,pathname);
 
   ASSERT_EQ(0,fetch_todelete_path(pathname, (2*NUMSUBDIR)-1));
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_%lld/meta%lld", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_%d/meta%d", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
 
   EXPECT_STREQ(expected_pathname,pathname);
 
-  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_%lld", NUMSUBDIR-1);
+  sprintf(expected_pathname,"/tmp/testmeta/metapath/todelete/sub_%d", NUMSUBDIR-1);
   rmdir(expected_pathname);
   rmdir("/tmp/testmeta/metapath/todelete/sub_0");
   rmdir("/tmp/testmeta/metapath/todelete");
@@ -373,16 +373,16 @@ TEST_F(fetch_block_pathTest, SubDirMod) {
 
   ASSERT_EQ(0,fetch_block_path(pathname,NUMSUBDIR,0));
 
-  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_0/block%lld_0", NUMSUBDIR);
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_0/block%d_0", NUMSUBDIR);
   EXPECT_STREQ(expected_pathname,pathname);
 
   ASSERT_EQ(0,fetch_block_path(pathname, 0, (2*NUMSUBDIR)-1));
 
-  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%lld/block0_%lld", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%d/block0_%d", NUMSUBDIR-1,(2*NUMSUBDIR)-1);
 
   EXPECT_STREQ(expected_pathname,pathname);
 
-  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%lld", NUMSUBDIR-1);
+  sprintf(expected_pathname,"/tmp/testmeta/blockpath/sub_%d", NUMSUBDIR-1);
   rmdir(expected_pathname);
   rmdir("/tmp/testmeta/blockpath/sub_0");
   rmdir(BLOCKPATH);
