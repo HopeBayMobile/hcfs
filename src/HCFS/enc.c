@@ -242,8 +242,6 @@ unsigned char* get_key(){
 	return ret;
 }
 
-/* TODO: error handling
- */
 /************************************************************************
  * *
  * * Function name: transform_encrypt_fd
@@ -251,36 +249,77 @@ unsigned char* get_key(){
  *		    unsigned char* key
  *		    unsigned char** data
  * *       Summary: Encrypt content read from in_fd, and return a new fd
+ *		    data must be free outside this function
  * *
- * *  Return value: File*
+ * *  Return value: File* or NULL if failed
  * *
  * *************************************************************************/
 FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
 			   unsigned char** data){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	if (buf == NULL){
+		write_log(10, "Failed to allocate memory in transform_encrypt_fd\n");
+		return NULL;
+	}
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
 			       in_fd);
 	unsigned char* new_data = calloc(read_count+TAG_SIZE,
 					 sizeof(unsigned char));
-	aes_gcm_encrypt_fix_iv(new_data, buf, read_count, key);
+	if (new_data == NULL){
+		free(buf);
+		write_log(10, "Failed to allocate memory in transform_encrypt_fd\n");
+		return NULL;
+	}
+	int ret = aes_gcm_encrypt_fix_iv(new_data, buf, read_count, key);
+	if(ret != 0){
+		free(buf);
+		write_log(10, "Failed encrypt. Code: %d\n", ret);
+		return NULL;
+	}
 	free(buf);
 	*data = new_data;
 	return fmemopen(new_data, read_count+TAG_SIZE, "r");
 }
 
-/* TODO: error handling
- */
-void decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd){
+
+
+/************************************************************************
+ * *
+ * * Function name: decrypt_to_fd
+ * *        Inputs: FILE* decrypt_to_fd, open with 'w' mode
+ *		    unsigned char* key
+ *		    FILE* in_fd
+ * *       Summary: Decrypt content in in_fd and write to decrypt_to_fd
+ * *
+ * *  Return value: 0 if success or 1 if failed
+ * *
+ * *************************************************************************/
+int decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd){
 	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	if (buf == NULL){
+		write_log(10, "Failed to allocate memory in decrypt_to_fd\n");
+		return 1;
+	}
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
 			       in_fd);
 	unsigned char* new_data = calloc(read_count-TAG_SIZE,
 					 sizeof(unsigned char));
-	aes_gcm_decrypt_fix_iv(new_data, buf, read_count, key);
+	if (new_data == NULL){
+		free(buf);
+		write_log(10, "Failed to allocate memory in decrypt_to_fd\n");
+		return 1;
+	}
+	int ret = aes_gcm_decrypt_fix_iv(new_data, buf, read_count, key);
+	if(ret != 0){
+		free(buf);
+		write_log(10, "Failed decrypt. Code: %d\n", ret);
+		return 1;
+	}
 	free(buf);
 	fwrite(new_data, sizeof(unsigned char), read_count-TAG_SIZE,
 	       decrypt_to_fd);
 	free(new_data);
+	return 0;
 }
 
 /*

@@ -32,6 +32,6 @@ unsigned char* get_key();
 
 FILE* transform_encrypt_fd(FILE*, unsigned char*, unsigned char**);
 
-void decrypt_to_fd(FILE*, unsigned char*, FILE*);
+int decrypt_to_fd(FILE*, unsigned char*, FILE*);
 
 #endif

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <string.h>
+#include <stdio.h>
 extern "C" {
 #include "b64encode.h"
 #include "enc.h"
@@ -55,6 +56,25 @@ TEST(enc, encrypt_then_decrypt)
 					 key);
 	EXPECT_EQ(ret, 0);
 	EXPECT_EQ(memcmp(input, decode, strlen(input)), 0);
+	free(key);
+	free(output);
+	free(decode);
+}
 
+TEST(enc, transform_encrypt_fd)
+{
+
+	const char* input = "4ytg0jkk0234]yhj]-43jddfv1111";
+	FILE* in_file = fmemopen((void*)input, strlen(input), "r");
+	unsigned char* key = get_key();
+	unsigned char* data;
+	FILE* new_encrypt_fd = transform_encrypt_fd(in_file, key, &data);
+	EXPECT_TRUE( new_encrypt_fd != NULL);
+
+	//decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd)
+	fclose(new_encrypt_fd);
+	fclose(in_file);
+	free(key);
+	free(data);
 
 }
