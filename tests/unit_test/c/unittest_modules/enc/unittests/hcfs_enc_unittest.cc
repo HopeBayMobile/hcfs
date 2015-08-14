@@ -15,11 +15,7 @@ TEST(base64, encode_then_decode)
 	b64encode_str((unsigned char*)input, (unsigned char*)code, &out_len, strlen(input));
 	unsigned char* decode = (unsigned char*)calloc(out_len+1, sizeof(unsigned char));
 	b64decode_str(code, decode, &out_len, out_len);
-	EXPECT_EQ(decode[0], '4');
-	EXPECT_EQ(decode[4], '0');
-	EXPECT_EQ(decode[8], '0');
-	EXPECT_EQ(decode[12], ']');
-	EXPECT_EQ(decode[16], ']');
+	EXPECT_EQ(memcmp(input, decode, strlen(input)), 0);
 	free(code);
 	free(decode);
 
