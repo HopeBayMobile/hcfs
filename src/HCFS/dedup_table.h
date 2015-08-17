@@ -60,7 +60,7 @@ typedef struct {
 
 int initialize_ddt_meta(char *meta_path);
 
-FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
+FILE* get_ddt_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta);
 
 int search_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
@@ -86,7 +86,7 @@ static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE 
 static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				DDT_BTREE_META *this_meta);
 
-int increase_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd);
+int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd);
 
 // Util function for data dedup
 int compute_hash(char *path, unsigned char *output);

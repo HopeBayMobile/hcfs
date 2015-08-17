@@ -29,6 +29,6 @@ typedef struct {
 
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no);
+int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash);
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

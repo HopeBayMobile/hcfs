@@ -148,10 +148,6 @@ static inline int _upload_terminate_thread(int index)
 		return ret;
 	}
 
-	printf("HASH -  %02x\n", upload_ctl.upload_threads[index].hash_key[SHA256_DIGEST_LENGTH-1]);
-	printf("Tempfilename -  %s\n", upload_ctl.upload_threads[index].tempfilename);
-	printf("Thread id -  %d\n", index);
-
 	/* Find the sync-inode correspond to the block-inode */
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
@@ -210,9 +206,9 @@ static inline int _upload_terminate_thread(int index)
 							(is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
-					memcpy(tmp_entry->objname, upload_ctl.upload_threads[index].hash_key,
+					// Storage hash in block meta too
+					memcpy(tmp_entry->hash, upload_ctl.upload_threads[index].hash_key,
 									SHA256_DIGEST_LENGTH);
-					printf("OBJ -  %02x\n", tmp_entry->objname[SHA256_DIGEST_LENGTH-1]);
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
@@ -593,13 +589,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				write_log(0, "IO error in %s.\n",
 					__func__);
 				sync_error = TRUE;
-				printf("I?O ERROR lol\n");
 				flock(fileno(metafptr), LOCK_UN);
 				break;
 			}
 			tmp_entry = &(temppage.block_entries[e_index]);
 			block_status = tmp_entry->status;
-			printf("block_status - %d\n", block_status);
 
 			if (((block_status == ST_LDISK) ||
 				(block_status == ST_LtoC)) &&
@@ -839,7 +833,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	memcpy(hash_in_meta, hash_key, SHA256_DIGEST_LENGTH);
 
 	// Get dedup table meta
-	ddt_fptr = get_btree_meta(hash_key, &tree_root, &ddt_meta);
+	ddt_fptr = get_ddt_btree_meta(hash_key, &tree_root, &ddt_meta);
 	ddt_fd = fileno(ddt_fptr);
 
 	// Check if upload is needed
@@ -850,7 +844,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		// Just increase the refcount of the origin block
 		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
 						objname);
-		increase_el_refcount(&result_node, result_idx, ddt_fd);
+		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
 	} else {
 		// New hash key - Start to upload object
 		ret_val = hcfs_put_object(fptr, objname, curl_handle);

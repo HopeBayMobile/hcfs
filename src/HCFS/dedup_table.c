@@ -69,20 +69,23 @@ errcode_handle:
 *  Return value: File pointer to btree file
 *
 *************************************************************************/
-FILE* get_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
+FILE* get_ddt_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta) {
 
-	char *meta_dir_path = "/tmp";
 	char meta_path[1000];
 	FILE *fptr;
 	int fd;
+	int ret;
 	int errcode;
 	ssize_t ret_ssize;
 
 
 	// Get metafile name by hash key
-	sprintf(meta_path, "%s/ddt_meta_%02x",
-					meta_dir_path, key[SHA256_DIGEST_LENGTH-1]);
+	ret = fetch_ddt_path(meta_path, key[SHA256_DIGEST_LENGTH-1]);
+	if (ret < 0) {
+		// Get the metafile path failed
+		return NULL;
+	}
 
 	// Initialize tree if not existed
 	if (access(meta_path, R_OK|W_OK) < 0) {
@@ -863,7 +866,7 @@ errcode_handle:
 *  Return value: 0 if operation was successful, -1 if not.
 *
 *************************************************************************/
-int increase_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd) {
+int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd) {
 
 	int errcode;
 	ssize_t ret_ssize;

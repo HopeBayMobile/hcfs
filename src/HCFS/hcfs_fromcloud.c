@@ -43,15 +43,18 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
+int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash)
 {
 	char objname[1000];
+	char hash_key_str[65];
 	int status;
 	int which_curl_handle;
 	char idname[256];
 	int ret, errcode;
 
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	// Get objname
+	hash_to_string(blk_hash, hash_key_str);
+	sprintf(objname, "data_%s", hash_key_str);
 
 	sem_wait(&download_curl_sem);
 	FSEEK(fptr, 0, SEEK_SET);
@@ -169,8 +172,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		ret = fetch_from_cloud(blockfptr, ptr->this_inode,
-					ptr->block_no);
+		ret = fetch_from_cloud(blockfptr, temppage.block_entries[entry_index].hash);
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;

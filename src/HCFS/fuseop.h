@@ -118,7 +118,7 @@ typedef struct {
 typedef struct {
 	unsigned char status;
 	unsigned char uploaded;
-	unsigned char objname[SHA256_DIGEST_LENGTH];
+	unsigned char hash[SHA256_DIGEST_LENGTH];
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
