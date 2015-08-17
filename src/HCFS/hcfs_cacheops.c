@@ -80,7 +80,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 	throw out blocks so aggressively and can sleep for a
 	while*/
 	if ((tempentry.inode_stat.st_ino > 0) &&
-			(tempentry.inode_stat.st_mode & S_IFREG)) {
+			(S_ISREG(tempentry.inode_stat.st_mode))) {
 		ret = fetch_meta_path(thismetapath, this_inode);
 		if (ret < 0)
 			return ret;

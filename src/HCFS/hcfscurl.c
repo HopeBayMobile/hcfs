@@ -54,7 +54,7 @@ size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 	size_t ret_size;
 	int errcode;
 
-	FWRITE(ptr, size, nmemb, fstream);
+	FWRITE(ptr, size, nmemb, (FILE *)fstream);
 
 	return ret_size*size;
 
@@ -166,8 +166,8 @@ int parse_swift_list_header(FILE *fptr)
 	while (!feof(fptr)) {
 		tmpptr = fgets(temp_string, 1000, fptr);
 		if (tmpptr == NULL) {
-			write_log(0, "Error parsing in %s\n", __func__);
-			return -1;
+			write_log(2, "Warning: Cannot parse num of objs\n");
+			return retcodenum;
 		}
 
 		if (!strncmp(temp_string, "X-Container-Object-Count",
