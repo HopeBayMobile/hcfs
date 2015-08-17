@@ -1,6 +1,6 @@
 /*************************************************************************
  * *
- * * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+ * * Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
  * *
  * * File Name: enc.c
  * * Abstract: The c source code file for some encryption helpers.
@@ -228,24 +228,27 @@ int aes_gcm_decrypt_fix_iv(unsigned char* output, unsigned char* input,
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char* get_key() {
-	const char* user_pass = "this is hopebay testing";
+unsigned char *get_key() {
+	const char *user_pass = "this is hopebay testing";
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
-	unsigned char *ret = (unsigned char*)calloc(KEY_SIZE,
+	unsigned char *ret = (unsigned char *)calloc(KEY_SIZE,
 						    sizeof(unsigned char));
-	if (!ret) return NULL;
+	if (!ret)
+		return NULL;
 	const EVP_MD *m;
 	EVP_MD_CTX ctx;
+
 	m = EVP_sha256();
+
 	if (!m)
 		return NULL;
 	EVP_DigestInit(&ctx, m);
-	unsigned char* salt = (unsigned
-			       char*)"oluik.354jhmnk,";
+	unsigned char *salt = (unsigned
+			       char *)"oluik.354jhmnk,";
 	PKCS5_PBKDF2_HMAC(user_pass,
 			  strlen(user_pass), salt,
-			  strlen((char*)salt), 3,
+			  strlen((char *)salt), 3,
 			  m, KEY_SIZE, ret);
 	EVP_DigestFinal(&ctx, md_value,
 			&md_len);
@@ -264,24 +267,28 @@ unsigned char* get_key() {
  * *  Return value: File* or NULL if failed
  * *
  * *************************************************************************/
-FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
-			   unsigned char** data) {
-	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
+			   unsigned char **data)
+{
+	unsigned char *buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+
 	if (buf == NULL) {
 		write_log(10, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
 			       in_fd);
-	unsigned char* new_data = calloc(read_count+TAG_SIZE,
+	unsigned char *new_data = calloc(read_count+TAG_SIZE,
 					 sizeof(unsigned char));
 	if (new_data == NULL) {
 		free(buf);
-		write_log(10, "Failed to allocate memory in transform_encrypt_fd\n");
+		write_log(10,
+			  "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
 	int ret = aes_gcm_encrypt_fix_iv(new_data, buf, read_count, key);
-	if(ret != 0) {
+
+	if (ret != 0) {
 		free(buf);
 		write_log(10, "Failed encrypt. Code: %d\n", ret);
 		return NULL;
@@ -304,15 +311,17 @@ FILE* transform_encrypt_fd(FILE* in_fd, unsigned char* key,
  * *  Return value: 0 if success or 1 if failed
  * *
  * *************************************************************************/
-int decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd) {
-	unsigned char* buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, FILE *in_fd)
+{
+	unsigned char *buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+
 	if (buf == NULL) {
 		write_log(10, "Failed to allocate memory in decrypt_to_fd\n");
 		return 1;
 	}
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
 			       in_fd);
-	unsigned char* new_data = calloc(read_count-TAG_SIZE,
+	unsigned char *new_data = calloc(read_count-TAG_SIZE,
 					 sizeof(unsigned char));
 	if (new_data == NULL) {
 		free(buf);
@@ -320,7 +329,8 @@ int decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd) {
 		return 1;
 	}
 	int ret = aes_gcm_decrypt_fix_iv(new_data, buf, read_count, key);
-	if(ret != 0) {
+
+	if (ret != 0) {
 		free(buf);
 		write_log(10, "Failed decrypt. Code: %d\n", ret);
 		return 1;

@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/10 Jiahong added header for this file, and revising coding style.
 * 2015/6/2 Jiahong added error handling
+* 2015/8/17 LT added b64decode_str
 *
 **************************************************************************/
 
@@ -99,32 +100,29 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 }
 
 static
-char decode_table(char c) {
-	if(c >= 'A' && c <= 'Z') {
+char decode_table(char c)
+{
+	if (c >= 'A' && c <= 'Z') {
 		return c - 'A';
 	} else if (c >= 'a' && c <= 'z') {
 		return c - 'a' + 26;
 	} else if (c >= '0' && c <= '9') {
 		return c - '0' + 52;
 	} else {
-		switch(c) {
+		switch (c) {
 		case '+':
 			return 62;
-			break;
 		case '/':
 			return 63;
-			break;
 		case '\n':
 		case '\r':
 		case '\t':
 		case ' ':
 		case '=':
 		case '\0':
-			return 64;  // ignore
-			break;
+			return 64;  /* ignore */
 		default:
 			return -1;
-			break;
 		}
 	}
 }
@@ -148,16 +146,18 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 	int out_index = 0;
 	int group_count = 0;
 	char buf[4] = {0};
-	while(i < inputlen) {
+
+	while (i < inputlen) {
 		char decode = decode_table(inputstr[i++]);
-		if(decode == -1) {
-			// not allowed characters occurs
+
+		if (decode == -1) {
+			/* not allowed characters occurs */
 			return -1;
 		} else if (decode == 64) {
 			continue;
 		} else {
 			buf[group_count++] = decode;
-			if(group_count == 4) {
+			if (group_count == 4) {
 				group_count = 0;
 				outputstr[out_index++] = (buf[0] << 2) +
 					((buf[1] & 0x30) >> 4);
@@ -168,7 +168,7 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 			}
 		}
 	}
-	if(group_count == 3) {
+	if (group_count == 3) {
 		outputstr[out_index++] = (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
 		outputstr[out_index++] = (buf[1] << 4) + (buf[2] >> 2);
 		outputstr[out_index++] = buf[2] << 6;
@@ -176,7 +176,7 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 		outputstr[out_index++] = (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
 		outputstr[out_index++] = (buf[1] << 4);
 	} else {
-		// impossible situation
+		/* impossible situation */
 		return -2;
 	}
 	*outlen = out_index - 1;
