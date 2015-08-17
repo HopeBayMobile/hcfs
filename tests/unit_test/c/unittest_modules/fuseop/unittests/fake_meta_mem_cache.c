@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+#include "filetables.h"
 #include "meta_mem_cache.h"
 #include "fake_misc.h"
 #include "global.h"
@@ -37,12 +38,21 @@ int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 }
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
-	if (target_ptr->fptr != NULL) {
-		fclose(target_ptr->fptr);
-		target_ptr->fptr = NULL;
+	int fh;
+
+	fh = target_ptr->inode_num % 100;
+	sem_post(&(target_ptr->access_sem));
+
+	if (system_fh_table.entry_table_flags[fh] != TRUE) {
+
+		if (target_ptr->fptr != NULL) {
+			fclose(target_ptr->fptr);
+			target_ptr->fptr = NULL;
+		}
+
+		if (target_ptr != NULL)
+			free(target_ptr);
 	}
-	if (target_ptr != NULL)
-		free(target_ptr);
 	return 0;
 }
 
@@ -260,11 +270,27 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
 	META_CACHE_ENTRY_STRUCT *ptr;
+	int fh;
+
+	fh = this_inode % 100;
+
+	if (system_fh_table.entry_table_flags[fh] == TRUE) {
+		ptr = system_fh_table.entry_table[fh].meta_cache_ptr;
+		if (ptr != NULL) {
+			sem_wait(&(ptr->access_sem));
+			return ptr;
+		}
+	}
 
 	ptr = malloc(sizeof(META_CACHE_ENTRY_STRUCT));
 	if (ptr != NULL) {
 		memset(ptr, 0, sizeof(META_CACHE_ENTRY_STRUCT));
 		ptr->inode_num = this_inode;
+		sem_init(&(ptr->access_sem), 0, 1);
+		sem_wait(&(ptr->access_sem));
+		if (system_fh_table.entry_table_flags[fh] == TRUE)
+			system_fh_table.entry_table[fh].meta_cache_ptr =
+				ptr;
 	}
 	return ptr;
 }
