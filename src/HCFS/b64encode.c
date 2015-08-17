@@ -99,15 +99,15 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 }
 
 static
-char decode_table(char c){
-	if(c >= 'A' && c <= 'Z')
+char decode_table(char c) {
+	if(c >= 'A' && c <= 'Z') {
 		return c - 'A';
-	else if( c >= 'a' && c <= 'z')
+	} else if (c >= 'a' && c <= 'z') {
 		return c - 'a' + 26;
-	else if(c >= '0' && c <= '9')
+	} else if (c >= '0' && c <= '9') {
 		return c - '0' + 52;
-	else{
-		switch(c){
+	} else {
+		switch(c) {
 		case '+':
 			return 62;
 			break;
@@ -120,7 +120,7 @@ char decode_table(char c){
 		case ' ':
 		case '=':
 		case '\0':
-			return 64; // ignore
+			return 64;  // ignore
 			break;
 		default:
 			return -1;
@@ -143,23 +143,21 @@ char decode_table(char c){
 *
 *************************************************************************/
 int b64decode_str(char *inputstr, unsigned char *outputstr,
-		  int *outlen, int inputlen){
+		  int *outlen, int inputlen) {
 	int i = 0;
 	int out_index = 0;
 	int group_count = 0;
 	char buf[4] = {0};
-	while(i < inputlen){
+	while(i < inputlen) {
 		char decode = decode_table(inputstr[i++]);
-		if(decode == -1){
+		if(decode == -1) {
 			// not allowed characters occurs
 			return -1;
-		}
-		else if(decode == 64){
+		} else if (decode == 64) {
 			continue;
-		}
-		else{
+		} else {
 			buf[group_count++] = decode;
-			if(group_count == 4){
+			if(group_count == 4) {
 				group_count = 0;
 				outputstr[out_index++] = (buf[0] << 2) +
 					((buf[1] & 0x30) >> 4);
@@ -170,16 +168,14 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 			}
 		}
 	}
-	if(group_count == 3){
+	if(group_count == 3) {
 		outputstr[out_index++] = (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
 		outputstr[out_index++] = (buf[1] << 4) + (buf[2] >> 2);
 		outputstr[out_index++] = buf[2] << 6;
-	}
-	else if(group_count == 2){
+	} else if (group_count == 2) {
 		outputstr[out_index++] = (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
 		outputstr[out_index++] = (buf[1] << 4);
-	}
-	else{
+	} else {
 		// impossible situation
 		return -2;
 	}

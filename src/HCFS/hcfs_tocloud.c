@@ -652,7 +652,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
 			}
-
 		}
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
@@ -890,7 +889,6 @@ errcode_handle:
 	if (count1 < MAX_SYNC_CONCURRENCY)
 		sync_ctl.threads_error[count1] = TRUE;
 	sem_post(&(sync_ctl.sync_op_sem));
-
 }
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
