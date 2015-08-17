@@ -362,8 +362,11 @@ void init_upload_control(void)
 	memset(&upload_curl_handles,
 			0, sizeof(CURL_HANDLE) * MAX_UPLOAD_CONCURRENCY);
 
-	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++)
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
+		snprintf(upload_curl_handles[count].id, 255,
+				"upload_thread_%d", count);
 		ret_val = hcfs_init_backend(&(upload_curl_handles[count]));
+	}
 
 	sem_init(&(upload_ctl.upload_op_sem), 0, 1);
 	sem_init(&(upload_ctl.upload_queue_sem), 0, MAX_UPLOAD_CONCURRENCY);
@@ -414,6 +417,9 @@ void init_sync_stat_control(void)
 
 	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
 	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
+	snprintf(sync_stat_ctl.statcurl.id, 255,
+				"sync_stat_ctl");
+
 	hcfs_init_backend(&(sync_stat_ctl.statcurl));
 
 	free(FS_stat_path);

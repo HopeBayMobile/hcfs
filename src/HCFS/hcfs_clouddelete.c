@@ -200,6 +200,9 @@ static inline int _init_delete_handle(int index)
 {
 	int ret_val;
 
+	snprintf(delete_curl_handles[index].id, 255,
+				"delete_thread_%d", index);
+
 	ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {

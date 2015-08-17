@@ -833,13 +833,13 @@ int backup_FS_database(void)
 	fclose(fptr);
 
 	fptr = NULL;
+	snprintf(upload_handle.id, 256, "FSmgr_upload");
 	ret = hcfs_init_backend(&upload_handle);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in backing up FS database\n");
 		goto errcode_handle;
 	}
-	snprintf(upload_handle.id, 256, "FSmgr_upload");
 
 	fptr = fopen("/tmp/FSmgr_upload", "r");
 	if (fptr == NULL) {
@@ -894,13 +894,15 @@ int restore_FS_database(void)
 
 	fptr = NULL;
 	memset(&download_handle, 0, sizeof(CURL_HANDLE));
+
+	snprintf(download_handle.id, 256, "FSmgr_download");
+
 	ret = hcfs_init_backend(&download_handle);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in restoring FS database\n");
 		goto errcode_handle;
 	}
-	snprintf(download_handle.id, 256, "FSmgr_download");
 
 	fptr = fopen(fs_mgr_path, "w");
 	if (fptr == NULL) {

@@ -49,7 +49,6 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	char objname[1000];
 	int status;
 	int which_curl_handle;
-	char idname[256];
 	int ret, errcode;
 
 #ifdef ARM_32bit_
@@ -73,8 +72,6 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
 						which_curl_handle);
-	sprintf(idname, "download_thread_%d", which_curl_handle);
-	strcpy(download_curl_handles[which_curl_handle].id, idname);
 	status = hcfs_get_object(fptr, objname,
 			&(download_curl_handles[which_curl_handle]));
 

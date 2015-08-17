@@ -189,6 +189,9 @@ int _init_download_curl(int count)
 {
 	int ret_val;
 
+	snprintf(download_curl_handles[count].id, 255,
+				"download_thread_%d", count);
+
 	curl_handle_mask[count] = FALSE;
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
