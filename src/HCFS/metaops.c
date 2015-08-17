@@ -295,7 +295,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 
 	/*If the new entry is a subdir, increase the hard link of the parent*/
 
-	if (child_mode & S_IFDIR)
+	if (S_ISDIR(child_mode))
 		parent_stat.st_nlink++;
 
 	parent_meta.total_children++;
@@ -401,7 +401,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		/* If the entry is a subdir, decrease the hard link of
 		*  the parent*/
 
-		if (child_mode & S_IFDIR)
+		if (S_ISDIR(child_mode))
 			parent_stat.st_nlink--;
 
 		parent_meta.total_children--;
