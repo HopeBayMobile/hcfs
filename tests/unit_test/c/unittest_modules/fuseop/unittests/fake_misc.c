@@ -317,6 +317,14 @@ int close_fh(long long index)
 	system_fh_table.entry_table_flags[index] = FALSE;
 	tmp_entry->thisinode = 0;
 
+	if (tmp_entry->meta_cache_ptr != NULL) {
+		if (tmp_entry->meta_cache_ptr->fptr != NULL) {
+			fclose(tmp_entry->meta_cache_ptr->fptr);
+			tmp_entry->meta_cache_ptr->fptr = NULL;
+		}
+
+		free(tmp_entry->meta_cache_ptr);
+	}
 	tmp_entry->meta_cache_ptr = NULL;
 	tmp_entry->blockfptr = NULL;
 	tmp_entry->opened_block = -1;
@@ -556,7 +564,6 @@ int meta_forget_inode(ino_t self_inode)
 int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 			char *selfname)
 {
-	printf("Debug fake rmdir, inode %ld\n", this_inode);
 	if (this_inode == 6)
 		before_mkdir_created = TRUE;
 	return 0;

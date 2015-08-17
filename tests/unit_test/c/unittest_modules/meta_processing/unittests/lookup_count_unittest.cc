@@ -103,32 +103,34 @@ class lookup_increaseTest : public InitLookupTableBaseClass {
 
 TEST_F(lookup_increaseTest, InsertOneNode_InEmptyTable)
 {
-	LOOKUP_NODE_TYPE expected_node;
+	LOOKUP_NODE_TYPE *expected_node;
 	unsigned ret_count;
 	int index;
-	
-	expected_node.this_inode = 123;
-	expected_node.lookup_count = 567777;
-	expected_node.d_type = D_ISDIR;
-	expected_node.to_delete = FALSE;
-	expected_node.next = NULL;
+
+	expected_node = (LOOKUP_NODE_TYPE *) malloc(sizeof(LOOKUP_NODE_TYPE));
+	expected_node->this_inode = 123;
+	expected_node->lookup_count = 567777;
+	expected_node->d_type = D_ISDIR;
+	expected_node->to_delete = FALSE;
+	expected_node->next = NULL;
 
 	/* Run */
-	ret_count = lookup_increase(lookup_table, expected_node.this_inode,
-		expected_node.lookup_count, expected_node.d_type);
+	ret_count = lookup_increase(lookup_table, expected_node->this_inode,
+		expected_node->lookup_count, expected_node->d_type);
 
 	/* Verify: find the entry and compare with expected answer */
-	index = expected_node.this_inode % NUM_LOOKUP_ENTRIES;
+	index = expected_node->this_inode % NUM_LOOKUP_ENTRIES;
 
-	EXPECT_EQ(expected_node.lookup_count, ret_count);
-	EXPECT_EQ(0, memcmp(&expected_node, lookup_table[index].head, 
+	EXPECT_EQ(expected_node->lookup_count, ret_count);
+	EXPECT_EQ(0, memcmp(expected_node, lookup_table[index].head, 
 		sizeof(LOOKUP_NODE_TYPE)));
 
+	free(expected_node);
 }
 
 TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
 {
-	LOOKUP_NODE_TYPE expected_node;
+	LOOKUP_NODE_TYPE *expected_node;
 	LOOKUP_NODE_TYPE *ptr;
 	unsigned num_insert_node;
 	unsigned ret_count;
@@ -136,25 +138,27 @@ TEST_F(lookup_increaseTest, InsertOneNode_InNonemptyTable)
 	num_insert_node = NUM_LOOKUP_ENTRIES * 3;
 	insert_many_mock_nodes(num_insert_node);
 	
-	expected_node.this_inode = NUM_LOOKUP_ENTRIES * 3 + 123;
-	expected_node.lookup_count = 567777;
-	expected_node.d_type = D_ISDIR;
-	expected_node.to_delete = FALSE;
-	expected_node.next = NULL;
+	expected_node = (LOOKUP_NODE_TYPE *) malloc(sizeof(LOOKUP_NODE_TYPE));
+	expected_node->this_inode = NUM_LOOKUP_ENTRIES * 3 + 123;
+	expected_node->lookup_count = 567777;
+	expected_node->d_type = D_ISDIR;
+	expected_node->to_delete = FALSE;
+	expected_node->next = NULL;
 
 	/* Run */
-	ret_count = lookup_increase(lookup_table, expected_node.this_inode,
-		expected_node.lookup_count, expected_node.d_type);
+	ret_count = lookup_increase(lookup_table, expected_node->this_inode,
+		expected_node->lookup_count, expected_node->d_type);
 
 	/* Verify: find the entry and compare with expected answer */
-	EXPECT_EQ(expected_node.lookup_count, ret_count);
+	EXPECT_EQ(expected_node->lookup_count, ret_count);
 	
-	ptr = find_lookup_entry(expected_node.this_inode);
+	ptr = find_lookup_entry(expected_node->this_inode);
 	
 	ASSERT_TRUE(ptr != NULL);
-	EXPECT_EQ(expected_node.lookup_count, ptr->lookup_count);
-	EXPECT_EQ(expected_node.d_type, ptr->d_type);
-	EXPECT_EQ(expected_node.to_delete, ptr->to_delete);
+	EXPECT_EQ(expected_node->lookup_count, ptr->lookup_count);
+	EXPECT_EQ(expected_node->d_type, ptr->d_type);
+	EXPECT_EQ(expected_node->to_delete, ptr->to_delete);
+	free(expected_node);
 }
 
 TEST_F(lookup_increaseTest, IncreaseManyNode)

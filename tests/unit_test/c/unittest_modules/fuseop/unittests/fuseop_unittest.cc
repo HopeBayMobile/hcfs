@@ -78,7 +78,6 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
 
 class fuseopEnvironment : public ::testing::Environment {
  public:
-  pthread_t new_thread;
   char *workpath, *tmppath;
 
   virtual void SetUp() {
@@ -125,7 +124,6 @@ class fuseopEnvironment : public ::testing::Environment {
      wait(NULL);
     sleep(1);
     pthread_join(unittest_mount.mt_thread, NULL);
-    pthread_join(new_thread, NULL);
     fuse_session_remove_chan(unittest_mount.chan_ptr);
     fuse_remove_signal_handlers(unittest_mount.session_ptr);
     fuse_session_destroy(unittest_mount.session_ptr);

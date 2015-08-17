@@ -190,7 +190,11 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
+#ifdef ARM_32bit_
+			sprintf(path, "/tmp/testHCFS/data_%lld_%d",inode, i);
+#else
 			sprintf(path, "/tmp/testHCFS/data_%d_%d",inode, i);
+#endif
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -287,7 +291,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 
 		ASSERT_EQ(ST_BOTH, mock_block_page.block_entries[i].status); // Check status
-		sprintf(path, "/tmp/testHCFS/data_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/data_1_%d", i);
 		getxattr(path, "user.dirty", xattr_val, 1);
 		ASSERT_STREQ("F", xattr_val);
 		unlink(path);
@@ -325,7 +329,7 @@ TEST_F(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char path[50];
 		ASSERT_EQ(ST_NONE, mock_block_page.block_entries[i].status);
-		sprintf(path, "/tmp/testHCFS/mockblock_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/mockblock_1_%d", i);
 		unlink(path);
 	}
 
@@ -575,9 +579,21 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[20];
-		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		unlink(expected_objname);
 	}
 	metaptr = fopen(metapath, "r+");
@@ -621,9 +637,21 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
 		char expected_objname[20];
-		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		unlink(expected_objname);
 	}
 	unlink(metapath);

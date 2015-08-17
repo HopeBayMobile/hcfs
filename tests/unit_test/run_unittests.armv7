@@ -1,0 +1,18 @@
+#!/bin/bash
+
+CURPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Install dependencies
+packages="libattr1-dev"
+packages="$packages gcovr"
+packages_to_install=""
+for P in $packages; do
+	if ! dpkg -s "$P" >/dev/null 2>&1; then
+		packages_to_install="$packages_to_install $P"
+	fi
+done
+[ -n "$packages_to_install" ] && sudo apt-get install -y $packages_to_install
+
+cd $CURPATH
+make clean
+make EXTRACPPFLAGS=-DARM_32bit_ test

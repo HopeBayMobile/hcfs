@@ -24,10 +24,13 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #include "macro.h"
 #include "global.h"
 #include "params.h"
+#include "FS_manager.h"
+#include "mount_manager.h"
 #include "fuseop.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot

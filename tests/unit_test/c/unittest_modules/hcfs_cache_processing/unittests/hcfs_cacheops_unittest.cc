@@ -7,6 +7,37 @@ extern "C" {
 #include "global.h"
 }
 
+class cacheopEnvironment : public ::testing::Environment {
+ public:
+  char *workpath, *tmppath;
+
+  virtual void SetUp() {
+
+    workpath = NULL;
+    tmppath = NULL;
+    if (access("/tmp/testHCFS", F_OK) != 0) {
+      workpath = get_current_dir_name();
+      tmppath = (char *)malloc(strlen(workpath)+20);
+      snprintf(tmppath, strlen(workpath)+20, "%s/tmpdir", workpath);
+      if (access(tmppath, F_OK) != 0)
+        mkdir(tmppath, 0700);
+      symlink(tmppath, "/tmp/testHCFS");
+     }
+
+  }
+
+  virtual void TearDown() {
+    unlink("/tmp/testHCFS");
+    rmdir(tmppath);
+    if (workpath != NULL)
+      free(workpath);
+    if (tmppath != NULL)
+      free(tmppath);
+  }
+};
+
+::testing::Environment* const cacheop_env = ::testing::AddGlobalTestEnvironment(new cacheopEnvironment);
+
 class run_cache_loopTest : public ::testing::Test {
 protected:
 	void SetUp()
@@ -27,11 +58,26 @@ protected:
 		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 			ino_t inode = inode_cache_usage_hash[i]->this_inode;
 
-			sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode);
+#ifdef ARM_32bit_
+			sprintf(meta_name,
+				"/tmp/testHCFS/run_cache_loop_filemeta%lld",
+				inode);
+#else
+			sprintf(meta_name,
+				"/tmp/testHCFS/run_cache_loop_filemeta%ld",
+				inode);
+#endif
 			unlink(meta_name);
 			for (int blockno = 0; blockno < 10 ; blockno++) {	
-				sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", 
+#ifdef ARM_32bit_
+				sprintf(block_name,
+					"/tmp/testHCFS/run_cache_loop_block%lld_%d", 
 					inode, blockno);
+#else
+				sprintf(block_name,
+					"/tmp/testHCFS/run_cache_loop_block%ld_%d", 
+					inode, blockno);
+#endif
 				unlink(block_name);
 			}
 		}
@@ -89,7 +135,13 @@ private:
 		for (int i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
 
-		sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode);
+#ifdef ARM_32bit_
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+				inode);
+#else
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
+				inode);
+#endif
 		fptr = fopen(meta_name, "w+");
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(struct stat), 1, fptr);
@@ -98,7 +150,15 @@ private:
 		fclose(fptr);
 
 		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
-			sprintf(meta_name, "/tmp/run_cache_loop_block%d_%d", inode, blockno);
+#ifdef ARM_32bit_
+			sprintf(meta_name,
+				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
+				inode, blockno);
+#else
+			sprintf(meta_name,
+				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
+				inode, blockno);
+#endif
 			mknod(meta_name, 0700, 0);
 			truncate(meta_name, MAX_BLOCK_SIZE);
 		}
@@ -130,8 +190,16 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 	
 	/* Run */
 	pthread_create(&thread_id, NULL, cache_loop_function, NULL);
-	printf("Test: cache_loop() is running. process sleep 15 seconds.\n");
-	sleep(15);
+	/* TODO: How to fix this unittest so that we don't need to count on
+		the process to finish within 30 or 120 seconds. */
+#ifdef ARM_32bit_
+	/* Change wait time to 120 secs for slower cpu */
+	printf("Test: cache_loop() is running. process sleep 120 seconds.\n");
+	sleep(120);
+#else
+	printf("Test: cache_loop() is running. process sleep 30 seconds.\n");
+	sleep(30);
+#endif
 	hcfs_system->systemdata.cache_size = CACHE_SOFT_LIMIT - 1; 
 	hcfs_system->system_going_down = TRUE;
 	printf("Test: Let thread leave.\n");
@@ -144,7 +212,13 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 		ino_t inode;
 		
 		inode = inode_cache_usage_hash[i]->this_inode;
-		sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", inode);
+#ifdef ARM_32bit_
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+				inode);
+#else
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
+				inode);
+#endif
 		fptr = fopen(meta_name, "r");
 		
 		fseek(fptr, 0, SEEK_SET);
@@ -157,7 +231,15 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 			char block_name[200];
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
-			sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", inode, entry);
+#ifdef ARM_32bit_
+			sprintf(block_name,
+				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
+				inode, entry);
+#else
+			sprintf(block_name,
+				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
+				inode, entry);
+#endif
 			ASSERT_TRUE(access(block_name, F_OK) < 0);
 
 			expected_block_num--;

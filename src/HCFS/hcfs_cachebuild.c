@@ -32,6 +32,7 @@
 #include "super_block.h"
 #include "logger.h"
 #include "global.h"
+#include "utils.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -282,8 +283,13 @@ int build_cache_usage(void)
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
+#ifdef ARM_32bit_
+			ret = sscanf(temp_dirent.d_name, "block%lld_%lld",
+							&this_inode, &blockno);
+#else
 			ret = sscanf(temp_dirent.d_name, "block%ld_%lld",
 							&this_inode, &blockno);
+#endif
 			if (ret != 2) {
 				ret = readdir_r(dirptr, &temp_dirent,
 					&direntptr);

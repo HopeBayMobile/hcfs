@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/file.h>
+#include <sys/time.h>
 #include <time.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -36,6 +37,8 @@
 #include "hfuse_system.h"
 #include "logger.h"
 #include "macro.h"
+#include "metaops.h"
+#include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 

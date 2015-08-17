@@ -33,6 +33,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "xattr_ops.h"
+#include "metaops.h"
 
 /************************************************************************
 *

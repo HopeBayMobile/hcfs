@@ -20,13 +20,15 @@
 
 
 #include "xattr_ops.h"
-#include "meta_mem_cache.h"
-#include "string.h"
-#include "global.h"
-#include "macro.h"
 
 #include <attr/xattr.h>
 #include <errno.h>
+
+#include "meta_mem_cache.h"
+#include "super_block.h"
+#include "string.h"
+#include "global.h"
+#include "macro.h"
 
 /**
  * Parse input parameter "name"
