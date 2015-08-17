@@ -71,10 +71,17 @@ TEST(enc, transform_encrypt_fd)
 	FILE* new_encrypt_fd = transform_encrypt_fd(in_file, key, &data);
 	EXPECT_TRUE( new_encrypt_fd != NULL);
 
-	//decrypt_to_fd(FILE* decrypt_to_fd, unsigned char* key, FILE* in_fd)
+	char* ptr;
+	size_t t = 0;
+	FILE* in_fd = open_memstream(&ptr, &t);
+	decrypt_to_fd(in_fd, key, new_encrypt_fd);
+	fclose(in_fd);
+	EXPECT_EQ(memcmp(ptr, input, strlen(input)), 0);
+
 	fclose(new_encrypt_fd);
 	fclose(in_file);
 	free(key);
 	free(data);
+	free(ptr);
 
 }
