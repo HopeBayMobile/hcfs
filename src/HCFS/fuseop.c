@@ -1277,7 +1277,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	if ((self_mode & S_IFDIR) && (parent_inode1 != parent_inode2)) {
+	if ((S_ISDIR(self_mode)) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
 				parent_inode2, &tempstat, body_ptr);
 		if (ret_val < 0) {
@@ -1718,8 +1718,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	write_log(10, "Debug truncate: offset %ld\n", offset);
 	/* If the filesystem object is not a regular file, return error */
-	if (filestat->st_mode & S_IFREG == FALSE) {
-		if (filestat->st_mode & S_IFDIR)
+	if (S_ISREG(filestat->st_mode) == FALSE) {
+		if (S_ISDIR(filestat->st_mode))
 			return -EISDIR;
 		else
 			return -EPERM;

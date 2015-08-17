@@ -511,8 +511,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	setbuf(metafptr, NULL);
 
-	/* Upload block if mode == S_IFREG */
-	if ((ptr->this_mode) & S_IFREG) {
+	/* Upload block if mode is regular file */
+	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
