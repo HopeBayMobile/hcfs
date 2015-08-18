@@ -20,10 +20,12 @@
  * *  Return value: bytes expected
  * *
  * *************************************************************************/
-int expect_b64_encode_length(unsigned int length) {
+int expect_b64_encode_length(unsigned int length)
+{
 	int tmp = length % 3;
-	tmp = (tmp == 0)? tmp : (3-tmp);
-	// 1 is for b64encode_str puts '\0' in the end
+
+	tmp = (tmp == 0) ? tmp : (3-tmp);
+	/* 1 is for b64encode_str puts '\0' in the end */
 	return  1+(length+tmp)*4/3;
 }
 
@@ -43,8 +45,9 @@ int expect_b64_encode_length(unsigned int length) {
  *                  error code
  * *
  * *************************************************************************/
-int generate_random_bytes(unsigned char* bytes, unsigned int length) {
-	if(length <= 0)
+int generate_random_bytes(unsigned char *bytes, unsigned int length)
+{
+	if (length <= 0)
 		return -1;
 
 	memset(bytes, 0, length);
@@ -54,13 +57,11 @@ int generate_random_bytes(unsigned char* bytes, unsigned int length) {
 	 * return -1 if not supported by the current RAND method.
 	 * https://www.openssl.org/docs/crypto/RAND_bytes.html
 	 */
-	switch(rand_success) {
+	switch (rand_success) {
 	case 1:
 		return 0;
-		break;
 	case -1:
 		return -2;
-		break;
 	default:
 		return -3;
 	}
@@ -76,7 +77,8 @@ int generate_random_bytes(unsigned char* bytes, unsigned int length) {
  * *  Return value: See get_random_bytes
  * *
  * *************************************************************************/
-int generate_random_key(unsigned char* key) {
+int generate_random_key(unsigned char *key)
+{
 	return generate_random_bytes(key, KEY_SIZE);
 }
 
@@ -85,7 +87,8 @@ int generate_random_key(unsigned char* key) {
  * *
  * * Function name: aes_gcm_encrypt_core
  * *        Inputs: unsigned char* output: points to a buffer which
- *		                           length should equals input_length + TAG_SIZE
+ *		                           length should equals
+ *		                           input_length + TAG_SIZE
  *		    unsigned char* input
  *		    unsigned int input_length
  *		    unsigned char* key: must be KEY_SIZE length
@@ -98,30 +101,31 @@ int generate_random_key(unsigned char* key) {
  *                  3 if extract TAG error
  * *
  * *************************************************************************/
-int aes_gcm_encrypt_core(unsigned char* output, unsigned char* input,
-		   unsigned int input_length, unsigned char* key,
-		   unsigned char* iv) {
+int aes_gcm_encrypt_core(unsigned char *output, unsigned char *input,
+		   unsigned int input_length, unsigned char *key,
+		   unsigned char *iv) {
 	int tmp_length = 0;
 	int output_length = 0;
 	int retcode = 0;
 	const int output_preserve_size = TAG_SIZE;
 	unsigned char tag[TAG_SIZE] = {0};
-	// clear output
+	/* clear output */
 	memset(output, 0, input_length+TAG_SIZE);
 	EVP_CIPHER_CTX ctx;
+
 	EVP_CIPHER_CTX_init(&ctx);
 	EVP_EncryptInit_ex(&ctx, EVP_aes_256_gcm(), NULL, key, iv);
-	if(!EVP_EncryptUpdate(&ctx, output+output_preserve_size, &tmp_length,
+	if (!EVP_EncryptUpdate(&ctx, output+output_preserve_size, &tmp_length,
 			      input, input_length)) {
 		retcode = 1;
 		goto final;
 	}
-	if(!EVP_EncryptFinal(&ctx, output+output_preserve_size+tmp_length,
+	if (!EVP_EncryptFinal(&ctx, output+output_preserve_size+tmp_length,
 			     &output_length)) {
 		retcode = 2;
 		goto final;
 	}
-	if(!EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag)) {
+	if (!EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_GET_TAG, TAG_SIZE, tag)) {
 		retcode = 3;
 		goto final;
 	}
@@ -149,31 +153,32 @@ final:
  *                  2 if Decrypr final error (TAG wrong)
  * *
  * *************************************************************************/
-int aes_gcm_decrypt_core(unsigned char* output, unsigned char* input,
-			 unsigned int input_length, unsigned char* key,
-			 unsigned char* iv) {
+int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
+			 unsigned int input_length, unsigned char *key,
+			 unsigned char *iv) {
 	int tmp_length = 0;
 	int output_length = 0;
 	int retcode = 0;
 	unsigned char tag[TAG_SIZE] = {0};
 	const int preserve_size = TAG_SIZE;
 
-	// clear output
+	/* clear output */
 	memset(output, 0, input_length-TAG_SIZE);
 
 	EVP_CIPHER_CTX ctx;
+
 	EVP_CIPHER_CTX_init(&ctx);
 	EVP_DecryptInit_ex(&ctx, EVP_aes_256_gcm(), NULL, key, iv);
-	if(!EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, input)) {
+	if (!EVP_CIPHER_CTX_ctrl(&ctx, EVP_CTRL_GCM_SET_TAG, TAG_SIZE, input)) {
 		retcode = 3;
 		goto decrypt_final;
 	}
-	if(!EVP_DecryptUpdate(&ctx, output, &tmp_length, input+preserve_size,
+	if (!EVP_DecryptUpdate(&ctx, output, &tmp_length, input+preserve_size,
 			  input_length-TAG_SIZE)) {
 		retcode = 1;
 		goto decrypt_final;
 	}
-	if(!EVP_DecryptFinal(&ctx, tag, &output_length)) {
+	if (!EVP_DecryptFinal(&ctx, tag, &output_length)) {
 		retcode = 2;
 		goto decrypt_final;
 	}
@@ -198,9 +203,10 @@ decrypt_final:
  * *  Return value: See aes_gcm_encrypt_core
  * *
  * *************************************************************************/
-int aes_gcm_encrypt_fix_iv(unsigned char* output, unsigned char* input,
-			   unsigned int input_length, unsigned char* key) {
+int aes_gcm_encrypt_fix_iv(unsigned char *output, unsigned char *input,
+			   unsigned int input_length, unsigned char *key) {
 	unsigned char iv[IV_SIZE] = {0};
+
 	return aes_gcm_encrypt_core(output, input, input_length, key, iv);
 }
 
@@ -217,9 +223,11 @@ int aes_gcm_encrypt_fix_iv(unsigned char* output, unsigned char* input,
  * *  Return value: See aes_gcm_decrypt_core
  * *
  * *************************************************************************/
-int aes_gcm_decrypt_fix_iv(unsigned char* output, unsigned char* input,
-			   unsigned int input_length, unsigned char* key) {
+int aes_gcm_decrypt_fix_iv(unsigned char *output, unsigned char *input,
+			   unsigned int input_length, unsigned char *key)
+{
 	unsigned char iv[IV_SIZE] = {0};
+
 	return aes_gcm_decrypt_core(output, input, input_length, key, iv);
 }
 
@@ -228,7 +236,8 @@ int aes_gcm_decrypt_fix_iv(unsigned char* output, unsigned char* input,
  * In the future, it should be reimplemented considering
  * key management specs
  */
-unsigned char *get_key() {
+unsigned char *get_key()
+{
 	const char *user_pass = "this is hopebay testing";
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
@@ -273,7 +282,8 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 	unsigned char *buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
 
 	if (buf == NULL) {
-		write_log(10, "Failed to allocate memory in transform_encrypt_fd\n");
+		write_log(10,
+			  "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
 	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
