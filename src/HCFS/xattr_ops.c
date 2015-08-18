@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: xattr_ops.c
 * Abstract: The c source code file for xattr operations. The file includes
@@ -20,13 +20,15 @@
 
 
 #include "xattr_ops.h"
-#include "meta_mem_cache.h"
-#include "string.h"
-#include "global.h"
-#include "macro.h"
 
 #include <attr/xattr.h>
 #include <errno.h>
+
+#include "meta_mem_cache.h"
+#include "super_block.h"
+#include "string.h"
+#include "global.h"
+#include "macro.h"
 
 /**
  * Parse input parameter "name"

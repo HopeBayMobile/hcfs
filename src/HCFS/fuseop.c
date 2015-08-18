@@ -45,6 +45,7 @@
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <sys/file.h>
 #include <fcntl.h>
 
 /* Headers from the other libraries */
@@ -67,6 +68,10 @@
 #include "macro.h"
 #include "xattr_ops.h"
 #include "mount_manager.h"
+#include "api_interface.h"
+#include "metaops.h"
+#include "lookup_count.h"
+#include "FS_manager.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -99,13 +104,13 @@ ntpdate / ntpd or manual changes*/
 /*   file handles */
 
 /* TODO: Need to be able to perform actual operations according to type of
-/*   folders (cached, non-cached, local) */
+	folders (cached, non-cached, local) */
 /* TODO: Push actual operations to other source files, especially no actual
-/*   file handling in this file */
+	file handling in this file */
 /* TODO: Multiple paths for read / write / other ops for different folder
-/*   policies. Policies to be determined at file or dir open. */
+	policies. Policies to be determined at file or dir open. */
 /* TODO: Check why du in HCFS and in ext4 behave differently in timestamp
-changes */
+	changes */
 
 /* Helper function for setting timestamp(s) to the current time, in
 nanosecond precision.
@@ -405,7 +410,12 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
+#ifdef ARM_32bit_
+	write_log(10, "Root inode is %lld\n", tmpptr->f_ino);
+#else
 	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
+#endif
+
 	if (ino == 1)
 		return tmpptr->f_ino;
 	else
@@ -430,7 +440,11 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
 
+#ifdef ARM_32bit_
+	write_log(10, "Debug getattr hit inode %lld\n", hit_inode);
+#else
 	write_log(10, "Debug getattr hit inode %ld\n", hit_inode);
+#endif
 
 	if (hit_inode > 0) {
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
@@ -439,8 +453,13 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			return;
 		}
 
+#ifdef ARM_32bit_
+		write_log(10, "Debug getattr return inode %lld\n",
+				tmp_stat.st_ino);
+#else
 		write_log(10, "Debug getattr return inode %ld\n",
 				tmp_stat.st_ino);
+#endif
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
@@ -786,8 +805,13 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 
 	parent_inode = real_ino(req, parent);
+#ifdef ARM_32bit_
+	write_log(10, "Debug rmdir: name %s, parent %lld\n", selfname,
+			parent_inode);
+#else
 	write_log(10, "Debug rmdir: name %s, parent %ld\n", selfname,
 			parent_inode);
+#endif
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -832,8 +856,13 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
+#ifdef ARM_32bit_
+	write_log(10, "Debug rmdir: name %s, %lld\n", temp_dentry.d_name,
+			this_inode);
+#else
 	write_log(10, "Debug rmdir: name %s, %ld\n", temp_dentry.d_name,
 			this_inode);
+#endif
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0)
@@ -868,8 +897,13 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
+#ifdef ARM_32bit_
+	write_log(10, "Debug lookup parent %lld, name %s\n",
+			parent_inode, selfname);
+#else
 	write_log(10, "Debug lookup parent %ld, name %s\n",
 			parent_inode, selfname);
+#endif
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -902,8 +936,13 @@ a directory (for NFS) */
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 
+#ifdef ARM_32bit_
+	write_log(10,
+		"Debug lookup %lld, %s, %d\n", parent_inode, selfname, ret_val);
+#else
 	write_log(10,
 		"Debug lookup %ld, %s, %d\n", parent_inode, selfname, ret_val);
+#endif
 
 	if (ret_val < 0) {
 		ret_val = -ret_val;
@@ -921,8 +960,13 @@ a directory (for NFS) */
 	}
 
 	output_param.generation = this_gen;
+#ifdef ARM_32bit_
+	write_log(10,
+		"Debug lookup inode %lld, gen %ld\n", this_inode, this_gen);
+#else
 	write_log(10,
 		"Debug lookup inode %ld, gen %ld\n", this_inode, this_gen);
+#endif
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -1257,7 +1301,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	} else {
 		/* If newpath does not exist, add the new entry */
 		ret_val = dir_add_entry(parent_inode2, self_inode,
-				selfname2, self_mode, parent2_ptr);
+			selfname2, self_mode, parent2_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -1279,7 +1323,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 
 	if ((S_ISDIR(self_mode)) && (parent_inode1 != parent_inode2)) {
 		ret_val = change_parent_inode(self_inode, parent_inode1,
-				parent_inode2, &tempstat, body_ptr);
+				parent_inode2, body_ptr);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -2058,8 +2102,13 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		temp_prefetch->block_no = block_index + 1;
 		temp_prefetch->page_start_fpos = this_page_fpos;
 		temp_prefetch->entry_index = eindex + 1;
+#ifdef ARM_32bit_
+		write_log(10, "Prefetching block %lld for inode %lld\n",
+			block_index + 1, this_inode);
+#else
 		write_log(10, "Prefetching block %lld for inode %ld\n",
 			block_index + 1, this_inode);
+#endif
 		ret = pthread_create(&(prefetch_thread),
 			&prefetch_thread_attr, (void *)&prefetch_block,
 			((void *)temp_prefetch));
@@ -2555,6 +2604,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 				fh_ptr, fh_ptr->thisinode, &errcode);
 		if ((this_bytes_read == 0) && (errcode < 0)) {
 			fuse_reply_err(req, -errcode);
+			free(buf);
 			return;
 		}
 
@@ -2570,6 +2620,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 				meta_cache_lock_entry(fh_ptr->thisinode);
 		if (fh_ptr->meta_cache_ptr == NULL) {
 			fuse_reply_err(req, -ENOMEM);
+			free(buf);
 			return;
 		}
 
@@ -2584,6 +2635,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			fuse_reply_err(req, -ret);
+			free(buf);
 			return;
 		}
 
@@ -2596,6 +2648,7 @@ void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 			meta_cache_close_file(fh_ptr->meta_cache_ptr);
 			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			fuse_reply_err(req, -ret);
+			free(buf);
 			return;
 		}
 
@@ -3490,9 +3543,15 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					(size - buf_pos),
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
+#ifdef ARM_32bit_
+			write_log(10, "Debug readdir entry %s, %lld\n",
+				temp_page.dir_entries[count].d_name,
+				tempstat.st_ino);
+#else
 			write_log(10, "Debug readdir entry %s, %ld\n",
 				temp_page.dir_entries[count].d_name,
 				tempstat.st_ino);
+#endif
 			write_log(10, "Debug readdir entry size %ld\n",
 				entry_size);
 			if (entry_size > (size - buf_pos)) {
@@ -3569,7 +3628,11 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
+#ifdef ARM_32bit_
+	write_log(10, "Root inode is %lld\n", tmpptr->f_ino);
+#else
 	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
+#endif
 
 	lookup_increase(tmpptr->lookup_table, tmpptr->f_ino, 1, D_ISDIR);
 }
@@ -3586,7 +3649,11 @@ void hfuse_ll_destroy(void *userdata)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
+#ifdef ARM_32bit_
+	write_log(10, "Unmounting FS with root inode %lld\n", tmpptr->f_ino);
+#else
 	write_log(10, "Unmounting FS with root inode %ld\n", tmpptr->f_ino);
+#endif
 }
 
 /************************************************************************
@@ -4710,8 +4777,15 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+#ifdef ARM_32bit_
 	write_log(10,
-		"DEBUG parent %ld, name %s mode %d\n", parent, name, mode);
+		"DEBUG parent %lld, name %s mode %d\n", parent_inode,
+		name, mode);
+#else
+	write_log(10,
+		"DEBUG parent %ld, name %s mode %d\n", parent_inode,
+		name, mode);
+#endif
 
 	/* Reject if not creating a regular file */
 	if (!S_ISREG(mode)) {
@@ -4848,8 +4922,13 @@ void *mount_multi_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop_mt(session_ptr);
+#ifdef ARM_32bit_
+	write_log(10, "Unmounting FS with root inode %lld, %d\n", tmpptr->f_ino,
+			tmpptr->is_unmount);
+#else
 	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
 			tmpptr->is_unmount);
+#endif
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
@@ -4865,8 +4944,13 @@ void *mount_single_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop(session_ptr);
+#ifdef ARM_32bit_
+	write_log(10, "Unmounting FS with root inode %lld, %d\n", tmpptr->f_ino,
+			tmpptr->is_unmount);
+#else
 	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
 			tmpptr->is_unmount);
+#endif
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);

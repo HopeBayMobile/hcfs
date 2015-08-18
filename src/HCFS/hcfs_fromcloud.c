@@ -34,6 +34,7 @@
 #include "hfuse_system.h"
 #include "logger.h"
 #include "macro.h"
+#include "utils.h"
 
 /************************************************************************
 *
@@ -49,10 +50,13 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	char objname[1000];
 	int status;
 	int which_curl_handle;
-	char idname[256];
 	int ret, errcode;
 
+#ifdef ARM_32bit_
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+#else
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+#endif
 
 	sem_wait(&download_curl_sem);
 	FSEEK(fptr, 0, SEEK_SET);

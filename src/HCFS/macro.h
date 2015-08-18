@@ -13,6 +13,8 @@
 #ifndef GW20_HCFS_MACRO_H_
 #define GW20_HCFS_MACRO_H_
 
+#include "logger.h"
+
 #define FSEEK(A, B, C)\
 	{\
 		errcode = 0;\

@@ -19,6 +19,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <attr/xattr.h>
 #include <semaphore.h>
 #include <unistd.h>
@@ -187,6 +188,9 @@ int init_hfuse(void)
 int _init_download_curl(int count)
 {
 	int ret_val;
+
+	snprintf(download_curl_handles[count].id, 255,
+				"download_thread_%d", count);
 
 	curl_handle_mask[count] = FALSE;
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));

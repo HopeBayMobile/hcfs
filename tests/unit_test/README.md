@@ -1,4 +1,5 @@
-Please add your unittests for new modules to "run_unittests".
+For x64 platform, please use ./run_unittests
+For arm 32bits platform, please use ./run_unittests.armv7
 
 Please put your unittests for C modules under "c"
 

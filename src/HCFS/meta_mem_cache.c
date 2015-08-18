@@ -21,6 +21,7 @@
 #include <dirent.h>
 #include <attr/xattr.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 #include "global.h"
 #include "params.h"
@@ -28,6 +29,7 @@
 #include "dir_entry_btree.h"
 #include "macro.h"
 #include "logger.h"
+#include "utils.h"
 
 /* If cache lock not locked, return -1*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \

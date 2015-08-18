@@ -6,7 +6,7 @@ TESTDIRS = $(DIRS:%=test-%)
 all: $(BUILDDIRS)
 $(DIRS): $(BUILDDIRS)
 $(BUILDDIRS):
-	$(MAKE) -C $(@:build-%=%)
+	$(MAKE) EXTRACPPFLAGS=$(EXTRACPPFLAGS) -C $(@:build-%=%)
 
 clean: $(CLEANDIRS)
 $(CLEANDIRS):

@@ -19,6 +19,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "logger.h"
+
 unsigned char base64_codes[64] =
 	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
