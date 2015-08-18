@@ -832,6 +832,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		return -errcode;
 	}
 #ifdef ENCRYPT_ENABLE
+	/* write_log(10, "start to encrypt...\n"); */
 	unsigned char* key = get_key();
 	unsigned char* data = NULL;
 	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);

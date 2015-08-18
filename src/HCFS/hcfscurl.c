@@ -683,6 +683,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	FTELL(fptr);
 	objsize = ret_pos;
 	FSEEK(fptr, 0, SEEK_SET);
+	/* write_log(10, "object size:%d\n", objsize); */
 
 	if (objsize < 0) {
 		fclose(swift_header_fptr);

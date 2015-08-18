@@ -74,7 +74,9 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	write_log(10, "Debug: downloading using curl handle %d\n",
 						which_curl_handle);
 #ifdef ENCRYPT_ENABLE
-	FILE *get_fptr = fmemopen(NULL, MAX_ENC_DATA, "w+");
+	char  *get_fptr_data = NULL;
+	size_t len = 0;
+	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
 
 	status = hcfs_get_object(get_fptr, objname,
 			&(download_curl_handles[which_curl_handle]));
@@ -83,10 +85,10 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 			&(download_curl_handles[which_curl_handle]));
 #endif
 #ifdef ENCRYPT_ENABLE
-	unsigned char *key = get_key();
-
-	decrypt_to_fd(fptr, key, get_fptr);
 	fclose(get_fptr);
+	unsigned char *key = get_key();
+	decrypt_to_fd(fptr, key, get_fptr_data, len);
+	free(get_fptr_data);
 	free(key);
 #endif
 

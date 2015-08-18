@@ -47,10 +47,10 @@ hcfscurl.o: hcfscurl.c hcfscurl.h
 	$(CC) $(CFLAGS) -c hcfscurl.c
 
 hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
-	$(CC) $(CFLAGS) -c hcfs_tocloud.c
+	$(CC) -DENCRYPT_ENABLE  $(CFLAGS) -c hcfs_tocloud.c
 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
-	$(CC) $(CFLAGS) -c hcfs_fromcloud.c
+	$(CC) -DENCRYPT_ENABLE $(CFLAGS) -c hcfs_fromcloud.c
 
 hcfs_cacheops.o: hcfs_cacheops.c hcfs_cacheops.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cacheops.c
@@ -71,7 +71,7 @@ xattr_ops.o: xattr_ops.c xattr_ops.h
 	$(CC) $(CFLAGS) -c xattr_ops.c
 
 enc.o: enc.h enc.c
-	$(CC) -DENCRYPT_ENABLE $(CFLAGS) -c enc.c
+	$(CC) $(CFLAGS) -c enc.c
 
 
 clean:
