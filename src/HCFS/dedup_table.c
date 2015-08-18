@@ -486,18 +486,24 @@ errcode_handle:
 *
 * Function name: delete_ddt_btree
 *        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
-*                DDT_BTREE_META *this_meta
-*       Summary: To find a element with a given key and delete it.
-*  Return value: 0 if operation was successful, or -1 if not.
+*                DDT_BTREE_META *this_meta, int force_delete
+*       Summary: To find a element with a given key. If force_delete is
+*                TRUE or the value of refcount decreased is equal to zero,
+*                the element will be removed from tree. Otherwise, this
+*                operation will only decreased the refcount of element.
+*  Return value: 0 if deletion was successful,
+*                1 if only decrease the refcount of element,
+*                -1 if encountered error.
 *
 *************************************************************************/
 int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
-				int fd, DDT_BTREE_META *this_meta) {
+				int fd, DDT_BTREE_META *this_meta, int force_delete) {
 
 	int search_idx;
 	int compare_result, match;
 	DDT_BTREE_NODE temp_node, largest_child_node;
 	DDT_BTREE_EL largest_child_el;
+	int ret_val;
 	int errcode;
 	ssize_t ret_ssize;
 
@@ -518,16 +524,26 @@ int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
 	if (!match) {
 		if (!tnode->is_leaf) {
 			PREAD(fd, &temp_node, sizeof(DDT_BTREE_NODE), tnode->child_node_pos[search_idx]);
-			delete_ddt_btree(key, &temp_node, fd, this_meta);
+			ret_val = delete_ddt_btree(key, &temp_node, fd, this_meta, force_delete);
+			if (ret_val != 0) {
+				return ret_val;
+			}
 		} else {
 			// Can't find the element to be deleted, return error
 			printf("No matched key\n");
 			return -1;
 		}
 	} else {
+		// Only decrease the refcount, tree rebalancing is not needed.
+		if (!force_delete && tnode->ddt_btree_el[search_idx].refcount > 1) {
+			(tnode->ddt_btree_el[search_idx].refcount)--;
+			PWRITE(fd, tnode, sizeof(DDT_BTREE_NODE), tnode->this_node_pos);
+			return 1;
+		}
+
 		if (tnode->is_leaf) {
 			// Element in leaf - just remove it
-			if (search_idx < (tnode->num_el -1)) {
+			if (search_idx < (tnode->num_el - 1)) {
 				// No need to shift elements for the largest element in this node
 				memmove(&(tnode->ddt_btree_el[search_idx]), &(tnode->ddt_btree_el[search_idx+1]),
 								(tnode->num_el - search_idx - 1)*sizeof(DDT_BTREE_EL));
@@ -860,7 +876,7 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: increase_el_refcount
+* Function name: increase_ddt_el_refcount
 *        Inputs: DDT_BTREE_NODE *tnode, int s_idx, int fd
 *       Summary: Increase the refcount of a specific element
 *  Return value: 0 if operation was successful, -1 if not.
@@ -887,6 +903,26 @@ int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd) {
 errcode_handle:
 	return errcode;
 }
+
+
+/************************************************************************
+*
+* Function name: decrease_ddt_el_refcount
+*        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+*                DDT_BTREE_META *this_meta
+*       Summary: Decrease the refcount of element or deleted the emelemt
+*                if the refcount is equal to zero.
+*  Return value: 0 if element was deleted,
+*                1 if only decrease the refcount of element,
+*                -1 if encountered error.
+*
+*************************************************************************/
+int decrease_ddt_el_refcount(unsigned char *key, DDT_BTREE_NODE *tnode,
+				int fd, DDT_BTREE_META *this_meta) {
+
+	return delete_ddt_btree(key, tnode, fd, this_meta, FALSE);
+}
+
 
 int compute_hash(char *path, unsigned char *output) {
 

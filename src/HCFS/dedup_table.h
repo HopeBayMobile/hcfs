@@ -78,7 +78,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 				DDT_BTREE_NODE *cnode, int fd, DDT_BTREE_META *this_meta);
 
 int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
-				int fd, DDT_BTREE_META *this_meta);
+				int fd, DDT_BTREE_META *this_meta, int force_delete);
 
 static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_NODE *result_node,
 				DDT_BTREE_EL *result_el, DDT_BTREE_META *this_meta);
@@ -87,6 +87,9 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				DDT_BTREE_META *this_meta);
 
 int increase_ddt_el_refcount(DDT_BTREE_NODE *tnode, int s_idx, int fd);
+
+int decrease_ddt_el_refcount(unsigned char *key, DDT_BTREE_NODE *tnode,
+				int fd, DDT_BTREE_META *this_meta);
 
 // Util function for data dedup
 int compute_hash(char *path, unsigned char *output);

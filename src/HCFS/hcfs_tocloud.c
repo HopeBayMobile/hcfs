@@ -798,7 +798,8 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-			CURL_HANDLE *curl_handle, char *filename, unsigned char *hash_in_meta)
+			CURL_HANDLE *curl_handle, char *filename,
+			unsigned char *old_hash, unsigned char *hash_in_meta)
 {
 	char objname[400];
 	char hash_key_str[65];
@@ -829,7 +830,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	hash_to_string(hash_key, hash_key_str);
 	sprintf(objname, "data_%s", hash_key_str);
 
-	// Copy new objname to update_thread
+	// Copy new hash key and reserve old one
+	memcpy(old_hash, hash_in_meta, SHA256_DIGEST_LENGTH);
 	memcpy(hash_in_meta, hash_key, SHA256_DIGEST_LENGTH);
 
 	// Get dedup table meta
@@ -862,6 +864,23 @@ int do_block_sync(ino_t this_inode, long long block_no,
 
 	fclose(ddt_fptr);
 	fclose(fptr);
+
+	// Since the objected mapped is changed, need to handle old object
+	// Sync was successful
+	if (ret == 0 && old_hash[0]) {
+		printf("Start to delete obj\n");
+		// Re-get dedup table meta for old hash
+		ddt_fptr = get_ddt_btree_meta(old_hash, &tree_root, &ddt_meta);
+		ddt_fd = fileno(ddt_fptr);
+ 
+		// TODO - Need to delete block
+		decrease_ddt_el_refcount(old_hash, &tree_root, ddt_fd, &ddt_meta);
+		fclose(ddt_fptr);
+
+		printf("Delete obj - %02x\n", old_hash[0]);
+	} else {
+		printf("No old block find\n");
+	}
 
 	return ret;
 }
@@ -903,8 +922,8 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename, thread_ptr->hash_key);
+				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
+				thread_ptr->old_hash_key, thread_ptr->hash_key);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
