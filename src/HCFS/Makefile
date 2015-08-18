@@ -71,7 +71,7 @@ xattr_ops.o: xattr_ops.c xattr_ops.h
 	$(CC) $(CFLAGS) -c xattr_ops.c
 
 enc.o: enc.h enc.c
-	$(CC) $(CFLAGS) -c enc.c
+	$(CC) -DENCRYPT_ENABLE $(CFLAGS) -c enc.c
 
 
 clean:

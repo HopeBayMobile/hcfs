@@ -806,21 +806,27 @@ int do_block_sync(ino_t this_inode, long long block_no,
 				errcode, strerror(errcode));
 		return -errcode;
 	}
-
+#ifdef ENCRYPT_ENABLE
 	unsigned char* key = get_key();
 	unsigned char* data = NULL;
 	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
 	fclose(fptr);
 
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
+#else
+	ret_val = hcfs_put_object(fptr, objname, curl_handle);
+#endif
+
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
+#ifdef ENCRYPT_ENABLE
 	fclose(new_fptr);
 	if(data != NULL)
 		free(data);
+#endif
 	return ret;
 }
 

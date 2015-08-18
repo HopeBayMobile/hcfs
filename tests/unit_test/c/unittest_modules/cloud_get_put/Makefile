@@ -89,7 +89,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
+	$(CXX) -DENCRYPT_ENABLE=0 $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
 
 hcfs_fromcloud.o : $(USER_DIR)/hcfs_fromcloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
