@@ -71,17 +71,23 @@ TEST(enc, transform_encrypt_fd)
 	FILE* new_encrypt_fd = transform_encrypt_fd(in_file, key, &data);
 	EXPECT_TRUE( new_encrypt_fd != NULL);
 
-	char* ptr;
+	unsigned char *ptr = (unsigned char*)calloc(strlen(input)+TAG_SIZE,
+					   sizeof(unsigned char));
+	fread(ptr, sizeof(unsigned char),
+	      strlen(input)+TAG_SIZE, new_encrypt_fd);
+	char *ptr2 = NULL;
 	size_t t = 0;
-	FILE* in_fd = open_memstream(&ptr, &t);
-	decrypt_to_fd(in_fd, key, new_encrypt_fd);
+	FILE *in_fd = open_memstream(&ptr2, &t);
+	decrypt_to_fd(in_fd, key, ptr, strlen(input)+TAG_SIZE);
+
 	fclose(in_fd);
-	EXPECT_EQ(memcmp(ptr, input, strlen(input)), 0);
+	EXPECT_EQ(memcmp(ptr2, input, strlen(input)), 0);
 
 	fclose(new_encrypt_fd);
 	fclose(in_file);
 	free(key);
 	free(data);
 	free(ptr);
+	free(ptr2);
 
 }

@@ -41,7 +41,7 @@ unsigned char *get_key(void);
 
 FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
 
-int decrypt_to_fd(FILE *, unsigned char*, FILE *);
+int decrypt_to_fd(FILE *, unsigned char *, unsigned char *, int);
 
 
 #endif  /* GW20_HCFS_ENC_H_ */
