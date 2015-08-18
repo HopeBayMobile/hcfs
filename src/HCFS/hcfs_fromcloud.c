@@ -73,8 +73,6 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
 						which_curl_handle);
-	sprintf(idname, "download_thread_%d", which_curl_handle);
-	strcpy(download_curl_handles[which_curl_handle].id, idname);
 #ifdef ENCRYPT_ENABLE
 	FILE *get_fptr = fmemopen(NULL, MAX_ENC_DATA, "w+");
 
