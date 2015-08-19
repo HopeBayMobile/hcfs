@@ -331,6 +331,9 @@ void collect_finished_upload_threads(void *ptr)
 				sync_ctl.threads_error[count1] = TRUE;
 			sem_post(&(sync_ctl.sync_op_sem));
 
+			// Reset uploaded flag for upload thread
+			upload_ctl.upload_threads[count].is_upload = FALSE;
+
 			upload_ctl.threads_in_use[count] = FALSE;
 			upload_ctl.threads_created[count] = FALSE;
 			upload_ctl.total_active_upload_threads--;
@@ -430,6 +433,7 @@ errcode_handle:
 }
 
 static inline int _select_upload_thread(char is_block, char is_delete,
+				char is_upload, unsigned char *old_hash,
 				ino_t this_inode, long long block_count,
 					off_t page_pos, long long e_index)
 {
@@ -442,6 +446,7 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.threads_created[count] = FALSE;
 			upload_ctl.upload_threads[count].is_block = is_block;
 			upload_ctl.upload_threads[count].is_delete = is_delete;
+			upload_ctl.upload_threads[count].is_upload = is_upload;
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
 			upload_ctl.upload_threads[count].page_filepos =
@@ -449,6 +454,11 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].page_entry_index =
 									e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
+
+			if (is_upload == TRUE) {
+				memcpy(upload_ctl.upload_threads[count].old_hash_key,
+						old_hash, SHA256_DIGEST_LENGTH);
+			}
 
 			upload_ctl.total_active_upload_threads++;
 			which_curl = count;
@@ -634,6 +644,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, FALSE,
+						tmp_entry->uploaded,
+						tmp_entry->hash,
 						ptr->inode, block_count,
 							page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
@@ -649,7 +661,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
-				which_curl = _select_upload_thread(TRUE, TRUE,
+				// TODO - handle old hash
+				which_curl = _select_upload_thread(TRUE, TRUE, FALSE,
+						tmp_entry->hash,
 						ptr->inode, block_count,
 							page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
@@ -689,7 +703,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
-	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
+	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL, ptr->inode, 0, 0, 0);
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
@@ -798,7 +812,7 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-			CURL_HANDLE *curl_handle, char *filename,
+			CURL_HANDLE *curl_handle, char *filename, char uploaded,
 			unsigned char *old_hash, unsigned char *hash_in_meta)
 {
 	char objname[400];
@@ -867,19 +881,22 @@ int do_block_sync(ino_t this_inode, long long block_no,
 
 	// Since the objected mapped is changed, need to handle old object
 	// Sync was successful
-	if (ret == 0 && old_hash[0]) {
+	if (ret == 0 && uploaded) {
 		printf("Start to delete obj\n");
 		// Re-get dedup table meta for old hash
 		ddt_fptr = get_ddt_btree_meta(old_hash, &tree_root, &ddt_meta);
 		ddt_fd = fileno(ddt_fptr);
  
 		// TODO - Need to delete block
-		decrease_ddt_el_refcount(old_hash, &tree_root, ddt_fd, &ddt_meta);
-		fclose(ddt_fptr);
+		//decrease_ddt_el_refcount(old_hash, &tree_root, ddt_fd, &ddt_meta);
+		//fclose(ddt_fptr);
 
-		printf("Delete obj - %02x\n", old_hash[0]);
-	} else {
-		printf("No old block find\n");
+		// Delete old object in cloud
+		ret = do_block_delete(this_inode, block_no, old_hash,
+					curl_handle);
+
+		printf("Delete result - %d\n", ret);
+		printf("Delete obj - %02x\n", old_hash[31]);
 	}
 
 	return ret;
@@ -923,7 +940,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
 				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
-				thread_ptr->old_hash_key, thread_ptr->hash_key);
+				thread_ptr->is_upload, thread_ptr->old_hash_key, thread_ptr->hash_key);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
@@ -954,6 +971,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
+					thread_ptr->hash_key,
 					&(upload_curl_handles[which_curl]));
 	if (ret < 0)
 		goto errcode_handle;

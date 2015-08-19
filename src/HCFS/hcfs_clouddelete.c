@@ -43,6 +43,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "global.h"
 #include "logger.h"
 #include "macro.h"
+#include "dedup_table.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -242,7 +243,8 @@ void init_delete_control(void)
 
 /* Helper function for marking a delete thread as in use */
 static inline int _use_delete_thread(int index, char is_blk_flag,
-				ino_t this_inode, long long blockno)
+				ino_t this_inode, long long blockno,
+				unsigned char *blk_hash)
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
 		return -1;
@@ -251,8 +253,10 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	delete_ctl.threads_created[index] = FALSE;
 	delete_ctl.delete_threads[index].is_block = is_blk_flag;
 	delete_ctl.delete_threads[index].inode = this_inode;
-	if (is_blk_flag == TRUE)
+	if (is_blk_flag == TRUE) {
+		memcpy(delete_ctl.delete_threads[index].hash_key, blk_hash, SHA256_DIGEST_LENGTH);
 		delete_ctl.delete_threads[index].blockno = blockno;
+	}
 	delete_ctl.delete_threads[index].which_curl = index;
 
 	delete_ctl.total_active_delete_threads++;
@@ -402,7 +406,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				for (count = 0; count < MAX_DELETE_CONCURRENCY;
 								count++) {
 					ret_val = _use_delete_thread(count,
-						TRUE, ptr->inode, block_count);
+						TRUE, ptr->inode, block_count,
+						temppage.block_entries[current_index].hash);
 					if (ret_val == 0) {
 						curl_id = count;
 						break;
@@ -456,7 +461,7 @@ errcode_handle:
 	sem_wait(&(delete_ctl.delete_op_sem));
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
-		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
+		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, NULL);
 		if (ret_val == 0) {
 			curl_id = count;
 			break;
@@ -545,22 +550,50 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 int do_block_delete(ino_t this_inode, long long block_no,
-						CURL_HANDLE *curl_handle)
+				unsigned char *blk_hash, CURL_HANDLE *curl_handle)
 {
-	char objname[1000];
-	int ret_val, ret;
+	char objname[400];
+	char hash_key_str[65];
+	int ret_val, ret, ddt_ret;
+	FILE *ddt_fptr;
+	int ddt_fd;
+	DDT_BTREE_NODE tree_root;
+	DDT_BTREE_META ddt_meta;
 
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 	write_log(10,
-		"Debug delete object: objname %s, inode %lld, block %lld\n",
+		"Debug delete object: inode %lld, block %lld\n",
 					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
-	ret_val = hcfs_delete_object(objname, curl_handle);
-	/* Already retried in get object if necessary */
-	if ((ret_val >= 200) && (ret_val <= 299))
-		ret = 0;
-	else
+
+	// Get dedup table meta
+	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
+	ddt_fd = fileno(ddt_fptr);
+
+	// Update ddt
+	ddt_ret = decrease_ddt_el_refcount(blk_hash, &tree_root, ddt_fd, &ddt_meta);
+	fclose(ddt_fptr);
+
+	if (ddt_ret == 0) {
+		printf("Element is deleted\n");
+
+		// Get objname - Object named by block hashkey
+		hash_to_string(blk_hash, hash_key_str);
+		sprintf(objname, "data_%s", hash_key_str);
+
+		sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+		ret_val = hcfs_delete_object(objname, curl_handle);
+		/* Already retried in get object if necessary */
+		if ((ret_val >= 200) && (ret_val <= 299))
+			ret = 0;
+		else
+			ret = -EIO;
+
+	} else if (ddt_ret = 1) {
+		printf("Only decrease refcount\n");
+	} else {
+		printf("ERROR delete el tree\n");
 		ret = -EIO;
+	}
+
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */
@@ -582,6 +615,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
+			delete_thread_ptr->hash_key,
 			&(delete_curl_handles[which_curl]));
 	else
 		do_meta_delete(delete_thread_ptr->inode,

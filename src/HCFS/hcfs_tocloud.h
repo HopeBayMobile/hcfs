@@ -35,6 +35,7 @@ typedef struct {
 	long long blockno;
 	char is_block;
 	char is_delete;
+	char is_upload;
 	int which_curl;
 	char tempfilename[400];
 	/* After uploaded, we should increase the refcount of hash_key
@@ -85,7 +86,7 @@ UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
-				CURL_HANDLE *curl_handle, char *filename,
+				CURL_HANDLE *curl_handle, char *filename, char uploaded,
 				unsigned char * old_hash, unsigned char *hash_in_meta);
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
