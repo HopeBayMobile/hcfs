@@ -664,7 +664,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			} else {
 				flock(fileno(metafptr), LOCK_UN);
 			}
-
 		}
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
@@ -832,14 +831,28 @@ int do_block_sync(ino_t this_inode, long long block_no,
 				errcode, strerror(errcode));
 		return -errcode;
 	}
+#ifdef ENCRYPT_ENABLE
+	/* write_log(10, "start to encrypt...\n"); */
+	unsigned char* key = get_key();
+	unsigned char* data = NULL;
+	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
+	fclose(fptr);
 
+	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
+#else
 	ret_val = hcfs_put_object(fptr, objname, curl_handle);
+#endif
+
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
-	fclose(fptr);
+#ifdef ENCRYPT_ENABLE
+	fclose(new_fptr);
+	if(data != NULL)
+		free(data);
+#endif
 	return ret;
 }
 
@@ -869,13 +882,19 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 				errcode, strerror(errcode));
 		return -errcode;
 	}
-	ret_val = hcfs_put_object(fptr, objname, curl_handle);
+	unsigned char* key = get_key();
+	unsigned char* data = NULL;
+	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
+	fclose(fptr);
+	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
-	fclose(fptr);
+	fclose(new_fptr);
+	if(data != NULL)
+		free(data);
 	return ret;
 }
 
@@ -910,7 +929,6 @@ errcode_handle:
 	if (count1 < MAX_SYNC_CONCURRENCY)
 		sync_ctl.threads_error[count1] = TRUE;
 	sem_post(&(sync_ctl.sync_op_sem));
-
 }
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)

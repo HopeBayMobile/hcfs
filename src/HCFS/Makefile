@@ -1,8 +1,8 @@
 CC = gcc
 CFLAGS = -g -lfuse -lcurl -pthread -D_FILE_OFFSET_BITS=64 -lssl -lcrypto -Wunused-variable -Wimplicit-function-declaration
 
-hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o
-	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o
+	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o -lfuse -lcurl -pthread -lssl -lcrypto
 
 mount_manager.o: mount_manager.c mount_manager.h
 	$(CC) $(CFLAGS) -c mount_manager.c
@@ -47,10 +47,10 @@ hcfscurl.o: hcfscurl.c hcfscurl.h
 	$(CC) $(CFLAGS) -c hcfscurl.c
 
 hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
-	$(CC) $(CFLAGS) -c hcfs_tocloud.c
+	$(CC) -DENCRYPT_ENABLE  $(CFLAGS) -c hcfs_tocloud.c
 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
-	$(CC) $(CFLAGS) -c hcfs_fromcloud.c
+	$(CC) -DENCRYPT_ENABLE $(CFLAGS) -c hcfs_fromcloud.c
 
 hcfs_cacheops.o: hcfs_cacheops.c hcfs_cacheops.h params.h fuseop.h super_block.h
 	$(CC) $(CFLAGS) -c hcfs_cacheops.c
@@ -69,6 +69,10 @@ b64encode.o: b64encode.c
 
 xattr_ops.o: xattr_ops.c xattr_ops.h
 	$(CC) $(CFLAGS) -c xattr_ops.c
+
+enc.o: enc.h enc.c
+	$(CC) $(CFLAGS) -c enc.c
+
 
 clean:
 	rm -rf *.o hcfs

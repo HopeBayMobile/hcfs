@@ -25,7 +25,7 @@ UNITTEST_DIR = ./unittests
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
+CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR)
 
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest 
+TESTS = hcfs_enc_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -51,9 +51,7 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : $(TESTS)
-	./hcfs_fromcloud_unittest
-	./hcfs_tocloud_unittest
-	./hcfs_clouddelete_unittest
+	./hcfs_enc_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -83,61 +81,23 @@ gtest_main.a : gtest-all.o gtest_main.o
 # gtest_main.a, depending on whether it defines its own main()
 # function.
 
-
-
-# hcfs_fromcloud testing
+b64encode.o : $(USER_DIR)/b64encode.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/b64encode.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/b64encode.c
 
 enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
 
-hcfs_fromcloud.o : $(USER_DIR)/hcfs_fromcloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_fromcloud.c
-
-hcfs_fromcloud_unittest.o : $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc \
-                      $(USER_DIR)/hcfs_fromcloud.h $(USER_DIR)/hcfs_fromcloud.c \
+mock_function.o : $(UNITTEST_DIR)/mock_function.c \
 		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_fromcloud_unittest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
 
-fromcloud_mock_function.o : $(UNITTEST_DIR)/fromcloud_mock_function.c
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fromcloud_mock_function.c
+hcfs_enc_unittest.o : $(UNITTEST_DIR)/hcfs_enc_unittest.cc \
+		      $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_enc_unittest.cc
 
-hcfs_fromcloud_unittest : enc.o fromcloud_mock_function.o hcfs_fromcloud.o hcfs_fromcloud_unittest.o gtest_main.a
+hcfs_enc_unittest : mock_function.o b64encode.o enc.o hcfs_enc_unittest.o  gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
-
-# hcfs_tocloud testing
-
-hcfs_tocloud.o : $(USER_DIR)/hcfs_tocloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_tocloud.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_tocloud.c
-
-hcfs_tocloud_unittest.o : $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc \
-                      $(USER_DIR)/hcfs_tocloud.h $(USER_DIR)/hcfs_tocloud.c \
-		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc
-
-tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_mock_function.c
-
-hcfs_tocloud_unittest : enc.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
-
-# hcfs_clouddelete testing
-
-hcfs_clouddelete.o : $(USER_DIR)/hcfs_clouddelete.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-                     $(USER_DIR)/fuseop.h $(USER_DIR)/hcfs_clouddelete.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_clouddelete.c
-
-hcfs_clouddelete_unittest.o : $(UNITTEST_DIR)/hcfs_clouddelete_unittest.cc \
-                      $(USER_DIR)/hcfs_clouddelete.h $(USER_DIR)/hcfs_clouddelete.c \
-		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_clouddelete_unittest.cc
-
-clouddelete_mock_function.o : $(UNITTEST_DIR)/clouddelete_mock_function.c
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/clouddelete_mock_function.c
-
-hcfs_clouddelete_unittest : clouddelete_mock_function.o hcfs_clouddelete.o hcfs_clouddelete_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 
