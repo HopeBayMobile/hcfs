@@ -36,7 +36,7 @@ int expect_b64_encode_length(unsigned int length)
  *		    length should equals length
  *		    unsigned int length
  * *       Summary: generate some random bytes
- * *                https://www.openssl.org/docs/crypto/RAND_bytes.html
+ * *
  * *
  * *  Return value: 0 if successful.
  *                  -1 if length <= 0.
@@ -55,14 +55,18 @@ int generate_random_bytes(unsigned char *bytes, unsigned int length)
 	/* RAND_bytes() returns 1 on success, 0 otherwise. The error code can
 	 * be obtained by ERR_get_error.
 	 * return -1 if not supported by the current RAND method.
-	 * https://www.openssl.org/docs/crypto/RAND_bytes.html
+	 * https://wiki.openssl.org/index.php/Manual:RAND_bytes%283%29
 	 */
 	switch (rand_success) {
 	case 1:
 		return 0;
 	case -1:
+		write_log(0, "RAND_bytes not supported");
 		return -2;
 	default:
+		write_log(1,
+			  "RAND_bytes: some openssl error may occurs: %d",
+			  ERR_peek_last_error());
 		return -3;
 	}
 }
@@ -282,7 +286,7 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 	unsigned char *buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
 
 	if (buf == NULL) {
-		write_log(10,
+		write_log(0,
 			  "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
@@ -292,7 +296,7 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 					 sizeof(unsigned char));
 	if (new_data == NULL) {
 		free(buf);
-		write_log(10,
+		write_log(0,
 			  "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
@@ -300,7 +304,7 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 
 	if (ret != 0) {
 		free(buf);
-		write_log(10, "Failed encrypt. Code: %d\n", ret);
+		write_log(1, "Failed encrypt. Code: %d\n", ret);
 		return NULL;
 	}
 	free(buf);
@@ -331,7 +335,7 @@ int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char* input,
 
 	if (ret != 0) {
 		free(output);
-		write_log(10, "Failed decrypt. Code: %d\n", ret);
+		write_log(2, "Failed decrypt. Code: %d\n", ret);
 		return 1;
 	}
 	fwrite(output, sizeof(unsigned char), input_length-TAG_SIZE,
