@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -D_FILE_OFFSET_BITS=64 -Wunused-variable -Wimplicit-function-declaration
+CFLAGS = -D_FILE_OFFSET_BITS=64 -Wall -Wextra
 
 HCFSvol: HCFSvol.o
 	$(CC) -o HCFSvol HCFSvol.o

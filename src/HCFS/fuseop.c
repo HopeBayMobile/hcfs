@@ -2666,8 +2666,13 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 {
 	int ret;
 
-	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
-		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+	/* Adding cache check for new or deleted blocks */
+        while ((((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+                ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
+                (((temppage->block_entries[entry_index]).status
+                                                        == ST_TODELETE) ||
+                ((temppage->block_entries[entry_index]).status == ST_NONE))) {
+
 		write_log(10,
 			"Debug write checking if need to wait for cache\n");
 		write_log(10, "%lld, %lld\n",
@@ -2940,12 +2945,6 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
 		case ST_TODELETE:
-			/* If block does not exist and cache is full,
-				need to wait. */
-			if (hcfs_system->systemdata.cache_size >
-					CACHE_HARD_LIMIT)
-				sleep_on_cache_full();
-
 			 /*If not stored anywhere, make it on local disk*/
 			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
 			if (fh_ptr->blockfptr == NULL) {
