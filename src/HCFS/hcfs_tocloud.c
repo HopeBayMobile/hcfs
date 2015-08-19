@@ -850,8 +850,10 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		ret = -EIO;
 #ifdef ENCRYPT_ENABLE
 	fclose(new_fptr);
-	if(data != NULL)
+	if (data != NULL) {
+		free(key);
 		free(data);
+	}
 #endif
 	return ret;
 }

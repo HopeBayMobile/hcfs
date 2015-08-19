@@ -2666,8 +2666,13 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 {
 	int ret;
 
-	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
-		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
+	/* Adding cache check for new or deleted blocks */
+        while ((((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
+                ((temppage->block_entries[entry_index]).status == ST_CtoL)) ||
+                (((temppage->block_entries[entry_index]).status
+                                                        == ST_TODELETE) ||
+                ((temppage->block_entries[entry_index]).status == ST_NONE))) {
+
 		write_log(10,
 			"Debug write checking if need to wait for cache\n");
 		write_log(10, "%lld, %lld\n",
