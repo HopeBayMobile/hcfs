@@ -2940,6 +2940,12 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
 		case ST_TODELETE:
+			/* If block does not exist and cache is full,
+				need to wait. */
+			if (hcfs_system->systemdata.cache_size >
+					CACHE_HARD_LIMIT)
+				sleep_on_cache_full();
+
 			 /*If not stored anywhere, make it on local disk*/
 			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
 			if (fh_ptr->blockfptr == NULL) {

@@ -15,6 +15,7 @@
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #include "b64encode.h"
+#include "logger.h"
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32
