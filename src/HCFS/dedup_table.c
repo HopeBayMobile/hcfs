@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <openssl/sha.h>
+#include <sys/file.h>
 
 #include "global.h"
 #include "macro.h"
@@ -64,8 +65,9 @@ errcode_handle:
 * Function name: get_btree_meta
 *        Inputs: unsigned char *key, DDT_BTREE_NODE *root,
 *                DDT_BTREE_META this_meta
-*       Summary: Get the metadata of a tree. Also return the root node
-*                (root) and the metadata(this_meta) of this tree.
+*       Summary: Get point to the metadata of a tree. Also return the root node
+*                (root) and the metadata(this_meta) of this tree. The meta file
+*                will be locked by flock after this oepration.
 *  Return value: File pointer to btree file
 *
 *************************************************************************/
@@ -96,6 +98,8 @@ FILE* get_ddt_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
 	// Open file
 	fptr = fopen(meta_path, "r+");
 	fd = fileno(fptr);
+	flock(fd, LOCK_EX);
+	setbuf(fptr, NULL);
 
 	// Copy metadata
 	PREAD(fd, this_meta, sizeof(DDT_BTREE_META), 0);
@@ -530,7 +534,7 @@ int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
 			}
 		} else {
 			// Can't find the element to be deleted, return error
-			printf("No matched key\n");
+			printf("No matched key - %02x.....%02x\n", key[0], key[31]);
 			return -1;
 		}
 	} else {

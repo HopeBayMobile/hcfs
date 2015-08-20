@@ -195,7 +195,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 				}
 			}
 /*Adding a delta threshold to avoid thrashing at hard limit boundary*/
-			if (hcfs_system->systemdata.cache_size <
+			if (hcfs_system->systemdata.cache_size <=
 					(CACHE_HARD_LIMIT - CACHE_DELTA))
 				notify_sleep_on_cache();
 

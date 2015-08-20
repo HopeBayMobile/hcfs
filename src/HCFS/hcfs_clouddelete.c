@@ -562,7 +562,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 	write_log(10,
 		"Debug delete object: inode %lld, block %lld\n",
-					objname, this_inode, block_no);
+					this_inode, block_no);
 
 	// Get dedup table meta
 	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
@@ -570,11 +570,10 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 	// Update ddt
 	ddt_ret = decrease_ddt_el_refcount(blk_hash, &tree_root, ddt_fd, &ddt_meta);
+	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 
 	if (ddt_ret == 0) {
-		printf("Element is deleted\n");
-
 		// Get objname - Object named by block hashkey
 		hash_to_string(blk_hash, hash_key_str);
 		sprintf(objname, "data_%s", hash_key_str);
@@ -587,7 +586,8 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		else
 			ret = -EIO;
 
-	} else if (ddt_ret = 1) {
+		printf("Element is deleted; ret = %d\n", ret_val);
+	} else if (ddt_ret == 1) {
 		printf("Only decrease refcount\n");
 	} else {
 		printf("ERROR delete el tree\n");

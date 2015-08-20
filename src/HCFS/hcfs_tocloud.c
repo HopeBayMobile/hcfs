@@ -862,6 +862,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 						objname);
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
 	} else {
+		write_log(10, "Debug datasync: start to sync obj %s", objname);
 		// New hash key - Start to upload object
 		ret_val = hcfs_put_object(fptr, objname, curl_handle);
 		/* Already retried in get object if necessary */
@@ -876,6 +877,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		}
 	}
 
+	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 	fclose(fptr);
 
@@ -883,14 +885,6 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	// Sync was successful
 	if (ret == 0 && uploaded) {
 		printf("Start to delete obj\n");
-		// Re-get dedup table meta for old hash
-		ddt_fptr = get_ddt_btree_meta(old_hash, &tree_root, &ddt_meta);
-		ddt_fd = fileno(ddt_fptr);
- 
-		// TODO - Need to delete block
-		//decrease_ddt_el_refcount(old_hash, &tree_root, ddt_fd, &ddt_meta);
-		//fclose(ddt_fptr);
-
 		// Delete old object in cloud
 		ret = do_block_delete(this_inode, block_no, old_hash,
 					curl_handle);
