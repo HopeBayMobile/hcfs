@@ -4,6 +4,16 @@
 extern "C" {
 #include "b64encode.h"
 #include "enc.h"
+#include "compress.h"
+}
+
+
+TEST(compress, lz4)
+{
+	const char* input = "12345123454ytg0jkk0234]yhj]-43jddfv111112345";
+	int input_size = strlen(input);
+
+
 }
 
 
