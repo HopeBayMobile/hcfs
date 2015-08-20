@@ -7,14 +7,20 @@
 void init_mock_system_config()
 {
 	system_config.blockpath = malloc(sizeof(char) * 100);
-	strcpy(system_config.blockpath, "/tmp/blockpath");
+	strcpy(system_config.blockpath, "/tmp/testHCFS/blockpath");
 }
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char block_name[200];
 
-	sprintf(block_name, "/tmp/run_cache_loop_block%d_%d", this_inode, block_num);
+#ifdef ARM_32bit_
+	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%lld_%lld",
+		this_inode, block_num);
+#else
+	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%ld_%lld",
+		this_inode, block_num);
+#endif
 	strcpy(pathname, block_name);
 	
 	return 0;
@@ -24,7 +30,13 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char meta_name[200];
 
-	sprintf(meta_name, "/tmp/run_cache_loop_filemeta%d", this_inode);
+#ifdef ARM_32bit_
+	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+			this_inode);
+#else
+	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
+			this_inode);
+#endif
 	strcpy(pathname, meta_name);
 
 	return 0;

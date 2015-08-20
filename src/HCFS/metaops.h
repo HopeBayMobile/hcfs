@@ -29,14 +29,16 @@
 #include "filetables.h"
 #include "mount_manager.h"
 
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
+			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
 int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 			ino_t parent_inode2, META_CACHE_ENTRY_STRUCT *body_ptr);
 int decrease_nlink_inode_file(fuse_req_t req, ino_t this_inode);
-int change_dir_entry_inode(ino_t self_inode, char *targetname, ino_t new_inode,
+int change_dir_entry_inode(ino_t self_inode, const char *targetname,
+			ino_t new_inode,
 			mode_t new_mode, META_CACHE_ENTRY_STRUCT *body_ptr);
 int delete_inode_meta(ino_t this_inode);
 int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode, ino_t parent_inode,

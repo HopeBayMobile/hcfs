@@ -442,7 +442,11 @@ class insert_xattrTest : public XattrOperationBase {
 TEST_F(insert_xattrTest, DefaultInsertManyKeys)
 {
 	int ret;
+#ifdef ARM_32bit_
+	int num_keys = 20000;
+#else
 	int num_keys = 60000;
+#endif
 	size_t value_size = 30;
 	pair<string, string> mock_xattr[num_keys];
 
@@ -1077,7 +1081,11 @@ TEST_F(remove_xattrTest, RemovedEntryNotFound)
 TEST_F(remove_xattrTest, RemoveManyKeysSuccess)
 {
 	int ret;
+#ifdef ARM_32bit_
+	int num_keys = 10000;
+#else
 	int num_keys = 30000;
+#endif
 	int reclaimed_count, expected_reclaimed_count;
 	size_t actual_size;
 	size_t value_size = MAX_VALUE_BLOCK_SIZE * 3 - 1;

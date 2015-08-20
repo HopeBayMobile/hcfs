@@ -163,6 +163,7 @@ class api_moduleTest : public ::testing::Test {
   virtual void SetUp() {
     hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
     hcfs_system->system_going_down = FALSE;
+    sem_init(&(hcfs_system->access_sem), 0, 1);
     if (access(SOCK_PATH, F_OK) == 0)
       unlink(SOCK_PATH);
     fd = 0;

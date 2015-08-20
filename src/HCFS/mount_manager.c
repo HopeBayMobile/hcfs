@@ -21,6 +21,9 @@
 #include "fuseop.h"
 #include "global.h"
 #include "FS_manager.h"
+#include "utils.h"
+#include "lookup_count.h"
+#include "logger.h"
 
 extern struct fuse_lowlevel_ops hfuse_ops;
 

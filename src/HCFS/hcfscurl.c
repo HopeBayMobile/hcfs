@@ -24,6 +24,8 @@
 #include <openssl/engine.h>
 #include <semaphore.h>
 #include <curl/curl.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "b64encode.h"
 #include "params.h"
@@ -54,7 +56,7 @@ size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 	size_t ret_size;
 	int errcode;
 
-	FWRITE(ptr, size, nmemb, fstream);
+	FWRITE(ptr, size, nmemb, (FILE *)fstream);
 
 	return ret_size*size;
 
@@ -166,8 +168,8 @@ int parse_swift_list_header(FILE *fptr)
 	while (!feof(fptr)) {
 		tmpptr = fgets(temp_string, 1000, fptr);
 		if (tmpptr == NULL) {
-			write_log(0, "Error parsing in %s\n", __func__);
-			return -1;
+			write_log(2, "Warning: Cannot parse num of objs\n");
+			return retcodenum;
 		}
 
 		if (!strncmp(temp_string, "X-Container-Object-Count",
@@ -324,7 +326,7 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass,
 	int errcode, ret;
 	int num_retries;
 
-	sprintf(filename, "/run/shm/swiftauth%s.tmp", curl_handle->id);
+	sprintf(filename, "/dev/shm/swiftauth%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
 
 	fptr = fopen(filename, "w+");
@@ -563,9 +565,9 @@ int hcfs_swift_list_container(CURL_HANDLE *curl_handle)
 	char header_filename[100], body_filename[100];
 	int ret_val, num_retries, errcode;
 
-	sprintf(header_filename, "/run/shm/swiftlisthead%s.tmp",
+	sprintf(header_filename, "/dev/shm/swiftlisthead%s.tmp",
 							curl_handle->id);
-	sprintf(body_filename, "/run/shm/swiftlistbody%s.tmp", curl_handle->id);
+	sprintf(body_filename, "/dev/shm/swiftlistbody%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
 
 	swift_header_fptr = fopen(header_filename, "w+");
@@ -658,7 +660,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int num_retries;
 	long ret_pos;
 
-	sprintf(header_filename, "/run/shm/swiftputhead%s.tmp",
+	sprintf(header_filename, "/dev/shm/swiftputhead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
@@ -681,6 +683,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	FTELL(fptr);
 	objsize = ret_pos;
 	FSEEK(fptr, 0, SEEK_SET);
+	/* write_log(10, "object size:%d\n", objsize); */
 
 	if (objsize < 0) {
 		fclose(swift_header_fptr);
@@ -765,7 +768,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	int ret_val, ret, errcode;
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/swiftgethead%s.tmp",
+	sprintf(header_filename, "/dev/shm/swiftgethead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
@@ -854,7 +857,7 @@ int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	int ret_val, errcode, ret;
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/swiftdeletehead%s.tmp",
+	sprintf(header_filename, "/dev/shm/swiftdeletehead%s.tmp",
 							curl_handle->id);
 	curl = curl_handle->curl;
 
@@ -1034,8 +1037,8 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	int ret_val, errcode;
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/S3listhead%s.tmp", curl_handle->id);
-	sprintf(body_filename, "/run/shm/S3listbody%s.tmp", curl_handle->id);
+	sprintf(header_filename, "/dev/shm/S3listhead%s.tmp", curl_handle->id);
+	sprintf(body_filename, "/dev/shm/S3listbody%s.tmp", curl_handle->id);
 	sprintf(resource, "%s/", S3_BUCKET);
 
 	curl = curl_handle->curl;
@@ -1487,7 +1490,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	long ret_pos;
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/s3puthead%s.tmp", curl_handle->id);
+	sprintf(header_filename, "/dev/shm/s3puthead%s.tmp", curl_handle->id);
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
 	curl = curl_handle->curl;
 
@@ -1612,7 +1615,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	unsigned char resource[200];
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/s3gethead%s.tmp", curl_handle->id);
+	sprintf(header_filename, "/dev/shm/s3gethead%s.tmp", curl_handle->id);
 
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
 
@@ -1717,7 +1720,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	unsigned char resource[200];
 	int num_retries;
 
-	sprintf(header_filename, "/run/shm/s3deletehead%s.tmp",
+	sprintf(header_filename, "/dev/shm/s3deletehead%s.tmp",
 						curl_handle->id);
 
 	sprintf(resource, "%s/%s", S3_BUCKET, objname);
