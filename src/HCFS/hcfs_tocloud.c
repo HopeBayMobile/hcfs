@@ -1077,7 +1077,7 @@ int dispatch_upload_block(int which_curl)
 				upload_ptr->inode, upload_ptr->blockno);
 #endif
 
-	/* Find a appropriate dispatch-name */
+	/* Find an appropriate dispatch-name */
 	count = 0;
 	while (TRUE) {
 		ret = access(tempfilename, F_OK);
@@ -1116,8 +1116,11 @@ int dispatch_upload_block(int which_curl)
 	blockfptr = fopen(thisblockpath, "r");
 	if (blockfptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
+		write_log(10, "Debug path %s\n", thisblockpath);
+		write_log(10, "Double check %d\n", access(thisblockpath,
+			F_OK));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1129,8 +1132,11 @@ int dispatch_upload_block(int which_curl)
 	fptr = fopen(tempfilename, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
+		write_log(10, "Debug path %s\n", tempfilename);
+		write_log(10, "Double check %d\n", access(tempfilename,
+			F_OK));
 		errcode = -errcode;
 		goto errcode_handle;
 	}

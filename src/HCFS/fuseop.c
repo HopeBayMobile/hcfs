@@ -3589,7 +3589,7 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 	}
 	gettimeofday(&tmp_time2, NULL);
 
-	write_log(0, "readdir elapse %f\n",
+	write_log(10, "readdir elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 
