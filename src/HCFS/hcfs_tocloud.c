@@ -141,10 +141,15 @@ static inline int _upload_terminate_thread(int index)
 	/* TODO: If thread join failed but not EBUSY, perhaps should try to
 	terminate the thread and mark fail? */
 	if (ret != 0) {
-		if (ret != EBUSY)
-			write_log(0, "Error in upload thread. Code %d\n",
-				ret);
-		return ret;
+		if (ret != EBUSY) {
+			/* Perhaps can't join. Mark the thread as not in use */
+			write_log(0, "Error in upload thread. Code %d, %s\n",
+				ret, strerror(ret));
+			return -ret;
+		} else {
+			/* Thread is busy. Wait some more */
+			return ret;
+		}
 	}
 
 	/* Find the sync-inode correspond to the block-inode */
@@ -158,8 +163,8 @@ static inline int _upload_terminate_thread(int index)
 	if (count1 < MAX_SYNC_CONCURRENCY) {
 		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
-			upload_ctl.threads_in_use[count1] = FALSE;
-			upload_ctl.threads_created[count1] = FALSE;
+			upload_ctl.threads_in_use[index] = FALSE;
+			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0;  /* Error already marked */
