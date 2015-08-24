@@ -644,8 +644,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 							page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
-				if (ret < 0)
+				if (ret < 0) {
 					sync_error = TRUE;
+					break;
+				}
 				/*TODO: Maybe should also first copy block
 					out first*/
 				continue;
@@ -690,6 +692,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (access(thismetapath, F_OK) < 0)
 		return;
+
+	/* Abort sync to cloud if error occured */
+	if (sync_error == TRUE) {
+		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		return;
+	}
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
@@ -1116,11 +1124,16 @@ int dispatch_upload_block(int which_curl)
 	blockfptr = fopen(thisblockpath, "r");
 	if (blockfptr == NULL) {
 		errcode = errno;
+		if (errcode == ENOENT) {
+			/* Block deleted already, log and skip */
+			write_log(10, "Block file %s gone. Perhaps deleted.\n",
+				thisblockpath);
+			errcode = 0;
+			goto errcode_handle;
+		}
 		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
 		write_log(10, "Debug path %s\n", thisblockpath);
-		write_log(10, "Double check %d\n", access(thisblockpath,
-			F_OK));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
