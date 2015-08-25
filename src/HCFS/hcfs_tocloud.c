@@ -597,8 +597,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			ret = fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			if (ret < 1) {
+				errcode = ferror(metafptr);
 				write_log(0, "IO error in %s.\n",
 					__func__);
+				if (errcode != 0)
+					write_log(0, "Code %d, %s\n", errcode,
+						strerror(errcode));
 				sync_error = TRUE;
 				flock(fileno(metafptr), LOCK_UN);
 				break;
@@ -632,9 +636,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						sizeof(BLOCK_ENTRY_PAGE),
 								1, metafptr);
 					if (ret < 1) {
+						errcode = ferror(metafptr);
 						write_log(0,
 							"IO error in %s.\n",
 							__func__);
+						write_log(0, "Code %d, %s\n",
+							errcode,
+							strerror(errcode));
 						sync_error = TRUE;
 						flock(fileno(metafptr),
 							LOCK_UN);
@@ -1379,12 +1387,15 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 				root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%ld", root_inode);
 #endif
+
+	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
 		/* Download the object first if any */
+		write_log(10, "Checking for FS stat in backend\n");
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
+			write_log(0, "Open error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;

@@ -28,6 +28,7 @@ class uploadEnvironment : public ::testing::Environment {
 
     workpath = NULL;
     tmppath = NULL;
+    no_backend_stat = TRUE;
     if (access("/tmp/testHCFS", F_OK) != 0) {
       workpath = get_current_dir_name();
       tmppath = (char *)malloc(strlen(workpath)+20);
@@ -36,6 +37,10 @@ class uploadEnvironment : public ::testing::Environment {
         mkdir(tmppath, 0700);
       symlink(tmppath, "/tmp/testHCFS");
      }
+    METAPATH = (char *) malloc(METAPATHLEN);
+    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
+    if (access(METAPATH, F_OK) < 0)
+      mkdir(METAPATH, 0744);
 
   }
 
@@ -47,6 +52,8 @@ class uploadEnvironment : public ::testing::Environment {
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
+    rmdir(METAPATH);
+    free(METAPATH);
   }
 };
 
@@ -59,16 +66,10 @@ class init_sync_stat_controlTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   virtual void SetUp() {
-    METAPATH = (char *) malloc(METAPATHLEN);
-    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
-    if (access(METAPATH, F_OK) < 0)
-      mkdir(METAPATH, 0744);
-
+    no_backend_stat = TRUE;
    }
 
   virtual void TearDown() {
-     rmdir(METAPATH);
-     free(METAPATH);
    }
 
  };
@@ -234,10 +235,18 @@ class init_upload_controlTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 	}
 
 	void TearDown()
 	{
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		unlink(MOCK_META_PATH);
 	}
 };
@@ -476,6 +485,8 @@ class sync_single_inodeTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
 		objname_counter = 0;
@@ -487,6 +498,12 @@ protected:
 	void TearDown()
 	{
 		void *res;
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -503,9 +520,11 @@ protected:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_metaptr;
 
+		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
 		mock_stat.st_size = 1000000; // Let total_blocks = 1000000/1000 = 1000
 		mock_stat.st_mode = S_IFREG;
+		mock_file_meta.root_inode = 10;
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
 
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
@@ -617,7 +636,6 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	int total_page = 3;
 	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	BLOCK_ENTRY_PAGE block_page;
-	FILE_META_TYPE filemeta;
 	FILE *metaptr;
 
 	/* Mock data */
@@ -684,6 +702,8 @@ protected:
 
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
@@ -699,6 +719,12 @@ protected:
 
 	void TearDown()
 	{
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -724,6 +750,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	   been tested in sync_single_inodeTest(). */
 	memset(&empty_stat, 0, sizeof(struct stat));
 	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	empty_meta.root_inode = 10;
 	fseek(mock_file_meta, 0, SEEK_SET);
 	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
 	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
@@ -801,17 +828,10 @@ class update_backend_statTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   virtual void SetUp() {
-    METAPATH = (char *) malloc(METAPATHLEN);
-    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
-    if (access(METAPATH, F_OK) < 0)
-      mkdir(METAPATH, 0744);
-
     no_backend_stat = TRUE;
    }
 
   virtual void TearDown() {
-     rmdir(METAPATH);
-     free(METAPATH);
    }
 
  };
