@@ -19,6 +19,7 @@
 
 char **objname_list;
 int objname_counter;
+int mock_total_page;
 sem_t objname_counter_sem;
 
 char no_backend_stat;

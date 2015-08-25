@@ -141,10 +141,15 @@ static inline int _upload_terminate_thread(int index)
 	/* TODO: If thread join failed but not EBUSY, perhaps should try to
 	terminate the thread and mark fail? */
 	if (ret != 0) {
-		if (ret != EBUSY)
-			write_log(0, "Error in upload thread. Code %d\n",
-				ret);
-		return ret;
+		if (ret != EBUSY) {
+			/* Perhaps can't join. Mark the thread as not in use */
+			write_log(0, "Error in upload thread. Code %d, %s\n",
+				ret, strerror(ret));
+			return -ret;
+		} else {
+			/* Thread is busy. Wait some more */
+			return ret;
+		}
 	}
 
 	/* Find the sync-inode correspond to the block-inode */
@@ -158,8 +163,8 @@ static inline int _upload_terminate_thread(int index)
 	if (count1 < MAX_SYNC_CONCURRENCY) {
 		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
-			upload_ctl.threads_in_use[count1] = FALSE;
-			upload_ctl.threads_created[count1] = FALSE;
+			upload_ctl.threads_in_use[index] = FALSE;
+			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0;  /* Error already marked */
@@ -592,8 +597,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			ret = fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);
 			if (ret < 1) {
+				errcode = ferror(metafptr);
 				write_log(0, "IO error in %s.\n",
 					__func__);
+				if (errcode != 0)
+					write_log(0, "Code %d, %s\n", errcode,
+						strerror(errcode));
 				sync_error = TRUE;
 				flock(fileno(metafptr), LOCK_UN);
 				break;
@@ -627,9 +636,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						sizeof(BLOCK_ENTRY_PAGE),
 								1, metafptr);
 					if (ret < 1) {
+						errcode = ferror(metafptr);
 						write_log(0,
 							"IO error in %s.\n",
 							__func__);
+						write_log(0, "Code %d, %s\n",
+							errcode,
+							strerror(errcode));
 						sync_error = TRUE;
 						flock(fileno(metafptr),
 							LOCK_UN);
@@ -644,8 +657,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 							page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
-				if (ret < 0)
+				if (ret < 0) {
 					sync_error = TRUE;
+					break;
+				}
 				/*TODO: Maybe should also first copy block
 					out first*/
 				continue;
@@ -690,6 +705,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (access(thismetapath, F_OK) < 0)
 		return;
+
+	/* Abort sync to cloud if error occured */
+	if (sync_error == TRUE) {
+		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		return;
+	}
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
@@ -1077,7 +1098,7 @@ int dispatch_upload_block(int which_curl)
 				upload_ptr->inode, upload_ptr->blockno);
 #endif
 
-	/* Find a appropriate dispatch-name */
+	/* Find an appropriate dispatch-name */
 	count = 0;
 	while (TRUE) {
 		ret = access(tempfilename, F_OK);
@@ -1116,8 +1137,16 @@ int dispatch_upload_block(int which_curl)
 	blockfptr = fopen(thisblockpath, "r");
 	if (blockfptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+		if (errcode == ENOENT) {
+			/* Block deleted already, log and skip */
+			write_log(10, "Block file %s gone. Perhaps deleted.\n",
+				thisblockpath);
+			errcode = 0;
+			goto errcode_handle;
+		}
+		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
+		write_log(10, "Debug path %s\n", thisblockpath);
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1129,8 +1158,11 @@ int dispatch_upload_block(int which_curl)
 	fptr = fopen(tempfilename, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
+		write_log(10, "Debug path %s\n", tempfilename);
+		write_log(10, "Double check %d\n", access(tempfilename,
+			F_OK));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1355,12 +1387,15 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 				root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%ld", root_inode);
 #endif
+
+	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {
 		/* Download the object first if any */
+		write_log(10, "Checking for FS stat in backend\n");
 		fptr = fopen(fname, "w");
 		if (fptr == NULL) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
+			write_log(0, "Open error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
