@@ -7,8 +7,8 @@
  * *
  * **************************************************************************/
 
-#ifndef GW20_HCFS_ENC_H_
-#define GW20_HCFS_ENC_H_
+#ifndef GW20_HCFS_COMPRESS_H_
+#define GW20_HCFS_COMPRESS_H_
 
 #include <lz4.h>
 

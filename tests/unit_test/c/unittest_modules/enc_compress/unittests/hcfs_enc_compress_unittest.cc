@@ -8,12 +8,23 @@ extern "C" {
 }
 
 
-TEST(compress, lz4)
+TEST(compress, compress)
 {
-	const char* input = "12345123454ytg0jkk0234]yhj]-43jddfv111112345";
-	int input_size = strlen(input);
-
-
+	const char input[1000] = {0};
+	int input_size = 1000;
+	int output_max_size = compress_bound_f(input_size);
+	char* compressed = (char*)calloc(output_max_size,
+						 sizeof(char));
+	int compress_size = compress_f(input, compressed, input_size);
+	EXPECT_TRUE(compress_size < input_size);
+	char* back = (char*)calloc(1073741824,
+				 sizeof(char));
+	int back_size = decompress_f(compressed, back, compress_size,
+				     1073741824);
+	EXPECT_TRUE(back_size == input_size);
+	EXPECT_EQ(memcmp(input, back, input_size), 0);
+	free(compressed);
+	free(back);
 }
 
 
