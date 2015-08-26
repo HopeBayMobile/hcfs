@@ -1253,9 +1253,15 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			errcode = errno;
 			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
-			fclose(metafptr);
 			return errcode;
 		}
+		/*Need to delete the meta. Move the meta file to "todelete"*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0) {
+			fclose(metafptr);
+			return ret;
+		}
+
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
@@ -1327,12 +1333,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 
 
-		fclose(metafptr);
 		flock(fileno(metafptr), LOCK_UN);
-		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0)
-			return ret;
+		fclose(metafptr);
+
 		break;
 
 	default:
