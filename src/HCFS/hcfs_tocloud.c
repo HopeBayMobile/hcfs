@@ -41,6 +41,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <sys/un.h>
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -1210,13 +1211,62 @@ void dispatch_delete_block(int which_curl)
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
+int tag_uploading_on_fuse(ino_t this_inode, char status)
+{
+	int sockfd;
+	int ret, resp;
+	struct sockaddr_un addr;
+	UPLOADING_COMMUNICATE_DATA data;
+
+	/* Prepare data */
+	data.inode = this_inode;
+	data.status = status;
+	data.progress_list_fd = 0; // tmp
+
+	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, FUSE_SOCK_PATH);
+	
+	ret = connect(sockfd, (struct sockaddr *)&addr, 
+		sizeof(struct sockaddr_un));
+
+	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATE_DATA), 0);
+	recv(sockfd, &resp, sizeof(int), 0);
+
+	if (resp < 0)
+		write_log(0, "Communication error: Response code %d in %s",
+			resp, __func__);
+	else
+		write_log(10, "Debug: Communication success\n");
+	
+	close(sockfd);
+	return resp;
+}
+
+/**
+ * Find a thread and let it start uploading inode
+ *
+ * This function is used to find an available thread and then nominate it 
+ * to upload data of "this_inode". sync_single_inode() is main function for 
+ * uploading a inode.
+ *
+ * @return 0 for success to start uploading. Otherwise return -1.
+ */
 static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					SYNC_THREAD_TYPE *sync_threads)
 {
-	int count;
+	int count, ret;
+
+	ret = -1;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
+			ret = tag_uploading_on_fuse(this_inode, UPLOADING);
+			if (ret < 0) {
+				write_log(0, "Error on tagging inode as "
+					"uploading.\n");
+				break;
+			}
 			sync_ctl.threads_in_use[count] = this_inode;
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
@@ -1237,11 +1287,12 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
+			ret = 0;
 			break;
 		}
 	}
 
-	return count;
+	return ret;
 }
 
 void upload_loop(void)
@@ -1333,7 +1384,10 @@ void upload_loop(void)
 				ret_val = _sync_mark(ino_sync,
 						tempentry.inode_stat.st_mode,
 								sync_threads);
-				do_something = TRUE;
+				if (ret_val < 0)
+					do_something = FALSE;
+				else
+					do_something = TRUE;
 				sem_post(&(sync_ctl.sync_op_sem));
 			} else {  /*If already syncing to cloud*/
 				sem_post(&(sync_ctl.sync_op_sem));

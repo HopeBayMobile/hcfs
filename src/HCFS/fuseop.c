@@ -4963,9 +4963,120 @@ void *mount_single_thread(void *ptr)
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
 
+/************************************************************************
+*
+* Function name: communication_contact_window
+*        Inputs: coid *data
+*
+*       Summary: This thread function aims to be a contact window between
+*                fuse process and other processes.
+*
+*************************************************************************/
+void *communication_contact_window(void *data)
+{
+	int socket_fd, ac_fd;
+	int socket_flag;
+	int errcode;
+	struct sockaddr_un sock_addr;
+	UPLOADING_COMMUNICATE_DATA uploading_data;
+	int communicate_result;
+	struct timespec timer;
+	int ret;
+
+	timer.tv_sec = 0;
+	timer.tv_nsec = 100000000;
+
+	sock_addr.sun_family = AF_UNIX;
+	strcpy(sock_addr.sun_path, FUSE_SOCK_PATH);
+	socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+	ret = bind(socket_fd, (struct sockaddr *)&sock_addr, 
+		sizeof(struct sockaddr_un));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Bind socket error in %s. Code %d.\n",
+			__func__, errcode);
+		return;
+	}
+
+	socket_flag = fcntl(socket_fd, F_GETFL, 0);
+	socket_flag |= O_NONBLOCK;
+	fcntl(socket_fd, F_SETFL, socket_flag);
+
+	ret = listen(socket_fd, 16);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Listen socket error in %s. Code %d.\n",
+			__func__, errcode);
+		return;
+	}
+
+	/* Wait for some connections */
+	while (hcfs_system->system_going_down == FALSE) {
+		ac_fd = accept(socket_fd, NULL, NULL);
+		if (ac_fd < 0) {
+			errcode = errno;
+			if (errcode == EAGAIN) {
+				nanosleep(&timer, NULL);
+				continue;
+			} else {
+				write_log(0, "Accept socket error in %s."
+					" Code %d\n", __func__, errcode);
+			}
+		}
+
+		recv(ac_fd, &uploading_data, 
+			sizeof(UPLOADING_COMMUNICATE_DATA), 0);
+		write_log(10, "Debug: Receive data. Now tag inode %d\n",
+			uploading_data.inode);
+		
+		communicate_result = 0;
+		send(ac_fd, &communicate_result, sizeof(int), 0);
+		close(ac_fd);
+	}
+
+}
+
+int init_fuse_proc_communicate_channel(pthread_t *communicate_tid)
+{
+	int ret;
+	int errcode;
+
+	if (!access(FUSE_SOCK_PATH, F_OK))
+		UNLINK(FUSE_SOCK_PATH);
+
+	ret = pthread_create(communicate_tid, NULL, 
+		communication_contact_window, NULL);
+	if (ret < 0) {
+		errcode = ret;
+		write_log(0, "Creating thread error in %s. Code %d.\n",
+			__func__, errcode);
+		return -errcode;
+	}
+
+	write_log(10, "Communication contact for fuse has been created.\n");
+	return 0;
+
+errcode_handle:
+	return errcode;		
+}
+
+int destroy_fuse_proc_communicate_channel(pthread_t *communicate_tid)
+{
+	int ret, errcode;
+
+	pthread_join(communicate_tid, NULL);
+	UNLINK(FUSE_SOCK_PATH);
+	return 0;
+
+errcode_handle:
+	return errcode;		
+}
+
 int hook_fuse(int argc, char **argv)
 {
 	int dl_count;
+	pthread_t communicate_tid;
 
 	global_argc = argc;
 	global_argv = argv;
@@ -4975,10 +5086,13 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
+	init_fuse_proc_communicate_channel(&communicate_tid);
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
+
+	destroy_fuse_proc_communicate_channel(&communicate_tid);
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();
@@ -4991,7 +5105,3 @@ int hook_fuse(int argc, char **argv)
 	return 0;
 }
 
-/* TODO: Operations to implement
-int hfuse_ll_link
-int hfuse_ll_create
-*/
