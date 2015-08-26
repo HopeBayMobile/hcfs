@@ -44,3 +44,8 @@ nosetests.xml
 # Mr Developer
 .project
 .pydevproject
+
+# Debug log
+backend_upload_log
+cache_maintain_log
+fuse_log
