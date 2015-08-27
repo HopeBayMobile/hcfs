@@ -283,14 +283,14 @@ unsigned char *get_key()
 FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 			   unsigned char **data)
 {
-	unsigned char *buf = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
 
 	if (buf == NULL) {
 		write_log(0,
 			  "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
-	int read_count = fread(buf, sizeof(unsigned char), MAX_ENC_DATA,
+	int read_count = fread(buf, sizeof(unsigned char), MAX_BLOCK_SIZE,
 			       in_fd);
 	unsigned char *new_data = calloc(read_count+TAG_SIZE,
 					 sizeof(unsigned char));

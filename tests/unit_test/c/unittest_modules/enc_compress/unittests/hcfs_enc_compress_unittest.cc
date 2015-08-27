@@ -2,11 +2,19 @@
 #include <string.h>
 #include <stdio.h>
 extern "C" {
+#include "params.h"
 #include "b64encode.h"
 #include "enc.h"
 #include "compress.h"
 }
 
+
+class enc : public testing::Test{
+protected:
+	virtual void SetUp(){
+		system_config.max_block_size = 1073741824;
+	}
+};
 
 TEST(compress, compress)
 {
@@ -43,7 +51,7 @@ TEST(base64, encode_then_decode)
 
 }
 
-TEST(enc, encrypt_with_fix_iv)
+TEST_F(enc, encrypt_with_fix_iv)
 {
 	const char* input = "4ytg0jkk0234]yhj]-43jddfv1111";
 	unsigned char* key = get_key();
@@ -62,7 +70,7 @@ TEST(enc, encrypt_with_fix_iv)
 	free(key);
 }
 
-TEST(enc, encrypt_then_decrypt)
+TEST_F(enc, encrypt_then_decrypt)
 {
 	const char* input = "4ytg0jkk0234]yhj]-43jddfv1111";
 	unsigned char* key = get_key();
@@ -82,7 +90,7 @@ TEST(enc, encrypt_then_decrypt)
 	free(decode);
 }
 
-TEST(enc, transform_encrypt_fd)
+TEST_F(enc, transform_encrypt_fd)
 {
 
 	const char* input = "4ytg0jkk0234]yhj]-43jddfv1111";

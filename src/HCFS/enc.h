@@ -14,12 +14,14 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#include "params.h"
 #include "b64encode.h"
 #include "logger.h"
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32
-#define MAX_ENC_DATA 3145728
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 int generate_random_key(unsigned char *);
 
