@@ -4963,16 +4963,56 @@ void *mount_single_thread(void *ptr)
 	lookup_destroy(tmpptr->lookup_table, tmpptr);
 }
 
+/**
+ * Set uploading data in meta cache.
+ *
+ * This static function aims to set uploading data in meta cache.
+ *
+ * @return 0 on success, -1 on error.
+ */
+int set_uploading_data(const UPLOADING_COMMUNICATE_DATA *data)
+{
+	int ret;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+
+	meta_cache_entry = meta_cache_lock_entry(data->inode);
+	if (!meta_cache_entry) {
+		write_log(0, "Fail to lock meta cache entry in %s\n", __func__);
+		return -1;
+	}
+
+	ret = meta_cache_set_uploading_info(meta_cache_entry, data->status, 
+		data->progress_list_fd);
+	if (ret < 0) {
+		write_log(0, "Fail to set uploading info in %s\n", __func__);
+		meta_cache_unlock_entry(meta_cache_entry);
+		return -1;
+	}
+
+	ret = meta_cache_unlock_entry(meta_cache_entry);
+	if (ret < 0) {
+		write_log(0, "Fail to unlock entry in %s\n", __func__);
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /************************************************************************
 *
 * Function name: communication_contact_window
 *        Inputs: coid *data
 *
 *       Summary: This thread function aims to be a contact window between
-*                fuse process and other processes.
+*                fuse process and other processes. 
 *
+*       Response: Send integer 0 when succeeding in tagging inode. Otherwise
+*                 Send -1 on error.
+*
+*	return : None
 *************************************************************************/
-void *communication_contact_window(void *data)
+void *fuse_communication_contact_window(void *data)
 {
 	int socket_fd, ac_fd;
 	int socket_flag;
@@ -4982,6 +5022,7 @@ void *communication_contact_window(void *data)
 	int communicate_result;
 	struct timespec timer;
 	int ret;
+	char *log_str;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -5022,19 +5063,36 @@ void *communication_contact_window(void *data)
 			} else {
 				write_log(0, "Accept socket error in %s."
 					" Code %d\n", __func__, errcode);
+				nanosleep(&timer, NULL);
+				continue;
 			}
 		}
 
 		recv(ac_fd, &uploading_data, 
 			sizeof(UPLOADING_COMMUNICATE_DATA), 0);
-		write_log(10, "Debug: Receive data. Now tag inode %d\n",
-			uploading_data.inode);
-		
-		communicate_result = 0;
+
+		ret = set_uploading_data(&uploading_data);
+		if (ret < 0) {
+			communicate_result = -1;
+			write_log(0, "Fail to tag inode %lld in %s",
+				uploading_data.inode, __func__);
+		} else {
+			communicate_result = 0;
+			if (uploading_data.status == UPLOADING)
+				write_log(10, "Debug: Succeed in tagging inode "
+					"%lld as UPLOADING\n", 
+					uploading_data.inode);
+			else if (uploading_data.status == UPLOADING)
+				write_log(10, "Debug: Succeed in tagging inode "
+					"%lld as NOT_UPLOADING\n", 
+					uploading_data.inode);
+		}
+
 		send(ac_fd, &communicate_result, sizeof(int), 0);
 		close(ac_fd);
 	}
 
+	write_log(10, "Debug: Terminate fuse communication contact\n");
 }
 
 int init_fuse_proc_communicate_channel(pthread_t *communicate_tid)
@@ -5046,7 +5104,7 @@ int init_fuse_proc_communicate_channel(pthread_t *communicate_tid)
 		UNLINK(FUSE_SOCK_PATH);
 
 	ret = pthread_create(communicate_tid, NULL, 
-		communication_contact_window, NULL);
+		fuse_communication_contact_window, NULL);
 	if (ret < 0) {
 		errcode = ret;
 		write_log(0, "Creating thread error in %s. Code %d.\n",

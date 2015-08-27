@@ -69,6 +69,13 @@ to other entries.
 
 #include "fuseop.h"
 
+/* Structure UPLOADING_INFO includes some information used to 
+check whether this inode is now uploading or not */
+typedef struct {
+	char status; /* UPLOADING or NOT_UPLOADING */
+	int progress_list_fd;
+} UPLOADING_INFO;
+
 typedef struct {
 	struct stat this_stat;
 	ino_t inode_num;
@@ -94,6 +101,7 @@ typedef struct {
 	/*TODO: Need to think whether system clock change could affect the
 	involved operations*/
 	struct timeval last_access_time;
+	UPLOADING_INFO uploading_info; /* Only in memory */
 } META_CACHE_ENTRY_STRUCT;
 
 struct meta_cache_lookup_struct {

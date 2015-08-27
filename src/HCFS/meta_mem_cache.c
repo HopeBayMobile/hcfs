@@ -1558,3 +1558,54 @@ errcode_handle:
 	meta_cache_close_file(body_ptr);
 	return errcode;
 }
+
+/**
+ * Set info about inode uploading
+ *
+ * Set uploading information used when updating data or meta. If inode
+ * is now uploading, then "copy on upload" for those updated-blocks so that
+ * we can assure the data is consistency on backend.
+ *
+ * @return 0 for succeeding in setting info, otherwise -1 on error.
+ */
+int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char new_status, int new_fd)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if ((new_status != UPLOADING) || (new_status != NOT_UPLOADING)) {
+		write_log(0, "Error: Invalid status in %s\n", __func__);
+		return -1;
+	}
+
+	if (body_ptr->uploading_info.status == new_status) {
+		write_log(0, "Error: Old status is the same as new one in %s\n",
+			__func__);
+		return -1;
+	}
+
+	body_ptr->uploading_info.status = new_status;
+	body_ptr->uploading_info.progress_list_fd = new_fd;
+
+	return 0;
+}
+
+/**
+ * Get info about inode uploading
+ *
+ * Get useful info about inode uploading.
+ *
+ * @return 0 on success, otherwise -1 on error.
+ */
+int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
+	char *ret_status, int *ret_fd)
+{
+	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
+
+	if (ret_status != NULL)
+		*ret_status = body_ptr->uploading_info.status;
+	if (ret_fd != NULL)
+		*ret_fd = body_ptr->uploading_info.progress_list_fd;
+
+	return 0;
+}

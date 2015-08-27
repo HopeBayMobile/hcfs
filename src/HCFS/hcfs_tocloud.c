@@ -65,12 +65,21 @@ sync_single_inode. */
 static inline void _sync_terminate_thread(int index)
 {
 	int ret;
+	int tag_ret;
+	ino_t inode;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 			(sync_ctl.threads_created[index] == TRUE)) {
 		ret = pthread_tryjoin_np(sync_ctl.inode_sync_thread[index],
 					NULL);
 		if (ret == 0) {
+			inode = sync_ctl.threads_in_use[index];
+			tag_ret = tag_status_on_fuse(inode, NOT_UPLOADING);
+			if (tag_ret < 0) {
+				write_log(0, "Fail to tag inode %lld as "
+					"NOT_UPLOADING in %s\n",
+					inode, __func__);
+			}
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
@@ -1211,7 +1220,7 @@ void dispatch_delete_block(int which_curl)
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
-int tag_uploading_on_fuse(ino_t this_inode, char status)
+int tag_status_on_fuse(ino_t this_inode, char status)
 {
 	int sockfd;
 	int ret, resp;
@@ -1233,14 +1242,17 @@ int tag_uploading_on_fuse(ino_t this_inode, char status)
 	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATE_DATA), 0);
 	recv(sockfd, &resp, sizeof(int), 0);
 
-	if (resp < 0)
+	if (resp < 0) {
 		write_log(0, "Communication error: Response code %d in %s",
 			resp, __func__);
-	else
-		write_log(10, "Debug: Communication success\n");
+		ret = -1;
+	} else {
+		write_log(10, "Debug: Communicating to fuse success\n");
+		ret = 0;
+	}
 	
 	close(sockfd);
-	return resp;
+	return ret;
 }
 
 /**
@@ -1250,7 +1262,8 @@ int tag_uploading_on_fuse(ino_t this_inode, char status)
  * to upload data of "this_inode". sync_single_inode() is main function for 
  * uploading a inode.
  *
- * @return 0 for success to start uploading. Otherwise return -1.
+ * @return thread index when succeeding in starting uploading. 
+ *         Otherwise return -1.
  */
 static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					SYNC_THREAD_TYPE *sync_threads)
@@ -1261,10 +1274,11 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
-			ret = tag_uploading_on_fuse(this_inode, UPLOADING);
+			ret = tag_status_on_fuse(this_inode, UPLOADING);
 			if (ret < 0) {
-				write_log(0, "Error on tagging inode as "
-					"uploading.\n");
+				write_log(0, "Error on tagging inode %lld as "
+					"UPLOADING.\n", this_inode);
+				ret = -1;
 				break;
 			}
 			sync_ctl.threads_in_use[count] = this_inode;
@@ -1287,7 +1301,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
-			ret = 0;
+			ret = count;
 			break;
 		}
 	}
@@ -1384,10 +1398,11 @@ void upload_loop(void)
 				ret_val = _sync_mark(ino_sync,
 						tempentry.inode_stat.st_mode,
 								sync_threads);
-				if (ret_val < 0)
+				if (ret_val < 0) {
 					do_something = FALSE;
-				else
+				} else {
 					do_something = TRUE;
+				}
 				sem_post(&(sync_ctl.sync_op_sem));
 			} else {  /*If already syncing to cloud*/
 				sem_post(&(sync_ctl.sync_op_sem));
