@@ -30,11 +30,51 @@ class FSTester:
 
         return result, output
 
+class HCFSOperate:
+    def __init__(self):
+        self.conf = {
+            'METAPATH': '/home/kentchen/testHCFS/metastorage'
+            'BLOCKPATH': '/home/kentchen/testHCFS/blockstorage'
+            'CACHE_SOFT_LIMIT': '53687091'
+            'CACHE_HARD_LIMIT': '107374182'
+            'CACHE_DELTA': '10485760'
+            'MAX_BLOCK_SIZE': '1048576'
+            'CURRENT_BACKEND': 's3'
+            'SWIFT_ACCOUNT': 'kentchen'
+            'SWIFT_USER': 'kentchen'
+            'SWIFT_PASS': '0qrrbOCHoNUM'
+            'SWIFT_URL': '10.10.99.11:8080'
+            'SWIFT_CONTAINER': 'kentchen_private_container'
+            'SWIFT_PROTOCOL': 'https'
+            'S3_ACCESS': 'AKIAJ3HMUZ2RY3FUSJMA'
+            'S3_SECRET': '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'
+            'S3_URL': 's3.amazonaws.com'
+            'S3_BUCKET': 'kentchen'
+            'S3_PROTOCOL': 'https'
+            'LOG_LEVEL': '10'
+        }
+
+    def generate_conf_file(self):
+        """Need root privileage
+        """
+
 class CommonSetup:
     def __init__(self):
         self.fstest = FSTester()
 
-class HCFS_2(CommonSetup):
+class HCFS_0(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+
+
+class HCFS_3(CommonSetup):
     '''
     write doc here
     '''    
@@ -49,4 +89,117 @@ class HCFS_2(CommonSetup):
         print result
 
         return False, ''
-    
+
+
+class HCFS_4(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_5(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_6(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_7(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_8(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_9(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_10(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_11(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+class HCFS_12(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+
+class HCFS_13(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+
+
+class HCFS_14(CommonSetup):
+    '''
+    write doc here
+    '''    
+    def __init__(self):
+        pass
+        
+    def run(self):
+        return False, ''
+

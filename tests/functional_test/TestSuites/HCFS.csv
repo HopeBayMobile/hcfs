@@ -1,2 +1,14 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
-,HCFS_2,chflags returns ENOTDIR if a component of the path prefix is not a directory,,0,,,
+,HCFS_0,Setup environment,,1,Fail,,0
+,HCFS_3,chflags,,0,,,
+,HCFS_4,chmod,,0,,,
+,HCFS_5,chown,,0,,,
+,HCFS_6,link,,0,,,
+,HCFS_7,mkdir,,0,,,
+,HCFS_8,mkfifo,,0,,,
+,HCFS_9,open,,0,,,
+,HCFS_10,rename,,0,,,
+,HCFS_11,rmdir,,0,,,
+,HCFS_12,symlink,,0,,,
+,HCFS_13,truncate,,0,,,
+,HCFS_14,unlink,,0,,,
