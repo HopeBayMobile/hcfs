@@ -10,7 +10,13 @@
 #ifndef GW20_HCFS_COMPRESS_H_
 #define GW20_HCFS_COMPRESS_H_
 
+#include <stdlib.h>
+#include <stdio.h>
 #include <lz4.h>
+
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 typedef
 int (*compress_func)(const char* source, char* dest, int inputSize);
@@ -26,4 +32,7 @@ extern compress_func compress_f;
 extern decompress_func decompress_f;
 extern compress_bound_func compress_bound_f;
 
+FILE *transform_compress_fd(FILE *, unsigned char **);
+
+int decompress_to_fd(FILE *, unsigned char *, int);
 #endif

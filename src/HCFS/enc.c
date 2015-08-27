@@ -320,8 +320,9 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
  * * Function name: decrypt_to_fd
  * *        Inputs: FILE* decrypt_to_fd, open with 'w' mode
  *		    unsigned char* key
- *		    FILE* in_fd
- * *       Summary: Decrypt content in in_fd and write to decrypt_to_fd
+ *		    unsigned char* input
+ *		    int input_length
+ * *       Summary: Decrypt write to decrypt_to_fd
  * *
  * *  Return value: 0 if success or 1 if failed
  * *
@@ -344,39 +345,3 @@ int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char* input,
 	return 0;
 }
 
-/*
-int main(void){
-	int ret = 0;
-	char* b64_input = "hello world!!\n";
-	int b64_input_len = strlen(b64_input);
-	printf("%d\n", b64_input_len);
-	int tmp = expect_b64_encode_length(b64_input_len);
-	int out_len = 0;
-	char* b64_output = calloc(tmp, sizeof(char));
-	b64encode_str((unsigned char*)b64_input, (unsigned char*)b64_output,
-		      &out_len, b64_input_len);
-	printf("%d %d\n", tmp, out_len);
-	printf("%s\n", b64_output);
-	char* b64_back = calloc(out_len, sizeof(char));
-	ret = b64decode_str(b64_output, b64_back ,&out_len, strlen(b64_output));
-	printf("%d\n", ret);
-	b64_back = realloc(b64_back, out_len);
-	printf("%s", b64_back);
-	printf("%d\n", out_len);
-	free(b64_output);
-	free(b64_back);
-
-	FILE* f = fopen("./enc.c", "r");
-	unsigned char* key = get_key();
-	printf("key: %d\n", key[31]);
-	unsigned char* data = NULL;
-	FILE* new_f = transform_encrypt_fd(f, key, &data);
-	FILE* new_f_f = fopen("/tmp/test", "w");
-	decrypt_to_fd(new_f_f, key, new_f);
-	fclose(f);
-	fclose(new_f);
-	fclose(new_f_f);
-	free(data);
-	free(key);
-}
-*/

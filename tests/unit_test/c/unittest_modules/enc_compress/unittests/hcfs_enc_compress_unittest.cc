@@ -16,7 +16,14 @@ protected:
 	}
 };
 
-TEST(compress, compress)
+class compress : public testing::Test{
+protected:
+	virtual void SetUp(){
+		system_config.max_block_size = 1073741824;
+	}
+};
+
+TEST_F(compress, compress)
 {
 	const char input[1000] = {0};
 	int input_size = 1000;
@@ -35,6 +42,35 @@ TEST(compress, compress)
 	free(back);
 }
 
+
+TEST_F(compress, transform_compress_fd)
+{
+
+	const char input[1000] = {0};
+	FILE* in_file = fmemopen((void*)input, 1000, "r");
+	unsigned char* data;
+	FILE* new_compress_fd = transform_compress_fd(in_file,  &data);
+	EXPECT_TRUE(new_compress_fd != NULL);
+
+	unsigned char *ptr = (unsigned char*)calloc( compress_bound_f(1000),
+					   sizeof(unsigned char));
+	int read_count = fread(ptr, sizeof(unsigned char), compress_bound_f(1000)
+	      ,new_compress_fd);
+	char *ptr2 = NULL;
+	size_t t = 0;
+	FILE *in_fd = open_memstream(&ptr2, &t);
+	decompress_to_fd(in_fd,  ptr, read_count);
+
+	fclose(in_fd);
+	EXPECT_EQ(memcmp(ptr2, input, strlen(input)), 0);
+
+	fclose(new_compress_fd);
+	fclose(in_file);
+	free(data);
+	free(ptr);
+	free(ptr2);
+
+}
 
 TEST(base64, encode_then_decode)
 {
