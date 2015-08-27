@@ -1573,7 +1573,7 @@ int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
-	if ((new_status != UPLOADING) || (new_status != NOT_UPLOADING)) {
+	if ((new_status != UPLOADING) && (new_status != NOT_UPLOADING)) {
 		write_log(0, "Error: Invalid status in %s\n", __func__);
 		return -1;
 	}

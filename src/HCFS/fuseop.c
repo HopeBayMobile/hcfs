@@ -4970,7 +4970,7 @@ void *mount_single_thread(void *ptr)
  *
  * @return 0 on success, -1 on error.
  */
-int set_uploading_data(const UPLOADING_COMMUNICATE_DATA *data)
+int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 {
 	int ret;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
@@ -5018,7 +5018,7 @@ void *fuse_communication_contact_window(void *data)
 	int socket_flag;
 	int errcode;
 	struct sockaddr_un sock_addr;
-	UPLOADING_COMMUNICATE_DATA uploading_data;
+	UPLOADING_COMMUNICATION_DATA uploading_data;
 	int communicate_result;
 	struct timespec timer;
 	int ret;
@@ -5069,7 +5069,7 @@ void *fuse_communication_contact_window(void *data)
 		}
 
 		recv(ac_fd, &uploading_data, 
-			sizeof(UPLOADING_COMMUNICATE_DATA), 0);
+			sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 
 		ret = set_uploading_data(&uploading_data);
 		if (ret < 0) {
@@ -5082,7 +5082,7 @@ void *fuse_communication_contact_window(void *data)
 				write_log(10, "Debug: Succeed in tagging inode "
 					"%lld as UPLOADING\n", 
 					uploading_data.inode);
-			else if (uploading_data.status == UPLOADING)
+			else if (uploading_data.status == NOT_UPLOADING)
 				write_log(10, "Debug: Succeed in tagging inode "
 					"%lld as NOT_UPLOADING\n", 
 					uploading_data.inode);

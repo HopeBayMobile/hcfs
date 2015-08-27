@@ -1225,7 +1225,7 @@ int tag_status_on_fuse(ino_t this_inode, char status)
 	int sockfd;
 	int ret, resp;
 	struct sockaddr_un addr;
-	UPLOADING_COMMUNICATE_DATA data;
+	UPLOADING_COMMUNICATION_DATA data;
 
 	/* Prepare data */
 	data.inode = this_inode;
@@ -1235,11 +1235,11 @@ int tag_status_on_fuse(ino_t this_inode, char status)
 	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, FUSE_SOCK_PATH);
-	
-	ret = connect(sockfd, (struct sockaddr *)&addr, 
+
+	ret = connect(sockfd, (struct sockaddr *)&addr,
 		sizeof(struct sockaddr_un));
 
-	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATE_DATA), 0);
+	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 	recv(sockfd, &resp, sizeof(int), 0);
 
 	if (resp < 0) {
@@ -1250,7 +1250,7 @@ int tag_status_on_fuse(ino_t this_inode, char status)
 		write_log(10, "Debug: Communicating to fuse success\n");
 		ret = 0;
 	}
-	
+
 	close(sockfd);
 	return ret;
 }
@@ -1258,11 +1258,11 @@ int tag_status_on_fuse(ino_t this_inode, char status)
 /**
  * Find a thread and let it start uploading inode
  *
- * This function is used to find an available thread and then nominate it 
- * to upload data of "this_inode". sync_single_inode() is main function for 
+ * This function is used to find an available thread and then nominate it
+ * to upload data of "this_inode". sync_single_inode() is main function for
  * uploading a inode.
  *
- * @return thread index when succeeding in starting uploading. 
+ * @return thread index when succeeding in starting uploading.
  *         Otherwise return -1.
  */
 static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
@@ -1349,8 +1349,11 @@ void upload_loop(void)
 		/* Get first dirty inode or next inode */
 		sem_wait(&(sync_ctl.sync_queue_sem));
 		super_block_exclusive_locking();
-		if (ino_check == 0)
+		if (ino_check == 0) {
 			ino_check = sys_super_block->head.first_dirty_inode;
+			write_log(10, "Debug: first dirty inode is inode %lld\n"
+				, ino_check);
+		}
 		ino_sync = 0;
 		if (ino_check != 0) {
 			ino_sync = ino_check;
@@ -1395,15 +1398,24 @@ void upload_loop(void)
 			}
 
 			if (in_sync == FALSE) {
+				do_something = TRUE;
+
 				ret_val = _sync_mark(ino_sync,
 						tempentry.inode_stat.st_mode,
 								sync_threads);
-				if (ret_val < 0) {
+				if (ret_val < 0) { /* Sync next time */
+					ret = super_block_update_transit(
+						ino_sync, FALSE, TRUE);
+					if (ret < 0) {
+						ino_sync = 0;
+						ino_check = 0;
+					}
 					do_something = FALSE;
+					sem_post(&(sync_ctl.sync_op_sem));
+					sem_post(&(sync_ctl.sync_queue_sem));
 				} else {
-					do_something = TRUE;
+					sem_post(&(sync_ctl.sync_op_sem));
 				}
-				sem_post(&(sync_ctl.sync_op_sem));
 			} else {  /*If already syncing to cloud*/
 				sem_post(&(sync_ctl.sync_op_sem));
 				sem_post(&(sync_ctl.sync_queue_sem));

@@ -81,7 +81,7 @@ typedef struct {
 	ino_t inode;
 	char status;
 	int progress_list_fd;
-} UPLOADING_COMMUNICATE_DATA;
+} UPLOADING_COMMUNICATION_DATA;
 
 STAT_OP_T sync_stat_ctl;
 UPLOAD_THREAD_CONTROL upload_ctl;
