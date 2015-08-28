@@ -77,7 +77,7 @@
 #define CTIME 1
 
 /* Define socket path for process communicating */
-#define FUSE_SOCK_PATH "/dev/shm/fuse_communication_socket_path"
+#define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
 
 /* Structures for directories */
 /* Defining directory entry in meta files*/

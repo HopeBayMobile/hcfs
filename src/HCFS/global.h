@@ -35,8 +35,4 @@
 #define CHECKMOUNT 10
 #define UNMOUNTALL 11
 
-/* Define status used to tag file as uploading or not */
-#define NOT_UPLOADING 0
-#define UPLOADING 1
-
 #endif  /* GW20_SRC_GLOBAL_H_ */

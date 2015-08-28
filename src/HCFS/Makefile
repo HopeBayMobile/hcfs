@@ -2,8 +2,8 @@ CC = gcc
 CPPFLAGS = -DENCRYPT_ENABLE -D_FILE_OFFSET_BITS=64
 CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -Wall -Wextra
 
-hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o
-	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o atomic_tocloud.o
+	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o atomic_tocloud.o -lfuse -lcurl -pthread -lssl -lcrypto
 
 mount_manager.o: mount_manager.c mount_manager.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c mount_manager.c
@@ -74,6 +74,8 @@ xattr_ops.o: xattr_ops.c xattr_ops.h
 enc.o: enc.h enc.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c enc.c
 
+atomic_tocloud.o: atomic_tocloud.h atomic_tocloud.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c atomic_tocloud.c
 
 clean:
 	rm -rf *.o hcfs

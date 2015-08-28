@@ -1569,22 +1569,17 @@ errcode_handle:
  * @return 0 for succeeding in setting info, otherwise -1 on error.
  */
 int meta_cache_set_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
-	char new_status, int new_fd)
+	char is_now_uploading, int new_fd)
 {
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
-	if ((new_status != UPLOADING) && (new_status != NOT_UPLOADING)) {
-		write_log(0, "Error: Invalid status in %s\n", __func__);
-		return -1;
-	}
-
-	if (body_ptr->uploading_info.status == new_status) {
+	if (body_ptr->uploading_info.is_uploading == is_now_uploading) {
 		write_log(0, "Error: Old status is the same as new one in %s\n",
 			__func__);
 		return -1;
 	}
 
-	body_ptr->uploading_info.status = new_status;
+	body_ptr->uploading_info.is_uploading = is_now_uploading;
 	body_ptr->uploading_info.progress_list_fd = new_fd;
 
 	return 0;
@@ -1603,9 +1598,14 @@ int meta_cache_get_uploading_info(META_CACHE_ENTRY_STRUCT *body_ptr,
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
 
 	if (ret_status != NULL)
-		*ret_status = body_ptr->uploading_info.status;
+		*ret_status = body_ptr->uploading_info.is_uploading;
 	if (ret_fd != NULL)
 		*ret_fd = body_ptr->uploading_info.progress_list_fd;
 
 	return 0;
+}
+
+inline char is_now_uploading(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return body_ptr->uploading_info.is_uploading;
 }

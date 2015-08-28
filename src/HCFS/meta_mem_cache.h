@@ -72,7 +72,7 @@ to other entries.
 /* Structure UPLOADING_INFO includes some information used to 
 check whether this inode is now uploading or not */
 typedef struct {
-	char status; /* UPLOADING or NOT_UPLOADING */
+	char is_uploading; /* TRUE or FALSE */
 	int progress_list_fd;
 } UPLOADING_INFO;
 

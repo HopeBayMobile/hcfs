@@ -74,7 +74,7 @@ static inline void _sync_terminate_thread(int index)
 					NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
-			tag_ret = tag_status_on_fuse(inode, NOT_UPLOADING);
+			tag_ret = tag_status_on_fuse(inode, FALSE);
 			if (tag_ret < 0) {
 				write_log(0, "Fail to tag inode %lld as "
 					"NOT_UPLOADING in %s\n",
@@ -1220,41 +1220,6 @@ void dispatch_delete_block(int which_curl)
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
-int tag_status_on_fuse(ino_t this_inode, char status)
-{
-	int sockfd;
-	int ret, resp;
-	struct sockaddr_un addr;
-	UPLOADING_COMMUNICATION_DATA data;
-
-	/* Prepare data */
-	data.inode = this_inode;
-	data.status = status;
-	data.progress_list_fd = 0; // tmp
-
-	sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, FUSE_SOCK_PATH);
-
-	ret = connect(sockfd, (struct sockaddr *)&addr,
-		sizeof(struct sockaddr_un));
-
-	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATION_DATA), 0);
-	recv(sockfd, &resp, sizeof(int), 0);
-
-	if (resp < 0) {
-		write_log(0, "Communication error: Response code %d in %s",
-			resp, __func__);
-		ret = -1;
-	} else {
-		write_log(10, "Debug: Communicating to fuse success\n");
-		ret = 0;
-	}
-
-	close(sockfd);
-	return ret;
-}
-
 /**
  * Find a thread and let it start uploading inode
  *
@@ -1274,7 +1239,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
-			ret = tag_status_on_fuse(this_inode, UPLOADING);
+			ret = tag_status_on_fuse(this_inode, TRUE);
 			if (ret < 0) {
 				write_log(0, "Error on tagging inode %lld as "
 					"UPLOADING.\n", this_inode);

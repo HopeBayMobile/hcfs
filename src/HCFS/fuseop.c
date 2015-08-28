@@ -72,6 +72,7 @@
 #include "metaops.h"
 #include "lookup_count.h"
 #include "FS_manager.h"
+#include "atomic_tocloud.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -4981,8 +4982,8 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 		return -1;
 	}
 
-	ret = meta_cache_set_uploading_info(meta_cache_entry, data->status, 
-		data->progress_list_fd);
+	ret = meta_cache_set_uploading_info(meta_cache_entry,
+		data->is_uploading, data->progress_list_fd);
 	if (ret < 0) {
 		write_log(0, "Fail to set uploading info in %s\n", __func__);
 		meta_cache_unlock_entry(meta_cache_entry);
@@ -5078,11 +5079,11 @@ void *fuse_communication_contact_window(void *data)
 				uploading_data.inode, __func__);
 		} else {
 			communicate_result = 0;
-			if (uploading_data.status == UPLOADING)
+			if (uploading_data.is_uploading)
 				write_log(10, "Debug: Succeed in tagging inode "
 					"%lld as UPLOADING\n", 
 					uploading_data.inode);
-			else if (uploading_data.status == NOT_UPLOADING)
+			else
 				write_log(10, "Debug: Succeed in tagging inode "
 					"%lld as NOT_UPLOADING\n", 
 					uploading_data.inode);
@@ -5095,7 +5096,7 @@ void *fuse_communication_contact_window(void *data)
 	write_log(10, "Debug: Terminate fuse communication contact\n");
 }
 
-int init_fuse_proc_communicate_channel(pthread_t *communicate_tid)
+int init_fuse_proc_communication(pthread_t *communicate_tid)
 {
 	int ret;
 	int errcode;
@@ -5119,12 +5120,13 @@ errcode_handle:
 	return errcode;		
 }
 
-int destroy_fuse_proc_communicate_channel(pthread_t *communicate_tid)
+int destroy_fuse_proc_communication(pthread_t *communicate_tid)
 {
 	int ret, errcode;
 
 	pthread_join(communicate_tid, NULL);
 	UNLINK(FUSE_SOCK_PATH);
+	write_log(10, "Debug: destroy fuse communication sockpath\n");
 	return 0;
 
 errcode_handle:
@@ -5144,13 +5146,13 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
-	init_fuse_proc_communicate_channel(&communicate_tid);
+	init_fuse_proc_communication(&communicate_tid);
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
 
-	destroy_fuse_proc_communicate_channel(&communicate_tid);
+	destroy_fuse_proc_communication(&communicate_tid);
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();

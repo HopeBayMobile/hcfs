@@ -76,13 +76,6 @@ typedef struct {
 	CURL_HANDLE statcurl;
 } STAT_OP_T;
 
-/* Data that should be known by fuse process when uploading a file */
-typedef struct {
-	ino_t inode;
-	char status;
-	int progress_list_fd;
-} UPLOADING_COMMUNICATION_DATA;
-
 STAT_OP_T sync_stat_ctl;
 UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
@@ -105,6 +98,5 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void upload_loop(void);
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta);
-int tag_status_on_fuse(ino_t this_inode, char status);
 
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */
