@@ -433,7 +433,7 @@ errcode_handle:
 }
 
 static inline int _select_upload_thread(char is_block, char is_delete,
-				char is_upload, unsigned char *old_hash,
+				char is_upload, unsigned char old_hash[],
 				ino_t this_inode, long long block_count,
 					off_t page_pos, long long e_index)
 {
@@ -456,7 +456,7 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].which_curl = count;
 
 			if (is_upload == TRUE) {
-				memcpy(upload_ctl.upload_threads[count].old_hash_key,
+				memcpy(upload_ctl.upload_threads[count].hash_key,
 						old_hash, SHA256_DIGEST_LENGTH);
 			}
 
@@ -813,7 +813,7 @@ errcode_handle:
 
 int do_block_sync(ino_t this_inode, long long block_no,
 			CURL_HANDLE *curl_handle, char *filename, char uploaded,
-			unsigned char *old_hash, unsigned char *hash_in_meta)
+			unsigned char old_hash[], unsigned char hash_in_meta[])
 {
 	char objname[400];
 	char hash_key_str[65];
@@ -884,13 +884,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	// Since the objected mapped is changed, need to handle old object
 	// Sync was successful
 	if (ret == 0 && uploaded) {
-		printf("Start to delete obj\n");
+		printf("Start to delete obj %02x...%02x\n", old_hash[0], old_hash[31]);
 		// Delete old object in cloud
 		ret = do_block_delete(this_inode, block_no, old_hash,
 					curl_handle);
 
 		printf("Delete result - %d\n", ret);
-		printf("Delete obj - %02x\n", old_hash[31]);
+		printf("Delete obj - %02x...%02x\n", old_hash[0], old_hash[31]);
 	}
 
 	return ret;

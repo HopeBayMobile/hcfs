@@ -42,6 +42,8 @@ int initialize_ddt_meta(char *meta_path) {
 
 	fptr = fopen(meta_path, "w");
 	fd = fileno(fptr);
+	flock(fd, LOCK_EX);
+	setbuf(fptr, NULL);
 
 	// Init meta struct
 	memset(&ddt_meta, 0, sizeof(DDT_BTREE_META));
@@ -51,6 +53,7 @@ int initialize_ddt_meta(char *meta_path) {
 
 	PWRITE(fd, &ddt_meta, sizeof(DDT_BTREE_META), 0);
 
+	flock(fd, LOCK_UN);
 	fclose(fptr);
 
 	return 0;
@@ -63,7 +66,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: get_btree_meta
-*        Inputs: unsigned char *key, DDT_BTREE_NODE *root,
+*        Inputs: unsigned char key[], DDT_BTREE_NODE *root,
 *                DDT_BTREE_META this_meta
 *       Summary: Get point to the metadata of a tree. Also return the root node
 *                (root) and the metadata(this_meta) of this tree. The meta file
@@ -71,7 +74,7 @@ errcode_handle:
 *  Return value: File pointer to btree file
 *
 *************************************************************************/
-FILE* get_ddt_btree_meta(unsigned char *key, DDT_BTREE_NODE *root,
+FILE* get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 				DDT_BTREE_META *this_meta) {
 
 	char meta_path[1000];
@@ -117,7 +120,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: search_ddt_btree
-*        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode,
+*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode,
 *                int fd, DDT_BTREE_NODE *result_node, int *result_idx
 *       Summary: Search a element by a given hash key. The search operation
 *                starts with tnode and go deeper until the element is found
@@ -127,7 +130,7 @@ errcode_handle:
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-int search_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 				DDT_BTREE_NODE *result_node, int *result_idx){
 
 	int search_idx;
@@ -225,7 +228,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: insert_ddt_btree
-*        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Insert a element with given hash key. Insert operation
 *                begins with tnode and goes deeper until a leaf node is
@@ -234,7 +237,7 @@ errcode_handle:
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-int insert_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_META *this_meta) {
+int insert_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd, DDT_BTREE_META *this_meta) {
 
 	DDT_BTREE_EL new_el;
 	DDT_BTREE_NODE new_root;
@@ -489,7 +492,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: delete_ddt_btree
-*        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 *                DDT_BTREE_META *this_meta, int force_delete
 *       Summary: To find a element with a given key. If force_delete is
 *                TRUE or the value of refcount decreased is equal to zero,
@@ -500,7 +503,7 @@ errcode_handle:
 *                -1 if encountered error.
 *
 *************************************************************************/
-int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
+int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 				int fd, DDT_BTREE_META *this_meta, int force_delete) {
 
 	int search_idx;
@@ -514,11 +517,18 @@ int delete_ddt_btree(unsigned char *key, DDT_BTREE_NODE *tnode,
 	// Init status
 	match = FALSE;
 
+	if (tnode->num_el <= 0) {
+		// This node doesn't contained any elements
+		printf("This node doesn't contain any elements\n");
+		return -1;
+	}
+
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 		compare_result = memcmp(key, tnode->ddt_btree_el[search_idx].obj_id,
 						SHA256_DIGEST_LENGTH);
 		if (compare_result == 0) {
 			match = TRUE;
+			printf("Match for %02x...%02x  res = %d\n", key[0], key[31], match);
 			break;
 		} else if (compare_result < 0) {
 			break;
@@ -912,7 +922,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: decrease_ddt_el_refcount
-*        Inputs: unsigned char *key, DDT_BTREE_NODE *tnode, int fd,
+*        Inputs: unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 *                DDT_BTREE_META *this_meta
 *       Summary: Decrease the refcount of element or deleted the emelemt
 *                if the refcount is equal to zero.
@@ -921,7 +931,7 @@ errcode_handle:
 *                -1 if encountered error.
 *
 *************************************************************************/
-int decrease_ddt_el_refcount(unsigned char *key, DDT_BTREE_NODE *tnode,
+int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode,
 				int fd, DDT_BTREE_META *this_meta) {
 
 	return delete_ddt_btree(key, tnode, fd, this_meta, FALSE);

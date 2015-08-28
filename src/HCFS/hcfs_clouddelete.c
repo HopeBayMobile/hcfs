@@ -570,8 +570,6 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 	// Update ddt
 	ddt_ret = decrease_ddt_el_refcount(blk_hash, &tree_root, ddt_fd, &ddt_meta);
-	flock(ddt_fd, LOCK_UN);
-	fclose(ddt_fptr);
 
 	if (ddt_ret == 0) {
 		// Get objname - Object named by block hashkey
@@ -589,10 +587,15 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		printf("Element is deleted; ret = %d\n", ret_val);
 	} else if (ddt_ret == 1) {
 		printf("Only decrease refcount\n");
+		ret = 0;
 	} else {
+		printf("%02x...%02x\n", blk_hash[0], blk_hash[31]);
 		printf("ERROR delete el tree\n");
-		ret = -EIO;
+		ret = 0;
 	}
+
+	flock(ddt_fd, LOCK_UN);
+	fclose(ddt_fptr);
 
 	return ret;
 }
