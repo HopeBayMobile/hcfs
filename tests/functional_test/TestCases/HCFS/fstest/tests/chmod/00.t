@@ -106,6 +106,7 @@ test_check $ctime1 -eq $ctime2
 expect 0 unlink ${n0}
 
 expect 0 mkdir ${n0} 0755
+echo 'mkdir ${n0} 0755'
 ctime1=`${fstest} stat ${n0} ctime`
 sleep 1
 expect EPERM -u 65534 chmod ${n0} 0753
