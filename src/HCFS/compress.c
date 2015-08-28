@@ -88,7 +88,7 @@ FILE *transform_compress_fd(FILE *in_fd,  unsigned char **data)
 			  "Failed to allocate memory in transform_compress_fd\n");
 		return NULL;
 	}
-	int ret = compress_f(buf, new_data, read_count);
+	int ret = compress_f((char *)buf, (char *)new_data, read_count);
 
 	if (ret == 0) {
 		free(buf);
@@ -117,7 +117,8 @@ int decompress_to_fd(FILE *decompress_to_fd, unsigned char* input,
 {
 	unsigned char *output = (unsigned char *)calloc(MAX_BLOCK_SIZE,
 						   sizeof(unsigned char));
-	int ret = decompress_f(input, output, input_length, MAX_BLOCK_SIZE);
+
+	int ret = decompress_f((char *)input, (char *)output, input_length, MAX_BLOCK_SIZE);
 
 	if (ret < 0) {
 		free(output);

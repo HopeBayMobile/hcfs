@@ -855,10 +855,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 #ifdef ENCRYPT_ENABLE
 	/* write_log(10, "start to encrypt...\n"); */
 	unsigned char* key = get_key();
+  unsigned char* compressed_data = NULL;
 	unsigned char* data = NULL;
-	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
 
+	FILE* compress_fptr = transform_compress_fd(fptr, &compressed_data);
+	FILE* new_fptr = transform_encrypt_fd(compress_fptr, key, &data);
 	fclose(fptr);
+  fclose(compress_fptr);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
 	fclose(new_fptr);
 #else
@@ -873,6 +876,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		ret = -EIO;
 #ifdef ENCRYPT_ENABLE
 	free(key);
+  if (compressed_data != NULL){
+    free(compressed_data);
+  }
 	if (data != NULL) {
 		free(data);
 	}

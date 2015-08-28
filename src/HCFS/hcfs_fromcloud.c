@@ -28,6 +28,7 @@
 
 #include "params.h"
 #include "enc.h"
+#include "compress.h"
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
@@ -87,9 +88,15 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 #ifdef ENCRYPT_ENABLE
 	fclose(get_fptr);
 	unsigned char *key = get_key();
-	decrypt_to_fd(fptr, key, get_fptr_data, len);
+	char  *decrypt_data = NULL;
+	size_t decrypt_len = 0;
+	FILE *decrypt_fptr = open_memstream(&decrypt_data, &decrypt_len);
+	decrypt_to_fd(decrypt_fptr, key, get_fptr_data, len);
 	free(get_fptr_data);
 	free(key);
+  fclose(decrypt_fptr);
+  decompress_to_fd(fptr, (unsigned char *)decrypt_data, decrypt_len);
+  free(decrypt_data);
 #endif
 
 	sem_wait(&download_curl_control_sem);
