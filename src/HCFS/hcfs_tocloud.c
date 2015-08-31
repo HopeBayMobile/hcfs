@@ -74,12 +74,14 @@ static inline void _sync_terminate_thread(int index)
 					NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
-			tag_ret = tag_status_on_fuse(inode, FALSE);
+			tag_ret = tag_status_on_fuse(inode, FALSE, 0);
 			if (tag_ret < 0) {
 				write_log(0, "Fail to tag inode %lld as "
 					"NOT_UPLOADING in %s\n",
 					inode, __func__);
 			}
+			close_progress_info(sync_ctl.progress_fd[index], inode);
+
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
@@ -448,7 +450,8 @@ errcode_handle:
 
 static inline int _select_upload_thread(char is_block, char is_delete,
 				ino_t this_inode, long long block_count,
-					off_t page_pos, long long e_index)
+				off_t page_pos, long long e_index, 
+				int progress_fd)
 {
 	int which_curl, count;
 
@@ -461,6 +464,8 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].is_delete = is_delete;
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
+			upload_ctl.upload_threads[count].progress_fd = 
+								progress_fd;
 			upload_ctl.upload_threads[count].page_filepos =
 								page_pos;
 			upload_ctl.upload_threads[count].page_entry_index =
@@ -504,6 +509,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	ino_t root_inode;
 	long long size_last_upload;
 	long long size_diff;
+	int progress_fd;
+
+	progress_fd = ptr->progress_fd;
 
 	sync_error = FALSE;
 	time_to_sleep.tv_sec = 0;
@@ -565,6 +573,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
 		flock(fileno(metafptr), LOCK_UN);
+
+		/* Init progress info based on # of blocks */
+		init_progress_info(progress_fd, total_blocks);
 
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
@@ -664,7 +675,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, FALSE,
 						ptr->inode, block_count,
-							page_pos, e_index);
+						page_pos, e_index, progress_fd);
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
 				if (ret < 0) {
@@ -681,7 +692,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, TRUE,
 						ptr->inode, block_count,
-							page_pos, e_index);
+						page_pos, e_index, progress_fd);
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
 				/* TODO: Maybe should also first copy
@@ -724,7 +735,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
-	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
+	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode,
+		0, 0, 0, progress_fd);
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
@@ -874,6 +886,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 #else
 	ret_val = hcfs_put_object(fptr, objname, curl_handle);
 	fclose(fptr);
+
 #endif
 
 	/* Already retried in get object if necessary */
@@ -937,16 +950,26 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
 	int which_curl, ret, errcode;
 	int count1;
+	char finish_uploading;
 
 	which_curl = thread_ptr->which_curl;
-	if (thread_ptr->is_block == TRUE)
+	if (thread_ptr->is_block == TRUE) {
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
-	else
+			&(upload_curl_handles[which_curl]),
+			thread_ptr->tempfilename);
+
+		/* This block finished uploading */
+		if (ret >= 0) {
+			finish_uploading = TRUE;
+			set_progress_info(thread_ptr->progress_fd,
+				thread_ptr->blockno, &finish_uploading,
+				NULL, NULL);
+		}
+	} else {
 		ret = do_meta_sync(thread_ptr->inode,
-				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
+			&(upload_curl_handles[which_curl]),
+			thread_ptr->tempfilename);
+	}
 	if (ret < 0)
 		goto errcode_handle;
 
@@ -1234,24 +1257,31 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 					SYNC_THREAD_TYPE *sync_threads)
 {
 	int count, ret;
+	int progress_fd;
 
 	ret = -1;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
-			ret = tag_status_on_fuse(this_inode, TRUE);
+			progress_fd = open_progress_info(this_inode);
+			if (progress_fd < 0)
+				break;
+			ret = tag_status_on_fuse(this_inode, TRUE, progress_fd);
 			if (ret < 0) {
 				write_log(0, "Error on tagging inode %lld as "
 					"UPLOADING.\n", this_inode);
+				close_progress_info(progress_fd);
 				ret = -1;
 				break;
 			}
 			sync_ctl.threads_in_use[count] = this_inode;
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
+			sync_ctl.progress_fd[count] = progress_fd;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
-
+			sync_threads[count].progress_fd = progress_fd;
+			
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",
 				sync_threads[count].inode,

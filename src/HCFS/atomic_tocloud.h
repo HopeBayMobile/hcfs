@@ -18,7 +18,7 @@ typedef struct {
 	long long backend_seq;
 } BLOCK_UPLOADING_STATUS;
 
-int tag_status_on_fuse(ino_t this_inode, char status);
+int tag_status_on_fuse(ino_t this_inode, char status, int fd);
 
 int get_progress_info(int fd, long long block_index, 
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
@@ -28,8 +28,10 @@ int set_progress_info(int fd, long long block_index,
 	const long long *to_upload_seq,
 	const long long *backend_seq);
 
-int init_progress_info(ino_t inode, long long num_block);
+int init_progress_info(int fd, long long num_block);
 
-int destroy_progress_info(int fd, ino_t inode);
+int open_progress_info(ino_t inode);
+
+int close_progress_info(int fd, ino_t inode);
 
 #endif

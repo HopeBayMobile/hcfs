@@ -36,12 +36,14 @@ typedef struct {
 	char is_block;
 	char is_delete;
 	int which_curl;
+	int progress_fd;
 	char tempfilename[400];
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
+	int progress_fd;
 } SYNC_THREAD_TYPE;
 
 typedef struct {
@@ -65,6 +67,7 @@ typedef struct {
 	pthread_t sync_handler_thread;
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
+	int progress_fd[MAX_SYNC_CONCURRENCY];
 	char threads_created[MAX_SYNC_CONCURRENCY];
 	char threads_error[MAX_SYNC_CONCURRENCY];
 	int total_active_sync_threads;
