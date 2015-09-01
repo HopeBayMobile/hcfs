@@ -95,7 +95,7 @@ void collect_finished_sync_threads(void *ptr);
 void collect_finished_upload_threads(void *ptr);
 int dispatch_upload_block(int which_curl);
 void dispatch_delete_block(int which_curl);
-int schedule_sync_meta(FILE *metafptr, int which_curl);
+int schedule_sync_meta(char *toupload_metapath, int which_curl);
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void upload_loop(void);
