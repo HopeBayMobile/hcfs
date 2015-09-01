@@ -89,7 +89,7 @@ FILE* get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 	// Initialize tree if not existed
 	if (access(meta_path, R_OK|W_OK) < 0) {
 		printf("No metafile found\n");
-	    initialize_ddt_meta(meta_path);
+		initialize_ddt_meta(meta_path);
 	}
 
 	// Open file
