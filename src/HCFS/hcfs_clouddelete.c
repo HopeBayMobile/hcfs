@@ -586,13 +586,11 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		sprintf(objname, "data_%s", hash_key_str);
 
 #ifdef ARM_32bit_
-		sprintf(objname, "data_%lld_%lld", this_inode, block_no);
 		write_log(10,
 			"Debug delete object: objname %s, inode %lld, block %lld\n",
 						objname, this_inode, block_no);
 		sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
 #else
-		sprintf(objname, "data_%ld_%lld", this_inode, block_no);
 		write_log(10,
 			"Debug delete object: objname %s, inode %ld, block %lld\n",
 						objname, this_inode, block_no);
