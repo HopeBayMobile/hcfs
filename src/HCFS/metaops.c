@@ -39,6 +39,8 @@
 #include "macro.h"
 #include "logger.h"
 #include "mount_manager.h"
+#include "lookup_count.h"
+#include "super_block.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -81,7 +83,7 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 /************************************************************************
 *
 * Function name: dir_add_entry
-*        Inputs: ino_t parent_inode, ino_t child_inode, char *childname,
+*        Inputs: ino_t parent_inode, ino_t child_inode, const char *childname,
 *                mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Add a directory entry with name "childname", inode number
 *                "child_inode", and mode "child_mode" to the directory
@@ -91,7 +93,7 @@ int init_dir_page(DIR_ENTRY_PAGE *tpage, ino_t self_inode,
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
@@ -295,7 +297,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 
 	/*If the new entry is a subdir, increase the hard link of the parent*/
 
-	if (child_mode & S_IFDIR)
+	if (S_ISDIR(child_mode))
 		parent_stat.st_nlink++;
 
 	parent_meta.total_children++;
@@ -318,7 +320,7 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: dir_remove_entry
-*        Inputs: ino_t parent_inode, ino_t child_inode, char *childname,
+*        Inputs: ino_t parent_inode, ino_t child_inode, const char *childname,
 *                mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: Remove a directory entry with name "childname", inode number
 *                "child_inode", and mode "child_mode" from the directory
@@ -328,7 +330,8 @@ errcode_handle:
 *                appropriate error code.
 *
 *************************************************************************/
-int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
+int dir_remove_entry(ino_t parent_inode, ino_t child_inode,
+			const char *childname,
 			mode_t child_mode, META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	struct stat parent_stat;
@@ -401,7 +404,7 @@ int dir_remove_entry(ino_t parent_inode, ino_t child_inode, char *childname,
 		/* If the entry is a subdir, decrease the hard link of
 		*  the parent*/
 
-		if (child_mode & S_IFDIR)
+		if (S_ISDIR(child_mode))
 			parent_stat.st_nlink--;
 
 		parent_meta.total_children--;
@@ -469,7 +472,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 /************************************************************************
 *
 * Function name: change_dir_entry_inode
-*        Inputs: ino_t self_inode, char *targetname,
+*        Inputs: ino_t self_inode, const char *targetname,
 *                ino_t new_inode, struct stat *thisstat,
 *                META_CACHE_ENTRY_STRUCT *body_ptr
 *       Summary: For a directory "self_inode", change the inode and mode
@@ -478,7 +481,7 @@ int change_parent_inode(ino_t self_inode, ino_t parent_inode1,
 *                appropriate error code.
 *
 *************************************************************************/
-int change_dir_entry_inode(ino_t self_inode, char *targetname,
+int change_dir_entry_inode(ino_t self_inode, const char *targetname,
 		ino_t new_inode, mode_t new_mode,
 		META_CACHE_ENTRY_STRUCT *body_ptr)
 {
@@ -1250,9 +1253,15 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			errcode = errno;
 			write_log(0, "IO error in %s. Code %d, %s\n",
 				__func__, errcode, strerror(errcode));
-			fclose(metafptr);
 			return errcode;
 		}
+		/*Need to delete the meta. Move the meta file to "todelete"*/
+		ret = delete_inode_meta(this_inode);
+		if (ret < 0) {
+			fclose(metafptr);
+			return ret;
+		}
+
 		flock(fileno(metafptr), LOCK_EX);
 		FSEEK(metafptr, 0, SEEK_SET);
 		FREAD(&this_inode_stat, sizeof(struct stat), 1, metafptr);
@@ -1324,12 +1333,9 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 
 
-		fclose(metafptr);
 		flock(fileno(metafptr), LOCK_UN);
-		/*Need to delete the meta. Move the meta file to "todelete"*/
-		ret = delete_inode_meta(this_inode);
-		if (ret < 0)
-			return ret;
+		fclose(metafptr);
+
 		break;
 
 	default:
@@ -1383,8 +1389,13 @@ int disk_markdelete(ino_t this_inode, ino_t root_inode)
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
 	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
 					METAPATH, this_inode, root_inode);
+#endif
 
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
@@ -1410,8 +1421,13 @@ int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
 	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
 					METAPATH, this_inode, root_inode);
+#endif
 
 	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
@@ -1438,8 +1454,13 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
+#ifdef ARM_32bit_
+	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+					METAPATH, this_inode, root_inode);
+#else
 	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
 					METAPATH, this_inode, root_inode);
+#endif
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1486,8 +1507,13 @@ int startup_finish_delete(void)
 	}
 
 	while (tmpptr != NULL) {
+#ifdef ARM_32bit_
+		ret_val = sscanf(tmpent.d_name, "inode%lld_%lld", &tmp_ino,
+					&root_inode);
+#else
 		ret_val = sscanf(tmpent.d_name, "inode%ld_%ld", &tmp_ino,
 					&root_inode);
+#endif
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
 			if (ret < 0) {
@@ -1503,6 +1529,9 @@ int startup_finish_delete(void)
 			if (S_ISLNK(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK,
 						root_inode, NULL);
+
+			/* TODO: Directly decrease num of inodes
+			in the xattr of root inode. */
 
 			if (ret < 0) {
 				closedir(dirp);

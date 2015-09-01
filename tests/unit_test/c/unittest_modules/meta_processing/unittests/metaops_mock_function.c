@@ -120,7 +120,12 @@ int meta_cache_remove(ino_t this_inode)
 	char metapath[METAPATHLEN];
 
 	/* Remove todel file here */
+#ifdef ARM_32bit_
+	sprintf(metapath, "testpatterns/inode_%lld_meta_file.todel",
+			this_inode);
+#else
 	sprintf(metapath, "testpatterns/inode_%d_meta_file.todel", this_inode);
+#endif
 	if (!access(metapath, F_OK))
 		unlink(metapath);
 
@@ -264,7 +269,11 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
+#ifdef ARM_32bit_
+	sprintf(pathname, "%s_%lld", MOCK_META_PATH, this_inode);
+#else
 	sprintf(pathname, "%s_%d", MOCK_META_PATH, this_inode);
+#endif
 	//strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
@@ -272,7 +281,13 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	sprintf(pathname, "testpatterns/inode_%d_block_%d", this_inode, block_num);
+#ifdef ARM_32bit_
+	sprintf(pathname, "testpatterns/inode_%lld_block_%lld", this_inode,
+			block_num);
+#else
+	sprintf(pathname, "testpatterns/inode_%d_block_%d", this_inode,
+			block_num);
+#endif
 	return 0;
 }
 

@@ -68,8 +68,13 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
+#ifdef ARM_32bit_
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%lld",
+		METAPATH, sub_dir, this_inode);
+#else
 	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%ld",
 		METAPATH, sub_dir, this_inode);
+#endif
 
 	return 0;
 errcode_handle:
@@ -111,8 +116,13 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
+#ifdef ARM_32bit_
+	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%lld",
+			METAPATH, sub_dir, this_inode);
+#else
 	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%ld",
 			METAPATH, sub_dir, this_inode);
+#endif
 	return 0;
 errcode_handle:
 	return errcode;
@@ -145,8 +155,13 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
+#ifdef ARM_32bit_
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%lld_%lld",
+			BLOCKPATH, sub_dir, this_inode, block_num);
+#else
 	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%ld_%lld",
 			BLOCKPATH, sub_dir, this_inode, block_num);
+#endif
 
 	return 0;
 

@@ -25,6 +25,7 @@ check the upload threads and sync threads to find out if there are any pending
 uploads. It must wait until those are cleared. It must then wait for any
 additional pending meta or block deletion for this inode to finish.*/
 
+#define _GNU_SOURCE
 #include "hcfs_clouddelete.h"
 
 #include <sys/file.h>
@@ -44,6 +45,8 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "logger.h"
 #include "macro.h"
 #include "dedup_table.h"
+#include "metaops.h"
+#include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
@@ -197,6 +200,9 @@ void init_dsync_control(void)
 static inline int _init_delete_handle(int index)
 {
 	int ret_val;
+
+	snprintf(delete_curl_handles[index].id, 255,
+				"delete_thread_%d", index);
 
 	ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 
@@ -527,10 +533,17 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	char objname[1000];
 	int ret_val, ret;
 
+#ifdef ARM_32bit_
+	sprintf(objname, "meta_%lld", this_inode);
+	write_log(10, "Debug meta deletion: objname %s, inode %lld\n",
+						objname, this_inode);
+	sprintf(curl_handle->id, "delete_meta_%lld", this_inode);
+#else
 	sprintf(objname, "meta_%ld", this_inode);
 	write_log(10, "Debug meta deletion: objname %s, inode %ld\n",
 						objname, this_inode);
 	sprintf(curl_handle->id, "delete_meta_%ld", this_inode);
+#endif
 	ret_val = hcfs_delete_object(objname, curl_handle);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
@@ -560,10 +573,6 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
 
-	write_log(10,
-		"Debug delete object: inode %lld, block %lld\n",
-					this_inode, block_no);
-
 	// Get dedup table meta
 	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
 	ddt_fd = fileno(ddt_fptr);
@@ -576,7 +585,19 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		hash_to_string(blk_hash, hash_key_str);
 		sprintf(objname, "data_%s", hash_key_str);
 
+#ifdef ARM_32bit_
+		sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+		write_log(10,
+			"Debug delete object: objname %s, inode %lld, block %lld\n",
+						objname, this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+#else
+		sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+		write_log(10,
+			"Debug delete object: objname %s, inode %ld, block %lld\n",
+						objname, this_inode, block_no);
 		sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+#endif
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))

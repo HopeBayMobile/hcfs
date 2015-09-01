@@ -18,8 +18,13 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%d_%d",
+#ifdef ARM_32bit_
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%lld_%lld",
 		this_inode, block_num);
+#else
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%ld_%lld",
+		this_inode, block_num);
+#endif
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -80,7 +85,11 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
 	char deleteobjname[30];
-	sprintf(deleteobjname, "data_%d_%d", this_inode, block_no);
+#ifdef ARM_32bit_
+	sprintf(deleteobjname, "data_%lld_%lld", this_inode, block_no);
+#else
+	sprintf(deleteobjname, "data_%ld_%lld", this_inode, block_no);
+#endif
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
 	usleep(200000); // Let thread busy
@@ -130,9 +139,15 @@ int super_block_exclusive_release(void)
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr, 
 	long long target_page, long long hint_page)
 {
-	long long ret_page_pos = sizeof(struct stat) + 
+	long long ret_page_pos;
+
+	/* target_page starts from 0 */
+	if (target_page >= mock_total_page)
+		return 0;
+
+	ret_page_pos = sizeof(struct stat) + 
 		sizeof(FILE_META_TYPE) + target_page * sizeof(BLOCK_ENTRY_PAGE);
-	
+
 	return ret_page_pos;
 }
 
@@ -141,7 +156,7 @@ int write_log(int level, char *format, ...)
 	va_list alist;
 
 	va_start(alist, format);
-	//vprintf(format, alist);
+	vprintf(format, alist);
 	va_end(alist);
 	return 0;
 }

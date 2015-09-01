@@ -28,6 +28,7 @@ class uploadEnvironment : public ::testing::Environment {
 
     workpath = NULL;
     tmppath = NULL;
+    no_backend_stat = TRUE;
     if (access("/tmp/testHCFS", F_OK) != 0) {
       workpath = get_current_dir_name();
       tmppath = (char *)malloc(strlen(workpath)+20);
@@ -36,6 +37,10 @@ class uploadEnvironment : public ::testing::Environment {
         mkdir(tmppath, 0700);
       symlink(tmppath, "/tmp/testHCFS");
      }
+    METAPATH = (char *) malloc(METAPATHLEN);
+    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
+    if (access(METAPATH, F_OK) < 0)
+      mkdir(METAPATH, 0744);
 
   }
 
@@ -47,6 +52,8 @@ class uploadEnvironment : public ::testing::Environment {
       free(workpath);
     if (tmppath != NULL)
       free(tmppath);
+    rmdir(METAPATH);
+    free(METAPATH);
   }
 };
 
@@ -59,16 +66,10 @@ class init_sync_stat_controlTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   virtual void SetUp() {
-    METAPATH = (char *) malloc(METAPATHLEN);
-    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
-    if (access(METAPATH, F_OK) < 0)
-      mkdir(METAPATH, 0744);
-
+    no_backend_stat = TRUE;
    }
 
   virtual void TearDown() {
-     rmdir(METAPATH);
-     free(METAPATH);
    }
 
  };
@@ -190,7 +191,11 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
+#ifdef ARM_32bit_
+			sprintf(path, "/tmp/testHCFS/data_%lld_%d",inode, i);
+#else
 			sprintf(path, "/tmp/testHCFS/data_%d_%d",inode, i);
+#endif
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -230,10 +235,18 @@ class init_upload_controlTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 	}
 
 	void TearDown()
 	{
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		unlink(MOCK_META_PATH);
 	}
 };
@@ -287,7 +300,7 @@ TEST_F(init_upload_controlTest, AllBlockExist_and_TerminateThreadSuccess)
 		char path[50];
 
 		ASSERT_EQ(ST_BOTH, mock_block_page.block_entries[i].status); // Check status
-		sprintf(path, "/tmp/testHCFS/data_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/data_1_%d", i);
 		getxattr(path, "user.dirty", xattr_val, 1);
 		ASSERT_STREQ("F", xattr_val);
 		unlink(path);
@@ -325,7 +338,7 @@ TEST_F(init_upload_controlTest, BlockIsDeleted_and_TerminateThreadSuccess)
 	for (int i = 0 ; i < num_block_entry ; i++) {
 		char path[50];
 		ASSERT_EQ(ST_NONE, mock_block_page.block_entries[i].status);
-		sprintf(path, "/tmp/testHCFS/mockblock_%d_%d",1, i);
+		sprintf(path, "/tmp/testHCFS/mockblock_1_%d", i);
 		unlink(path);
 	}
 
@@ -472,6 +485,8 @@ class sync_single_inodeTest : public ::testing::Test {
 protected:
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 		max_objname_num = 4000;
 		sem_init(&objname_counter_sem, 0, 1);
 		objname_counter = 0;
@@ -483,6 +498,12 @@ protected:
 	void TearDown()
 	{
 		void *res;
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -499,9 +520,11 @@ protected:
 		BLOCK_ENTRY_PAGE mock_block_page;
 		FILE *mock_metaptr;
 
+		mock_total_page = total_page;
 		mock_metaptr = fopen(metapath, "w+");
 		mock_stat.st_size = 1000000; // Let total_blocks = 1000000/1000 = 1000
 		mock_stat.st_mode = S_IFREG;
+		mock_file_meta.root_inode = 10;
 		fwrite(&mock_stat, sizeof(struct stat), 1, mock_metaptr); // Write stat
 
 		fwrite(&mock_file_meta, sizeof(FILE_META_TYPE), 1, mock_metaptr); // Write file meta
@@ -575,9 +598,21 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[20];
-		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		unlink(expected_objname);
 	}
 	metaptr = fopen(metapath, "r+");
@@ -601,7 +636,6 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	int total_page = 3;
 	int num_total_blocks = total_page * MAX_BLOCK_ENTRIES_PER_PAGE + 1;
 	BLOCK_ENTRY_PAGE block_page;
-	FILE_META_TYPE filemeta;
 	FILE *metaptr;
 
 	/* Mock data */
@@ -621,9 +655,21 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
 		char expected_objname[20];
-		sprintf(expected_objname, "data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d", mock_thread_type.inode, blockno);
+#ifdef ARM_32bit_
+		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+				mock_thread_type.inode, blockno);
+#else
+		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
+				mock_thread_type.inode, blockno);
+#endif
 		unlink(expected_objname);
 	}
 	unlink(metapath);
@@ -656,6 +702,8 @@ protected:
 
 	void SetUp()
 	{
+		no_backend_stat = TRUE;
+		init_sync_stat_control();
 		if (!access(MOCK_META_PATH, F_OK))
 			unlink(MOCK_META_PATH);
 		mock_file_meta = fopen(MOCK_META_PATH, "w+");
@@ -671,6 +719,12 @@ protected:
 
 	void TearDown()
 	{
+		char tmppath[200];
+		char tmppath2[200];
+		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
+		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
+		unlink(tmppath2);
+		rmdir(tmppath);
 		for (int i = 0 ; i < max_objname_num ; i++)
 			free(objname_list[i]);
 		free(objname_list);
@@ -696,6 +750,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	   been tested in sync_single_inodeTest(). */
 	memset(&empty_stat, 0, sizeof(struct stat));
 	memset(&empty_meta, 0, sizeof(DIR_META_TYPE));
+	empty_meta.root_inode = 10;
 	fseek(mock_file_meta, 0, SEEK_SET);
 	fwrite(&empty_stat, sizeof(struct stat), 1, mock_file_meta);
 	fwrite(&empty_meta, sizeof(DIR_META_TYPE), 1, mock_file_meta);
@@ -773,17 +828,10 @@ class update_backend_statTest : public ::testing::Test {
   int count;
   char tmpmgrpath[100];
   virtual void SetUp() {
-    METAPATH = (char *) malloc(METAPATHLEN);
-    snprintf(METAPATH, METAPATHLEN - 1, "/tmp/testHCFS/metapath");
-    if (access(METAPATH, F_OK) < 0)
-      mkdir(METAPATH, 0744);
-
     no_backend_stat = TRUE;
    }
 
   virtual void TearDown() {
-     rmdir(METAPATH);
-     free(METAPATH);
    }
 
  };

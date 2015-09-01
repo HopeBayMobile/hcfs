@@ -27,12 +27,14 @@
 #include <curl/curl.h>
 
 #include "params.h"
+#include "enc.h"
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
 #include "hfuse_system.h"
 #include "logger.h"
 #include "macro.h"
+#include "utils.h"
 
 /************************************************************************
 *
@@ -49,7 +51,6 @@ int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash)
 	char hash_key_str[65];
 	int status;
 	int which_curl_handle;
-	char idname[256];
 	int ret, errcode;
 
 	// Get objname
@@ -71,10 +72,24 @@ int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash)
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
 						which_curl_handle);
-	sprintf(idname, "download_thread_%d", which_curl_handle);
-	strcpy(download_curl_handles[which_curl_handle].id, idname);
+#ifdef ENCRYPT_ENABLE
+	char  *get_fptr_data = NULL;
+	size_t len = 0;
+	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
+
+	status = hcfs_get_object(get_fptr, objname,
+			&(download_curl_handles[which_curl_handle]));
+#else
 	status = hcfs_get_object(fptr, objname,
 			&(download_curl_handles[which_curl_handle]));
+#endif
+#ifdef ENCRYPT_ENABLE
+	fclose(get_fptr);
+	unsigned char *key = get_key();
+	decrypt_to_fd(fptr, key, get_fptr_data, len);
+	free(get_fptr_data);
+	free(key);
+#endif
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
