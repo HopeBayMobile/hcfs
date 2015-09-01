@@ -25,12 +25,6 @@
 #include "logger.h"
 
 
-// Mock function - to ignore logger
-//int write_log(int level, char *format, ...) {
-//	return 0;
-//}
-
-
 int initialize_ddt_meta(char *meta_path) {
 
 	FILE *fptr;
@@ -85,8 +79,8 @@ FILE* get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 	ssize_t ret_ssize;
 
 
-	// Get metafile name by hash key
-	ret = fetch_ddt_path(meta_path, key[SHA256_DIGEST_LENGTH-1]);
+	// Get metafile name by the first char of hash key
+	ret = fetch_ddt_path(meta_path, key[0]);
 	if (ret < 0) {
 		// Get the metafile path failed
 		return NULL;

@@ -11,7 +11,6 @@
 **************************************************************************/
 
 #include <openssl/sha.h>
-
 #include <stdio.h>
 
 /*
@@ -94,4 +93,5 @@ int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode,
 // Util function for data dedup
 int compute_hash(char *path, unsigned char *output);
 
-int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH], char output_str[65]);
+int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH],
+				char output_str[SHA256_STRING_LENGTH]);
