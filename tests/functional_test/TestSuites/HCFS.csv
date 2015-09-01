@@ -12,3 +12,6 @@ Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,HCFS_12,symlink,,1,Pass,,1
 ,HCFS_13,truncate,,1,Pass,,2
 ,HCFS_14,unlink,,1,Pass,,8
+,HCFS_15,Mount,,,,,
+,HCFS_16,Multiple Mount,,,,,
+,HCFS_17,Backend Setting – ArkFlex U (Swift),,,,,
