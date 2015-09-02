@@ -18,15 +18,12 @@
 
 extern SYSTEM_CONF_STRUCT system_config;
 
-typedef
-int (*compress_func)(const char* source, char* dest, int inputSize);
+typedef int (*compress_func)(const char *source, char *dest, int inputSize);
 
-typedef
-int (*decompress_func)(const char* source, char* dest, int inputSize,
-		       int maxOutputSize);
+typedef int (*decompress_func)(const char *source, char *dest, int inputSize,
+                               int maxOutputSize);
 
-typedef
-int (*compress_bound_func)(int inputSize);
+typedef int (*compress_bound_func)(int inputSize);
 
 extern compress_func compress_f;
 extern decompress_func decompress_f;

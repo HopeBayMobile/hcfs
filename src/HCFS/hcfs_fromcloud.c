@@ -94,9 +94,9 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	decrypt_to_fd(decrypt_fptr, key, get_fptr_data, len);
 	free(get_fptr_data);
 	free(key);
-  fclose(decrypt_fptr);
-  decompress_to_fd(fptr, (unsigned char *)decrypt_data, decrypt_len);
-  free(decrypt_data);
+	fclose(decrypt_fptr);
+	decompress_to_fd(fptr, (unsigned char *)decrypt_data, decrypt_len);
+	free(decrypt_data);
 #endif
 
 	sem_wait(&download_curl_control_sem);
