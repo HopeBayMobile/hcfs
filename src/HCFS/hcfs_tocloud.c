@@ -546,7 +546,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 	}
 
-	metafptr = fopen(toupload_metapath, "r+");
+	metafptr = fopen(local_metapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
 		if (errcode != ENOENT) {
@@ -760,7 +760,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	flock(fileno(metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
-	if (!access(toupload_metapath, F_OK)) {
+	if (!access(local_metapath, F_OK)) {
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
 		if (S_ISREG(ptr->this_mode)) {
@@ -1127,8 +1127,8 @@ errcode_handle:
 
 int dispatch_upload_block(int which_curl)
 {
-	char tempfilename[400];
 	char thisblockpath[400];
+	char toupload_blockpath[400];
 	char filebuf[4100];
 	int read_size;
 	int count, ret, errcode;
@@ -1141,7 +1141,7 @@ int dispatch_upload_block(int which_curl)
 	topen = FALSE;
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
-
+/*
 #ifdef ARM_32bit_
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%lld_%lld.tmp",
 				upload_ptr->inode, upload_ptr->blockno);
@@ -1149,9 +1149,9 @@ int dispatch_upload_block(int which_curl)
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%ld_%lld.tmp",
 				upload_ptr->inode, upload_ptr->blockno);
 #endif
-
+*/
 	/* Find an appropriate dispatch-name */
-	count = 0;
+/*	count = 0;
 	while (TRUE) {
 		ret = access(tempfilename, F_OK);
 		if (ret == 0) {
@@ -1177,7 +1177,7 @@ int dispatch_upload_block(int which_curl)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-
+*/
 	/* Open source block (origin block in blockpath) */
 	ret = fetch_block_path(thisblockpath,
 			upload_ptr->inode, upload_ptr->blockno);
@@ -1186,12 +1186,27 @@ int dispatch_upload_block(int which_curl)
 		goto errcode_handle;
 	}
 
+	ret = fetch_toupload_block_path(toupload_blockpath, 
+		upload_ptr->inode, upload_ptr->blockno, 0);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	ret = check_and_copy_file(thisblockpath, toupload_blockpath);
+	if (ret < 0) {
+		if (ret != -EEXIST) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+/*
 	blockfptr = fopen(thisblockpath, "r");
 	if (blockfptr == NULL) {
 		errcode = errno;
-		if (errcode == ENOENT) {
+		if (errcode == ENOENT) {*/
 			/* Block deleted already, log and skip */
-			write_log(10, "Block file %s gone. Perhaps deleted.\n",
+/*			write_log(10, "Block file %s gone. Perhaps deleted.\n",
 				thisblockpath);
 			errcode = 0;
 			goto errcode_handle;
@@ -1205,9 +1220,9 @@ int dispatch_upload_block(int which_curl)
 
 	bopen = TRUE;
 
-	flock(fileno(blockfptr), LOCK_EX);
+	flock(fileno(blockfptr), LOCK_EX);*/
 	/* Open target block and prepare to copy */
-	fptr = fopen(tempfilename, "w");
+/*	fptr = fopen(tempfilename, "w");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
@@ -1218,9 +1233,9 @@ int dispatch_upload_block(int which_curl)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	topen = TRUE;
+	topen = TRUE;*/
 	/* Copy block */
-	while (!feof(blockfptr)) {
+/*	while (!feof(blockfptr)) {
 		FREAD(filebuf, 1, 4096, blockfptr);
 		read_size = ret_size;
 		if (read_size > 0) {
@@ -1232,8 +1247,8 @@ int dispatch_upload_block(int which_curl)
 	flock(fileno(blockfptr), LOCK_UN);
 	fclose(blockfptr);
 	fclose(fptr);
-
-	strcpy(upload_ptr->tempfilename, tempfilename);
+*/
+	strcpy(upload_ptr->tempfilename, toupload_blockpath);
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]),
 		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
 	upload_ctl.threads_created[which_curl] = TRUE;

@@ -199,13 +199,27 @@ int fetch_toupload_meta_path(char *pathname, ino_t inode)
 
 errcode_handle:
 	return errcode;
+}
 
+int fetch_toupload_block_path(char *pathname, ino_t inode, 
+	long long block_no, long long seq)
+{
+
+#ifdef ARM_32bit_
+	sprintf(pathname, "/dev/shm/hcfs_sync_block_%lld_%lld_%lld.tmp",
+		inode, block_no, seq);
+#else
+	sprintf(pathname, "/dev/shm/hcfs_sync_block_%ld_%lld_%lld.tmp",
+		inode, block_no, seq);
+#endif
+
+	return 0;
 }
 
 /**
  * Check whether target file exists or not and copy source file.
  *
- * This function aims to first check whether source file exist and target file
+ * This function first checks whether source file exist and target file
  * does not exist and then lock source file and copy it.
  *
  * @return 0 if succeed in copy, -EEXIST in case of target file existing.

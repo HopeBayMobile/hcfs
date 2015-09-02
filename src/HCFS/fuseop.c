@@ -5015,43 +5015,17 @@ int set_uploading_data(const UPLOADING_COMMUNICATION_DATA *data)
 *************************************************************************/
 void *fuse_communication_contact_window(void *data)
 {
-	int socket_fd, ac_fd;
-	int socket_flag;
 	int errcode;
-	struct sockaddr_un sock_addr;
 	UPLOADING_COMMUNICATION_DATA uploading_data;
 	int communicate_result;
 	struct timespec timer;
 	int ret;
 	char *log_str;
+	int ac_fd;
+	const int socket_fd = *(int *)data;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
-
-	sock_addr.sun_family = AF_UNIX;
-	strcpy(sock_addr.sun_path, FUSE_SOCK_PATH);
-	socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-
-	ret = bind(socket_fd, (struct sockaddr *)&sock_addr, 
-		sizeof(struct sockaddr_un));
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "Bind socket error in %s. Code %d.\n",
-			__func__, errcode);
-		return;
-	}
-
-	socket_flag = fcntl(socket_fd, F_GETFL, 0);
-	socket_flag |= O_NONBLOCK;
-	fcntl(socket_fd, F_SETFL, socket_flag);
-
-	ret = listen(socket_fd, 16);
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "Listen socket error in %s. Code %d.\n",
-			__func__, errcode);
-		return;
-	}
 
 	/* Wait for some connections */
 	while (hcfs_system->system_going_down == FALSE) {
@@ -5096,21 +5070,50 @@ void *fuse_communication_contact_window(void *data)
 	write_log(10, "Debug: Terminate fuse communication contact\n");
 }
 
-int init_fuse_proc_communication(pthread_t *communicate_tid)
+int init_fuse_proc_communication(pthread_t *communicate_tid, int *socket_fd)
 {
-	int ret;
+	int ret, i;
 	int errcode;
+	int socket_flag;
+	struct sockaddr_un sock_addr;
 
 	if (!access(FUSE_SOCK_PATH, F_OK))
 		UNLINK(FUSE_SOCK_PATH);
 
-	ret = pthread_create(communicate_tid, NULL, 
-		fuse_communication_contact_window, NULL);
+	sock_addr.sun_family = AF_UNIX;
+	strcpy(sock_addr.sun_path, FUSE_SOCK_PATH);
+	*socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+
+	ret = bind(*socket_fd, (struct sockaddr *)&sock_addr, 
+		sizeof(struct sockaddr_un));
 	if (ret < 0) {
-		errcode = ret;
-		write_log(0, "Creating thread error in %s. Code %d.\n",
+		errcode = errno;
+		write_log(0, "Bind socket error in %s. Code %d.\n",
 			__func__, errcode);
-		return -errcode;
+		return;
+	}
+
+	socket_flag = fcntl(*socket_fd, F_GETFL, 0);
+	socket_flag |= O_NONBLOCK;
+	fcntl(*socket_fd, F_SETFL, socket_flag);
+
+	ret = listen(*socket_fd, MAX_FUSE_COMMUNICATION_THREAD);
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Listen socket error in %s. Code %d.\n",
+			__func__, errcode);
+		return;
+	}
+
+	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {
+		ret = pthread_create(&communicate_tid[i], NULL, 
+			fuse_communication_contact_window, socket_fd);
+		if (ret < 0) {
+			errcode = ret;
+			write_log(0, "Creating thread error in %s. Code %d.\n",
+					__func__, errcode);
+			return -errcode;
+		}
 	}
 
 	write_log(10, "Communication contact for fuse has been created.\n");
@@ -5120,11 +5123,16 @@ errcode_handle:
 	return errcode;		
 }
 
-int destroy_fuse_proc_communication(pthread_t *communicate_tid)
+int destroy_fuse_proc_communication(pthread_t *communicate_tid, int socket_fd)
 {
 	int ret, errcode;
+	int i;
 
-	pthread_join(communicate_tid, NULL);
+	for (i = 0; i< MAX_FUSE_COMMUNICATION_THREAD ; i++) {
+		pthread_join(communicate_tid, NULL);
+	}
+
+	close(socket_fd);
 	UNLINK(FUSE_SOCK_PATH);
 	write_log(10, "Debug: destroy fuse communication sockpath\n");
 	return 0;
@@ -5136,7 +5144,8 @@ errcode_handle:
 int hook_fuse(int argc, char **argv)
 {
 	int dl_count;
-	pthread_t communicate_tid;
+	pthread_t communicate_tid[MAX_FUSE_COMMUNICATION_THREAD];
+	int socket_fd;
 
 	global_argc = argc;
 	global_argv = argv;
@@ -5146,13 +5155,13 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
-	init_fuse_proc_communication(&communicate_tid);
+	init_fuse_proc_communication(communicate_tid, &socket_fd);
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
 		sleep(1);
 
-	destroy_fuse_proc_communication(&communicate_tid);
+	destroy_fuse_proc_communication(communicate_tid, socket_fd);
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();

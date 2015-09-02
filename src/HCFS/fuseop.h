@@ -78,6 +78,7 @@
 
 /* Define socket path for process communicating */
 #define FUSE_SOCK_PATH "/dev/shm/fuse_communication_reporter"
+#define MAX_FUSE_COMMUNICATION_THREAD 4
 
 /* Structures for directories */
 /* Defining directory entry in meta files*/
