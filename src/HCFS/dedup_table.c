@@ -121,7 +121,9 @@ errcode_handle:
 *                or there are no nodes to search. Return the tree node
 *                (result_node) which contains the key element and the index
 *                (result_index) of elements array in the node.
-*  Return value: 0 if the element is found, or -1 if not.
+*  Return value: 0 if the element is found
+*                1 if element not found
+*                -1 if error occured.
 *
 *************************************************************************/
 int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
@@ -153,7 +155,7 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 	// this node is leaf
 	if (tnode->is_leaf) {
 		printf("Key doesn't existed\n");
-		return -1;
+		return 1;
 	}
 
 	// Go deeper to search
@@ -415,8 +417,8 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NO
 
 	int el_per_child, median;
 	DDT_BTREE_NODE new_node;
-    int errcode;
-    ssize_t ret_ssize;
+	int errcode;
+	ssize_t ret_ssize;
 	off_t ret_pos;
 
 
@@ -494,6 +496,7 @@ errcode_handle:
 *                operation will only decreased the refcount of element.
 *  Return value: 0 if deletion was successful,
 *                1 if only decrease the refcount of element,
+*                2 if the target element is not found
 *                -1 if encountered error.
 *
 *************************************************************************/
@@ -539,7 +542,7 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 		} else {
 			// Can't find the element to be deleted, return error
 			printf("No matched key - %02x.....%02x\n", key[0], key[31]);
-			return -1;
+			return 2;
 		}
 	} else {
 		// Only decrease the refcount, tree rebalancing is not needed.
@@ -557,8 +560,10 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 								(tnode->num_el - search_idx - 1)*sizeof(DDT_BTREE_EL));
 			}
 			tnode->num_el--;
+			this_meta->total_el--;
 			// Update tnode in disk
 			PWRITE(fd, tnode, sizeof(DDT_BTREE_NODE), tnode->this_node_pos);
+			PWRITE(fd, this_meta, sizeof(DDT_BTREE_META), 0);
 
 		} else {
 			// Elements to be deleted is in an internal node.
@@ -574,8 +579,10 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 			// Copy the value of largest child
 			memcpy(&(tnode->ddt_btree_el[search_idx]), &largest_child_el, sizeof(DDT_BTREE_EL));
 
-			// Update this node
+			this_meta->total_el--;
+			// Update this node and meta
 			PWRITE(fd, tnode, sizeof(DDT_BTREE_NODE), tnode->this_node_pos);
+			PWRITE(fd, this_meta, sizeof(DDT_BTREE_META), 0);
 		}
 	}
 
@@ -941,6 +948,10 @@ int compute_hash(char *path, unsigned char *output) {
 	SHA256_CTX ctx;
 
 	// Initialize
+	if (access(path, R_OK) == -1) {
+		return -1;
+	}
+
 	SHA256_Init(&ctx);
 	buf = malloc(buf_size);
 	bytes_read = 0;

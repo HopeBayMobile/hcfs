@@ -607,10 +607,13 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	} else if (ddt_ret == 1) {
 		printf("Only decrease refcount\n");
 		ret = 0;
+	} else if (ddt_ret == 2) {
+		printf("Can't find this element, maybe deleted already?\n");
+		ret = 0;
 	} else {
 		printf("%02x...%02x\n", blk_hash[0], blk_hash[31]);
 		printf("ERROR delete el tree\n");
-		ret = 0;
+		ret = -1;
 	}
 
 	flock(ddt_fd, LOCK_UN);
