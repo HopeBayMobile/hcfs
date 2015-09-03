@@ -481,6 +481,59 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 	return which_curl;
 }
 
+
+
+
+#define FSEEK_ADHOC_SYNC_LOOP(A, B, C, UNLOCK_ON_ERROR)\
+	{\
+		ret = fseek(A, B, C);\
+		if (ret < 0) {\
+			errcode = errno;\
+			write_log(0, "IO error in %s. Code %d, %s\n",\
+				__func__, errcode, strerror(errcode));\
+			sync_error = TRUE;\
+			if (UNLOCK_ON_ERROR == TRUE) {\
+				flock(fileno(A), LOCK_UN);\
+			}\
+			break;\
+		}\
+	}
+
+#define FREAD_ADHOC_SYNC_LOOP(A, B, C, D, UNLOCK_ON_ERROR)\
+	{\
+		ret = fread(A, B, C, D);\
+		if (ret < 1) {\
+			errcode = ferror(D);\
+			write_log(0, "IO error in %s.\n", __func__);\
+			if (errcode != 0)\
+				write_log(0, "Code %d, %s\n", errcode,\
+					strerror(errcode));\
+			sync_error = TRUE;\
+			if (UNLOCK_ON_ERROR == TRUE) {\
+				flock(fileno(D), LOCK_UN);\
+			}\
+			break;\
+		}\
+	}
+
+#define FWRITE_ADHOC_SYNC_LOOP(A, B, C, D, UNLOCK_ON_ERROR)\
+	{\
+		ret = fwrite(A, B, C, D);\
+		if (ret < 1) {\
+			errcode = ferror(D);\
+			write_log(0, "IO error in %s.\n", __func__);\
+			write_log(0, "Code %d, %s\n", errcode,\
+				strerror(errcode));\
+			sync_error = TRUE;\
+			if (UNLOCK_ON_ERROR == TRUE) {\
+				flock(fileno(D), LOCK_UN);\
+			}\
+			break;\
+		}\
+	}
+
+
+
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
 	char toupload_metapath[400];
@@ -627,113 +680,46 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				page_pos = seek_page2(&tempfilemeta,
 					toupload_metafptr, which_page, 0);
 				if (page_pos <= 0) {
-					block_count += BLK_INCREMENTS - 1;
+					block_count += (BLK_INCREMENTS - 1);
 					//flock(fileno(metafptr), LOCK_UN);
 					continue;
 				}
 				current_page = which_page;
-				ret = fseek(toupload_metafptr, page_pos,
-					SEEK_SET);
+				FSEEK_ADHOC_SYNC_LOOP(toupload_metafptr,
+					page_pos, SEEK_SET, FALSE);
 
-				if (ret < 0) {
-					errcode = errno;
-					write_log(0, "IO error in %s. Code %d, %s\n",
-						__func__, errcode, strerror(errcode));
-					sync_error = TRUE;
-					break;
-				}
-
-				ret = fread(&toupload_temppage,
+				FREAD_ADHOC_SYNC_LOOP(&toupload_temppage,
 					sizeof(BLOCK_ENTRY_PAGE), 
-					1, toupload_metafptr);
-				if (ret < 1) {
-					errcode = ferror(toupload_metafptr);
-					write_log(0, "IO error in %s.\n",
-							__func__);
-					if (errcode != 0)
-						write_log(0, "Code %d, %s\n",
-							errcode, 
-							strerror(errcode));
-					sync_error = TRUE;
-					break;
-				}
+					1, toupload_metafptr, FALSE);
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
 			toupload_block_status = tmp_entry->status;
 			/*TODO: error handling here if cannot read correctly*/
 
-			/* Lock local meta */
+			/* Lock local meta. Read local meta and update status */
 			flock(fileno(local_metafptr), LOCK_EX);
-			ret = fseek(local_metafptr, page_pos, SEEK_SET);
-			if (ret < 0) {
-				errcode = errno;
-				write_log(0, "IO error in %s. Code %d, %s\n",
-					__func__, errcode, strerror(errcode));
-				sync_error = TRUE;
-				flock(fileno(local_metafptr), LOCK_UN);
-				break;
-			}
+			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos, 
+				SEEK_SET, TRUE);
+			FREAD_ADHOC_SYNC_LOOP(&local_temppage,
+				sizeof(BLOCK_ENTRY_PAGE), 1,
+				local_metafptr, TRUE);
 
-			/* Read local meta and update status */
-			ret = fread(&local_temppage, sizeof(BLOCK_ENTRY_PAGE),
-				1, local_metafptr);
-			if (ret < 1) {
-				errcode = ferror(toupload_metafptr);
-				write_log(0, "IO error in %s.\n",
-					__func__);
-				if (errcode != 0)
-					write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
-				sync_error = TRUE;
-				flock(fileno(local_metafptr), LOCK_UN);
-				break;
-			}
 			tmp_entry = &(local_temppage.block_entries[e_index]);
 			local_block_status = tmp_entry->status;
 
-			if (((toupload_block_status == ST_LDISK) ||
-				(toupload_block_status == ST_LtoC)) &&
-					(block_count < total_blocks)) {
-				if (toupload_block_status == ST_LDISK) {	
+			/*** Case 1: Local is dirty. Update status & upload ***/
+			if (toupload_block_status == ST_LDISK) {
+				if (local_block_status != ST_TODELETE) {
 					tmp_entry->status = ST_LtoC;
-					ret = fseek(local_metafptr, page_pos,
-						SEEK_SET);
-					if (ret < 0) {
-						errcode = errno;
-						write_log(0,
-							"IO error in %s.\n",
-							__func__);
-						write_log(0,
-							"Code %d, %s\n",
-							errcode,
-							strerror(errcode));
-						sync_error = TRUE;
-						flock(fileno(local_metafptr),
-							LOCK_UN);
-						break;
-					}
-
-					ret = fwrite(&local_temppage,
+					/* Update local meta */
+					FSEEK_ADHOC_SYNC_LOOP( local_metafptr,
+						page_pos, SEEK_SET, TRUE);
+					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
 						sizeof(BLOCK_ENTRY_PAGE),
-						1, local_metafptr);
-					if (ret < 1) {
-						errcode = 
-							ferror(local_metafptr);
-						write_log(0,
-							"IO error in %s.\n",
-							__func__);
-						write_log(0, "Code %d, %s\n",
-							errcode,
-							strerror(errcode));
-						sync_error = TRUE;
-						flock(fileno(local_metafptr),
-							LOCK_UN);
-						break;
-					}
-					
-					/* Unlock local meta */	
-					flock(fileno(local_metafptr), LOCK_UN);
+						1, local_metafptr, TRUE);
 				}
+				/* Unlock local meta */	
+				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, FALSE,
@@ -749,6 +735,28 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					out first*/
 				continue;
 			}
+
+			/*** Case 2: Fail to upload last time, re-upload it.***/
+			if (toupload_block_status == ST_LtoC) {
+				flock(fileno(local_metafptr), LOCK_UN);
+				sem_wait(&(upload_ctl.upload_queue_sem));
+				sem_wait(&(upload_ctl.upload_op_sem));
+				which_curl = _select_upload_thread(TRUE, FALSE,
+						ptr->inode, block_count,
+						page_pos, e_index, progress_fd);
+				sem_post(&(upload_ctl.upload_op_sem));
+				ret = dispatch_upload_block(which_curl);
+				if (ret < 0) {
+					sync_error = TRUE;
+					break;
+				}
+				/*TODO: Maybe should also first copy block
+					out first*/
+				continue;
+			}
+
+			/*** Case 3: Local block is deleted. Delete backend 
+			   block data, too ***/
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
 				flock(fileno(local_metafptr), LOCK_UN);
@@ -766,9 +774,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(local_metafptr), LOCK_UN);
 			}
 		}
+		/* ---End of syncing blocks loop--- */
+
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
-
 		upload_done = FALSE;
 		while (upload_done == FALSE) {
 			nanosleep(&time_to_sleep, NULL);
@@ -811,7 +820,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	flock(fileno(local_metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(local_metapath, F_OK)) {
-		FSEEK(toupload_metafptr, sizeof(struct stat), SEEK_SET);
+		FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
 
 		if (S_ISREG(ptr->this_mode)) {
 			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
