@@ -17,6 +17,7 @@
 #include "params.h"
 #include "b64encode.h"
 #include "logger.h"
+#include "compress.h"
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32
@@ -45,7 +46,10 @@ unsigned char *get_key(void);
 
 FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
 
+FILE *transform_fd(FILE *, unsigned char *, unsigned char **, int, int);
+
 int decrypt_to_fd(FILE *, unsigned char *, unsigned char *, int);
 
+int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
 
 #endif  /* GW20_HCFS_ENC_H_ */

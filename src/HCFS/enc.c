@@ -7,9 +7,7 @@
  * *
  * **************************************************************************/
 
-
 #include "enc.h"
-
 
 /************************************************************************
  * *
@@ -24,9 +22,9 @@ int expect_b64_encode_length(unsigned int length)
 {
 	int tmp = length % 3;
 
-	tmp = (tmp == 0) ? tmp : (3-tmp);
+	tmp = (tmp == 0) ? tmp : (3 - tmp);
 	/* 1 is for b64encode_str puts '\0' in the end */
-	return  1+(length+tmp)*4/3;
+	return 1 + (length + tmp) * 4 / 3;
 }
 
 /************************************************************************
@@ -64,8 +62,7 @@ int generate_random_bytes(unsigned char *bytes, unsigned int length)
 		write_log(0, "RAND_bytes not supported");
 		return -2;
 	default:
-		write_log(1,
-			  "RAND_bytes: some openssl error may occurs: %d",
+		write_log(1, "RAND_bytes: some openssl error may occurs: %d",
 			  ERR_peek_last_error());
 		return -3;
 	}
@@ -86,7 +83,6 @@ int generate_random_key(unsigned char *key)
 	return generate_random_bytes(key, KEY_SIZE);
 }
 
-
 /************************************************************************
  * *
  * * Function name: aes_gcm_encrypt_core
@@ -106,26 +102,27 @@ int generate_random_key(unsigned char *key)
  * *
  * *************************************************************************/
 int aes_gcm_encrypt_core(unsigned char *output, unsigned char *input,
-		   unsigned int input_length, unsigned char *key,
-		   unsigned char *iv) {
+			 unsigned int input_length, unsigned char *key,
+			 unsigned char *iv)
+{
 	int tmp_length = 0;
 	int output_length = 0;
 	int retcode = 0;
 	const int output_preserve_size = TAG_SIZE;
 	unsigned char tag[TAG_SIZE] = {0};
 	/* clear output */
-	memset(output, 0, input_length+TAG_SIZE);
+	memset(output, 0, input_length + TAG_SIZE);
 	EVP_CIPHER_CTX ctx;
 
 	EVP_CIPHER_CTX_init(&ctx);
 	EVP_EncryptInit_ex(&ctx, EVP_aes_256_gcm(), NULL, key, iv);
-	if (!EVP_EncryptUpdate(&ctx, output+output_preserve_size, &tmp_length,
-			      input, input_length)) {
+	if (!EVP_EncryptUpdate(&ctx, output + output_preserve_size, &tmp_length,
+			       input, input_length)) {
 		retcode = 1;
 		goto final;
 	}
-	if (!EVP_EncryptFinal(&ctx, output+output_preserve_size+tmp_length,
-			     &output_length)) {
+	if (!EVP_EncryptFinal(&ctx, output + output_preserve_size + tmp_length,
+			      &output_length)) {
 		retcode = 2;
 		goto final;
 	}
@@ -159,7 +156,8 @@ final:
  * *************************************************************************/
 int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
 			 unsigned int input_length, unsigned char *key,
-			 unsigned char *iv) {
+			 unsigned char *iv)
+{
 	int tmp_length = 0;
 	int output_length = 0;
 	int retcode = 0;
@@ -167,7 +165,7 @@ int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
 	const int preserve_size = TAG_SIZE;
 
 	/* clear output */
-	memset(output, 0, input_length-TAG_SIZE);
+	memset(output, 0, input_length - TAG_SIZE);
 
 	EVP_CIPHER_CTX ctx;
 
@@ -177,8 +175,8 @@ int aes_gcm_decrypt_core(unsigned char *output, unsigned char *input,
 		retcode = 3;
 		goto decrypt_final;
 	}
-	if (!EVP_DecryptUpdate(&ctx, output, &tmp_length, input+preserve_size,
-			  input_length-TAG_SIZE)) {
+	if (!EVP_DecryptUpdate(&ctx, output, &tmp_length, input + preserve_size,
+			       input_length - TAG_SIZE)) {
 		retcode = 1;
 		goto decrypt_final;
 	}
@@ -208,7 +206,8 @@ decrypt_final:
  * *
  * *************************************************************************/
 int aes_gcm_encrypt_fix_iv(unsigned char *output, unsigned char *input,
-			   unsigned int input_length, unsigned char *key) {
+			   unsigned int input_length, unsigned char *key)
+{
 	unsigned char iv[IV_SIZE] = {0};
 
 	return aes_gcm_encrypt_core(output, input, input_length, key, iv);
@@ -245,8 +244,8 @@ unsigned char *get_key()
 	const char *user_pass = "this is hopebay testing";
 	unsigned char md_value[EVP_MAX_MD_SIZE];
 	unsigned int md_len;
-	unsigned char *ret = (unsigned char *)calloc(KEY_SIZE,
-						    sizeof(unsigned char));
+	unsigned char *ret =
+	    (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
 	if (!ret)
 		return NULL;
 	const EVP_MD *m;
@@ -257,14 +256,10 @@ unsigned char *get_key()
 	if (!m)
 		return NULL;
 	EVP_DigestInit(&ctx, m);
-	unsigned char *salt = (unsigned
-			       char *)"oluik.354jhmnk,";
-	PKCS5_PBKDF2_HMAC(user_pass,
-			  strlen(user_pass), salt,
-			  strlen((char *)salt), 3,
-			  m, KEY_SIZE, ret);
-	EVP_DigestFinal(&ctx, md_value,
-			&md_len);
+	unsigned char *salt = (unsigned char *)"oluik.354jhmnk,";
+	PKCS5_PBKDF2_HMAC(user_pass, strlen(user_pass), salt,
+			  strlen((char *)salt), 3, m, KEY_SIZE, ret);
+	EVP_DigestFinal(&ctx, md_value, &md_len);
 	return ret;
 }
 
@@ -286,18 +281,18 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
 
 	if (buf == NULL) {
-		write_log(0,
-			  "Failed to allocate memory in transform_encrypt_fd\n");
+		write_log(
+		    0, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
-	int read_count = fread(buf, sizeof(unsigned char), MAX_BLOCK_SIZE,
-			       in_fd);
-	unsigned char *new_data = calloc(read_count+TAG_SIZE,
-					 sizeof(unsigned char));
+	int read_count =
+	    fread(buf, sizeof(unsigned char), MAX_BLOCK_SIZE, in_fd);
+	unsigned char *new_data =
+	    calloc(read_count + TAG_SIZE, sizeof(unsigned char));
 	if (new_data == NULL) {
 		free(buf);
-		write_log(0,
-			  "Failed to allocate memory in transform_encrypt_fd\n");
+		write_log(
+		    0, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
 	int ret = aes_gcm_encrypt_fix_iv(new_data, buf, read_count, key);
@@ -309,11 +304,9 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 	}
 	free(buf);
 	*data = new_data;
-	write_log(10, "encrypt_size: %d\n", read_count+TAG_SIZE);
-	return fmemopen(new_data, read_count+TAG_SIZE, "rb");
+	write_log(10, "encrypt_size: %d\n", read_count + TAG_SIZE);
+	return fmemopen(new_data, read_count + TAG_SIZE, "rb");
 }
-
-
 
 /************************************************************************
  * *
@@ -327,11 +320,11 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
  * *  Return value: 0 if success or 1 if failed
  * *
  * *************************************************************************/
-int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char* input,
+int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char *input,
 		  int input_length)
 {
-	unsigned char *output = (unsigned char *)calloc(input_length-TAG_SIZE,
-						   sizeof(unsigned char));
+	unsigned char *output = (unsigned char *)calloc(input_length - TAG_SIZE,
+							sizeof(unsigned char));
 	int ret = aes_gcm_decrypt_fix_iv(output, input, input_length, key);
 
 	if (ret != 0) {
@@ -339,9 +332,78 @@ int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char* input,
 		write_log(2, "Failed decrypt. Code: %d\n", ret);
 		return 1;
 	}
-	fwrite(output, sizeof(unsigned char), input_length-TAG_SIZE,
+	fwrite(output, sizeof(unsigned char), input_length - TAG_SIZE,
 	       decrypt_to_fd);
 	free(output);
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: transform_fd
+ * *        Inputs: FILE* in_fd, open with 'r' mode, key, data, enc_flag,
+ * compress_flag
+ * *       Summary: Combine transform_encrypt_fd and transform_compress_fd
+ * functions
+ * *  Return value: File* or NULL if failed
+ * *
+ * *************************************************************************/
+FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
+		   int enc_flag, int compress_flag)
+{
+
+	if (enc_flag && !compress_flag) {
+    return transform_encrypt_fd(in_fd, key, data);
+	}
+  if (!enc_flag && compress_flag){
+    return transform_compress_fd(in_fd, data);
+  }
+  if(enc_flag && compress_flag){
+    FILE* compress_fd = transform_compress_fd(in_fd, data);
+    if(compress_fd == NULL)
+      return NULL;
+    free(*data);
+    FILE* ret = transform_encrypt_fd(compress_fd, key, data);
+    fclose(compress_fd);
+    return ret;
+  }
+  return in_fd;
+}
+
+/************************************************************************
+ * *
+ * * Function name: decode_to_fd
+ * *        Inputs: FILE* to_fd, open with 'w' mode, unsigned char* key,unsigned
+ * *  char* input,int input_length, enc_flag, compress_flag,
+ * *       Summary: Decode to to_fd
+ * *
+ * *  Return value: 0 if success or 1 if failed
+ * *
+ * *************************************************************************/
+int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
+		 int input_length, int enc_flag, int compress_flag)
+{
+	if (enc_flag && !compress_flag) {
+    return decrypt_to_fd(to_fd, key, input, input_length);
+	}
+  if (!enc_flag && compress_flag){
+    return decompress_to_fd(to_fd, input, input_length);
+  }
+  if(enc_flag && compress_flag){
+    unsigned char *output = (unsigned char *)calloc(input_length - TAG_SIZE,
+                                                    sizeof(unsigned char));
+    int ret = aes_gcm_decrypt_fix_iv(output, input, input_length, key);
+    if (ret != 0) {
+      free(output);
+      write_log(2, "Failed decrypt. Code: %d\n", ret);
+      return 1;
+    }
+    ret = decompress_to_fd(to_fd, output, input_length - TAG_SIZE);
+    free(output);
+    return ret;
+
+  }
+
+	fwrite(input, sizeof(unsigned char), input_length - TAG_SIZE, to_fd);
+  return 0;
+}
