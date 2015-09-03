@@ -6,7 +6,31 @@ extern "C" {
 #include "dedup_table.h"
 }
 
-int test_elements = 10;
+int test_elements = 70000;
+
+void _get_mock_hash(unsigned char output_hash[], int seed) {
+
+	int hash_length = 32;
+	int size_to_cmp = 0;
+	int count;
+	int mod;
+
+	// Clear output hash
+	memset(output_hash, 0, 32);
+
+	size_to_cmp = seed;
+
+	count = 1;
+	while (1) {
+		mod = size_to_cmp % 256;
+		size_to_cmp = size_to_cmp / 256;
+		memcpy(&(output_hash[32-count]), &mod, 1);
+		memcpy(&(output_hash[32-(count+1)]), &size_to_cmp, 1);
+		if (size_to_cmp < 256)
+			break;
+		count += 1;
+	}
+}
 
 // Base class to prepare tree for test
 class prepare_tree : public ::testing::Test {
@@ -51,11 +75,20 @@ class prepare_tree : public ::testing::Test {
 			 *       .
 			 */
 			for (int i = 0; i < test_elements; i++) {
-				memcpy(&(testdata[31]), &i, 1);
+				pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
+				pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
+
+				_get_mock_hash(testdata, i);
+				//for (int tmp_idx = 0; tmp_idx < 32; ++tmp_idx) {
+				//	printf("%02x", testdata[tmp_idx]);
+				//}
+				//printf("\n");
 				insert_ddt_btree(testdata, &tempnode, fd, &tempmeta);
 			}
 
 			// Check if insert OK
+			//pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
+			//pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 			//traverse_ddt_btree(&tempnode, fd);
 
 			fclose(fptr);
@@ -136,9 +169,12 @@ TEST_F(search_ddt_btreeTest, searchOK) {
 
 	// Start to search
 	for (s_idx = 0; s_idx < test_elements; s_idx++) {
-		memcpy(&(testdata[31]), &s_idx, 1);
+		pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
+		pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
+
+		_get_mock_hash(testdata, s_idx);
 		// Compare return value
-		EXPECT_EQ(0, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
+		ASSERT_EQ(0, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
 		// Compare key we found
 		EXPECT_EQ(0, memcmp(testdata, r_node.ddt_btree_el[r_idx].obj_id, 32));
 	}
@@ -165,7 +201,7 @@ TEST_F(search_ddt_btreeTest, search_non_existed_el) {
 
 	// Start to search key - 0000..00011
 	s_idx = test_elements + 1;
-	memcpy(&(testdata[31]), &s_idx, 1);
+	_get_mock_hash(testdata, s_idx);
 	EXPECT_EQ(1, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
 }
 
@@ -191,7 +227,7 @@ TEST_F(search_ddt_btreeTest, search_empty_node) {
 
 	// Start to search
 	s_idx = 0;
-	memcpy(&(testdata[31]), &s_idx, 1);
+	_get_mock_hash(testdata, s_idx);
 	EXPECT_EQ(-1, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
 
 	fclose(fptr);
@@ -267,13 +303,13 @@ TEST_F(insert_ddt_btreeTest, insertOK) {
 
 	// Total insert 10 elements
 	for (int i = 0; i < test_elements; i++) {
-		memcpy(&(testdata[31]), &i, 1);
+		_get_mock_hash(testdata, i);
 		EXPECT_EQ(0, insert_ddt_btree(testdata, &tempnode, fd, &tempmeta));
 	}
 
 	// Reload btree meta
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
-	EXPECT_EQ(10, tempmeta.total_el);
+	EXPECT_EQ(test_elements, tempmeta.total_el);
 
 	fclose(fptr);
 }
@@ -285,7 +321,7 @@ TEST_F(insert_ddt_btreeTest, goto_error_handler) {
 
 	// Total insert 10 elements
 	for (int i = 9; i >= 0; i--) {
-		memcpy(&(testdata[31]), &i, 1);
+		_get_mock_hash(testdata, i);
 		ret_val = insert_ddt_btree(testdata, &tempnode, fd, &tempmeta);
 		if (ret_val < 0)
 			has_err = 1;
@@ -321,6 +357,8 @@ TEST_F(delete_ddt_btreeTest, deleteOK) {
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
+
+	_get_mock_hash(testdata, test_elements - 1);
 
 	EXPECT_EQ(0, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 	EXPECT_EQ(test_elements - 1, tempmeta.total_el);
@@ -360,14 +398,21 @@ TEST_F(delete_ddt_btreeTest, delete_all_elements) {
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	EXPECT_EQ(10, tempmeta.total_el);
+	EXPECT_EQ(test_elements, tempmeta.total_el);
 
 	for (int i = 0; i < test_elements; i++) {
-		memcpy(&(testdata[31]), &i, 1);
+		pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
+		pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
+
+		_get_mock_hash(testdata, i);
 		EXPECT_EQ(0, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 	}
 
+	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
+	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
+
 	EXPECT_EQ(0, tempmeta.total_el);
+	EXPECT_EQ(0, tempnode.num_el);
 
 	fclose(fptr);
 }
@@ -389,7 +434,7 @@ TEST_F(delete_ddt_btreeTest, delete_non_existed_el) {
 	EXPECT_EQ(test_elements, tempmeta.total_el);
 
 	key = test_elements + 1;
-	memcpy(&(testdata[31]), &key, 1);
+	_get_mock_hash(testdata, key);
 	EXPECT_EQ(2, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 
 	EXPECT_EQ(test_elements, tempmeta.total_el);
@@ -596,3 +641,13 @@ TEST(compute_hashTest, non_existed_path) {
 	EXPECT_EQ(-1, compute_hash(data_path, hash));
 }
 
+//class mockTest : public prepare_tree {
+//	protected:
+//		virtual void get_tree_name(char path[]){
+//			sprintf(path, "%s", "testpatterns/ddt/for_mock_test");
+//		}
+//};
+//
+//TEST_F(mockTest, searchOK) {
+//	EXPECT_EQ(0, 0);
+//}

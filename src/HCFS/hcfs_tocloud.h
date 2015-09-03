@@ -41,7 +41,6 @@ typedef struct {
 	char tempfilename[400];
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
-	unsigned char old_hash_key[SHA256_DIGEST_LENGTH];
 	unsigned char hash_key[SHA256_DIGEST_LENGTH];
 } UPLOAD_THREAD_TYPE;
 
@@ -88,7 +87,7 @@ SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
 				CURL_HANDLE *curl_handle, char *filename, char uploaded,
-				unsigned char * old_hash, unsigned char *hash_in_meta);
+				unsigned char *hash_in_meta);
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);

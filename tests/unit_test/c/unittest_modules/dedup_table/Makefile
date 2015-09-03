@@ -38,7 +38,7 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = dedup_table_unittest 
+TESTS = dedup_table_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.

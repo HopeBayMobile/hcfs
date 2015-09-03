@@ -88,7 +88,6 @@ FILE* get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 
 	// Initialize tree if not existed
 	if (access(meta_path, R_OK|W_OK) < 0) {
-		printf("No metafile found\n");
 		initialize_ddt_meta(meta_path);
 	}
 
@@ -136,7 +135,7 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 	ssize_t ret_ssize;
 
 	if (tnode->num_el == 0) {
-		printf("Encounter invalid node\n");
+		// Search on empty node
 		return -1;
 	}
 
@@ -195,7 +194,9 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
 				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
 			}
-			printf(" with refcount (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
+			printf(" with refcount (%lld) in node - %lld\n",
+					tnode->ddt_btree_el[search_idx].refcount,
+					tnode->this_node_pos);
 		}
 		return 0;
 	}
@@ -210,7 +211,9 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd) {
 			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH; ++tmp_idx) {
 				printf("%02x", tnode->ddt_btree_el[search_idx].obj_id[tmp_idx]);
 			}
-			printf(" with refcount (%lld)\n", tnode->ddt_btree_el[search_idx].refcount);
+			printf(" with refcount (%lld) in node - %lld\n",
+					tnode->ddt_btree_el[search_idx].refcount,
+					tnode->this_node_pos);
 		}
 	}
 
@@ -268,9 +271,7 @@ int insert_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd, DDT_BTR
 		// assign new root
 		memcpy(tnode, &new_root, sizeof(DDT_BTREE_NODE));
 
-		printf("new root pos - %lld\n", new_root.this_node_pos);
-
-	} else if (tnode->num_el == MAX_EL_PER_NODE) {
+	} else if (tnode->num_el >= MAX_EL_PER_NODE) {
 		// Detect full root, need to create new root
 		// Copy old root
 		memset(&temp_node, 0, sizeof(DDT_BTREE_NODE));
@@ -304,7 +305,6 @@ int insert_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd, DDT_BTR
 		// Root is changed - Update btree meta and write to disk
 		this_meta->total_el += 1;
 		this_meta->tree_root = new_root.this_node_pos;
-		printf("new root pos - %lld\n", new_root.this_node_pos);
 
 		// assign new root
 		memcpy(tnode, &new_root, sizeof(DDT_BTREE_NODE));
@@ -437,7 +437,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NO
 		new_node.this_node_pos = ret_pos;
 	}
 	new_node.num_el = el_per_child;
-	new_node.is_leaf=(cnode->is_leaf)?1:0;
+	new_node.is_leaf=(cnode->is_leaf)?TRUE:FALSE;
 	new_node.parent_node_pos = pnode->this_node_pos;
 	new_node.gc_list_next = 0;
 
@@ -453,6 +453,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx, DDT_BTREE_NO
 
 	// cnode has same number of children too
 	cnode->num_el = el_per_child;
+	cnode->parent_node_pos = new_node.parent_node_pos;
 
 	// write new node and cnode to disk
 	PWRITE(fd, &new_node, sizeof(DDT_BTREE_NODE), new_node.this_node_pos);
@@ -516,7 +517,8 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 
 	if (tnode->num_el <= 0) {
 		// This node doesn't contained any elements
-		printf("This node doesn't contain any elements\n");
+		printf("This node doesn't contain any elements - node (%lld)\n",
+				tnode->this_node_pos);
 		return -1;
 	}
 
@@ -525,7 +527,6 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode,
 						SHA256_DIGEST_LENGTH);
 		if (compare_result == 0) {
 			match = TRUE;
-			printf("Match for %02x...%02x  res = %d\n", key[0], key[31], match);
 			break;
 		} else if (compare_result < 0) {
 			break;
@@ -701,7 +702,6 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				tnode->child_node_pos[selected_child-1]);
 
 		if (sibling_node.num_el > MIN_EL_PER_NODE) {
-			printf("Start rotete right\n");
 			// Left sibling is selected, start to rotate right
 			selected_sibling = selected_child - 1;
 			num_el_selected_sibling = sibling_node.num_el;
@@ -751,7 +751,6 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 				tnode->child_node_pos[selected_child+1]);
 
 		if (sibling_node.num_el > MIN_EL_PER_NODE) {
-			printf("Start rotete left\n");
 			// Right sibling is selected, start to rotate left
 			selected_sibling = selected_child + 1;
 			num_el_selected_sibling = sibling_node.num_el;
@@ -803,7 +802,6 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 	*/
 
 	if (!finish_rotate) {
-		printf("Start merge\n");
 		if (selected_child <= 0) {
 			// Merge with right sibling
 			selected_sibling = selected_child;
@@ -839,6 +837,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 		}
 
 		// Reclaim child node
+		child_node.num_el = 0;
 		child_node.gc_list_next = this_meta->node_gc_list;
 		this_meta->node_gc_list = child_node.this_node_pos;
 
@@ -852,17 +851,28 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 			memmove(&(tnode->child_node_pos[selected_sibling+1]),
 							&(tnode->child_node_pos[selected_sibling+2]),
 							(tnode->num_el - selected_sibling -1)*sizeof(long long));
-		} else if (tnode->parent_node_pos == 0) {
-			printf("Reclaim root\n");
-			// Tree root has no elements anymore, reclaim it
-			tnode->gc_list_next = this_meta->node_gc_list;
-			this_meta->node_gc_list = tnode->this_node_pos;
-			this_meta->tree_root = sibling_node.this_node_pos;
+			// One element is borrowed from tnode
+			(tnode->num_el)--;
+		} else {
+			if (tnode->parent_node_pos == 0) {
+				//printf("Reclaim root - %lld\n", sibling_node.this_node_pos);
+				// Sibling node is new root
+				sibling_node.parent_node_pos = 0;
 
-			change_root = TRUE;
+				// Tree root has no elements anymore, reclaim it
+				tnode->num_el = 0;
+				tnode->gc_list_next = this_meta->node_gc_list;
+
+				this_meta->node_gc_list = tnode->this_node_pos;
+				this_meta->tree_root = sibling_node.this_node_pos;
+
+				change_root = TRUE;
+			} else {
+				// One element is borrowed from tnode
+				(tnode->num_el)--;
+			}
 		}
 
-		(tnode->num_el)--;
 		sibling_node.num_el += (num_el_selected_child + 1);
 
 		// Three nodes changed - Update in disk
@@ -874,7 +884,7 @@ static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
 		PWRITE(fd, this_meta, sizeof(DDT_BTREE_META), 0);
 
 		if (change_root) {
-			// assign new root
+			// Assign new root
 			memcpy(tnode, &sibling_node, sizeof(DDT_BTREE_NODE));
 		}
 

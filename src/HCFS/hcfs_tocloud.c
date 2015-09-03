@@ -850,10 +850,11 @@ errcode_handle:
 
 int do_block_sync(ino_t this_inode, long long block_no,
 			CURL_HANDLE *curl_handle, char *filename, char uploaded,
-			unsigned char old_hash[], unsigned char hash_in_meta[])
+			unsigned char hash_in_meta[])
 {
 	char objname[400];
 	char hash_key_str[65];
+	unsigned char old_hash_key[SHA256_DIGEST_LENGTH];
 	unsigned char hash_key[SHA256_DIGEST_LENGTH];
 	FILE *fptr, *ddt_fptr;
 	int ret_val, errcode, ret;
@@ -888,7 +889,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	sprintf(objname, "data_%s", hash_key_str);
 
 	// Copy new hash key and reserve old one
-	memcpy(old_hash, hash_in_meta, SHA256_DIGEST_LENGTH);
+	memcpy(old_hash_key, hash_in_meta, SHA256_DIGEST_LENGTH);
 	memcpy(hash_in_meta, hash_key, SHA256_DIGEST_LENGTH);
 
 	// Get dedup table meta
@@ -946,13 +947,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	// Since the objected mapped is changed, need to handle old object
 	// Sync was successful
 	if (ret == 0 && uploaded) {
-		printf("Start to delete obj %02x...%02x\n", old_hash[0], old_hash[31]);
+		printf("Start to delete obj %02x...%02x\n", old_hash_key[0], old_hash_key[31]);
 		// Delete old object in cloud
-		ret = do_block_delete(this_inode, block_no, old_hash,
+		do_block_delete(this_inode, block_no, old_hash_key,
 					curl_handle);
 
 		printf("Delete result - %d\n", ret);
-		printf("Delete obj - %02x...%02x\n", old_hash[0], old_hash[31]);
+		printf("Delete obj - %02x...%02x\n", old_hash_key[0], old_hash_key[31]);
 	}
 
 	return ret;
@@ -1010,7 +1011,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
 				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
-				thread_ptr->is_upload, thread_ptr->old_hash_key, thread_ptr->hash_key);
+				thread_ptr->is_upload, thread_ptr->hash_key);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
