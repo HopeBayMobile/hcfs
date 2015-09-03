@@ -147,7 +147,7 @@ int init_progress_info(int fd, long long num_block)
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 
 	/* Do NOT need to lock file because this function will be called by
-	   only one thread in sync_single_inode */
+	   the only one thread in sync_single_inode() */
 	offset = 0;
 	memset(&block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	for (i = 0; i < num_block; i++) {
@@ -219,8 +219,8 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 /**
  * Check whether target file exists or not and copy source file.
  *
- * This function first checks whether source file exist and target file
- * does not exist and then lock source file and copy it.
+ * This function first checks whether source file exist and whether target file
+ * does not exist and then lock source file and copy it if.
  *
  * @return 0 if succeed in copy, -EEXIST in case of target file existing.
  */
@@ -272,7 +272,9 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 	/* Lock source, do NOT need to lock target because 
 	   other processes will be locked at source file. */
 	flock(fileno(src_ptr), LOCK_EX);
-	if (access(tarpath, F_OK) == 0) { /* Check again */
+
+	/* Check again to avoid race condition*/
+	if (access(tarpath, F_OK) == 0) {
 		flock(fileno(src_ptr), LOCK_UN);
 		fclose(src_ptr);
 		return -EEXIST;

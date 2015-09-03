@@ -685,6 +685,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					continue;
 				}
 				current_page = which_page;
+
+				/* Do not need to read again in the same
+				   page position because toupload_meta cannot
+				   be modified by other processes.  */
 				FSEEK_ADHOC_SYNC_LOOP(toupload_metafptr,
 					page_pos, SEEK_SET, FALSE);
 
@@ -696,7 +700,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			toupload_block_status = tmp_entry->status;
 			/*TODO: error handling here if cannot read correctly*/
 
-			/* Lock local meta. Read local meta and update status */
+			/* Lock local meta. Read local meta and update status.
+			   This should be read again even in the same page pos
+			   because someone may modify it. */
 			flock(fileno(local_metafptr), LOCK_EX);
 			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos, 
 				SEEK_SET, TRUE);
