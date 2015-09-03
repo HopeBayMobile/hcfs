@@ -114,6 +114,7 @@ FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 int decompress_to_fd(FILE *decompress_to_fd, unsigned char *input,
 		     int input_length)
 {
+	write_log(10, "decompress_size: %d\n", input_length);
 	unsigned char *output =
 	    (unsigned char *)calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
 

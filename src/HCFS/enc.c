@@ -278,15 +278,16 @@ unsigned char *get_key()
 FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 			   unsigned char **data)
 {
-	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
+	unsigned char *buf =
+	    calloc(compress_bound_f(MAX_BLOCK_SIZE), sizeof(unsigned char));
 
 	if (buf == NULL) {
 		write_log(
 		    0, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
-	int read_count =
-	    fread(buf, sizeof(unsigned char), MAX_BLOCK_SIZE, in_fd);
+	int read_count = fread(buf, sizeof(unsigned char),
+			       compress_bound_f(MAX_BLOCK_SIZE), in_fd);
 	unsigned char *new_data =
 	    calloc(read_count + TAG_SIZE, sizeof(unsigned char));
 	if (new_data == NULL) {
@@ -323,6 +324,7 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 int decrypt_to_fd(FILE *decrypt_to_fd, unsigned char *key, unsigned char *input,
 		  int input_length)
 {
+	write_log(10, "decrypt_size: %d\n", input_length);
 	unsigned char *output = (unsigned char *)calloc(input_length - TAG_SIZE,
 							sizeof(unsigned char));
 	int ret = aes_gcm_decrypt_fix_iv(output, input, input_length, key);
@@ -353,21 +355,21 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 {
 
 	if (enc_flag && !compress_flag) {
-    return transform_encrypt_fd(in_fd, key, data);
+		return transform_encrypt_fd(in_fd, key, data);
 	}
-  if (!enc_flag && compress_flag){
-    return transform_compress_fd(in_fd, data);
-  }
-  if(enc_flag && compress_flag){
-    FILE* compress_fd = transform_compress_fd(in_fd, data);
-    if(compress_fd == NULL)
-      return NULL;
-    free(*data);
-    FILE* ret = transform_encrypt_fd(compress_fd, key, data);
-    fclose(compress_fd);
-    return ret;
-  }
-  return in_fd;
+	if (!enc_flag && compress_flag) {
+		return transform_compress_fd(in_fd, data);
+	}
+	if (enc_flag && compress_flag) {
+		FILE *compress_fd = transform_compress_fd(in_fd, data);
+		if (compress_fd == NULL)
+			return NULL;
+		free(*data);
+		FILE *ret = transform_encrypt_fd(compress_fd, key, data);
+		fclose(compress_fd);
+		return ret;
+	}
+	return in_fd;
 }
 
 /************************************************************************
@@ -384,26 +386,26 @@ int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 		 int input_length, int enc_flag, int compress_flag)
 {
 	if (enc_flag && !compress_flag) {
-    return decrypt_to_fd(to_fd, key, input, input_length);
+		return decrypt_to_fd(to_fd, key, input, input_length);
 	}
-  if (!enc_flag && compress_flag){
-    return decompress_to_fd(to_fd, input, input_length);
-  }
-  if(enc_flag && compress_flag){
-    unsigned char *output = (unsigned char *)calloc(input_length - TAG_SIZE,
-                                                    sizeof(unsigned char));
-    int ret = aes_gcm_decrypt_fix_iv(output, input, input_length, key);
-    if (ret != 0) {
-      free(output);
-      write_log(2, "Failed decrypt. Code: %d\n", ret);
-      return 1;
-    }
-    ret = decompress_to_fd(to_fd, output, input_length - TAG_SIZE);
-    free(output);
-    return ret;
-
-  }
+	if (!enc_flag && compress_flag) {
+		return decompress_to_fd(to_fd, input, input_length);
+	}
+	if (enc_flag && compress_flag) {
+		unsigned char *output = (unsigned char *)calloc(
+		    input_length - TAG_SIZE, sizeof(unsigned char));
+		int ret =
+		    aes_gcm_decrypt_fix_iv(output, input, input_length, key);
+		if (ret != 0) {
+			free(output);
+			write_log(2, "Failed decrypt. Code: %d\n", ret);
+			return 1;
+		}
+		ret = decompress_to_fd(to_fd, output, input_length - TAG_SIZE);
+		free(output);
+		return ret;
+	}
 
 	fwrite(input, sizeof(unsigned char), input_length - TAG_SIZE, to_fd);
-  return 0;
+	return 0;
 }
