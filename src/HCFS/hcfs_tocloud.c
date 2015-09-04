@@ -852,37 +852,29 @@ int do_block_sync(ino_t this_inode, long long block_no,
 				errcode, strerror(errcode));
 		return -errcode;
 	}
-#ifdef ENCRYPT_ENABLE
-	/* write_log(10, "start to encrypt...\n"); */
-	unsigned char *key = get_key();
-	unsigned char *compressed_data = NULL;
-	unsigned char *data = NULL;
 
-	FILE *compress_fptr = transform_compress_fd(fptr, &compressed_data);
-	FILE *new_fptr = transform_encrypt_fd(compress_fptr, key, &data);
-	fclose(fptr);
-	fclose(compress_fptr);
+	unsigned char *key = NULL;
+	unsigned char *data = NULL;
+#if ENCRYPT_ENABLE
+	key = get_key();
+#endif
+
+	FILE *new_fptr = transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
 	fclose(new_fptr);
-#else
-	ret_val = hcfs_put_object(fptr, objname, curl_handle);
-	fclose(fptr);
-#endif
+  if(fptr != new_fptr)
+    fclose(fptr);
+  if(data != NULL)
+    free(data);
+  if(key != NULL)
+    OPENSSL_free(key);
+
 
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
 	else
 		ret = -EIO;
-#ifdef ENCRYPT_ENABLE
-	free(key);
-	if (compressed_data != NULL) {
-		free(compressed_data);
-	}
-	if (data != NULL) {
-		free(data);
-	}
-#endif
 	return ret;
 }
 
