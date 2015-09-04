@@ -33,8 +33,10 @@ typedef struct {
 	long long page_entry_index;
 	ino_t inode;
 	long long blockno;
+	long long seq;
 	char is_block;
 	char is_delete;
+	char is_backend_delete;
 	int which_curl;
 	int progress_fd;
 	char tempfilename[400];
@@ -83,7 +85,7 @@ STAT_OP_T sync_stat_ctl;
 UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
-int do_block_sync(ino_t this_inode, long long block_no,
+int do_block_sync(ino_t this_inode, long long block_no, long long seq,
 				CURL_HANDLE *curl_handle, char *filename);
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 

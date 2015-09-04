@@ -557,20 +557,20 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *  Return value: 0 if successful, and negation of errcode if not.
 *
 *************************************************************************/
-int do_block_delete(ino_t this_inode, long long block_no,
+int do_block_delete(ino_t this_inode, long long block_no, long long seq,
 						CURL_HANDLE *curl_handle)
 {
 	char objname[1000];
 	int ret_val, ret;
 
 #ifdef ARM_32bit_
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%lld_%lld_%lld", this_inode, block_no, seq);
 	write_log(10,
 		"Debug delete object: objname %s, inode %lld, block %lld\n",
 					objname, this_inode, block_no);
 	sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%ld_%lld_%lld", this_inode, block_no, seq);
 	write_log(10,
 		"Debug delete object: objname %s, inode %ld, block %lld\n",
 					objname, this_inode, block_no);
@@ -602,7 +602,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	which_curl = delete_thread_ptr->which_curl;
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
-			delete_thread_ptr->blockno,
+			delete_thread_ptr->blockno, 0, 
 			&(delete_curl_handles[which_curl]));
 	else
 		do_meta_delete(delete_thread_ptr->inode,

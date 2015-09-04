@@ -77,10 +77,8 @@ errcode_handle:
 
 }
 
-int set_progress_info(int fd, long long block_index, 
-	const char *finish_uploading,
-	const long long *to_upload_seq,
-	const long long *backend_seq)
+int set_progress_info(int fd, long long block_index, char finish_uploading,
+	long long to_upload_seq, long long backend_seq)
 {
 	int errcode;
 	long long offset;
@@ -89,25 +87,18 @@ int set_progress_info(int fd, long long block_index,
 
 	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
 
-	if (finish_uploading != NULL)
-		block_uploading_status.finish_uploading = *finish_uploading;
-	if (to_upload_seq != NULL)
-		block_uploading_status.to_upload_seq = *to_upload_seq;
-	if (backend_seq != NULL)
-		block_uploading_status.backend_seq = *backend_seq;
-
-	memset(&block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
+	block_uploading_status.finish_uploading = finish_uploading;
+	block_uploading_status.to_upload_seq = to_upload_seq;
+	block_uploading_status.backend_seq = backend_seq;
 
 	flock(fd, LOCK_EX);
 	PWRITE(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
 		offset);
 	flock(fd, LOCK_UN);
 
-	if (finish_uploading != NULL) {
-		if (*finish_uploading == TRUE)
-			write_log(10, "Debug: block_%lld finished uploading - "
-				"fd = %d\n", block_index, fd);
-	}
+	if (finish_uploading == TRUE)
+		write_log(10, "Debug: block_%lld finished uploading - "
+			"fd = %d\n", block_index, fd);
 
 	return 0;
 
