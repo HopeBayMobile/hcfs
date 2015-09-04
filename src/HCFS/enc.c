@@ -361,12 +361,13 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 		return transform_compress_fd(in_fd, data);
 	}
 	if (enc_flag && compress_flag) {
-		FILE *compress_fd = transform_compress_fd(in_fd, data);
+    unsigned char *compress_data;
+		FILE *compress_fd = transform_compress_fd(in_fd, &compress_data);
 		if (compress_fd == NULL)
 			return NULL;
-		free(*data);
 		FILE *ret = transform_encrypt_fd(compress_fd, key, data);
 		fclose(compress_fd);
+		free(compress_data);
 		return ret;
 	}
 	return in_fd;
@@ -406,6 +407,6 @@ int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 		return ret;
 	}
 
-	fwrite(input, sizeof(unsigned char), input_length - TAG_SIZE, to_fd);
+	fwrite(input, sizeof(unsigned char), input_length, to_fd);
 	return 0;
 }
