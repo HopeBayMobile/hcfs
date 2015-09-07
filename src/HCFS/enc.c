@@ -361,8 +361,9 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 		return transform_compress_fd(in_fd, data);
 	}
 	if (enc_flag && compress_flag) {
-    unsigned char *compress_data;
-		FILE *compress_fd = transform_compress_fd(in_fd, &compress_data);
+		unsigned char *compress_data;
+		FILE *compress_fd =
+		    transform_compress_fd(in_fd, &compress_data);
 		if (compress_fd == NULL)
 			return NULL;
 		FILE *ret = transform_encrypt_fd(compress_fd, key, data);

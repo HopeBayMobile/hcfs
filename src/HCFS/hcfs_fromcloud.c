@@ -89,12 +89,12 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	key = get_key();
 #endif
 
-	decode_to_fd(fptr, key, (unsigned char*)get_fptr_data, len, ENCRYPT_ENABLE,
-		     COMPRESS_ENABLE);
+	decode_to_fd(fptr, key, (unsigned char *)get_fptr_data, len,
+		     ENCRYPT_ENABLE, COMPRESS_ENABLE);
 
 	free(get_fptr_data);
-  if(key != NULL)
-    OPENSSL_free(key);
+	if (key != NULL)
+		OPENSSL_free(key);
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
