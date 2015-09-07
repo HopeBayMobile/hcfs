@@ -32,4 +32,9 @@ int open_progress_info(ino_t inode);
 
 int close_progress_info(int fd, ino_t inode);
 
+int check_and_copy_file(const char *srcpath, const char *tarpath);
+
+int fetch_toupload_block_path(char *pathname, ino_t inode, 
+	long long block_no, long long seq);
+
 #endif

@@ -462,44 +462,11 @@ errcode_handle:
 	free(fname);
 }
 
-static inline int _select_upload_thread(char is_block, char is_delete,
-				ino_t this_inode, long long block_count,
-				long long seq, off_t page_pos,
-				long long e_index, int progress_fd,
-				char is_backend_delete)
-{
-	int which_curl, count;
-
-	which_curl = -1;
-	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
-		if (upload_ctl.threads_in_use[count] == FALSE) {
-			upload_ctl.threads_in_use[count] = TRUE;
-			upload_ctl.threads_created[count] = FALSE;
-			upload_ctl.upload_threads[count].is_block = is_block;
-			upload_ctl.upload_threads[count].is_delete = is_delete;
-			upload_ctl.upload_threads[count].inode = this_inode;
-			upload_ctl.upload_threads[count].blockno = block_count;
-			upload_ctl.upload_threads[count].seq = seq;
-			upload_ctl.upload_threads[count].progress_fd = 
-								progress_fd;
-			upload_ctl.upload_threads[count].page_filepos =
-								page_pos;
-			upload_ctl.upload_threads[count].page_entry_index =
-									e_index;
-			upload_ctl.upload_threads[count].which_curl = count;
-			upload_ctl.upload_threads[count].is_backend_delete = 
-							is_backend_delete;
-
-			upload_ctl.total_active_upload_threads++;
-			which_curl = count;
-			break;
-		 }
-	 }
-	return which_curl;
-}
-
-
-
+/**
+ *
+ * Following are some inline macros and functions used in sync_single_inode()
+ *
+ */
 
 #define FSEEK_ADHOC_SYNC_LOOP(A, B, C, UNLOCK_ON_ERROR)\
 	{\
@@ -549,8 +516,78 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 		}\
 	}
 
+static inline int _select_upload_thread(char is_block, char is_delete,
+				ino_t this_inode, long long block_count,
+				long long seq, off_t page_pos,
+				long long e_index, int progress_fd,
+				char is_backend_delete)
+{
+	int which_curl, count;
 
+	which_curl = -1;
+	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
+		if (upload_ctl.threads_in_use[count] == FALSE) {
+			upload_ctl.threads_in_use[count] = TRUE;
+			upload_ctl.threads_created[count] = FALSE;
+			upload_ctl.upload_threads[count].is_block = is_block;
+			upload_ctl.upload_threads[count].is_delete = is_delete;
+			upload_ctl.upload_threads[count].inode = this_inode;
+			upload_ctl.upload_threads[count].blockno = block_count;
+			upload_ctl.upload_threads[count].seq = seq;
+			upload_ctl.upload_threads[count].progress_fd = 
+								progress_fd;
+			upload_ctl.upload_threads[count].page_filepos =
+								page_pos;
+			upload_ctl.upload_threads[count].page_entry_index =
+									e_index;
+			upload_ctl.upload_threads[count].which_curl = count;
+			upload_ctl.upload_threads[count].is_backend_delete = 
+							is_backend_delete;
 
+			upload_ctl.total_active_upload_threads++;
+			which_curl = count;
+			break;
+		 }
+	 }
+	return which_curl;
+}
+
+static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
+{
+	char upload_done;
+	struct timespec time_to_sleep;
+	int count;
+	
+	time_to_sleep.tv_sec = 0;
+	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
+	upload_done = FALSE;
+	while (upload_done == FALSE) {
+		nanosleep(&time_to_sleep, NULL);
+		upload_done = TRUE;
+		sem_wait(&(upload_ctl.upload_op_sem));
+		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
+			if ((upload_ctl.threads_in_use[count] == TRUE) &&
+				(upload_ctl.upload_threads[count].inode == 
+				inode)) { /* Wait for this inode */
+				upload_done = FALSE;
+				break;
+			}
+		}
+		sem_post(&(upload_ctl.upload_op_sem));
+	}
+
+	return;
+}
+/**
+ * Main function to upload all block and meta
+ *
+ * This function aims to upload all meta data and block data to cloud. 
+ * If it is a regfile, upload all blocks first and then upload meta when finish 
+ * uploading all blocks. Finally delete old blocks on backend.
+ * If it is not a regfile, then just upload metadata to cloud.
+ *
+ * @return none
+ */
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
 	char toupload_metapath[400];
@@ -565,12 +602,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int which_curl;
 	long long page_pos, e_index, which_page, current_page;
 	long long total_blocks;
-	long long count, block_count;
+	long long block_count;
 	unsigned char local_block_status, toupload_block_status;
-	char upload_done;
 	int ret, errcode;
 	off_t tmp_size;
-	struct timespec time_to_sleep;
 	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
 	ssize_t ret_ssize;
@@ -584,12 +619,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int progress_fd;
 
 	progress_fd = ptr->progress_fd;
-
-	sync_error = FALSE;
-	time_to_sleep.tv_sec = 0;
-	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
-
 	this_inode = ptr->inode;
+	sync_error = FALSE;
+
+	//ret = download_meta()
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
@@ -647,6 +680,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
 		//flock(fileno(metafptr), LOCK_EX);
+		FSEEK(toupload_metafptr, 0, SEEK_SET);
 		FREAD(&tempfilestat, sizeof(struct stat), 1,
 			toupload_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
@@ -702,10 +736,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					continue;
 				}
 				current_page = which_page;
-
 				/* Do not need to read again in the same
 				   page position because toupload_meta cannot
-				   be modified by other processes.  */
+				   be modified by other processes. */
 				FSEEK_ADHOC_SYNC_LOOP(toupload_metafptr,
 					page_pos, SEEK_SET, FALSE);
 
@@ -822,23 +855,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
-		upload_done = FALSE;
-		while (upload_done == FALSE) {
-			nanosleep(&time_to_sleep, NULL);
-			upload_done = TRUE;
-			sem_wait(&(upload_ctl.upload_op_sem));
-			for (count = 0; count < MAX_UPLOAD_CONCURRENCY;
-								count++) {
-				if ((upload_ctl.threads_in_use[count] == TRUE)
-					&&
-					(upload_ctl.upload_threads[count].inode
-						== ptr->inode)) {
-					upload_done = FALSE;
-					break;
-				}
-			}
-			sem_post(&(upload_ctl.upload_op_sem));
-		}
+		_busy_wait_all_specified_upload_threads(ptr->inode);
+		
 	}
 
 	/*Check if metafile still exists. If not, forget the meta upload*/
@@ -900,6 +918,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				1, local_metafptr);
 		}
 
+		write_log(10, "Debug: Now inode %ld has upload_seq = %lld\n", ptr->inode, upload_seq);
 		ret = schedule_sync_meta(toupload_metapath, which_curl);
 		if (ret < 0)
 			sync_error = TRUE;
@@ -1008,23 +1027,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		dispatch_delete_block(which_curl);
 	}
 
-	upload_done = FALSE;
-	while (upload_done == FALSE) {
-		nanosleep(&time_to_sleep, NULL);
-		upload_done = TRUE;
-		sem_wait(&(upload_ctl.upload_op_sem));
-		for (count = 0; count < MAX_UPLOAD_CONCURRENCY;
-				count++) {
-			if ((upload_ctl.threads_in_use[count] == TRUE)
-					&&
-					(upload_ctl.upload_threads[count].inode
-					 == ptr->inode)) {
-				upload_done = FALSE;
-				break;
-			}
-		}
-		sem_post(&(upload_ctl.upload_op_sem));
-	}
+	/* Wait for those threads */
+	_busy_wait_all_specified_upload_threads(ptr->inode);
 
 
 	return;

@@ -53,9 +53,9 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	int ret, errcode;
 
 #ifdef ARM_32bit_
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%lld_%lld_0", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%ld_%lld_0", this_inode, block_no);
 #endif
 
 	sem_wait(&download_curl_sem);
