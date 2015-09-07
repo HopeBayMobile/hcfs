@@ -153,7 +153,7 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 
 	// this node is leaf
 	if (tnode->is_leaf) {
-		printf("Key doesn't existed\n");
+		//printf("Key doesn't existed\n");
 		return 1;
 	}
 

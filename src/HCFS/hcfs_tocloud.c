@@ -119,6 +119,7 @@ static inline int _upload_terminate_thread(int index)
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
+	unsigned char blk_hash[SHA256_DIGEST_LENGTH];
 	ino_t this_inode;
 	off_t page_filepos;
 	long long e_index;
@@ -175,6 +176,7 @@ static inline int _upload_terminate_thread(int index)
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
 
+	memcpy(blk_hash, upload_ctl.upload_threads[index].hash_key, SHA256_DIGEST_LENGTH);
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -214,8 +216,7 @@ static inline int _upload_terminate_thread(int index)
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
 					// Storage hash in block meta too
-					memcpy(tmp_entry->hash, upload_ctl.upload_threads[index].hash_key,
-									SHA256_DIGEST_LENGTH);
+					memcpy(tmp_entry->hash, blk_hash, SHA256_DIGEST_LENGTH);
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
@@ -273,6 +274,7 @@ static inline int _upload_terminate_thread(int index)
 				tmp_del->inode = this_inode;
 				tmp_del->blockno = blockno;
 				tmp_del->which_curl = count2;
+				memcpy(tmp_del->hash_key, blk_hash, SHA256_DIGEST_LENGTH);
 
 				delete_ctl.total_active_delete_threads++;
 				which_curl = count2;
@@ -687,11 +689,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
-				// TODO - handle old hash
-				which_curl = _select_upload_thread(TRUE, TRUE, FALSE,
+				which_curl = _select_upload_thread(TRUE, TRUE, TRUE,
 						tmp_entry->hash,
 						ptr->inode, block_count,
-							page_pos, e_index);
+						page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
 				/* TODO: Maybe should also first copy
@@ -943,8 +944,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 
-
-	// Since the objected mapped is changed, need to handle old object
+	// Since the object mapped by this block is changed, need to remove old object
 	// Sync was successful
 	if (ret == 0 && uploaded) {
 		printf("Start to delete obj %02x...%02x\n", old_hash_key[0], old_hash_key[31]);
@@ -1270,6 +1270,7 @@ int dispatch_upload_block(int which_curl)
 
 errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
+	upload_ctl.upload_threads[count].is_upload = FALSE;
 	upload_ctl.threads_in_use[which_curl] = FALSE;
 	upload_ctl.threads_created[which_curl] = FALSE;
 	upload_ctl.total_active_upload_threads--;
