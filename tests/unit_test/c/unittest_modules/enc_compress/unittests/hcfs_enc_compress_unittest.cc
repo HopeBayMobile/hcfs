@@ -11,34 +11,33 @@ extern "C" {
 class enc : public testing::Test
 {
       protected:
-  char* input;
-  int input_size;
-	virtual void SetUp() {
-    system_config.max_block_size = 1024;
-    input = (char*)calloc(sizeof(char), system_config.max_block_size);
-    input_size = system_config.max_block_size;
-    RAND_bytes((unsigned char*)input, input_size);
-  }
-  virtual void TearDown(){
-    free(input);
-  }
+	char *input;
+	int input_size;
+	virtual void SetUp()
+	{
+		system_config.max_block_size = 1024;
+		input =
+		    (char *)calloc(sizeof(char), system_config.max_block_size);
+		input_size = system_config.max_block_size;
+		RAND_bytes((unsigned char *)input, input_size);
+	}
+	virtual void TearDown() { free(input); }
 };
 
 class compress : public testing::Test
 {
       protected:
-  char* input;
-  int input_size;
-	virtual void SetUp() {
-    system_config.max_block_size = 1024;
-    input = (char*)calloc(sizeof(char), system_config.max_block_size);
-    input_size = system_config.max_block_size;
-    RAND_bytes((unsigned char*)input, input_size);
-  }
-  virtual void TearDown(){
-    free(input);
-  }
-
+	char *input;
+	int input_size;
+	virtual void SetUp()
+	{
+		system_config.max_block_size = 1024;
+		input =
+		    (char *)calloc(sizeof(char), system_config.max_block_size);
+		input_size = system_config.max_block_size;
+		RAND_bytes((unsigned char *)input, input_size);
+	}
+	virtual void TearDown() { free(input); }
 };
 
 TEST_F(compress, compress)
@@ -63,8 +62,8 @@ TEST_F(compress, transform_compress_fd)
 	FILE *new_compress_fd = transform_compress_fd(in_file, &data);
 	EXPECT_TRUE(new_compress_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(compress_bound_f(input_size),
-						     sizeof(unsigned char));
+	unsigned char *ptr = (unsigned char *)calloc(
+	    compress_bound_f(input_size), sizeof(unsigned char));
 	int read_count = fread(ptr, sizeof(unsigned char),
 			       compress_bound_f(input_size), new_compress_fd);
 	char *ptr2 = NULL;
@@ -102,10 +101,10 @@ TEST_F(enc, encrypt_with_fix_iv)
 {
 	unsigned char *key = get_key();
 	unsigned char iv[IV_SIZE] = {0};
-	unsigned char *output1 = (unsigned char *)calloc(
-	    input_size + TAG_SIZE, sizeof(unsigned char));
-	unsigned char *output2 = (unsigned char *)calloc(
-	    input_size + TAG_SIZE, sizeof(unsigned char));
+	unsigned char *output1 = (unsigned char *)calloc(input_size + TAG_SIZE,
+							 sizeof(unsigned char));
+	unsigned char *output2 = (unsigned char *)calloc(input_size + TAG_SIZE,
+							 sizeof(unsigned char));
 	int ret1 = aes_gcm_encrypt_core(output1, (unsigned char *)input,
 					input_size, key, iv);
 	int ret2 = aes_gcm_encrypt_fix_iv(output2, (unsigned char *)input,
@@ -121,16 +120,16 @@ TEST_F(enc, encrypt_with_fix_iv)
 TEST_F(enc, encrypt_then_decrypt)
 {
 	unsigned char *key = get_key();
-	unsigned char *output = (unsigned char *)calloc(
-	    input_size + TAG_SIZE, sizeof(unsigned char));
+	unsigned char *output = (unsigned char *)calloc(input_size + TAG_SIZE,
+							sizeof(unsigned char));
 	unsigned char *decode =
 	    (unsigned char *)calloc(input_size, sizeof(unsigned char));
 
 	int ret = aes_gcm_encrypt_fix_iv(output, (unsigned char *)input,
 					 input_size, key);
 	EXPECT_EQ(ret, 0);
-	ret = aes_gcm_decrypt_fix_iv(decode, output, input_size + TAG_SIZE,
-				     key);
+	ret =
+	    aes_gcm_decrypt_fix_iv(decode, output, input_size + TAG_SIZE, key);
 	EXPECT_EQ(ret, 0);
 	EXPECT_EQ(memcmp(input, decode, input_size), 0);
 	free(key);
@@ -176,7 +175,8 @@ TEST_F(enc, transform_fd_no_flag)
 
 	unsigned char *ptr =
 	    (unsigned char *)calloc(input_size, sizeof(unsigned char));
-	int read_count = fread(ptr, sizeof(unsigned char), input_size, new_file);
+	int read_count =
+	    fread(ptr, sizeof(unsigned char), input_size, new_file);
 	char *ptr2 = NULL;
 	size_t t = 0;
 	FILE *in_fd = open_memstream(&ptr2, &t);
@@ -228,8 +228,8 @@ TEST_F(enc, transform_fd_compress_flag)
 	FILE *new_compress_fd = transform_fd(in_file, NULL, &data, 0, 1);
 	EXPECT_TRUE(new_compress_fd != NULL);
 
-	unsigned char *ptr = (unsigned char *)calloc(compress_bound_f(input_size),
-						     sizeof(unsigned char));
+	unsigned char *ptr = (unsigned char *)calloc(
+	    compress_bound_f(input_size), sizeof(unsigned char));
 	int read_count = fread(ptr, sizeof(unsigned char),
 			       compress_bound_f(input_size), new_compress_fd);
 	char *ptr2 = NULL;
@@ -258,8 +258,8 @@ TEST_F(enc, transform_fd_both_flag)
 	unsigned char *ptr = (unsigned char *)calloc(
 	    compress_bound_f(input_size) + TAG_SIZE, sizeof(unsigned char));
 	int read_count =
-	    fread(ptr, sizeof(unsigned char), compress_bound_f(input_size) + TAG_SIZE,
-		  new_encrypt_fd);
+	    fread(ptr, sizeof(unsigned char),
+		  compress_bound_f(input_size) + TAG_SIZE, new_encrypt_fd);
 	char *ptr2 = NULL;
 	size_t t = 0;
 	FILE *in_fd = open_memstream(&ptr2, &t);
