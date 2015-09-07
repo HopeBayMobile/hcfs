@@ -1,17 +1,28 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,HCFS_0,Setup environment,,0,Fail,,0
-,HCFS_3,chflags,,1,Pass,,0
-,HCFS_4,chmod,,1,Pass,,8
-,HCFS_5,chown,,1,Pass,,16
-,HCFS_6,link,,1,Pass,,4
-,HCFS_7,mkdir,,1,Pass,,1
-,HCFS_8,mkfifo,,1,Pass,,1
-,HCFS_9,open,,1,Pass,,3
-,HCFS_10,rename,,1,Pass,,9
-,HCFS_11,rmdir,,1,Pass,,1
-,HCFS_12,symlink,,1,Pass,,1
-,HCFS_13,truncate,,1,Pass,,2
-,HCFS_14,unlink,,1,Pass,,8
-,HCFS_15,Mount,,,,,
-,HCFS_16,Multiple Mount,,,,,
-,HCFS_17,Backend Setting – ArkFlex U (Swift),,,,,
+,HCFS_3,chflags,,0,Pass,,0
+,HCFS_4,chmod,,0,Pass,,8
+,HCFS_5,chown,,0,Pass,,16
+,HCFS_6,link,,0,Pass,,4
+,HCFS_7,mkdir,,0,Pass,,1
+,HCFS_8,mkfifo,,0,Pass,,1
+,HCFS_9,open,,0,Pass,,3
+,HCFS_10,rename,,0,Pass,,9
+,HCFS_11,rmdir,,0,Pass,,1
+,HCFS_12,symlink,,0,Pass,,1
+,HCFS_13,truncate,,0,Pass,,2
+,HCFS_14,unlink,,0,Pass,,8
+,HCFS_15,Mount,,0,,,
+,HCFS_16,Multiple Mount,,0,,,
+,HCFS_17,Backend Setting – ArkFlex U (Swift),,1,Pass,,10
+,HCFS_18,Backend Setting – ArkFlex U (S3),,1,Pass,,31
+,HCFS_19,Backend Setting – Swift,,1,,,
+,HCFS_20,Backend Setting – S3,,1,Pass,,31
+,HCFS_21,Terminate/umount,,0,,,
+,HCFS_22,Upload,,1,Fail,"New size: 149724056, Origin size: 149724056",10
+,HCFS_23,Upload – exceed hard limit,,1,,,
+,HCFS_24,Download,,1,Pass,,56
+,HCFS_25,Delete,,0,,,
+,HCFS_26,Deduplication,,0,,,
+,HCFS_27,Encryption,,0,,,
+,HCFS_28,Compression,,0,,,
