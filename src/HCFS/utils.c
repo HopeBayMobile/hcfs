@@ -909,3 +909,25 @@ errcode_handle:
 	return errcode;
 }
 
+void fetch_backend_block_name(ino_t this_inode, long long block_no,
+	char *block_name)
+{
+
+#ifdef ARM_32bit_
+	sprintf(block_name, "data_%lld_%lld_0", this_inode, block_no);
+#else
+	sprintf(block_name, "data_%ld_%lld_0", this_inode, block_no);
+#endif
+	return;
+}
+
+void fetch_backend_meta_name(ino_t this_inode, char *meta_name)
+{
+
+#ifdef ARM_32bit_
+	sprintf(meta_name, "meta_%lld", this_inode);
+#else
+	sprintf(meta_name, "meta_%ld", this_inode);
+#endif
+	return;
+}

@@ -1486,6 +1486,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 
 {
 	char thisblockpath[1024];
+	char objname[1000];
 	FILE *blockfptr;
 	struct stat tempstat;
 	off_t old_block_size, new_block_size;
@@ -1566,8 +1567,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_close_file(*body_ptr);
 			meta_cache_unlock_entry(*body_ptr);
 
-			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
-				last_block);
+			fetch_backend_block_name(filestat->st_ino, last_block,
+				objname);
+			ret = fetch_from_cloud(blockfptr, objname);
 			if (ret < 0) {
 				if (blockfptr != NULL) {
 					fclose(blockfptr);
@@ -2132,6 +2134,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
 {
 	char thisblockpath[400];
+	char objname[1000];
 	struct stat tempstat2;
 	int ret, errcode;
 	META_CACHE_ENTRY_STRUCT *tmpptr;
@@ -2212,7 +2215,8 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			return ret;
 		}
 
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		fetch_backend_block_name(this_inode, bindex, objname);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, objname);
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
 				fclose(fh_ptr->blockfptr);
@@ -2720,6 +2724,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		BLOCK_ENTRY_PAGE *tpage, off_t page_fpos, long long eindex)
 {
 	char thisblockpath[400];
+	char objname[1000];
 	struct stat tempstat2;
 	int ret, errcode;
 
@@ -2782,7 +2787,8 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		fetch_backend_block_name(this_inode, bindex, objname);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, objname);
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
 				fclose(fh_ptr->blockfptr);

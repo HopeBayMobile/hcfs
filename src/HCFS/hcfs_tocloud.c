@@ -622,7 +622,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	this_inode = ptr->inode;
 	sync_error = FALSE;
 
-	//ret = download_meta()
+	//ret = download_meta_from_backend()
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
