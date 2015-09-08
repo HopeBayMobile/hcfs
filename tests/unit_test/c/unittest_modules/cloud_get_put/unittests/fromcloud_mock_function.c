@@ -43,3 +43,14 @@ int write_log(int level, char *format, ...)
 {
 	return 0;
 }
+
+int decode_to_fd(FILE *fptr, unsigned char *key, unsigned char *input, int input_length, int enc_flag, int compress_flag){
+
+  ftruncate(fileno(fptr), EXTEND_FILE_SIZE);
+	return 0;
+}
+
+unsigned char *get_key(){
+  return NULL;
+}
+

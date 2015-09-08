@@ -1389,6 +1389,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t total_deleted_cache;
 	long long total_deleted_blocks;
 	int ret_val, errcode;
+	BLOCK_ENTRY *tmpentry;
 
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
@@ -1402,7 +1403,10 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			+ (MAX_BLOCK_ENTRIES_PER_PAGE * page_index);
 		if (tmp_blk_index > old_last_block)
 			break;
-		switch ((temppage->block_entries[block_count]).status) {
+
+		tmpentry = &(temppage->block_entries[block_count]);
+
+		switch (tmpentry->status) {
 		case ST_NONE:
 		case ST_TODELETE:
 			break;
@@ -1421,13 +1425,16 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				write_log(0, "Code %d, %s\n", errcode,
 						strerror(errcode));
 			}
-			(temppage->block_entries[block_count]).status =
-				ST_NONE;
+			if (tmpentry->uploaded == TRUE)
+				tmpentry->status = ST_TODELETE;
+			else
+				tmpentry->status = ST_NONE;
+
 			total_deleted_cache += (long long) cache_block_size;
 			total_deleted_blocks += 1;
 			break;
 		case ST_CLOUD:
-			(temppage->block_entries[block_count]).status =
+			tmpentry->status =
 				ST_TODELETE;
 			break;
 		case ST_BOTH:
@@ -1444,8 +1451,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 					(long long) cache_block_size;
 				total_deleted_blocks += 1;
 			}
-			(temppage->block_entries[block_count]).status =
-				ST_TODELETE;
+			tmpentry->status = ST_TODELETE;
 			break;
 		case ST_CtoL:
 			ret_val = fetch_block_path(thisblockpath, inode_index,
@@ -1454,8 +1460,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				return ret_val;
 			if (access(thisblockpath, F_OK) == 0)
 				unlink(thisblockpath);
-			(temppage->block_entries[block_count]).status =
-				ST_TODELETE;
+			tmpentry->status = ST_TODELETE;
 			break;
 		default:
 			break;

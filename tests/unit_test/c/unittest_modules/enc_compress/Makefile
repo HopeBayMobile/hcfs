@@ -36,7 +36,7 @@ CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSE
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_enc_unittest
+TESTS = hcfs_enc_compress_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -51,7 +51,7 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : $(TESTS)
-	./hcfs_enc_unittest
+	./hcfs_enc_compress_unittest
 
 # Builds gtest.a and gtest_main.a.
 
@@ -89,15 +89,19 @@ enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
 
+compress.o : $(USER_DIR)/compress.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/compress.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/compress.c
+
 mock_function.o : $(UNITTEST_DIR)/mock_function.c \
 		      $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/mock_function.c
 
-hcfs_enc_unittest.o : $(UNITTEST_DIR)/hcfs_enc_unittest.cc \
+hcfs_enc_compress_unittest.o : $(UNITTEST_DIR)/hcfs_enc_compress_unittest.cc \
 		      $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_enc_unittest.cc
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/hcfs_enc_compress_unittest.cc
 
-hcfs_enc_unittest : mock_function.o b64encode.o enc.o hcfs_enc_unittest.o  gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto
+hcfs_enc_compress_unittest : mock_function.o b64encode.o enc.o compress.o hcfs_enc_compress_unittest.o  gtest_main.a
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
 
 

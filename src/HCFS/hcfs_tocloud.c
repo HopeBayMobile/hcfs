@@ -69,15 +69,15 @@ static inline void _sync_terminate_thread(int index)
 	int ret;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
-			(sync_ctl.threads_created[index] == TRUE)) {
-		ret = pthread_tryjoin_np(sync_ctl.inode_sync_thread[index],
-					NULL);
+	    (sync_ctl.threads_created[index] == TRUE)) {
+		ret =
+		    pthread_tryjoin_np(sync_ctl.inode_sync_thread[index], NULL);
 		if (ret == 0) {
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
-		 }
+		}
 	}
 }
 
@@ -91,7 +91,7 @@ void collect_finished_sync_threads(void *ptr)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
-		(sync_ctl.total_active_sync_threads > 0)) {
+	       (sync_ctl.total_active_sync_threads > 0)) {
 		sem_wait(&(sync_ctl.sync_op_sem));
 
 		if (sync_ctl.total_active_sync_threads <= 0) {
@@ -148,19 +148,18 @@ static inline int _upload_terminate_thread(int index)
 		if (ret != EBUSY) {
 			/* Perhaps can't join. Mark the thread as not in use */
 			write_log(0, "Error in upload thread. Code %d, %s\n",
-				ret, strerror(ret));
+				  ret, strerror(ret));
 			return -ret;
-		} else {
-			/* Thread is busy. Wait some more */
-			return ret;
 		}
+		/* Thread is busy. Wait some more */
+		return ret;
 	}
 
 	/* Find the sync-inode correspond to the block-inode */
 	sem_wait(&(sync_ctl.sync_op_sem));
 	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
 		if (sync_ctl.threads_in_use[count1] ==
-			upload_ctl.upload_threads[index].inode)
+		    upload_ctl.upload_threads[index].inode)
 			break;
 	}
 	/* Check whether the sync-inode-thread raise error or not. */
@@ -171,7 +170,7 @@ static inline int _upload_terminate_thread(int index)
 			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
-			return 0;  /* Error already marked */
+			return 0; /* Error already marked */
 		}
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
@@ -196,8 +195,7 @@ static inline int _upload_terminate_thread(int index)
 			errcode = errno;
 			if (errcode != ENOENT) {
 				write_log(0, "IO error in %s. Code %d, %s\n",
-					__func__, errcode,
-					strerror(errcode));
+					  __func__, errcode, strerror(errcode));
 				return -errcode;
 			}
 		}
@@ -208,36 +206,38 @@ static inline int _upload_terminate_thread(int index)
 			if (!access(thismetapath, F_OK)) {
 				FSEEK(metafptr, page_filepos, SEEK_SET);
 				FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-								metafptr);
+				      metafptr);
 				tmp_entry = &(temppage.block_entries[e_index]);
 				tmp_size = sizeof(BLOCK_ENTRY_PAGE);
 				if ((tmp_entry->status == ST_LtoC) &&
-							(is_delete == FALSE)) {
+				    (is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
 					// Storage hash in block meta too
 					memcpy(tmp_entry->hash, blk_hash, SHA256_DIGEST_LENGTH);
+
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
 						errcode = ret;
 						goto errcode_handle;
 					}
-					SETXATTR(blockpath, "user.dirty",
-							"F", 1, 0);
+					SETXATTR(blockpath, "user.dirty", "F",
+						 1, 0);
 
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
-								metafptr);
+					       metafptr);
 				} else {
-					if ((tmp_entry->status == ST_TODELETE)
-						&& (is_delete == TRUE)) {
+					if ((tmp_entry->status ==
+					     ST_TODELETE) &&
+					    (is_delete == TRUE)) {
 						tmp_entry->status = ST_NONE;
 						tmp_entry->uploaded = FALSE;
 						FSEEK(metafptr, page_filepos,
-								SEEK_SET);
-						FWRITE(&temppage, tmp_size,
-								1, metafptr);
+						      SEEK_SET);
+						FWRITE(&temppage, tmp_size, 1,
+						       metafptr);
 					}
 				}
 				/*Check if status is ST_NONE. If so,
@@ -247,9 +247,9 @@ static inline int _upload_terminate_thread(int index)
 				Need to schedule block for deletion due to
 				truncating*/
 				if ((tmp_entry->status == ST_NONE) &&
-						(is_delete == FALSE)) {
+				    (is_delete == FALSE)) {
 					write_log(5,
-						"Debug upload block gone\n");
+						  "Debug upload block gone\n");
 					need_delete_object = TRUE;
 				}
 			}
@@ -282,9 +282,10 @@ static inline int _upload_terminate_thread(int index)
 			}
 		}
 		sem_post(&(delete_ctl.delete_op_sem));
-		pthread_create(&(delete_ctl.threads_no[which_curl]), NULL,
-			(void *)&con_object_dsync,
-			(void *)&(delete_ctl.delete_threads[which_curl]));
+		pthread_create(
+		    &(delete_ctl.threads_no[which_curl]), NULL,
+		    (void *)&con_object_dsync,
+		    (void *)&(delete_ctl.delete_threads[which_curl]));
 
 		delete_ctl.threads_created[which_curl] = TRUE;
 	}
@@ -312,7 +313,7 @@ void collect_finished_upload_threads(void *ptr)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	while ((hcfs_system->system_going_down == FALSE) ||
-		(upload_ctl.total_active_upload_threads > 0)) {
+	       (upload_ctl.total_active_upload_threads > 0)) {
 		sem_wait(&(upload_ctl.upload_op_sem));
 
 		if (upload_ctl.total_active_upload_threads <= 0) {
@@ -330,9 +331,9 @@ void collect_finished_upload_threads(void *ptr)
 			/* Record the error in sync_thread */
 			sem_wait(&(sync_ctl.sync_op_sem));
 			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-				count1++) {
+			     count1++) {
 				if (sync_ctl.threads_in_use[count1] ==
-					upload_ctl.upload_threads[count].inode)
+				    upload_ctl.upload_threads[count].inode)
 					break;
 			}
 			write_log(10, "Recording error in %s\n", __func__);
@@ -361,13 +362,13 @@ void init_sync_control(void)
 	sem_init(&(sync_ctl.sync_op_sem), 0, 1);
 	sem_init(&(sync_ctl.sync_queue_sem), 0, MAX_SYNC_CONCURRENCY);
 	memset(&(sync_ctl.threads_in_use), 0,
-				sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
+	       sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
 	memset(&(sync_ctl.threads_created), 0,
-				sizeof(char) * MAX_SYNC_CONCURRENCY);
+	       sizeof(char) * MAX_SYNC_CONCURRENCY);
 	sync_ctl.total_active_sync_threads = 0;
 
 	pthread_create(&(sync_ctl.sync_handler_thread), NULL,
-			(void *)&collect_finished_sync_threads, NULL);
+		       (void *)&collect_finished_sync_threads, NULL);
 }
 
 void init_upload_control(void)
@@ -375,25 +376,25 @@ void init_upload_control(void)
 	int count, ret_val;
 
 	memset(&upload_ctl, 0, sizeof(UPLOAD_THREAD_CONTROL));
-	memset(&upload_curl_handles,
-			0, sizeof(CURL_HANDLE) * MAX_UPLOAD_CONCURRENCY);
+	memset(&upload_curl_handles, 0,
+	       sizeof(CURL_HANDLE) * MAX_UPLOAD_CONCURRENCY);
 
 	for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
-		snprintf(upload_curl_handles[count].id, 255,
-				"upload_thread_%d", count);
+		snprintf(upload_curl_handles[count].id, 255, "upload_thread_%d",
+			 count);
 		ret_val = hcfs_init_backend(&(upload_curl_handles[count]));
 	}
 
 	sem_init(&(upload_ctl.upload_op_sem), 0, 1);
 	sem_init(&(upload_ctl.upload_queue_sem), 0, MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_in_use), 0,
-					sizeof(char) * MAX_UPLOAD_CONCURRENCY);
+	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_created), 0,
-					sizeof(char) * MAX_UPLOAD_CONCURRENCY);
+	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	upload_ctl.total_active_upload_threads = 0;
 
 	pthread_create(&(upload_ctl.upload_handler_thread), NULL,
-			(void *)&collect_finished_upload_threads, NULL);
+		       (void *)&collect_finished_upload_threads, NULL);
 }
 
 void init_sync_stat_control(void)
@@ -403,8 +404,8 @@ void init_sync_stat_control(void)
 	struct dirent tmp_entry, *tmpptr;
 	int ret, errcode;
 
-	FS_stat_path = (char *) malloc(METAPATHLEN);
-	fname = (char *) malloc(METAPATHLEN);
+	FS_stat_path = (char *)malloc(METAPATHLEN);
+	fname = (char *)malloc(METAPATHLEN);
 	snprintf(FS_stat_path, METAPATHLEN - 1, "%s/FS_sync", METAPATH);
 	if (access(FS_stat_path, F_OK) == -1) {
 		MKDIR(FS_stat_path, 0700);
@@ -412,8 +413,8 @@ void init_sync_stat_control(void)
 		dirp = opendir(FS_stat_path);
 		if (dirp == NULL) {
 			errcode = errno;
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				  errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
 		}
@@ -423,7 +424,7 @@ void init_sync_stat_control(void)
 		while ((ret == 0) && (tmpptr != NULL)) {
 			if (strncmp(tmp_entry.d_name, "FSstat", 6) == 0) {
 				snprintf(fname, METAPATHLEN - 1, "%s/%s",
-					FS_stat_path, tmp_entry.d_name);
+					 FS_stat_path, tmp_entry.d_name);
 				unlink(fname);
 			}
 			ret = readdir_r(dirp, &tmp_entry, &tmpptr);
@@ -433,8 +434,7 @@ void init_sync_stat_control(void)
 
 	memset(&(sync_stat_ctl.statcurl), 0, sizeof(CURL_HANDLE));
 	sem_init(&(sync_stat_ctl.stat_op_sem), 0, 1);
-	snprintf(sync_stat_ctl.statcurl.id, 255,
-				"sync_stat_ctl");
+	snprintf(sync_stat_ctl.statcurl.id, 255, "sync_stat_ctl");
 
 	hcfs_init_backend(&(sync_stat_ctl.statcurl));
 
@@ -450,7 +450,7 @@ errcode_handle:
 static inline int _select_upload_thread(char is_block, char is_delete,
 				char is_upload, unsigned char old_hash[],
 				ino_t this_inode, long long block_count,
-					off_t page_pos, long long e_index)
+				off_t page_pos, long long e_index)
 {
 	int which_curl, count;
 
@@ -465,9 +465,9 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
 			upload_ctl.upload_threads[count].page_filepos =
-								page_pos;
+			    page_pos;
 			upload_ctl.upload_threads[count].page_entry_index =
-									e_index;
+			    e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
 
 			if (is_upload == TRUE) {
@@ -478,8 +478,8 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.total_active_upload_threads++;
 			which_curl = count;
 			break;
-		 }
-	 }
+		}
+	}
 	return which_curl;
 }
 
@@ -535,8 +535,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (metafptr == NULL) {
 		errcode = errno;
 		if (errcode != ENOENT) {
-			write_log(0, "IO error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,
+				  errcode, strerror(errcode));
 			super_block_update_transit(ptr->inode, FALSE, TRUE);
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
@@ -560,7 +560,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 		/* Check if need to sync past the current size */
 		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
+				      &temp_trunc_size, sizeof(long long));
 
 		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
 			tmp_size = temp_trunc_size;
@@ -576,7 +576,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
-							block_count++) {
+		     block_count++) {
 			flock(fileno(metafptr), LOCK_EX);
 
 			/*Perhaps the file is deleted already*/
@@ -590,7 +590,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 			if (current_page != which_page) {
 				page_pos = seek_page2(&tempfilemeta, metafptr,
-					which_page, 0);
+						      which_page, 0);
 				if (page_pos <= 0) {
 					block_count += BLK_INCREMENTS - 1;
 					flock(fileno(metafptr), LOCK_UN);
@@ -606,21 +606,20 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			if (ret < 0) {
 				errcode = errno;
 				write_log(0, "IO error in %s. Code %d, %s\n",
-					__func__, errcode, strerror(errcode));
+					  __func__, errcode, strerror(errcode));
 				sync_error = TRUE;
 				flock(fileno(metafptr), LOCK_UN);
 				break;
 			}
 
 			ret = fread(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-								metafptr);
+				    metafptr);
 			if (ret < 1) {
 				errcode = ferror(metafptr);
-				write_log(0, "IO error in %s.\n",
-					__func__);
+				write_log(0, "IO error in %s.\n", __func__);
 				if (errcode != 0)
 					write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
+						  strerror(errcode));
 				sync_error = TRUE;
 				flock(fileno(metafptr), LOCK_UN);
 				break;
@@ -629,41 +628,40 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			block_status = tmp_entry->status;
 
 			if (((block_status == ST_LDISK) ||
-				(block_status == ST_LtoC)) &&
-					(block_count < total_blocks)) {
+			     (block_status == ST_LtoC)) &&
+			    (block_count < total_blocks)) {
 				if (block_status == ST_LDISK) {
 					tmp_entry->status = ST_LtoC;
-					ret = fseek(metafptr, page_pos,
-						SEEK_SET);
+					ret =
+					    fseek(metafptr, page_pos, SEEK_SET);
 					if (ret < 0) {
 						errcode = errno;
 						write_log(0,
-							"IO error in %s.\n",
-							__func__);
-						write_log(0,
-							"Code %d, %s\n",
-							errcode,
-							strerror(errcode));
+							  "IO error in %s.\n",
+							  __func__);
+						write_log(0, "Code %d, %s\n",
+							  errcode,
+							  strerror(errcode));
 						sync_error = TRUE;
 						flock(fileno(metafptr),
-							LOCK_UN);
+						      LOCK_UN);
 						break;
 					}
 
 					ret = fwrite(&temppage,
-						sizeof(BLOCK_ENTRY_PAGE),
-								1, metafptr);
+						     sizeof(BLOCK_ENTRY_PAGE),
+						     1, metafptr);
 					if (ret < 1) {
 						errcode = ferror(metafptr);
 						write_log(0,
-							"IO error in %s.\n",
-							__func__);
+							  "IO error in %s.\n",
+							  __func__);
 						write_log(0, "Code %d, %s\n",
-							errcode,
-							strerror(errcode));
+							  errcode,
+							  strerror(errcode));
 						sync_error = TRUE;
 						flock(fileno(metafptr),
-							LOCK_UN);
+						      LOCK_UN);
 						break;
 					}
 				}
@@ -674,7 +672,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						tmp_entry->uploaded,
 						tmp_entry->hash,
 						ptr->inode, block_count,
-							page_pos, e_index);
+						page_pos, e_index);
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
 				if (ret < 0) {
@@ -710,11 +708,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			upload_done = TRUE;
 			sem_wait(&(upload_ctl.upload_op_sem));
 			for (count = 0; count < MAX_UPLOAD_CONCURRENCY;
-								count++) {
-				if ((upload_ctl.threads_in_use[count] == TRUE)
-					&&
-					(upload_ctl.upload_threads[count].inode
-						== ptr->inode)) {
+			     count++) {
+				if ((upload_ctl.threads_in_use[count] ==
+				     TRUE) &&
+				    (upload_ctl.upload_threads[count].inode ==
+				     ptr->inode)) {
 					upload_done = FALSE;
 					break;
 				}
@@ -745,37 +743,36 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 
 		if (S_ISREG(ptr->this_mode)) {
-			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
-				1, metafptr);
+			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+			      metafptr);
 			tempfilemeta.size_last_upload = tempfilestat.st_size;
 			tempfilemeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE),
-				1, metafptr);
+			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+			       metafptr);
 		}
 
 		if (S_ISDIR(ptr->this_mode)) {
-			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
-				1, metafptr);
+			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
 			root_inode = tempdirmeta.root_inode;
 			upload_seq = tempdirmeta.upload_seq;
 			tempdirmeta.upload_seq++;
 			size_diff = 0;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempdirmeta, sizeof(DIR_META_TYPE),
-				1, metafptr);
+			FWRITE(&tempdirmeta, sizeof(DIR_META_TYPE), 1,
+			       metafptr);
 		}
 
 		if (S_ISLNK(ptr->this_mode)) {
-			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
-				1, metafptr);
+			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
+			      metafptr);
 			root_inode = tempsymmeta.root_inode;
 			upload_seq = tempsymmeta.upload_seq;
 			size_diff = 0;
 			tempsymmeta.upload_seq++;
 			FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
-				1, metafptr);
+			FWRITE(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1,
+			       metafptr);
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
@@ -801,9 +798,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			write_log(10, "Checking for other error\n");
 			sem_wait(&(sync_ctl.sync_op_sem));
 			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-				count1++) {
+			     count1++) {
 				if (sync_ctl.threads_in_use[count1] ==
-					ptr->inode)
+				    ptr->inode)
 					break;
 			}
 			if (count1 < MAX_SYNC_CONCURRENCY)
@@ -813,11 +810,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		if (sync_error == TRUE) {
 #ifdef ARM_32bit_
 			write_log(10,
-				"Sync inode %lld to backend incomplete.\n",
-				ptr->inode);
+				  "Sync inode %lld to backend incomplete.\n",
+				  ptr->inode);
 #else
 			write_log(10, "Sync inode %ld to backend incomplete.\n",
-				ptr->inode);
+				  ptr->inode);
 #endif
 			/* TODO: Revert info re last upload if upload
 				fails */
@@ -877,8 +874,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		return -errcode;
 	}
 
@@ -907,22 +904,26 @@ int do_block_sync(ino_t this_inode, long long block_no,
 						objname);
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
 	} else {
-#ifdef ENCRYPT_ENABLE
-		/* write_log(10, "start to encrypt...\n"); */
-		unsigned char* key = get_key();
-		unsigned char* data = NULL;
-		FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
-
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
-		fclose(fptr);
-		// New hash key - Start to upload object
+
+		unsigned char *key = NULL;
+		unsigned char *data = NULL;
+
+#ifdef ENCRYPT_ENABLE
+		key = get_key();
+#endif
+
+		FILE *new_fptr =
+		    transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
 		ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
 		fclose(new_fptr);
-#else
-		// New hash key - Start to upload object
-		ret_val = hcfs_put_object(fptr, objname, curl_handle);
-		fclose(fptr);
-#endif
+		if (fptr != new_fptr)
+			fclose(fptr);
+		if (data != NULL)
+			free(data);
+		if (key != NULL)
+			OPENSSL_free(key);
+
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))
 			ret = 0;
@@ -933,12 +934,6 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		if (ret == 0) {
 			insert_ddt_btree(hash_key, &tree_root, ddt_fd, &ddt_meta);
 		}
-#ifdef ENCRYPT_ENABLE
-		free(key);
-		if (data != NULL) {
-			free(data);
-		}
-#endif
 	}
 
 	flock(ddt_fd, LOCK_UN);
@@ -967,27 +962,26 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 
 #ifdef ARM_32bit_
 	sprintf(objname, "meta_%lld", this_inode);
-	write_log(10,
-		"Debug datasync: objname %s, inode %lld\n",
-		objname, this_inode);
+	write_log(10, "Debug datasync: objname %s, inode %lld\n", objname,
+		  this_inode);
 	sprintf(curl_handle->id, "upload_meta_%lld", this_inode);
 #else
 	sprintf(objname, "meta_%ld", this_inode);
-	write_log(10,
-		"Debug datasync: objname %s, inode %ld\n",
-		objname, this_inode);
+	write_log(10, "Debug datasync: objname %s, inode %ld\n", objname,
+		  this_inode);
 	sprintf(curl_handle->id, "upload_meta_%ld", this_inode);
 #endif
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		return -errcode;
 	}
-	unsigned char* key = get_key();
-	unsigned char* data = NULL;
-	FILE* new_fptr = transform_encrypt_fd(fptr, key, &data);
+	unsigned char *key = get_key();
+	unsigned char *data = NULL;
+	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
+
 	fclose(fptr);
 	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
 	/* Already retried in get object if necessary */
@@ -996,7 +990,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	else
 		ret = -EIO;
 	fclose(new_fptr);
-	if(data != NULL)
+	if (data != NULL)
 		free(data);
 	return ret;
 }
@@ -1073,10 +1067,10 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	topen = FALSE;
 #ifdef ARM_32bit_
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.tmp",
-			upload_ctl.upload_threads[which_curl].inode);
+		upload_ctl.upload_threads[which_curl].inode);
 #else
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.tmp",
-			upload_ctl.upload_threads[which_curl].inode);
+		upload_ctl.upload_threads[which_curl].inode);
 #endif
 
 	/* Find a appropriate copied-meta name */
@@ -1088,11 +1082,11 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 #ifdef ARM_32bit_
 			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.%d",
 				upload_ctl.upload_threads[which_curl].inode,
-									count);
+				count);
 #else
 			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.%d",
 				upload_ctl.upload_threads[which_curl].inode,
-									count);
+				count);
 #endif
 		} else {
 			errcode = errno;
@@ -1101,8 +1095,8 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	}
 
 	if (errcode != ENOENT) {
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1110,8 +1104,8 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	fptr = fopen(tempfilename, "w");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1132,10 +1126,10 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	fclose(fptr);
 
 	strcpy(upload_ctl.upload_threads[which_curl].tempfilename,
-							tempfilename);
+	       tempfilename);
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
-			(void *)&con_object_sync,
-			(void *)&(upload_ctl.upload_threads[which_curl]));
+		       (void *)&con_object_sync,
+		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
 
 	return 0;
@@ -1172,10 +1166,10 @@ int dispatch_upload_block(int which_curl)
 
 #ifdef ARM_32bit_
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%lld_%lld.tmp",
-				upload_ptr->inode, upload_ptr->blockno);
+		upload_ptr->inode, upload_ptr->blockno);
 #else
 	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%ld_%lld.tmp",
-				upload_ptr->inode, upload_ptr->blockno);
+		upload_ptr->inode, upload_ptr->blockno);
 #endif
 
 	/* Find an appropriate dispatch-name */
@@ -1200,15 +1194,15 @@ int dispatch_upload_block(int which_curl)
 	}
 
 	if (errcode != ENOENT) {
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
 
 	/* Open source block (origin block in blockpath) */
-	ret = fetch_block_path(thisblockpath,
-			upload_ptr->inode, upload_ptr->blockno);
+	ret = fetch_block_path(thisblockpath, upload_ptr->inode,
+			       upload_ptr->blockno);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
@@ -1220,12 +1214,12 @@ int dispatch_upload_block(int which_curl)
 		if (errcode == ENOENT) {
 			/* Block deleted already, log and skip */
 			write_log(10, "Block file %s gone. Perhaps deleted.\n",
-				thisblockpath);
+				  thisblockpath);
 			errcode = 0;
 			goto errcode_handle;
 		}
 		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+			  errcode, strerror(errcode));
 		write_log(10, "Debug path %s\n", thisblockpath);
 		errcode = -errcode;
 		goto errcode_handle;
@@ -1239,10 +1233,9 @@ int dispatch_upload_block(int which_curl)
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "Open error in %s. Code %d, %s\n", __func__,
-				errcode, strerror(errcode));
+			  errcode, strerror(errcode));
 		write_log(10, "Debug path %s\n", tempfilename);
-		write_log(10, "Double check %d\n", access(tempfilename,
-			F_OK));
+		write_log(10, "Double check %d\n", access(tempfilename, F_OK));
 		errcode = -errcode;
 		goto errcode_handle;
 	}
@@ -1262,8 +1255,8 @@ int dispatch_upload_block(int which_curl)
 	fclose(fptr);
 
 	strcpy(upload_ptr->tempfilename, tempfilename);
-	pthread_create(&(upload_ctl.upload_threads_no[which_curl]),
-		NULL, (void *)&con_object_sync,	(void *)upload_ptr);
+	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
+		       (void *)&con_object_sync, (void *)upload_ptr);
 	upload_ctl.threads_created[which_curl] = TRUE;
 
 	return 0;
@@ -1286,13 +1279,13 @@ errcode_handle:
 void dispatch_delete_block(int which_curl)
 {
 	pthread_create(&(upload_ctl.upload_threads_no[which_curl]), NULL,
-			(void *)&delete_object_sync,
-			(void *)&(upload_ctl.upload_threads[which_curl]));
+		       (void *)&delete_object_sync,
+		       (void *)&(upload_ctl.upload_threads[which_curl]));
 	upload_ctl.threads_created[which_curl] = TRUE;
 }
 
 static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
-					SYNC_THREAD_TYPE *sync_threads)
+			     SYNC_THREAD_TYPE *sync_threads)
 {
 	int count;
 
@@ -1306,16 +1299,16 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",
-				sync_threads[count].inode,
-				sync_threads[count].this_mode);
+				  sync_threads[count].inode,
+				  sync_threads[count].this_mode);
 #else
 			write_log(10, "Before syncing: inode %ld, mode %d\n",
-				sync_threads[count].inode,
-				sync_threads[count].this_mode);
+				  sync_threads[count].inode,
+				  sync_threads[count].this_mode);
 #endif
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&sync_single_inode,
-					(void *)&(sync_threads[count]));
+				       NULL, (void *)&sync_single_inode,
+				       (void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
 			break;
@@ -1345,19 +1338,18 @@ void upload_loop(void)
 
 	while (hcfs_system->system_going_down == FALSE) {
 		if (is_start_check) {
-			for (sleep_count = 0; sleep_count < 30;
-							sleep_count++) {
+			for (sleep_count = 0; sleep_count < 30; sleep_count++) {
 				/*Sleep for a while if we are not really
 					in a hurry*/
 				if (hcfs_system->systemdata.cache_size <
-							CACHE_SOFT_LIMIT)
+				    CACHE_SOFT_LIMIT)
 					sleep(1);
 				else
 					break;
 			}
 
-		ino_check = 0;
-		do_something = FALSE;
+			ino_check = 0;
+			do_something = FALSE;
 		}
 
 		is_start_check = FALSE;
@@ -1383,8 +1375,8 @@ void upload_loop(void)
 					tempentry.in_transit = TRUE;
 					tempentry.mod_after_in_transit = FALSE;
 					ino_check = tempentry.util_ll_next;
-					ret = write_super_block_entry(ino_sync,
-							&tempentry);
+					ret = write_super_block_entry(
+					    ino_sync, &tempentry);
 					if (ret < 0)
 						ino_sync = 0;
 				}
@@ -1404,19 +1396,19 @@ void upload_loop(void)
 			in_sync = FALSE;
 			for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 				if (sync_ctl.threads_in_use[count] ==
-								ino_sync) {
+				    ino_sync) {
 					in_sync = TRUE;
 					break;
 				}
 			}
 
 			if (in_sync == FALSE) {
-				ret_val = _sync_mark(ino_sync,
-						tempentry.inode_stat.st_mode,
-								sync_threads);
+				ret_val = _sync_mark(
+				    ino_sync, tempentry.inode_stat.st_mode,
+				    sync_threads);
 				do_something = TRUE;
 				sem_post(&(sync_ctl.sync_op_sem));
-			} else {  /*If already syncing to cloud*/
+			} else { /*If already syncing to cloud*/
 				sem_post(&(sync_ctl.sync_op_sem));
 				sem_post(&(sync_ctl.sync_queue_sem));
 			}
@@ -1461,11 +1453,11 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 
 #ifdef ARM_32bit_
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%lld", METAPATH,
-				root_inode);
+		 root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%lld", root_inode);
 #else
 	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%ld", METAPATH,
-				root_inode);
+		 root_inode);
 	snprintf(objname, METAPATHLEN - 1, "FSstat%ld", root_inode);
 #endif
 
@@ -1477,7 +1469,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 		if (fptr == NULL) {
 			errcode = errno;
 			write_log(0, "Open error in %s. Code %d, %s\n",
-				__func__, errcode, strerror(errcode));
+				  __func__, errcode, strerror(errcode));
 			errcode = -errcode;
 			goto errcode_handle;
 		}
@@ -1504,8 +1496,8 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	fptr = fopen(fname, "r+");
 	if (fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		errcode = -errcode;
 		goto errcode_handle;
 	}

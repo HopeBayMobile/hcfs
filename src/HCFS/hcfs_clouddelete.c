@@ -295,6 +295,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
 	long long total_blocks;
+	long long ret_ssize;
+	long long temp_trunc_size;
 	unsigned char block_status;
 	char delete_done;
 	char in_sync;
@@ -362,6 +364,15 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		upload_seq = tempfilemeta.upload_seq;
 
 		tmp_size = tempfilestat.st_size;
+
+		/* Check if need to sync past the current size */
+		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+
+		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+			tmp_size = temp_trunc_size;
+			fremovexattr(fileno(metafptr), "user.trunc_size");
+		}
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else

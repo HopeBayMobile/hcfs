@@ -724,9 +724,9 @@ int validate_system_config(void)
 			"cache_soft_limit must be at least max_block_size\n");
 		return -1;
 	}
-	if (CACHE_HARD_LIMIT < CACHE_SOFT_LIMIT) {
-		write_log(0,
-			"cache_hard_limit must be at least cache_soft_limit\n");
+	if (CACHE_HARD_LIMIT < (CACHE_SOFT_LIMIT + CACHE_DELTA)) {
+		write_log(0, "cache_hard_limit >= \
+				cache_soft_limit + cache_delta\n");
 		return -1;
 	}
 

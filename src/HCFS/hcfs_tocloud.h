@@ -23,6 +23,7 @@
 #include <openssl/sha.h>
 
 #include "hcfscurl.h"
+#include "compress.h"
 #include "enc.h"
 #include "fuseop.h"
 
