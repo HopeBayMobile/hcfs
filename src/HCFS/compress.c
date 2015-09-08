@@ -9,6 +9,8 @@
 
 #include "compress.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 /************************************************************************
  * *
  * * Function name: compress_f

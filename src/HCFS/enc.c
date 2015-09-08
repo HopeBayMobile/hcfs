@@ -9,6 +9,8 @@
 
 #include "enc.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 /************************************************************************
  * *
  * * Function name: expect_b64_encode_length

@@ -22,8 +22,6 @@
 #define TAG_SIZE 16
 #define KEY_SIZE 32
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 int generate_random_key(unsigned char *);
 
 int generate_random_bytes(unsigned char *, unsigned int);

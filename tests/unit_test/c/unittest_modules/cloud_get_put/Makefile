@@ -25,7 +25,7 @@ UNITTEST_DIR = ./unittests
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
+CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=1
 
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64

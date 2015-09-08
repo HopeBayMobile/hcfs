@@ -16,8 +16,6 @@
 
 #include "params.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 typedef int (*compress_func)(const char *source, char *dest, int inputSize);
 
 typedef int (*decompress_func)(const char *source, char *dest, int inputSize,

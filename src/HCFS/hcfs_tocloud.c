@@ -146,10 +146,9 @@ static inline int _upload_terminate_thread(int index)
 			write_log(0, "Error in upload thread. Code %d, %s\n",
 				  ret, strerror(ret));
 			return -ret;
-		} else {
-			/* Thread is busy. Wait some more */
-			return ret;
 		}
+		/* Thread is busy. Wait some more */
+		return ret;
 	}
 
 	/* Find the sync-inode correspond to the block-inode */
