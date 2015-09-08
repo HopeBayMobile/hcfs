@@ -1,9 +1,11 @@
 #!/bin/bash
-echo ==== ci.sh =====================================================================
-set -ex
+echo ======== ${BASH_SOURCE[0]} ========
+echo docker-unittest-stylecheck-slave environment is required
+export TERM=xterm-256color
 export repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
 WORKSPACE=${WORKSPACE:-$repo}
 
+set -e -x
 cd $WORKSPACE
 pwd
 whoami

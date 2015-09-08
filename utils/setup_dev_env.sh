@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e -x
 # dev dependencies
 packages="libattr1-dev"
 packages="$packages libfuse-dev"
