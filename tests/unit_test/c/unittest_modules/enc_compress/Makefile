@@ -51,7 +51,7 @@ clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : $(TESTS)
-	./hcfs_enc_unittest
+	./hcfs_enc_compress_unittest
 
 # Builds gtest.a and gtest_main.a.
 
