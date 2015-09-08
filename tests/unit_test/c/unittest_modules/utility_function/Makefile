@@ -17,10 +17,10 @@
 GTEST_DIR = ../../gtest-1.7.0
 
 # Where to find user code.
-USER_DIR = ../../../../../src/HCFS
+USER_DIR = $(realpath ../../../../../src/HCFS)
 
 # Location for unittest code
-UNITTEST_DIR = ./unittests
+UNITTEST_DIR = $(realpath ./unittests)
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
