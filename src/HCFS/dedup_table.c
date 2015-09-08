@@ -34,6 +34,12 @@ int initialize_ddt_meta(char *meta_path)
 	ssize_t ret_ssize;
 
 	fptr = fopen(meta_path, "w");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+				strerror(errcode));
+		goto errcode_handle;
+	}
 	fd = fileno(fptr);
 	flock(fd, LOCK_EX);
 	setbuf(fptr, NULL);
@@ -90,6 +96,12 @@ FILE *get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 
 	/* Open file */
 	fptr = fopen(meta_path, "r+");
+	if (fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+				strerror(errcode));
+		goto errcode_handle;
+	}
 	fd = fileno(fptr);
 	flock(fd, LOCK_EX);
 	setbuf(fptr, NULL);
