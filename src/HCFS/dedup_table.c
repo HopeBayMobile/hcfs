@@ -182,8 +182,6 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 	int errcode;
 	ssize_t ret_ssize;
 
-	memset(&temp_node, 0, sizeof(DDT_BTREE_NODE));
-
 	if (tnode->is_leaf) {
 		for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 			printf("Leaf - ");
@@ -200,6 +198,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 
 	for (search_idx = 0; search_idx < tnode->num_el + 1; search_idx++) {
 		if (!tnode->is_leaf) {
+			memset(&temp_node, 0, sizeof(DDT_BTREE_NODE));
 			PREAD(fd, &temp_node, sizeof(DDT_BTREE_NODE),
 			      tnode->child_node_pos[search_idx]);
 			traverse_ddt_btree(&temp_node, fd);
@@ -426,14 +425,15 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 				  DDT_BTREE_META *this_meta)
 {
 
-	int el_per_child, median;
+	int el_left_child, el_right_child, median;
 	DDT_BTREE_NODE new_node;
 	int errcode;
 	ssize_t ret_ssize;
 	off_t ret_pos;
 
-	el_per_child = ((MAX_EL_PER_NODE - 1) / 2);
-	median = el_per_child + 1;
+	median = cnode->num_el / 2;
+	el_left_child = median;
+	el_right_child = cnode->num_el - (median + 1);
 
 	/* Need a new node */
 	if (this_meta->node_gc_list != 0) {
@@ -447,24 +447,24 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 		LSEEK(fd, 0, SEEK_END);
 		new_node.this_node_pos = ret_pos;
 	}
-	new_node.num_el = el_per_child;
+	new_node.num_el = el_right_child;
 	new_node.is_leaf = (cnode->is_leaf) ? TRUE : FALSE;
 	new_node.parent_node_pos = pnode->this_node_pos;
 	new_node.gc_list_next = 0;
 
 	/* Copy all elements and children after median */
-	memcpy(&(new_node.ddt_btree_el[0]), &(cnode->ddt_btree_el[median]),
-	       el_per_child * sizeof(DDT_BTREE_EL));
+	memcpy(&(new_node.ddt_btree_el[0]), &(cnode->ddt_btree_el[median + 1]),
+	       el_right_child * sizeof(DDT_BTREE_EL));
 
 	if (!cnode->is_leaf) {
 		// Need to copy the pointer to child node for non-leaf node
 		memcpy(&(new_node.child_node_pos[0]),
-		       &(cnode->child_node_pos[median]),
-		       (el_per_child + 1) * sizeof(long long));
+		       &(cnode->child_node_pos[median + 1]),
+		       (el_right_child + 1) * sizeof(long long));
 	}
 
-	/* cnode has same number of children too */
-	cnode->num_el = el_per_child;
+	/* Update cnode stat */
+	cnode->num_el = el_left_child;
 	cnode->parent_node_pos = new_node.parent_node_pos;
 
 	/* write new node and cnode to disk */
@@ -489,7 +489,7 @@ static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
 	/* Update pnode status
 	 * Move the median element to pnode
 	 */
-	pnode->ddt_btree_el[s_idx] = cnode->ddt_btree_el[el_per_child];
+	pnode->ddt_btree_el[s_idx] = cnode->ddt_btree_el[median];
 	pnode->child_node_pos[s_idx + 1] = new_node.this_node_pos;
 	(pnode->num_el)++;
 	/* Write pnode to disk */

@@ -10,6 +10,10 @@
 *
 **************************************************************************/
 
+#ifndef GW20_HCFS_DEDUP_TABLE_H_
+#define GW20_HCFS_DEDUP_TABLE_H_
+
+
 #include <openssl/sha.h>
 #include <stdio.h>
 
@@ -25,8 +29,8 @@
 #define SHA256_STRING_LENGTH 65
 
 // Define the upper/lower bound of btree elements
-#define MAX_EL_PER_NODE 3
-#define MIN_EL_PER_NODE 1
+#define MAX_EL_PER_NODE 100
+#define MIN_EL_PER_NODE 40
 
 
 typedef struct {
@@ -95,3 +99,5 @@ int compute_hash(char *path, unsigned char *output);
 
 int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH],
 				char output_str[SHA256_STRING_LENGTH]);
+
+#endif

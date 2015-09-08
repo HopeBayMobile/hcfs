@@ -1015,7 +1015,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
+				thread_ptr->tempfilename);
 	if (ret < 0)
 		goto errcode_handle;
 
