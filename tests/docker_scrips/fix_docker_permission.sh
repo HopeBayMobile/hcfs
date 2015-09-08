@@ -1,5 +1,5 @@
 #!/bin/bash
-echo ==== ci_scripts/fix_docker_permission.sh
+echo ======== ${BASH_SOURCE[0]} ========
 set -x
 OLDUID=${SUDO_UID:-$UID}
 OLDGID=${SUDO_GID:-$GROUPS}

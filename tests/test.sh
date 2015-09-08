@@ -36,7 +36,7 @@ SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$IP"
 while ! $SSH true; do sleep 1; done
 
 # Fix permission issue inside docker FS
-$SSH sudo $docker_workspace/tests/ci_scripts/fix_docker_permission.sh
+$SSH sudo $docker_workspace/tests/docker_scrips/fix_docker_permission.sh
 
 # Running auto test
-$SSH $docker_workspace/tests/ci_scripts/ci.sh
+$SSH $docker_workspace/tests/docker_scrips/test.sh
