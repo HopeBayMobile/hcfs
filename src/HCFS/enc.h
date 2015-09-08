@@ -14,12 +14,13 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
+#include "params.h"
 #include "b64encode.h"
 #include "logger.h"
+#include "compress.h"
 #define IV_SIZE 12
 #define TAG_SIZE 16
 #define KEY_SIZE 32
-#define MAX_ENC_DATA 3145728
 
 int generate_random_key(unsigned char *);
 
@@ -43,7 +44,10 @@ unsigned char *get_key(void);
 
 FILE *transform_encrypt_fd(FILE *, unsigned char *, unsigned char **);
 
+FILE *transform_fd(FILE *, unsigned char *, unsigned char **, int, int);
+
 int decrypt_to_fd(FILE *, unsigned char *, unsigned char *, int);
 
+int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
 
 #endif  /* GW20_HCFS_ENC_H_ */
