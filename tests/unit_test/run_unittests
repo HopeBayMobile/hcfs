@@ -8,4 +8,5 @@ $WORKSPACE/utils/setup_dev_env.sh
 
 # Unit test
 cd $UNITTEST_DIR
-make clean test
+make clean
+make test
