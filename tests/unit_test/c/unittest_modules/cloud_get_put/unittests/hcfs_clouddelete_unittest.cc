@@ -79,6 +79,7 @@ TEST(init_dsync_controlTest, ControlDsyncThreadSuccess)
 		}
 		dsync_ctl.threads_in_use[t_index] = inode;
 		dsync_ctl.threads_created[t_index] = TRUE;
+		dsync_ctl.threads_finished[t_index] = TRUE;
 		dsync_ctl.total_active_dsync_threads++;
 		EXPECT_EQ(0, pthread_create(&(dsync_ctl.inode_dsync_thread[t_index]), NULL, 
 			dsync_test_thread_fn, (void *)&i));
@@ -135,6 +136,7 @@ TEST(init_delete_controlTest, ControlDeleteThreadSuccess)
 		}
 		delete_ctl.threads_in_use[t_index] = TRUE;
 		delete_ctl.threads_created[t_index] = TRUE;
+		delete_ctl.threads_finished[t_index] = TRUE;
 		delete_ctl.delete_threads[t_index].is_block = TRUE;
 		delete_ctl.total_active_delete_threads++;
 		EXPECT_EQ(0, pthread_create(&(delete_ctl.threads_no[t_index]), NULL,
