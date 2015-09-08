@@ -1,5 +1,4 @@
 #!/bin/bash
-
 echo ==== ci.sh =====================================================================
 set -x
 WORKSPACE=${WORKSPACE:-/home/jenkins/workspace/HCFS}
@@ -26,9 +25,11 @@ sudo cloc --by-file --xml --out=$WORKSPACE/cloc-result.xml $srcdir/HCFS/
 # Publish CCM analysis results (Cyclomatic Complexity)
 sudo mono /CCM.exe . /xml > $WORKSPACE/ccm-result.xml
 
+# Run unit test
 cd $testdir/unit_test
 ./run_unittests
-gcov utils.gcda
+
+# Unit test coverage report
 gcovr -x -r $srcdir/HCFS . > $WORKSPACE/coverage.xml
 
 # Cehck code style

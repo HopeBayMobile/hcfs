@@ -37,6 +37,7 @@ pip-log.txt
 /oclint-report.xml
 *.gcda
 *.gcno
+*.gcov
 /tests/unit_test/c/unittest_modules/*/*_unittest
 
 # Auto tests

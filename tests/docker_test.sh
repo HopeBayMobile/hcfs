@@ -26,5 +26,6 @@ key=$local_repo/tests/.id_rsa
 docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys' < ${key}.pub
 
 SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$IP"
+while ! $SSH true; do sleep 1; done
 $SSH sudo $workspace/tests/ci_scripts/fix_docker_permission.sh
 $SSH $workspace/tests/ci_scripts/ci.sh

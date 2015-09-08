@@ -41,20 +41,19 @@ TESTS = hcfs_cachebuild_unittest hcfs_cacheops_unittest
 # All Google Test headers. Usually you shouldn't change this
 # definition.
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
-$(GTEST_DIR)/include/gtest/internal/*.h
+                $(GTEST_DIR)/include/gtest/internal/*.h
 
 # House-keeping build targets.
 
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o
-	rm -f *.gcno
-	rm -f *.gcda
+	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : $(TESTS)
 	./hcfs_cachebuild_unittest
 	./hcfs_cacheops_unittest
+	gcov *.gcno
 
 # Builds gtest.a and gtest_main.a.
 

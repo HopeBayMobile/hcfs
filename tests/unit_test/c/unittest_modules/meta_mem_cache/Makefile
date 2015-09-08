@@ -52,6 +52,7 @@ clean :
 
 test : $(TESTS)
 	./meta_mem_cache_unittest
+	gcov *.gcno
 
 # Builds gtest.a and gtest_main.a.
 

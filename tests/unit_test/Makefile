@@ -13,7 +13,8 @@ $(CLEANDIRS):
 	$(MAKE) -C $(@:clean-%=%) clean
 
 test: all $(TESTDIRS)
-	gcovr -r ../../src/HCFS/
+	gcovr -r ../../src/HCFS/ .
+
 $(TESTDIRS):
 	$(MAKE) -C $(@:test-%=%) test
 

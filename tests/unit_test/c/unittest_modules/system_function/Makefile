@@ -48,12 +48,12 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o
-	rm -f *.gcda *.gcno
+	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test: $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
+	gcov *.gcno
 
 # Builds gtest.a and gtest_main.a.
 

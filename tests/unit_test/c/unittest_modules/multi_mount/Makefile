@@ -55,6 +55,7 @@ clean :
 test : $(TESTS)
 	./FS_manager_unittest
 	./mount_manager_unittest
+	gcov *.gcno
 
 # Builds gtest.a and gtest_main.a.
 
