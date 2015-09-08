@@ -37,11 +37,13 @@ typedef struct {
 	char is_delete;
 	int which_curl;
 	char tempfilename[400];
+	int which_index;
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
+	int which_index;
 } SYNC_THREAD_TYPE;
 
 typedef struct {
@@ -55,6 +57,7 @@ typedef struct {
 	pthread_t upload_threads_no[MAX_UPLOAD_CONCURRENCY];
 	char threads_in_use[MAX_UPLOAD_CONCURRENCY];
 	char threads_created[MAX_UPLOAD_CONCURRENCY];
+	char threads_finished[MAX_UPLOAD_CONCURRENCY];
 	int total_active_upload_threads;
 	/*upload threads: used for upload objects to backends*/
 } UPLOAD_THREAD_CONTROL;
@@ -66,6 +69,7 @@ typedef struct {
 	pthread_t inode_sync_thread[MAX_SYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_SYNC_CONCURRENCY];
 	char threads_created[MAX_SYNC_CONCURRENCY];
+	char threads_finished[MAX_SYNC_CONCURRENCY];
 	char threads_error[MAX_SYNC_CONCURRENCY];
 	int total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/

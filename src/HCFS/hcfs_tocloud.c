@@ -66,12 +66,14 @@ static inline void _sync_terminate_thread(int index)
 	int ret;
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
-			(sync_ctl.threads_created[index] == TRUE)) {
-		ret = pthread_tryjoin_np(sync_ctl.inode_sync_thread[index],
+	    ((sync_ctl.threads_finished[index] == TRUE) &&
+	     (sync_ctl.threads_created[index] == TRUE))) {
+		ret = pthread_join(sync_ctl.inode_sync_thread[index],
 					NULL);
 		if (ret == 0) {
 			sync_ctl.threads_in_use[index] = 0;
 			sync_ctl.threads_created[index] = FALSE;
+			sync_ctl.threads_finished[index] = FALSE;
 			sync_ctl.total_active_sync_threads--;
 			sem_post(&(sync_ctl.sync_queue_sem));
 		 }
@@ -136,7 +138,10 @@ static inline int _upload_terminate_thread(int index)
 	if (upload_ctl.threads_created[index] != TRUE)
 		return 0;
 
-	ret = pthread_tryjoin_np(upload_ctl.upload_threads_no[index], NULL);
+	if (upload_ctl.threads_finished[index] != TRUE)
+		return 0;
+
+	ret = pthread_join(upload_ctl.upload_threads_no[index], NULL);
 
 	/* TODO: If thread join failed but not EBUSY, perhaps should try to
 	terminate the thread and mark fail? */
@@ -165,6 +170,7 @@ static inline int _upload_terminate_thread(int index)
 			sem_post(&(sync_ctl.sync_op_sem));
 			upload_ctl.threads_in_use[index] = FALSE;
 			upload_ctl.threads_created[index] = FALSE;
+			upload_ctl.threads_finished[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0;  /* Error already marked */
@@ -261,12 +267,14 @@ static inline int _upload_terminate_thread(int index)
 			if (delete_ctl.threads_in_use[count2] == FALSE) {
 				delete_ctl.threads_in_use[count2] = TRUE;
 				delete_ctl.threads_created[count2] = FALSE;
+				delete_ctl.threads_finished[count2] = FALSE;
 
 				tmp_del = &(delete_ctl.delete_threads[count2]);
 				tmp_del->is_block = TRUE;
 				tmp_del->inode = this_inode;
 				tmp_del->blockno = blockno;
 				tmp_del->which_curl = count2;
+				tmp_del->which_index = count2;
 
 				delete_ctl.total_active_delete_threads++;
 				which_curl = count2;
@@ -284,6 +292,7 @@ static inline int _upload_terminate_thread(int index)
 	/* Finally reclaim the uploaded-thread. */
 	upload_ctl.threads_in_use[index] = FALSE;
 	upload_ctl.threads_created[index] = FALSE;
+	upload_ctl.threads_finished[index] = FALSE;
 	upload_ctl.total_active_upload_threads--;
 	sem_post(&(upload_ctl.upload_queue_sem));
 
@@ -334,6 +343,7 @@ void collect_finished_upload_threads(void *ptr)
 
 			upload_ctl.threads_in_use[count] = FALSE;
 			upload_ctl.threads_created[count] = FALSE;
+			upload_ctl.threads_finished[count] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 			sem_post(&(upload_ctl.upload_queue_sem));
 		}
@@ -352,6 +362,8 @@ void init_sync_control(void)
 	memset(&(sync_ctl.threads_in_use), 0,
 				sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
 	memset(&(sync_ctl.threads_created), 0,
+				sizeof(char) * MAX_SYNC_CONCURRENCY);
+	memset(&(sync_ctl.threads_finished), 0,
 				sizeof(char) * MAX_SYNC_CONCURRENCY);
 	sync_ctl.total_active_sync_threads = 0;
 
@@ -376,9 +388,11 @@ void init_upload_control(void)
 	sem_init(&(upload_ctl.upload_op_sem), 0, 1);
 	sem_init(&(upload_ctl.upload_queue_sem), 0, MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_in_use), 0,
-					sizeof(char) * MAX_UPLOAD_CONCURRENCY);
+	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	memset(&(upload_ctl.threads_created), 0,
-					sizeof(char) * MAX_UPLOAD_CONCURRENCY);
+	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
+	memset(&(upload_ctl.threads_finished), 0,
+	       sizeof(char) * MAX_UPLOAD_CONCURRENCY);
 	upload_ctl.total_active_upload_threads = 0;
 
 	pthread_create(&(upload_ctl.upload_handler_thread), NULL,
@@ -447,6 +461,7 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 		if (upload_ctl.threads_in_use[count] == FALSE) {
 			upload_ctl.threads_in_use[count] = TRUE;
 			upload_ctl.threads_created[count] = FALSE;
+			upload_ctl.threads_finished[count] = FALSE;
 			upload_ctl.upload_threads[count].is_block = is_block;
 			upload_ctl.upload_threads[count].is_delete = is_delete;
 			upload_ctl.upload_threads[count].inode = this_inode;
@@ -456,6 +471,7 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].page_entry_index =
 									e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
+			upload_ctl.upload_threads[count].which_index = count;
 
 			upload_ctl.total_active_upload_threads++;
 			which_curl = count;
@@ -510,6 +526,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 #endif
 	if (ret < 0) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
@@ -523,6 +540,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
 		to sync this object anymore. */
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
@@ -703,12 +721,15 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	/*Check if metafile still exists. If not, forget the meta upload*/
-	if (access(thismetapath, F_OK) < 0)
+	if (access(thismetapath, F_OK) < 0) {
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
+	}
 
 	/* Abort sync to cloud if error occured */
 	if (sync_error == TRUE) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
+		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;
 	}
 
@@ -770,6 +791,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
 		upload_ctl.threads_created[which_curl] = FALSE;
+		upload_ctl.threads_finished[which_curl] = FALSE;
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
@@ -814,10 +836,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
 		upload_ctl.threads_created[which_curl] = FALSE;
+		upload_ctl.threads_finished[which_curl] = FALSE;
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
 	}
+	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 
 	return;
 
@@ -825,6 +849,7 @@ errcode_handle:
 	flock(fileno(metafptr), LOCK_UN);
 	fclose(metafptr);
 	super_block_update_transit(ptr->inode, FALSE, TRUE);
+	sync_ctl.threads_finished[ptr->which_index] = TRUE;
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
@@ -925,22 +950,24 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 /* TODO: use pthread_exit to pass error code here. */
 void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, errcode;
+	int which_curl, ret, errcode, which_index;
 	int count1;
 
 	which_curl = thread_ptr->which_curl;
+	which_index = thread_ptr->which_index;
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
+		                    &(upload_curl_handles[which_curl]),
+		                    thread_ptr->tempfilename);
 	else
 		ret = do_meta_sync(thread_ptr->inode,
-				&(upload_curl_handles[which_curl]),
-						thread_ptr->tempfilename);
+		                   &(upload_curl_handles[which_curl]),
+		                   thread_ptr->tempfilename);
 	if (ret < 0)
 		goto errcode_handle;
 
 	UNLINK(thread_ptr->tempfilename);
+        upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
 errcode_handle:
@@ -952,20 +979,23 @@ errcode_handle:
 	}
 	if (count1 < MAX_SYNC_CONCURRENCY)
 		sync_ctl.threads_error[count1] = TRUE;
+        upload_ctl.threads_finished[which_index] = TRUE;
 	sem_post(&(sync_ctl.sync_op_sem));
 }
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 {
-	int which_curl, ret, count1;
+	int which_curl, ret, count1, which_index;
 
 	which_curl = thread_ptr->which_curl;
+	which_index = thread_ptr->which_index;
 	if (thread_ptr->is_block == TRUE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
 					&(upload_curl_handles[which_curl]));
 	if (ret < 0)
 		goto errcode_handle;
 
+	upload_ctl.threads_finished[which_index] = TRUE;
 	return;
 
 errcode_handle:
@@ -977,6 +1007,8 @@ errcode_handle:
 	}
 	if (count1 < MAX_SYNC_CONCURRENCY)
 		sync_ctl.threads_error[count1] = TRUE;
+
+	upload_ctl.threads_finished[which_index] = TRUE;
 	sem_post(&(sync_ctl.sync_op_sem));
 }
 
@@ -1064,6 +1096,7 @@ errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
 	upload_ctl.threads_in_use[which_curl] = FALSE;
 	upload_ctl.threads_created[which_curl] = FALSE;
+	upload_ctl.threads_finished[which_curl] = FALSE;
 	upload_ctl.total_active_upload_threads--;
 	sem_post(&(upload_ctl.upload_op_sem));
 	sem_post(&(upload_ctl.upload_queue_sem));
@@ -1192,6 +1225,7 @@ errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
 	upload_ctl.threads_in_use[which_curl] = FALSE;
 	upload_ctl.threads_created[which_curl] = FALSE;
+	upload_ctl.threads_finished[which_curl] = FALSE;
 	upload_ctl.total_active_upload_threads--;
 	sem_post(&(upload_ctl.upload_op_sem));
 	sem_post(&(upload_ctl.upload_queue_sem));
@@ -1219,9 +1253,11 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 		if (sync_ctl.threads_in_use[count] == 0) {
 			sync_ctl.threads_in_use[count] = this_inode;
 			sync_ctl.threads_created[count] = FALSE;
+			sync_ctl.threads_finished[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
+			sync_threads[count].which_index = count;
 
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",

@@ -140,7 +140,11 @@ public:
 	}
 	static void *upload_thread_function(void *ptr)
 	{
+		UPLOAD_THREAD_TYPE *ptr1;
+
+		ptr1 = (UPLOAD_THREAD_TYPE *) ptr;
 		usleep(100000);
+		upload_ctl.threads_finished[ptr1->which_index] = TRUE;
 		return NULL;
 	}
 	int get_thread_index()
@@ -205,6 +209,7 @@ public:
 			index = get_thread_index();
 
 			upload_ctl.upload_threads[index].inode = inode;
+			upload_ctl.upload_threads[index].which_index = index;
 			upload_ctl.upload_threads[index].is_delete= is_delete;
 			upload_ctl.upload_threads[index].page_filepos = 0;
 			upload_ctl.upload_threads[index].page_entry_index = i;
@@ -212,10 +217,14 @@ public:
 			upload_ctl.upload_threads[index].is_block = TRUE;
 			upload_ctl.threads_in_use[index] = TRUE;
 			upload_ctl.threads_created[index] = TRUE;
+			upload_ctl.threads_finished[index] = TRUE;
 			upload_ctl.total_active_upload_threads++;
 
 			pthread_create(&(upload_ctl.upload_threads_no[index]),
-					NULL, InitUploadControlTool::upload_thread_function, NULL); // create thread
+					NULL,
+				InitUploadControlTool::upload_thread_function,
+				(void *)&(upload_ctl.upload_threads[index]));
+			// create thread
 			sem_post(&(upload_ctl.upload_op_sem));
 		}
 	}
@@ -374,11 +383,15 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 		upload_ctl.upload_threads[index].page_entry_index = i;
 		upload_ctl.upload_threads[index].blockno = i;
 		upload_ctl.upload_threads[index].is_block = TRUE;
+		upload_ctl.upload_threads[index].which_index = index;
 		upload_ctl.threads_in_use[index] = TRUE;
 		upload_ctl.threads_created[index] = TRUE;
+		upload_ctl.threads_finished[index] = TRUE;
 		upload_ctl.total_active_upload_threads++;
 		pthread_create(&(upload_ctl.upload_threads_no[index]),
-			NULL, InitUploadControlTool::upload_thread_function, NULL); // create thread
+			NULL, InitUploadControlTool::upload_thread_function,
+			(void *)&(upload_ctl.upload_threads[index]));
+			// create thread
 		sem_post(&(upload_ctl.upload_op_sem));
 	}
 	sleep(2);
@@ -408,7 +421,11 @@ TEST_F(init_upload_controlTest, MetaIsDeleted_and_TerminateThreadSuccess)
 
 void *sync_thread_function(void *ptr)
 {
+	SYNC_THREAD_TYPE *ptr1;
+
+	ptr1 = (SYNC_THREAD_TYPE *) ptr;
 	usleep(100000); // Let thread busy
+	sync_ctl.threads_finished[ptr1->which_index] = TRUE;
 	return NULL;
 }
 TEST(init_sync_controlTest, DoNothing_ControlSuccess)
@@ -438,6 +455,7 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 	int num_threads = 100;
 	ino_t empty_ino_array[MAX_SYNC_CONCURRENCY] = {0};
 	char empty_created_array[MAX_SYNC_CONCURRENCY] = {0};
+	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 
 	/* Run tested function */
 	init_sync_control();
@@ -456,8 +474,11 @@ TEST(init_sync_controlTest, Multithread_ControlSuccess)
 		}
 		sync_ctl.threads_in_use[idle_thread] = i+1;
 		sync_ctl.threads_created[idle_thread] = TRUE;
+		sync_ctl.threads_finished[idle_thread] = FALSE;
+		sync_threads[idle_thread].which_index = idle_thread;
 		pthread_create(&sync_ctl.inode_sync_thread[idle_thread], NULL,
-			sync_thread_function, NULL);
+			sync_thread_function,
+			(void *)&(sync_threads[idle_thread]));
 		sync_ctl.total_active_sync_threads++;
 		sem_post(&sync_ctl.sync_op_sem);
 	}
