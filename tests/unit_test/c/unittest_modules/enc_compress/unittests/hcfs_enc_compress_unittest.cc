@@ -8,6 +8,8 @@ extern "C" {
 #include "compress.h"
 }
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 class enc : public testing::Test
 {
       protected:
