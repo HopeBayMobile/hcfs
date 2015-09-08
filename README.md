@@ -56,6 +56,7 @@ LOG_LEVEL = 10
 Required packages
 -----------------
 
+ATTR
 FUSE
 CURL
 OPENSSL
@@ -63,7 +64,9 @@ LZ4
 
 Required by Dev
 ---------------
+
 libattr1-dev
+libfuse-dev
 libcurl4-openssl-dev
 libssl-dev
 liblz4-dev
