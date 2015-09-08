@@ -1,7 +1,8 @@
 #!/bin/bash
 echo ==== ci.sh =====================================================================
-set -x
-WORKSPACE=${WORKSPACE:-/home/jenkins/workspace/HCFS}
+set -ex
+export repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
+WORKSPACE=${WORKSPACE:-$repo}
 
 cd $WORKSPACE
 pwd

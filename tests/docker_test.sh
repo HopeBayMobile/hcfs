@@ -4,7 +4,7 @@ date
 set -x -e
 
 export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-export workspace=/home/jenkins/workspace/HCFS
+export docker_workspace=/home/jenkins/workspace/HCFS
 
 if ! hash docker; then
     curl https://get.docker.com | sudo sh
@@ -27,5 +27,5 @@ docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys
 
 SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$IP"
 while ! $SSH true; do sleep 1; done
-$SSH sudo $workspace/tests/ci_scripts/fix_docker_permission.sh
-$SSH $workspace/tests/ci_scripts/ci.sh
+$SSH sudo $docker_workspace/tests/ci_scripts/fix_docker_permission.sh
+$SSH $docker_workspace/tests/ci_scripts/ci.sh
