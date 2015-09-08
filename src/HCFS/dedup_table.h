@@ -48,7 +48,7 @@ typedef struct ddt_btree_node{
 	// Parent node
 	long long parent_node_pos;
 	// Child nodes
-	long long child_node_pos[MAX_EL_PER_NODE+1];
+	long long child_node_pos[MAX_EL_PER_NODE + 1];
 	// Point to next reclaimed node
 	long long gc_list_next;
 } DDT_BTREE_NODE;
@@ -100,4 +100,4 @@ int compute_hash(char *path, unsigned char *output);
 int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH],
 				char output_str[SHA256_STRING_LENGTH]);
 
-#endif
+#endif /* GW20_HCFS_DEDUP_TABLE_H_ */

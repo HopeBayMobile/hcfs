@@ -175,7 +175,9 @@ static inline int _upload_terminate_thread(int index)
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
 
+#if (DEDUP_ENABLE)
 	memcpy(blk_hash, upload_ctl.upload_threads[index].hash_key, SHA256_DIGEST_LENGTH);
+#endif
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -213,9 +215,10 @@ static inline int _upload_terminate_thread(int index)
 				    (is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
-					// Storage hash in block meta too
+#if (DEDUP_ENABLE)
+					// Store hash in block meta too
 					memcpy(tmp_entry->hash, blk_hash, SHA256_DIGEST_LENGTH);
-
+#endif
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
 					if (ret < 0) {
@@ -274,7 +277,9 @@ static inline int _upload_terminate_thread(int index)
 				tmp_del->inode = this_inode;
 				tmp_del->blockno = blockno;
 				tmp_del->which_curl = count2;
+#if (DEDUP_ENABLE)
 				memcpy(tmp_del->hash_key, blk_hash, SHA256_DIGEST_LENGTH);
+#endif
 
 				delete_ctl.total_active_delete_threads++;
 				which_curl = count2;
@@ -341,9 +346,10 @@ void collect_finished_upload_threads(void *ptr)
 				sync_ctl.threads_error[count1] = TRUE;
 			sem_post(&(sync_ctl.sync_op_sem));
 
+#if (DEDUP_ENABLE)
 			// Reset uploaded flag for upload thread
 			upload_ctl.upload_threads[count].is_upload = FALSE;
-
+#endif
 			upload_ctl.threads_in_use[count] = FALSE;
 			upload_ctl.threads_created[count] = FALSE;
 			upload_ctl.total_active_upload_threads--;
@@ -448,7 +454,9 @@ errcode_handle:
 }
 
 static inline int _select_upload_thread(char is_block, char is_delete,
+#if (DEDUP_ENABLE)
 				char is_upload, unsigned char old_hash[],
+#endif
 				ino_t this_inode, long long block_count,
 				off_t page_pos, long long e_index)
 {
@@ -461,7 +469,6 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.threads_created[count] = FALSE;
 			upload_ctl.upload_threads[count].is_block = is_block;
 			upload_ctl.upload_threads[count].is_delete = is_delete;
-			upload_ctl.upload_threads[count].is_upload = is_upload;
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
 			upload_ctl.upload_threads[count].page_filepos =
@@ -469,11 +476,13 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].page_entry_index =
 			    e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
-
+#if (DEDUP_ENABLE)
+			upload_ctl.upload_threads[count].is_upload = is_upload;
 			if (is_upload == TRUE) {
 				memcpy(upload_ctl.upload_threads[count].hash_key,
 						old_hash, SHA256_DIGEST_LENGTH);
 			}
+#endif
 
 			upload_ctl.total_active_upload_threads++;
 			which_curl = count;
@@ -668,11 +677,17 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
 				which_curl = _select_upload_thread(TRUE, FALSE,
 						tmp_entry->uploaded,
 						tmp_entry->hash,
 						ptr->inode, block_count,
 						page_pos, e_index);
+#else
+				which_curl = _select_upload_thread(
+						TRUE, FALSE, ptr->inode, block_count,
+						page_pos, e_index);
+#endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
 				if (ret < 0) {
@@ -687,10 +702,16 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
 				which_curl = _select_upload_thread(TRUE, TRUE, TRUE,
 						tmp_entry->hash,
 						ptr->inode, block_count,
 						page_pos, e_index);
+#else
+				which_curl = _select_upload_thread(
+						TRUE, TRUE, ptr->inode, block_count,
+						page_pos, e_index);
+#endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
 				/* TODO: Maybe should also first copy
@@ -733,7 +754,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
 	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL, ptr->inode, 0, 0, 0);
+#else
+	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
+#endif
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
@@ -847,15 +872,20 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-			CURL_HANDLE *curl_handle, char *filename, char uploaded,
-			unsigned char hash_in_meta[])
+#if (DEDUP_ENABLE)
+			CURL_HANDLE *curl_handle, char *filename,
+			char uploaded, unsigned char hash_in_meta[])
+#else
+			CURL_HANDLE *curl_handle, char *filename)
+#endif
 {
 	char objname[400];
 	char hash_key_str[65];
 	unsigned char old_hash_key[SHA256_DIGEST_LENGTH];
 	unsigned char hash_key[SHA256_DIGEST_LENGTH];
 	FILE *fptr, *ddt_fptr;
-	int ret_val, errcode, ret;
+	int ret_val, errcode;
+	int ret = 0;
 	int ddt_fd;
 	int result_idx;
 	DDT_BTREE_NODE tree_root, result_node;
@@ -871,6 +901,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 					this_inode, block_no);
 	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
 #endif
+
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -879,27 +910,39 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		return -errcode;
 	}
 
-	// Compute hash of block
+#if (DEDUP_ENABLE)
+	/* Compute hash of block */
 	compute_hash(filename, hash_key);
 
-	// Get objname - Object named by hash key
+	/* Get objname - Object named by hash key */
 	hash_to_string(hash_key, hash_key_str);
 	sprintf(objname, "data_%s", hash_key_str);
 
-	// Copy new hash key and reserve old one
+	/* Copy new hash key and reserve old one */
 	memcpy(old_hash_key, hash_in_meta, SHA256_DIGEST_LENGTH);
 	memcpy(hash_in_meta, hash_key, SHA256_DIGEST_LENGTH);
 
-	// Get dedup table meta
+	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(hash_key, &tree_root, &ddt_meta);
 	ddt_fd = fileno(ddt_fptr);
 
-	// Check if upload is needed
+	/* Check if upload is needed */
 	ret = search_ddt_btree(hash_key, &tree_root, ddt_fd,
 	                &result_node, &result_idx);
+#elif defined(ARM_32bit_)
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	/* Force to upload */
+	ret = 1;
+#else
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	/* Force to upload */
+	ret = 1;
+#endif
+
 	if (ret == 0) {
-		// Find a same hash in cloud
-		// Just increase the refcount of the origin block
+		/* Find a same hash in cloud
+		 * Just increase the refcount of the origin block
+		 */
 		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
 						objname);
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
@@ -930,7 +973,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		else
 			ret = -EIO;
 
-		// Upload finished - Need to update dedup table
+#if (DEDUP_ENABLE)
+		/* Upload finished - Need to update dedup table */
 		if (ret == 0) {
 			insert_ddt_btree(hash_key, &tree_root, ddt_fd, &ddt_meta);
 		}
@@ -939,8 +983,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 
-	// Since the object mapped by this block is changed, need to remove old object
-	// Sync was successful
+	/* Since the object mapped by this block is changed, need to remove old object
+	 * Sync was successful
+	 */
 	if (ret == 0 && uploaded) {
 		printf("Start to delete obj %02x...%02x\n", old_hash_key[0], old_hash_key[31]);
 		// Delete old object in cloud
@@ -950,6 +995,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		printf("Delete result - %d\n", ret);
 		printf("Delete obj - %02x...%02x\n", old_hash_key[0], old_hash_key[31]);
 	}
+#else
+	}
+#endif
 
 	return ret;
 }
@@ -1003,9 +1051,15 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
+#if (DEDUP_ENABLE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
 				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
 				thread_ptr->is_upload, thread_ptr->hash_key);
+#else
+		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename);
+#endif
 	else
 		ret = do_meta_sync(thread_ptr->inode,
 				&(upload_curl_handles[which_curl]),
@@ -1034,9 +1088,14 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
+#if (DEDUP_ENABLE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
 					thread_ptr->hash_key,
 					&(upload_curl_handles[which_curl]));
+#else
+		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
+					&(upload_curl_handles[which_curl]));
+#endif
 	if (ret < 0)
 		goto errcode_handle;
 
@@ -1263,7 +1322,9 @@ int dispatch_upload_block(int which_curl)
 
 errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
 	upload_ctl.upload_threads[count].is_upload = FALSE;
+#endif
 	upload_ctl.threads_in_use[which_curl] = FALSE;
 	upload_ctl.threads_created[which_curl] = FALSE;
 	upload_ctl.total_active_upload_threads--;

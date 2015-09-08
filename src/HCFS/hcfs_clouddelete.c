@@ -249,8 +249,12 @@ void init_delete_control(void)
 
 /* Helper function for marking a delete thread as in use */
 static inline int _use_delete_thread(int index, char is_blk_flag,
+#if (DEDUP_ENABLE)
 				ino_t this_inode, long long blockno,
 				unsigned char *blk_hash)
+#else
+				ino_t this_inode, long long blockno)
+#endif
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
 		return -1;
@@ -260,7 +264,9 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	delete_ctl.delete_threads[index].is_block = is_blk_flag;
 	delete_ctl.delete_threads[index].inode = this_inode;
 	if (is_blk_flag == TRUE) {
+#if (DEDUP_ENABLE)
 		memcpy(delete_ctl.delete_threads[index].hash_key, blk_hash, SHA256_DIGEST_LENGTH);
+#endif
 		delete_ctl.delete_threads[index].blockno = blockno;
 	}
 	delete_ctl.delete_threads[index].which_curl = index;
@@ -422,9 +428,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				curl_id = -1;
 				for (count = 0; count < MAX_DELETE_CONCURRENCY;
 								count++) {
+#if (DEDUP_ENABLE)
 					ret_val = _use_delete_thread(count,
 						TRUE, ptr->inode, block_count,
 						temppage.block_entries[current_index].hash);
+#else
+					ret_val = _use_delete_thread(count,
+						TRUE, ptr->inode, block_count);
+#endif
 					if (ret_val == 0) {
 						curl_id = count;
 						break;
@@ -478,7 +489,11 @@ errcode_handle:
 	sem_wait(&(delete_ctl.delete_op_sem));
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
+#if (DEDUP_ENABLE)
 		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, NULL);
+#else
+		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
+#endif
 		if (ret_val == 0) {
 			curl_id = count;
 			break;
@@ -574,7 +589,11 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 int do_block_delete(ino_t this_inode, long long block_no,
+#if (DEDUP_ENABLE)
 				unsigned char *blk_hash, CURL_HANDLE *curl_handle)
+#else
+				CURL_HANDLE *curl_handle)
+#endif
 {
 	char objname[400];
 	char hash_key_str[65];
@@ -584,18 +603,29 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root;
 	DDT_BTREE_META ddt_meta;
 
-	// Get dedup table meta
+/* Handle objname - consider platforms, dedup flag  */
+#if (DEDUP_ENABLE)
+	// Object named by block hashkey */
+	hash_to_string(blk_hash, hash_key_str);
+	sprintf(objname, "data_%s", hash_key_str);
+
+	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
 	ddt_fd = fileno(ddt_fptr);
 
-	// Update ddt
+	/* Update ddt */
 	ddt_ret = decrease_ddt_el_refcount(blk_hash, &tree_root, ddt_fd, &ddt_meta);
+#elif defined(ARM_32bit_)
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	/* Force to delete */
+	ddt_ret = 0;
+#else
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	/* Force to delete */
+	ddt_ret = 0;
+#endif
 
 	if (ddt_ret == 0) {
-		// Get objname - Object named by block hashkey
-		hash_to_string(blk_hash, hash_key_str);
-		sprintf(objname, "data_%s", hash_key_str);
-
 #ifdef ARM_32bit_
 		write_log(10,
 			"Debug delete object: objname %s, inode %lld, block %lld\n",
@@ -613,22 +643,21 @@ int do_block_delete(ino_t this_inode, long long block_no,
 			ret = 0;
 		else
 			ret = -EIO;
-
-		printf("Element is deleted; ret = %d\n", ret_val);
 	} else if (ddt_ret == 1) {
-		printf("Only decrease refcount\n");
+		write_log(10, "Only decrease refcount of object - %s", objname);
 		ret = 0;
 	} else if (ddt_ret == 2) {
 		printf("Can't find this element, maybe deleted already?\n");
 		ret = 0;
 	} else {
-		printf("%02x...%02x\n", blk_hash[0], blk_hash[31]);
 		printf("ERROR delete el tree\n");
 		ret = -1;
 	}
 
+#if (DEDUP_ENABLE)
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
+#endif
 
 	return ret;
 }
@@ -651,7 +680,9 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
+#if (DEDUP_ENABLE)
 			delete_thread_ptr->hash_key,
+#endif
 			&(delete_curl_handles[which_curl]));
 	else
 		do_meta_delete(delete_thread_ptr->inode,

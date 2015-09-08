@@ -46,7 +46,12 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash)
+int fetch_from_cloud(FILE *fptr,
+#if (DEDUP_ENABLE)
+		unsigned char *blk_hash)
+#else
+		ino_t this_inode, long long block_no)
+#endif
 {
 	char objname[1000];
 	char hash_key_str[65];
@@ -54,9 +59,15 @@ int fetch_from_cloud(FILE *fptr, unsigned char *blk_hash)
 	int which_curl_handle;
 	int ret, errcode;
 
-	// Get objname
+#if (DEDUP_ENABLE)
+	/* Get objname by hash*/
 	hash_to_string(blk_hash, hash_key_str);
 	sprintf(objname, "data_%s", hash_key_str);
+#elif ARM_32bit_
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+#else
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+#endif
 
 	sem_wait(&download_curl_sem);
 	FSEEK(fptr, 0, SEEK_SET);
@@ -191,7 +202,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		ret = fetch_from_cloud(blockfptr, temppage.block_entries[entry_index].hash);
+#if (DEDUP_ENABLE)
+		ret = fetch_from_cloud(blockfptr,
+				temppage.block_entries[entry_index].hash);
+#else
+		ret = fetch_from_cloud(blockfptr,
+				ptr->this_inode, ptr->block_no);
+#endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;

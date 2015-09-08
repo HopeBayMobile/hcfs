@@ -37,12 +37,14 @@ typedef struct {
 	long long blockno;
 	char is_block;
 	char is_delete;
-	char is_upload;
 	int which_curl;
 	char tempfilename[400];
+#if (DEDUP_ENABLE)
+	char is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
 	unsigned char hash_key[SHA256_DIGEST_LENGTH];
+#endif
 } UPLOAD_THREAD_TYPE;
 
 typedef struct {
@@ -87,8 +89,13 @@ UPLOAD_THREAD_CONTROL upload_ctl;
 SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
+#if (DEDUP_ENABLE)
 				CURL_HANDLE *curl_handle, char *filename, char uploaded,
 				unsigned char *hash_in_meta);
+#else
+				CURL_HANDLE *curl_handle, char *filename);
+#endif
+
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);
 
 void init_upload_control(void);
