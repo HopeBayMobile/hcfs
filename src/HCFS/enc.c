@@ -257,6 +257,7 @@ unsigned char *get_key()
 		return NULL;
 	EVP_DigestInit(&ctx, m);
 	unsigned char *salt = (unsigned char *)"oluik.354jhmnk,";
+
 	PKCS5_PBKDF2_HMAC(user_pass, strlen(user_pass), salt,
 			  strlen((char *)salt), 3, m, KEY_SIZE, ret);
 	EVP_DigestFinal(&ctx, md_value, &md_len);
@@ -367,6 +368,7 @@ FILE *transform_fd(FILE *in_fd, unsigned char *key, unsigned char **data,
 		if (compress_fd == NULL)
 			return NULL;
 		FILE *ret = transform_encrypt_fd(compress_fd, key, data);
+
 		fclose(compress_fd);
 		free(compress_data);
 		return ret;
