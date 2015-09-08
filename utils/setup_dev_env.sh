@@ -17,4 +17,6 @@ for P in $packages; do
         packages_to_install="$packages_to_install $P"
     fi
 done
-[ -n "$packages_to_install" ] && sudo apt-get install -y $packages_to_install
+if [ -n "$packages_to_install" ]; then
+    sudo apt-get install -y $packages_to_install
+fi
