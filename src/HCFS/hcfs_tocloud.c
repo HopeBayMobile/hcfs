@@ -924,6 +924,10 @@ int do_block_sync(ino_t this_inode, long long block_no,
 
 	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(hash_key, &tree_root, &ddt_meta);
+	if (ddt_fptr == NULL) {
+		/* Can't access ddt btree file */
+		return -EBADF;
+	}
 	ddt_fd = fileno(ddt_fptr);
 
 	/* Check if upload is needed */

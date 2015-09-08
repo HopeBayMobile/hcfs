@@ -611,6 +611,10 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
+	if (ddt_fptr == NULL) {
+		/* Can't access ddt btree file */
+		return -EBADF;
+	}
 	ddt_fd = fileno(ddt_fptr);
 
 	/* Update ddt */
@@ -651,7 +655,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 		ret = 0;
 	} else {
 		printf("ERROR delete el tree\n");
-		ret = -1;
+		ret = -EIO;
 	}
 
 #if (DEDUP_ENABLE)

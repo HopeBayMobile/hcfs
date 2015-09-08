@@ -38,6 +38,8 @@ int initialize_ddt_meta(char *meta_path)
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
 				strerror(errcode));
+
+		errcode = -errcode;
 		goto errcode_handle;
 	}
 	fd = fileno(fptr);
@@ -87,12 +89,15 @@ FILE *get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 	ret = fetch_ddt_path(meta_path, key[0]);
 	if (ret < 0) {
 		/* Get the metafile path failed */
-		return NULL;
+		goto errcode_handle;
 	}
 
 	/* Initialize tree if not existed */
-	if (access(meta_path, R_OK | W_OK) < 0)
-		initialize_ddt_meta(meta_path);
+	if (access(meta_path, F_OK | W_OK) < 0) {
+		ret = initialize_ddt_meta(meta_path);
+		if (ret < 0)
+			goto errcode_handle;
+	}
 
 	/* Open file */
 	fptr = fopen(meta_path, "r+");

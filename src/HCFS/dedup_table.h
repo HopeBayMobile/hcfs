@@ -25,7 +25,7 @@
  * by hash function, and then put it to the btree.
  */
 
-// Hash key size
+// Hash key str size
 #define SHA256_STRING_LENGTH 65
 
 // Define the upper/lower bound of btree elements
