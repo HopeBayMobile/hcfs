@@ -27,4 +27,4 @@ docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys
 
 SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$IP"
 $SSH sudo $workspace/tests/ci_scripts/fix_docker_permission.sh
-$SSH $workspace/tests/ci.sh
+$SSH $workspace/tests/ci_scripts/ci.sh
