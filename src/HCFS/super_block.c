@@ -23,8 +23,10 @@
 
 #include "super_block.h"
 
+#ifndef _ANDROID_ENV_
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#endif
 #include <sys/time.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -143,6 +145,9 @@ int super_block_init(void)
 	int errcode;
 	ssize_t ret;
 
+#ifdef _ANDROID_ENV_
+	sys_super_block = malloc(sizeof(SUPER_BLOCK_CONTROL));
+#else
 	shm_key = shmget(1234, sizeof(SUPER_BLOCK_CONTROL), IPC_CREAT | 0666);
 	if (shm_key < 0) {
 		errcode = errno;
@@ -157,6 +162,7 @@ int super_block_init(void)
 			errcode, strerror(errcode));
 		return -errcode;
 	}
+#endif
 
 	memset(sys_super_block, 0, sizeof(SUPER_BLOCK_CONTROL));
 	sem_init(&(sys_super_block->exclusive_lock_sem), 1, 1);

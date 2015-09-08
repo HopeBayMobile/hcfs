@@ -14,8 +14,6 @@
 **************************************************************************/
 #include "hfuse_system.h"
 
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/types.h>
@@ -26,6 +24,10 @@
 #include <pthread.h>
 #include <string.h>
 #include <errno.h>
+#ifndef _ANDROID_ENV_
+#include <sys/shm.h>
+#include <sys/ipc.h>
+#endif
 
 #include <curl/curl.h>
 #include <openssl/hmac.h>
@@ -66,6 +68,9 @@ int init_hcfs_system_data(void)
 	int shm_key, errcode;
 	size_t ret_size;
 
+#ifdef _ANDROID_ENV_
+	hcfs_system = malloc(sizeof(SYSTEM_DATA_HEAD));
+#else
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {
 		errcode = errno;
@@ -76,6 +81,7 @@ int init_hcfs_system_data(void)
 		errcode = errno;
 		return -errcode;
 	}
+#endif
 
 	memset(hcfs_system, 0, sizeof(SYSTEM_DATA_HEAD));
 	sem_init(&(hcfs_system->access_sem), 1, 1);
@@ -221,6 +227,8 @@ int main(int argc, char **argv)
 	int count;
 	struct rlimit nofile_limit;
 	pthread_t delete_loop_thread;
+	pthread_t upload_loop_thread;
+	pthread_t cache_loop_thread;
 
 	logptr = NULL;
 
@@ -275,6 +283,25 @@ int main(int argc, char **argv)
 		exit(-1);
 
 	/* TODO: error handling for log files */
+#ifdef _ANDROID_ENV_
+	open_log("hcfs_android_log");
+	write_log(2, "\nStart logging\n");
+	pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+	pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+	pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+	sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+	sem_init(&download_curl_control_sem, 0, 1);
+	for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
+		_init_download_curl(count);
+
+	hook_fuse(argc, argv);
+	pthread_join(cache_loop_thread, NULL);
+	pthread_join(delete_loop_thread, NULL);
+	pthread_join(upload_loop_thread, NULL);
+
+	close_log();
+
+#else
 	this_pid = fork();
 	if (this_pid == 0) {
 		open_log("cache_maintain_log");
@@ -310,5 +337,6 @@ int main(int argc, char **argv)
 			close_log();
 		}
 	}
+#endif  /* _ANDROID_ENV_ */
 	return 0;
 }

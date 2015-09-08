@@ -66,12 +66,14 @@ static inline void _dsync_terminate_thread(int index)
 	int ret;
 
 	if ((dsync_ctl.threads_in_use[index] != 0) &&
-			(dsync_ctl.threads_created[index] == TRUE)) {
-		ret = pthread_tryjoin_np(dsync_ctl.inode_dsync_thread[index],
+			((dsync_ctl.threads_finished[index] == TRUE) &&
+			(dsync_ctl.threads_created[index] == TRUE))) {
+		ret = pthread_join(dsync_ctl.inode_dsync_thread[index],
 					NULL);
 		if (ret == 0) {
 			dsync_ctl.threads_in_use[index] = 0;
 			dsync_ctl.threads_created[index] = FALSE;
+			dsync_ctl.threads_finished[index] = FALSE;
 			dsync_ctl.total_active_dsync_threads--;
 			sem_post(&(dsync_ctl.dsync_queue_sem));
 		 }
@@ -122,12 +124,13 @@ static inline void _delete_terminate_thread(int index)
 
 	if (((delete_ctl.threads_in_use[index] != 0) &&
 		(delete_ctl.delete_threads[index].is_block == TRUE)) &&
-				(delete_ctl.threads_created[index] == TRUE)) {
-		ret = pthread_tryjoin_np(delete_ctl.threads_no[index],
-									NULL);
+		((delete_ctl.threads_finished[index] == TRUE) &&
+			(delete_ctl.threads_created[index] == TRUE))) {
+		ret = pthread_join(delete_ctl.threads_no[index], NULL);
 		if (ret == 0) {
 			delete_ctl.threads_in_use[index] = FALSE;
 			delete_ctl.threads_created[index] = FALSE;
+			delete_ctl.threads_finished[index] = FALSE;
 			delete_ctl.total_active_delete_threads--;
 			sem_post(&(delete_ctl.delete_queue_sem));
 		}
@@ -189,6 +192,8 @@ void init_dsync_control(void)
 					sizeof(ino_t) * MAX_DSYNC_CONCURRENCY);
 	memset(&(dsync_ctl.threads_created), 0,
 					sizeof(char) * MAX_DSYNC_CONCURRENCY);
+	memset(&(dsync_ctl.threads_finished), 0,
+					sizeof(char) * MAX_DSYNC_CONCURRENCY);
 	dsync_ctl.total_active_dsync_threads = 0;
 
 	pthread_create(&(dsync_ctl.dsync_handler_thread), NULL,
@@ -240,6 +245,8 @@ void init_delete_control(void)
 					sizeof(char) * MAX_DELETE_CONCURRENCY);
 	memset(&(delete_ctl.threads_created), 0,
 					sizeof(char) * MAX_DELETE_CONCURRENCY);
+	memset(&(delete_ctl.threads_finished), 0,
+					sizeof(char) * MAX_DELETE_CONCURRENCY);
 	delete_ctl.total_active_delete_threads = 0;
 
 	pthread_create(&(delete_ctl.delete_handler_thread), NULL,
@@ -255,11 +262,13 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 
 	delete_ctl.threads_in_use[index] = TRUE;
 	delete_ctl.threads_created[index] = FALSE;
+	delete_ctl.threads_finished[index] = FALSE;
 	delete_ctl.delete_threads[index].is_block = is_blk_flag;
 	delete_ctl.delete_threads[index].inode = this_inode;
 	if (is_blk_flag == TRUE)
 		delete_ctl.delete_threads[index].blockno = blockno;
 	delete_ctl.delete_threads[index].which_curl = index;
+	delete_ctl.delete_threads[index].which_index = index;
 
 	delete_ctl.total_active_delete_threads++;
 
@@ -286,7 +295,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	DIR_META_TYPE tempdirmeta;
 	SYMLINK_META_TYPE tempsymmeta;
 	BLOCK_ENTRY_PAGE temppage;
-	int curl_id;
+	int curl_id, which_index;
 	long long current_index;
 	long long page_pos, which_page, current_page;
 	long long count, block_count;
@@ -486,6 +495,7 @@ errcode_handle:
 		(void *)&(delete_ctl.delete_threads[curl_id]));
 
 	delete_ctl.threads_created[curl_id] = TRUE;
+	delete_ctl.threads_finished[curl_id] = FALSE;
 
 	pthread_join(delete_ctl.threads_no[curl_id], NULL);
 
@@ -523,6 +533,10 @@ errcode_handle:
 	unlink(thismetapath);
 	super_block_delete(this_inode);
 	super_block_reclaim();
+
+	which_index = ptr->which_index;
+	dsync_ctl.threads_finished[which_index] = TRUE;
+
 }
 
 /************************************************************************
@@ -609,8 +623,10 @@ int do_block_delete(ino_t this_inode, long long block_no,
 void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 {
 	int which_curl;
+	int which_index;
 
 	which_curl = delete_thread_ptr->which_curl;
+	which_index = delete_thread_ptr->which_index;
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
@@ -618,6 +634,8 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	else
 		do_meta_delete(delete_thread_ptr->inode,
 			&(delete_curl_handles[which_curl]));
+
+	delete_ctl.threads_finished[which_index] = TRUE;
 }
 
 /* Helper for creating threads for deletion */
@@ -627,8 +645,10 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 		return -1;
 	dsync_ctl.threads_in_use[index] = this_inode;
 	dsync_ctl.threads_created[index] = FALSE;
+	dsync_ctl.threads_finished[index] = FALSE;
 	dsync_thread_info[index].inode = this_inode;
 	dsync_thread_info[index].this_mode = this_mode;
+	dsync_thread_info[index].which_index = index;
 	pthread_create(&(dsync_ctl.inode_dsync_thread[index]), NULL,
 		(void *)&dsync_single_inode,
 				(void *)&(dsync_thread_info[index]));

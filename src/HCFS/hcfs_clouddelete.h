@@ -31,11 +31,13 @@ typedef struct {
 	long long blockno;
 	char is_block;
 	int which_curl;
+	int which_index;
 } DELETE_THREAD_TYPE;
 
 typedef struct {
 	ino_t inode;
 	mode_t this_mode;
+	int which_index;
 } DSYNC_THREAD_TYPE;
 
 /*delete threads: used for deleting objects to backends*/
@@ -50,6 +52,7 @@ typedef struct {
 	pthread_t threads_no[MAX_DELETE_CONCURRENCY];
 	char threads_in_use[MAX_DELETE_CONCURRENCY];
 	char threads_created[MAX_DELETE_CONCURRENCY];
+	char threads_finished[MAX_DELETE_CONCURRENCY];
 	int total_active_delete_threads;
 } DELETE_THREAD_CONTROL;
 
@@ -61,6 +64,7 @@ typedef struct {
 	pthread_t inode_dsync_thread[MAX_DSYNC_CONCURRENCY];
 	ino_t threads_in_use[MAX_DSYNC_CONCURRENCY];
 	char threads_created[MAX_DSYNC_CONCURRENCY];
+	char threads_finished[MAX_DSYNC_CONCURRENCY];
 	int total_active_dsync_threads;
 } DSYNC_THREAD_CONTROL;
 
