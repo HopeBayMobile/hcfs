@@ -29,13 +29,13 @@
 #define SHA256_STRING_LENGTH 65
 
 // Define the upper/lower bound of btree elements
-#define MAX_EL_PER_NODE 100
-#define MIN_EL_PER_NODE 40
+#define MAX_EL_PER_NODE 70
+#define MIN_EL_PER_NODE 30
 
 
 typedef struct {
 	unsigned char obj_id[SHA256_DIGEST_LENGTH];
-	long long obj_size;
+	size_t obj_size;
 	long long refcount;
 } DDT_BTREE_EL;
 

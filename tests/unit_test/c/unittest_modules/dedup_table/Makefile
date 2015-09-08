@@ -90,7 +90,7 @@ mock_functions.o : $(UNITTEST_DIR)/mock_functions.c $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(UNITTEST_DIR)/mock_functions.c
 
 dedup_table_unittest.o : $(UNITTEST_DIR)/dedup_table_unittest.cc \
-                     $(GTEST_HEADERS)
+                     $(GTEST_HEADERS) $(USER_DIR)/dedup_table.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/dedup_table_unittest.cc
 
 dedup_table_unittest : dedup_table.o mock_functions.o dedup_table_unittest.o gtest_main.a
