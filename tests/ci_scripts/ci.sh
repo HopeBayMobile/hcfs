@@ -35,4 +35,4 @@ gcovr -x -r $srcdir/HCFS . > $WORKSPACE/coverage.xml
 
 # Cehck code style
 find $srcdir -name '*.[ch]' | xargs $testdir/code_checking/hb_clint.py 2>&1 | tee $WORKSPACE/hb_clint.xml
-find $srcdir -name '*.[ch]' | xargs $testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff --no-summary -f
+find $srcdir -name '*.[ch]' | xargs $testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff --no-summary -f || true
