@@ -7,6 +7,7 @@ import pdb
 import subprocess
 import logging
 from subprocess import PIPE
+from datetime import datetime
 
 import swiftclient
 
@@ -449,17 +450,8 @@ class HCFS_14(CommonSetup):
             msg = output
         return result, msg
 
-class HCFS_15(CommonSetup):
-    '''
-    Mount
-    '''    
-    def __init__(self):
-        pass
-        
-    def run(self):
-        return False, ''
 
-class HCFS_16(CommonSetup):
+class HCFS_15(CommonSetup):
     '''
     Multiple mount
     '''    
@@ -470,7 +462,7 @@ class HCFS_16(CommonSetup):
         return False, ''
 
 
-class HCFS_17(CommonSetup):
+class HCFS_16(CommonSetup):
     '''
     Backend Setting – ArkFlex U (Swift)
     '''
@@ -499,7 +491,7 @@ class HCFS_17(CommonSetup):
         return result, msg
 
 
-class HCFS_18(CommonSetup):
+class HCFS_17(CommonSetup):
     '''
     Backend Setting – ArkFlex U (S3)
     '''    
@@ -515,7 +507,7 @@ class HCFS_18(CommonSetup):
         return result, msg
 
 
-class HCFS_19(CommonSetup):
+class HCFS_18(CommonSetup):
     '''
     Backend Setting – Swift (Pending)
     '''    
@@ -526,7 +518,7 @@ class HCFS_19(CommonSetup):
         return False, ''
 
 
-class HCFS_20(CommonSetup):
+class HCFS_19(CommonSetup):
     '''
     Backend Setting – S3
     '''    
@@ -543,27 +535,20 @@ class HCFS_20(CommonSetup):
         return False, ''
 
 
-class HCFS_21(CommonSetup):
+class HCFS_20(CommonSetup):
     '''
-    Terminate
-    '''    
-    def __init__(self):
-        pass
-        
-    def run(self):
-        return False, ''
-
-
-class HCFS_22(CommonSetup):
-    '''
-    Upload
+    Upload – exceed soft limit
     '''    
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate() 
         self.hcfsbin = HCFSBin()       
+        self.mount_point = '/mnt/hcfs'
         self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_60M'
+        self.first_time = ''
+        self.new_time = ''
+        self.log_timeformat = '%Y-%m-%d %H:%M:%s'
 
     def run(self):
         # Prepare the arkflex swift environment
@@ -577,20 +562,29 @@ class HCFS_22(CommonSetup):
         self.fileGenerate.gen_file(self.testfilename, '1', 60, 1024*1024, self.current_dir)
         time.sleep(10)      # magic number again
 
-        # Check the size of the remote storage is increase.
-        new_container_size = self.get_container_size()
+        # Copy the file to hcfs (upload)
+        testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
+        testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
+        self.first_time = datetime.now()
+        p = subprocess.Popen(['cp', '-f', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
+
+        # Diff these two files
+        p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
 
         # Delete the generated file
-        file_path = os.path.join(self.current_dir, self.testfilename)
+        file_path = os.path.join(self.current_dir, testfile_abs_local)
+        self.exec_command_sync(['rm', '-f', file_path], False)
+        file_path = os.path.join(self.current_dir, testfile_abs_hcfs)
         self.exec_command_sync(['rm', '-f', file_path], False)
 
-        if origin_container_size < new_container_size:
-            return True, 'New size: {0}, Origin size: {1}'.format(new_container_size, origin_container_size)
+        if output == '':
+            return True, ''
         else:
-            return False, 'New size: {0}, Origin size: {1}'.format(new_container_size, origin_container_size)
+            return False, output
 
-
-class HCFS_23(CommonSetup):
+class HCFS_21(CommonSetup):
     '''
     Upload – exceed hard limit
     '''    
@@ -598,9 +592,18 @@ class HCFS_23(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate() 
         self.hcfsbin = HCFSBin()       
+        self.mount_point = '/mnt/hcfs'
+        self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_160M'
-        
+        self.first_time = ''
+        self.new_time = ''
+        self.log_timeformat = '%Y-%m-%d %H:%M:%s'
+
     def run(self):
+        # Prepare the arkflex swift environment
+        #self.replace_hcfs_config(self.config)
+        #self.hcfsbin.restart_hcfs()
+
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
 
@@ -608,23 +611,31 @@ class HCFS_23(CommonSetup):
         self.fileGenerate.gen_file(self.testfilename, '1', 160, 1024*1024, self.current_dir)
         time.sleep(10)      # magic number again
 
-        # Check the size of the remote storage is increase.
-        new_container_size = self.get_container_size()
+        # Copy the file to hcfs (upload)
+        testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
+        testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
+        self.first_time = datetime.now()
+        p = subprocess.Popen(['cp', '-f', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
+
+        # Diff these two files
+        p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
 
         # Delete the generated file
-        file_path = os.path.join(self.current_dir, self.testfilename)
+        file_path = os.path.join(self.current_dir, testfile_abs_local)
+        self.exec_command_sync(['rm', '-f', file_path], False)
+        file_path = os.path.join(self.current_dir, testfile_abs_hcfs)
         self.exec_command_sync(['rm', '-f', file_path], False)
 
-
-        if origin_container_size < new_container_size:
-            return True, 'New size: {0}, Origin size: {1}'.format(new_container_size, origin_container_size)
+        if output == '':
+            return True, ''
         else:
-            return False, 'New size: {0}, Origin size: {1}'.format(new_container_size, origin_container_size)
+            return False, output
 
 
-class HCFS_24(CommonSetup):
-    '''
-    Download
+class HCFS_22(CommonSetup):
+    '''Upload/Download
     '''    
     def __init__(self):
         CommonSetup.__init__(self)
@@ -639,7 +650,7 @@ class HCFS_24(CommonSetup):
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
 
-        # Generate the 60M size file.
+        # Generate the 160M size file.
         self.fileGenerate.gen_file(self.testfilename_local, '1', 160, 1024*1024, self.current_dir)
         time.sleep(10)      # magic number again
 
@@ -655,7 +666,7 @@ class HCFS_24(CommonSetup):
         p = subprocess.Popen(['cp', '-f', testfile_abs_hcfs, testfile_abs_local_2], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
-        # Diff the two files
+        # Diff these two files
         p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_local_2], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
