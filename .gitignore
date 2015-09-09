@@ -62,6 +62,7 @@ backend_upload_log
 cache_maintain_log
 fuse_log
 
-# Build
-HCFSvol
-HCFS
+# Build 
+/src/CLI_utils/HCFSvol
+/src/HCFS/hcfs
+/src/HCFS/hcfs.log
