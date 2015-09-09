@@ -312,6 +312,10 @@ FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 	write_log(10, "encrypt_size: %d\n", read_count+TAG_SIZE);
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	FILE *tmp_file = tmpfile();
+	if (tmp_file == NULL) {
+		write_log(2, "tmpfile() failed to create tmpfile\n");
+		return NULL;
+	}
 	fwrite(new_data, sizeof(unsigned char), read_count + TAG_SIZE,
 	       tmp_file);
 	rewind(tmp_file);
