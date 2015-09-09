@@ -85,16 +85,17 @@ TEST_F(compress, transform_compress_fd)
 
 TEST(base64, encode_then_decode)
 {
-	const char *input = "4ytg0jkk0234]yhj]-43jddfv1111";
-	int length_encode = expect_b64_encode_length(strlen(input));
+	char *input = (char *)calloc(60, sizeof(char));
+  generate_random_bytes((unsigned char*)input, 60);
+	int length_encode = expect_b64_encode_length(60);
 	char *code = (char *)calloc(length_encode, sizeof(char));
 	int out_len = 0;
-	b64encode_str((unsigned char *)input, (unsigned char *)code, &out_len,
-		      strlen(input));
+	b64encode_str((unsigned char *)input, (unsigned char *)code, &out_len, 60);
 	unsigned char *decode =
 	    (unsigned char *)calloc(out_len + 1, sizeof(unsigned char));
 	b64decode_str(code, decode, &out_len, out_len);
-	EXPECT_EQ(memcmp(input, decode, strlen(input)), 0);
+	EXPECT_EQ(memcmp(input, decode, 60), 0);
+  free(input);
 	free(code);
 	free(decode);
 }
@@ -277,4 +278,28 @@ TEST_F(enc, transform_fd_both_flag)
 	free(data);
 	free(ptr);
 	free(ptr2);
+}
+
+TEST_F(enc, get_decode_meta){
+  HCFS_encode_object_meta object_meta;
+  unsigned char *session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
+  unsigned char *iv = (unsigned char *)calloc(IV_SIZE, sizeof(unsigned char));
+  unsigned char *key = get_key();
+
+  int ret = get_decode_meta(&object_meta, session_key, iv, key, 1, 1);
+  EXPECT_EQ(ret, 0);
+
+  printf("%s\n", object_meta.enc_session_key);
+
+  unsigned char *back_session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
+  ret = decrypt_session_key(back_session_key, object_meta.enc_session_key, key);
+  EXPECT_EQ(ret, 0);
+  //EXPECT_TRUE(memcmp(session_key, back_session_key, KEY_SIZE) == 0);
+
+  if(object_meta.enc_session_key)
+    free(object_meta.enc_session_key);
+  OPENSSL_free(key);
+  OPENSSL_free(session_key);
+  OPENSSL_free(back_session_key);
+  OPENSSL_free(iv);
 }

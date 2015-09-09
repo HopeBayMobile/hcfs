@@ -80,7 +80,7 @@ int generate_random_bytes(unsigned char *bytes, unsigned int length)
  * *  Return value: See get_random_bytes
  * *
  * *************************************************************************/
-int generate_random_key(unsigned char *key)
+int generate_random_aes_key(unsigned char *key)
 {
 	return generate_random_bytes(key, KEY_SIZE);
 }
@@ -414,4 +414,60 @@ int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 
 	fwrite(input, sizeof(unsigned char), input_length, to_fd);
 	return 0;
+}
+
+int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
+		    unsigned char *iv, unsigned char *key, int enc_flag,
+		    int compress_flag)
+{
+
+	int ret = 0;
+
+	meta->enc_alg = ENC_ALG_NONE;
+	meta->len_enc_session_key = 0;
+	meta->enc_session_key = NULL;
+
+	if (compress_flag) {
+		meta->comp_alg = COMP_ALG_V1;
+	} else {
+		meta->comp_alg = COMP_ALG_NONE;
+	}
+
+	if (enc_flag) {
+		int outlen = 0;
+		int len_cipher = KEY_SIZE + IV_SIZE + TAG_SIZE;
+		unsigned char buf[KEY_SIZE + IV_SIZE + TAG_SIZE] = {0};
+
+		/* TODO: check return values */
+		meta->enc_alg = ENC_ALG_V1;
+		generate_random_aes_key(session_key);
+		generate_random_bytes(iv, IV_SIZE);
+		ret = aes_gcm_encrypt_core(buf + IV_SIZE, session_key, KEY_SIZE,
+					   key, iv);
+		memcpy(buf, iv, IV_SIZE);
+		meta->len_enc_session_key =
+		    expect_b64_encode_length(len_cipher);
+		meta->enc_session_key =
+		    calloc(meta->len_enc_session_key, sizeof(char));
+		b64encode_str(buf, meta->enc_session_key, &outlen, len_cipher);
+	}
+
+	return 0;
+}
+
+int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
+			unsigned char *key)
+{
+	unsigned char buf[KEY_SIZE + IV_SIZE + TAG_SIZE] = {0};
+	int outlen = 0;
+	int ret = b64decode_str(enc_session_key, buf, &outlen,
+				strlen(enc_session_key));
+	if (ret != 0) {
+		return ret - 100;
+		/* -101 if illegal character occurs */
+		/* -102 if impossible format occurs */
+	}
+	ret = aes_gcm_decrypt_core(session_key, buf + IV_SIZE, KEY_SIZE+TAG_SIZE, key,
+				   buf);
+	return ret;
 }
