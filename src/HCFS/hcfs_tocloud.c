@@ -578,6 +578,36 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 
 	return;
 }
+
+static int increment_upload_seq(FILE *fptr, long long *upload_seq)
+{
+	ssize_t ret_ssize;
+
+	ret_ssize = fgetxattr(fileno(fptr),
+			"user.upload_seq", upload_seq, sizeof(long long));
+	if (ret_ssize >= 0) {
+		*upload_seq += 1;
+		fsetxattr(fileno(local_metafptr), "user.upload_seq",
+			upload_seq, sizeof(long long), 0);
+	} else {
+		errcode = errno;
+		*upload_seq = 1;
+		if (errcode == ENOATTR) {
+			fsetxattr(fileno(local_metafptr),
+				"user.upload_seq", upload_seq,
+				sizeof(long long), 0);
+		} else {
+			write_log(0, "Error: Get xattr error in %s."
+					" Code %d\n", __func__, errcode);
+			*upload_seq = 0;
+			return errcode;
+		}
+	}
+	*upload_seq -= 1; /* Return old seq so that backend stat works */
+
+	return 0;
+}
+
 /**
  * Main function to upload all block and meta
  *
@@ -605,7 +635,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	long long block_count;
 	unsigned char local_block_status, toupload_block_status;
 	int ret, errcode;
-	off_t tmp_size;
+	off_t toupload_size, toupload_trunc_block_size;
 	BLOCK_ENTRY *tmp_entry;
 	long long temp_trunc_size;
 	ssize_t ret_ssize;
@@ -686,26 +716,26 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
 
-		tmp_size = tempfilestat.st_size;
-		size_last_upload = tempfilemeta.size_last_upload;
-		size_diff = tmp_size - size_last_upload;
+	
+		toupload_size = tempfilestat.st_size;
+		//size_last_upload = tempfilemeta.size_last_upload;
 		root_inode = tempfilemeta.root_inode;
-		upload_seq = tempfilemeta.upload_seq;
-
 		/* Check if need to sync past the current size */
 		ret_ssize = fgetxattr(fileno(toupload_metafptr),
 			"user.trunc_size", &temp_trunc_size, sizeof(long long));
 
-		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
-			tmp_size = temp_trunc_size;
+		toupload_trunc_block_size = toupload_size;
+		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
+			toupload_trunc_block_size = temp_trunc_size;
 			fremovexattr(fileno(toupload_metafptr),
 				"user.trunc_size");
 		}
 
-		if (tmp_size == 0)
+		if (toupload_trunc_block_size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
+			total_blocks = ((toupload_trunc_block_size - 1) 
+				/ MAX_BLOCK_SIZE) + 1;
 
 		//flock(fileno(metafptr), LOCK_UN);
 
@@ -778,7 +808,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
-				write_log(10, "Debug: upload_seq = %lld\n", upload_seq);
 				which_curl = _select_upload_thread(TRUE, FALSE,
 						ptr->inode, block_count, 
 						0, page_pos, 
@@ -882,40 +911,41 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	flock(fileno(local_metafptr), LOCK_EX);
 	/*Check if metafile still exists. If not, forget the meta upload*/
 	if (!access(local_metapath, F_OK)) {
-		FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
+		increment_upload_seq(local_metafptr, &upload_seq);
 
+		/* Get root_inode from meta */
 		if (S_ISREG(ptr->this_mode)) {
-			FREAD(&tempfilemeta, sizeof(FILE_META_TYPE),
-				1, local_metafptr);
-			tempfilemeta.size_last_upload = size_last_upload;
-			tempfilemeta.upload_seq++;
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE),
-				1, local_metafptr);
-		}
+			ret_ssize = fgetxattr(fileno(local_metafptr),
+				"user.size_last_upload", &size_last_upload,
+				sizeof(long long));
+			if (ret_ssize < 0) {
+				errcode = errno;
+				size_last_upload = 0;
+				if (errcode != ENOATTR)
+					write_log(0, "Error: getxattr failed "
+						"in %s. Code %d\n", __func__,
+						errcode);
+			}
 
+			size_diff = toupload_size - size_last_upload;
+
+			fsetxattr(fileno(local_metafptr),
+				"user.size_last_upload",
+				&toupload_size, sizeof(long long), 0);
+		}
 		if (S_ISDIR(ptr->this_mode)) {
+			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempdirmeta, sizeof(DIR_META_TYPE),
 				1, local_metafptr);
 			root_inode = tempdirmeta.root_inode;
-			upload_seq = tempdirmeta.upload_seq;
-			tempdirmeta.upload_seq++;
 			size_diff = 0;
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempdirmeta, sizeof(DIR_META_TYPE),
-				1, local_metafptr);
 		}
-
 		if (S_ISLNK(ptr->this_mode)) {
+			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
 			FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
 				1, local_metafptr);
 			root_inode = tempsymmeta.root_inode;
-			upload_seq = tempsymmeta.upload_seq;
 			size_diff = 0;
-			tempsymmeta.upload_seq++;
-			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
-			FWRITE(&tempsymmeta, sizeof(SYMLINK_META_TYPE),
-				1, local_metafptr);
 		}
 
 		write_log(10, "Debug: Now inode %ld has upload_seq = %lld\n", ptr->inode, upload_seq);
@@ -1659,7 +1689,9 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	char is_fopen;
 	size_t ret_size;
 
-	write_log(10, "Debug entering update backend stat\n");
+	write_log(10, "Debug: entering update backend stat\n");
+	write_log(10, "Debug: root %ld change %lld bytes and %lld inodes on "
+		"backend\n", root_inode, system_size_delta, num_inodes_delta);
 
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));

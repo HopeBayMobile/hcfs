@@ -296,6 +296,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	char in_sync;
 	int ret_val, errcode, ret;
 	size_t ret_size;
+	ssize_t ret_ssize;
 	struct timespec time_to_sleep;
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
@@ -323,6 +324,17 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 
 	setbuf(metafptr, NULL);
+
+	ret_ssize = fgetxattr(fileno(metafptr),
+		"user.upload_seq", &upload_seq, sizeof(long long));
+	if (ret_ssize < 0) {
+		errcode = errno;
+		upload_seq = 0;
+		if (errcode != ENOATTR)
+			write_log(0, "Error: Get xattr error in %s."
+				" Code %d\n", __func__, errcode);
+	}
+
 	if (S_ISDIR(ptr->this_mode)) {
 		flock(fileno(metafptr), LOCK_EX);
 		mlock = TRUE;
@@ -330,7 +342,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempdirmeta, sizeof(DIR_META_TYPE), 1, metafptr);
 
 		root_inode = tempdirmeta.root_inode;
-		upload_seq = tempdirmeta.upload_seq;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 	}
@@ -342,7 +353,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempsymmeta, sizeof(SYMLINK_META_TYPE), 1, metafptr);
 
 		root_inode = tempsymmeta.root_inode;
-		upload_seq = tempsymmeta.upload_seq;
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 	}
@@ -353,10 +363,17 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
 
-		system_size_change = tempfilemeta.size_last_upload;
-		root_inode = tempfilemeta.root_inode;
-		upload_seq = tempfilemeta.upload_seq;
+		ret_ssize = fgetxattr(fileno(metafptr), "user.size_last_upload",
+			&system_size_change, sizeof(long long));
+		if (ret_ssize < 0) {
+			errcode = errno;
+			system_size_change = 0;
+			if (errcode != ENOATTR)
+				write_log(0, "Error: Get xattr error in %s."
+					" Code %d\n", __func__, errcode);
+		}
 
+		root_inode = tempfilemeta.root_inode;
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
 			total_blocks = 0;
