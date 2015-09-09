@@ -76,7 +76,12 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 #ifdef ENCRYPT_ENABLE
 	char  *get_fptr_data = NULL;
 	size_t len = 0;
+
+#if defined(__ANDROID__) || defined(_ANDROID_ENV_)
+  FILE *get_fptr = tmpfile();
+#else
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
+#endif
 
 	status = hcfs_get_object(get_fptr, objname,
 			&(download_curl_handles[which_curl_handle]));
@@ -85,9 +90,16 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 			&(download_curl_handles[which_curl_handle]));
 #endif
 #ifdef ENCRYPT_ENABLE
+
+#if defined(__ANDROID__) || defined(_ANDROID_ENV_)
+  get_fptr_data = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+  rewind(get_fptr);
+  len = fread(get_fptr_data, sizeof(unsigned char), MAX_ENC_DATA, get_fptr);
+#endif
+
 	fclose(get_fptr);
 	unsigned char *key = get_key();
-	decrypt_to_fd(fptr, key, get_fptr_data, len);
+	decrypt_to_fd(fptr, key, (unsigned char*)get_fptr_data, len);
 	free(get_fptr_data);
 	free(key);
 #endif
