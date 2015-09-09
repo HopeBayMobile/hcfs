@@ -78,7 +78,7 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	size_t len = 0;
 
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
-  FILE *get_fptr = tmpfile();
+	FILE *get_fptr = tmpfile();
 #else
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
 #endif
@@ -92,9 +92,10 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 #ifdef ENCRYPT_ENABLE
 
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
-  get_fptr_data = calloc(MAX_ENC_DATA, sizeof(unsigned char));
-  rewind(get_fptr);
-  len = fread(get_fptr_data, sizeof(unsigned char), MAX_ENC_DATA, get_fptr);
+	get_fptr_data = calloc(MAX_ENC_DATA, sizeof(unsigned char));
+	rewind(get_fptr);
+	len =
+	    fread(get_fptr_data, sizeof(unsigned char), MAX_ENC_DATA, get_fptr);
 #endif
 
 	fclose(get_fptr);
