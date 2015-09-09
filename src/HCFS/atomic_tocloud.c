@@ -303,7 +303,7 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 			&temp_trunc_size, sizeof(long long), 0);
 
 		fremovexattr(fileno(src_ptr), "user.trunc_size");
-		write_log(10, "Debug: tunc_size = %lld",temp_trunc_size);
+		write_log(10, "Debug: trunc_size = %lld",temp_trunc_size);
 	}
 
 	/* Unlock soruce file */

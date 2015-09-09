@@ -582,30 +582,79 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 {
 	ssize_t ret_ssize;
+	int errcode;
 
 	ret_ssize = fgetxattr(fileno(fptr),
 			"user.upload_seq", upload_seq, sizeof(long long));
 	if (ret_ssize >= 0) {
 		*upload_seq += 1;
-		fsetxattr(fileno(local_metafptr), "user.upload_seq",
+		fsetxattr(fileno(fptr), "user.upload_seq",
 			upload_seq, sizeof(long long), 0);
 	} else {
 		errcode = errno;
 		*upload_seq = 1;
 		if (errcode == ENOATTR) {
-			fsetxattr(fileno(local_metafptr),
+			fsetxattr(fileno(fptr),
 				"user.upload_seq", upload_seq,
 				sizeof(long long), 0);
 		} else {
 			write_log(0, "Error: Get xattr error in %s."
 					" Code %d\n", __func__, errcode);
 			*upload_seq = 0;
-			return errcode;
+			return -errcode;
 		}
 	}
 	*upload_seq -= 1; /* Return old seq so that backend stat works */
 
 	return 0;
+}
+
+int download_meta_from_backend(ino_t inode, const char *download_metapath,
+	FILE *backend_fptr)
+{
+	char backend_meta_name[500];
+	int ret, errcode;
+
+	fetch_backend_meta_name(inode, backend_meta_name);
+
+	backend_fptr = fopen(download_metapath, "w+");
+	if (backend_fptr == NULL) {
+		write_log(0, "Error: Fail to open file in %s\n", __func__);
+		return -1;
+	}
+
+	sem_wait(&(sync_stat_ctl.stat_op_sem));
+	
+	ret = hcfs_get_object(backend_fptr, backend_meta_name,
+		&(sync_stat_ctl.statcurl));
+	if ((ret >= 200) && (ret <= 299)) {
+		errcode = 0;
+		write_log(10, "Debug: Download meta %ld from backend\n", inode);
+	} else if (ret != 404) {
+		errcode = -EIO;	
+		fclose(backend_fptr);
+		unlink(download_metapath);
+		backend_fptr = NULL;
+	} else {
+		errcode = 0;
+		fclose(backend_fptr);
+		unlink(download_metapath);
+		backend_fptr = NULL;
+		write_log(10, "Debug: meta %ld does not exist on cloud\n",
+			inode);
+	}
+	
+	sem_post(&(sync_stat_ctl.stat_op_sem));
+/*	
+	ret = fetch_from_cloud(backend_fptr, backend_meta_name);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to download meta from backend\n");
+		fclose(backend_fptr);
+		unlink(download_metapath);
+		return -1;
+	}
+*/
+	return errcode;
 }
 
 /**
@@ -621,9 +670,10 @@ static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
 	char toupload_metapath[400];
+	char backend_metapath[500];
 	char local_metapath[METAPATHLEN];
 	ino_t this_inode;
-	FILE *toupload_metafptr, *local_metafptr;
+	FILE *toupload_metafptr, *local_metafptr, *backend_metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	SYMLINK_META_TYPE tempsymmeta;
@@ -652,7 +702,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	this_inode = ptr->inode;
 	sync_error = FALSE;
 
-	//ret = download_meta_from_backend()
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
@@ -699,12 +748,29 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 		/* If meta file is gone, the inode is deleted and we don't need
 		to sync this object anymore. */
-		fclose(local_metafptr);
+		fclose(toupload_metafptr);
+		unlink(toupload_metapath);
 		return;
 	}
-
 	setbuf(local_metafptr, NULL);
 
+	/* Download backend meta */
+	backend_metafptr = NULL;
+	ret_ssize = fgetxattr(fileno(local_metafptr), "user.upload_seq",
+		&upload_seq, sizeof(long long));
+	if ((ret_ssize >= 0) && (upload_seq > 0)) {
+		sprintf(backend_metapath,
+			"upload_bullpen/backend_meta_%ld", this_inode);
+		ret = download_meta_from_backend(this_inode, backend_metapath,
+			backend_metafptr);
+		if (ret < 0) {
+			fclose(local_metafptr);
+			fclose(toupload_metafptr);
+			unlink(toupload_metapath);
+			return;
+		}
+	}
+	
 	flock(fileno(toupload_metafptr), LOCK_EX);
 
 	/* Upload block if mode is regular file */
@@ -956,6 +1022,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		fclose(local_metafptr);
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
+		if (backend_metafptr)
+			fclose(backend_metafptr);
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
 		/*TODO: Need to check if metafile still exists.
@@ -1280,7 +1348,7 @@ int schedule_sync_meta(char *toupload_metapath, int which_curl)
 	if (errcode != ENOENT) {
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
-		errcode = -errcode;
+	errcode = -errcode;
 		goto errcode_handle;
 	}
 
