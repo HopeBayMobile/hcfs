@@ -37,8 +37,7 @@ typedef struct encode_object_meta {
 } HCFS_encode_object_meta;
 
 int get_decode_meta(HCFS_encode_object_meta *, unsigned char *session_key,
-		    unsigned char *iv, unsigned char *key, int enc_flag,
-		    int compress_flag);
+		    unsigned char *key, int enc_flag, int compress_flag);
 
 int generate_random_aes_key(unsigned char *);
 
@@ -70,4 +69,5 @@ int decode_to_fd(FILE *, unsigned char *, unsigned char *, int, int, int);
 
 int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 			unsigned char *key);
+
 #endif /* GW20_HCFS_ENC_H_ */

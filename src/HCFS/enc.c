@@ -417,8 +417,7 @@ int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 }
 
 int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
-		    unsigned char *iv, unsigned char *key, int enc_flag,
-		    int compress_flag)
+		    unsigned char *key, int enc_flag, int compress_flag)
 {
 
 	int ret = 0;
@@ -437,6 +436,7 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 		int outlen = 0;
 		int len_cipher = KEY_SIZE + IV_SIZE + TAG_SIZE;
 		unsigned char buf[KEY_SIZE + IV_SIZE + TAG_SIZE] = {0};
+    unsigned char iv[IV_SIZE] = {0};
 
 		/* TODO: check return values */
 		meta->enc_alg = ENC_ALG_V1;
@@ -467,7 +467,7 @@ int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 		/* -101 if illegal character occurs */
 		/* -102 if impossible format occurs */
 	}
-	ret = aes_gcm_decrypt_core(session_key, buf + IV_SIZE, KEY_SIZE+TAG_SIZE, key,
-				   buf);
+	ret = aes_gcm_decrypt_core(session_key, buf + IV_SIZE,
+				   KEY_SIZE + TAG_SIZE, key, buf);
 	return ret;
 }

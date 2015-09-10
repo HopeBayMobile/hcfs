@@ -283,10 +283,10 @@ TEST_F(enc, transform_fd_both_flag)
 TEST_F(enc, get_decode_meta){
   HCFS_encode_object_meta object_meta;
   unsigned char *session_key = (unsigned char *)calloc(KEY_SIZE, sizeof(unsigned char));
-  unsigned char *iv = (unsigned char *)calloc(IV_SIZE, sizeof(unsigned char));
+  //unsigned char *iv = (unsigned char *)calloc(IV_SIZE, sizeof(unsigned char));
   unsigned char *key = get_key();
 
-  int ret = get_decode_meta(&object_meta, session_key, iv, key, 1, 1);
+  int ret = get_decode_meta(&object_meta, session_key, key, 1, 1);
   EXPECT_EQ(ret, 0);
 
   printf("%s\n", object_meta.enc_session_key);
@@ -301,5 +301,4 @@ TEST_F(enc, get_decode_meta){
   OPENSSL_free(key);
   OPENSSL_free(session_key);
   OPENSSL_free(back_session_key);
-  OPENSSL_free(iv);
 }
