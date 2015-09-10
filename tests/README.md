@@ -6,4 +6,4 @@ HCFS uses Jenkins CI to automate test and run tests in docker container to ensur
 Running testing on developer's local machine
 -----------
 
-./docker_test.sh
+./test.sh

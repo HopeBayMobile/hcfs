@@ -4,9 +4,10 @@ UNITTEST_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WORKSPACE="$( cd "$UNITTEST_DIR/../.." && pwd )"
 
 # Install dependencies
-$WORKSPACE/utils/setup_dev_env.sh
+mode="unit_test" $WORKSPACE/utils/setup_dev_env.sh
 
 # Unit test
 cd $UNITTEST_DIR
 make clean
 make test
+gcovr -r $WORKSPACE/src .

@@ -70,3 +70,4 @@ libfuse-dev
 libcurl4-openssl-dev
 libssl-dev
 liblz4-dev
+python-swiftclient

@@ -1,39 +1,37 @@
 #!/bin/bash
-echo ===============================
+echo ======== ${BASH_SOURCE[0]} ========
 date
 set -x -e
 
-export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-export docker_workspace=/home/jenkins/workspace/HCFS
+local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+docker_workspace=/home/jenkins/workspace/HCFS
 
-# Install Docker
-if ! hash docker; then
-    curl https://get.docker.com | sudo sh
-fi
+mode="tests" $local_repo/utils/setup_dev_env.sh
 
-# Pull test image from local registry server
-if ! grep -q docker:5000 /etc/default/docker; then
-    echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' | sudo tee -a /etc/default/docker
-    sudo service docker restart
-fi
-docker pull docker:5000/docker-unittest-stylecheck-slave
+# Start test slave
+sudo docker rm -f hcfs_test 2>/dev/null || true
+SLAVE_ID=$(sudo docker run --privileged -v $local_repo:/home/jenkins/workspace/HCFS -d --name=hcfs_test docker:5000/docker-unittest-stylecheck-slave bash -c "/usr/sbin/sshd -D -p 22")
+SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)
 
+# Start Swift server
+mkdir -p $local_repo/tests/tmp/swift_data
+sudo rm -rf $local_repo/tests/tmp/swift_data/*
+sudo docker rm -f swift_test || true
+SWIFT_ID=$(sudo docker run -d -v $local_repo/tests/tmp/swift_data:/srv --name=swift_test -t aerofs/swift)
+SWIFT_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SWIFT_ID)
 
-# Start / Restart test container
-docker rm -f hcfs_test 2>/dev/null || true
-CID=$(docker run --privileged -v $local_repo:/home/jenkins/workspace/HCFS -d --name=hcfs_test docker:5000/docker-unittest-stylecheck-slave bash -c "/usr/sbin/sshd -D -p 22")
-IP=$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' $CID)
-
-# Inject SSH key into container
+# Inject SSH key into test slave
 key=$local_repo/tests/.id_rsa
 [ ! -f $key ] && ssh-keygen -f $key -N ""
-docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys' < ${key}.pub
+sudo docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys' < ${key}.pub
 
-# alias for Remote ssh command
-SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$IP"
-
-# Wait ssh service running
+# Wait test slave ready
+SSH="ssh -oStrictHostKeyChecking=no -i $key jenkins@$SLAVE_IP"
 while ! $SSH true; do sleep 1; done
+
+# Wait swift ready
+SWIFT="swift -A http://$SWIFT_IP:8080/auth/v1.0 -U test:tester -K testing stat"
+while ! $SWIFT; do sleep 1; done
 
 # Fix permission issue inside docker FS
 $SSH sudo $docker_workspace/tests/docker_scrips/fix_docker_permission.sh

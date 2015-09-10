@@ -41,6 +41,7 @@ pip-log.txt
 /tests/unit_test/c/unittest_modules/*/*_unittest
 
 # Auto tests
+/tests/tmp
 /tests/.id_rsa
 /tests/.id_rsa.pub
 

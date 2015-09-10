@@ -1,4 +1,5 @@
 DIRS := $(wildcard c/unittest_modules/*/.)
+DIRS := c/unittest_modules/enc_compress/.
 BUILDDIRS = $(DIRS:%=build-%)
 CLEANDIRS = $(DIRS:%=clean-%)
 TESTDIRS = $(DIRS:%=test-%)
@@ -13,7 +14,6 @@ $(CLEANDIRS):
 	$(MAKE) -C $(@:clean-%=%) clean
 
 test: all $(TESTDIRS)
-	gcovr -r ../../src/ .
 
 $(TESTDIRS):
 	$(MAKE) -C $(@:test-%=%) test
