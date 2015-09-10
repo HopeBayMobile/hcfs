@@ -825,95 +825,6 @@ int change_system_meta(long long system_size_delta,
 	return 0;
 }
 
-/************************************************************************
-*
-* Function name: update_FS_statistics
-*        Inputs: char *pathname, long long system_size,
-*                long long num_inodes
-*       Summary: Update per-FS statistics to the meta file of root inode.
-*                "pathname" is the path for the meta file.
-*  Return value: 0 if successful. Otherwise returns negation of error code.
-*
-*************************************************************************/
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes)
-{
-	int ret, errcode;
-	long long tmp_system_size, tmp_num_inodes;
-
-	tmp_system_size = system_size;
-	tmp_num_inodes = num_inodes;
-	ret = setxattr(pathname, "user.system_size",
-		(void *) &tmp_system_size, sizeof(long long), 0);
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	ret = setxattr(pathname, "user.num_inodes",
-		(void *) &tmp_num_inodes, sizeof(long long), 0);
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	return 0;
-
-errcode_handle:
-	return errcode;
-}
-
-/************************************************************************
-*
-* Function name: read_FS_statistics
-*        Inputs: char *pathname, long long *system_size_ptr,
-*                long long *num_inodes_ptr
-*       Summary: Read per-FS statistics from the meta file of root inode.
-*                "pathname" is the path for the meta file.
-*  Return value: 0 if successful. Otherwise returns negation of error code.
-*
-*************************************************************************/
-int read_FS_statistics(char *pathname, long long *system_size_ptr,
-		long long *num_inodes_ptr)
-{
-	int ret, errcode;
-	long long tmp_system_size, tmp_num_inodes;
-
-	ret = getxattr(pathname, "user.system_size",
-		(void *) &tmp_system_size, sizeof(long long));
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	ret = getxattr(pathname, "user.num_inodes",
-		(void *) &tmp_num_inodes, sizeof(long long));
-	if (ret < 0) {
-		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n",
-			__func__, errcode, strerror(errcode));
-		errcode = -errcode;
-		goto errcode_handle;
-	}
-
-	*system_size_ptr = tmp_system_size;
-	*num_inodes_ptr = tmp_num_inodes;
-	return 0;
-
-errcode_handle:
-	return errcode;
-}
-
-
 int set_block_dirty_status(char *path, FILE *fptr, char status)
 {
 	int ret, errcode;
@@ -1112,6 +1023,52 @@ int get_block_dirty_status(char *path, FILE *fptr, char *status)
 	}
 #endif
 
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: fetch_stat_path
+*        Inputs: char *pathname, ino_t this_inode
+*        Output: Integer
+*       Summary: Given the inode number this_inode,
+*                copy the filename to the stat file
+*                to the space pointed by pathname.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+	char tempname[METAPATHLEN];
+	int sub_dir;
+	int errcode, ret;
+
+	if (METAPATH == NULL)
+		return -EPERM;
+
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
+
+	sub_dir = this_inode % NUMSUBDIR;
+
+	snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
+
+	snprintf(tempname, METAPATHLEN, "%s/sub_%d/stat", METAPATH, sub_dir);
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
+
+#ifdef ARM_32bit_
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/stat/stat%lld",
+			METAPATH, sub_dir, this_inode);
+#else
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/stat/stat%ld",
+			METAPATH, sub_dir, this_inode);
+#endif
 	return 0;
 errcode_handle:
 	return errcode;

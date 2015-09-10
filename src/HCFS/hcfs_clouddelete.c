@@ -35,9 +35,6 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
 
 #include "hcfs_tocloud.h"
 #include "params.h"
@@ -373,13 +370,18 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		tmp_size = tempfilestat.st_size;
 
 		/* Check if need to sync past the current size */
-		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
+		/* Now store trunc_size in file meta, removing the need
+		of xattr */
+		temp_trunc_size = tempfilemeta.trunc_size;
 
-		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+		if (tmp_size < temp_trunc_size) {
 			tmp_size = temp_trunc_size;
-			fremovexattr(fileno(metafptr), "user.trunc_size");
+			tempfilemeta.trunc_size = 0;
+			FSEEK(metafptr, sizeof(FILE_META_TYPE), SEEK_SET);
+			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+				metafptr);
 		}
+
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else

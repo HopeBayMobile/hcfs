@@ -28,6 +28,19 @@
 		} \
 	}
 
+#define FSYNC(A)\
+	{\
+		errcode = 0;\
+		ret = fsync(A);\
+		if (ret < 0) {\
+			errcode = errno;\
+			write_log(0, "IO error in %s. Code %d, %s\n", __func__,\
+				errcode, strerror(errcode));\
+			errcode = -errcode;\
+			goto errcode_handle;\
+		} \
+	}
+
 #define FTRUNCATE(A, B)\
 	{\
 		errcode = 0;\

@@ -22,6 +22,9 @@
 #include "xattr_ops.h"
 
 #include <errno.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 #include "meta_mem_cache.h"
 #include "super_block.h"
@@ -647,10 +650,12 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 	if (namespace_page->key_hash_table[hash_entry] == 0) {
 		/* Allocate if no page */
+#ifndef _ANDROID_ENV_
 		if (flag == XATTR_REPLACE) {
 			write_log(2, "Error: Replace value but key did not exist\n");
 			return -ENODATA;
 		}
+#endif
 
 		/* Get key list pos from "gc list" or "end of file" */
 		ret_code = get_usable_key_list_filepos(meta_cache_entry,
@@ -692,10 +697,12 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		if (ret_code > 0) { /* Hit nothing, CREATE key and value */
 
+#ifndef _ANDROID_ENV_
 			if (flag == XATTR_REPLACE) {
 				write_log(2, "Error: Replace value but key did not exist\n");
 				return -ENODATA;
 			}
+#endif
 
 			if (key_index < 0) { /* All key_list are full, allocate new one */
 				long long usable_pos;
@@ -771,10 +778,12 @@ int insert_xattr(META_CACHE_ENTRY_STRUCT *meta_cache_entry, XATTR_PAGE *xattr_pa
 
 		} else if (ret_code == 0) {
 			/* Hit the key entry, REPLACE value */
+#ifndef _ANDROID_ENV_
 			if (flag == XATTR_CREATE) {
 				write_log(2, "Error: Create a new key but it existed\n");
 				return -EEXIST;
 			}
+#endif
 
 			/* Replace the value size and then rewrite. */
 			now_key_entry =

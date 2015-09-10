@@ -38,7 +38,6 @@ Pointers to the FUSE session and channel used for this mount
 typedef struct {
 	long long system_size;
 	long long num_inodes;
-	sem_t lock;
 } FS_STAT_T;
 
 typedef struct {
@@ -53,6 +52,8 @@ typedef struct {
 	char is_unmount;
 	LOOKUP_HEAD_TYPE *lookup_table;
 	FS_STAT_T FS_stat;
+	FILE *stat_fptr;  /* For keeping track of FS stat */
+	sem_t stat_lock;
 	struct fuse_args mount_args;
 } MOUNT_T;
 
@@ -105,6 +106,8 @@ int delete_mount(char *fsname, MOUNT_NODE_T **ret_node);
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 				long long num_inodes_delta);
+int update_FS_statistics(MOUNT_T *mptr);
 
+int read_FS_statistics(MOUNT_T *mptr);
 #endif  /* GW20_HCFS_MOUNT_MANAGER_H_ */
 

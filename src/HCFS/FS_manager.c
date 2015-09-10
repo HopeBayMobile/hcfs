@@ -178,12 +178,16 @@ ino_t _create_root_inode(void)
 	DIR_META_TYPE this_meta;
 	DIR_ENTRY_PAGE temppage;
 	mode_t self_mode;
-	FILE *metafptr;
+	FILE *metafptr, *statfptr;
 	char metapath[METAPATHLEN];
+	char temppath[METAPATHLEN];
 	int ret, errcode;
 	size_t ret_size;
 	long ret_pos;
 	unsigned long this_gen;
+	FS_STAT_T tmp_stat;
+
+	statfptr = NULL;
 
 	memset(&this_stat, 0, sizeof(struct stat));
 	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
@@ -241,11 +245,29 @@ ino_t _create_root_inode(void)
 	}
 
 	FWRITE(&temppage, sizeof(DIR_ENTRY_PAGE), 1, metafptr);
-	ret = update_FS_statistics(metapath, 0, 1);
+
+	ret = fetch_stat_path(temppath, root_inode);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
+
+	statfptr = fopen(temppath, "w");
+	if (statfptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error %d (%s)\n", errcode,
+		          strerror(errcode));
+		errcode = -errcode;
+		goto errcode_handle;
+	}
+	memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+	tmp_stat.num_inodes = 1;
+
+	FWRITE(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+	FSYNC(fileno(statfptr));
+
+	fclose(statfptr);
+	statfptr = NULL;
 
 	fclose(metafptr);
 	metafptr = NULL;
@@ -258,6 +280,8 @@ ino_t _create_root_inode(void)
 
 errcode_handle:
 	if (metafptr != NULL)
+		fclose(metafptr);
+	if (statfptr != NULL)
 		fclose(metafptr);
 	return 0;
 }

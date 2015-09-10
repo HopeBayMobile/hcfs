@@ -337,7 +337,7 @@ int build_cache_usage(void)
 				break;
 			}
 			/*If this is dirty cache entry*/
-			if (is_dirty == TRUE) {
+			if (is_dirty == TRUE)
 				tempnode->dirty_cache_size += tempstat.st_size;
 			else
 				tempnode->clean_cache_size +=

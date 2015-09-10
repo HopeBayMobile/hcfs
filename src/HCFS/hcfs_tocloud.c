@@ -40,9 +40,6 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -564,12 +561,16 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		upload_seq = tempfilemeta.upload_seq;
 
 		/* Check if need to sync past the current size */
-		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
+		/* Now store trunc_size in file meta, removing the need
+		of xattr */
+		temp_trunc_size = tempfilemeta.trunc_size;
 
-		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+		if (tmp_size < temp_trunc_size) {
 			tmp_size = temp_trunc_size;
-			fremovexattr(fileno(metafptr), "user.trunc_size");
+			tempfilemeta.trunc_size = 0;
+			FSEEK(metafptr, sizeof(FILE_META_TYPE), SEEK_SET);
+			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+				metafptr);
 		}
 
 		if (tmp_size == 0)

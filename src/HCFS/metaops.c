@@ -1196,15 +1196,19 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
         struct timeval start_time, end_time;
         float elapsed_time;
         char block_status;
-	long long tmp_system_size, tmp_num_inodes;
 	char rootpath[METAPATHLEN];
+	FILE *fptr;
+	FS_STAT_T tmpstat;
 
 	if (mptr == NULL) {
-		ret = fetch_meta_path(rootpath, root_inode);
+		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
-		read_FS_statistics(rootpath, &tmp_system_size,
-					&tmp_num_inodes);
+		fptr = fopen(rootpath, "r+");
+		if (fptr == NULL)
+			return ret;
+		setbuf(fptr, NULL);
+		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
 
 	gettimeofday(&start_time, NULL);
@@ -1218,7 +1222,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 		if (mptr == NULL)
-			tmp_num_inodes--;
+			tmpstat.num_inodes--;
 		else
 			change_mount_stat(mptr, 0, -1);
 		break;
@@ -1232,7 +1236,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (ret < 0)
 			return ret;
 		if (mptr == NULL)
-			tmp_num_inodes--;
+			tmpstat.num_inodes--;
 		else
 			change_mount_stat(mptr, 0, -1);
 		break;
@@ -1327,8 +1331,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		if (mptr != NULL) {
 			change_mount_stat(mptr, -this_inode_stat.st_size, -1);
 		} else {
-			tmp_num_inodes--;
-			tmp_system_size -= this_inode_stat.st_size;
+			tmpstat.num_inodes--;
+			tmpstat.system_size -= this_inode_stat.st_size;
 		}
 
 
@@ -1341,9 +1345,11 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		break;
 	}
 
-	if (mptr == NULL)
-		update_FS_statistics(rootpath, tmp_system_size,
-					tmp_num_inodes);
+	if (mptr == NULL) {
+		FSEEK(fptr, 0, SEEK_SET);
+		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
+		fclose(fptr);
+	}
 
 	/* unlink markdelete tag because it has been deleted */
 	ret = disk_cleardelete(this_inode, root_inode); 

@@ -46,9 +46,6 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
-#ifndef _ANDROID_ENV_
-#include <attr/xattr.h>
-#endif
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -1743,7 +1740,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 /* If need to truncate some block that's ST_CtoL or ST_CLOUD, download it
 *  first, mod it, then set to ST_LDISK*/
 
-	FILE_META_TYPE tempfilemeta;
+	FILE_META_TYPE tempfilemeta, truncfilemeta;
 	int ret, errcode;
 	long long last_block, last_page, old_last_block;
 	long long current_page, old_last_page;
@@ -1753,6 +1750,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	long long temp_trunc_size;
 	ssize_t ret_ssize;
 	MOUNT_T *tmpptr;
+	size_t ret_size;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -1905,33 +1903,26 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			return ret;
 		}
 
-		ret_ssize = fgetxattr(fileno((*body_ptr)->fptr),
-				"user.trunc_size",
-				&temp_trunc_size, sizeof(long long));
-		if (((ret_ssize < 0) && (errno == ENOATTR)) ||
-			((ret_ssize >= 0) &&
-				(temp_trunc_size < filestat->st_size))) {
-			ret = fsetxattr(fileno((*body_ptr)->fptr),
-				"user.trunc_size", &(filestat->st_size),
-				sizeof(long long), 0);
-			if (ret < 0) {
-				errcode = errno;
-				write_log(0, "IO error in truncate. Data may ");
-				write_log(0, "not be consistent. ");
-				write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
-				return -EIO;
-			}
-		} else {
-			if (ret_ssize < 0) {
-				errcode = errno;
-				write_log(0, "IO error in truncate. Data may ");
-				write_log(0, "not be consistent. ");
-				write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
-				return -EIO;
-			}
-		}
+		/* First read from meta file, if need
+		to update trunc_size, change the value in meta cache and
+		write back to meta cache */
+		FSEEK((*body_ptr)->fptr, sizeof(struct stat), SEEK_SET);
+		FREAD(&truncfilemeta, sizeof(FILE_META_TYPE), 1,
+			(*body_ptr)->fptr);
+		temp_trunc_size = truncfilemeta.trunc_size;
+		if (temp_trunc_size != tempfilemeta.trunc_size)
+			tempfilemeta.trunc_size = temp_trunc_size;
+
+		if (temp_trunc_size < filestat->st_size)
+			tempfilemeta.trunc_size = filestat->st_size;
+	}
+
+	ret = meta_cache_update_file_data(this_inode, filestat,
+			&tempfilemeta, NULL, 0, *body_ptr);
+	if (ret < 0) {
+		write_log(0, "IO error in truncate. Data may ");
+		write_log(0, "not be consistent\n");
+		return ret;
 	}
 
 	/* Update file and system meta here */
@@ -1945,15 +1936,9 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	filestat->st_size = offset;
 	filestat->st_mtime = time(NULL);
 
-	ret = meta_cache_update_file_data(this_inode, filestat,
-			&tempfilemeta, NULL, 0, *body_ptr);
-	if (ret < 0) {
-		write_log(0, "IO error in truncate. Data may ");
-		write_log(0, "not be consistent\n");
-		return ret;
-	}
-
 	return 0;
+errcode_handle:
+	return errcode;
 }
 
 /************************************************************************
@@ -3232,12 +3217,12 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 		return;
 	}
 	/*Prototype is linux statvfs call*/
-	sem_wait(&((tmpptr->FS_stat).lock));
+	sem_wait(&(tmpptr->stat_lock));
 
 	system_size = (tmpptr->FS_stat).system_size;
 	num_inodes = (tmpptr->FS_stat).num_inodes;
 
-	sem_post(&((tmpptr->FS_stat).lock));
+	sem_post(&(tmpptr->stat_lock));
 
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
@@ -4894,10 +4879,12 @@ struct fuse_lowlevel_ops hfuse_ops = {
 	.forget = hfuse_ll_forget,
 	.symlink = hfuse_ll_symlink,
 	.readlink = hfuse_ll_readlink,
+#ifndef _ANDROID_ENV_
 	.setxattr = hfuse_ll_setxattr,
 	.getxattr = hfuse_ll_getxattr,
 	.listxattr = hfuse_ll_listxattr,
 	.removexattr = hfuse_ll_removexattr,
+#endif
 	.link = hfuse_ll_link,
 	.create = hfuse_ll_create,
 };
