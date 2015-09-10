@@ -50,7 +50,7 @@ all : $(TESTS)
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test: $(TESTS)
+test : $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
 	gcov *.gcno

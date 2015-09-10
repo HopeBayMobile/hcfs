@@ -52,7 +52,7 @@ all : $(TESTS)
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test: $(TESTS)
+test : $(TESTS)
 	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest
