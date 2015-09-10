@@ -125,16 +125,32 @@ class HCFSBin:
     """
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
+        self.hcfs_src_dir =  os.path.join(self.current_dir, '../../../../src/HCFS')
+        self.cli_src_dir =  os.path.join(self.current_dir, '../../../../src/CLI_utils')
         self.hcfs_bin_folder = os.path.join(self.current_dir, 'hcfs_bin')
-        self.hcfs_bin = os.path.join(self.hcfs_bin_folder, 'hcfs')
-        self.hcfsvol_bin = os.path.join(self.hcfs_bin_folder, 'HCFSvol')
+        self.hcfs_bin = 'hcfs'
+        self.hcfsvol_bin = self._get_cli_dir()
         self.timeout = 30
+
+    def _get_cli_dir(self):
+        try:
+            p = subprocess.Popen(['HCFSvol'])
+            cli = 'HCFSvol'
+        except:
+            cli = os.path.abspath(os.path.join(self.cli_src_dir, 'HCFSvol'))
+        finally:
+            return cli
 
     def start_hcfs(self):
         """Launch the hcfs processes
         """
-        p = subprocess.Popen([self.hcfs_bin, '-d'])
-        time.sleep(10)  # if use timeout for it?
+        try:
+            p = subprocess.Popen([self.hcfs_bin, '-d'])
+        except:
+            self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
+            p = subprocess.Popen([self.hcfs_bin, '-d'])
+        finally:
+            time.sleep(10)  # if use timeout for it?
 
     def verify_hcfs_processes(self):
         """Check the processes are exist, expect it has three.
@@ -210,7 +226,7 @@ class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
         self.fstest = FSTester('/mnt/hcfs/fstest')
-        self.logger = logger
+        self.logger = logging.getLogger('CommonSetup')
         # swift
         self.swift_url = 'https://10.10.99.118:8080/auth/v1.0'
         self.swift_key = '0qrrbOCHoNUM'
@@ -228,11 +244,11 @@ class CommonSetup:
         return output
 
     def replace_hcfs_config(self, source):
-        p = subprocess.Popen(['cp', source, '/etc/hcfs.conf'], stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(['sudo', 'cp', source, '/etc/hcfs.conf'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         if error_msg:
-            self.logger(str(error_msg))
+            self.logger.error(str(error_msg))
             return False, str(error_msg)
         else:
             return True, ''
@@ -587,6 +603,7 @@ class HCFS_16(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
+        self.origin_config = 'hcfs_swift_easepro.conf'
         self.config = 'hcfs_swift_easepro.conf'
 
     def check_if_hcfs_start_success(self):
@@ -605,6 +622,7 @@ class HCFS_16(CommonSetup):
     def run(self):
         self.replace_hcfs_config(self.config)
         (result, msg) = self.check_if_hcfs_start_success()
+        self.replace_hcfs_config(self.origin_config)
 
         return result, msg
 
@@ -616,6 +634,7 @@ class HCFS_17(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
+        self.origin_config = 'hcfs_swift_easepro.conf'
         self.config = 'hcfs_s3_easepro.conf'
         
     def check_if_hcfs_start_success(self):
@@ -634,6 +653,7 @@ class HCFS_17(CommonSetup):
     def run(self):
         self.replace_hcfs_config(self.config)
         (result, msg) = self.check_if_hcfs_start_success()
+        self.replace_hcfs_config(self.origin_config)
         return result, msg
 
 
@@ -861,8 +881,10 @@ class HCFS_99(CommonSetup):
 
 
 if __name__ == '__main__':
-    print os.path.dirname(os.path.abspath(__file__))
-    hcfs_bin = HCFSBin()
-
+    current =  os.path.dirname(os.path.abspath(__file__))
+    print current
+    hcfs_src_folder =  os.path.join(current, '../../../../src/HCFS')
+    cli_src_folder =  os.path.join(os.path.join(current, '../../../../src/CLI_utils'), 'HCFSvol')
+    print os.path.abspath(cli_src_folder)
         
 
