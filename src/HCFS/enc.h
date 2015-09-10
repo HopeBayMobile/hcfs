@@ -36,6 +36,8 @@ typedef struct encode_object_meta {
 	int len_enc_session_key;
 } HCFS_encode_object_meta;
 
+void free_object_meta(HCFS_encode_object_meta *);
+
 int get_decode_meta(HCFS_encode_object_meta *, unsigned char *session_key,
 		    unsigned char *key, int enc_flag, int compress_flag);
 

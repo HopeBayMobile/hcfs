@@ -471,3 +471,12 @@ int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 				   KEY_SIZE + TAG_SIZE, key, buf);
 	return ret;
 }
+
+void free_object_meta(HCFS_encode_object_meta *object_meta){
+  if(object_meta != NULL){
+    if(object_meta->enc_session_key != NULL){
+      OPENSSL_free(object_meta->enc_session_key);
+    }
+    free(object_meta);
+  }
+}

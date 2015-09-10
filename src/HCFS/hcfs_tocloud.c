@@ -850,21 +850,36 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	}
 
 	unsigned char *key = NULL;
+	HCFS_encode_object_meta *object_meta = NULL;
+	unsigned char *object_key = NULL;
 	unsigned char *data = NULL;
+
 #if ENCRYPT_ENABLE
+	object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
+	object_key = calloc(KEY_SIZE, sizeof(unsigned char));
 	key = get_key();
+	get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
+			COMPRESS_ENABLE);
+	OPENSSL_free(key);
 #endif
 
-	FILE *new_fptr =
-	    transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
-	ret_val = hcfs_put_object_v2(new_fptr, objname, curl_handle, NULL);
+	//FILE *new_fptr = transform_fd(fptr, object_key, &data, ENCRYPT_ENABLE,
+  //				      COMPRESS_ENABLE);
+  key = get_key();
+	FILE *new_fptr = transform_fd(fptr, key, &data, ENCRYPT_ENABLE,
+  				      COMPRESS_ENABLE);
+	OPENSSL_free(key);
+	ret_val =
+	    hcfs_put_object_v2(new_fptr, objname, curl_handle, object_meta);
 	fclose(new_fptr);
+	if (object_key != NULL)
+		OPENSSL_free(object_key);
+	if (object_meta != NULL)
+		free_object_meta(object_meta);
 	if (fptr != new_fptr)
 		fclose(fptr);
 	if (data != NULL)
 		free(data);
-	if (key != NULL)
-		OPENSSL_free(key);
 
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
