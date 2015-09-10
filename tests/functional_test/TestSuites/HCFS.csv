@@ -1,5 +1,5 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
-,HCFS_0,Setup environment,,0,Fail,,0
+,HCFS_0,Setup environment,,1,Fail,,20
 ,HCFS_3,chflags,,0,Pass,,0
 ,HCFS_4,chmod,,0,Pass,,8
 ,HCFS_5,chown,,0,Pass,,16
