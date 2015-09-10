@@ -12,13 +12,6 @@ Release Log
 * first released
 
 
-Requirement Thirdpary Libraries
-===============================
-<pre>
-pip install -r requirements.txt
-</pre>
-
-
 Folder Structure
 ================
 * DataSets: The data set for test cases
