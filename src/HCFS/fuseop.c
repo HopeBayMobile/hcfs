@@ -43,10 +43,12 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -1598,13 +1600,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			if (stat(thisblockpath, &tempstat) == 0) {
 				(temppage->block_entries[last_index]).status =
 					ST_LDISK;
-				ret = setxattr(thisblockpath, "user.dirty",
-						"T", 1, 0);
+				ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 				if (ret < 0) {
-					errcode = errno;
-					write_log(0, "IO error in truncate. ");
-					write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
 					if (blockfptr != NULL) {
 						fclose(blockfptr);
 						blockfptr = NULL;
@@ -1628,13 +1626,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			if (stat(thisblockpath, &tempstat) == 0) {
 				(temppage->block_entries[last_index]).status =
 					ST_LDISK;
-				ret = setxattr(thisblockpath, "user.dirty",
-					"T", 1, 0);
+				ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 				if (ret < 0) {
-					errcode = errno;
-					write_log(0, "IO error in truncate. ");
-					write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
 					if (blockfptr != NULL) {
 						fclose(blockfptr);
 						blockfptr = NULL;
@@ -1691,12 +1685,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			when truncate is conducted (meta is locked) */
 		if (stat(thisblockpath, &tempstat) == 0) {
 			(temppage->block_entries[last_index]).status = ST_LDISK;
-			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 			if (ret < 0) {
-				errcode = errno;
-				write_log(0, "IO error in truncate. ");
-				write_log(0, "Code %d, %s\n", errcode,
-						strerror(errcode));
 				if (blockfptr != NULL) {
 					fclose(blockfptr);
 					blockfptr = NULL;
@@ -2250,12 +2241,9 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		if (stat(thisblockpath, &tempstat2) == 0) {
 			(tpage->block_entries[eindex]).status = ST_BOTH;
 			tmpptr = fh_ptr->meta_cache_ptr;
-			ret = fsetxattr(fileno(fh_ptr->blockfptr),
-					"user.dirty", "F", 1, 0);
+			ret = set_block_dirty_status(NULL,
+				fh_ptr->blockfptr, FALSE);
 			if (ret < 0) {
-				errcode = errno;
-				write_log(0, "IO error in read. Code %d, %s\n",
-					errcode, strerror(errcode));
 				fh_ptr->meta_cache_locked = FALSE;
 				meta_cache_close_file(tmpptr);
 				meta_cache_unlock_entry(tmpptr);
@@ -2815,15 +2803,13 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 
 		if (stat(thisblockpath, &tempstat2) == 0) {
 			(tpage->block_entries[eindex]).status = ST_LDISK;
-			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 			if (ret < 0) {
-				errcode = errno;
 				if (fh_ptr->blockfptr != NULL) {
 					fclose(fh_ptr->blockfptr);
 					fh_ptr->blockfptr = NULL;
 				}
-				write_log(0, "IO error in write. Code %d, %s\n",
-					errcode, strerror(errcode));
 				return -EIO;
 			}
 
@@ -2843,15 +2829,13 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	} else {
 		if (stat(thisblockpath, &tempstat2) == 0) {
 			(tpage->block_entries[eindex]).status = ST_LDISK;
-			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 			if (ret < 0) {
-				errcode = errno;
 				if (fh_ptr->blockfptr != NULL) {
 					fclose(fh_ptr->blockfptr);
 					fh_ptr->blockfptr = NULL;
 				}
-				write_log(0, "IO error in write. Code %d, %s\n",
-					errcode, strerror(errcode));
 				return -EIO;
 			}
 
@@ -2962,13 +2946,11 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 			fclose(fh_ptr->blockfptr);
 			(temppage).block_entries[entry_index].status = ST_LDISK;
-			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 			if (ret < 0) {
-				errnum = errno;
 				sem_post(&(fh_ptr->block_sem));
 				*reterr = -EIO;
-				write_log(0, "Error in write. Code %d, %s\n",
-					errnum, strerror(errnum));
 				return 0;
 			}
 			ret = meta_cache_update_file_data(fh_ptr->thisinode,
@@ -2987,13 +2969,11 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		case ST_BOTH:
 		case ST_LtoC:
 			(temppage).block_entries[entry_index].status = ST_LDISK;
-			ret = setxattr(thisblockpath, "user.dirty", "T", 1, 0);
+			ret = set_block_dirty_status(thisblockpath,
+						NULL, TRUE);
 			if (ret < 0) {
-				errnum = errno;
 				sem_post(&(fh_ptr->block_sem));
 				*reterr = -EIO;
-				write_log(0, "Error in write. Code %d, %s\n",
-					errnum, strerror(errnum));
 				return 0;
 			}
 			ret = meta_cache_update_file_data(fh_ptr->thisinode,

@@ -34,8 +34,10 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 #include "hcfs_tocloud.h"
 #include "params.h"

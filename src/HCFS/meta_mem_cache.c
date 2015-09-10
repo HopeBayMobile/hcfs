@@ -19,7 +19,6 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/time.h>
 

@@ -15,6 +15,7 @@
 #define GW20_SRC_UTILS_H_
 
 #include <sys/types.h>
+#include <stdio.h>
 
 /*BEGIN string utility definition*/
 
@@ -43,5 +44,8 @@ int update_FS_statistics(char *pathname, long long system_size,
 
 int read_FS_statistics(char *pathname, long long *system_size_ptr,
 		long long *num_inodes_ptr);
+
+int set_block_dirty_status(char *path, FILE *fptr, char status);
+int get_block_dirty_status(char *path, FILE *fptr, char *status);
 
 #endif  /* GW20_SRC_UTILS_H_ */

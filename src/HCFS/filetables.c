@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 
 #include "fuseop.h"

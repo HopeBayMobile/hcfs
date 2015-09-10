@@ -21,7 +21,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <curl/curl.h>
@@ -215,7 +214,11 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 		if (stat(thisblockpath, &tempstat) == 0) {
 			(temppage).block_entries[entry_index].status = ST_BOTH;
-			fsetxattr(fileno(blockfptr), "user.dirty", "F", 1, 0);
+			ret = set_block_dirty_status(NULL, blockfptr, FALSE);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 								metafptr);

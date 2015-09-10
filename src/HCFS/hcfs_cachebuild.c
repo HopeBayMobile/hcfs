@@ -24,7 +24,6 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 
 #include "params.h"
@@ -245,8 +244,8 @@ int build_cache_usage(void)
 	ino_t this_inode;
 	struct stat tempstat;
 	CACHE_USAGE_NODE *tempnode;
-	char tempval[10];
 	size_t tmp_size;
+	char is_dirty;
 
 	write_log(5, "Building cache usage hash table\n");
 	ret = cache_usage_hash_init();
@@ -331,23 +330,19 @@ int build_cache_usage(void)
 
 			tempnode->this_inode = this_inode;
 
-			ret = getxattr(thisblockpath, "user.dirty",
-							(void *)tempval, 1);
+			ret = get_block_dirty_status(thisblockpath, NULL,
+					&is_dirty);
 			if (ret < 0) {
 				errcode = errno;
 				break;
 			}
 			/*If this is dirty cache entry*/
-			if (!strncmp(tempval, "T", 1)) {
+			if (is_dirty == TRUE) {
 				tempnode->dirty_cache_size += tempstat.st_size;
-			} else {
-				/*If clean cache entry*/
-				if (!strncmp(tempval, "F", 1))
-					tempnode->clean_cache_size +=
+			else
+				tempnode->clean_cache_size +=
 							tempstat.st_size;
-				/*Otherwise, don't know the status of
-						the block, so do nothing*/
-			}
+
 			insert_cache_usage_node(this_inode, tempnode);
 			ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 			if (ret > 0) {

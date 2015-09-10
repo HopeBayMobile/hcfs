@@ -26,7 +26,6 @@
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <semaphore.h>
 #include <sys/mman.h>
 
@@ -1529,9 +1528,6 @@ int startup_finish_delete(void)
 			if (S_ISLNK(tmpstat.st_mode))
 				ret = actual_delete_inode(tmp_ino, D_ISLNK,
 						root_inode, NULL);
-
-			/* TODO: Directly decrease num of inodes
-			in the xattr of root inode. */
 
 			if (ret < 0) {
 				closedir(dirp);

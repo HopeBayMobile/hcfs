@@ -37,10 +37,12 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
-#include <attr/xattr.h>
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -222,9 +224,12 @@ static inline int _upload_terminate_thread(int index)
 						errcode = ret;
 						goto errcode_handle;
 					}
-					SETXATTR(blockpath, "user.dirty",
-							"F", 1, 0);
-
+					ret = set_block_dirty_status(blockpath,
+						NULL, FALSE);
+					if (ret < 0) {
+						errcode = ret;
+						goto errcode_handle;
+					}
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 								metafptr);

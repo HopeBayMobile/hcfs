@@ -16,16 +16,17 @@
 
 #include "utils.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <attr/xattr.h>
 #include <errno.h>
 #include <limits.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 #include "global.h"
 #include "fuseop.h"
@@ -623,6 +624,7 @@ int validate_system_config(void)
 	fprintf(fptr, "test\n");
 	fclose(fptr);
 
+#ifndef _ANDROID_ENV_
 	ret_val = setxattr(pathname, "user.dirty", "T", 1, 0);
 	if (ret_val < 0) {
 		errcode = errno;
@@ -643,6 +645,8 @@ int validate_system_config(void)
 	}
 	write_log(10,
 		"test value is: %s, %d\n", tempval, strncmp(tempval, "T", 1));
+#endif
+
 	unlink(pathname);
 
 	SUPERBLOCK = (char *) malloc(strlen(METAPATH) + 20);
@@ -909,3 +913,206 @@ errcode_handle:
 	return errcode;
 }
 
+
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	int ret, errcode;
+
+#ifdef _ANDROID_ENV_
+
+	struct stat tmpstat;
+	if (path != NULL) {
+		ret = stat(path, &tmpstat);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		/* Use sticky bit to store dirty status */
+		if ((status == TRUE) && ((tmpstat.st_mode & S_ISVTX) == 0)) {
+			ret = chmod(path, tmpstat.st_mode | S_ISVTX);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "Unexpected IO error\n");
+				write_log(10, "In %s. code %d, %s\n", __func__,
+					errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+		}
+
+		if ((status == FALSE) && ((tmpstat.st_mode & S_ISVTX) != 0)) {
+			ret = chmod(path, tmpstat.st_mode & ~S_ISVTX);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "Unexpected IO error\n");
+				write_log(10, "In %s. code %d, %s\n", __func__,
+					errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+		}
+	} else if (fptr != NULL) {
+		ret = fstat(fileno(fptr), &tmpstat);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		/* Use sticky bit to store dirty status */
+		if ((status == TRUE) && ((tmpstat.st_mode & S_ISVTX) == 0)) {
+			ret = fchmod(fileno(fptr), tmpstat.st_mode | S_ISVTX);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "Unexpected IO error\n");
+				write_log(10, "In %s. code %d, %s\n", __func__,
+					errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+		}
+
+		if ((status == FALSE) && ((tmpstat.st_mode & S_ISVTX) != 0)) {
+			ret = fchmod(fileno(fptr), tmpstat.st_mode & ~S_ISVTX);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "Unexpected IO error\n");
+				write_log(10, "In %s. code %d, %s\n", __func__,
+					errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+		}
+
+	} else {
+		/* Cannot set block dirty status */
+		write_log(0, "Unexpected error\n");
+		write_log(10, "Unable to set block dirty status\n");
+		errcode = -ENOTSUP;
+		goto errcode_handle;
+	}
+
+#else
+	if (path != NULL) {
+		if (status == TRUE) {
+			SETXATTR(path, "user.dirty", "T", 1, 0);
+		} else {
+			SETXATTR(path, "user.dirty", "F", 1, 0);
+		}
+	} else if (fptr != NULL) {
+		if (status == TRUE) {
+			FSETXATTR(fileno(fptr), "user.dirty", "T", 1, 0);
+		} else {
+			FSETXATTR(fileno(fptr), "user.dirty", "F", 1, 0);
+		}
+	} else {
+		/* Cannot set block dirty status */
+		write_log(0, "Unexpected error\n");
+		write_log(10, "Unable to set block dirty status\n");
+		errcode = -ENOTSUP;
+		goto errcode_handle;
+	}
+#endif
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+int get_block_dirty_status(char *path, FILE *fptr, char *status)
+{
+	int ret, errcode;
+	char tmpstr[5];
+
+#ifdef _ANDROID_ENV_
+
+	struct stat tmpstat;
+	if (path != NULL) {
+		ret = stat(path, &tmpstat);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		/* Use sticky bit to store dirty status */
+
+		if ((tmpstat.st_mode & S_ISVTX) == 0)
+			*status = FALSE;
+		else
+			*status = TRUE;
+	} else if (fptr != NULL) {
+		ret = fstat(fileno(fptr), &tmpstat);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		/* Use sticky bit to store dirty status */
+
+		if ((tmpstat.st_mode & S_ISVTX) == 0)
+			*status = FALSE;
+		else
+			*status = TRUE;
+	} else {
+		/* Cannot get block dirty status */
+		write_log(0, "Unexpected error\n");
+		write_log(10, "Unable to get block dirty status\n");
+		errcode = -ENOTSUP;
+		goto errcode_handle;
+	}
+
+#else
+	if (path != NULL) {
+		ret = getxattr(path, "user.dirty", (void *) tmpstr, 1);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		if (strncmp(tmpstr, "T", 1) == 0)
+			*status = TRUE;
+		else
+			*status = FALSE
+	} else if (fptr != NULL) {
+		ret = fgetxattr(fileno(fptr), "user.dirty",
+				(void *) tmpstr, 1);
+		if (ret < 0) {
+			errcode = errno;
+			write_log(0, "Unexpected IO error\n");
+			write_log(10, "In %s. code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			errcode = -errcode;
+			goto errcode_handle;
+		}
+		if (strncmp(tmpstr, "T", 1) == 0)
+			*status = TRUE;
+		else
+			*status = FALSE
+	} else {
+		/* Cannot get block dirty status */
+		write_log(0, "Unexpected error\n");
+		write_log(10, "Unable to get block dirty status\n");
+		errcode = -ENOTSUP;
+		goto errcode_handle;
+	}
+#endif
+
+	return 0;
+errcode_handle:
+	return errcode;
+}

@@ -18,7 +18,6 @@
 #include <sys/resource.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <attr/xattr.h>
 #include <semaphore.h>
 #include <unistd.h>
 #include <pthread.h>

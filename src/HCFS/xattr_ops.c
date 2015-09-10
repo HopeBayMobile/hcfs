@@ -21,7 +21,6 @@
 
 #include "xattr_ops.h"
 
-#include <attr/xattr.h>
 #include <errno.h>
 
 #include "meta_mem_cache.h"
