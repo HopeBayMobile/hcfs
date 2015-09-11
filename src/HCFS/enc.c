@@ -427,7 +427,7 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 	meta->enc_session_key = NULL;
 
 	if (compress_flag) {
-		meta->comp_alg = COMP_ALG_V1;
+		meta->comp_alg = compress_flag;
 	} else {
 		meta->comp_alg = COMP_ALG_NONE;
 	}
@@ -439,7 +439,7 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
     unsigned char iv[IV_SIZE] = {0};
 
 		/* TODO: check return values */
-		meta->enc_alg = ENC_ALG_V1;
+		meta->enc_alg = enc_flag;
 		generate_random_aes_key(session_key);
 		generate_random_bytes(iv, IV_SIZE);
 		ret = aes_gcm_encrypt_core(buf + IV_SIZE, session_key, KEY_SIZE,

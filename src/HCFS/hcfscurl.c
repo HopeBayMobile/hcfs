@@ -1970,6 +1970,7 @@ int hcfs_swift_put_object_v2(FILE *fptr, char *objname,
 	object_put_control put_control;
 	CURLcode res;
 	char container_string[200];
+	char object_string[100];
 	FILE *swift_header_fptr;
 	CURL *curl;
 	char header_filename[100];
@@ -1991,11 +1992,21 @@ int hcfs_swift_put_object_v2(FILE *fptr, char *objname,
 	}
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s",
-				swift_url_string, SWIFT_CONTAINER, objname);
+	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
+		objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
-
+	if (object_meta != NULL) {
+		sprintf(object_string, "X-OBJECT-META-ENC: %d",
+			object_meta->enc_alg);
+		chunk = curl_slist_append(chunk, object_string);
+		sprintf(object_string, "X-OBJECT-META-COMP: %d",
+			object_meta->comp_alg);
+		chunk = curl_slist_append(chunk, object_string);
+		sprintf(object_string, "X-OBJECT-META-NONCE: %s",
+			object_meta->enc_session_key);
+		chunk = curl_slist_append(chunk, object_string);
+	}
 	FSEEK(fptr, 0, SEEK_END);
 	FTELL(fptr);
 	objsize = ret_pos;
