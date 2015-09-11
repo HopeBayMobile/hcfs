@@ -279,8 +279,9 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
 	char thismetapath[400];
+	char backend_metapath[400];
 	ino_t this_inode;
-	FILE *metafptr;
+	FILE *metafptr, *backend_metafptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	DIR_META_TYPE tempdirmeta;
@@ -305,6 +306,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	long long system_size_change;
 	long long upload_seq;
 	ino_t root_inode;
+	char is_meta_on_cloud;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -315,16 +317,41 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	fetch_todelete_path(thismetapath, this_inode);
 
+	/* Download backend meta and read it if it is regfile */
+	if (S_ISREG(ptr->this_mode)) {
+		is_meta_on_cloud = TRUE;
+		backend_metafptr = NULL;
+		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld.del",
+				this_inode);
+		ret = download_meta_from_backend(this_inode, backend_metapath,
+				&backend_metafptr);
+		if (ret < 0) {
+			write_log(0, "Error: Fail to download backend meta_%ld."
+				" Delete next time...\n", this_inode);
+			return;
+		} else {
+		/* backend_metafptr may be NULL when never uploading */
+			if (backend_metafptr == NULL) {
+				write_log(10, "Debug: Nothing on cloud for "
+					"meta_%ld.\n", this_inode);
+				is_meta_on_cloud = FALSE;
+				unlink(thismetapath);
+				super_block_delete(this_inode);
+				super_block_reclaim();
+				return;
+			}
+		}
+	}
+	/* Open local meta for dir and symlink */
 	metafptr = fopen(thismetapath, "r+");
 	if (metafptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
+				errcode, strerror(errcode));
 		goto errcode_handle;
 	}
 
 	setbuf(metafptr, NULL);
-
 	ret_ssize = fgetxattr(fileno(metafptr),
 		"user.upload_seq", &upload_seq, sizeof(long long));
 	if (ret_ssize < 0) {
@@ -358,21 +385,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	}
 
 	if (S_ISREG(ptr->this_mode)) {
-		flock(fileno(metafptr), LOCK_EX);
+		flock(fileno(backend_metafptr), LOCK_EX);
 		mlock = TRUE;
-		FREAD(&tempfilestat, sizeof(struct stat), 1, metafptr);
-		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1, metafptr);
+		FSEEK(backend_metafptr, 0, SEEK_SET);
+		FREAD(&tempfilestat, sizeof(struct stat), 1, backend_metafptr);
+		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
+							backend_metafptr);
 
-		ret_ssize = fgetxattr(fileno(metafptr), "user.size_last_upload",
-			&system_size_change, sizeof(long long));
-		if (ret_ssize < 0) {
-			errcode = errno;
-			system_size_change = 0;
-			if (errcode != ENOATTR)
-				write_log(0, "Error: Get xattr error in %s."
-					" Code %d\n", __func__, errcode);
-		}
-
+		system_size_change = tempfilestat.st_size;
 		root_inode = tempfilemeta.root_inode;
 		tmp_size = tempfilestat.st_size;
 		if (tmp_size == 0)
@@ -380,27 +400,20 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		else
 			total_blocks = ((tmp_size - 1) / MAX_BLOCK_SIZE) + 1;
 
-		flock(fileno(metafptr), LOCK_UN);
-		mlock = FALSE;
-
 		/* Delete all blocks */
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
 							block_count++) {
-			flock(fileno(metafptr), LOCK_EX);
-			mlock = TRUE;
 
 			current_index = block_count % BLK_INCREMENTS;
 			which_page = block_count / BLK_INCREMENTS;
 
 			if (current_page != which_page) {
-				page_pos = seek_page2(&tempfilemeta, metafptr,
-					which_page, 0);
+				page_pos = seek_page2(&tempfilemeta, 
+					backend_metafptr, which_page, 0);
 
 				if (page_pos <= 0) {
 					block_count += BLK_INCREMENTS - 1;
-					flock(fileno(metafptr), LOCK_UN);
-					mlock = FALSE;
 					continue;
 				}
 				current_page = which_page;
@@ -408,17 +421,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 			/*TODO: error handling here if cannot read correctly*/
 
-			FSEEK(metafptr, page_pos, SEEK_SET);
-
+			FSEEK(backend_metafptr, page_pos, SEEK_SET);
 			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-								metafptr);
+							backend_metafptr);
 			block_status =
-				temppage.block_entries[current_index].uploaded;
+				temppage.block_entries[current_index].status;
 
 			/* Delete backend object if uploaded */
-			if (block_status == TRUE) {
-				flock(fileno(metafptr), LOCK_UN);
-				mlock = FALSE;
+			if (block_status != ST_NONE) {
 				sem_wait(&(delete_ctl.delete_queue_sem));
 				sem_wait(&(delete_ctl.delete_op_sem));
 				curl_id = -1;
@@ -438,9 +448,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 						(void *)&con_object_dsync,
 							(void *)tmp_dt);
 				delete_ctl.threads_created[curl_id] = TRUE;
-			} else {
-				flock(fileno(metafptr), LOCK_UN);
-				mlock = FALSE;
 			}
 		}
 		/* Block deletion should be done here. Check if all delete
@@ -464,6 +471,11 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 			}
 			sem_post(&(delete_ctl.delete_op_sem));
 		}
+
+		flock(fileno(backend_metafptr), LOCK_UN);
+		mlock = FALSE;
+
+		unlink(backend_metapath);
 	}
 
 errcode_handle:
@@ -472,6 +484,11 @@ errcode_handle:
 		if (mlock == TRUE)
 			flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
+	}
+	if (backend_metafptr != NULL) {
+		if (mlock == TRUE)
+			flock(fileno(backend_metafptr), LOCK_UN);
+		fclose(backend_metafptr);
 	}
 
 	/* Delete meta */
