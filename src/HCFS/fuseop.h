@@ -143,7 +143,6 @@ typedef struct {
 	ino_t root_inode;
 	long long upload_seq;
 	long long size_last_upload;
-	long long trunc_size;
 } FILE_META_TYPE;
 
 /* Defining the structure of symbolic link meta */

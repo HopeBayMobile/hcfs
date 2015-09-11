@@ -46,6 +46,9 @@
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <fcntl.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -1751,6 +1754,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	ssize_t ret_ssize;
 	MOUNT_T *tmpptr;
 	size_t ret_size;
+	FILE *truncfptr;
+	char truncpath[METAPATHLEN];
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -1906,15 +1911,87 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		/* First read from meta file, if need
 		to update trunc_size, change the value in meta cache and
 		write back to meta cache */
-		FSEEK((*body_ptr)->fptr, sizeof(struct stat), SEEK_SET);
-		FREAD(&truncfilemeta, sizeof(FILE_META_TYPE), 1,
-			(*body_ptr)->fptr);
-		temp_trunc_size = truncfilemeta.trunc_size;
-		if (temp_trunc_size != tempfilemeta.trunc_size)
-			tempfilemeta.trunc_size = temp_trunc_size;
+#ifdef _ANDROID_ENV_
+		ret = fetch_trunc_path(truncpath, this_inode);
 
-		if (temp_trunc_size < filestat->st_size)
-			tempfilemeta.trunc_size = filestat->st_size;
+		if (access(truncpath, F_OK) != 0) {
+			errcode = errno;
+
+			if (errcode != ENOENT) {
+				write_log(0, "IO Error\n");
+				write_log(10, "Debug %s. %d, %s\n",
+					__func__, errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+
+			truncfptr = fopen(truncpath, "w");
+			if (truncfptr == NULL) {
+				errcode = errno;
+				write_log(0, "IO Error\n");
+				write_log(10, "Debug %s. %d, %s\n",
+					__func__, errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+			setbuf(truncfptr, NULL);
+			flock(fileno(truncfptr), LOCK_EX);
+			temp_trunc_size = filestat->st_size;
+			FWRITE(&temp_trunc_size, sizeof(long long), 1,
+				truncfptr);
+			fclose(truncfptr);
+		} else {
+			truncfptr = fopen(truncpath, "r+");
+			if (truncfptr == NULL) {
+				errcode = errno;
+				write_log(0, "IO Error\n");
+				write_log(10, "Debug %s. %d, %s\n",
+					__func__, errcode, strerror(errcode));
+				errcode = -errcode;
+				goto errcode_handle;
+			}
+			setbuf(truncfptr, NULL);
+			flock(fileno(truncfptr), LOCK_EX);
+			FREAD(&temp_trunc_size, sizeof(long long), 1,
+				truncfptr);
+			if (temp_trunc_size < filestat->st_size) {
+				temp_trunc_size = filestat->st_size;
+				FSEEK(truncfptr, 0, SEEK_SET);
+				FWRITE(&temp_trunc_size, sizeof(long long), 1,
+					truncfptr);
+			}
+			fclose(truncfptr);
+		}
+#else
+		ret_ssize = fgetxattr(fileno((*body_ptr)->fptr),
+				"user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+		if (((ret_ssize < 0) && (errno == ENOATTR)) ||
+			((ret_ssize >= 0) &&
+				(temp_trunc_size < filestat->st_size))) {
+			temp_trunc_size = filestat->st_size;
+			ret = fsetxattr(fileno((*body_ptr)->fptr),
+				"user.trunc_size", &(temp_trunc_size),
+				sizeof(long long), 0);
+			if (ret < 0) {
+				errcode = errno;
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent. ");
+				write_log(0, "Code %d, %s\n", errcode,
+						strerror(errcode));
+				return -EIO;
+			}
+		} else {
+			if (ret_ssize < 0) {
+				errcode = errno;
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent. ");
+				write_log(0, "Code %d, %s\n", errcode,
+						strerror(errcode));
+				return -EIO;
+			}
+		}
+#endif /* _ANDROID_ENV_ */
 	}
 
 	ret = meta_cache_update_file_data(this_inode, filestat,

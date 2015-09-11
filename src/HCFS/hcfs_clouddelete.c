@@ -35,6 +35,9 @@ additional pending meta or block deletion for this inode to finish.*/
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
+#ifndef _ANDROID_ENV_
+#include <attr/xattr.h>
+#endif
 
 #include "hcfs_tocloud.h"
 #include "params.h"
@@ -286,9 +289,10 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 *************************************************************************/
 void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 {
-	char thismetapath[400];
+	char thismetapath[METAPATHLEN];
+	char truncpath[METAPATHLEN];
 	ino_t this_inode;
-	FILE *metafptr;
+	FILE *metafptr, *truncfptr;
 	struct stat tempfilestat;
 	FILE_META_TYPE tempfilemeta;
 	DIR_META_TYPE tempdirmeta;
@@ -370,17 +374,31 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		tmp_size = tempfilestat.st_size;
 
 		/* Check if need to sync past the current size */
-		/* Now store trunc_size in file meta, removing the need
-		of xattr */
-		temp_trunc_size = tempfilemeta.trunc_size;
+#ifdef _ANDROID_ENV_
+		ret = fetch_trunc_path(truncpath, this_inode);
 
-		if (tmp_size < temp_trunc_size) {
-			tmp_size = temp_trunc_size;
-			tempfilemeta.trunc_size = 0;
-			FSEEK(metafptr, sizeof(FILE_META_TYPE), SEEK_SET);
-			FWRITE(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
-				metafptr);
+		truncfptr = fopen(truncpath, "r+");
+		if (truncfptr != NULL) {
+			setbuf(truncfptr, NULL);
+			flock(fileno(truncfptr), LOCK_EX);
+			FREAD(&temp_trunc_size, sizeof(long long), 1,
+				truncfptr);
+
+			if (tmp_size < temp_trunc_size) {
+				tmp_size = temp_trunc_size;
+				UNLINK(truncpath);
+			}
+			fclose(truncfptr);
 		}
+#else
+		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
+				&temp_trunc_size, sizeof(long long));
+
+		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
+			tmp_size = temp_trunc_size;
+			fremovexattr(fileno(metafptr), "user.trunc_size");
+		}
+#endif
 
 		if (tmp_size == 0)
 			total_blocks = 0;

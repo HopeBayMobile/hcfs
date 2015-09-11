@@ -24,6 +24,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode);
 
 int fetch_stat_path(char *pathname, ino_t this_inode);
 
+int fetch_trunc_path(char *pathname, ino_t this_inode);
+
 /*Will copy the filename of the block file to pathname*/
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num);
 int parse_parent_self(const char *pathname, char *parentname, char *selfname);

@@ -1073,3 +1073,49 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
 errcode_handle:
 	return errcode;
 }
+
+/************************************************************************
+*
+* Function name: fetch_trunc_path
+*        Inputs: char *pathname, ino_t this_inode
+*        Output: Integer
+*       Summary: Given the inode number this_inode,
+*                copy the filename to the trunc tag file
+*                to the space pointed by pathname.
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	char tempname[METAPATHLEN];
+	int sub_dir;
+	int errcode, ret;
+
+	if (METAPATH == NULL)
+		return -EPERM;
+
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
+
+	sub_dir = this_inode % NUMSUBDIR;
+
+	snprintf(tempname, METAPATHLEN, "%s/sub_%d", METAPATH, sub_dir);
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
+
+	snprintf(tempname, METAPATHLEN, "%s/sub_%d/trunc", METAPATH, sub_dir);
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
+
+#ifdef ARM_32bit_
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/trunc/trunc%lld",
+			METAPATH, sub_dir, this_inode);
+#else
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/trunc/trunc%ld",
+			METAPATH, sub_dir, this_inode);
+#endif
+	return 0;
+errcode_handle:
+	return errcode;
+}
