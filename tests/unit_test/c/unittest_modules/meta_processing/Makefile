@@ -58,7 +58,7 @@ test : $(TESTS)
 	./super_block_unittest
 	./lookup_count_unittest
 	./xattr_ops_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

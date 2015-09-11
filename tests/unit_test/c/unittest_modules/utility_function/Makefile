@@ -56,7 +56,7 @@ test : $(TESTS)
 	./utils_unittest
 	./dir_entry_btree_unittest
 	./logger_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

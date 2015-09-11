@@ -53,7 +53,7 @@ clean :
 test : $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

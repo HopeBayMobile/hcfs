@@ -53,7 +53,7 @@ clean :
 test : $(TESTS)
 	./hcfs_cachebuild_unittest
 	./hcfs_cacheops_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

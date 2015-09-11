@@ -54,7 +54,7 @@ clean :
 
 test : $(TESTS)
 	./api_interface_unittest
-	gcov *.gcno
+	gcovr -r $(USER_DIR) .
 
 # Builds gtest.a and gtest_main.a.
 

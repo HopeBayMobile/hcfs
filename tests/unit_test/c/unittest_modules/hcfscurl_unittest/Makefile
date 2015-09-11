@@ -52,7 +52,7 @@ clean :
 
 test : $(TESTS)
 	./hcfscurl_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

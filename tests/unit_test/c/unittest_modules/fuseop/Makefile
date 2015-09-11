@@ -54,7 +54,7 @@ clean :
 
 test : $(TESTS)
 	./fuseop_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

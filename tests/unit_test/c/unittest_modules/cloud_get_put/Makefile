@@ -54,7 +54,7 @@ test : $(TESTS)
 	./hcfs_fromcloud_unittest
 	./hcfs_tocloud_unittest
 	./hcfs_clouddelete_unittest
-	gcov *.gcno
+	gcovr -r / .
 
 # Builds gtest.a and gtest_main.a.
 

@@ -52,7 +52,7 @@ clean :
 
 test : $(TESTS)
 	./hcfs_enc_compress_unittest
-	gcov *.gcno
+	gcovr -r $(USER_DIR) .
 
 # Builds gtest.a and gtest_main.a.
 
