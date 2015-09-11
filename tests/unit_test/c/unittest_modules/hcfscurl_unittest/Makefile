@@ -52,7 +52,7 @@ clean :
 
 test : setup $(TESTS)
 	./hcfscurl_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

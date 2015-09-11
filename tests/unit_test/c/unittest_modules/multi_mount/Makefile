@@ -55,7 +55,7 @@ clean :
 test : setup $(TESTS)
 	./FS_manager_unittest
 	./mount_manager_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

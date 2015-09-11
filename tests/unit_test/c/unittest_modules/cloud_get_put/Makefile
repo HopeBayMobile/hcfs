@@ -54,7 +54,7 @@ test : setup $(TESTS)
 	./hcfs_fromcloud_unittest
 	./hcfs_tocloud_unittest
 	./hcfs_clouddelete_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

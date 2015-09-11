@@ -53,7 +53,7 @@ clean :
 test : setup $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

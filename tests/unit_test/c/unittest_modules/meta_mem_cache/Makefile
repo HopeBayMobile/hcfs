@@ -52,7 +52,7 @@ clean :
 
 test : setup $(TESTS)
 	./meta_mem_cache_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

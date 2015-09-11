@@ -53,7 +53,7 @@ clean :
 test : setup $(TESTS)
 	./hcfs_cachebuild_unittest
 	./hcfs_cacheops_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

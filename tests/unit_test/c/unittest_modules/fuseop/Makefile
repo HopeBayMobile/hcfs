@@ -54,7 +54,7 @@ clean :
 
 test : setup $(TESTS)
 	./fuseop_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

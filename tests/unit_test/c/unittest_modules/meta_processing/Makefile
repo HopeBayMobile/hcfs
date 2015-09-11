@@ -58,7 +58,7 @@ test : setup $(TESTS)
 	./super_block_unittest
 	./lookup_count_unittest
 	./xattr_ops_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :

@@ -56,7 +56,7 @@ test : setup $(TESTS)
 	./utils_unittest
 	./dir_entry_btree_unittest
 	./logger_unittest
-	gcovr -r / .
+	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
 setup :
