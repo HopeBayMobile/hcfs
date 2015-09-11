@@ -1,5 +1,4 @@
 DIRS := $(wildcard c/unittest_modules/*/.)
-DIRS := c/unittest_modules/enc_compress/.
 BUILDDIRS = $(DIRS:%=build-%)
 CLEANDIRS = $(DIRS:%=clean-%)
 TESTDIRS = $(DIRS:%=test-%)
