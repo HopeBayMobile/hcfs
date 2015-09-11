@@ -1,6 +1,37 @@
 #!/bin/bash
 
-echo ======== ${BASH_SOURCE[0]} ========
+# A POSIX variable
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+
+# Initialize our own variables:
+output_file=""
+verbose=0
+
+while getopts ":vm:" opt; do
+    case $opt in
+    m)
+        mode=$OPTARG
+        ;;
+    v)
+        verbose=1
+        ;;
+    \?)
+        echo "Invalid option: -$OPTARG" >&2
+        exit 1
+        ;;
+    :)
+        echo "Option -$OPTARG requires an argument." >&2
+        exit 1
+        ;;
+    esac
+done
+
+if [ $verbose -ne 0 ]; then 
+    echo ======== ${BASH_SOURCE[0]} ========
+    echo Setup mode: $mode
+    set -x
+fi
+
 export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
 function install_pkg {
@@ -9,14 +40,13 @@ function install_pkg {
     fi
 }
 
-set -e -x
 # dev dependencies
-packages="
-libattr1-dev
-libfuse-dev
-libcurl4-openssl-dev
-liblz4-dev
-libssl-dev
+packages="\
+libattr1-dev \
+libfuse-dev \
+libcurl4-openssl-dev \
+liblz4-dev \
+libssl-dev \
 "
 
 # Add NOPASSWD for user, required by functional test to replace /etc/hcfs.conf

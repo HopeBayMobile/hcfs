@@ -6,7 +6,7 @@ set -x -e
 local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 docker_workspace=/home/jenkins/workspace/HCFS
 
-mode="tests" $local_repo/utils/setup_dev_env.sh
+$local_repo/utils/setup_dev_env.sh -vm tests
 
 # Start test slave
 sudo docker rm -f hcfs_test 2>/dev/null || true

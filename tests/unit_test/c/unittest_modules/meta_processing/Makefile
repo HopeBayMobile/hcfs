@@ -47,18 +47,22 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 
 # House-keeping build targets.
 
-all : $(TESTS)
+all : setup $(TESTS)
 
 clean :
 	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : $(TESTS)
+test : setup $(TESTS)
 	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest
 	./lookup_count_unittest
 	./xattr_ops_unittest
 	gcovr -r / .
+
+.PHONY : setup
+setup :
+	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 # Builds gtest.a and gtest_main.a.
 
