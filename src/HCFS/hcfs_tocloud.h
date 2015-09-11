@@ -28,6 +28,9 @@
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16
 
+#define TOUPLOAD_BLOCKS 0
+#define BACKEND_BLOCKS 1
+
 typedef struct {
 	off_t page_filepos;
 	long long page_entry_index;
@@ -103,5 +106,8 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr);
 void upload_loop(void);
 int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			long long num_inodes_delta);
+int download_meta_from_backend(ino_t inode, const char *download_metapath,
+	FILE **backend_fptr);
 
+int delete_toupload_blocks(int progress_fd);
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */
