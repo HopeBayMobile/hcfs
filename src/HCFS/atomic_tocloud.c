@@ -101,7 +101,7 @@ int set_progress_info(int fd, long long block_index, char finish_uploading,
 	flock(fd, LOCK_EX);
 	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
 		offset);
-	if (ret_ssize == 0) /* Init because backend meta is a truncated file */
+	if (ret_ssize == 0) /* Init because backend_blocks < now blocks */
 		memset(&block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 	block_uploading_status.finish_uploading = finish_uploading;
@@ -171,14 +171,12 @@ int open_progress_info(ino_t inode)
 	return ret_fd;
 }
 
-int init_progress_info(int fd, long long num_blocks, FILE *backend_metafptr)
+int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 {
 	int errcode;
 	long long offset, ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 	struct stat tempstat;
-	long long backend_blocks;
-	long long progress_num_blocks;
 	long long e_index, which_page, current_page, page_pos;
 	long long block;
 	BLOCK_ENTRY_PAGE block_page;
@@ -190,7 +188,7 @@ int init_progress_info(int fd, long long num_blocks, FILE *backend_metafptr)
 		offset = 0;
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
-		for (block = 0; block < num_blocks; block++) {
+		for (block = 0; block < backend_blocks; block++) {
 			PWRITE(fd, &block_uploading_status,
 					sizeof(BLOCK_UPLOADING_STATUS), offset);
 			offset += sizeof(BLOCK_UPLOADING_STATUS);
@@ -199,23 +197,15 @@ int init_progress_info(int fd, long long num_blocks, FILE *backend_metafptr)
 		return 0;
 	}
 
-	PREAD(fileno(backend_metafptr), &tempstat, sizeof(struct stat), 0);
 	PREAD(fileno(backend_metafptr), &tempfilemeta, sizeof(FILE_META_TYPE),
 							sizeof(struct stat));
 
-	if (tempstat.st_size == 0)
-		backend_blocks = 0;
-	else
-		backend_blocks = ((tempstat.st_size - 1)
-				/ MAX_BLOCK_SIZE) + 1;
-	progress_num_blocks = (num_blocks > backend_blocks) ?
-		num_blocks : backend_blocks;
 	write_log(10, "Debug: backend blocks = %lld\n", backend_blocks);
 
 	/* Write into progress info */
 	current_page = -1;
 	offset = 0;
-	for (block = 0; block < progress_num_blocks; block++) {
+	for (block = 0; block < backend_blocks; block++) {
 		e_index = block % BLK_INCREMENTS;
 		which_page = block / BLK_INCREMENTS;
 
@@ -364,7 +354,7 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 		return -EEXIST;
 	}
 
-	tar_ptr = fopen(tarpath, "w");
+	tar_ptr = fopen(tarpath, "w+");
 	if (tar_ptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
