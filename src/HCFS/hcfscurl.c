@@ -311,7 +311,7 @@ void dump_S3_list_body(FILE *fptr)
 *  Return value: Return code from HTTP header, or -1 if error.
 *
 *************************************************************************/
-int hcfs_get_auth_swift(char *swift_user, char *swift_pass, 
+int hcfs_get_auth_swift(char *swift_user, char *swift_pass,
 	char *swift_url, CURL_HANDLE *curl_handle)
 {
 	struct curl_slist *chunk = NULL;
@@ -683,7 +683,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	FTELL(fptr);
 	objsize = ret_pos;
 	FSEEK(fptr, 0, SEEK_SET);
-	/* write_log(10, "object size:%d\n", objsize); */
+	//write_log(10, "object size: %d, objname: %s\n", objsize, objname);
 
 	if (objsize < 0) {
 		fclose(swift_header_fptr);

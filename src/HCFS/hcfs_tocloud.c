@@ -186,13 +186,13 @@ static inline int _upload_terminate_thread(int index)
 	sem_post(&(sync_ctl.sync_op_sem));
 
 	/* Terminate directly when delete old data on backend */
-	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {	
+	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
 		sem_wait(&(sync_ctl.sync_op_sem));
 		upload_ctl.threads_in_use[index] = FALSE;
 		upload_ctl.threads_created[index] = FALSE;
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(sync_ctl.sync_op_sem));
-		
+
 		sem_post(&(upload_ctl.upload_queue_sem));
 		return 0;
 	}
@@ -247,7 +247,7 @@ static inline int _upload_terminate_thread(int index)
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 								metafptr);
-					write_log(10, "Debug: block is set as ST_BOTH\n");
+					//write_log(10, "Debug: block is set as ST_BOTH\n");
 				} else {
 					if ((tmp_entry->status == ST_TODELETE)
 						&& (is_delete == TRUE)) {
@@ -534,14 +534,14 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].inode = this_inode;
 			upload_ctl.upload_threads[count].blockno = block_count;
 			upload_ctl.upload_threads[count].seq = seq;
-			upload_ctl.upload_threads[count].progress_fd = 
+			upload_ctl.upload_threads[count].progress_fd =
 								progress_fd;
 			upload_ctl.upload_threads[count].page_filepos =
 								page_pos;
 			upload_ctl.upload_threads[count].page_entry_index =
 									e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
-			upload_ctl.upload_threads[count].is_backend_delete = 
+			upload_ctl.upload_threads[count].is_backend_delete =
 							is_backend_delete;
 
 			upload_ctl.total_active_upload_threads++;
@@ -557,7 +557,7 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 	char upload_done;
 	struct timespec time_to_sleep;
 	int count;
-	
+
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 	upload_done = FALSE;
@@ -567,7 +567,7 @@ static inline void _busy_wait_all_specified_upload_threads(ino_t inode)
 		sem_wait(&(upload_ctl.upload_op_sem));
 		for (count = 0; count < MAX_UPLOAD_CONCURRENCY; count++) {
 			if ((upload_ctl.threads_in_use[count] == TRUE) &&
-				(upload_ctl.upload_threads[count].inode == 
+				(upload_ctl.upload_threads[count].inode ==
 				inode)) { /* Wait for this inode */
 				upload_done = FALSE;
 				break;
@@ -610,58 +610,67 @@ static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 }
 
 int download_meta_from_backend(ino_t inode, const char *download_metapath,
-	FILE *backend_fptr)
+	FILE **backend_fptr)
 {
 	char backend_meta_name[500];
 	int ret, errcode;
 
 	fetch_backend_meta_name(inode, backend_meta_name);
 
-	backend_fptr = fopen(download_metapath, "w+");
-	if (backend_fptr == NULL) {
+	*backend_fptr = fopen(download_metapath, "w+");
+	if (*backend_fptr == NULL) {
 		write_log(0, "Error: Fail to open file in %s\n", __func__);
 		return -1;
 	}
+	setbuf(*backend_fptr, NULL);
 
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
-	
-	ret = hcfs_get_object(backend_fptr, backend_meta_name,
+
+#ifdef ENCRYPT_ENABLE
+	char  *get_fptr_data = NULL;
+	size_t len = 0;
+	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
+
+	ret = hcfs_get_object(get_fptr, backend_meta_name,
 		&(sync_stat_ctl.statcurl));
+#else
+	ret = hcfs_get_object(*backend_fptr, backend_meta_name,
+		&(sync_stat_ctl.statcurl));
+#endif
+#ifdef ENCRYPT_ENABLE
+	fclose(get_fptr);
+	unsigned char *key = get_key();
+	decrypt_to_fd(*backend_fptr, key, get_fptr_data, len);
+	free(get_fptr_data);
+	free(key);
+#endif
+	sem_post(&(sync_stat_ctl.stat_op_sem));
+
 	if ((ret >= 200) && (ret <= 299)) {
 		errcode = 0;
 		write_log(10, "Debug: Download meta %ld from backend\n", inode);
 	} else if (ret != 404) {
-		errcode = -EIO;	
-		fclose(backend_fptr);
+		errcode = -EIO;
+		fclose(*backend_fptr);
 		unlink(download_metapath);
-		backend_fptr = NULL;
+		*backend_fptr = NULL;
 	} else {
 		errcode = 0;
-		fclose(backend_fptr);
+		fclose(*backend_fptr);
 		unlink(download_metapath);
-		backend_fptr = NULL;
+		*backend_fptr = NULL;
 		write_log(10, "Debug: meta %ld does not exist on cloud\n",
 			inode);
 	}
-	
-	sem_post(&(sync_stat_ctl.stat_op_sem));
-/*	
-	ret = fetch_from_cloud(backend_fptr, backend_meta_name);
-	if (ret < 0) {
-		write_log(0, "Error: Fail to download meta from backend\n");
-		fclose(backend_fptr);
-		unlink(download_metapath);
-		return -1;
-	}
-*/
+
 	return errcode;
 }
 
 /**
  * Main function to upload all block and meta
  *
- * This function aims to upload all meta data and block data to cloud. 
- * If it is a regfile, upload all blocks first and then upload meta when finish 
+ * This function aims to upload all meta data and block data to cloud.
+ * If it is a regfile, upload all blocks first and then upload meta when finish
  * uploading all blocks. Finally delete old blocks on backend.
  * If it is not a regfile, then just upload metadata to cloud.
  *
@@ -697,11 +706,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	long long size_last_upload;
 	long long size_diff;
 	int progress_fd;
+	char first_upload, is_local_meta_deleted;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
 	sync_error = FALSE;
-
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
 	if (ret < 0) {
@@ -723,12 +732,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/* Copy local meta, -EEXIST means it has been copied */
 	ret = check_and_copy_file(local_metapath, toupload_metapath);
 	if (ret < 0) {
-		if (ret != -EEXIST) { 
+		if (ret != -EEXIST) {
 			super_block_update_transit(ptr->inode, FALSE, TRUE);
 			return;
 		}
 	}
 
+	/* Open temp meta to be uploaded */
 	toupload_metafptr = fopen(toupload_metapath, "r");
 	if (toupload_metafptr == NULL) {
 		errcode = errno;
@@ -738,6 +748,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
+	/* Open local meta */
 	local_metafptr = fopen(local_metapath, "r+");
 	if (local_metafptr == NULL) {
 		errcode = errno;
@@ -754,38 +765,41 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
-	/* Download backend meta */
-	backend_metafptr = NULL;
-	ret_ssize = fgetxattr(fileno(local_metafptr), "user.upload_seq",
-		&upload_seq, sizeof(long long));
-	if ((ret_ssize >= 0) && (upload_seq > 0)) {
-		sprintf(backend_metapath,
-			"upload_bullpen/backend_meta_%ld", this_inode);
+	/* Download backend meta if it is regfile */
+	if (S_ISREG(ptr->this_mode)) {
+		first_upload = FALSE;
+		backend_metafptr = NULL;
+		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld",
+				this_inode);
 		ret = download_meta_from_backend(this_inode, backend_metapath,
-			backend_metafptr);
+				&backend_metafptr);
 		if (ret < 0) {
+			super_block_update_transit(ptr->inode, FALSE, TRUE);
 			fclose(local_metafptr);
 			fclose(toupload_metafptr);
 			unlink(toupload_metapath);
 			return;
+		} else {
+		/* backend_metafptr may be NULL when first uploading */
+			if (backend_metafptr == NULL) {
+				write_log(10, "Debug: upload first time\n");
+				first_upload = TRUE;
+			}
 		}
 	}
-	
-	flock(fileno(toupload_metafptr), LOCK_EX);
 
+	flock(fileno(toupload_metafptr), LOCK_EX);
 	/* Upload block if mode is regular file */
 	if (S_ISREG(ptr->this_mode)) {
-		//flock(fileno(metafptr), LOCK_EX);
 		FSEEK(toupload_metafptr, 0, SEEK_SET);
 		FREAD(&tempfilestat, sizeof(struct stat), 1,
 			toupload_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
 			toupload_metafptr);
 
-	
 		toupload_size = tempfilestat.st_size;
-		//size_last_upload = tempfilemeta.size_last_upload;
 		root_inode = tempfilemeta.root_inode;
+
 		/* Check if need to sync past the current size */
 		ret_ssize = fgetxattr(fileno(toupload_metafptr),
 			"user.trunc_size", &temp_trunc_size, sizeof(long long));
@@ -797,19 +811,24 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				"user.trunc_size");
 		}
 
+		/* Compute number of blocks */
 		if (toupload_trunc_block_size == 0)
 			total_blocks = 0;
 		else
-			total_blocks = ((toupload_trunc_block_size - 1) 
+			total_blocks = ((toupload_trunc_block_size - 1)
 				/ MAX_BLOCK_SIZE) + 1;
 
-		//flock(fileno(metafptr), LOCK_UN);
-
 		/* Init progress info based on # of blocks */
-		init_progress_info(progress_fd, total_blocks);
-		write_log(10, "Debug: total blocks = %lld, root_inode = %lld\n", total_blocks, root_inode);
+		init_progress_info(progress_fd, total_blocks, backend_metafptr);
+		if (backend_metafptr != NULL) {
+			fclose(backend_metafptr);
+			backend_metafptr = NULL;
+			UNLINK(backend_metapath);
+		}
 
+		/* Begin to upload blocks */
 		current_page = -1;
+		is_local_meta_deleted = FALSE;
 		for (block_count = 0; block_count < total_blocks;
 							block_count++) {
 			//flock(fileno(metafptr), LOCK_EX);
@@ -839,7 +858,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					page_pos, SEEK_SET, FALSE);
 
 				FREAD_ADHOC_SYNC_LOOP(&toupload_temppage,
-					sizeof(BLOCK_ENTRY_PAGE), 
+					sizeof(BLOCK_ENTRY_PAGE),
 					1, toupload_metafptr, FALSE);
 			}
 			tmp_entry = &(toupload_temppage.block_entries[e_index]);
@@ -849,8 +868,16 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			/* Lock local meta. Read local meta and update status.
 			   This should be read again even in the same page pos
 			   because someone may modify it. */
-			flock(fileno(local_metafptr), LOCK_EX);
-			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos, 
+
+			if (is_local_meta_deleted == FALSE) {
+				flock(fileno(local_metafptr), LOCK_EX);
+				if (access(local_metapath, F_OK) < 0) {
+					flock(fileno(local_metafptr), LOCK_UN);
+					is_local_meta_deleted = TRUE;
+				}
+			}
+
+			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos,
 				SEEK_SET, TRUE);
 			FREAD_ADHOC_SYNC_LOOP(&local_temppage,
 				sizeof(BLOCK_ENTRY_PAGE), 1,
@@ -864,19 +891,19 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				if (local_block_status != ST_TODELETE) {
 					tmp_entry->status = ST_LtoC;
 					/* Update local meta */
-					FSEEK_ADHOC_SYNC_LOOP( local_metafptr,
+					FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
 						page_pos, SEEK_SET, TRUE);
 					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
 						sizeof(BLOCK_ENTRY_PAGE),
 						1, local_metafptr, TRUE);
 				}
-				/* Unlock local meta */	
+				/* Unlock local meta */
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, FALSE,
-						ptr->inode, block_count, 
-						0, page_pos, 
+						ptr->inode, block_count,
+						0, page_pos,
 						e_index, progress_fd,
 						FALSE);
 				sem_post(&(upload_ctl.upload_op_sem));
@@ -896,8 +923,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, FALSE,
-						ptr->inode, block_count, 
-						0, page_pos, 
+						ptr->inode, block_count,
+						0, page_pos,
 						e_index, progress_fd,
 						FALSE);
 				sem_post(&(upload_ctl.upload_op_sem));
@@ -911,15 +938,15 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				continue;
 			}
 
-			/*** Case 3: Local block is deleted. Delete backend 
+			/*** Case 3: Local block is deleted. Delete backend
 			   block data, too. ***/
-			/* TODO: delete backend data here or 
+			/* TODO: delete backend data here or
 			   after meta being uploaded? */
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
 				/*tmp_entry->status = ST_LtoC;*/
 				/* Update local meta */
-				/*FSEEK_ADHOC_SYNC_LOOP(local_metafptr, 
+				/*FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
 					page_pos, SEEK_SET, TRUE);
 				FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
 					sizeof(BLOCK_ENTRY_PAGE),
@@ -931,8 +958,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, TRUE,
-						ptr->inode, block_count, 
-						0, page_pos, 
+						ptr->inode, block_count,
+						0, page_pos,
 						e_index, progress_fd,
 						FALSE);
 				sem_post(&(upload_ctl.upload_op_sem));
@@ -951,7 +978,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		/* Block sync should be done here. Check if all upload
 		threads for this inode has returned before starting meta sync*/
 		_busy_wait_all_specified_upload_threads(ptr->inode);
-		
+
 	}
 
 	/*Check if metafile still exists. If not, forget the meta upload*/
@@ -1022,8 +1049,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		fclose(local_metafptr);
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
-		if (backend_metafptr)
-			fclose(backend_metafptr);
 
 		pthread_join(upload_ctl.upload_threads_no[which_curl], NULL);
 		/*TODO: Need to check if metafile still exists.
@@ -1093,14 +1118,26 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	long long backend_seq;
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
-		ret = get_progress_info(progress_fd, block_count, &block_info);
+		ret = get_progress_info_nonlock(progress_fd, block_count,
+			&block_info);
+		if (ret == 0) /* Remaining are empty blocks */
+			break;
+		else if (ret < 0) /* error */
+			continue;
+
 		finish_uploading = block_info.finish_uploading;
 		to_upload_seq = block_info.to_upload_seq;
 		backend_seq = block_info.backend_seq;
 
 		if (finish_uploading == FALSE) {
-			write_log(10, "Debug: block_%ld_%lld did not finish?\n",
-				ptr->inode, block_count);
+			//write_log(10, "Debug: block_%ld_%lld did not finish?\n",
+			//	ptr->inode, block_count);
+			continue;
+		}
+
+		if (backend_seq == 0) {
+			write_log(10, "Debug: block_%ld_%lld is uploaded first time\n",
+					ptr->inode, block_count);
 			continue;
 		}
 
@@ -1110,16 +1147,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			continue;
 		}
 
-		if (backend_seq == 0) {
-			write_log(10, "Debug: block_%ld_%lld is uploaded first time\n",
-				ptr->inode, block_count);
-			continue;
-		}
-
 		sem_wait(&(upload_ctl.upload_queue_sem));
 		sem_wait(&(upload_ctl.upload_op_sem));
 		which_curl = _select_upload_thread(TRUE, FALSE,
-			ptr->inode, block_count, backend_seq, 
+			ptr->inode, block_count, backend_seq,
 			0, 0, progress_fd, TRUE);
 		sem_post(&(upload_ctl.upload_op_sem));
 		dispatch_delete_block(which_curl);
@@ -1128,10 +1159,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/* Wait for those threads */
 	_busy_wait_all_specified_upload_threads(ptr->inode);
 
-
 	return;
 
 errcode_handle:
+	if (backend_metafptr != NULL) {
+		fclose(backend_metafptr);
+		unlink(backend_metapath);
+	}
 	flock(fileno(local_metafptr), LOCK_UN);
 	fclose(local_metafptr);
 	flock(fileno(toupload_metafptr), LOCK_UN);
@@ -1459,7 +1493,7 @@ int dispatch_upload_block(int which_curl)
 		goto errcode_handle;
 	}
 
-	ret = fetch_toupload_block_path(toupload_blockpath, 
+	ret = fetch_toupload_block_path(toupload_blockpath,
 		upload_ptr->inode, upload_ptr->blockno, 0);
 	if (ret < 0) {
 		errcode = ret;
@@ -1589,7 +1623,7 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
 			sync_threads[count].progress_fd = progress_fd;
-			
+
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",
 				sync_threads[count].inode,

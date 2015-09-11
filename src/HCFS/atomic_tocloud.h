@@ -20,13 +20,16 @@ typedef struct {
 
 int tag_status_on_fuse(ino_t this_inode, char status, int fd);
 
-int get_progress_info(int fd, long long block_index, 
+int get_progress_info(int fd, long long block_index,
+	BLOCK_UPLOADING_STATUS *block_uploading_status);
+
+int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
 int set_progress_info(int fd, long long block_index, char finish_uploading,
 	long long to_upload_seq, long long backend_seq);
 
-int init_progress_info(int fd, long long num_block);
+int init_progress_info(int fd, long long num_block, FILE *backend_metafptr);
 
 int open_progress_info(ino_t inode);
 
@@ -34,7 +37,7 @@ int close_progress_info(int fd, ino_t inode);
 
 int check_and_copy_file(const char *srcpath, const char *tarpath);
 
-int fetch_toupload_block_path(char *pathname, ino_t inode, 
+int fetch_toupload_block_path(char *pathname, ino_t inode,
 	long long block_no, long long seq);
 
 #endif
