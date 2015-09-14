@@ -26,7 +26,7 @@ while getopts ":vm:" opt; do
     esac
 done
 
-if [ $verbose -ne 0 ]; then 
+if [ $verbose -ne 0 ]; then
     echo ======== ${BASH_SOURCE[0]} ========
     echo Setup mode: $mode
     set -x
@@ -37,6 +37,7 @@ export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 function install_pkg {
     if ! dpkg -s $packages >/dev/null 2>&1; then
         sudo apt-get install -y $packages
+        packages=""
     fi
 }
 
@@ -58,6 +59,20 @@ fi
 case "$mode" in
 unit_test )
     packages="$packages gcovr"
+    # Use ccache to speedup compile
+    if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
+        export PATH="/usr/lib/ccache:$PATH"
+    fi
+    if ! ccache -V | grep 3.2; then
+        if ! apt-cache policy ccache | grep 3.2; then
+            source /etc/lsb-release
+            echo "deb http://ppa.launchpad.net/comet-jc/ppa/ubuntu $DISTRIB_CODENAME main" \
+                | sudo tee /etc/apt/sources.list.d/comet-jc-ppa-trusty.list
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 32EF5841642ADD17
+            sudo apt-get update
+        fi
+        sudo apt-get install -y ccache
+    fi
     install_pkg
     ;;
 functional_test )
