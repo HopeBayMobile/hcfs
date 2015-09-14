@@ -73,6 +73,7 @@ unit_test )
         fi
         sudo apt-get install -y ccache
     fi
+    export USE_CCACHE=1
     install_pkg
     ;;
 functional_test )

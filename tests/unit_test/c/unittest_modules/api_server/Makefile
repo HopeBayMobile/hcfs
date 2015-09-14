@@ -60,6 +60,9 @@ test : setup $(TESTS)
 setup :
 	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
+export PATH := /usr/lib/ccache:$(PATH)
+export USE_CCACHE := 1
+
 # Builds gtest.a and gtest_main.a.
 
 # Usually you shouldn't tweak such internal variables, indicated by a
