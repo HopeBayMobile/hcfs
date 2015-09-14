@@ -1,5 +1,10 @@
 #!/bin/bash
 
+flags=$-
+set +x # Pause debug, enable if verbose on
+[[ "$flags" =~ "x" ]] && flag_x="-x" || flag_x="+x"
+echo ======== ${BASH_SOURCE[0]} mode $mode ========
+
 # A POSIX variable
 OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
@@ -26,9 +31,9 @@ while getopts ":vm:" opt; do
     esac
 done
 
-if [ $verbose -ne 0 ]; then
-    echo ======== ${BASH_SOURCE[0]} ========
-    echo Setup mode: $mode
+if [ $verbose -eq 0 ]; then
+    set +x
+else
     set -x
 fi
 
@@ -57,8 +62,7 @@ if [ -n "$USER" -a "$USER" != "root" -a ! -f /etc/sudoers.d/50_${USER}_sh ]; the
 fi
 
 case "$mode" in
-unit_test )
-    packages="$packages gcovr"
+unit_test | functional_test )
     # Use ccache to speedup compile
     if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
         export PATH="/usr/lib/ccache:$PATH"
@@ -74,6 +78,9 @@ unit_test )
         sudo apt-get install -y ccache
     fi
     export USE_CCACHE=1
+    ;;&
+unit_test )
+    packages="$packages gcovr"
     install_pkg
     ;;
 functional_test )
@@ -101,3 +108,5 @@ tests )
     install_pkg
     ;;
 esac
+
+set $flag_x
