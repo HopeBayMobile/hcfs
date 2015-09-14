@@ -53,15 +53,6 @@ function install_pkg {
     fi
 }
 
-# dev dependencies
-packages="\
-libattr1-dev \
-libfuse-dev \
-libcurl4-openssl-dev \
-liblz4-dev \
-libssl-dev \
-"
-
 # Add NOPASSWD for user, required by functional test to replace /etc/hcfs.conf
 if [ -n "$USER" -a "$USER" != "root" -a ! -f /etc/sudoers.d/50_${USER}_sh ]; then
     sudo grep -q "^#includedir.*/etc/sudoers.d" /etc/sudoers || (echo "#includedir /etc/sudoers.d" | sudo tee -a /etc/sudoers)
@@ -75,6 +66,14 @@ docker_slave )
     sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list.d/proposed.list
     ;;&
 unit_test | functional_test | docker_slave )
+	# dev dependencies
+	packages="\
+	libattr1-dev \
+	libfuse-dev \
+	libcurl4-openssl-dev \
+	liblz4-dev \
+	libssl-dev \
+	"
     # Use ccache to speedup compile
     if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
         export PATH="/usr/lib/ccache:$PATH"
