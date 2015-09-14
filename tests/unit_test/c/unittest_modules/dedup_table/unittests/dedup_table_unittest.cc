@@ -8,15 +8,35 @@ extern "C" {
 
 int test_elements = 70000;
 
+class testEnvironment : public ::testing::Environment {
+	public:
+		virtual void SetUp() {
+		}
+
+		virtual void TearDown() {
+			printf("Removing temp files...\n");
+			unlink("testpatterns/ddt/test_ddt_meta");
+			unlink("testpatterns/ddt/ddt_meta_00");
+			unlink("testpatterns/ddt/for_delete_test");
+			unlink("testpatterns/ddt/for_increase_refcount_test");
+			unlink("testpatterns/ddt/for_insert_test");
+			unlink("testpatterns/ddt/for_mock_test");
+			unlink("testpatterns/ddt/for_search_test");
+			printf("Finished\n");
+		}
+};
+
+::testing::Environment* const dedup_table_env = ::testing::AddGlobalTestEnvironment(new testEnvironment);
+
 void _get_mock_hash(unsigned char output_hash[], int seed) {
 
-	int hash_length = 32;
+	int hash_length = SHA256_DIGEST_LENGTH;
 	int size_to_cmp = 0;
 	int count;
 	int mod;
 
-	// Clear output hash
-	memset(output_hash, 0, 32);
+	/* Clear output hash */
+	memset(output_hash, 0, hash_length);
 
 	size_to_cmp = seed;
 
@@ -24,19 +44,19 @@ void _get_mock_hash(unsigned char output_hash[], int seed) {
 	while (1) {
 		mod = size_to_cmp % 256;
 		size_to_cmp = size_to_cmp / 256;
-		memcpy(&(output_hash[32-count]), &mod, 1);
-		memcpy(&(output_hash[32-(count+1)]), &size_to_cmp, 1);
+		memcpy(&(output_hash[hash_length - count]), &mod, 1);
+		memcpy(&(output_hash[hash_length - (count + 1)]), &size_to_cmp, 1);
 		if (size_to_cmp < 256)
 			break;
 		count += 1;
 	}
 }
 
-// Base class to prepare tree for test
+/* Base class to prepare tree for test */
 class prepare_tree : public ::testing::Test {
         protected:
 		char test_tree_path[400];
-		unsigned char testdata[32] = {0};
+		unsigned char testdata[OBJID_LENGTH] = {0};
 		FILE *fptr;
 		int fd;
 		DDT_BTREE_NODE tempnode;
@@ -51,10 +71,10 @@ class prepare_tree : public ::testing::Test {
 
 			get_tree_name(test_tree_path);
 
-			// Prepare tree
+			/* Prepare tree */
 			initialize_ddt_meta(test_tree_path);
 
-			// Insert test data
+			/* Insert test data */
 			fptr = fopen(test_tree_path, "r+");
 			fd = fileno(fptr);
 
@@ -79,11 +99,12 @@ class prepare_tree : public ::testing::Test {
 				pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
 				_get_mock_hash(testdata, i);
+				memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 				//for (int tmp_idx = 0; tmp_idx < 32; ++tmp_idx) {
 				//	printf("%02x", testdata[tmp_idx]);
 				//}
 				//printf("\n");
-				insert_ddt_btree(testdata, &tempnode, fd, &tempmeta);
+				insert_ddt_btree(testdata, 0, &tempnode, fd, &tempmeta);
 			}
 
 			// Check if insert OK
@@ -99,7 +120,7 @@ class prepare_tree : public ::testing::Test {
                 }
 };
 
-// Test for initialize_ddt_meta
+/* Test for initialize_ddt_meta */
 TEST(initialize_ddt_metaTest, initOK) {
 
 	char metapath[] = "testpatterns/ddt/test_ddt_meta";
@@ -114,7 +135,7 @@ TEST(initialize_ddt_metaTest, initOK) {
 
 	fread(&tempmeta, sizeof(DDT_BTREE_META), 1, fptr);
 
-	// Compare arguments of tree meta
+	/* Compare arguments of tree meta */
 	EXPECT_EQ(0, tempmeta.tree_root);
 	EXPECT_EQ(0, tempmeta.total_el);
 	EXPECT_EQ(0, tempmeta.node_gc_list);
@@ -160,23 +181,23 @@ TEST_F(search_ddt_btreeTest, searchOK) {
 	memset(&t_node, 0, sizeof(DDT_BTREE_NODE));
 	memset(&tempmeta, 0, sizeof(DDT_BTREE_META));
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Start to search
+	/* Start to search */
 	for (s_idx = 0; s_idx < test_elements; s_idx++) {
 		pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 		pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
 		_get_mock_hash(testdata, s_idx);
-		// Compare return value
+		/* Compare return value */
 		ASSERT_EQ(0, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
-		// Compare key we found
-		EXPECT_EQ(0, memcmp(testdata, r_node.ddt_btree_el[r_idx].obj_id, 32));
+		/* Compare key we found */
+		EXPECT_EQ(0, memcmp(testdata, r_node.ddt_btree_el[r_idx].obj_id, SHA256_DIGEST_LENGTH));
 	}
 
 	fclose(fptr);
@@ -192,16 +213,17 @@ TEST_F(search_ddt_btreeTest, search_non_existed_el) {
 	memset(&t_node, 0, sizeof(DDT_BTREE_NODE));
 	memset(&tempmeta, 0, sizeof(DDT_BTREE_META));
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Start to search key - 0000..00011
+	/* Start to search key - 0000..00011 */
 	s_idx = test_elements + 1;
 	_get_mock_hash(testdata, s_idx);
+	memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 	EXPECT_EQ(1, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
 }
 
@@ -215,19 +237,20 @@ TEST_F(search_ddt_btreeTest, search_empty_node) {
 	memset(&t_node, 0, sizeof(DDT_BTREE_NODE));
 	memset(&tempmeta, 0, sizeof(DDT_BTREE_META));
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Force t_node has no elements
+	/* Force t_node has no elements */
 	t_node.num_el = 0;
 
-	// Start to search
+	/* Start to search */
 	s_idx = 0;
 	_get_mock_hash(testdata, s_idx);
+	memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 	EXPECT_EQ(-1, search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx));
 
 	fclose(fptr);
@@ -240,14 +263,14 @@ TEST_F(search_ddt_btreeTest, goto_error_handler) {
 	DDT_BTREE_NODE t_node, r_node;
 	DDT_BTREE_META tempmeta;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &t_node, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Force to close meta file
+	/* Force to close meta file */
 	fclose(fptr);
 
 	ret_val = search_ddt_btree(testdata, &t_node, fd, &r_node, &r_idx);
@@ -275,10 +298,10 @@ class insert_ddt_btreeTest : public ::testing::Test {
 
                 virtual void SetUp()
                 {
-			// Prepare tree
+			/* Prepare tree */
 			initialize_ddt_meta(test_tree_path);
 
-			// Insert test data
+			/* Insert test data */
 			fptr = fopen(test_tree_path, "r+");
 			fd = fileno(fptr);
 
@@ -296,18 +319,19 @@ class insert_ddt_btreeTest : public ::testing::Test {
 
 TEST_F(insert_ddt_btreeTest, insertOK) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
-	// Total insert 10 elements
+	/* Total insert 10 elements */
 	for (int i = 0; i < test_elements; i++) {
 		_get_mock_hash(testdata, i);
-		EXPECT_EQ(0, insert_ddt_btree(testdata, &tempnode, fd, &tempmeta));
+		memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
+		EXPECT_EQ(0, insert_ddt_btree(testdata, 0, &tempnode, fd, &tempmeta));
 	}
 
-	// Reload btree meta
+	/* Reload btree meta */
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	EXPECT_EQ(test_elements, tempmeta.total_el);
 
@@ -316,13 +340,14 @@ TEST_F(insert_ddt_btreeTest, insertOK) {
 
 TEST_F(insert_ddt_btreeTest, goto_error_handler) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int ret_val, has_err;
 
-	// Total insert 10 elements
+	/* Total insert 10 elements */
 	for (int i = 9; i >= 0; i--) {
 		_get_mock_hash(testdata, i);
-		ret_val = insert_ddt_btree(testdata, &tempnode, fd, &tempmeta);
+		memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
+		ret_val = insert_ddt_btree(testdata, 0, &tempnode, fd, &tempmeta);
 		if (ret_val < 0)
 			has_err = 1;
 		else
@@ -347,11 +372,11 @@ class delete_ddt_btreeTest : public prepare_tree {
 
 TEST_F(delete_ddt_btreeTest, deleteOK) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -359,6 +384,7 @@ TEST_F(delete_ddt_btreeTest, deleteOK) {
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
 	_get_mock_hash(testdata, test_elements - 1);
+	memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 
 	EXPECT_EQ(0, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 	EXPECT_EQ(test_elements - 1, tempmeta.total_el);
@@ -371,7 +397,7 @@ TEST_F(delete_ddt_btreeTest, delete_internal_element) {
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -387,11 +413,11 @@ TEST_F(delete_ddt_btreeTest, delete_internal_element) {
 
 TEST_F(delete_ddt_btreeTest, delete_all_elements) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -405,6 +431,7 @@ TEST_F(delete_ddt_btreeTest, delete_all_elements) {
 		pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
 		_get_mock_hash(testdata, i);
+		memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 		EXPECT_EQ(0, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 	}
 
@@ -419,12 +446,12 @@ TEST_F(delete_ddt_btreeTest, delete_all_elements) {
 
 TEST_F(delete_ddt_btreeTest, delete_non_existed_el) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int key;
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -435,6 +462,7 @@ TEST_F(delete_ddt_btreeTest, delete_non_existed_el) {
 
 	key = test_elements + 1;
 	_get_mock_hash(testdata, key);
+	memset(&(testdata[SHA256_DIGEST_LENGTH]), 0, (BYTES_TO_CHECK * 2));
 	EXPECT_EQ(2, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
 
 	EXPECT_EQ(test_elements, tempmeta.total_el);
@@ -452,7 +480,7 @@ TEST_F(delete_ddt_btreeTest, decrease_with_refcount_1) {
 	int ret_val, has_err;
 	int force_delete = 0;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -475,14 +503,14 @@ TEST_F(delete_ddt_btreeTest, decrease_with_refcount_2) {
 	int ret_val, has_err;
 	int force_delete = 0;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Need to increase the refcount manually
+	/* Need to increase the refcount manually */
 	tempnode.ddt_btree_el[0].refcount += 1;
 
 	EXPECT_EQ(1, delete_ddt_btree(tempnode.ddt_btree_el[0].obj_id,
@@ -494,18 +522,18 @@ TEST_F(delete_ddt_btreeTest, decrease_with_refcount_2) {
 
 TEST_F(delete_ddt_btreeTest, empty_node) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Force this node has no elements
+	/* Force this node has no elements */
 	tempnode.num_el = 0;
 
 	EXPECT_EQ(-1, delete_ddt_btree(testdata, &tempnode, fd, &tempmeta, force_delete));
@@ -515,11 +543,11 @@ TEST_F(delete_ddt_btreeTest, empty_node) {
 
 TEST_F(delete_ddt_btreeTest, goto_error_handler) {
 
-	unsigned char testdata[32] = {0};
+	unsigned char testdata[OBJID_LENGTH] = {0};
 	int ret_val, has_err;
 	int force_delete = 1;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -554,7 +582,7 @@ TEST_F(increase_ddt_el_refcountTest, increaseOK) {
 
 	int old_refcount;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -574,7 +602,7 @@ TEST_F(increase_ddt_el_refcountTest, wrong_search_index) {
 
 	int old_refcount;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
@@ -594,14 +622,14 @@ TEST_F(increase_ddt_el_refcountTest, goto_error_handler) {
 
 	int ret_val, has_err;
 
-	// Get tree file handler
+	/* Get tree file handler */
 	fptr = fopen(test_tree_path, "r+");
 	fd = fileno(fptr);
 
 	pread(fd, &tempmeta, sizeof(DDT_BTREE_META), 0);
 	pread(fd, &tempnode, sizeof(DDT_BTREE_NODE), tempmeta.tree_root);
 
-	// Force to close meta file
+	/* Force to close meta file */
 	fclose(fptr);
 
 	ret_val = increase_ddt_el_refcount(&tempnode, 0, fd);
@@ -616,29 +644,50 @@ TEST_F(increase_ddt_el_refcountTest, goto_error_handler) {
         Unittest of increase_ddt_el_refcount()
  */
 
-TEST(compute_hashTest, computeOK) {
+TEST(get_obj_idTest, computeOK) {
 
 	char *data_path = "testpatterns/testdata.1M";
-	// Actual hash is computed by openssl cli
+	/* Actual hash is computed by openssl cli */
 	char actual_hash[65] = "ac596f8d08e48824ceb4bdcc1085ca18f977ef166e67280808400d818d49616e";
 	char hash_str[65];
-	unsigned char hash[32];
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	/* To verify bytes of content of test data */
+	unsigned char actual_start_bytes[BYTES_TO_CHECK];
+	unsigned char actual_end_bytes[BYTES_TO_CHECK];
+	unsigned char start_bytes[BYTES_TO_CHECK];
+	unsigned char end_bytes[BYTES_TO_CHECK];
+	off_t size;
+	int i;
 
-	EXPECT_EQ(0, compute_hash(data_path, hash));
+	EXPECT_EQ(0, get_obj_id(data_path, hash, start_bytes, end_bytes, &size));
 
-	// Convert to string
-	hash_to_string(hash, hash_str);
+	/* Convert to string */
+	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
+		sprintf(hash_str + (i * 2), "%02x", hash[i]);
+	hash_str[64] = 0;
 
-	// Make sure hash computed is correct
+	/* Make sure hash computed is correct */
 	EXPECT_STREQ(actual_hash, hash_str);
+	EXPECT_EQ(1048576, size);
+
+	FILE *fptr = fopen(data_path, "rb");
+	fread(actual_start_bytes, BYTES_TO_CHECK, 1, fptr);
+	fseek(fptr, -BYTES_TO_CHECK, SEEK_END);
+	fread(actual_end_bytes, BYTES_TO_CHECK, 1, fptr);
+
+	EXPECT_EQ(0, memcmp(start_bytes, actual_start_bytes, BYTES_TO_CHECK));
+	EXPECT_EQ(0, memcmp(end_bytes, actual_end_bytes, BYTES_TO_CHECK));
 }
 
-TEST(compute_hashTest, non_existed_path) {
+TEST(get_obj_idTest, non_existed_path) {
 
 	char *data_path = "testpatterns/data_nonexisted";
-	unsigned char hash[32];
+	unsigned char hash[SHA256_DIGEST_LENGTH];
+	unsigned char start_bytes[BYTES_TO_CHECK];
+	unsigned char end_bytes[BYTES_TO_CHECK];
+	off_t size;
 
-	EXPECT_EQ(-1, compute_hash(data_path, hash));
+	EXPECT_EQ(-1, get_obj_id(data_path, hash, start_bytes, end_bytes, &size));
 }
 
 //class mockTest : public prepare_tree {

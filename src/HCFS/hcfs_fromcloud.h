@@ -31,7 +31,7 @@ pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
 int fetch_from_cloud(FILE *fptr,
 #if (DEDUP_ENABLE)
-		unsigned char *blk_hash);
+		unsigned char *obj_id);
 #else
 		ino_t this_inode, long long block_no);
 #endif

@@ -24,11 +24,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <openssl/sha.h>
 
 #include <fuse/fuse_opt.h>
 
 #include "params.h"
+#include "dedup_table.h"
 
 /*BEGIN META definition*/
 
@@ -119,7 +119,7 @@ typedef struct {
 	unsigned char status;
 	unsigned char uploaded;
 #if (DEDUP_ENABLE)
-	unsigned char hash[SHA256_DIGEST_LENGTH];
+	unsigned char obj_id[OBJID_LENGTH];
 #endif
 } BLOCK_ENTRY;
 

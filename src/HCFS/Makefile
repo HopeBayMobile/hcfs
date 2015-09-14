@@ -79,7 +79,7 @@ compress.o: compress.h compress.c
 
 
 dedup_table.o: dedup_table.c dedup_table.h
-	$(CC) $(CFLAGS) -c dedup_table.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c dedup_table.c
 
 clean:
 	rm -rf *.o hcfs

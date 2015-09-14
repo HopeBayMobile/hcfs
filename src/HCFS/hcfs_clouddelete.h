@@ -20,9 +20,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>
-#include <openssl/sha.h>
 
 #include "hcfscurl.h"
+#include "dedup_table.h"
 
 #define MAX_DELETE_CONCURRENCY 16
 #define MAX_DSYNC_CONCURRENCY 16
@@ -31,7 +31,7 @@ typedef struct {
 	ino_t inode;
 	long long blockno;
 #if (DEDUP_ENABLE)
-	unsigned char hash_key[SHA256_DIGEST_LENGTH];
+	unsigned char obj_id[OBJID_LENGTH];
 #endif
 	char is_block;
 	int which_curl;
@@ -73,9 +73,9 @@ DSYNC_THREAD_CONTROL dsync_ctl;
 
 int do_block_delete(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
-					unsigned char *blk_hash,
+		    unsigned char *obj_id,
 #endif
-					CURL_HANDLE *curl_handle);
+		    CURL_HANDLE *curl_handle);
 int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle);
 
 void init_delete_control(void);

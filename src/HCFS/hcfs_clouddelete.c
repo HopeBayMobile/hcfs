@@ -251,7 +251,7 @@ void init_delete_control(void)
 static inline int _use_delete_thread(int index, char is_blk_flag,
 #if (DEDUP_ENABLE)
 				ino_t this_inode, long long blockno,
-				unsigned char *blk_hash)
+				unsigned char *obj_id)
 #else
 				ino_t this_inode, long long blockno)
 #endif
@@ -265,7 +265,7 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	delete_ctl.delete_threads[index].inode = this_inode;
 	if (is_blk_flag == TRUE) {
 #if (DEDUP_ENABLE)
-		memcpy(delete_ctl.delete_threads[index].hash_key, blk_hash, SHA256_DIGEST_LENGTH);
+		memcpy(delete_ctl.delete_threads[index].obj_id, obj_id, OBJID_LENGTH);
 #endif
 		delete_ctl.delete_threads[index].blockno = blockno;
 	}
@@ -431,7 +431,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 #if (DEDUP_ENABLE)
 					ret_val = _use_delete_thread(count,
 						TRUE, ptr->inode, block_count,
-						temppage.block_entries[current_index].hash);
+						temppage.block_entries[current_index].obj_id);
 #else
 					ret_val = _use_delete_thread(count,
 						TRUE, ptr->inode, block_count);
@@ -590,13 +590,13 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *************************************************************************/
 int do_block_delete(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
-				unsigned char *blk_hash, CURL_HANDLE *curl_handle)
+				unsigned char *obj_id, CURL_HANDLE *curl_handle)
 #else
 				CURL_HANDLE *curl_handle)
 #endif
 {
 	char objname[400];
-	char hash_key_str[65];
+	char obj_id_str[65];
 	int ret_val, ret, ddt_ret;
 	FILE *ddt_fptr;
 	int ddt_fd;
@@ -605,12 +605,12 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 /* Handle objname - consider platforms, dedup flag  */
 #if (DEDUP_ENABLE)
-	// Object named by block hashkey */
-	hash_to_string(blk_hash, hash_key_str);
-	sprintf(objname, "data_%s", hash_key_str);
+	/* Object named by block hashkey */
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
 
 	/* Get dedup table meta */
-	ddt_fptr = get_ddt_btree_meta(blk_hash, &tree_root, &ddt_meta);
+	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
 	if (ddt_fptr == NULL) {
 		/* Can't access ddt btree file */
 		return -EBADF;
@@ -618,7 +618,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	ddt_fd = fileno(ddt_fptr);
 
 	/* Update ddt */
-	ddt_ret = decrease_ddt_el_refcount(blk_hash, &tree_root, ddt_fd, &ddt_meta);
+	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #elif defined(ARM_32bit_)
 	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
 	/* Force to delete */
@@ -685,7 +685,7 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 		do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
 #if (DEDUP_ENABLE)
-			delete_thread_ptr->hash_key,
+			delete_thread_ptr->obj_id,
 #endif
 			&(delete_curl_handles[which_curl]));
 	else

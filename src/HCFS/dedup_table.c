@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <openssl/sha.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 
 #include "global.h"
 #include "macro.h"
@@ -142,8 +143,9 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 {
 
 	int search_idx;
-	int cmpare_result;
+	int compare_result;
 	DDT_BTREE_NODE temp_node;
+	DDT_BTREE_EL temp_el;
 	int errcode;
 	ssize_t ret_ssize;
 
@@ -153,21 +155,27 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 	}
 
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
-		cmpare_result =
-		    memcmp(key, tnode->ddt_btree_el[search_idx].obj_id,
-			   SHA256_DIGEST_LENGTH);
-		if (cmpare_result == 0) {
+		memcpy(&temp_el, &(tnode->ddt_btree_el[search_idx]),
+		       sizeof(DDT_BTREE_EL));
+		compare_result =
+		    memcmp(key, temp_el.obj_id, OBJID_LENGTH);
+
+		if (compare_result == 0) {
+			/* If the value of DEDUP_ENABLE flag is equal to 2,
+			 * we need to check object size and parts of the content
+			 * of the object.
+			 */
 			memcpy(result_node, tnode, sizeof(DDT_BTREE_NODE));
 			*result_idx = search_idx;
 			return 0;
-		} else if (cmpare_result < 0) {
+		} else if (compare_result < 0) {
 			break;
 		}
 	}
 
 	/* this node is leaf */
 	if (tnode->is_leaf) {
-		// printf("Key doesn't existed\n");
+		//printf("Key - %02x doesn't existed\n", key[0]);
 		return 1;
 	}
 
@@ -202,7 +210,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 	if (tnode->is_leaf) {
 		for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 			printf("Leaf - ");
-			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH;
+			for (tmp_idx = 0; tmp_idx < OBJID_LENGTH;
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
@@ -222,7 +230,7 @@ int traverse_ddt_btree(DDT_BTREE_NODE *tnode, int fd)
 		}
 		if (search_idx < tnode->num_el) {
 			printf("Node - ");
-			for (tmp_idx = 0; tmp_idx < SHA256_DIGEST_LENGTH;
+			for (tmp_idx = 0; tmp_idx < OBJID_LENGTH;
 			     ++tmp_idx)
 				printf("%02x", tnode->ddt_btree_el[search_idx]
 						   .obj_id[tmp_idx]);
@@ -238,6 +246,15 @@ errcode_handle:
 	return errcode;
 }
 
+/* static functions for insert_ddt_btree */
+static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
+				      DDT_BTREE_NODE *tnode, int fd,
+				      DDT_BTREE_META *this_meta);
+
+static int _split_child_ddt_btree(DDT_BTREE_NODE *pnode, int s_idx,
+				  DDT_BTREE_NODE *cnode, int fd,
+				  DDT_BTREE_META *this_meta);
+
 /************************************************************************
 *
 * Function name: insert_ddt_btree
@@ -250,7 +267,8 @@ errcode_handle:
 *  Return value: 0 if the element is found, or -1 if not.
 *
 *************************************************************************/
-int insert_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
+int insert_ddt_btree(unsigned char key[], const off_t obj_size,
+		     DDT_BTREE_NODE *tnode, int fd,
 		     DDT_BTREE_META *this_meta)
 {
 
@@ -263,8 +281,10 @@ int insert_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 
 	/* Init new elements */
 	memset(&new_el, 0, sizeof(DDT_BTREE_EL));
-	memcpy(new_el.obj_id, key, SHA256_DIGEST_LENGTH);
-	new_el.obj_size = 0;
+	memcpy(new_el.obj_id, key, OBJID_LENGTH);
+	//memcpy(new_el.start_bytes, start_bytes, BYTES_TO_CHECK);
+	//memcpy(new_el.end_bytes, end_bytes, BYTES_TO_CHECK);
+	new_el.obj_size = obj_size;
 	new_el.refcount = 1;
 
 	if (this_meta->tree_root == 0) {
@@ -371,7 +391,7 @@ static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 		compare_result = memcmp(new_element->obj_id,
 					tnode->ddt_btree_el[search_idx].obj_id,
-					SHA256_DIGEST_LENGTH);
+					OBJID_LENGTH);
 		if (compare_result < 0) {
 			break;
 		}
@@ -408,7 +428,7 @@ static int _insert_non_full_ddt_btree(DDT_BTREE_EL *new_element,
 			compare_result =
 			    memcmp(new_element->obj_id,
 				   tnode->ddt_btree_el[search_idx].obj_id,
-				   SHA256_DIGEST_LENGTH);
+				   OBJID_LENGTH);
 			if (compare_result > 0) {
 				search_idx++;
 				PREAD(fd, &temp_node, sizeof(DDT_BTREE_NODE),
@@ -518,6 +538,15 @@ errcode_handle:
 	return errcode;
 }
 
+/* static functions for delete_ddt_btee */
+static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd,
+				  DDT_BTREE_NODE *result_node,
+				  DDT_BTREE_EL *result_el,
+				  DDT_BTREE_META *this_meta);
+
+static int _rebalance_btree(DDT_BTREE_NODE *tnode, int selected_child, int fd,
+			    DDT_BTREE_META *this_meta);
+
 /************************************************************************
 *
 * Function name: delete_ddt_btree
@@ -558,7 +587,7 @@ int delete_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 	for (search_idx = 0; search_idx < tnode->num_el; search_idx++) {
 		compare_result =
 		    memcmp(key, tnode->ddt_btree_el[search_idx].obj_id,
-			   SHA256_DIGEST_LENGTH);
+			   OBJID_LENGTH);
 		if (compare_result == 0) {
 			match = TRUE;
 			break;
@@ -689,7 +718,7 @@ static int _extract_largest_child(DDT_BTREE_NODE *tnode, int fd,
 			       this_meta);
 
 	/* Need to rebalance tree because of a element
-	 * is deleted in this node
+	 * is deleted
 	 */
 	_rebalance_btree(tnode, tnode->num_el, fd, this_meta);
 
@@ -1028,52 +1057,80 @@ errcode_handle:
 *                -1 if encountered error.
 *
 *************************************************************************/
-int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
-			     DDT_BTREE_META *this_meta)
+int decrease_ddt_el_refcount(unsigned char key[], DDT_BTREE_NODE *tnode,
+			     int fd, DDT_BTREE_META *this_meta)
 {
 
 	return delete_ddt_btree(key, tnode, fd, this_meta, FALSE);
 }
 
-int compute_hash(char *path, unsigned char *output)
+int get_obj_id(char *path, unsigned char hash[], unsigned char start_bytes[],
+	       unsigned char end_bytes[], off_t *obj_size)
 {
 
 	FILE *fptr;
 	const int buf_size = 16384;
 	char *buf;
 	int bytes_read;
+	struct stat obj_stat;
+	off_t size;
 	SHA256_CTX ctx;
+	int fd;
+	int errcode;
+	ssize_t ret_ssize;
 
-	/* Initialize */
 	if (access(path, R_OK) == -1)
 		return -1;
 
+	/* Get file size */
+	stat(path, &obj_stat);
+	size = obj_stat.st_size;
+	*obj_size = size;
+
+	/* Compute hash */
 	SHA256_Init(&ctx);
 	buf = malloc(buf_size);
 	bytes_read = 0;
 
-	/* Open file */
 	fptr = fopen(path, "r");
+	fd = fileno(fptr);
 
 	while ((bytes_read = fread(buf, 1, buf_size, fptr)))
 		SHA256_Update(&ctx, buf, bytes_read);
 
-	SHA256_Final(output, &ctx);
+	SHA256_Final(hash, &ctx);
+
+	/* Copy bytes to check */
+	memset(start_bytes, 0, BYTES_TO_CHECK);
+	memset(end_bytes, 0, BYTES_TO_CHECK);
+	if (size >= BYTES_TO_CHECK) {
+		PREAD(fd, start_bytes, BYTES_TO_CHECK, 0);
+		size = size - BYTES_TO_CHECK;
+		if (size >= BYTES_TO_CHECK) {
+			PREAD(fd, end_bytes, BYTES_TO_CHECK, (*obj_size - BYTES_TO_CHECK));
+		} else {
+			PREAD(fd, end_bytes, size, (*obj_size - size));
+		}
+	} else {
+		PREAD(fd, start_bytes, size, 0);
+	}
 
 	fclose(fptr);
 	free(buf);
 
 	return 0;
+
+errcode_handle:
+	return errcode;
 }
 
-int hash_to_string(unsigned char hash[SHA256_DIGEST_LENGTH],
-		   char output_str[SHA256_STRING_LENGTH])
+int obj_id_to_string(unsigned char obj_id[OBJID_LENGTH],
+		   char output_str[OBJID_STRING_LENGTH])
 {
 
 	int i;
+	for (i = 0; i < OBJID_LENGTH; i++)
+		sprintf(output_str + (i * 2), "%02x", obj_id[i]);
 
-	for (i = 0; i < SHA256_DIGEST_LENGTH; i++)
-		sprintf(output_str + (i * 2), "%02x", hash[i]);
-
-	output_str[64] = 0;
+	output_str[OBJID_STRING_LENGTH - 1] = 0;
 }

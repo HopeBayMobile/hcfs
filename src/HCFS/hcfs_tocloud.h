@@ -20,12 +20,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <curl/curl.h>
-#include <openssl/sha.h>
 
 #include "hcfscurl.h"
 #include "compress.h"
 #include "enc.h"
 #include "fuseop.h"
+#include "dedup_table.h"
 
 #define MAX_UPLOAD_CONCURRENCY 16
 #define MAX_SYNC_CONCURRENCY 16
@@ -43,7 +43,7 @@ typedef struct {
 	char is_upload;
 	/* After uploaded, we should increase the refcount of hash_key
 	and decrease the refcount of old_hash_key*/
-	unsigned char hash_key[SHA256_DIGEST_LENGTH];
+	unsigned char obj_id[OBJID_LENGTH];
 #endif
 } UPLOAD_THREAD_TYPE;
 
@@ -90,10 +90,10 @@ SYNC_THREAD_CONTROL sync_ctl;
 
 int do_block_sync(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
-				CURL_HANDLE *curl_handle, char *filename, char uploaded,
-				unsigned char *hash_in_meta);
+		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
+		  unsigned char *hash_in_meta);
 #else
-				CURL_HANDLE *curl_handle, char *filename);
+		  CURL_HANDLE *curl_handle, char *filename);
 #endif
 
 int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename);

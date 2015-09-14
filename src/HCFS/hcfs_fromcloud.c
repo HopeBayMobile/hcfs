@@ -36,6 +36,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "utils.h"
+#include "dedup_table.h"
 
 /************************************************************************
 *
@@ -48,21 +49,21 @@
 *************************************************************************/
 int fetch_from_cloud(FILE *fptr,
 #if (DEDUP_ENABLE)
-		unsigned char *blk_hash)
+		unsigned char *obj_id)
 #else
 		ino_t this_inode, long long block_no)
 #endif
 {
 	char objname[1000];
-	char hash_key_str[65];
+	char obj_id_str[OBJID_STRING_LENGTH];
 	int status;
 	int which_curl_handle;
 	int ret, errcode;
 
 #if (DEDUP_ENABLE)
 	/* Get objname by hash*/
-	hash_to_string(blk_hash, hash_key_str);
-	sprintf(objname, "data_%s", hash_key_str);
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
 #elif ARM_32bit_
 	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
 #else
@@ -204,7 +205,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		mlock = FALSE;
 #if (DEDUP_ENABLE)
 		ret = fetch_from_cloud(blockfptr,
-				temppage.block_entries[entry_index].hash);
+				temppage.block_entries[entry_index].obj_id);
 #else
 		ret = fetch_from_cloud(blockfptr,
 				ptr->this_inode, ptr->block_no);

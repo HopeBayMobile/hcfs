@@ -1566,7 +1566,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_unlock_entry(*body_ptr);
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, temppage->block_entries[last_index].hash);
+			ret = fetch_from_cloud(blockfptr, temppage->block_entries[last_index].obj_id);
 #else
 			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
 					last_block);
@@ -2217,7 +2217,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		}
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[eindex].hash);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[eindex].obj_id);
 #else
 		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
 #endif
@@ -2791,7 +2791,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[bindex].hash);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[bindex].obj_id);
 #else
 		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
 #endif
