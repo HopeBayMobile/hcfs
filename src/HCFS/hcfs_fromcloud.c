@@ -81,7 +81,7 @@ int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
 
 	status = hcfs_get_object(get_fptr, objname,
-				 &(download_curl_handles[which_curl_handle]));
+                           &(download_curl_handles[which_curl_handle]), NULL);
 
 	fclose(get_fptr);
 	unsigned char *key = NULL;

@@ -831,7 +831,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
@@ -893,12 +893,14 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 		unlink(header_filename);
 		return -1;
 	}
-  // get object meta data
-	char header[1000] = {0};
-	FSEEK(swift_header_fptr, 0, SEEK_SET);
-	fread(header, sizeof(char), 1000, swift_header_fptr);
-	write_log(10, "download object %s header:\n%s", objname, header);
-  //
+  /* get object meta data */
+  if(object_meta){
+    char header[1000] = {0};
+    FSEEK(swift_header_fptr, 0, SEEK_SET);
+    fread(header, sizeof(char), 1000, swift_header_fptr);
+    write_log(10, "download object %s header:\n%s", objname, header);
+    parse_http_header_coding_meta(object_meta, header);
+  }
 
 	fclose(swift_header_fptr);
 	swift_header_fptr = NULL;
@@ -1432,7 +1434,7 @@ errcode_handle:
 *************************************************************************/
 /* TODO: Fix handling in reauthing in SWIFT.
 	Now will try to reauth for any HTTP error*/
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	int ret_val, num_retries;
 	int ret, errcode;
@@ -1440,7 +1442,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	num_retries = 0;
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
-		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle);
+		ret_val = hcfs_swift_get_object(fptr, objname, curl_handle, object_meta);
 		while ((!_http_is_success(ret_val)) &&
 			((_swift_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
@@ -1456,11 +1458,11 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 			FSEEK(fptr, 0, SEEK_SET);
 			FTRUNCATE(fileno(fptr), 0);
 			ret_val = hcfs_swift_get_object(fptr, objname,
-				curl_handle);
+                                      curl_handle, object_meta);
 		}
 		break;
 	case S3:
-		ret_val = hcfs_S3_get_object(fptr, objname, curl_handle);
+		ret_val = hcfs_S3_get_object(fptr, objname, curl_handle, object_meta);
 		while ((!_http_is_success(ret_val)) &&
 			((_S3_http_can_retry(ret_val)) &&
 			(num_retries < MAX_RETRIES))) {
@@ -1471,7 +1473,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 			FSEEK(fptr, 0, SEEK_SET);
 			FTRUNCATE(fileno(fptr), 0);
 			ret_val = hcfs_S3_get_object(fptr, objname,
-				curl_handle);
+                                   curl_handle, object_meta);
 		}
 		break;
 	default:
@@ -1678,7 +1680,7 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;

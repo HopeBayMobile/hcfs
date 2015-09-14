@@ -1407,7 +1407,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			goto errcode_handle;
 		}
 		is_fopen = TRUE;
-		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl));
+		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 		if ((ret >= 200) && (ret <= 299)) {
 			ret = 0;
 			errcode = 0;
