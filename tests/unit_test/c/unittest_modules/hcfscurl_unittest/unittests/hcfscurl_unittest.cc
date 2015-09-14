@@ -5,6 +5,26 @@ extern "C" {
 #include <gtest/gtest.h>
 #include "mock_params.h"
 
+class parse_http_header :public ::testing::Test {
+protected:
+    char httpheader[1000];
+    void SetUp()
+    {
+        const char * http = "HTTP/1.1 200 OK\r\nContent-Length: 1052706\r\nX-Object-Meta-Enc: 1\r\nX-Object-Meta-Comp: 1\r\nX-Object-Meta-Nonce: 11111111111111111111122222222222\r\n\r\n";
+        memcpy(httpheader, http, strlen(http));
+    }
+};
+
+TEST_F(parse_http_header, Parse_Header){
+    HCFS_encode_object_meta *object_meta = (HCFS_encode_object_meta *)calloc(1, sizeof(HCFS_encode_object_meta));
+    int ret = parse_http_header_coding_meta(object_meta, httpheader);
+    printf("%d\n", object_meta->len_enc_session_key);
+    EXPECT_EQ(object_meta->comp_alg, 1);
+    EXPECT_EQ(object_meta->enc_alg, 1);
+    EXPECT_EQ(ret, 0);
+
+}
+
 /*
 	Unittest of hcfs_get_auth_swift()
  */
@@ -30,7 +50,7 @@ protected:
 	void TearDown()
 	{
 		if (curl_handle)
-			free(curl_handle);
+			 free(curl_handle);
 	}
 };
 

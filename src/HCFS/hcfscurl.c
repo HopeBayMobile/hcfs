@@ -258,6 +258,90 @@ errcode_handle:
 }
 
 /************************************************************************
+ *
+ * Function name: parse_http_header_coding_meta
+ *        Inputs: HCFS_object_meta *object_meta, char* httpheader, int header_len
+ *       Summary: Parse the HTTP header for general requests and return write to
+                  object_meta
+ *  Return value: 0 for success otherwise indicates an error
+ *
+ *************************************************************************/
+int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
+				  char *httpheader)
+{
+  const char *meta = "X-Object-Meta-";
+  const int meta_len = strlen(meta);
+	const char *comp_meta = "Comp";
+  const int comp_meta_len = 4;
+	const char *enc_meta = "Enc";
+  const int enc_meta_len = 3;
+	const char *nonce_meta = "Nonce";
+  const int nonce_meta_len = 5;
+
+	char *s, *backup;
+	s = strtok_r(httpheader, "\n", &backup);
+	while (s) {
+		char *s2;
+		char *backup_s2;
+		s2 = strtok_r(s, ":", &backup_s2);
+		if (s2 != NULL) {
+			int s2_len = strlen(s2);
+			if ((s2_len > meta_len) &&
+			    memcmp(s2, meta, meta_len) == 0) {
+				int len_diff = s2_len - meta_len;
+				switch (len_diff) {
+				case 3:
+					if (memcmp(enc_meta, s2 + meta_len,
+						   enc_meta_len) == 0) {
+						s2 = strtok_r(NULL, ":",
+							      &backup_s2);
+						object_meta->enc_alg = atoi(s2);
+					}
+					break;
+				case 4:
+					if (memcmp(comp_meta, s2 + meta_len,
+						   comp_meta_len) == 0) {
+						s2 = strtok_r(NULL, ":",
+							      &backup_s2);
+						object_meta->comp_alg =
+						    atoi(s2);
+					}
+					break;
+				case 5:
+					if (memcmp(nonce_meta, s2 + meta_len,
+						   nonce_meta_len) == 0) {
+						s2 = strtok_r(NULL, ":",
+							      &backup_s2);
+						if (s2 != NULL) {
+							object_meta
+							    ->len_enc_session_key =
+							    strlen(s2);
+							object_meta
+							    ->enc_session_key =
+							    calloc(
+								object_meta
+								    ->len_enc_session_key,
+								sizeof(char));
+							memcpy(
+							    object_meta
+								->enc_session_key,
+							    s2,
+							    object_meta
+								->len_enc_session_key);
+						}
+					}
+					break;
+				default:
+					break;
+				}
+      }
+		}
+		s = strtok_r(NULL, "\n", &backup);
+	}
+	return 0;
+}
+
+/************************************************************************
 *
 * Function name: dump_list_body
 *        Inputs: FILE *fptr
@@ -818,6 +902,12 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 		unlink(header_filename);
 		return -1;
 	}
+  // get object meta data
+	char header[1000] = {0};
+	FSEEK(swift_header_fptr, 0, SEEK_SET);
+	fread(header, sizeof(char), 1000, swift_header_fptr);
+	write_log(10, "download object %s header:\n%s", objname, header);
+  //
 
 	fclose(swift_header_fptr);
 	swift_header_fptr = NULL;

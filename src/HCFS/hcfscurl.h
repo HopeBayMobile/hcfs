@@ -69,7 +69,10 @@ void hcfs_destroy_backend(CURL *curl);
 int hcfs_list_container(CURL_HANDLE *curl_handle);
 int hcfs_put_object_v2(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		       HCFS_encode_object_meta *);
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
 
+int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
+                                  char *httpheader);
 #endif  /* GW20_HCFS_HCFSCURL_H_ */
