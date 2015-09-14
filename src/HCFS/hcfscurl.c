@@ -269,14 +269,14 @@ errcode_handle:
 int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 				  char *httpheader)
 {
-  const char *meta = "X-Object-Meta-";
-  const int meta_len = strlen(meta);
+	const char *meta = "X-Object-Meta-";
+	const int meta_len = strlen(meta);
 	const char *comp_meta = "Comp";
-  const int comp_meta_len = 4;
+	const int comp_meta_len = 4;
 	const char *enc_meta = "Enc";
-  const int enc_meta_len = 3;
+	const int enc_meta_len = 3;
 	const char *nonce_meta = "Nonce";
-  const int nonce_meta_len = 5;
+	const int nonce_meta_len = 5;
 
 	char *s, *backup;
 	s = strtok_r(httpheader, "\n", &backup);
@@ -284,58 +284,49 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 		char *s2;
 		char *backup_s2;
 		s2 = strtok_r(s, ":", &backup_s2);
-		if (s2 != NULL) {
-			int s2_len = strlen(s2);
-			if ((s2_len > meta_len) &&
-			    memcmp(s2, meta, meta_len) == 0) {
-				int len_diff = s2_len - meta_len;
-				switch (len_diff) {
-				case 3:
-					if (memcmp(enc_meta, s2 + meta_len,
-						   enc_meta_len) == 0) {
-						s2 = strtok_r(NULL, ":",
-							      &backup_s2);
-						object_meta->enc_alg = atoi(s2);
-					}
-					break;
-				case 4:
-					if (memcmp(comp_meta, s2 + meta_len,
-						   comp_meta_len) == 0) {
-						s2 = strtok_r(NULL, ":",
-							      &backup_s2);
-						object_meta->comp_alg =
-						    atoi(s2);
-					}
-					break;
-				case 5:
-					if (memcmp(nonce_meta, s2 + meta_len,
-						   nonce_meta_len) == 0) {
-						s2 = strtok_r(NULL, ":",
-							      &backup_s2);
-						if (s2 != NULL) {
-							object_meta
-							    ->len_enc_session_key =
-							    strlen(s2);
-							object_meta
-							    ->enc_session_key =
-							    calloc(
-								object_meta
-								    ->len_enc_session_key,
-								sizeof(char));
-							memcpy(
-							    object_meta
-								->enc_session_key,
-							    s2,
-							    object_meta
-								->len_enc_session_key);
-						}
-					}
-					break;
-				default:
-					break;
+		int s2_len = strlen(s2);
+		if (s2_len <= meta_len)
+			goto cont;
+		if (memcmp(s2, meta, meta_len) != 0)
+			goto cont;
+
+		int len_diff = s2_len - meta_len;
+		switch (len_diff) {
+		case 3:
+			if (memcmp(enc_meta, s2 + meta_len, enc_meta_len) ==
+			    0) {
+				s2 = strtok_r(NULL, ":", &backup_s2);
+				object_meta->enc_alg = atoi(s2);
+			}
+			break;
+		case 4:
+			if (memcmp(comp_meta, s2 + meta_len, comp_meta_len) ==
+			    0) {
+				s2 = strtok_r(NULL, ":", &backup_s2);
+				object_meta->comp_alg = atoi(s2);
+			}
+			break;
+		case 5:
+			if (memcmp(nonce_meta, s2 + meta_len, nonce_meta_len) ==
+			    0) {
+				s2 = strtok_r(NULL, ":", &backup_s2);
+				if (s2 != NULL) {
+					object_meta->len_enc_session_key =
+					    strlen(s2);
+					object_meta->enc_session_key = calloc(
+					    object_meta->len_enc_session_key,
+					    sizeof(char));
+					memcpy(
+					    object_meta->enc_session_key, s2,
+					    object_meta->len_enc_session_key);
 				}
-      }
+			}
+			break;
+		default:
+			break;
 		}
+
+	cont:
 		s = strtok_r(NULL, "\n", &backup);
 	}
 	return 0;
