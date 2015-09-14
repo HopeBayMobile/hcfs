@@ -3,7 +3,6 @@
 flags=$-
 set +x # Pause debug, enable if verbose on
 [[ "$flags" =~ "x" ]] && flag_x="-x" || flag_x="+x"
-echo ======== ${BASH_SOURCE[0]} mode $mode ========
 
 # A POSIX variable
 OPTIND=1         # Reset in case getopts has been used previously in the shell.
@@ -15,7 +14,7 @@ verbose=0
 while getopts ":vm:" opt; do
     case $opt in
     m)
-        mode=$OPTARG
+        setup_dev_env_mode=$OPTARG
         ;;
     v)
         verbose=1
@@ -31,18 +30,26 @@ while getopts ":vm:" opt; do
     esac
 done
 
-if [ $verbose -eq 0 ]; then
-    set +x
-else
-    set -x
-fi
+echo ======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========
+
+if [ $verbose -eq 0 ]; then set +x; else set -x; fi
 
 export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
 function install_pkg {
-    if ! dpkg -s $packages >/dev/null 2>&1; then
-        sudo apt-get install -y $packages
+    set +x
+    for pkg in $packages;
+    do
+        if ! dpkg -s $pkg >/dev/null 2>&1; then
+            install="$install $pkg"
+        fi
+    done
+    if [ $verbose -eq 0 ]; then set +x; else set -x; fi
+    if [ "$install $force_install" != " " ]; then
+        sudo apt-get install -y $install $force_install
         packages=""
+        install=""
+        force_install=""
     fi
 }
 
@@ -61,8 +68,13 @@ if [ -n "$USER" -a "$USER" != "root" -a ! -f /etc/sudoers.d/50_${USER}_sh ]; the
     ( umask 226 && echo "$USER ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/50_${USER}_sh )
 fi
 
-case "$mode" in
-unit_test | functional_test )
+case "$setup_dev_env_mode" in
+docker_slave )
+    echo 'Acquire::http::Proxy "http://cache:8000";' | sudo tee /etc/apt/apt.conf.d/30autoproxy
+    sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list
+    sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list.d/proposed.list
+    ;;&
+unit_test | functional_test | docker_slave )
     # Use ccache to speedup compile
     if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
         export PATH="/usr/lib/ccache:$PATH"
@@ -75,23 +87,20 @@ unit_test | functional_test )
             sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 32EF5841642ADD17
             sudo apt-get update
         fi
-        sudo apt-get install -y ccache
+        force_install="$force_install ccache"
     fi
     export USE_CCACHE=1
     ;;&
-unit_test )
+unit_test | docker_slave )
     packages="$packages gcovr"
-    install_pkg
-    ;;
-functional_test )
+    ;;&
+functional_test | docker_slave )
     packages="$packages python-pip"
-    install_pkg
-    sudo -H pip install -r $local_repo/tests/functional_test/requirements.txt
-    ;;
-tests )
     packages="$packages python-swiftclient"
     install_pkg
-
+    sudo -H pip install -q -r $local_repo/tests/functional_test/requirements.txt
+    ;;&
+tests )
     # Install Docker
     if ! hash docker; then
         curl https://get.docker.com | sudo sh
@@ -103,7 +112,7 @@ tests )
     fi
     # Pull test image from local registry server
     sudo docker pull docker:5000/docker-unittest-stylecheck-slave
-    ;;
+    ;;&
 * )
     install_pkg
     ;;

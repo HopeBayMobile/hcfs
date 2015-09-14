@@ -1,0 +1,14 @@
+#!/bin/bash
+export TERM=xterm-256color
+export repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
+WORKSPACE=${WORKSPACE:-$repo}
+
+cd $WORKSPACE
+set -e -x
+
+srcdir=$WORKSPACE/src
+testdir=$WORKSPACE/tests
+
+
+# Unit test coverage report
+mode=docker $testdir/functional_test/test.bash
