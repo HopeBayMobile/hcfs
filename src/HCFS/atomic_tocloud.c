@@ -1,10 +1,11 @@
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
 #include "hcfs_tocloud.h"
 #include "atomic_tocloud.h"
 #include "macro.h"
 #include "global.h"
-
-#include <fcntl.h>
-#include <sys/stat.h>
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT system_config;
@@ -69,13 +70,12 @@ int get_progress_info(int fd, long long block_index,
 		/* Reading exceeds EOF. It may occur when backend
 		   has truncated data and this block has not been
 		   uploaded. */
-		//write_log(10, "Debug: truncate?");
 		memset(block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		block_uploading_status->finish_uploading = FALSE;
 	}
 
-	return 0;
+	return ret_ssize;
 
 errcode_handle:
 	write_log(0, "Error: Fail to get progress-info of block_%lld\n",
@@ -290,6 +290,16 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 	return 0;
 }
 
+int fetch_backend_meta_path(char *pathname, ino_t inode)
+{
+#ifdef ARM_32bit_
+	sprintf(pathname, "upload_bullpen/hcfs_backend_meta_%lld.tmp", inode);
+#else
+	sprintf(pathname, "upload_bullpen/hcfs_backend_meta_%ld.tmp", inode);
+#endif
+	return 0;
+}
+
 /**
  * Check whether target file exists or not and copy source file.
  *
@@ -403,7 +413,7 @@ errcode_handle:
 	return errcode;
 }
 
-char block_finish_uploading(int fd, long long blockno)
+char did_block_finish_uploading(int fd, long long blockno)
 {
 	int ret;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
@@ -414,4 +424,141 @@ char block_finish_uploading(int fd, long long blockno)
 		return FALSE;
 	}
 	return block_uploading_status.finish_uploading;
+}
+
+
+int _revert_inode_uploading(ino_t inode, FILE *progress_fptr)
+{
+	char toupload_meta_exist, backend_meta_exist;
+	char toupload_meta_path[200];
+	char backend_meta_path[200];
+	int errcode;
+	long progress_size;
+
+	fetch_backend_meta_path(backend_meta_path, inode);
+	fetch_toupload_meta_path(toupload_meta_path, inode);
+
+	/* Check backend meta exist */
+	if (access(backend_meta_path, F_OK) == 0) {
+		backend_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			return -errcode;
+		} else {
+			backend_meta_exist = FALSE;
+		}
+	}
+
+	/* Check to-upload meta exist */
+	if (access(toupload_meta_path, F_OK) == 0) {
+		toupload_meta_exist = TRUE;
+	} else {
+		errcode = errno;
+		if (errcode != ENOENT) {
+			write_log(0, "Error in %s. Code %d, %s\n", __func__,
+				errcode, strerror(errcode));
+			return -errcode;
+		} else {
+			toupload_meta_exist = FALSE;
+		}
+	}
+
+	fseek(progress_fptr, 0, SEEK_END);
+	progress_size = ftell(progress_fptr);
+	
+	if (toupload_meta_exist == TRUE) {
+		if ((backend_meta_exist == FALSE) && (progress_size != 0)) {
+		/* Keep on uploading */
+
+		} else { /* NOT begin to upload, so cancel uploading */
+		
+		}
+	} else {
+		if (progress_size == 0) {
+		/* Crash before copying local meta, so just 
+		cancel uploading */
+
+		} else {
+		/* Finish uploading all blocks and meta,
+		remove backend old block */
+
+		}
+	}
+
+	return 0;
+}
+
+int uploading_revert()
+{	
+	DIR *dirptr;
+	FILE *fptr;
+	struct dirent temp_dirent;
+	struct dirent *direntptr;
+	char upload_pathname[100];
+	char progress_filepath[300];
+	int errcode, ret;
+	ino_t inode;
+
+	sprintf(upload_pathname, "upload_bullpen");
+	if (access(upload_pathname, F_OK) < 0)
+		return 0;
+
+	dirptr = opendir(upload_pathname);
+	if (dirptr == NULL) {
+		errcode = errno;
+		write_log(0, "Fail to open %s. Code %d, %s\n",
+			upload_pathname, errcode, strerror(errcode));
+		return -errcode;
+	}
+
+	ret = readdir_r(dirptr, &temp_dirent, &direntptr);
+	if (ret > 0) {
+		errcode = errno;
+		write_log(0, "Fail to read %s. Code %d, %s\n",
+			upload_pathname, errcode, strerror(errcode));
+		closedir(dirptr);
+		return -errcode;
+	}
+
+	errcode = 0;
+	while (direntptr) {
+		if (strncmp("upload_progress", temp_dirent.d_name, 15) == 0) {
+			ret = sscanf(temp_dirent.d_name,
+				"upload_progress_inode_%ld", &inode);
+			sprintf(progress_filepath, "%s/%s", upload_pathname,
+				temp_dirent.d_name);
+			fptr = fopen(progress_filepath, "r+");
+			if ((ret != 1) || (fptr == NULL)) {
+				ret = readdir_r(dirptr, &temp_dirent,
+						&direntptr);
+				if (ret > 0) {
+					errcode = errno;
+					break;
+				}
+				continue;
+			}
+
+			/* TODO: use multi-threads */
+			_revert_inode_uploading(inode, fptr);
+		} else {
+			ret = readdir_r(dirptr, &temp_dirent,
+					&direntptr);
+			if (ret > 0) {
+				errcode = errno;
+				break;
+			}
+		}
+	}
+
+	closedir(dirptr);
+	if (errcode > 0) {
+		write_log(0, "Fail to traverse dir %s. Code %d, %s\n",
+			upload_pathname, errcode , strerror(errcode));
+		return -errcode;
+	}
+
+	return 0;
 }

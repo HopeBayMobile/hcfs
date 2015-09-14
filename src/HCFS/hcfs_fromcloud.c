@@ -182,7 +182,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		fetch_backend_block_name(ptr->this_inode, ptr->block_no,
+		fetch_backend_block_objname(ptr->this_inode, ptr->block_no,
 			objname);
 		ret = fetch_from_cloud(blockfptr, objname);
 		if (ret < 0) {

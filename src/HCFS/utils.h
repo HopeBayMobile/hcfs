@@ -44,9 +44,9 @@ int update_FS_statistics(char *pathname, long long system_size,
 int read_FS_statistics(char *pathname, long long *system_size_ptr,
 		long long *num_inodes_ptr);
 
-void fetch_backend_block_name(ino_t this_inode, long long block_no,
+void fetch_backend_block_objname(ino_t this_inode, long long block_no,
 	char *block_name);
 
-void fetch_backend_meta_name(ino_t this_inode, char *meta_name);
+void fetch_backend_meta_objname(ino_t this_inode, char *meta_name);
 
 #endif  /* GW20_SRC_UTILS_H_ */

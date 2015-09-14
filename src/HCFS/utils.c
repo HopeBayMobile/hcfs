@@ -909,7 +909,7 @@ errcode_handle:
 	return errcode;
 }
 
-void fetch_backend_block_name(ino_t this_inode, long long block_no,
+void fetch_backend_block_objname(ino_t this_inode, long long block_no,
 	char *block_name)
 {
 
@@ -921,7 +921,7 @@ void fetch_backend_block_name(ino_t this_inode, long long block_no,
 	return;
 }
 
-void fetch_backend_meta_name(ino_t this_inode, char *meta_name)
+void fetch_backend_meta_objname(ino_t this_inode, char *meta_name)
 {
 
 #ifdef ARM_32bit_

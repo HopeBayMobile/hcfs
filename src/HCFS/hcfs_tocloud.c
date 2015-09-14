@@ -615,7 +615,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	char backend_meta_name[500];
 	int ret, errcode;
 
-	fetch_backend_meta_name(inode, backend_meta_name);
+	fetch_backend_meta_objname(inode, backend_meta_name);
 
 	*backend_fptr = fopen(download_metapath, "w+");
 	if (*backend_fptr == NULL) {
@@ -838,8 +838,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (S_ISREG(ptr->this_mode)) {
 		first_upload = FALSE;
 		backend_metafptr = NULL;
-		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld.tmp",
-				this_inode);
+		fetch_backend_meta_path(backend_metapath, this_inode);
 		ret = download_meta_from_backend(this_inode, backend_metapath,
 				&backend_metafptr);
 		if (ret < 0) {
