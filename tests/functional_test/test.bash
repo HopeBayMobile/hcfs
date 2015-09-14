@@ -1,8 +1,7 @@
 #!/bin/bash
 echo ======== ${BASH_SOURCE[0]} ========
-set -x -e
-
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
+set -x -e
 
 # Setup Test Env
 . $WORKSPACE/utils/setup_dev_env.sh -m functional_test
@@ -21,9 +20,10 @@ if [ "$mode" = "docker" ]; then
 	# Wait swift ready
 	SWIFT="swift -A http://swift_test:8080/auth/v1.0 -U test:tester -K testing"
 	while ! $SWIFT stat; do sleep 1; done
+	# Create Container
+	while $SWIFT post autotest_private_container |& grep failed; do sleep 1; done
 	mkdir -p $WORKSPACE/tmp/{meta,block,mount}
-	rm -rf $WORKSPACE/tmp/{meta,block,mount}/*
-	$SWIFT post autotest_private_container
+	sudo rm -rf $WORKSPACE/tmp/{meta,block,mount}/*
 	sudo tee /etc/hcfs.conf <<-EOF
 	METAPATH= $WORKSPACE/tmp/meta
 	BLOCKPATH = $WORKSPACE/tmp/block

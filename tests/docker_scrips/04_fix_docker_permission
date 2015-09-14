@@ -21,3 +21,4 @@ if [[ $OLDUID != $NEWUID || $OLDGID != $NEWGID ]]; then
 	sudo chown -R $NEWUID:$NEWGID $HOME
 	ls -l /home/jenkins/workspace/HCFS
 fi
+
