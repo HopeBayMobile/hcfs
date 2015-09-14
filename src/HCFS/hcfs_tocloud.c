@@ -666,7 +666,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	return errcode;
 }
 
-static inline long long _delete_this_one(char delete_which_one, 
+static inline int _choose_deleted_block(char delete_which_one, 
 	const BLOCK_UPLOADING_STATUS *block_info, long long *block_seq)
 {
 	char finish_uploading;
@@ -720,7 +720,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 			continue;
 
 		block_seq = 0;
-		ret = _delete_this_one(delete_which_one,
+		ret = _choose_deleted_block(delete_which_one,
 			&block_info, &block_seq);
 		if (ret < 0)
 			continue;
@@ -759,7 +759,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	BLOCK_ENTRY_PAGE local_temppage, toupload_temppage;
 	int which_curl;
 	long long page_pos, e_index, which_page, current_page;
-	long long total_blocks, backend_blocks;
+	long long total_blocks, total_backend_blocks;
 	long long block_count;
 	unsigned char local_block_status, toupload_block_status;
 	int ret, errcode;
@@ -772,7 +772,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int count1;
 	long long upload_seq;
 	ino_t root_inode;
-	long long size_last_upload;
+	long long backend_size;
 	long long size_diff;
 	int progress_fd;
 	char first_upload, is_local_meta_deleted;
@@ -834,11 +834,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
-	/* Download backend meta if it is regfile */
+	/* Download backend meta and fetch seq number if it is regfile */
 	if (S_ISREG(ptr->this_mode)) {
 		first_upload = FALSE;
 		backend_metafptr = NULL;
-		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld",
+		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld.tmp",
 				this_inode);
 		ret = download_meta_from_backend(this_inode, backend_metapath,
 				&backend_metafptr);
@@ -860,15 +860,17 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		if (first_upload == FALSE) {
 			PREAD(fileno(backend_metafptr), &tempfilestat,
 				sizeof(struct stat), 0);
-			backend_blocks = (tempfilestat.st_size == 0) ? 
-				0 : (tempfilestat.st_size - 1) / 
-				MAX_BLOCK_SIZE + 1;
-			init_progress_info(progress_fd, backend_blocks,
+			backend_size = tempfilestat.st_size;
+			total_backend_blocks = (backend_size == 0) ? 
+				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
+			init_progress_info(progress_fd, total_backend_blocks,
 				backend_metafptr);
 
 			fclose(backend_metafptr);
 			backend_metafptr = NULL;
 			UNLINK(backend_metapath);
+		} else {
+			backend_size = 0;
 		}
 	}
 
@@ -1054,6 +1056,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			delete_backend_blocks(progress_fd, total_blocks,
 				ptr->inode, TOUPLOAD_BLOCKS);
 			_busy_wait_all_specified_upload_threads(ptr->inode);
+			flock(fileno(toupload_metafptr), LOCK_UN);
+			fclose(toupload_metafptr);
+			fclose(local_metafptr);
 			return;
 		}
 	}
@@ -1066,8 +1071,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (sync_error == TRUE) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		flock(fileno(toupload_metafptr), LOCK_UN);
-		fclose(toupload_metafptr);
 		fclose(local_metafptr);
+		fclose(toupload_metafptr);
+		unlink(toupload_metapath);
 		return;
 	}
 
@@ -1085,23 +1091,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 		/* Get root_inode from meta */
 		if (S_ISREG(ptr->this_mode)) {
-			ret_ssize = fgetxattr(fileno(local_metafptr),
-				"user.size_last_upload", &size_last_upload,
-				sizeof(long long));
-			if (ret_ssize < 0) {
-				errcode = errno;
-				size_last_upload = 0;
-				if (errcode != ENOATTR)
-					write_log(0, "Error: getxattr failed "
-						"in %s. Code %d\n", __func__,
-						errcode);
-			}
-
-			size_diff = toupload_size - size_last_upload;
-
-			fsetxattr(fileno(local_metafptr),
-				"user.size_last_upload",
-				&toupload_size, sizeof(long long), 0);
+			size_diff = toupload_size - backend_size;
 		}
 		if (S_ISDIR(ptr->this_mode)) {
 			FSEEK(local_metafptr, sizeof(struct stat), SEEK_SET);
@@ -1176,6 +1166,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		fclose(local_metafptr);
 		flock(fileno(toupload_metafptr), LOCK_UN);
 		fclose(toupload_metafptr);
+		unlink(toupload_metapath);
+
+		/* Delete those uploaded blocks if local meta is removed */
+		delete_backend_blocks(progress_fd, total_blocks,
+			ptr->inode, TOUPLOAD_BLOCKS);
+		_busy_wait_all_specified_upload_threads(ptr->inode);
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1188,52 +1184,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	if (!S_ISREG(ptr->this_mode))
 		return;
 
-	/* Delete old block data on backend */
-	BLOCK_UPLOADING_STATUS block_info;
-	char finish_uploading;
-	long long to_upload_seq;
-	long long backend_seq;
-
-	for (block_count = 0; block_count < backend_blocks; block_count++) {
-		ret = get_progress_info_nonlock(progress_fd, block_count,
-			&block_info);
-		if (ret == 0) /* Remaining are empty blocks */
-			break;
-		else if (ret < 0) /* error */
-			continue;
-
-		finish_uploading = block_info.finish_uploading;
-		to_upload_seq = block_info.to_upload_seq;
-		backend_seq = block_info.backend_seq;
-
-		if (finish_uploading == FALSE) {
-			//write_log(10, "Debug: block_%ld_%lld did not finish?\n",
-			//	ptr->inode, block_count);
-			continue;
-		}
-
-		if (backend_seq == 0) {
-			write_log(10, "Debug: block_%ld_%lld is uploaded first time\n",
-					ptr->inode, block_count);
-			continue;
-		}
-
-		if (to_upload_seq == backend_seq) {
-			write_log(10, "Debug: block_%ld_%lld has the same seq?\n",
-				ptr->inode, block_count);
-			continue;
-		}
-
-		sem_wait(&(upload_ctl.upload_queue_sem));
-		sem_wait(&(upload_ctl.upload_op_sem));
-		which_curl = _select_upload_thread(TRUE, FALSE,
-			ptr->inode, block_count, backend_seq,
-			0, 0, progress_fd, TRUE);
-		sem_post(&(upload_ctl.upload_op_sem));
-		dispatch_delete_block(which_curl);
-	}
-
-	/* Wait for those threads */
+	/* Delete old block data on backend and wait for those threads */
+	delete_backend_blocks(progress_fd, total_backend_blocks, 
+		ptr->inode, BACKEND_BLOCKS);
 	_busy_wait_all_specified_upload_threads(ptr->inode);
 
 	return;
