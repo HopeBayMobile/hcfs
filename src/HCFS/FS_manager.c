@@ -912,7 +912,7 @@ int restore_FS_database(void)
 		errcode = -errcode;
 		goto errcode_handle;
 	}
-	ret = hcfs_get_object(fptr, "FSmgr_backup", &download_handle);
+	ret = hcfs_get_object(fptr, "FSmgr_backup", &download_handle, NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in restoring FS database\n");

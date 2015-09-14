@@ -863,11 +863,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	OPENSSL_free(key);
 #endif
 
-	//FILE *new_fptr = transform_fd(fptr, object_key, &data, ENCRYPT_ENABLE,
-  //				      COMPRESS_ENABLE);
-  key = get_key();
-	FILE *new_fptr = transform_fd(fptr, key, &data, ENCRYPT_ENABLE,
-  				      COMPRESS_ENABLE);
+	key = get_key();
+	FILE *new_fptr = transform_fd(fptr, object_key, &data, ENCRYPT_ENABLE,
+				      COMPRESS_ENABLE);
 	OPENSSL_free(key);
 	ret_val =
 	    hcfs_put_object_v2(new_fptr, objname, curl_handle, object_meta);
