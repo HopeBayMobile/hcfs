@@ -30,18 +30,18 @@
  * appended to the obj_id for verfication.
  *
  * Obj_id -
- *     -------------------------------------------------------
- *     |                            |            |           |
- *     |  32 Bytes for sha256 hash  | First byte | Last byte |
- *     |                            | of object  | of object |
- *     -------------------------------------------------------
+ *     -------------------------------------------------------------
+ *     |                            |               |              |
+ *     |  32 Bytes for sha256 hash  | First n bytes | Last n bytes |
+ *     |                            | of object     | of object    |
+ *     -------------------------------------------------------------
  *
  */
 #define OBJID_LENGTH (SHA256_DIGEST_LENGTH + (BYTES_TO_CHECK * 2))
 /* Hash key str size */
 #define OBJID_STRING_LENGTH (OBJID_LENGTH * 2 + 1)
 /* Addtionial bytes to check - To avoid collision cases */
-#define BYTES_TO_CHECK 1
+#define BYTES_TO_CHECK 4
 
 /* Define the upper/lower bound of btree elements */
 #define MAX_EL_PER_NODE 70

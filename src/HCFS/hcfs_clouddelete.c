@@ -596,7 +596,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 #endif
 {
 	char objname[400];
-	char obj_id_str[65];
+	char obj_id_str[OBJID_STRING_LENGTH];
 	int ret_val, ret, ddt_ret;
 	FILE *ddt_fptr;
 	int ddt_fd;

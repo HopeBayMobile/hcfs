@@ -61,7 +61,7 @@ int fetch_from_cloud(FILE *fptr,
 	int ret, errcode;
 
 #if (DEDUP_ENABLE)
-	/* Get objname by hash*/
+	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
 	sprintf(objname, "data_%s", obj_id_str);
 #elif ARM_32bit_

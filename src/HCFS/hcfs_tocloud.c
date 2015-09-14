@@ -925,17 +925,16 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	}
 	ddt_fd = fileno(ddt_fptr);
 
-	/* Check if upload is needed */
-	ret = search_ddt_btree(obj_id, &tree_root, ddt_fd,
-			&result_node, &result_idx);
-
-	printf("search ret = %d\n", ret);
 	/* Copy new obj_id and reserve old one */
 	memcpy(old_obj_id, id_in_meta, OBJID_LENGTH);
 	memcpy(&(obj_id[SHA256_DIGEST_LENGTH]), start_bytes, BYTES_TO_CHECK);
 	memcpy(&(obj_id[SHA256_DIGEST_LENGTH + BYTES_TO_CHECK]), end_bytes,
 			BYTES_TO_CHECK);
 	memcpy(id_in_meta, obj_id, OBJID_LENGTH);
+
+	/* Check if upload is needed */
+	ret = search_ddt_btree(obj_id, &tree_root, ddt_fd,
+			&result_node, &result_idx);
 
 	/* Get objname - Object named by hash key */
 	obj_id_to_string(obj_id, obj_id_str);

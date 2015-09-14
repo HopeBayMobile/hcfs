@@ -34,7 +34,7 @@ int initialize_ddt_meta(char *meta_path)
 	int errcode;
 	ssize_t ret_ssize;
 
-	fptr = fopen(meta_path, "w");
+	fptr = fopen(meta_path, "wb");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
@@ -101,7 +101,7 @@ FILE *get_ddt_btree_meta(unsigned char key[], DDT_BTREE_NODE *root,
 	}
 
 	/* Open file */
-	fptr = fopen(meta_path, "r+");
+	fptr = fopen(meta_path, "r+b");
 	if (fptr == NULL) {
 		errcode = errno;
 		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
@@ -161,10 +161,6 @@ int search_ddt_btree(unsigned char key[], DDT_BTREE_NODE *tnode, int fd,
 		    memcmp(key, temp_el.obj_id, OBJID_LENGTH);
 
 		if (compare_result == 0) {
-			/* If the value of DEDUP_ENABLE flag is equal to 2,
-			 * we need to check object size and parts of the content
-			 * of the object.
-			 */
 			memcpy(result_node, tnode, sizeof(DDT_BTREE_NODE));
 			*result_idx = search_idx;
 			return 0;
@@ -1092,7 +1088,7 @@ int get_obj_id(char *path, unsigned char hash[], unsigned char start_bytes[],
 	buf = malloc(buf_size);
 	bytes_read = 0;
 
-	fptr = fopen(path, "r");
+	fptr = fopen(path, "rb");
 	fd = fileno(fptr);
 
 	while ((bytes_read = fread(buf, 1, buf_size, fptr)))
