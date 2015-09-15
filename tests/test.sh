@@ -38,5 +38,5 @@ $SSH sudo $docker_workspace/utils/setup_dev_env.sh -vm docker_slave
 # Running auto test
 $SSH "run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips"
 
-sudo docker stop swift_test
-sudo docker stop hcfs_test
+sudo docker stop $SWIFT_ID
+sudo docker stop $SLAVE_ID
