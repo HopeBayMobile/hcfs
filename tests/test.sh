@@ -23,7 +23,7 @@ SLAVE_ID=$(sudo docker run --privileged -v $local_repo:/home/jenkins/workspace/H
 SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)
 
 # Inject SSH key into test slave
-mkdir $local_repo/tmp
+mkdir -p $local_repo/tmp
 key=$local_repo/tmp/id_rsa
 [ ! -f $key ] && ssh-keygen -f $key -N ""
 sudo docker exec -i hcfs_test /bin/bash -c 'cat >> /home/jenkins/.ssh/authorized_keys' < ${key}.pub
