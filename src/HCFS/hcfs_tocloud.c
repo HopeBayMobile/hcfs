@@ -868,7 +868,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 				      COMPRESS_ENABLE);
 	OPENSSL_free(key);
 	ret_val =
-	    hcfs_put_object_v2(new_fptr, objname, curl_handle, object_meta);
+	    hcfs_put_object(new_fptr, objname, curl_handle, object_meta);
 	fclose(new_fptr);
 	if (object_key != NULL)
 		OPENSSL_free(object_key);
@@ -916,7 +916,7 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	FILE *new_fptr = transform_encrypt_fd(fptr, key, &data);
 
 	fclose(fptr);
-	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
+	ret_val = hcfs_put_object(new_fptr, objname, curl_handle, NULL);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
 		ret = 0;
@@ -1445,7 +1445,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	FWRITE(&system_size, sizeof(long long), 1, fptr);
 	FWRITE(&num_inodes, sizeof(long long), 1, fptr);
 	FSEEK(fptr, 0, SEEK_SET);
-	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl));
+	ret = hcfs_put_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		goto errcode_handle;

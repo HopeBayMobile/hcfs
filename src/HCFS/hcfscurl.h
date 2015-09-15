@@ -44,12 +44,11 @@ int hcfs_get_auth_swift(char *swift_user, char *swift_pass,
 int hcfs_init_swift_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_swift_backend(CURL *curl);
 int hcfs_swift_list_container(CURL_HANDLE *curl_handle);
-int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 			  HCFS_encode_object_meta *);
 int hcfs_swift_reauth(CURL_HANDLE *curl_handle);
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
-int hcfs_swift_put_object_v2(FILE *fptr, char *objname,
+int hcfs_swift_put_object(FILE *fptr, char *objname,
                              CURL_HANDLE *curl_handle,
                              HCFS_encode_object_meta *object_meta);
 
@@ -57,21 +56,19 @@ int hcfs_swift_put_object_v2(FILE *fptr, char *objname,
 int hcfs_init_S3_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_S3_backend(CURL *curl);
 int hcfs_S3_list_container(CURL_HANDLE *curl_handle);
-int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
 int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		       HCFS_encode_object_meta *);
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle);
 int hcfs_S3_reauth(CURL_HANDLE *curl_handle);
-int hcfs_S3_put_object_v2(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-			  HCFS_encode_object_meta *);
+int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+                          HCFS_encode_object_meta *);
 
 /* Generic */
 int hcfs_init_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_backend(CURL *curl);
 int hcfs_list_container(CURL_HANDLE *curl_handle);
-int hcfs_put_object_v2(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		       HCFS_encode_object_meta *);
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle);
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+		    HCFS_encode_object_meta *);
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *);
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
