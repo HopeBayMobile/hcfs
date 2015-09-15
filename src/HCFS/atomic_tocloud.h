@@ -14,8 +14,13 @@ typedef struct {
 
 typedef struct {
 	char finish_uploading;
+#ifdef DEDUP_ENABLE
+	unsigned char to_upload_objid[OBJID_LENGTH];
+	unsigned char backend_objid[OBJID_LENGTH];
+#else
 	long long to_upload_seq;
 	long long backend_seq;
+#endif
 } BLOCK_UPLOADING_STATUS;
 
 

@@ -1298,7 +1298,6 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
-
 #ifdef ARM_32bit_
 	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
 #else
