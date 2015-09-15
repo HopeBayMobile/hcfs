@@ -89,6 +89,7 @@ int set_progress_info(int fd, long long block_index, char finish_uploading,
 {
 	int errcode;
 	long long offset;
+	off_t end_pos;
 	ssize_t ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 
@@ -101,9 +102,19 @@ int set_progress_info(int fd, long long block_index, char finish_uploading,
 	flock(fd, LOCK_EX);
 	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
 		offset);
-	if (ret_ssize == 0) /* Init because backend_blocks < now blocks */
+	if (ret_ssize == 0) { /* Init because backend_blocks < now blocks */
 		memset(&block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
+		end_pos = lseek(fd, 0, SEEK_END);
+		while (end_pos < offset) {
+			PWRITE(fd, &block_uploading_status,
+				sizeof(BLOCK_UPLOADING_STATUS), end_pos);
+			end_pos += sizeof(BLOCK_UPLOADING_STATUS);
+		}
+		if (end_pos > offset)
+			write_log(0, "Error: end_pos != offset?, in %s\n",
+				__func__);
+	}
 	block_uploading_status.finish_uploading = finish_uploading;
 	block_uploading_status.to_upload_seq = to_upload_seq;
 	PWRITE(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
@@ -427,13 +438,21 @@ char did_block_finish_uploading(int fd, long long blockno)
 }
 
 
-int _revert_inode_uploading(ino_t inode, FILE *progress_fptr)
+void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 {
 	char toupload_meta_exist, backend_meta_exist;
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
 	int errcode;
-	long progress_size;
+	off_t progress_size;
+	mode_t this_mode;
+	ino_t inode;
+	int progress_fd;
+	long long total_blocks;
+
+	this_mode = data_ptr->this_mode;
+	inode = data_ptr->inode;
+	progress_fd = data_ptr->progress_fd;
 
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
@@ -446,7 +465,7 @@ int _revert_inode_uploading(ino_t inode, FILE *progress_fptr)
 		if (errcode != ENOENT) {
 			write_log(0, "Error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
-			return -errcode;
+			return;
 		} else {
 			backend_meta_exist = FALSE;
 		}
@@ -460,47 +479,55 @@ int _revert_inode_uploading(ino_t inode, FILE *progress_fptr)
 		if (errcode != ENOENT) {
 			write_log(0, "Error in %s. Code %d, %s\n", __func__,
 				errcode, strerror(errcode));
-			return -errcode;
+			return;
 		} else {
 			toupload_meta_exist = FALSE;
 		}
 	}
 
-	fseek(progress_fptr, 0, SEEK_END);
-	progress_size = ftell(progress_fptr);
-	
+	/* Begin to revert */
+	progress_size = lseek(progress_fd, 0, SEEK_END);
+
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (progress_size != 0)) {
-		/* Keep on uploading */
+		/* TODO: Keep on uploading */
 
 		} else { /* NOT begin to upload, so cancel uploading */
-		
+			if (backend_meta_exist)
+				unlink(backend_meta_path);
+			unlink(toupload_meta_path);
 		}
 	} else {
 		if (progress_size == 0) {
 		/* Crash before copying local meta, so just 
 		cancel uploading */
+			if (backend_meta_exist)
+				unlink(backend_meta_path);
 
 		} else {
 		/* Finish uploading all blocks and meta,
 		remove backend old block */
-
+			total_blocks = progress_size / 
+				sizeof(BLOCK_UPLOADING_STATUS);
+			delete_backend_blocks(progress_fd, total_blocks,
+				inode, BACKEND_BLOCKS);
 		}
 	}
 
-	return 0;
+	return;
 }
 
 int uploading_revert()
 {	
 	DIR *dirptr;
-	FILE *fptr;
+	int fd;
 	struct dirent temp_dirent;
 	struct dirent *direntptr;
 	char upload_pathname[100];
 	char progress_filepath[300];
-	int errcode, ret;
+	int errcode, ret, count;
 	ino_t inode;
+	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 
 	sprintf(upload_pathname, "upload_bullpen");
 	if (access(upload_pathname, F_OK) < 0)
@@ -530,8 +557,8 @@ int uploading_revert()
 				"upload_progress_inode_%ld", &inode);
 			sprintf(progress_filepath, "%s/%s", upload_pathname,
 				temp_dirent.d_name);
-			fptr = fopen(progress_filepath, "r+");
-			if ((ret != 1) || (fptr == NULL)) {
+			fd = open(progress_filepath, O_RDWR);
+			if ((ret != 1) || (fd <= 0)) {
 				ret = readdir_r(dirptr, &temp_dirent,
 						&direntptr);
 				if (ret > 0) {
@@ -541,8 +568,27 @@ int uploading_revert()
 				continue;
 			}
 
-			/* TODO: use multi-threads */
-			_revert_inode_uploading(inode, fptr);
+			sem_wait(&(sync_ctl.sync_queue_sem));
+			sem_wait(&(sync_ctl.sync_op_sem));
+			for (count = 0; count < MAX_SYNC_CONCURRENCY; 
+								count++) {
+				if (sync_ctl.threads_in_use[count] == 0)
+					break;
+			}
+			sync_ctl.threads_in_use[count] = inode;
+			sync_ctl.threads_created[count] = FALSE;
+			sync_ctl.threads_error[count] = FALSE;
+			sync_ctl.progress_fd[count] = fd;
+			sync_threads[count].inode = inode;
+			sync_threads[count].this_mode = 0; // temp
+			sync_threads[count].progress_fd = fd;
+			pthread_create(&(sync_ctl.inode_sync_thread[count]),
+					NULL, (void *)&_revert_inode_uploading,
+					(void *)&(sync_threads[count]));
+			sync_ctl.threads_created[count] = TRUE;
+			sync_ctl.total_active_sync_threads++;
+
+			sem_post(&(sync_ctl.sync_op_sem));
 		} else {
 			ret = readdir_r(dirptr, &temp_dirent,
 					&direntptr);

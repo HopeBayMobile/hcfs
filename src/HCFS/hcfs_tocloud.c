@@ -733,6 +733,9 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		sem_post(&(upload_ctl.upload_op_sem));
 		dispatch_delete_block(which_curl);
 	}
+
+	_busy_wait_all_specified_upload_threads(inode);
+	return 0;
 }
 
 /**
@@ -1054,7 +1057,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		if (is_local_meta_deleted == TRUE) {
 			delete_backend_blocks(progress_fd, total_blocks,
 				ptr->inode, TOUPLOAD_BLOCKS);
-			_busy_wait_all_specified_upload_threads(ptr->inode);
 			flock(fileno(toupload_metafptr), LOCK_UN);
 			fclose(toupload_metafptr);
 			fclose(local_metafptr);
@@ -1170,7 +1172,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		/* Delete those uploaded blocks if local meta is removed */
 		delete_backend_blocks(progress_fd, total_blocks,
 			ptr->inode, TOUPLOAD_BLOCKS);
-		_busy_wait_all_specified_upload_threads(ptr->inode);
 
 		sem_wait(&(upload_ctl.upload_op_sem));
 		upload_ctl.threads_in_use[which_curl] = FALSE;
@@ -1186,7 +1187,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	/* Delete old block data on backend and wait for those threads */
 	delete_backend_blocks(progress_fd, total_backend_blocks, 
 		ptr->inode, BACKEND_BLOCKS);
-	_busy_wait_all_specified_upload_threads(ptr->inode);
 
 	return;
 
