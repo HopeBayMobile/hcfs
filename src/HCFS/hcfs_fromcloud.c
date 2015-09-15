@@ -36,6 +36,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "utils.h"
+#include "dedup_table.h"
 
 /************************************************************************
 *
@@ -46,14 +47,24 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, ino_t this_inode, long long block_no)
+int fetch_from_cloud(FILE *fptr,
+#if (DEDUP_ENABLE)
+		unsigned char *obj_id)
+#else
+		ino_t this_inode, long long block_no)
+#endif
 {
 	char objname[1000];
+	char obj_id_str[OBJID_STRING_LENGTH];
 	int status;
 	int which_curl_handle;
 	int ret, errcode;
 
-#ifdef ARM_32bit_
+#if (DEDUP_ENABLE)
+	/* Get objname by obj_id */
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
+#elif ARM_32bit_
 	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
 #else
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
@@ -192,8 +203,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		ret =
-		    fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+#if (DEDUP_ENABLE)
+		ret = fetch_from_cloud(blockfptr,
+				temppage.block_entries[entry_index].obj_id);
+#else
+		ret = fetch_from_cloud(blockfptr,
+				ptr->this_inode, ptr->block_no);
+#endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;

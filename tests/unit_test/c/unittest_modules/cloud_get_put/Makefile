@@ -25,7 +25,7 @@ UNITTEST_DIR = ./unittests
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=1
+CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=1
 
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
@@ -84,6 +84,9 @@ gtest_main.a : gtest-all.o gtest_main.o
 # function.
 
 
+# mock functions for dedup_table.c
+dedup_mock_function.o : $(UNITTEST_DIR)/dedup_mock_function.c
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/dedup_mock_function.c
 
 # hcfs_fromcloud testing
 enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
@@ -123,7 +126,7 @@ hcfs_tocloud_unittest.o : $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc \
 tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_mock_function.c
 
-hcfs_tocloud_unittest : enc.o compress.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
+hcfs_tocloud_unittest : enc.o compress.o dedup_mock_function.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
 
 # hcfs_clouddelete testing

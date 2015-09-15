@@ -44,4 +44,7 @@ int update_FS_statistics(char *pathname, long long system_size,
 int read_FS_statistics(char *pathname, long long *system_size_ptr,
 		long long *num_inodes_ptr);
 
+/* Will copy the filename of ddt meta file to pathname */
+int fetch_ddt_path(char *pathname, unsigned char last_char);
+
 #endif  /* GW20_SRC_UTILS_H_ */

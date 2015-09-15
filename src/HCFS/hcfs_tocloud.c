@@ -34,6 +34,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 
 #include <unistd.h>
 #include <time.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <dirent.h>
@@ -41,6 +42,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <sys/mman.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <openssl/sha.h>
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -50,6 +52,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "logger.h"
 #include "macro.h"
 #include "metaops.h"
+#include "dedup_table.h"
 #include "utils.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
@@ -116,6 +119,7 @@ static inline int _upload_terminate_thread(int index)
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
+	unsigned char blk_obj_id[OBJID_LENGTH];
 	ino_t this_inode;
 	off_t page_filepos;
 	long long e_index;
@@ -171,6 +175,9 @@ static inline int _upload_terminate_thread(int index)
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
 
+#if (DEDUP_ENABLE)
+	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id, OBJID_LENGTH);
+#endif
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
 	page_filepos = upload_ctl.upload_threads[index].page_filepos;
@@ -208,8 +215,12 @@ static inline int _upload_terminate_thread(int index)
 				    (is_delete == FALSE)) {
 					tmp_entry->status = ST_BOTH;
 					tmp_entry->uploaded = TRUE;
-					ret = fetch_block_path(
-					    blockpath, this_inode, blockno);
+#if (DEDUP_ENABLE)
+					// Store hash in block meta too
+					memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+#endif
+					ret = fetch_block_path(blockpath,
+						this_inode, blockno);
 					if (ret < 0) {
 						errcode = ret;
 						goto errcode_handle;
@@ -266,6 +277,9 @@ static inline int _upload_terminate_thread(int index)
 				tmp_del->inode = this_inode;
 				tmp_del->blockno = blockno;
 				tmp_del->which_curl = count2;
+#if (DEDUP_ENABLE)
+				memcpy(tmp_del->obj_id, blk_obj_id, OBJID_LENGTH);
+#endif
 
 				delete_ctl.total_active_delete_threads++;
 				which_curl = count2;
@@ -332,6 +346,10 @@ void collect_finished_upload_threads(void *ptr)
 				sync_ctl.threads_error[count1] = TRUE;
 			sem_post(&(sync_ctl.sync_op_sem));
 
+#if (DEDUP_ENABLE)
+			// Reset uploaded flag for upload thread
+			upload_ctl.upload_threads[count].is_upload = FALSE;
+#endif
 			upload_ctl.threads_in_use[count] = FALSE;
 			upload_ctl.threads_created[count] = FALSE;
 			upload_ctl.total_active_upload_threads--;
@@ -436,8 +454,11 @@ errcode_handle:
 }
 
 static inline int _select_upload_thread(char is_block, char is_delete,
-					ino_t this_inode, long long block_count,
-					off_t page_pos, long long e_index)
+#if (DEDUP_ENABLE)
+				char is_upload, unsigned char old_obj_id[],
+#endif
+				ino_t this_inode, long long block_count,
+				off_t page_pos, long long e_index)
 {
 	int which_curl, count;
 
@@ -455,6 +476,13 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].page_entry_index =
 			    e_index;
 			upload_ctl.upload_threads[count].which_curl = count;
+#if (DEDUP_ENABLE)
+			upload_ctl.upload_threads[count].is_upload = is_upload;
+			if (is_upload == TRUE) {
+				memcpy(upload_ctl.upload_threads[count].obj_id,
+						old_obj_id, OBJID_LENGTH);
+			}
+#endif
 
 			upload_ctl.total_active_upload_threads++;
 			which_curl = count;
@@ -649,9 +677,17 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+				which_curl = _select_upload_thread(TRUE, FALSE,
+						tmp_entry->uploaded,
+						tmp_entry->obj_id,
+						ptr->inode, block_count,
+						page_pos, e_index);
+#else
 				which_curl = _select_upload_thread(
-				    TRUE, FALSE, ptr->inode, block_count,
-				    page_pos, e_index);
+						TRUE, FALSE, ptr->inode, block_count,
+						page_pos, e_index);
+#endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
 				if (ret < 0) {
@@ -666,9 +702,16 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				flock(fileno(metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+				which_curl = _select_upload_thread(TRUE, TRUE, TRUE,
+						tmp_entry->obj_id,
+						ptr->inode, block_count,
+						page_pos, e_index);
+#else
 				which_curl = _select_upload_thread(
-				    TRUE, TRUE, ptr->inode, block_count,
-				    page_pos, e_index);
+						TRUE, TRUE, ptr->inode, block_count,
+						page_pos, e_index);
+#endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
 				/* TODO: Maybe should also first copy
@@ -711,7 +754,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL, ptr->inode, 0, 0, 0);
+#else
 	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
+#endif
 
 	sem_post(&(upload_ctl.upload_op_sem));
 
@@ -754,6 +801,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 
 		ret = schedule_sync_meta(metafptr, which_curl);
+		printf("schedule sync meta ret - %d\n", ret);
 		if (ret < 0)
 			sync_error = TRUE;
 		flock(fileno(metafptr), LOCK_UN);
@@ -824,23 +872,38 @@ errcode_handle:
 }
 
 int do_block_sync(ino_t this_inode, long long block_no,
-		  CURL_HANDLE *curl_handle, char *filename)
+#if (DEDUP_ENABLE)
+			CURL_HANDLE *curl_handle, char *filename,
+			char uploaded, unsigned char id_in_meta[])
+#else
+			CURL_HANDLE *curl_handle, char *filename)
+#endif
 {
-	char objname[1000];
-	FILE *fptr;
+	char objname[400];
+	char obj_id_str[OBJID_STRING_LENGTH];
+	unsigned char old_obj_id[OBJID_LENGTH];
+	unsigned char obj_id[OBJID_LENGTH];
+	unsigned char start_bytes[BYTES_TO_CHECK];
+	unsigned char end_bytes[BYTES_TO_CHECK];
+	off_t obj_size;
+	FILE *fptr, *ddt_fptr;
 	int ret_val, errcode, ret;
+	int ddt_fd;
+	int ver_tag, result_idx;
+	DDT_BTREE_NODE tree_root, result_node;
+	DDT_BTREE_META ddt_meta;
+
 
 #ifdef ARM_32bit_
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	write_log(10, "Debug datasync: objname %s, inode %lld, block %lld\n",
-		  objname, this_inode, block_no);
+	write_log(10, "Debug datasync: inode %lld, block %lld\n",
+					this_inode, block_no);
 	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
-	write_log(10, "Debug datasync: objname %s, inode %ld, block %lld\n",
-		  objname, this_inode, block_no);
+	write_log(10, "Debug datasync: inode %ld, block %lld\n",
+					this_inode, block_no);
 	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
 #endif
+
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -849,28 +912,105 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		return -errcode;
 	}
 
-	unsigned char *key = NULL;
-	unsigned char *data = NULL;
-#if ENCRYPT_ENABLE
-	key = get_key();
+#if (DEDUP_ENABLE)
+	/* Compute hash of block */
+	get_obj_id(filename, obj_id, start_bytes, end_bytes, &obj_size);
+	//compute_hash(filename, hash_key);
+
+	/* Get dedup table meta */
+	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
+	if (ddt_fptr == NULL) {
+		/* Can't access ddt btree file */
+		return -EBADF;
+	}
+	ddt_fd = fileno(ddt_fptr);
+
+	/* Copy new obj_id and reserve old one */
+	memcpy(old_obj_id, id_in_meta, OBJID_LENGTH);
+	memcpy(&(obj_id[SHA256_DIGEST_LENGTH]), start_bytes, BYTES_TO_CHECK);
+	memcpy(&(obj_id[SHA256_DIGEST_LENGTH + BYTES_TO_CHECK]), end_bytes,
+			BYTES_TO_CHECK);
+	memcpy(id_in_meta, obj_id, OBJID_LENGTH);
+
+	/* Check if upload is needed */
+	ret = search_ddt_btree(obj_id, &tree_root, ddt_fd,
+			&result_node, &result_idx);
+
+	/* Get objname - Object named by hash key */
+	obj_id_to_string(obj_id, obj_id_str);
+	//hash_to_string(hash_key, hash_key_str);
+	sprintf(objname, "data_%s", obj_id_str);
+#elif defined(ARM_32bit_)
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+	/* Force to upload */
+	ret = 1;
+#else
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	/* Force to upload */
+	ret = 1;
 #endif
 
-	FILE *new_fptr =
-	    transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
-	ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
-	fclose(new_fptr);
-	if (fptr != new_fptr)
-		fclose(fptr);
-	if (data != NULL)
-		free(data);
-	if (key != NULL)
-		OPENSSL_free(key);
+	if (ret == 0) {
+		/* Find a same object in cloud
+		 * Just increase the refcount of the origin block
+		 */
+		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
+						objname);
+		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
+	} else {
+		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
-	/* Already retried in get object if necessary */
-	if ((ret_val >= 200) && (ret_val <= 299))
-		ret = 0;
-	else
-		ret = -EIO;
+		unsigned char *key = NULL;
+		unsigned char *data = NULL;
+
+#ifdef ENCRYPT_ENABLE
+		key = get_key();
+#endif
+
+		FILE *new_fptr =
+		    transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
+		ret_val = hcfs_put_object(new_fptr, objname, curl_handle);
+		fclose(new_fptr);
+		if (fptr != new_fptr)
+			fclose(fptr);
+		if (data != NULL)
+			free(data);
+		if (key != NULL)
+			OPENSSL_free(key);
+
+		/* Already retried in get object if necessary */
+		if ((ret_val >= 200) && (ret_val <= 299))
+			ret = 0;
+		else
+			ret = -EIO;
+
+#if (DEDUP_ENABLE)
+		/* Upload finished - Need to update dedup table */
+		if (ret == 0) {
+			insert_ddt_btree(obj_id, obj_size, &tree_root,
+					ddt_fd, &ddt_meta);
+		}
+	}
+
+	flock(ddt_fd, LOCK_UN);
+	fclose(ddt_fptr);
+
+	/* Since the object mapped by this block is changed, need to remove old object
+	 * Sync was successful
+	 */
+	if (ret == 0 && uploaded) {
+		printf("Start to delete obj %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
+		// Delete old object in cloud
+		do_block_delete(this_inode, block_no, old_obj_id,
+					curl_handle);
+
+		printf("Delete result - %d\n", ret);
+		printf("Delete obj - %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
+	}
+#else
+	}
+#endif
+
 	return ret;
 }
 
@@ -923,13 +1063,19 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
+#if (DEDUP_ENABLE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				    &(upload_curl_handles[which_curl]),
-				    thread_ptr->tempfilename);
+				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
+				thread_ptr->is_upload, thread_ptr->obj_id);
+#else
+		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename);
+#endif
 	else
 		ret = do_meta_sync(thread_ptr->inode,
-				   &(upload_curl_handles[which_curl]),
-				   thread_ptr->tempfilename);
+				&(upload_curl_handles[which_curl]),
+				thread_ptr->tempfilename);
 	if (ret < 0)
 		goto errcode_handle;
 
@@ -954,8 +1100,14 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 	which_curl = thread_ptr->which_curl;
 	if (thread_ptr->is_block == TRUE)
+#if (DEDUP_ENABLE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
-				      &(upload_curl_handles[which_curl]));
+					thread_ptr->obj_id,
+					&(upload_curl_handles[which_curl]));
+#else
+		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
+					&(upload_curl_handles[which_curl]));
+#endif
 	if (ret < 0)
 		goto errcode_handle;
 
@@ -1182,6 +1334,9 @@ int dispatch_upload_block(int which_curl)
 
 errcode_handle:
 	sem_wait(&(upload_ctl.upload_op_sem));
+#if (DEDUP_ENABLE)
+	upload_ctl.upload_threads[count].is_upload = FALSE;
+#endif
 	upload_ctl.threads_in_use[which_curl] = FALSE;
 	upload_ctl.threads_created[which_curl] = FALSE;
 	upload_ctl.total_active_upload_threads--;

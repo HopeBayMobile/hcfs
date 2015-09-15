@@ -171,6 +171,42 @@ errcode_handle:
 
 /************************************************************************
 *
+* Function name: fetch_ddt_path
+*        Inputs: char *pathname
+*        Summary: Use the last character of the hash as the key of ddt
+*                 metafile. Copy the path to ddt_btree_meta to "pathname".
+*  Return value: 0 if successful. Otherwise returns the negation of the
+*                appropriate error code.
+*
+*************************************************************************/
+int fetch_ddt_path(char *pathname, unsigned char last_char)
+{
+	char tempname[METAPATHLEN];
+	int errcode, ret;
+
+	if (METAPATH == NULL)
+		return -1;
+
+	/* Creates meta path if it does not exist */
+	if (access(METAPATH, F_OK) == -1)
+		MKDIR(METAPATH, 0700);
+
+	snprintf(tempname, METAPATHLEN, "%s/ddt", METAPATH);
+
+	/* Creates meta path for meta subfolder if it does not exist */
+	if (access(tempname, F_OK) == -1)
+		MKDIR(tempname, 0700);
+
+	snprintf(pathname, METAPATHLEN, "%s/ddt/ddt_meta_%02x",
+		METAPATH, last_char);
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+/************************************************************************
+*
 * Function name: parse_parent_self
 *        Inputs: const char *pathname, char *parentname, char *selfname
 *       Summary: Given the path "pathname", breaks it down into two components:
