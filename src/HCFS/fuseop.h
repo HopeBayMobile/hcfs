@@ -28,6 +28,7 @@
 #include <fuse/fuse_opt.h>
 
 #include "params.h"
+#include "dedup_table.h"
 
 /*BEGIN META definition*/
 
@@ -121,6 +122,9 @@ typedef struct {
 typedef struct {
 	unsigned char status;
 	unsigned char uploaded;
+#if (DEDUP_ENABLE)
+	unsigned char obj_id[OBJID_LENGTH];
+#endif
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */

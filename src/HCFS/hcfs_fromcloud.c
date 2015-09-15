@@ -28,6 +28,7 @@
 
 #include "params.h"
 #include "enc.h"
+#include "compress.h"
 #include "hcfscurl.h"
 #include "fuseop.h"
 #include "global.h"
@@ -35,6 +36,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "utils.h"
+#include "dedup_table.h"
 
 /************************************************************************
 *
@@ -45,19 +47,37 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr, const char *objname)
+int fetch_from_cloud(FILE *fptr,
+#if (DEDUP_ENABLE)
+		unsigned char *obj_id)
+#else
+		ino_t this_inode, long long block_no)
+#endif
 {
+	char objname[1000];
+	char obj_id_str[OBJID_STRING_LENGTH];
 	int status;
 	int which_curl_handle;
 	int ret, errcode;
+
+#if (DEDUP_ENABLE)
+	/* Get objname by obj_id */
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
+#elif ARM_32bit_
+	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
+#else
+	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+#endif
 
 	sem_wait(&download_curl_sem);
 	FSEEK(fptr, 0, SEEK_SET);
 	FTRUNCATE(fileno(fptr), 0);
 
 	sem_wait(&download_curl_control_sem);
-	for (which_curl_handle = 0; which_curl_handle <
-		MAX_DOWNLOAD_CURL_HANDLE; which_curl_handle++) {
+	for (which_curl_handle = 0;
+	     which_curl_handle < MAX_DOWNLOAD_CURL_HANDLE;
+	     which_curl_handle++) {
 		if (curl_handle_mask[which_curl_handle] == FALSE) {
 			curl_handle_mask[which_curl_handle] = TRUE;
 			break;
@@ -65,25 +85,27 @@ int fetch_from_cloud(FILE *fptr, const char *objname)
 	}
 	sem_post(&download_curl_control_sem);
 	write_log(10, "Debug: downloading using curl handle %d\n",
-						which_curl_handle);
-#ifdef ENCRYPT_ENABLE
-	char  *get_fptr_data = NULL;
+		  which_curl_handle);
+
+	char *get_fptr_data = NULL;
 	size_t len = 0;
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
 
 	status = hcfs_get_object(get_fptr, objname,
-			&(download_curl_handles[which_curl_handle]));
-#else
-	status = hcfs_get_object(fptr, objname,
-			&(download_curl_handles[which_curl_handle]));
-#endif
-#ifdef ENCRYPT_ENABLE
+				 &(download_curl_handles[which_curl_handle]));
+
 	fclose(get_fptr);
-	unsigned char *key = get_key();
-	decrypt_to_fd(fptr, key, get_fptr_data, len);
-	free(get_fptr_data);
-	free(key);
+	unsigned char *key = NULL;
+#if ENCRYPT_ENABLE
+	key = get_key();
 #endif
+
+	decode_to_fd(fptr, key, (unsigned char *)get_fptr_data, len,
+		     ENCRYPT_ENABLE, COMPRESS_ENABLE);
+
+	free(get_fptr_data);
+	if (key != NULL)
+		OPENSSL_free(key);
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
@@ -172,19 +194,24 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 	FREAD(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1, metafptr);
 
 	if (((temppage).block_entries[entry_index].status == ST_CLOUD) ||
-		((temppage).block_entries[entry_index].status == ST_CtoL)) {
+	    ((temppage).block_entries[entry_index].status == ST_CtoL)) {
 		if ((temppage).block_entries[entry_index].status == ST_CLOUD) {
 			(temppage).block_entries[entry_index].status = ST_CtoL;
 			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
-								metafptr);
+			       metafptr);
 			fflush(metafptr);
 		}
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
-		fetch_backend_block_objname(ptr->this_inode, ptr->block_no,
-			objname);
-		ret = fetch_from_cloud(blockfptr, objname);
+
+#if (DEDUP_ENABLE)
+		ret = fetch_from_cloud(blockfptr,
+				temppage.block_entries[entry_index].obj_id);
+#else
+		ret = fetch_from_cloud(blockfptr,
+				ptr->this_inode, ptr->block_no);
+#endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
 			goto errcode_handle;
@@ -200,7 +227,7 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			fsetxattr(fileno(blockfptr), "user.dirty", "F", 1, 0);
 			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
-								metafptr);
+			       metafptr);
 			fflush(metafptr);
 
 			sem_wait(&(hcfs_system->access_sem));
