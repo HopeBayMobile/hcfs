@@ -32,8 +32,8 @@ int get_progress_info(int fd, long long block_index,
 int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
-int set_progress_info(int fd, long long block_index, char finish_uploading,
-	long long to_upload_seq, long long backend_seq);
+int set_progress_info(int fd, long long block_index,
+	BLOCK_UPLOADING_STATUS *set_block_uploading_status);
 
 int init_progress_info(int fd, long long backend_blocks,
 	FILE *backend_metafptr);

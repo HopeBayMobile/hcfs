@@ -84,8 +84,8 @@ errcode_handle:
 
 }
 
-int set_progress_info(int fd, long long block_index, char finish_uploading,
-	long long to_upload_seq, long long backend_seq)
+int set_progress_info(int fd, long long block_index,
+	BLOCK_UPLOADING_STATUS *set_block_uploading_status)
 {
 	int errcode;
 	long long offset;
@@ -94,11 +94,7 @@ int set_progress_info(int fd, long long block_index, char finish_uploading,
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 
 	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
-/*
-	block_uploading_status.finish_uploading = finish_uploading;
-	block_uploading_status.to_upload_seq = to_upload_seq;
-	block_uploading_status.backend_seq = backend_seq;
-*/
+
 	flock(fd, LOCK_EX);
 	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
 		offset);
@@ -115,13 +111,20 @@ int set_progress_info(int fd, long long block_index, char finish_uploading,
 			write_log(0, "Error: end_pos != offset?, in %s\n",
 				__func__);
 	}
-	block_uploading_status.finish_uploading = finish_uploading;
-	block_uploading_status.to_upload_seq = to_upload_seq;
-	PWRITE(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
+
+#ifdef DEDUP_ENABLE
+	memcpy(set_block_uploading_status->backend_objid,
+		block_uploading_status.backend_objid,
+		sizeof(unsigned char) * OBJID_LENGTH);
+#else
+	set_block_uploading_status->backend_seq =
+		block_uploading_status.backend_seq;
+#endif
+	PWRITE(fd, set_block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
 		offset);
 	flock(fd, LOCK_UN);
 
-	if (finish_uploading == TRUE)
+	if (set_block_uploading_status->finish_uploading == TRUE)
 		write_log(10, "Debug: block_%lld finished uploading - "
 			"fd = %d\n", block_index, fd);
 
@@ -234,7 +237,13 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
+#ifdef DEDUP_ENABLE
+		memcpy(block_uploading_status.backend_objid,
+			block_page.block_entries[e_index].obj_id,
+			sizeof(char) * OBJID_LENGTH);
+#else
 		block_uploading_status.backend_seq = 0; /* temp */
+#endif
 
 		PWRITE(fd, &block_uploading_status,
 				sizeof(BLOCK_UPLOADING_STATUS), offset);
