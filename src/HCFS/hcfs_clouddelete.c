@@ -343,8 +343,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		} else {
 		/* backend_metafptr may be NULL when never uploading */
 			if (backend_metafptr == NULL) {
-				write_log(10, "Debug: Nothing on cloud for "
-					"meta_%ld.\n", this_inode);
+				write_log(10, "Debug: Nothing on cloud to be "
+					"deleted for inode_%ld\n", this_inode);
 				is_meta_on_cloud = FALSE;
 				unlink(thismetapath);
 				super_block_delete(this_inode);
@@ -408,13 +408,13 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		tmp_size = tempfilestat.st_size;
 
 		/* Check if need to sync past the current size */
-		ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
+		/*ret_ssize = fgetxattr(fileno(metafptr), "user.trunc_size",
 				&temp_trunc_size, sizeof(long long));
 
 		if ((ret_ssize >= 0) && (tmp_size < temp_trunc_size)) {
 			tmp_size = temp_trunc_size;
 			fremovexattr(fileno(metafptr), "user.trunc_size");
-		}
+		}*/
 		if (tmp_size == 0)
 			total_blocks = 0;
 		else
@@ -437,18 +437,19 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 					continue;
 				}
 				current_page = which_page;
+				FSEEK(backend_metafptr, page_pos, SEEK_SET);
+				FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
+							backend_metafptr);
 			}
 
 			/*TODO: error handling here if cannot read correctly*/
 
-			FSEEK(backend_metafptr, page_pos, SEEK_SET);
-			FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1,
-							backend_metafptr);
 			block_status =
 				temppage.block_entries[current_index].status;
 
 			/* Delete backend object if uploaded */
-			if (block_status != ST_NONE) {
+			if ((block_status != ST_NONE) && 
+					(block_status != ST_TODELETE)) {
 				sem_wait(&(delete_ctl.delete_queue_sem));
 				sem_wait(&(delete_ctl.delete_op_sem));
 				curl_id = -1;
@@ -501,7 +502,6 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		flock(fileno(backend_metafptr), LOCK_UN);
 		mlock = FALSE;
 
-		unlink(backend_metapath);
 	}
 
 errcode_handle:
@@ -515,6 +515,7 @@ errcode_handle:
 		if (mlock == TRUE)
 			flock(fileno(backend_metafptr), LOCK_UN);
 		fclose(backend_metafptr);
+		unlink(backend_metapath);
 	}
 
 	/* Delete meta */

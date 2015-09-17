@@ -384,6 +384,13 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 		return -EEXIST;
 	}
 
+	if (access(srcpath, F_OK) < 0) {
+		errcode = errno;
+		flock(fileno(src_ptr), LOCK_UN);
+		fclose(src_ptr);
+		return -errcode;
+	}
+
 	tar_ptr = fopen(tarpath, "w+");
 	if (tar_ptr == NULL) {
 		errcode = errno;
@@ -430,7 +437,7 @@ errcode_handle:
 	flock(fileno(src_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
-	return errcode;
+	return -errcode;
 }
 
 char did_block_finish_uploading(int fd, long long blockno)
