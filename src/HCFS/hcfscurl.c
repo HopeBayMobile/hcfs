@@ -1092,29 +1092,13 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 *
 * Function name: generate_S3_sig
 *        Inputs: unsigned char *method, unsigned char *date_string,
-*                unsigned char *sig_string, unsigned char *resource_string
+*                unsigned char *sig_string, unsigned char *resource_string,
+                 HCFS_encode_object_meta
 *       Summary: Compute the signature string for S3 backend.
 *  Return value: None.
 *
 *************************************************************************/
 void generate_S3_sig(unsigned char *method, unsigned char *date_string,
-		unsigned char *sig_string, unsigned char *resource_string)
-{
-	unsigned char sig_temp1[4096], sig_temp2[4096];
-	int len_signature, hashlen;
-
-	convert_currenttime(date_string);
-	sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
-		resource_string);
-	write_log(10, "sig temp1: %s\n", sig_temp1);
-	compute_hmac_sha1(sig_temp1, sig_temp2, S3_SECRET, &hashlen);
-	write_log(10, "sig temp2: %s\n", sig_temp2);
-	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
-
-	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
-}
-
-void generate_S3_sig_v2(unsigned char *method, unsigned char *date_string,
 		     unsigned char *sig_string, unsigned char *resource_string,
 		     HCFS_encode_object_meta *object_meta)
 {
@@ -1196,7 +1180,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 		return -1;
 	}
 
-	generate_S3_sig("GET", date_string, S3_signature, resource);
+	generate_S3_sig("GET", date_string, S3_signature, resource, NULL);
 
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
@@ -1640,7 +1624,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 		return -1;
 	}
 
-	generate_S3_sig_v2("PUT", date_string, S3_signature, resource, object_meta);
+	generate_S3_sig("PUT", date_string, S3_signature, resource, object_meta);
 
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
@@ -1781,7 +1765,7 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 		return -1;
 	}
 
-	generate_S3_sig("GET", date_string, S3_signature, resource);
+	generate_S3_sig("GET", date_string, S3_signature, resource, NULL);
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
@@ -1898,7 +1882,7 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 
 	strcpy(delete_command, "DELETE");
 
-	generate_S3_sig("DELETE", date_string, S3_signature, resource);
+	generate_S3_sig("DELETE", date_string, S3_signature, resource, NULL);
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
 								S3_signature);
