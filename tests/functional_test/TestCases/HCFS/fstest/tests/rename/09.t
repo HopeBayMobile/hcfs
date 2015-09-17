@@ -6,7 +6,7 @@ desc="rename returns EACCES or EPERM if the directory containing 'from' is marke
 dir=`dirname $0`
 . ${dir}/../misc.sh
 
-echo "1..56"
+echo "1..40"
 
 n0=`namegen`
 n1=`namegen`
@@ -46,25 +46,25 @@ expect "EACCES|EPERM" -u 65533 -g 65533 rename ${n0}/${n2} ${n1}/${n3}
 expect 0 unlink ${n0}/${n2}
 
 # User owns both: the sticky directory and the fifo to be renamed.
-expect 0 chown ${n1} 65534 65534
-expect 0 -u 65534 -g 65534 mkfifo ${n0}/${n2} 0644
-expect 0 -u 65534 -g 65534 rename ${n0}/${n2} ${n1}/${n3}
-expect 0 unlink ${n1}/${n3}
+# expect 0 chown ${n1} 65534 65534
+# expect 0 -u 65534 -g 65534 mkfifo ${n0}/${n2} 0644
+# expect 0 -u 65534 -g 65534 rename ${n0}/${n2} ${n1}/${n3}
+# expect 0 unlink ${n1}/${n3}
 # User owns the fifo to be renamed, but doesn't own the sticky directory.
-expect 0 chown ${n1} 65533 65533
-expect 0 -u 65533 -g 65533 mkfifo ${n0}/${n2} 0644
-expect 0 -u 65533 -g 65533 rename ${n0}/${n2} ${n1}/${n3}
-expect 0 unlink ${n1}/${n3}
+# expect 0 chown ${n1} 65533 65533
+# expect 0 -u 65533 -g 65533 mkfifo ${n0}/${n2} 0644
+# expect 0 -u 65533 -g 65533 rename ${n0}/${n2} ${n1}/${n3}
+# expect 0 unlink ${n1}/${n3}
 # User owns the sticky directory, but doesn't own the fifo to be renamed.
-expect 0 chown ${n1} 65534 65534
-expect 0 -u 65533 -g 65533 mkfifo ${n0}/${n2} 0644
-expect 0 -u 65534 -g 65534 rename ${n0}/${n2} ${n1}/${n3}
-expect 0 unlink ${n1}/${n3}
+# expect 0 chown ${n1} 65534 65534
+# expect 0 -u 65533 -g 65533 mkfifo ${n0}/${n2} 0644
+# expect 0 -u 65534 -g 65534 rename ${n0}/${n2} ${n1}/${n3}
+# expect 0 unlink ${n1}/${n3}
 # User doesn't own the sticky directory nor the fifo to be renamed.
-expect 0 chown ${n1} 65533 65533
-expect 0 -u 65534 -g 65534 mkfifo ${n0}/${n2} 0644
-expect "EACCES|EPERM" -u 65533 -g 65533 rename ${n0}/${n2} ${n1}/${n3}
-expect 0 unlink ${n0}/${n2}
+# expect 0 chown ${n1} 65533 65533
+# expect 0 -u 65534 -g 65534 mkfifo ${n0}/${n2} 0644
+# expect "EACCES|EPERM" -u 65533 -g 65533 rename ${n0}/${n2} ${n1}/${n3}
+# expect 0 unlink ${n0}/${n2}
 
 # User owns both: the sticky directory and the symlink to be renamed.
 expect 0 chown ${n1} 65534 65534

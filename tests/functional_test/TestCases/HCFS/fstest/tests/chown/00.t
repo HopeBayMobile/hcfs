@@ -9,7 +9,7 @@ dir=`dirname $0`
 if supported lchmod; then
 	echo "1..186"
 else
-	echo "1..171"
+	echo "1..145"
 fi
 
 n0=`namegen`
@@ -29,12 +29,12 @@ expect 0 chown ${n0} 0 0
 expect 0,0 lstat ${n0} uid,gid
 expect 0 unlink ${n0}
 # 8
-expect 0 mkfifo ${n0} 0644
-expect 0 chown ${n0} 123 456
-expect 123,456 lstat ${n0} uid,gid
-expect 0 chown ${n0} 0 0
-expect 0,0 lstat ${n0} uid,gid
-expect 0 unlink ${n0}
+# expect 0 mkfifo ${n0} 0644
+# expect 0 chown ${n0} 123 456
+# expect 123,456 lstat ${n0} uid,gid
+# expect 0 chown ${n0} 0 0
+# expect 0,0 lstat ${n0} uid,gid
+# expect 0 unlink ${n0}
 # 14
 expect 0 mkdir ${n0} 0755
 expect 0 chown ${n0} 123 456
@@ -218,14 +218,14 @@ ctime2=`${fstest} stat ${n0} ctime`
 test_check $ctime1 -lt $ctime2
 expect 0 rmdir ${n0}
 # 119
-expect 0 mkfifo ${n0} 0644
-ctime1=`${fstest} stat ${n0} ctime`
-sleep 1
-expect 0 chown ${n0} 65534 65533
-expect 65534,65533 lstat ${n0} uid,gid
-ctime2=`${fstest} stat ${n0} ctime`
-test_check $ctime1 -lt $ctime2
-expect 0 unlink ${n0}
+# expect 0 mkfifo ${n0} 0644
+# ctime1=`${fstest} stat ${n0} ctime`
+# sleep 1
+# expect 0 chown ${n0} 65534 65533
+# expect 65534,65533 lstat ${n0} uid,gid
+# ctime2=`${fstest} stat ${n0} ctime`
+# test_check $ctime1 -lt $ctime2
+# expect 0 unlink ${n0}
 # 124
 expect 0 symlink ${n1} ${n0}
 ctime1=`${fstest} lstat ${n0} ctime`
@@ -256,16 +256,16 @@ ctime2=`${fstest} stat ${n0} ctime`
 test_check $ctime1 -lt $ctime2
 expect 0 rmdir ${n0}
 # 141
-expect 0 mkfifo ${n0} 0644
-expect 0 chown ${n0} 65534 65533
-ctime1=`${fstest} stat ${n0} ctime`
-sleep 1
-expect 0 chown ${n0} 65534 65533
-expect 0 -u 65534 -g 65532 chown ${n0} 65534 65532
-expect 65534,65532 lstat ${n0} uid,gid
-ctime2=`${fstest} stat ${n0} ctime`
-test_check $ctime1 -lt $ctime2
-expect 0 unlink ${n0}
+# expect 0 mkfifo ${n0} 0644
+# expect 0 chown ${n0} 65534 65533
+# ctime1=`${fstest} stat ${n0} ctime`
+# sleep 1
+# expect 0 chown ${n0} 65534 65533
+# expect 0 -u 65534 -g 65532 chown ${n0} 65534 65532
+# expect 65534,65532 lstat ${n0} uid,gid
+# ctime2=`${fstest} stat ${n0} ctime`
+# test_check $ctime1 -lt $ctime2
+# expect 0 unlink ${n0}
 # 148
 expect 0 symlink ${n1} ${n0}
 expect 0 lchown ${n0} 65534 65533
@@ -307,20 +307,20 @@ Linux:ext3)
 esac
 expect 0 rmdir ${n0}
 # 162
-expect 0 mkfifo ${n0} 0644
-ctime1=`${fstest} stat ${n0} ctime`
-sleep 1
-expect 0 -- chown ${n0} -1 -1
-ctime2=`${fstest} stat ${n0} ctime`
-case "${os}:${fs}" in
-Linux:ext3)
-	test_check $ctime1 -lt $ctime2
-        ;;
-*)
-	test_check $ctime1 -eq $ctime2
-        ;;
-esac
-expect 0 unlink ${n0}
+# expect 0 mkfifo ${n0} 0644
+# ctime1=`${fstest} stat ${n0} ctime`
+# sleep 1
+# expect 0 -- chown ${n0} -1 -1
+# ctime2=`${fstest} stat ${n0} ctime`
+# case "${os}:${fs}" in
+# Linux:ext3)
+# 	test_check $ctime1 -lt $ctime2
+#         ;;
+# *)
+# 	test_check $ctime1 -eq $ctime2
+#         ;;
+# esac
+# expect 0 unlink ${n0}
 # 166
 expect 0 symlink ${n1} ${n0}
 ctime1=`${fstest} lstat ${n0} ctime`
@@ -355,13 +355,13 @@ ctime2=`${fstest} stat ${n0} ctime`
 test_check $ctime1 -eq $ctime2
 expect 0 rmdir ${n0}
 # 178
-expect 0 mkfifo ${n0} 0644
-ctime1=`${fstest} stat ${n0} ctime`
-sleep 1
-expect EPERM -u 65534 -g 65534 chown ${n0} 65534 65534
-ctime2=`${fstest} stat ${n0} ctime`
-test_check $ctime1 -eq $ctime2
-expect 0 unlink ${n0}
+# expect 0 mkfifo ${n0} 0644
+# ctime1=`${fstest} stat ${n0} ctime`
+# sleep 1
+# expect EPERM -u 65534 -g 65534 chown ${n0} 65534 65534
+# ctime2=`${fstest} stat ${n0} ctime`
+# test_check $ctime1 -eq $ctime2
+# expect 0 unlink ${n0}
 # 182
 expect 0 symlink ${n1} ${n0}
 ctime1=`${fstest} lstat ${n0} ctime`

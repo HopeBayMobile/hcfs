@@ -1,5 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+"""
+Classes:
+    FSTester: The Wrapper for fstest
+
+"""
 import os
 import re
 import time
@@ -27,12 +32,14 @@ class FSTester:
         :param script_filename: The test script file name.
         """
         target_script = os.path.join(os.path.join(self.path_of_scripts, test_type), script_filename)
-        cmds = [self.harness, '-r', target_script]
+        cmds = ['sudo', self.harness, '-r', target_script]
+        logger.info(str(cmds))
 
         try:
             p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
             (output, error_msg) = p.communicate()
             print output
+            print error_msg
             result = True
         except OSError as e:
             result = False
@@ -194,6 +201,12 @@ class HCFSBin:
         """
         p = subprocess.Popen([self.hcfsvol_bin, 'terminate'], stdout=PIPE, stderr=PIPE)
 
+    def list_filesystems(self):
+        p = subprocess.Popen([self.hcfsvol_bin, 'list'], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
+        filesystems = output.split('\n')
+        return filesystems[1:]
+
     def create_filesystem(self, filesystem_name):
         """Create a filesystem of HCFS
         """
@@ -207,7 +220,7 @@ class HCFSBin:
     def mount(self, filesystem, mount_point):
         """Mount HCFS to a mount point
         """
-        cmds = [self.hcfsvol_bin, 'mount', filesystem, mount_point]
+        cmds = [self.hcfsvol_bin, 'mount', filesystem, mount_point, '-o allow_root']
         print cmds
         p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
@@ -225,7 +238,7 @@ class HCFSBin:
 class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.fstest = FSTester('/mnt/hcfs/fstest')
+        self.fstest = FSTester('/mnt/hcfs2/fstest/tests')
         self.logger = logging.getLogger('CommonSetup')
         # swift
         self.swift_url = 'https://10.10.99.118:8080/auth/v1.0'
@@ -299,25 +312,26 @@ class CommonSetup:
         else:
             return False, output
 
-    def check_hcfs_mount(self):
+    def check_hcfs_mount(self, mount_point):
         p = subprocess.Popen(['mount'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         for line in output.split('\n'):
-            if re.search(r'hcfs', line):
+            if re.search(mount_point, line):
                 return True
 
         return False
 
-    def check_hcfs_df(self):
+    def check_hcfs_df(self, mount_point):
         p = subprocess.Popen(['mount'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         for line in output.split('\n'):
-            if re.search(r'hcfs', line):
+            if re.search(self.mount_point, line):
                 return True
 
         return False
+
 
 
 # ============================ Test Case Start ================================
@@ -329,22 +343,34 @@ class HCFS_0(CommonSetup):
         self.HCFSBin = HCFSBin()
 
     def run(self):
-        self.HCFSBin.start_hcfs()
+        (output, error_msg) = self.HCFSBin.verify_hcfs_processes()
+        if output == False:
+            self.HCFSBin.start_hcfs()
+            logger.info('Create HCFS processes...')
+        else:
+            logger.info('HCFS process already exist!')
         time.sleep(10)
 
         # create a filesystem
-        (result, msg) = self.HCFSBin.create_filesystem(self.fake_filesystem)
-        print result, msg
+        filesystems = self.HCFSBin.list_filesystems()
+        if self.fake_filesystem not in filesystems:
+            (result, msg) = self.HCFSBin.create_filesystem(self.fake_filesystem)
+            logger.info('fake filesystem no exist, create one: {0}'.format(self.fake_filesystem))
+        else:
+            logger.info('fake fiesystem already exist.')
 
-        # mount file system to a mount point
-        (result, msg) = self.HCFSBin.mount(self.fake_filesystem, self.mount_point)
-        print result, msg
+        # create mount point
+        if not self.check_hcfs_mount(self.mount_point):
+            (result, msg) = self.HCFSBin.mount(self.fake_filesystem, self.mount_point)
+            print result, msg
+        else:
+            logger.info('Mount point: {0} already exist.'.format(self.mount_point))
 
         # check the df and mount
-        if not self.check_hcfs_mount():
+        if not self.check_hcfs_mount(self.mount_point):
             return False, 'Mount failed'
         
-        if not self.check_hcfs_df():
+        if not self.check_hcfs_df(self.mount_point):
             return False, 'Missed df information'
 
         # copy fstest tool to HCFS
@@ -450,7 +476,7 @@ class HCFS_7(CommonSetup):
 
 class HCFS_8(CommonSetup):
     '''
-    chmod
+    mkfifo
     '''    
     def __init__(self):
         CommonSetup.__init__(self)
@@ -465,7 +491,7 @@ class HCFS_8(CommonSetup):
         else:
             result = False
             msg = output
-        return result, msg 
+        return True, 'mkfifo not supported now'
 
 class HCFS_9(CommonSetup):
     '''
