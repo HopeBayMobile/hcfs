@@ -44,6 +44,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #include "global.h"
 #include "logger.h"
 #include "macro.h"
+#include "dedup_table.h"
 #include "metaops.h"
 #include "utils.h"
 
@@ -248,7 +249,12 @@ void init_delete_control(void)
 
 /* Helper function for marking a delete thread as in use */
 static inline int _use_delete_thread(int index, char is_blk_flag,
+#if (DEDUP_ENABLE)
+				ino_t this_inode, long long blockno,
+				unsigned char *obj_id)
+#else
 				ino_t this_inode, long long blockno)
+#endif
 {
 	if (delete_ctl.threads_in_use[index] != FALSE)
 		return -1;
@@ -257,8 +263,12 @@ static inline int _use_delete_thread(int index, char is_blk_flag,
 	delete_ctl.threads_created[index] = FALSE;
 	delete_ctl.delete_threads[index].is_block = is_blk_flag;
 	delete_ctl.delete_threads[index].inode = this_inode;
-	if (is_blk_flag == TRUE)
+	if (is_blk_flag == TRUE) {
+#if (DEDUP_ENABLE)
+		memcpy(delete_ctl.delete_threads[index].obj_id, obj_id, OBJID_LENGTH);
+#endif
 		delete_ctl.delete_threads[index].blockno = blockno;
+	}
 	delete_ctl.delete_threads[index].which_curl = index;
 
 	delete_ctl.total_active_delete_threads++;
@@ -418,8 +428,14 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 				curl_id = -1;
 				for (count = 0; count < MAX_DELETE_CONCURRENCY;
 								count++) {
+#if (DEDUP_ENABLE)
+					ret_val = _use_delete_thread(count,
+						TRUE, ptr->inode, block_count,
+						temppage.block_entries[current_index].obj_id);
+#else
 					ret_val = _use_delete_thread(count,
 						TRUE, ptr->inode, block_count);
+#endif
 					if (ret_val == 0) {
 						curl_id = count;
 						break;
@@ -473,7 +489,11 @@ errcode_handle:
 	sem_wait(&(delete_ctl.delete_op_sem));
 	curl_id = -1;
 	for (count = 0; count < MAX_DELETE_CONCURRENCY; count++) {
+#if (DEDUP_ENABLE)
+		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1, NULL);
+#else
 		ret_val = _use_delete_thread(count, FALSE, ptr->inode, -1);
+#endif
 		if (ret_val == 0) {
 			curl_id = count;
 			break;
@@ -569,30 +589,80 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 *
 *************************************************************************/
 int do_block_delete(ino_t this_inode, long long block_no,
-						CURL_HANDLE *curl_handle)
+#if (DEDUP_ENABLE)
+				unsigned char *obj_id, CURL_HANDLE *curl_handle)
+#else
+				CURL_HANDLE *curl_handle)
+#endif
 {
-	char objname[1000];
-	int ret_val, ret;
+	char objname[400];
+	char obj_id_str[OBJID_STRING_LENGTH];
+	int ret_val, ret, ddt_ret;
+	FILE *ddt_fptr;
+	int ddt_fd;
+	DDT_BTREE_NODE tree_root;
+	DDT_BTREE_META ddt_meta;
 
-#ifdef ARM_32bit_
+/* Handle objname - consider platforms, dedup flag  */
+#if (DEDUP_ENABLE)
+	/* Object named by block hashkey */
+	obj_id_to_string(obj_id, obj_id_str);
+	sprintf(objname, "data_%s", obj_id_str);
+
+	/* Get dedup table meta */
+	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
+	if (ddt_fptr == NULL) {
+		/* Can't access ddt btree file */
+		return -EBADF;
+	}
+	ddt_fd = fileno(ddt_fptr);
+
+	/* Update ddt */
+	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
+#elif defined(ARM_32bit_)
 	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	write_log(10,
-		"Debug delete object: objname %s, inode %lld, block %lld\n",
-					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+	/* Force to delete */
+	ddt_ret = 0;
 #else
 	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
-	write_log(10,
-		"Debug delete object: objname %s, inode %ld, block %lld\n",
-					objname, this_inode, block_no);
-	sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+	/* Force to delete */
+	ddt_ret = 0;
 #endif
-	ret_val = hcfs_delete_object(objname, curl_handle);
-	/* Already retried in get object if necessary */
-	if ((ret_val >= 200) && (ret_val <= 299))
+
+	if (ddt_ret == 0) {
+#ifdef ARM_32bit_
+		write_log(10,
+			"Debug delete object: objname %s, inode %lld, block %lld\n",
+						objname, this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
+#else
+		write_log(10,
+			"Debug delete object: objname %s, inode %ld, block %lld\n",
+						objname, this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
+#endif
+		ret_val = hcfs_delete_object(objname, curl_handle);
+		/* Already retried in get object if necessary */
+		if ((ret_val >= 200) && (ret_val <= 299))
+			ret = 0;
+		else
+			ret = -EIO;
+	} else if (ddt_ret == 1) {
+		write_log(10, "Only decrease refcount of object - %s", objname);
 		ret = 0;
-	else
+	} else if (ddt_ret == 2) {
+		printf("Can't find this element, maybe deleted already?\n");
+		ret = 0;
+	} else {
+		printf("ERROR delete el tree\n");
 		ret = -EIO;
+	}
+
+#if (DEDUP_ENABLE)
+	flock(ddt_fd, LOCK_UN);
+	fclose(ddt_fptr);
+#endif
+
 	return ret;
 }
 /* TODO: How to retry object deletion later if failed at some point */
@@ -614,6 +684,9 @@ void con_object_dsync(DELETE_THREAD_TYPE *delete_thread_ptr)
 	if (delete_thread_ptr->is_block == TRUE)
 		do_block_delete(delete_thread_ptr->inode,
 			delete_thread_ptr->blockno,
+#if (DEDUP_ENABLE)
+			delete_thread_ptr->obj_id,
+#endif
 			&(delete_curl_handles[which_curl]));
 	else
 		do_meta_delete(delete_thread_ptr->inode,
