@@ -18,7 +18,7 @@ SWIFT_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SWIF
 # Start test slave
 sudo docker rm -f hcfs_test 2>/dev/null || true
 SLAVE_ID=$(sudo docker run --privileged -v $local_repo:/home/jenkins/workspace/HCFS \
-        -d --name=hcfs_test --link swift_test \
+		-d --name=hcfs_test --link swift_test \
 		docker:5000/docker_hcfs_test_slave bash -c "/usr/sbin/sshd -D -p 22")
 SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)
 
