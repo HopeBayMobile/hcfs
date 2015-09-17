@@ -5,7 +5,7 @@ HCFS uses Jenkins CI to automate test and run tests in docker container to ensur
 
 # File Structure #
 
-## `test.sh` ##
+## `docker_test.sh` ##
     By executing it, developers can run CI tests at localhost. By running test image in a docker container, it will not affecting localhost's environment too much. test.sh will first install docker then run 2 images -- test slave image and swift all-in-one image -- to perform tests in containers.
 
 ## `docker_scrips/*` ##
