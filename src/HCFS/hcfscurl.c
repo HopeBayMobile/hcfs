@@ -1829,13 +1829,13 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 		return -1;
 	}
 
-  /* get object meta data */
+  /* get object meta data */  
   if(object_meta){
     char header[1000] = {0};
     FSEEK(S3_header_fptr, 0, SEEK_SET);
     fread(header, sizeof(char), 1000, S3_header_fptr);
     write_log(10, "download object %s header:\n%s", objname, header);
-    /* parse_http_header_coding_meta(object_meta, header); */
+    parse_http_header_coding_meta(object_meta, header, "x-amz-meta-", "comp", "enc", "nonce");
   }
 
 	fclose(S3_header_fptr);
