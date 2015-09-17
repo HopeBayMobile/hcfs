@@ -11,6 +11,8 @@ int test_elements = 70000;
 class testEnvironment : public ::testing::Environment {
 	public:
 		virtual void SetUp() {
+			if (access("testpatterns/ddt", F_OK) == -1)
+				mkdir("testpatterns/ddt", 0700);
 		}
 
 		virtual void TearDown() {
