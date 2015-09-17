@@ -267,16 +267,18 @@ errcode_handle:
  *
  *************************************************************************/
 int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
-				  char *httpheader)
+				  char *httpheader, const char *meta,
+				  const char *comp_meta, const char *enc_meta,
+				  const char *nonce_meta)
 {
-	const char *meta = "X-Object-Meta-";
+	//const char *meta = "X-Object-Meta-";
 	const int meta_len = strlen(meta);
-	const char *comp_meta = "Comp";
-	const int comp_meta_len = 4;
-	const char *enc_meta = "Enc";
-	const int enc_meta_len = 3;
-	const char *nonce_meta = "Nonce";
-	const int nonce_meta_len = 5;
+	//const char *comp_meta = "Comp";
+	const int comp_meta_len = strlen(comp_meta);
+	//const char *enc_meta = "Enc";
+	const int enc_meta_len = strlen(enc_meta);
+	//const char *nonce_meta = "Nonce";
+	const int nonce_meta_len = strlen(nonce_meta);
 
 	char *s, *backup;
 	s = strtok_r(httpheader, "\n", &backup);
@@ -912,7 +914,11 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, H
     FSEEK(swift_header_fptr, 0, SEEK_SET);
     fread(header, sizeof(char), 1000, swift_header_fptr);
     write_log(10, "download object %s header:\n%s", objname, header);
-    parse_http_header_coding_meta(object_meta, header);
+    //const char *meta = "X-Object-Meta-";
+    //const char *comp_meta = "Comp";
+    //const char *enc_meta = "Enc";
+    //const char *nonce_meta = "Nonce";
+    parse_http_header_coding_meta(object_meta, header, "X-Object-Meta-", "Comp", "Enc", "Nonce");
   }
 
 	fclose(swift_header_fptr);
@@ -1822,6 +1828,15 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 		unlink(header_filename);
 		return -1;
 	}
+
+  /* get object meta data */
+  if(object_meta){
+    char header[1000] = {0};
+    FSEEK(S3_header_fptr, 0, SEEK_SET);
+    fread(header, sizeof(char), 1000, S3_header_fptr);
+    write_log(10, "download object %s header:\n%s", objname, header);
+    /* parse_http_header_coding_meta(object_meta, header); */
+  }
 
 	fclose(S3_header_fptr);
 	S3_header_fptr = NULL;

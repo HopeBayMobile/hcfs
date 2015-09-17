@@ -74,5 +74,5 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
 
 int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
-                                  char *httpheader);
+                                  char *httpheader, const char *, const char *, const char *, const char *);
 #endif  /* GW20_HCFS_HCFSCURL_H_ */
