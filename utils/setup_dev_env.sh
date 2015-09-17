@@ -114,7 +114,7 @@ tests )
 		sudo service docker restart
 	fi
 	# Pull test image from local registry server
-	sudo docker pull docker:5000/docker-unittest-stylecheck-slave
+	sudo docker pull docker:5000/docker_hcfs_test_slave
 	;;&
 esac
 
