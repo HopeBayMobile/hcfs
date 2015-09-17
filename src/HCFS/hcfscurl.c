@@ -1077,8 +1077,8 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 	output_str[len_finalhash] = 0;
 	*outputlen = len_finalhash;
 
-	for (count = 0; count < len_finalhash; count++)
-		write_log(10, "%02X", finalhash[count]);
+	/* for (count = 0; count < len_finalhash; count++) */
+	/* 	write_log(10, "%02X", finalhash[count]); */
 	write_log(10, "\n");
 }
 
@@ -1099,9 +1099,43 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 
 	convert_currenttime(date_string);
 	sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
-							resource_string);
+		resource_string);
 	write_log(10, "sig temp1: %s\n", sig_temp1);
 	compute_hmac_sha1(sig_temp1, sig_temp2, S3_SECRET, &hashlen);
+	write_log(10, "sig temp2: %s\n", sig_temp2);
+	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
+
+	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
+}
+
+void generate_S3_sig_v2(unsigned char *method, unsigned char *date_string,
+		     unsigned char *sig_string, unsigned char *resource_string,
+		     HCFS_encode_object_meta *object_meta)
+{
+
+	char sig_temp1[4096] = {0};
+	unsigned char sig_temp2[64] = {0};
+	int len_signature, hashlen;
+  char header[1024] = {0};
+
+  if (object_meta != NULL) {
+	  sprintf(header,
+		  "x-amz-meta-comp:%d\nx-amz-meta-enc:%d\nx-amz-meta-nonce:%s\n",
+		  object_meta->comp_alg, object_meta->enc_alg,
+		  object_meta->enc_session_key);
+  }
+
+	convert_currenttime(date_string);
+	if (object_meta != NULL) {
+		sprintf(sig_temp1, "%s\n\n\n%s\n%s/%s", method, date_string,
+            header, resource_string);
+	} else {
+		sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
+			resource_string);
+	}
+	write_log(10, "sig temp1: %s\n", sig_temp1);
+	compute_hmac_sha1((unsigned char *)sig_temp1, sig_temp2, S3_SECRET,
+			  &hashlen);
 	write_log(10, "sig temp2: %s\n", sig_temp2);
 	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
 
@@ -1135,7 +1169,7 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 
 	sprintf(header_filename, "/dev/shm/S3listhead%s.tmp", curl_handle->id);
 	sprintf(body_filename, "/dev/shm/S3listbody%s.tmp", curl_handle->id);
-	sprintf(resource, "%s/", S3_BUCKET);
+	sprintf(resource, "%s", S3_BUCKET);
 
 	curl = curl_handle->curl;
 
@@ -1578,6 +1612,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 	char header_filename[100];
 
 	unsigned char date_string[100];
+  char object_string[150];
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
@@ -1599,7 +1634,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 		return -1;
 	}
 
-	generate_S3_sig("PUT", date_string, S3_signature, resource);
+	generate_S3_sig_v2("PUT", date_string, S3_signature, resource, object_meta);
 
 	sprintf(date_string_header, "date: %s", date_string);
 	sprintf(AWS_auth_string, "authorization: AWS %s:%s", S3_ACCESS,
@@ -1613,6 +1648,19 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 	chunk = curl_slist_append(chunk, "Expect:");
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
+	if (object_meta != NULL) {
+    write_log(10, "prepare object meta\n");
+		sprintf(object_string, "x-amz-meta-enc: %d",
+            object_meta->enc_alg);
+		chunk = curl_slist_append(chunk, object_string);
+		sprintf(object_string, "x-amz-meta-comp: %d",
+            object_meta->comp_alg);
+		chunk = curl_slist_append(chunk, object_string);
+		sprintf(object_string, "x-amz-meta-nonce: %s",
+            object_meta->enc_session_key);
+		chunk = curl_slist_append(chunk, object_string);
+    write_log(10, "finish object meta\n");
+	}
 
 	FSEEK(fptr, 0, SEEK_END);
 	FTELL(fptr);
@@ -1661,6 +1709,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 
 	curl_slist_free_all(chunk);
 	ret_val = parse_http_header_retcode(S3_header_fptr);
+  write_log(9, "http return code: %d", ret_val);
 	if (ret_val < 0) {
 		fclose(S3_header_fptr);
 		unlink(header_filename);
@@ -1674,6 +1723,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 	return ret_val;
 
 errcode_handle:
+  write_log(9, "Something wrong in curl \n");
 	if (S3_header_fptr == NULL) {
 		fclose(S3_header_fptr);
 		unlink(header_filename);
