@@ -975,7 +975,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 #endif
 
 		FILE *new_fptr =
-		    transform_fd(fptr, key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
+		    transform_fd(fptr, object_key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
 		ret_val = hcfs_put_object(new_fptr, objname, curl_handle, object_meta);
 
     fclose(new_fptr);

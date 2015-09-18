@@ -416,10 +416,21 @@ int decode_to_fd(FILE *to_fd, unsigned char *key, unsigned char *input,
 	return 0;
 }
 
+/************************************************************************
+ * *
+ * * Function name: get_decode_meta
+ * *        Inputs: HCFS_encode_object_meta *, unsigned char *session_key
+ * *                unsigned char *key, int enc_flag, int_compress_flag
+ * *       Summary: encrypt session_key and write to meta
+ * *
+ * *  Return value: 0 if success or -1 if failed
+ * *
+ * *************************************************************************/
 int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 		    unsigned char *key, int enc_flag, int compress_flag)
 {
 
+	int retCode = 0;
 	int ret = 0;
 
 	meta->enc_alg = ENC_ALG_NONE;
@@ -436,14 +447,17 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 		int outlen = 0;
 		int len_cipher = KEY_SIZE + IV_SIZE + TAG_SIZE;
 		unsigned char buf[KEY_SIZE + IV_SIZE + TAG_SIZE] = {0};
-    unsigned char iv[IV_SIZE] = {0};
+		unsigned char iv[IV_SIZE] = {0};
 
-		/* TODO: check return values */
 		meta->enc_alg = enc_flag;
-		generate_random_aes_key(session_key);
-		generate_random_bytes(iv, IV_SIZE);
+		if (generate_random_aes_key(session_key) != 0)
+			goto error;
+		if (generate_random_bytes(iv, IV_SIZE) != 0)
+			goto error;
 		ret = aes_gcm_encrypt_core(buf + IV_SIZE, session_key, KEY_SIZE,
 					   key, iv);
+		if (ret != 0)
+			goto error;
 		memcpy(buf, iv, IV_SIZE);
 		meta->len_enc_session_key =
 		    expect_b64_encode_length(len_cipher);
@@ -451,13 +465,45 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 		    calloc(meta->len_enc_session_key, sizeof(char));
 		b64encode_str(buf, meta->enc_session_key, &outlen, len_cipher);
 	}
+  goto end;
 
-	return 0;
+error:
+	retCode = -1;
+
+end:
+	return retCode;
 }
 
+
+/************************************************************************
+ * *
+ * * Function name: decrypt_session_key
+ * *        Inputs: unsigned char *session_key
+ * *                unsigned char *enc_session_key, unsigned char *key
+ * *       Summary: decrypt enc_seesion_key to session_key
+ * *
+ * *  Return value: 0 if success
+ * *                -99 if invalid input
+ * *                -101 if illegal character appears in b64decode
+ * *                -102 if impossible format occurs in b64decode
+ * *
+ * *************************************************************************/
 int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 			unsigned char *key)
 {
+	if (!session_key) {
+		write_log(3, "session_key is NULL\n");
+		return -99;
+	}
+	if (!enc_session_key) {
+		write_log(3, "enc_session_key is NULL\n");
+		return -99;
+	}
+	if (!key) {
+		write_log(3, "key is NULL\n");
+		return -99;
+	}
+
 	unsigned char buf[KEY_SIZE + IV_SIZE + TAG_SIZE] = {0};
 	int outlen = 0;
 	int ret = b64decode_str(enc_session_key, buf, &outlen,
@@ -472,11 +518,12 @@ int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
 	return ret;
 }
 
-void free_object_meta(HCFS_encode_object_meta *object_meta){
-  if(object_meta != NULL){
-    if(object_meta->enc_session_key != NULL){
-      OPENSSL_free(object_meta->enc_session_key);
-    }
-    free(object_meta);
-  }
+void free_object_meta(HCFS_encode_object_meta *object_meta)
+{
+	if (object_meta != NULL) {
+		if (object_meta->enc_session_key != NULL) {
+			OPENSSL_free(object_meta->enc_session_key);
+		}
+		free(object_meta);
+	}
 }
