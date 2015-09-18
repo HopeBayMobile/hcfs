@@ -85,13 +85,13 @@ int parse_swift_auth_header(FILE *fptr)
 	char to_stop;
 
 	FSEEK(fptr, 0, SEEK_SET);
-	ret_val = fscanf(fptr, "%19s %19s %19[^\r\n]\n",
-			httpcode, retcode, retstatus);
+	ret_val = fscanf(fptr, "%19s %19s %19[^\r\n]\n", httpcode, retcode,
+			 retstatus);
 	if (ret_val < 3)
 		return -1;
 
 	ATOL(retcode);
-	retcodenum = (int) ret_num;
+	retcodenum = (int)ret_num;
 
 	if ((retcodenum < 200) || (retcodenum > 299))
 		return retcodenum;
@@ -100,7 +100,7 @@ int parse_swift_auth_header(FILE *fptr)
 
 	while (to_stop == FALSE) {
 		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string,
-					temp_string2);
+				 temp_string2);
 		if (ret_val < 2)
 			return -1;
 		if (strcmp(temp_string, "X-Storage-Url:") == 0) {
@@ -113,18 +113,17 @@ int parse_swift_auth_header(FILE *fptr)
 
 	while (to_stop == FALSE) {
 		ret_val = fscanf(fptr, "%1023s %1023[^\r\n]\n", temp_string,
-					temp_string2);
+				 temp_string2);
 		if (ret_val < 2)
 			return -1;
 		if (strcmp(temp_string, "X-Auth-Token:") == 0)
 			to_stop = TRUE;
 	}
 
-	sprintf(swift_auth_string, "%s %s", temp_string,
-			temp_string2);
+	sprintf(swift_auth_string, "%s %s", temp_string, temp_string2);
 
 	write_log(10, "Header info: %s, %s\n", swift_url_string,
-				swift_auth_string);
+		  swift_auth_string);
 	return retcodenum;
 
 errcode_handle:
@@ -846,7 +845,8 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
+int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+			  HCFS_encode_object_meta *object_meta)
 {
 	struct curl_slist *chunk = NULL;
 	CURLcode res;
@@ -859,21 +859,21 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, H
 	int num_retries;
 
 	sprintf(header_filename, "/dev/shm/swiftgethead%s.tmp",
-							curl_handle->id);
+		curl_handle->id);
 	curl = curl_handle->curl;
 
 	swift_header_fptr = fopen(header_filename, "w+");
 	if (swift_header_fptr == NULL) {
 		errcode = errno;
-		write_log(0, "IO error in %s. Code %d, %s\n", __func__,
-			errcode, strerror(errcode));
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
 		return -1;
 	}
 
 	chunk = NULL;
 
-	sprintf(container_string, "%s/%s/%s",
-				swift_url_string, SWIFT_CONTAINER, objname);
+	sprintf(container_string, "%s/%s/%s", swift_url_string, SWIFT_CONTAINER,
+		objname);
 	chunk = curl_slist_append(chunk, swift_auth_string);
 	chunk = curl_slist_append(chunk, "Expect:");
 
@@ -882,7 +882,7 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, H
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
 	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1L);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *) fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)fptr);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, NULL);
@@ -908,18 +908,21 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, H
 		unlink(header_filename);
 		return -1;
 	}
-  /* get object meta data */
-  if(object_meta){
-    char header[1000] = {0};
-    FSEEK(swift_header_fptr, 0, SEEK_SET);
-    fread(header, sizeof(char), 1000, swift_header_fptr);
-    write_log(10, "download object %s header:\n%s", objname, header);
-    //const char *meta = "X-Object-Meta-";
-    //const char *comp_meta = "Comp";
-    //const char *enc_meta = "Enc";
-    //const char *nonce_meta = "Nonce";
-    parse_http_header_coding_meta(object_meta, header, "X-Object-Meta-", "Comp", "Enc", "Nonce");
-  }
+	/* get object meta data */
+	if (object_meta) {
+		char header[1000] = {0};
+		FSEEK(swift_header_fptr, 0, SEEK_SET);
+		fread(header, sizeof(char), 1000, swift_header_fptr);
+		write_log(10, "download object %s header:\n%s", objname,
+			  header);
+		// const char *meta = "X-Object-Meta-";
+		// const char *comp_meta = "Comp";
+		// const char *enc_meta = "Enc";
+		// const char *nonce_meta = "Nonce";
+		parse_http_header_coding_meta(object_meta, header,
+					      "X-Object-Meta-", "Comp", "Enc",
+					      "Nonce");
+	}
 
 	fclose(swift_header_fptr);
 	swift_header_fptr = NULL;
@@ -935,7 +938,6 @@ errcode_handle:
 	}
 
 	return -1;
-
 }
 
 /************************************************************************
@@ -1106,19 +1108,19 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 	char sig_temp1[4096] = {0};
 	unsigned char sig_temp2[64] = {0};
 	int len_signature, hashlen;
-  char header[1024] = {0};
+	char header[1024] = {0};
 
-  if (object_meta != NULL) {
-	  sprintf(header,
-		  "x-amz-meta-comp:%d\nx-amz-meta-enc:%d\nx-amz-meta-nonce:%s\n",
-		  object_meta->comp_alg, object_meta->enc_alg,
-		  object_meta->enc_session_key);
-  }
+	if (object_meta != NULL) {
+		sprintf(header, "x-amz-meta-comp:%d\nx-amz-meta-enc:%d\nx-amz-"
+				"meta-nonce:%s\n",
+			object_meta->comp_alg, object_meta->enc_alg,
+			object_meta->enc_session_key);
+	}
 
 	convert_currenttime(date_string);
 	if (object_meta != NULL) {
 		sprintf(sig_temp1, "%s\n\n\n%s\n%s/%s", method, date_string,
-            header, resource_string);
+			header, resource_string);
 	} else {
 		sprintf(sig_temp1, "%s\n\n\n%s\n/%s", method, date_string,
 			resource_string);
