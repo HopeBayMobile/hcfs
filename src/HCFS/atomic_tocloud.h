@@ -5,6 +5,12 @@
 #include <sys/un.h>
 #include <sys/file.h>
 
+#define TOUPLOAD_BLOCK_EXIST(flag) (((flag) & 1) == 1 ? TRUE : FALSE)
+#define SET_TOUPLOAD_BLOCK_EXIST(flag) ((flag) |= 1)
+
+#define CLOUD_BLOCK_EXIST(flag) (((flag) & 2) == 2 ? TRUE : FALSE)
+#define SET_CLOUD_BLOCK_EXIST(flag) ((flag) |= 2)
+
 /* Data that should be known by fuse process when uploading a file */
 typedef struct {
 	ino_t inode;
@@ -14,6 +20,7 @@ typedef struct {
 
 typedef struct {
 	char finish_uploading;
+	char block_exist; /*first bit means toupload block, second means cloud*/
 #ifdef DEDUP_ENABLE
 	unsigned char to_upload_objid[OBJID_LENGTH];
 	unsigned char backend_objid[OBJID_LENGTH];
@@ -33,7 +40,8 @@ int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
 int set_progress_info(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *set_block_uploading_status);
+	BLOCK_UPLOADING_STATUS *set_block_uploading_status,
+	char set_which_one);
 
 int init_progress_info(int fd, long long backend_blocks,
 	FILE *backend_metafptr);

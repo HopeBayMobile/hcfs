@@ -245,13 +245,17 @@ static inline int _upload_terminate_thread(int index)
 	temp_block_uploading_status.finish_uploading = TRUE;
 	memcpy(temp_block_uploading_status.to_upload_objid, blk_obj_id,
 		sizeof(char) * OBJID_LENGTH);
-	set_progress_info(progress_fd, blockno, &temp_block_uploading_status);
+	SET_TOUPLOAD_BLOCK_EXIST(temp_block_uploading_status.block_exist);
+	set_progress_info(progress_fd, blockno, &temp_block_uploading_status,
+		TOUPLOAD_BLOCKS);
 
 #else
 	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	temp_block_uploading_status.finish_uploading = TRUE;
 	temp_block_uploading_status.to_upload_seq = 0; /* temp */
-	set_progress_info(progress_fd, blockno, &temp_block_uploading_status);
+	SET_TOUPLOAD_BLOCK_EXIST(temp_block_uploading_status.block_exist);
+	set_progress_info(progress_fd, blockno, &temp_block_uploading_status,
+		TOUPLOAD_BLOCKS);
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
 
@@ -746,9 +750,7 @@ static inline int _choose_deleted_block(char delete_which_one,
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
 {
 	char finish_uploading;
-	long long to_upload_seq;
-	long long backend_seq;
-	unsigned char zero_objid[OBJID_LENGTH];
+	//unsigned char zero_objid[OBJID_LENGTH];
 
 	finish_uploading = block_info->finish_uploading;
 
@@ -757,17 +759,19 @@ static inline int _choose_deleted_block(char delete_which_one,
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
 			return -1;
+		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
+			return -1;
 		/* Do not delete if it is the same as backend block */
 		if (!memcmp(block_info->to_upload_objid,
 				block_info->backend_objid, OBJID_LENGTH))
 			return -1;
 		/* Do not delete if it does not exist */
-		if (block_info->to_upload_objid[0] == 0) {
+		/*if (block_info->to_upload_objid[0] == 0) {
 			memset(zero_objid, 0, OBJID_LENGTH);
 			if (!memcmp(block_info->to_upload_objid,
 					zero_objid, OBJID_LENGTH))
 				return -1;
-		}
+		}*/
 
 		memcpy(block_objid, block_info->to_upload_objid, OBJID_LENGTH);
 		return 0;
@@ -775,13 +779,15 @@ static inline int _choose_deleted_block(char delete_which_one,
 
 	/* Delete old blocks on cloud */
 	if (delete_which_one == BACKEND_BLOCKS) {
+		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
+			return -1;
 		/* Do not delete if it does not exist */
-		if (block_info->backend_objid[0] == 0) {
+		/*if (block_info->backend_objid[0] == 0) {
 			memset(zero_objid, 0, OBJID_LENGTH);
 			if (!memcmp(block_info->backend_objid,
 					zero_objid, OBJID_LENGTH))
 				return -1;
-		}
+		}*/
 		/* Do not delete if it is the same as to-upload block */
 		if (!memcmp(block_info->to_upload_objid,
 				block_info->backend_objid, OBJID_LENGTH))
@@ -1211,8 +1217,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				memset(&temp_uploading_status, 0,
 					sizeof(BLOCK_UPLOADING_STATUS));
 				temp_uploading_status.finish_uploading = TRUE;
+				/* Do not need to set to-upload block exist */
 				set_progress_info(progress_fd, block_count,
-					&temp_uploading_status);
+					&temp_uploading_status,
+					TOUPLOAD_BLOCKS);
 #else
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
@@ -1233,16 +1241,22 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					sizeof(BLOCK_UPLOADING_STATUS));
 #ifdef DEDUP_ENABLE
 				temp_uploading_status.finish_uploading = TRUE;
-				if (toupload_block_status != ST_NONE)
-				memcpy(temp_uploading_status.to_upload_objid,
-					tmp_entry->obj_id, OBJID_LENGTH);
+				if (toupload_block_status != ST_NONE) {
+					memcpy(temp_uploading_status.to_upload_objid,
+						tmp_entry->obj_id, OBJID_LENGTH);
+					SET_TOUPLOAD_BLOCK_EXIST(
+						temp_uploading_status.block_exist);
+				}
 #else
 
 				temp_uploading_status.finish_uploading = TRUE;
 				temp_uploading_status.to_upload_seq = 0; /*temp*/
+				SET_TOUPLOAD_BLOCK_EXIST(
+					temp_uploading_status.block_exist);
 #endif
 				set_progress_info(progress_fd, block_count,
-					&temp_uploading_status);
+					&temp_uploading_status,
+					TOUPLOAD_BLOCKS);
 			}
 		}
 		/* ---End of syncing blocks loop--- */

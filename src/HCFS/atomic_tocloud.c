@@ -85,7 +85,8 @@ errcode_handle:
 }
 
 int set_progress_info(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *set_block_uploading_status)
+	BLOCK_UPLOADING_STATUS *set_block_uploading_status,
+	char set_which_one)
 {
 	int errcode;
 	long long offset;
@@ -112,16 +113,40 @@ int set_progress_info(int fd, long long block_index,
 				__func__);
 	}
 
+	if (set_which_one == TOUPLOAD_BLOCKS) {
+		block_uploading_status.block_exist =
+			((set_block_uploading_status->block_exist & 1) |
+			(block_uploading_status.block_exist & 2));
+
 #ifdef DEDUP_ENABLE
-	memcpy(set_block_uploading_status->backend_objid,
-		block_uploading_status.backend_objid,
-		sizeof(unsigned char) * OBJID_LENGTH);
+		memcpy(block_uploading_status.to_upload_objid,
+			set_block_uploading_status->to_upload_objid,
+			sizeof(unsigned char) * OBJID_LENGTH);
 #else
-	set_block_uploading_status->backend_seq =
-		block_uploading_status.backend_seq;
+		block_uploading_status.toupload_seq =
+			set_block_uploading_status->toupload_seq;
 #endif
-	PWRITE(fd, set_block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
-		offset);
+
+	} else if (set_which_one == BACKEND_BLOCKS) {
+		block_uploading_status.block_exist =
+			((set_block_uploading_status->block_exist & 2) |
+			(block_uploading_status.block_exist & 1));
+
+#ifdef DEDUP_ENABLE
+		memcpy(block_uploading_status.backend_objid,
+			set_block_uploading_status->backend_objid,
+			sizeof(unsigned char) * OBJID_LENGTH);
+#else
+		block_uploading_status.backend_seq =
+			set_block_uploading_status->backend_seq;
+#endif
+	}
+
+	block_uploading_status.finish_uploading =
+		set_block_uploading_status->finish_uploading;
+
+	PWRITE(fd, &block_uploading_status,
+		sizeof(BLOCK_UPLOADING_STATUS), offset);
 	flock(fd, LOCK_UN);
 
 	if (set_block_uploading_status->finish_uploading == TRUE)
@@ -242,6 +267,8 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 		cloud_status = block_page.block_entries[e_index].status;
 		if ((cloud_status != ST_NONE) &&
 			(cloud_status != ST_TODELETE)) {
+			SET_CLOUD_BLOCK_EXIST(
+				block_uploading_status.block_exist);
 #ifdef DEDUP_ENABLE
 			memcpy(block_uploading_status.backend_objid,
 				block_page.block_entries[e_index].obj_id,
@@ -458,7 +485,6 @@ char did_block_finish_uploading(int fd, long long blockno)
 	return block_uploading_status.finish_uploading;
 }
 
-
 void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 {
 	char toupload_meta_exist, backend_meta_exist;
@@ -506,14 +532,18 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
-	/* Begin to revert */
+	/*** Begin to revert ***/
 	progress_size = lseek(progress_fd, 0, SEEK_END);
 
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (progress_size != 0)) {
-		/* TODO: Keep on uploading */
+		/* TODO: Keep on uploading. case[5, 6], case6, case[6, 7],
+		case7, case[7, 8], case8 */
 
-		} else { /* NOT begin to upload, so cancel uploading */
+		} else { 
+		/* NOT begin to upload, so cancel uploading.
+		case2, case[2, 3], case3, case[3, 4], case4, case[4, 5], case5,
+		 */
 			if (backend_meta_exist)
 				unlink(backend_meta_path);
 			unlink(toupload_meta_path);
@@ -521,13 +551,14 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	} else {
 		if (progress_size == 0) {
 		/* Crash before copying local meta, so just 
-		cancel uploading */
+		cancel uploading. case[1, 2] */
 			if (backend_meta_exist)
 				unlink(backend_meta_path);
 
 		} else {
 		/* Finish uploading all blocks and meta,
-		remove backend old block */
+		remove backend old block. case[8, 9], case9, case[9. 10],
+		case10 */
 			total_blocks = progress_size / 
 				sizeof(BLOCK_UPLOADING_STATUS);
 			delete_backend_blocks(progress_fd, total_blocks,
