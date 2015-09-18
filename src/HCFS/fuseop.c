@@ -549,17 +549,28 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	memset(&this_stat, 0, sizeof(struct stat));
 
-	self_mode = mode | S_IFREG;
-	this_stat.st_mode = self_mode;
 	this_stat.st_size = 0;
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
 
+#ifdef _ANDROID_ENV_
+        self_mode = 0770 | S_IFREG;
+        this_stat.st_mode = self_mode;
+
+        this_stat.st_uid = 0;  /* root */
+        this_stat.st_gid = 1028;  /* sdcard_r */
+
+#else
+        self_mode = mode | S_IFREG;
+        this_stat.st_mode = self_mode;
+
 	/*Use the uid and gid of the fuse caller*/
+
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
+#endif
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
@@ -674,13 +685,23 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	self_mode = mode | S_IFDIR;
-	this_stat.st_mode = self_mode;
 	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
+
+#ifdef _ANDROID_ENV_
+        self_mode = 0770 | S_IFDIR;
+        this_stat.st_mode = self_mode;
+
+        this_stat.st_uid = 0;  /* root */
+        this_stat.st_gid = 1028;  /* sdcard_r */
+
+#else
+        self_mode = mode | S_IFDIR;
+        this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
+#endif
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
@@ -3781,6 +3802,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		attr_changed = TRUE;
 	}
 
+#ifndef _ANDROID_ENV_
 	if (to_set & FUSE_SET_ATTR_MODE) {
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
@@ -3834,6 +3856,7 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
+#endif
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
 		if ((temp_context->uid != 0) &&
@@ -4107,11 +4130,21 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	}
 
 	memset(&this_stat, 0, sizeof(struct stat));
-	this_stat.st_mode = S_IFLNK | 0777;
 	this_stat.st_nlink = 1;
 	this_stat.st_size = strlen(link);
+
+#ifdef _ANDROID_ENV_
+        this_stat.st_mode = 0770 | S_IFLNK;
+
+        this_stat.st_uid = 0;  /* root */
+        this_stat.st_gid = 1028;  /* sdcard_r */
+
+#else
+        this_stat.st_mode = S_IFLNK | 0777;
+
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
+#endif
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation);
@@ -4877,16 +4910,26 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	memset(&this_stat, 0, sizeof(struct stat));
-	self_mode = mode | S_IFREG;
-	this_stat.st_mode = self_mode;
 	this_stat.st_size = 0;
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = 0;
 	this_stat.st_nlink = 1;
+#ifdef _ANDROID_ENV_
+        self_mode = 0770 | S_IFREG;
+        this_stat.st_mode = self_mode;
+
+        this_stat.st_uid = 0;  /* root */
+        this_stat.st_gid = 1028;  /* sdcard_r */
+#else
+        self_mode = mode | S_IFREG;
+        this_stat.st_mode = self_mode;
+
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
+#endif
+
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 	self_inode = super_block_new_inode(&this_stat, &this_generation);

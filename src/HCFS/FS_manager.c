@@ -193,6 +193,16 @@ ino_t _create_root_inode(void)
 	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
 	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
 
+#ifdef _ANDROID_ENV_
+        self_mode = S_IFDIR | 0770;
+        this_stat.st_mode = self_mode;
+
+        /*One pointed by the parent, another by self*/
+        this_stat.st_nlink = 2;
+        this_stat.st_uid = 0;  /* root */
+        this_stat.st_gid = 1028;  /* sdcard_r */
+
+#else
 	self_mode = S_IFDIR | 0777;
 	this_stat.st_mode = self_mode;
 
@@ -200,6 +210,7 @@ ino_t _create_root_inode(void)
 	this_stat.st_nlink = 2;
 	this_stat.st_uid = getuid();
 	this_stat.st_gid = getgid();
+#endif
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
