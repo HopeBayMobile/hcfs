@@ -7,6 +7,7 @@
 #include "super_block.h"
 #include "global.h"
 #include "fuseop.h"
+#include "enc.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -60,7 +61,7 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 	return 0;
 }
 
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *meta)
 {
 	char objectpath[40];
 	FILE *objptr;
@@ -161,7 +162,7 @@ int write_log(int level, char *format, ...)
 	return 0;
 }
 
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *object_meta)
 {
 	long long sys_size, num_ino;
 
