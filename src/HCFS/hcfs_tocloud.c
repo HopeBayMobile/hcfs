@@ -873,10 +873,10 @@ errcode_handle:
 
 int do_block_sync(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
-			CURL_HANDLE *curl_handle, char *filename,
-			char uploaded, unsigned char id_in_meta[])
+		  CURL_HANDLE *curl_handle, char *filename, char uploaded,
+		  unsigned char id_in_meta[])
 #else
-			CURL_HANDLE *curl_handle, char *filename)
+		  CURL_HANDLE *curl_handle, char *filename)
 #endif
 {
 	char objname[400];
@@ -893,14 +893,13 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
-
 #ifdef ARM_32bit_
-	write_log(10, "Debug datasync: inode %lld, block %lld\n",
-					this_inode, block_no);
+	write_log(10, "Debug datasync: inode %lld, block %lld\n", this_inode,
+		  block_no);
 	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
 #else
-	write_log(10, "Debug datasync: inode %ld, block %lld\n",
-					this_inode, block_no);
+	write_log(10, "Debug datasync: inode %ld, block %lld\n", this_inode,
+		  block_no);
 	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
 #endif
 
@@ -915,7 +914,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
 	/* Compute hash of block */
 	get_obj_id(filename, obj_id, start_bytes, end_bytes, &obj_size);
-	//compute_hash(filename, hash_key);
+	// compute_hash(filename, hash_key);
 
 	/* Get dedup table meta */
 	ddt_fptr = get_ddt_btree_meta(obj_id, &tree_root, &ddt_meta);
@@ -929,16 +928,16 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	memcpy(old_obj_id, id_in_meta, OBJID_LENGTH);
 	memcpy(&(obj_id[SHA256_DIGEST_LENGTH]), start_bytes, BYTES_TO_CHECK);
 	memcpy(&(obj_id[SHA256_DIGEST_LENGTH + BYTES_TO_CHECK]), end_bytes,
-			BYTES_TO_CHECK);
+	       BYTES_TO_CHECK);
 	memcpy(id_in_meta, obj_id, OBJID_LENGTH);
 
 	/* Check if upload is needed */
-	ret = search_ddt_btree(obj_id, &tree_root, ddt_fd,
-			&result_node, &result_idx);
+	ret = search_ddt_btree(obj_id, &tree_root, ddt_fd, &result_node,
+			       &result_idx);
 
 	/* Get objname - Object named by hash key */
 	obj_id_to_string(obj_id, obj_id_str);
-	//hash_to_string(hash_key, hash_key_str);
+	// hash_to_string(hash_key, hash_key_str);
 	sprintf(objname, "data_%s", obj_id_str);
 #elif defined(ARM_32bit_)
 	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
@@ -954,39 +953,41 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		/* Find a same object in cloud
 		 * Just increase the refcount of the origin block
 		 */
-		write_log(10, "Debug datasync: find same obj %s - Aborted to upload",
-						objname);
+		write_log(
+		    10, "Debug datasync: find same obj %s - Aborted to upload",
+		    objname);
 		increase_ddt_el_refcount(&result_node, result_idx, ddt_fd);
 	} else {
 		write_log(10, "Debug datasync: start to sync obj %s", objname);
 
 		unsigned char *key = NULL;
 		unsigned char *data = NULL;
-    HCFS_encode_object_meta *object_meta = NULL;
-    unsigned char *object_key = NULL;
+		HCFS_encode_object_meta *object_meta = NULL;
+		unsigned char *object_key = NULL;
 
 #ifdef ENCRYPT_ENABLE
-    key = get_key();
-    object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
-    object_key = calloc(KEY_SIZE, sizeof(unsigned char));
-    get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
-                    COMPRESS_ENABLE);
-    OPENSSL_free(key);
+		key = get_key();
+		object_meta = calloc(1, sizeof(HCFS_encode_object_meta));
+		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
+		get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
+				COMPRESS_ENABLE);
+		OPENSSL_free(key);
 #endif
 
-		FILE *new_fptr =
-		    transform_fd(fptr, object_key, &data, ENCRYPT_ENABLE, COMPRESS_ENABLE);
-		ret_val = hcfs_put_object(new_fptr, objname, curl_handle, object_meta);
+		FILE *new_fptr = transform_fd(fptr, object_key, &data,
+					      ENCRYPT_ENABLE, COMPRESS_ENABLE);
+		ret_val = hcfs_put_object(new_fptr, objname, curl_handle,
+					  object_meta);
 
-    fclose(new_fptr);
-    if (object_key != NULL)
-      OPENSSL_free(object_key);
-    if (object_meta != NULL)
-      free_object_meta(object_meta);
-    if (fptr != new_fptr)
-      fclose(fptr);
-    if (data != NULL)
-      free(data);
+		fclose(new_fptr);
+		if (object_key != NULL)
+			OPENSSL_free(object_key);
+		if (object_meta != NULL)
+			free_object_meta(object_meta);
+		if (fptr != new_fptr)
+			fclose(fptr);
+		if (data != NULL)
+			free(data);
 
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))
@@ -997,25 +998,27 @@ int do_block_sync(ino_t this_inode, long long block_no,
 #if (DEDUP_ENABLE)
 		/* Upload finished - Need to update dedup table */
 		if (ret == 0) {
-			insert_ddt_btree(obj_id, obj_size, &tree_root,
-					ddt_fd, &ddt_meta);
+			insert_ddt_btree(obj_id, obj_size, &tree_root, ddt_fd,
+					 &ddt_meta);
 		}
 	}
 
 	flock(ddt_fd, LOCK_UN);
 	fclose(ddt_fptr);
 
-	/* Since the object mapped by this block is changed, need to remove old object
+	/* Since the object mapped by this block is changed, need to remove old
+	 * object
 	 * Sync was successful
 	 */
 	if (ret == 0 && uploaded) {
-		printf("Start to delete obj %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
+		printf("Start to delete obj %02x...%02x\n", old_obj_id[0],
+		       old_obj_id[31]);
 		// Delete old object in cloud
-		do_block_delete(this_inode, block_no, old_obj_id,
-					curl_handle);
+		do_block_delete(this_inode, block_no, old_obj_id, curl_handle);
 
 		printf("Delete result - %d\n", ret);
-		printf("Delete obj - %02x...%02x\n", old_obj_id[0], old_obj_id[31]);
+		printf("Delete obj - %02x...%02x\n", old_obj_id[0],
+		       old_obj_id[31]);
 	}
 #else
 	}
