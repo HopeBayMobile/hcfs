@@ -17,7 +17,7 @@ protected:
 
 TEST_F(parse_http_header, Parse_Header){
     HCFS_encode_object_meta *object_meta = (HCFS_encode_object_meta *)calloc(1, sizeof(HCFS_encode_object_meta));
-    int ret = parse_http_header_coding_meta(object_meta, httpheader);
+    int ret = parse_http_header_coding_meta(object_meta, httpheader, "X-Object-Meta-", "Comp", "Enc", "Nonce");
     printf("%d\n", object_meta->len_enc_session_key);
     EXPECT_EQ(object_meta->comp_alg, 1);
     EXPECT_EQ(object_meta->enc_alg, 1);
@@ -314,7 +314,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_HttpPerformFail)
 	CURRENT_BACKEND = SWIFT;
 	http_perform_retry_fail = TRUE;
 
-	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftputhead_test_.tmp", F_OK));
 
 	http_perform_retry_fail = FALSE;
@@ -324,7 +324,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_ParseHttpHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
 
-	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftputhead_test_.tmp", F_OK));
 }
 
@@ -333,7 +333,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObjectSuccess)
 	CURRENT_BACKEND = SWIFT;
 	write_list_header_flag = TRUE;
 
-	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftputhead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -346,7 +346,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_Retry_Success) /* Retry put success *
 	let_retry = TRUE;
 
 	std::cout << "Test retry. wait 10 secs." << std::endl;
-	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftputhead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -358,7 +358,7 @@ TEST_F(hcfs_put_objectTest, S3PutObject_HttpPerformFail)
 	CURRENT_BACKEND = S3;
 	http_perform_retry_fail = TRUE;
 
-	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3puthead_test_.tmp", F_OK));
 
 	http_perform_retry_fail = FALSE;
@@ -368,7 +368,7 @@ TEST_F(hcfs_put_objectTest, S3PutObject_ParseHttpHeaderFail)
 {
 	CURRENT_BACKEND = S3;
 
-	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3puthead_test_.tmp", F_OK));
 }
 
@@ -377,7 +377,7 @@ TEST_F(hcfs_put_objectTest, S3PutObjectSuccess)
 	CURRENT_BACKEND = S3;
 	write_list_header_flag = TRUE;
 
-	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3puthead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -390,7 +390,7 @@ TEST_F(hcfs_put_objectTest, S3PutObject_Retry_Success) /* Retry put success */
 	let_retry = TRUE;
 
 	std::cout << "Test retry. wait 10 secs." << std::endl;
-	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3puthead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -451,7 +451,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpPerformFail)
 	CURRENT_BACKEND = SWIFT;
 	http_perform_retry_fail = TRUE;
 
-	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftgethead_test_.tmp", F_OK));
 
 	http_perform_retry_fail = FALSE;
@@ -461,7 +461,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
 
-	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftgethead_test_.tmp", F_OK));
 }
 
@@ -470,7 +470,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObjectSuccess)
 	CURRENT_BACKEND = SWIFT;
 	write_list_header_flag = TRUE;
 
-	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftgethead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -483,7 +483,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_Retry_Success) /* Retry get success *
 	let_retry = TRUE;
 
 	std::cout << "Test retry. wait 10 secs." << std::endl;
-	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftgethead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -495,7 +495,7 @@ TEST_F(hcfs_get_objectTest, S3GetObject_HttpPerformFail)
 	CURRENT_BACKEND = S3;
 	http_perform_retry_fail = TRUE;
 
-	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3gethead_test_.tmp", F_OK));
 
 	http_perform_retry_fail = FALSE;
@@ -505,7 +505,7 @@ TEST_F(hcfs_get_objectTest, S3GetObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = S3;
 
-	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3gethead_test_.tmp", F_OK));
 }
 
@@ -514,7 +514,7 @@ TEST_F(hcfs_get_objectTest, S3GetObjectSuccess)
 	CURRENT_BACKEND = S3;
 	write_list_header_flag = TRUE;
 
-	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3gethead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
@@ -527,7 +527,7 @@ TEST_F(hcfs_get_objectTest, S3GetObject_Retry_Success) /* Retry get success */
 	let_retry = TRUE;
 
 	std::cout << "Test retry. wait 10 secs." << std::endl;
-	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle));
+	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3gethead_test_.tmp", F_OK));
 
 	write_list_header_flag = FALSE;
