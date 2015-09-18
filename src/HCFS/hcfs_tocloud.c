@@ -215,7 +215,6 @@ static inline int _upload_terminate_thread(int index)
 
 #if (DEDUP_ENABLE)
 	/* copy new object id to toupload meta */
-	//write_log(10, "Debug: block%ld_%lld begin to write objid\n", this_inode, blockno);
 	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id,
 		OBJID_LENGTH);
 
@@ -227,9 +226,7 @@ static inline int _upload_terminate_thread(int index)
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
-	//write_log(10, "Debug: block%ld_%lld begin to lock toupload_meta\n", this_inode, blockno);
 	flock(fileno(toupload_metafptr), LOCK_EX);
-	//write_log(10, "Debug: block%ld_%lld finished locking toupload_meta\n", this_inode, blockno);
 	is_toupload_meta_lock = TRUE;
 	
 	FSEEK(toupload_metafptr, page_filepos, SEEK_SET);
@@ -242,7 +239,6 @@ static inline int _upload_terminate_thread(int index)
 	flock(fileno(toupload_metafptr), LOCK_UN);
 	fclose(toupload_metafptr);
 	is_toupload_meta_lock = FALSE;
-	//write_log(10, "Debug: block%ld_%lld leave writing objid\n", this_inode, blockno);
 
 	/* Set this block as FINISH */
 	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
@@ -250,7 +246,6 @@ static inline int _upload_terminate_thread(int index)
 	memcpy(temp_block_uploading_status.to_upload_objid, blk_obj_id,
 		sizeof(char) * OBJID_LENGTH);
 	set_progress_info(progress_fd, blockno, &temp_block_uploading_status);
-	//write_log(10, "Debug: block%ld_%lld begin to set as finished\n", this_inode, blockno);
 
 #else
 	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
@@ -1122,7 +1117,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
 						sizeof(BLOCK_ENTRY_PAGE),
 						1, local_metafptr, TRUE);
-					/* Unlock local meta */
 				}
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
@@ -1192,7 +1186,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			   after meta being uploaded? */
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
-				flock(fileno(local_metafptr), LOCK_UN);
 				/*tmp_entry->status = ST_LtoC;*/
 				/* Update local meta */
 				/*FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
@@ -1204,12 +1197,24 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				set_progress_info(progress_fd, block_count,
 					TRUE, 0, 0);*/
 #if (DEDUP_ENABLE)
+				if (local_block_status == ST_TODELETE) {
+					memset(tmp_entry, 0,
+							sizeof(BLOCK_ENTRY));
+					tmp_entry->status = ST_NONE;
+					FSEEK_ADHOC_SYNC_LOOP(local_metafptr,
+						page_pos, SEEK_SET, TRUE);
+					FWRITE_ADHOC_SYNC_LOOP(&local_temppage,
+						sizeof(BLOCK_ENTRY_PAGE),
+						1, local_metafptr, TRUE);
+				}
+				flock(fileno(local_metafptr), LOCK_UN);
 				memset(&temp_uploading_status, 0,
 					sizeof(BLOCK_UPLOADING_STATUS));
 				temp_uploading_status.finish_uploading = TRUE;
 				set_progress_info(progress_fd, block_count,
 					&temp_uploading_status);
 #else
+				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 				which_curl = _select_upload_thread(TRUE, TRUE,
@@ -1221,7 +1226,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				dispatch_delete_block(which_curl);
 #endif
 			
-			} else { /* ST_BOTH, ST_NONE, ST_CtoL */
+			} else { /* ST_BOTH, ST_LtoC, ST_CtoL, ST_NONE */
 				write_log(10, "Debug: block_%lld is %d\n", block_count, toupload_block_status);
 				flock(fileno(local_metafptr), LOCK_UN);
 				memset(&temp_uploading_status, 0,

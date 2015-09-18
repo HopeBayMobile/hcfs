@@ -195,6 +195,7 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 	long long block;
 	BLOCK_ENTRY_PAGE block_page;
 	FILE_META_TYPE tempfilemeta;
+	char cloud_status;
 
 	/* Do NOT need to lock file because this function will be called by
 	   the only one thread in sync_single_inode() */
@@ -237,14 +238,18 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
-#ifdef DEDUP_ENABLE
-		memcpy(block_uploading_status.backend_objid,
-			block_page.block_entries[e_index].obj_id,
-			sizeof(char) * OBJID_LENGTH);
-#else
-		block_uploading_status.backend_seq = 0; /* temp */
-#endif
 
+		cloud_status = block_page.block_entries[e_index].status;
+		if ((cloud_status != ST_NONE) &&
+			(cloud_status != ST_TODELETE)) {
+#ifdef DEDUP_ENABLE
+			memcpy(block_uploading_status.backend_objid,
+				block_page.block_entries[e_index].obj_id,
+				sizeof(char) * OBJID_LENGTH);
+#else
+			block_uploading_status.backend_seq = 0; /* temp */
+#endif
+		}
 		PWRITE(fd, &block_uploading_status,
 				sizeof(BLOCK_UPLOADING_STATUS), offset);
 		offset += sizeof(BLOCK_UPLOADING_STATUS);
