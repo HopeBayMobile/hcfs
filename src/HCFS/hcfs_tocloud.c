@@ -145,6 +145,7 @@ static inline int _upload_terminate_thread(int index)
 	char need_delete_object, is_toupload_meta_lock;
 	BLOCK_UPLOADING_STATUS temp_block_uploading_status;
 	int progress_fd;
+	char toupload_exist, finish_uploading;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return 0;
@@ -241,19 +242,18 @@ static inline int _upload_terminate_thread(int index)
 	is_toupload_meta_lock = FALSE;
 
 	/* Set this block as FINISH */
-	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
-	temp_block_uploading_status.finish_uploading = TRUE;
-	memcpy(temp_block_uploading_status.to_upload_objid, blk_obj_id,
-		sizeof(char) * OBJID_LENGTH);
-	SET_TOUPLOAD_BLOCK_EXIST(temp_block_uploading_status.block_exist);
-	set_progress_info(progress_fd, blockno, &temp_block_uploading_status,
-		TOUPLOAD_BLOCKS);
+	finish_uploading = TRUE;
+	toupload_exist = TRUE;
+	set_progress_info(progress_fd, blockno, &toupload_exist, NULL,
+		blk_obj_id, NULL, &finish_uploading);
 
 #else
 	memset(&temp_block_uploading_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
 	temp_block_uploading_status.finish_uploading = TRUE;
 	temp_block_uploading_status.to_upload_seq = 0; /* temp */
 	SET_TOUPLOAD_BLOCK_EXIST(temp_block_uploading_status.block_exist);
+	toupload_exist = TRUE;
+	finish_uploading = TRUE;
 	set_progress_info(progress_fd, blockno, &temp_block_uploading_status,
 		TOUPLOAD_BLOCKS);
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
@@ -288,7 +288,8 @@ static inline int _upload_terminate_thread(int index)
 					tmp_entry->uploaded = TRUE;
 #if (DEDUP_ENABLE)
 					// Store hash in block meta too
-					memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+					memcpy(tmp_entry->obj_id, blk_obj_id,
+								OBJID_LENGTH);
 #endif
 					ret = fetch_block_path(blockpath,
 						this_inode, blockno);
@@ -931,6 +932,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	int progress_fd;
 	char first_upload, is_local_meta_deleted;
 	BLOCK_UPLOADING_STATUS temp_uploading_status;
+	char toupload_exist, finish_uploading;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
@@ -1096,11 +1098,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			   because someone may modify it. */
 
 			if (is_local_meta_deleted == FALSE) {
+				flock(fileno(local_metafptr), LOCK_EX);
 				if (access(local_metapath, F_OK) < 0) {
 					is_local_meta_deleted = TRUE;
+					flock(fileno(local_metafptr), LOCK_UN);
 					break;
 				}
-				flock(fileno(local_metafptr), LOCK_EX);
 			}
 
 			FSEEK_ADHOC_SYNC_LOOP(local_metafptr, page_pos,
@@ -1181,15 +1184,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 					sync_error = TRUE;
 					break;
 				}
-				/*TODO: Maybe should also first copy block
-					out first*/
 				continue;
 			}
 
 			/*** Case 3: Local block is deleted. Delete backend
 			   block data, too. ***/
-			/* TODO: delete backend data here or
-			   after meta being uploaded? */
 			if (toupload_block_status == ST_TODELETE) {
 				write_log(10, "Debug: block_%lld is TO_DELETE\n", block_count);
 				/*tmp_entry->status = ST_LtoC;*/
@@ -1214,13 +1213,12 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 						1, local_metafptr, TRUE);
 				}
 				flock(fileno(local_metafptr), LOCK_UN);
-				memset(&temp_uploading_status, 0,
-					sizeof(BLOCK_UPLOADING_STATUS));
-				temp_uploading_status.finish_uploading = TRUE;
-				/* Do not need to set to-upload block exist */
+
+				finish_uploading = TRUE;
+				toupload_exist = FALSE;
 				set_progress_info(progress_fd, block_count,
-					&temp_uploading_status,
-					TOUPLOAD_BLOCKS);
+					&toupload_exist, NULL, NULL, NULL,
+					&finish_uploading);
 #else
 				flock(fileno(local_metafptr), LOCK_UN);
 				sem_wait(&(upload_ctl.upload_queue_sem));
@@ -1233,30 +1231,40 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
 #endif
-			
-			} else { /* ST_BOTH, ST_LtoC, ST_CtoL, ST_NONE */
-				write_log(10, "Debug: block_%lld is %d\n", block_count, toupload_block_status);
+				continue;	
+			}
+
+			if (toupload_block_status == ST_NONE) {
+				write_log(10, "Debug: block_%lld is ST_NONE\n",
+					block_count);
 				flock(fileno(local_metafptr), LOCK_UN);
+				finish_uploading = TRUE;
+				toupload_exist = FALSE;
+				set_progress_info(progress_fd, block_count,
+					&toupload_exist, NULL, NULL, NULL,
+					&finish_uploading);
+
+			} else { /* ST_BOTH, ST_CtoL */
+				write_log(10, "Debug: block_%lld is %d\n",
+						block_count, toupload_block_status);
+				flock(fileno(local_metafptr), LOCK_UN);
+
+				finish_uploading = TRUE;
+				toupload_exist = TRUE;
+#ifdef DEDUP_ENABLE
+				set_progress_info(progress_fd,
+						block_count, &toupload_exist,
+						NULL, tmp_entry->obj_id, NULL,
+						&finish_uploading);	
+#else
 				memset(&temp_uploading_status, 0,
 					sizeof(BLOCK_UPLOADING_STATUS));
-#ifdef DEDUP_ENABLE
-				temp_uploading_status.finish_uploading = TRUE;
-				if (toupload_block_status != ST_NONE) {
-					memcpy(temp_uploading_status.to_upload_objid,
-						tmp_entry->obj_id, OBJID_LENGTH);
-					SET_TOUPLOAD_BLOCK_EXIST(
-						temp_uploading_status.block_exist);
-				}
-#else
-
-				temp_uploading_status.finish_uploading = TRUE;
 				temp_uploading_status.to_upload_seq = 0; /*temp*/
-				SET_TOUPLOAD_BLOCK_EXIST(
-					temp_uploading_status.block_exist);
+				set_progress_info(progress_fd,
+					block_count, &toupload_exist, NULL,
+					&temp_block_uploading_status.to_upload_seq, NULL,
+					&finish_uploading);
 #endif
-				set_progress_info(progress_fd, block_count,
-					&temp_uploading_status,
-					TOUPLOAD_BLOCKS);
 			}
 		}
 		/* ---End of syncing blocks loop--- */

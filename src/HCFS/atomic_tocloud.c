@@ -84,9 +84,11 @@ errcode_handle:
 
 }
 
+#ifdef DEDUP_ENABLE
 int set_progress_info(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *set_block_uploading_status,
-	char set_which_one)
+	const char *toupload_exist, const char *backend_exist,
+	const char *toupload_objid, const char *backend_objid,
+	const char *finish)
 {
 	int errcode;
 	long long offset;
@@ -113,37 +115,78 @@ int set_progress_info(int fd, long long block_index,
 				__func__);
 	}
 
-	if (set_which_one == TOUPLOAD_BLOCKS) {
-		block_uploading_status.block_exist =
-			((set_block_uploading_status->block_exist & 1) |
-			(block_uploading_status.block_exist & 2));
-
-#ifdef DEDUP_ENABLE
-		memcpy(block_uploading_status.to_upload_objid,
-			set_block_uploading_status->to_upload_objid,
+	if (toupload_exist)
+		block_uploading_status.block_exist = ((*toupload_exist) & 1) |
+			(block_uploading_status.block_exist & 2);
+	if (backend_exist)
+		block_uploading_status.block_exist = ((*backend_exist) & 2) |
+			(block_uploading_status.block_exist & 1);
+	if (toupload_objid)
+		memcpy(block_uploading_status.to_upload_objid, toupload_objid,
 			sizeof(unsigned char) * OBJID_LENGTH);
-#else
-		block_uploading_status.toupload_seq =
-			set_block_uploading_status->toupload_seq;
-#endif
-
-	} else if (set_which_one == BACKEND_BLOCKS) {
-		block_uploading_status.block_exist =
-			((set_block_uploading_status->block_exist & 2) |
-			(block_uploading_status.block_exist & 1));
-
-#ifdef DEDUP_ENABLE
-		memcpy(block_uploading_status.backend_objid,
-			set_block_uploading_status->backend_objid,
+	if (backend_objid)
+		memcpy(block_uploading_status.backend_objid, backend_objid,
 			sizeof(unsigned char) * OBJID_LENGTH);
+	if (finish)
+		block_uploading_status.finish_uploading = *finish;
+
+	PWRITE(fd, &block_uploading_status,
+		sizeof(BLOCK_UPLOADING_STATUS), offset);
+	flock(fd, LOCK_UN);
+
+	if (block_uploading_status.finish_uploading == TRUE)
+		write_log(10, "Debug: block_%lld finished uploading - "
+			"fd = %d\n", block_index, fd);
+
+	return 0;
+
+errcode_handle:
+	return errcode;
+}
+
 #else
-		block_uploading_status.backend_seq =
-			set_block_uploading_status->backend_seq;
-#endif
+int set_progress_info(int fd, long long block_index,
+	const char *toupload_exist, const char *backend_exist,
+	const long long *toupload_seq, const long long *backend_seq,
+	const char *finish)
+{
+	int errcode;
+	long long offset;
+	off_t end_pos;
+	ssize_t ret_ssize;
+	BLOCK_UPLOADING_STATUS block_uploading_status;
+
+	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
+
+	flock(fd, LOCK_EX);
+	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
+		offset);
+	if (ret_ssize == 0) { /* Init because backend_blocks < now blocks */
+		memset(&block_uploading_status, 0,
+			sizeof(BLOCK_UPLOADING_STATUS));
+		end_pos = lseek(fd, 0, SEEK_END);
+		while (end_pos < offset) {
+			PWRITE(fd, &block_uploading_status,
+				sizeof(BLOCK_UPLOADING_STATUS), end_pos);
+			end_pos += sizeof(BLOCK_UPLOADING_STATUS);
+		}
+		if (end_pos > offset)
+			write_log(0, "Error: end_pos != offset?, in %s\n",
+				__func__);
 	}
 
-	block_uploading_status.finish_uploading =
-		set_block_uploading_status->finish_uploading;
+	if (toupload_exist)
+		block_uploading_status.block_exist = ((*toupload_exist) & 1) |
+			(block_uploading_status.block_exist & 2);
+	if (backend_exist)
+		block_uploading_status.block_exist = ((*backend_exist) & 2) |
+			(block_uploading_status.block_exist & 1);
+	if (toupload_seq)
+		block_uploading_status.toupload_seq = *toupload_seq;
+	if (backend_seq)
+		block_uploading_status.backend_seq = *backend_seq;
+	if (finish)
+		block_uploading_status.finish_uploading = *finish;
 
 	PWRITE(fd, &block_uploading_status,
 		sizeof(BLOCK_UPLOADING_STATUS), offset);
@@ -158,6 +201,8 @@ int set_progress_info(int fd, long long block_index,
 errcode_handle:
 	return errcode;
 }
+#endif
+
 
 int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)

@@ -313,7 +313,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	pthread_t *tmp_tn;
 	DELETE_THREAD_TYPE *tmp_dt;
 	off_t tmp_size;
-	char mlock;
+	char mlock, backend_mlock;
 	long long system_size_change;
 	long long upload_seq;
 	ino_t root_inode;
@@ -323,15 +323,16 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
 
 	mlock = FALSE;
+	backend_mlock = FALSE;
 	this_inode = ptr->inode;
 	system_size_change = 0;
 
 	fetch_todelete_path(thismetapath, this_inode);
 
 	/* Download backend meta and read it if it is regfile */
+	backend_metafptr = NULL;
 	if (S_ISREG(ptr->this_mode)) {
 		is_meta_on_cloud = TRUE;
-		backend_metafptr = NULL;
 		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld.del",
 				this_inode);
 		ret = download_meta_from_backend(this_inode, backend_metapath,
@@ -397,7 +398,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 
 	if (S_ISREG(ptr->this_mode)) {
 		flock(fileno(backend_metafptr), LOCK_EX);
-		mlock = TRUE;
+		backend_mlock = TRUE;
 		FSEEK(backend_metafptr, 0, SEEK_SET);
 		FREAD(&tempfilestat, sizeof(struct stat), 1, backend_metafptr);
 		FREAD(&tempfilemeta, sizeof(FILE_META_TYPE), 1,
@@ -500,7 +501,7 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		}
 
 		flock(fileno(backend_metafptr), LOCK_UN);
-		mlock = FALSE;
+		backend_mlock = FALSE;
 
 	}
 
@@ -512,7 +513,7 @@ errcode_handle:
 		fclose(metafptr);
 	}
 	if (backend_metafptr != NULL) {
-		if (mlock == TRUE)
+		if (backend_mlock == TRUE)
 			flock(fileno(backend_metafptr), LOCK_UN);
 		fclose(backend_metafptr);
 		unlink(backend_metapath);

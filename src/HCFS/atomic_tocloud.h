@@ -39,9 +39,17 @@ int get_progress_info(int fd, long long block_index,
 int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status);
 
+#ifdef DEDUP_ENABLE
 int set_progress_info(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *set_block_uploading_status,
-	char set_which_one);
+	const char *toupload_exist, const char *backend_exist,
+	const char *toupload_objid, const char *backend_objid,
+	const char *finish);
+#else
+int set_progress_info(int fd, long long block_index,
+	const char *toupload_exist, const char *backend_exist,
+	const long long *toupload_seq, const long long *backend_seq,
+	const char *finish);
+#endif
 
 int init_progress_info(int fd, long long backend_blocks,
 	FILE *backend_metafptr);
