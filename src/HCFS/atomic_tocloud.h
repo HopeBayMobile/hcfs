@@ -42,7 +42,7 @@ int get_progress_info_nonlock(int fd, long long block_index,
 #ifdef DEDUP_ENABLE
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const char *toupload_objid, const char *backend_objid,
+	const unsigned char *toupload_objid, const unsigned char *backend_objid,
 	const char *finish);
 #else
 int set_progress_info(int fd, long long block_index,

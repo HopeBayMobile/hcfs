@@ -57,6 +57,7 @@ typedef struct {
 	ino_t inode;
 	mode_t this_mode;
 	int progress_fd;
+	char is_revert;
 } SYNC_THREAD_TYPE;
 
 typedef struct {
@@ -83,6 +84,7 @@ typedef struct {
 	int progress_fd[MAX_SYNC_CONCURRENCY];
 	char threads_created[MAX_SYNC_CONCURRENCY];
 	char threads_error[MAX_SYNC_CONCURRENCY];
+	char is_revert[MAX_SYNC_CONCURRENCY];
 	int total_active_sync_threads;
 	/*sync threads: used for syncing meta/block in a single inode*/
 } SYNC_THREAD_CONTROL;
@@ -123,5 +125,7 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	FILE **backend_fptr);
 
-int delete_toupload_blocks(int progress_fd);
+int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
+	char delete_which_one);
+
 #endif  /* GW20_HCFS_HCFS_TOCLOUD_H_ */

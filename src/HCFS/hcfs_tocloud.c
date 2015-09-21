@@ -74,15 +74,18 @@ static inline void _sync_terminate_thread(int index)
 
 	if ((sync_ctl.threads_in_use[index] != 0) &&
 	    (sync_ctl.threads_created[index] == TRUE)) {
-		ret =
-		    pthread_tryjoin_np(sync_ctl.inode_sync_thread[index], NULL);
+		ret = pthread_tryjoin_np(sync_ctl.inode_sync_thread[index],
+			NULL);
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
-			tag_ret = tag_status_on_fuse(inode, FALSE, 0);
-			if (tag_ret < 0) {
-				write_log(0, "Fail to tag inode %lld as "
-					"NOT_UPLOADING in %s\n",
-					inode, __func__);
+			/* Reverting do not need communicate with fuse */
+			if (sync_ctl.is_revert[index] == FALSE) {
+				tag_ret = tag_status_on_fuse(inode, FALSE, 0);
+				if (tag_ret < 0) {
+					write_log(0, "Fail to tag inode %lld "
+						"as NOT_UPLOADING in %s\n",
+						inode, __func__);
+				}
 			}
 			close_progress_info(sync_ctl.progress_fd[index], inode);
 
@@ -191,8 +194,17 @@ static inline int _upload_terminate_thread(int index)
 	}
 	sem_post(&(sync_ctl.sync_op_sem));
 
+	this_inode = upload_ctl.upload_threads[index].inode;
+	is_delete = upload_ctl.upload_threads[index].is_delete;
+	page_filepos = upload_ctl.upload_threads[index].page_filepos;
+	e_index = upload_ctl.upload_threads[index].page_entry_index;
+	blockno = upload_ctl.upload_threads[index].blockno;
+	progress_fd = upload_ctl.upload_threads[index].progress_fd;
+
 	/* Terminate directly whenthread is used to delete old data on cloud */
 	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
+		char backend_exist;
+		
 		sem_wait(&(sync_ctl.sync_op_sem));
 		upload_ctl.threads_in_use[index] = FALSE;
 		upload_ctl.threads_created[index] = FALSE;
@@ -200,15 +212,12 @@ static inline int _upload_terminate_thread(int index)
 		sem_post(&(sync_ctl.sync_op_sem));
 
 		sem_post(&(upload_ctl.upload_queue_sem));
+		backend_exist = FALSE;
+		set_progress_info(progress_fd, blockno, NULL, &backend_exist,
+			NULL, NULL, NULL);
+
 		return 0;
 	}
-
-	this_inode = upload_ctl.upload_threads[index].inode;
-	is_delete = upload_ctl.upload_threads[index].is_delete;
-	page_filepos = upload_ctl.upload_threads[index].page_filepos;
-	e_index = upload_ctl.upload_threads[index].page_entry_index;
-	blockno = upload_ctl.upload_threads[index].blockno;
-	progress_fd = upload_ctl.upload_threads[index].progress_fd;
 
 	ret = fetch_meta_path(thismetapath, this_inode);
 	if (ret < 0)
@@ -760,19 +769,13 @@ static inline int _choose_deleted_block(char delete_which_one,
 		/* Do not delete if not finish */
 		if (finish_uploading == FALSE)
 			return -1;
+		/* Do not delete if it does not exist */
 		if (TOUPLOAD_BLOCK_EXIST(block_info->block_exist) == FALSE)
 			return -1;
 		/* Do not delete if it is the same as backend block */
 		if (!memcmp(block_info->to_upload_objid,
 				block_info->backend_objid, OBJID_LENGTH))
 			return -1;
-		/* Do not delete if it does not exist */
-		/*if (block_info->to_upload_objid[0] == 0) {
-			memset(zero_objid, 0, OBJID_LENGTH);
-			if (!memcmp(block_info->to_upload_objid,
-					zero_objid, OBJID_LENGTH))
-				return -1;
-		}*/
 
 		memcpy(block_objid, block_info->to_upload_objid, OBJID_LENGTH);
 		return 0;
@@ -780,15 +783,9 @@ static inline int _choose_deleted_block(char delete_which_one,
 
 	/* Delete old blocks on cloud */
 	if (delete_which_one == BACKEND_BLOCKS) {
-		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
-			return -1;
 		/* Do not delete if it does not exist */
-		/*if (block_info->backend_objid[0] == 0) {
-			memset(zero_objid, 0, OBJID_LENGTH);
-			if (!memcmp(block_info->backend_objid,
-					zero_objid, OBJID_LENGTH))
-				return -1;
-		}*/
+		if (CLOUD_BLOCK_EXIST(block_info->block_exist) == FALSE)
+			return -1;		
 		/* Do not delete if it is the same as to-upload block */
 		if (!memcmp(block_info->to_upload_objid,
 				block_info->backend_objid, OBJID_LENGTH))
@@ -852,7 +849,7 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		"inode_%ld because local meta disapper\n", inode);
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
-		ret = get_progress_info_nonlock(progress_fd, block_count,
+		ret = get_progress_info(progress_fd, block_count,
 			&block_info);
 		if (ret == 0) /* Remaining are empty blocks */
 			break;
@@ -933,9 +930,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	char first_upload, is_local_meta_deleted;
 	BLOCK_UPLOADING_STATUS temp_uploading_status;
 	char toupload_exist, finish_uploading;
+	char is_revert;
 
 	progress_fd = ptr->progress_fd;
 	this_inode = ptr->inode;
+	is_revert = ptr->is_revert;
 	sync_error = FALSE;
 
 	ret = fetch_toupload_meta_path(toupload_metapath, this_inode);
@@ -956,11 +955,14 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 
 	/* Copy local meta, -EEXIST means it has been copied */
-	ret = check_and_copy_file(local_metapath, toupload_metapath);
-	if (ret < 0) {
-		if (ret != -EEXIST) {
-			super_block_update_transit(ptr->inode, FALSE, TRUE);
-			return;
+	if (is_revert == FALSE) {
+		ret = check_and_copy_file(local_metapath, toupload_metapath);
+		if (ret < 0) {
+			if (ret != -EEXIST) {
+				super_block_update_transit(ptr->inode,
+					FALSE, TRUE);
+				return;
+			}
 		}
 	}
 
@@ -1019,8 +1021,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			backend_size = tempfilestat.st_size;
 			total_backend_blocks = (backend_size == 0) ? 
 				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
-			init_progress_info(progress_fd, total_backend_blocks,
-				backend_metafptr);
+			if (is_revert == FALSE) /* Reverting need not init */
+				init_progress_info(progress_fd,
+					total_backend_blocks, backend_metafptr);
 
 			fclose(backend_metafptr);
 			backend_metafptr = NULL;
@@ -1048,8 +1051,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		toupload_trunc_block_size = toupload_size;
 		if ((ret_ssize >= 0) && (toupload_size < temp_trunc_size)) {
 			toupload_trunc_block_size = temp_trunc_size;
-			fremovexattr(fileno(toupload_metafptr),
-				"user.trunc_size");
 		}
 
 		/* Compute number of blocks */
@@ -1064,6 +1065,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		is_local_meta_deleted = FALSE;
 		for (block_count = 0; block_count < total_blocks;
 							block_count++) {
+
+			if (is_revert == TRUE) {
+				if (did_block_finish_uploading(progress_fd, 
+					block_count) == TRUE)
+					continue;
+			}
+
 			e_index = block_count % BLK_INCREMENTS;
 			which_page = block_count / BLK_INCREMENTS;
 
@@ -1379,12 +1387,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 #endif
 			/* TODO: Revert info re last upload if upload
 				fails */
-		} else {
-			/* Upload successfully. Update FS stat in backend */
-			if (upload_seq == 0)
-				update_backend_stat(root_inode, size_diff, 1);
-			else if (size_diff != 0)
-				update_backend_stat(root_inode, size_diff, 0);
 		}
 		super_block_update_transit(ptr->inode, FALSE, sync_error);
 	} else {
@@ -1406,12 +1408,20 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		sem_post(&(upload_ctl.upload_queue_sem));
 	}
 
-	if (!S_ISREG(ptr->this_mode))
+	if (sync_error == TRUE) /* TODO: Something has to be done? */
 		return;
 
+	if (S_ISREG(ptr->this_mode)) {
 	/* Delete old block data on backend and wait for those threads */
-	delete_backend_blocks(progress_fd, total_backend_blocks, 
-		ptr->inode, BACKEND_BLOCKS);
+		delete_backend_blocks(progress_fd, total_backend_blocks, 
+				ptr->inode, BACKEND_BLOCKS);
+	}
+
+	/* Upload successfully. Update FS stat in backend */
+	if (upload_seq == 0)
+		update_backend_stat(root_inode, size_diff, 1);
+	else if (size_diff != 0)
+		update_backend_stat(root_inode, size_diff, 0);
 
 	return;
 
@@ -1995,9 +2005,11 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
 			sync_ctl.progress_fd[count] = progress_fd;
+			sync_ctl.is_revert[count] = FALSE;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
 			sync_threads[count].progress_fd = progress_fd;
+			sync_threads[count].is_revert = FALSE;
 
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",

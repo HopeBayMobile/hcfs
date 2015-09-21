@@ -87,7 +87,7 @@ errcode_handle:
 #ifdef DEDUP_ENABLE
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
-	const char *toupload_objid, const char *backend_objid,
+	const unsigned char *toupload_objid, const unsigned char *backend_objid,
 	const char *finish)
 {
 	int errcode;
@@ -541,6 +541,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	ino_t inode;
 	int progress_fd;
 	long long total_blocks;
+	int count;
 
 	this_mode = data_ptr->this_mode;
 	inode = data_ptr->inode;
@@ -582,8 +583,12 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (progress_size != 0)) {
-		/* TODO: Keep on uploading. case[5, 6], case6, case[6, 7],
+		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
+
+			write_log(10, "Debug: begin revert uploading inode %ld",
+				inode);
+			sync_single_inode((void *)data_ptr);
 
 		} else { 
 		/* NOT begin to upload, so cancel uploading.
@@ -676,9 +681,11 @@ int uploading_revert()
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
 			sync_ctl.progress_fd[count] = fd;
+			sync_ctl.is_revert[count] = TRUE;
 			sync_threads[count].inode = inode;
-			sync_threads[count].this_mode = 0; // temp
+			sync_threads[count].this_mode = S_IFREG; // temp
 			sync_threads[count].progress_fd = fd;
+			sync_threads[count].is_revert = TRUE;
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
 					NULL, (void *)&_revert_inode_uploading,
 					(void *)&(sync_threads[count]));
