@@ -20,7 +20,11 @@ bear make -C $srcdir/HCFS
 sed -i 's/file name="/&src\/HCFS\//g' oclint-report.xml
 
 # PMD's Copy/Paste Detector (CPD)
-sudo /pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir/ --format xml --language cpp > $WORKSPACE/cpd-result.xml || true
+sudo /pmd-bin-5.2.2/bin/run.sh cpd --minimum-tokens 100 --encoding UTF-8 --files $srcdir/ --format xml --language cpp > $WORKSPACE/cpd-result.xml || return_code=$?
+if [[ "$return_code" != "" && "$return_code" != 4 ]]; then
+	echo pmd returns unknown error code $return_code
+	false
+fi
 
 # Publish SLOCCount analysis results
 sudo cloc --by-file --xml --out=$WORKSPACE/cloc-result.xml $srcdir/HCFS/
