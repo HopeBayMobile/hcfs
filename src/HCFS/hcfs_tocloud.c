@@ -55,6 +55,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "dedup_table.h"
 #include "utils.h"
 
+
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 extern SYSTEM_CONF_STRUCT system_config;
@@ -963,6 +964,7 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		unsigned char *key = NULL;
 		unsigned char *data = NULL;
 		HCFS_encode_object_meta *object_meta = NULL;
+		HTTP_meta *http_meta = NULL;
 		unsigned char *object_key = NULL;
 
 #ifdef ENCRYPT_ENABLE
@@ -971,19 +973,26 @@ int do_block_sync(ino_t this_inode, long long block_no,
 		object_key = calloc(KEY_SIZE, sizeof(unsigned char));
 		get_decode_meta(object_meta, object_key, key, ENCRYPT_ENABLE,
 				COMPRESS_ENABLE);
+		http_meta = new_http_meta();
+		write_log(10, "transform header start...\n");
+		transform_objdata_to_header(http_meta, object_meta);
+		write_log(10, "transform header end...\n");
 		OPENSSL_free(key);
 #endif
 
 		FILE *new_fptr = transform_fd(fptr, object_key, &data,
 					      ENCRYPT_ENABLE, COMPRESS_ENABLE);
-		ret_val = hcfs_put_object(new_fptr, objname, curl_handle,
-					  object_meta);
+		write_log(10, "start to put..\n");
+		ret_val =
+		    hcfs_put_object(new_fptr, objname, curl_handle, http_meta);
 
 		fclose(new_fptr);
 		if (object_key != NULL)
 			OPENSSL_free(object_key);
 		if (object_meta != NULL)
 			free_object_meta(object_meta);
+		if (http_meta != NULL)
+			delete_http_meta(http_meta);
 		if (fptr != new_fptr)
 			fclose(fptr);
 		if (data != NULL)

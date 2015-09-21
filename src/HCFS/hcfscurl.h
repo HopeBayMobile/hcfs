@@ -50,7 +50,7 @@ int hcfs_swift_reauth(CURL_HANDLE *curl_handle);
 int hcfs_swift_delete_object(char *objname, CURL_HANDLE *curl_handle);
 int hcfs_swift_put_object(FILE *fptr, char *objname,
                              CURL_HANDLE *curl_handle,
-                             HCFS_encode_object_meta *object_meta);
+                             HTTP_meta *object_meta);
 
 /* S3 collections */
 int hcfs_init_S3_backend(CURL_HANDLE *curl_handle);
@@ -61,14 +61,14 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle);
 int hcfs_S3_reauth(CURL_HANDLE *curl_handle);
 int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-                          HCFS_encode_object_meta *);
+                          HTTP_meta *);
 
 /* Generic */
 int hcfs_init_backend(CURL_HANDLE *curl_handle);
 void hcfs_destroy_backend(CURL *curl);
 int hcfs_list_container(CURL_HANDLE *curl_handle);
 int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
-		    HCFS_encode_object_meta *);
+		    HTTP_meta *);
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *);
 int hcfs_delete_object(char *objname, CURL_HANDLE *curl_handle);
