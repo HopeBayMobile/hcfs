@@ -52,4 +52,4 @@ fuse_log
 
 # Build 
 HCFSvol
-HCFS
+/src/HCFS/hcfs

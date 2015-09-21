@@ -17,7 +17,7 @@
 #include <stdlib.h>
 #include <curl/curl.h>
 #include <semaphore.h>
-#include "enc.h"
+#include "objmeta.h"
 
 #define MAX_DOWNLOAD_CURL_HANDLE 16
 
