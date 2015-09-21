@@ -1604,7 +1604,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 	char header_filename[100];
 
 	unsigned char date_string[100];
-  char object_string[150];
+	char object_string[150];
 	char date_string_header[100];
 	unsigned char AWS_auth_string[200];
 	unsigned char S3_signature[200];
@@ -1641,17 +1641,17 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS
 	chunk = curl_slist_append(chunk, date_string_header);
 	chunk = curl_slist_append(chunk, AWS_auth_string);
 	if (object_meta != NULL) {
-    write_log(10, "prepare object meta\n");
+		write_log(10, "prepare object meta\n");
 		sprintf(object_string, "x-amz-meta-enc: %d",
-            object_meta->enc_alg);
+			object_meta->enc_alg);
 		chunk = curl_slist_append(chunk, object_string);
 		sprintf(object_string, "x-amz-meta-comp: %d",
-            object_meta->comp_alg);
+			object_meta->comp_alg);
 		chunk = curl_slist_append(chunk, object_string);
 		sprintf(object_string, "x-amz-meta-nonce: %s",
-            object_meta->enc_session_key);
+			object_meta->enc_session_key);
 		chunk = curl_slist_append(chunk, object_string);
-    write_log(10, "finish object meta\n");
+		write_log(10, "finish object meta\n");
 	}
 
 	FSEEK(fptr, 0, SEEK_END);
