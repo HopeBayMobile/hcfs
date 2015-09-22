@@ -152,12 +152,26 @@ class HCFSBin:
         """Launch the hcfs processes
         """
         try:
-            p = subprocess.Popen([self.hcfs_bin, '-d'])
+            p = subprocess.Popen([self.hcfs_bin, '-d', '-oallow_root'])
         except:
             self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-            p = subprocess.Popen([self.hcfs_bin, '-d'])
+            p = subprocess.Popen([self.hcfs_bin, '-d', '-oallow_root'])
         finally:
             time.sleep(10)  # if use timeout for it?
+
+    def start_hcfs_background(self):
+        self.hcfs_bin = os.path.join(os.path.abspath(self.hcfs_src_dir), 'hcfs')
+        # cmds = self.hcfs_bin + ' -d -oallow_root'
+        cmds = [self.hcfs_bin, '-d', '-oallow_root']
+        print self.hcfs_src_dir
+        print self.hcfs_bin
+        
+        try:
+            subprocess.Popen(['sh', 'TestCases/HCFS/start_hcfs.sh'])
+            logger.info('Start the HCFS process..')
+        except:
+            logger.error(cmds)
+            logger.error('Start hcfs in background failed.')
 
     def verify_hcfs_processes(self):
         """Check the processes are exist, expect it has three.
@@ -174,10 +188,11 @@ class HCFSBin:
         else:
             return False, 'The process of hcfs number is wrong: {0}'.format(count)
 
-    def check_if_hcfs_terminated(self):
-        """Check the process is not exist
+    def check_if_hcfs_terminated(self, timeout=None):
+        """Check the process is not exist, timeout default is 30
         """
-        while (self.timeout > 0):
+        timeout = self.timeout if timeout == None else timeout
+        while (timeout > 0):
             process_exsit = 0    
             p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
             (output, error_msg) = p.communicate()
@@ -240,6 +255,7 @@ class CommonSetup:
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
         self.fstest = FSTester('/mnt/hcfs2/fstest/tests')
         self.logger = logging.getLogger('CommonSetup')
+        self.mount_point = '/mnt/hcfs2'
         # swift
         self.swift_url = 'https://10.10.99.118:8080/auth/v1.0'
         self.swift_key = '0qrrbOCHoNUM'
@@ -261,9 +277,11 @@ class CommonSetup:
         (output, error_msg) = p.communicate()
 
         if error_msg:
+            self.logger.error('Replace file failed: {0}'.format(source))
             self.logger.error(str(error_msg))
             return False, str(error_msg)
         else:
+            self.logger.info('Replace file: {0}'.format(source))
             return True, ''
 
     def get_container_size(self):
@@ -374,6 +392,11 @@ class HCFS_0(CommonSetup):
             return False, 'Missed df information'
 
         # copy fstest tool to HCFS
+        cmds = 'cp -rf TestCases/HCFS/fstest ' + self.mount_point
+        try:
+            subprocess.call(cmds, shell=True)
+        except:
+            return False, 'Copy fstest failed!'
 
         return True, ''
 
@@ -629,26 +652,33 @@ class HCFS_16(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.origin_config = 'hcfs_swift_easepro.conf'
-        self.config = 'hcfs_swift_easepro.conf'
+        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
 
     def check_if_hcfs_start_success(self):
         # Start the hcfs
-        self.hcfs_bin.start_hcfs()
+        self.hcfs_bin.start_hcfs_background()
+        time.sleep(5)   # lazy magic
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
+        if result == False:
+            return False, msg
+        else:
+            return True, ''
+        
+    def run(self):
+        result = True
+        msg = ''
+        self.replace_hcfs_config(self.config)
+        (result, msg) = self.check_if_hcfs_start_success()
 
+        #self.replace_hcfs_config(self.origin_config)
+
+        time.sleep(5)
         # close the hcfs
         self.hcfs_bin.terminate_hcfs()
         self.hcfs_bin.check_if_hcfs_terminated()
-
-        return result, msg
-        
-    def run(self):
-        self.replace_hcfs_config(self.config)
-        (result, msg) = self.check_if_hcfs_start_success()
-        self.replace_hcfs_config(self.origin_config)
 
         return result, msg
 
@@ -660,12 +690,13 @@ class HCFS_17(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.origin_config = 'hcfs_swift_easepro.conf'
-        self.config = 'hcfs_s3_easepro.conf'
+        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.config = 'TestCases/HCFS/hcfs_s3_easepro.conf'
         
     def check_if_hcfs_start_success(self):
         # Start the hcfs
-        self.hcfs_bin.start_hcfs()
+        self.hcfs_bin.start_hcfs_background()
+        time.sleep(5)
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
@@ -701,14 +732,28 @@ class HCFS_19(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.config = 'hcfs_s3.conf'
-        self.hcfs_17 = HCFS_17()
+        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.config = 'TestCases/HCFS/hcfs_s3.conf'
+
+    def check_if_hcfs_start_success(self):
+        # Start the hcfs
+        self.hcfs_bin.start_hcfs_background()
+        time.sleep(5)
+
+        # Check the process exist
+        (result, msg) = self.hcfs_bin.verify_hcfs_processes()
+
+        # close the hcfs
+        self.hcfs_bin.terminate_hcfs()
+        self.hcfs_bin.check_if_hcfs_terminated()
+
+        return result, msg
         
     def run(self):
         self.replace_hcfs_config(self.config)
-        (result, msg) = self.hcfs_17.check_if_hcfs_start_success()
+        (result, msg) = self.check_if_hcfs_start_success()
+        self.replace_hcfs_config(self.origin_config)
         return result, msg
-        return False, ''
 
 
 class HCFS_20(CommonSetup):
@@ -856,13 +901,28 @@ class HCFS_22(CommonSetup):
             return False, output
 
 
+class HCFS_31(CommonSetup):
+    '''
+    Terminate
+    '''    
+    def __init__(self):
+        self.hcfsbin = HCFSBin()
+        
+    def run(self):
+        self.hcfsbin.terminate_hcfs()
+        result = self.hcfsbin.check_if_hcfs_terminated()
+        if result:
+            return True, ''
+        else:
+            return False, 'The HCFS did not terminate successfully'
+
 class HCFS_39(CommonSetup):
     '''Upload big file
     '''    
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate() 
-        self.hcfsbin = HCFSBin()       
+        self.hcfsbin = HCFSBin()
         self.mount_point = '/mnt/hcfs'
         self.samples_dir = '/home/kentchen/TestSamples'
         self.testfilename_local = 'matlabl2011-mac.iso'
@@ -895,15 +955,28 @@ class HCFS_39(CommonSetup):
 
 class HCFS_99(CommonSetup):
     '''
-    comment
+    Clear environment for file system operation test
     '''    
     def __init__(self):
-        pass
+        CommonSetup.__init__(self)
+        self.hcfsbin = HCFSBin()
+        self.fstest_path = os.path.join(self.mount_point, 'fstest')
         
+    def remove_fstest(self):
+        try:
+            subprocess.call('rm -rf ' + self.fstest_path)
+            return True
+        except:
+            return False
+
     def run(self):
+        self.remove_fstest()
+        self.hcfsbin.terminate_hcfs()
 
-        return False, ''
-
+        if not self.hcfsbin.check_if_hcfs_terminated():
+            return False , 'HCFS did not terminate complete'
+        
+        return True, ''
 
 
 if __name__ == '__main__':

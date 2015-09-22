@@ -1,80 +1,24 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
-,HCFS_0,Setup environment,,1,Pass,,10
-,HCFS_3,chflags,,1,Pass,,0
+,HCFS_0,Setup environment,,1,Fail,Mount failed,10
+,HCFS_3,chflags,,1,Pass,,28
 ,HCFS_4,chmod,,1,Pass,,4
 ,HCFS_5,chown,,1,Pass,,12
-,HCFS_6,link,,1,Fail,"/mnt/hcfs2/fstest/tests/link/00.t .. 
-Failed 18/66 subtests 
-/mnt/hcfs2/fstest/tests/link/01.t .. ok
-/mnt/hcfs2/fstest/tests/link/02.t .. ok
-/mnt/hcfs2/fstest/tests/link/03.t .. ok
-/mnt/hcfs2/fstest/tests/link/04.t .. ok
-/mnt/hcfs2/fstest/tests/link/05.t .. ok
-/mnt/hcfs2/fstest/tests/link/06.t .. ok
-/mnt/hcfs2/fstest/tests/link/07.t .. ok
-/mnt/hcfs2/fstest/tests/link/08.t .. ok
-/mnt/hcfs2/fstest/tests/link/09.t .. ok
-/mnt/hcfs2/fstest/tests/link/10.t .. ok
-/mnt/hcfs2/fstest/tests/link/11.t .. ok
-/mnt/hcfs2/fstest/tests/link/12.t .. ok
-/mnt/hcfs2/fstest/tests/link/13.t .. ok
-/mnt/hcfs2/fstest/tests/link/14.t .. ok
-/mnt/hcfs2/fstest/tests/link/15.t .. ok
-/mnt/hcfs2/fstest/tests/link/16.t .. ok
-/mnt/hcfs2/fstest/tests/link/17.t .. ok
-
-Test Summary Report
--------------------
-/mnt/hcfs2/fstest/tests/link/00.t (Wstat: 0 Tests: 66 Failed: 18)
-  Failed tests:  28-40, 42-44, 46, 48
-Files=18, Tests=190,  3 wallclock secs ( 0.05 usr  0.02 sys +  0.01 cusr  0.03 csys =  0.11 CPU)
-Result: FAIL
-",2
+,HCFS_6,link,,1,Pass,,2
 ,HCFS_7,mkdir,,1,Pass,,1
 ,HCFS_8,mkfifo,,1,Pass,mkfifo not supported now,0
-,HCFS_9,open,,1,Fail,"/mnt/hcfs2/fstest/tests/open/00.t .. ok
-/mnt/hcfs2/fstest/tests/open/01.t .. ok
-/mnt/hcfs2/fstest/tests/open/02.t .. ok
-/mnt/hcfs2/fstest/tests/open/03.t .. ok
-/mnt/hcfs2/fstest/tests/open/04.t .. ok
-/mnt/hcfs2/fstest/tests/open/05.t .. ok
-/mnt/hcfs2/fstest/tests/open/06.t .. ok
-/mnt/hcfs2/fstest/tests/open/07.t .. ok
-/mnt/hcfs2/fstest/tests/open/08.t .. ok
-/mnt/hcfs2/fstest/tests/open/09.t .. ok
-/mnt/hcfs2/fstest/tests/open/10.t .. ok
-/mnt/hcfs2/fstest/tests/open/11.t .. ok
-/mnt/hcfs2/fstest/tests/open/12.t .. ok
-/mnt/hcfs2/fstest/tests/open/13.t .. ok
-/mnt/hcfs2/fstest/tests/open/14.t .. ok
-/mnt/hcfs2/fstest/tests/open/15.t .. ok
-/mnt/hcfs2/fstest/tests/open/16.t .. ok
-/mnt/hcfs2/fstest/tests/open/17.t .. 
-No subtests run 
-/mnt/hcfs2/fstest/tests/open/18.t .. ok
-/mnt/hcfs2/fstest/tests/open/19.t .. ok
-/mnt/hcfs2/fstest/tests/open/20.t .. ok
-/mnt/hcfs2/fstest/tests/open/21.t .. ok
-/mnt/hcfs2/fstest/tests/open/22.t .. ok
-/mnt/hcfs2/fstest/tests/open/23.t .. ok
-
-Test Summary Report
--------------------
-/mnt/hcfs2/fstest/tests/open/17.t (Wstat: 0 Tests: 0 Failed: 0)
-  Parse errors: No plan found in TAP output
-Files=24, Tests=218,  4 wallclock secs ( 0.07 usr  0.02 sys +  0.02 cusr  0.02 csys =  0.13 CPU)
-Result: FAIL
-",3
+,HCFS_9,open,,1,Pass,,3
 ,HCFS_10,rename,,1,Pass,,6
 ,HCFS_11,rmdir,,1,Pass,,1
 ,HCFS_12,symlink,,1,Pass,,1
 ,HCFS_13,truncate,,1,Pass,,2
 ,HCFS_14,unlink,,1,Pass,,5
+,HCFS_99,Clear environment for file system operation test,,1,Pass,,5
 ,HCFS_15,Multiple Mount,,0,,,
-,HCFS_16,Backend Setting – ArkFlex U (Swift),,0,Pass,,10
-,HCFS_17,Backend Setting – ArkFlex U (S3),,0,Pass,,40
+,HCFS_16,Backend Setting – ArkFlex U (Swift),,1,Pass,,39
+,HCFS_17,Backend Setting – ArkFlex U (S3),,1,Fail,The process of hcfs number is wrong: 0,6
 ,HCFS_18,Backend Setting – Swift,,0,,,
-,HCFS_19,Backend Setting – S3,,0,Pass,,31
+,HCFS_19,Backend Setting – S3,,1,Pass,,40
+,HCFS_0,Setup environment,,1,Fail,Mount failed,10
 ,HCFS_20,Upload – exceed soft limit,,0,Pass,,15
 ,HCFS_21,Upload – exceed hard limit,,0,Pass,,33
 ,HCFS_22,Download,,0,Pass,,56
