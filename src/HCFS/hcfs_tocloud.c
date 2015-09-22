@@ -225,13 +225,11 @@ static inline int _upload_terminate_thread(int index)
 	if (count1 < MAX_SYNC_CONCURRENCY) {
 		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
-			sem_wait(&(upload_ctl.upload_op_sem));
 
 			upload_ctl.threads_in_use[index] = FALSE;
 			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
 
-			sem_post(&(upload_ctl.upload_op_sem));
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0; /* Error already marked */
 		}
@@ -248,14 +246,12 @@ static inline int _upload_terminate_thread(int index)
 	/* Terminate directly whenthread is used to delete old data on cloud */
 	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
 		char backend_exist;
-		
-		sem_wait(&(upload_ctl.upload_op_sem));
 
+		/* Do NOT need to lock upload_op_sem. It is locked by caller. */
 		upload_ctl.threads_in_use[index] = FALSE;
 		upload_ctl.threads_created[index] = FALSE;
 		upload_ctl.total_active_upload_threads--;
 
-		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
 		backend_exist = FALSE;
 		set_progress_info(progress_fd, blockno, NULL, &backend_exist,
@@ -798,7 +794,6 @@ static inline int _choose_deleted_block(char delete_which_one,
 	const BLOCK_UPLOADING_STATUS *block_info, unsigned char *block_objid)
 {
 	char finish_uploading;
-	//unsigned char zero_objid[OBJID_LENGTH];
 
 	finish_uploading = block_info->finish_uploading;
 
@@ -1075,10 +1070,11 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		}
 	}
 
-	/* If it is reverting mode, read progress meta so that get info */
+	/* If it is reverting mode, read progress meta and get info */
 	if (is_revert == TRUE) {
 		PROGRESS_META progress_meta;
 
+		memset(&progress_meta, 0, sizeof(PROGRESS_META));
 		PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 		backend_size = progress_meta.backend_size;
 		total_backend_blocks = progress_meta.total_backend_blocks;
