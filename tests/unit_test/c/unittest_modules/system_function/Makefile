@@ -48,7 +48,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : setup $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : setup $(TESTS)
 	./filetable_unittest

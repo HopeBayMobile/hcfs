@@ -50,7 +50,7 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 all : $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o  *.gcda *.gcov *.gcno
+	rm -rf $(TESTS) gtest.a gtest_main.a *.o  *.gcda *.gcov *.gcno
 
 test :
 	./dedup_table_unittest
