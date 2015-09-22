@@ -185,9 +185,13 @@ static inline int _upload_terminate_thread(int index)
 	if (count1 < MAX_SYNC_CONCURRENCY) {
 		if (sync_ctl.threads_error[count1] == TRUE) {
 			sem_post(&(sync_ctl.sync_op_sem));
+			sem_wait(&(upload_ctl.upload_op_sem));
+
 			upload_ctl.threads_in_use[index] = FALSE;
 			upload_ctl.threads_created[index] = FALSE;
 			upload_ctl.total_active_upload_threads--;
+
+			sem_post(&(upload_ctl.upload_op_sem));
 			sem_post(&(upload_ctl.upload_queue_sem));
 			return 0; /* Error already marked */
 		}
@@ -205,12 +209,13 @@ static inline int _upload_terminate_thread(int index)
 	if (upload_ctl.upload_threads[index].is_backend_delete == TRUE) {
 		char backend_exist;
 		
-		sem_wait(&(sync_ctl.sync_op_sem));
+		sem_wait(&(upload_ctl.upload_op_sem));
+
 		upload_ctl.threads_in_use[index] = FALSE;
 		upload_ctl.threads_created[index] = FALSE;
 		upload_ctl.total_active_upload_threads--;
-		sem_post(&(sync_ctl.sync_op_sem));
 
+		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
 		backend_exist = FALSE;
 		set_progress_info(progress_fd, blockno, NULL, &backend_exist,
@@ -236,6 +241,8 @@ static inline int _upload_terminate_thread(int index)
 				__func__, errcode, strerror(errcode));
 		return -errcode;
 	}
+	setbuf(toupload_metafptr, NULL);
+
 	flock(fileno(toupload_metafptr), LOCK_EX);
 	is_toupload_meta_lock = TRUE;
 	
@@ -312,7 +319,6 @@ static inline int _upload_terminate_thread(int index)
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 								metafptr);
-					//write_log(10, "Debug: ddblock is set as ST_BOTH\n");
 				} else {
 					if ((tmp_entry->status ==
 					     ST_TODELETE) &&
@@ -422,17 +428,9 @@ void collect_finished_upload_threads(void *ptr)
 			if (ret >= 0)
 				continue;
 			/* Record the error in sync_thread */
-			sem_wait(&(sync_ctl.sync_op_sem));
-			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-			     count1++) {
-				if (sync_ctl.threads_in_use[count1] ==
-				    upload_ctl.upload_threads[count].inode)
-					break;
-			}
+			_set_inode_sync_error(
+				upload_ctl.upload_threads[count].inode);
 			write_log(10, "Recording error in %s\n", __func__);
-			if (count1 < MAX_SYNC_CONCURRENCY)
-				sync_ctl.threads_error[count1] = TRUE;
-			sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
 			// Reset uploaded flag for upload thread
@@ -594,6 +592,46 @@ errcode_handle:
 			break;\
 		}\
 	}
+
+static inline int _get_inode_sync_error(ino_t inode, char *sync_error)
+{
+	int count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		*sync_error = sync_ctl.threads_error[count1];
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {	
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
+static inline int _set_inode_sync_error(ino_t inode)
+{
+	int count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		sync_ctl.threads_error[count1] = TRUE;
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {	
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
 
 static inline int _select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
@@ -1365,16 +1403,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		if (sync_error == FALSE) {
 			/* Check the error in sync_thread */
 			write_log(10, "Checking for other error\n");
-			sem_wait(&(sync_ctl.sync_op_sem));
-			for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY;
-			     count1++) {
-				if (sync_ctl.threads_in_use[count1] ==
-				    ptr->inode)
-					break;
-			}
-			if (count1 < MAX_SYNC_CONCURRENCY)
-				sync_error = sync_ctl.threads_error[count1];
-			sem_post(&(sync_ctl.sync_op_sem));
+			_get_inode_sync_error(ptr->inode, &sync_error);	
 		}
 		if (sync_error == TRUE) {
 #ifdef ARM_32bit_
@@ -1675,14 +1704,7 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 errcode_handle:
 	UNLINK(thread_ptr->tempfilename);
 	write_log(10, "Recording error in %s\n", __func__);
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
-			break;
-	}
-	if (count1 < MAX_SYNC_CONCURRENCY)
-		sync_ctl.threads_error[count1] = TRUE;
-	sem_post(&(sync_ctl.sync_op_sem));
+	_set_inode_sync_error(thread_ptr->inode);	
 }
 
 void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
@@ -1708,14 +1730,7 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 
 errcode_handle:
 	write_log(10, "Recording error in %s\n", __func__);
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == thread_ptr->inode)
-			break;
-	}
-	if (count1 < MAX_SYNC_CONCURRENCY)
-		sync_ctl.threads_error[count1] = TRUE;
-	sem_post(&(sync_ctl.sync_op_sem));
+	_set_inode_sync_error(thread_ptr->inode);	
 }
 
 int schedule_sync_meta(char *toupload_metapath, int which_curl)
