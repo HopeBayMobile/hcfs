@@ -18,6 +18,7 @@ typedef struct {
 	int progress_list_fd;
 } UPLOADING_COMMUNICATION_DATA;
 
+/* Info entry for a specified block in uploading progress file */
 typedef struct {
 	char finish_uploading;
 	char block_exist; /*first bit means toupload block, second means cloud*/
@@ -30,6 +31,11 @@ typedef struct {
 #endif
 } BLOCK_UPLOADING_STATUS;
 
+typedef struct {
+	char finish_init_backend_data;
+	long long backend_size;
+	long long total_backend_blocks;
+} PROGRESS_META;
 
 int tag_status_on_fuse(ino_t this_inode, char status, int fd);
 
@@ -51,7 +57,7 @@ int set_progress_info(int fd, long long block_index,
 	const char *finish);
 #endif
 
-int init_progress_info(int fd, long long backend_blocks,
+int init_progress_info(int fd, long long backend_blocks, long long backend_size,
 	FILE *backend_metafptr);
 
 int open_progress_info(ino_t inode);

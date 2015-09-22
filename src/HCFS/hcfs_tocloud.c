@@ -63,6 +63,46 @@ extern SYSTEM_CONF_STRUCT system_config;
 
 CURL_HANDLE upload_curl_handles[MAX_UPLOAD_CONCURRENCY];
 
+static inline int _get_inode_sync_error(ino_t inode, char *sync_error)
+{
+	int count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		*sync_error = sync_ctl.threads_error[count1];
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {	
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
+static inline int _set_inode_sync_error(ino_t inode)
+{
+	int count1;
+
+	sem_wait(&(sync_ctl.sync_op_sem));
+	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
+		if (sync_ctl.threads_in_use[count1] == inode)
+			break;
+	}
+
+	if (count1 < MAX_SYNC_CONCURRENCY) {
+		sync_ctl.threads_error[count1] = TRUE;
+		sem_post(&(sync_ctl.sync_op_sem));
+		return 0;
+	} else {	
+		sem_post(&(sync_ctl.sync_op_sem));
+		return -1;
+	}
+}
+
 /* Don't need to collect return code for the per-inode sync thread, as
 the error handling for syncing this inode will be handled in
 sync_single_inode. */
@@ -593,46 +633,6 @@ errcode_handle:
 		}\
 	}
 
-static inline int _get_inode_sync_error(ino_t inode, char *sync_error)
-{
-	int count1;
-
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == inode)
-			break;
-	}
-
-	if (count1 < MAX_SYNC_CONCURRENCY) {
-		*sync_error = sync_ctl.threads_error[count1];
-		sem_post(&(sync_ctl.sync_op_sem));
-		return 0;
-	} else {	
-		sem_post(&(sync_ctl.sync_op_sem));
-		return -1;
-	}
-}
-
-static inline int _set_inode_sync_error(ino_t inode)
-{
-	int count1;
-
-	sem_wait(&(sync_ctl.sync_op_sem));
-	for (count1 = 0; count1 < MAX_SYNC_CONCURRENCY; count1++) {
-		if (sync_ctl.threads_in_use[count1] == inode)
-			break;
-	}
-
-	if (count1 < MAX_SYNC_CONCURRENCY) {
-		sync_ctl.threads_error[count1] = TRUE;
-		sem_post(&(sync_ctl.sync_op_sem));
-		return 0;
-	} else {	
-		sem_post(&(sync_ctl.sync_op_sem));
-		return -1;
-	}
-}
-
 static inline int _select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
 				char is_upload, unsigned char old_obj_id[],
@@ -1031,8 +1031,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	}
 	setbuf(local_metafptr, NULL);
 
-	/* Download backend meta and fetch seq number if it is regfile */
-	if (S_ISREG(ptr->this_mode)) {
+	/* Download backend meta and fetch seq number if it is regfile 
+	and is not reverting mode */
+	if (S_ISREG(ptr->this_mode) && (is_revert == FALSE)) {
 		first_upload = FALSE;
 		backend_metafptr = NULL;
 		fetch_backend_meta_path(backend_metapath, this_inode);
@@ -1059,15 +1060,36 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			backend_size = tempfilestat.st_size;
 			total_backend_blocks = (backend_size == 0) ? 
 				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
-			if (is_revert == FALSE) /* Reverting need not init */
-				init_progress_info(progress_fd,
-					total_backend_blocks, backend_metafptr);
+			init_progress_info(progress_fd,
+				total_backend_blocks, backend_size,
+				backend_metafptr);
 
 			fclose(backend_metafptr);
 			backend_metafptr = NULL;
 			UNLINK(backend_metapath);
 		} else {
+			init_progress_info(progress_fd, 0, 0,
+				backend_metafptr);
 			backend_size = 0;
+			total_backend_blocks = 0; 
+		}
+	}
+
+	/* If it is reverting mode, read progress meta so that get info */
+	if (is_revert == TRUE) {
+		PROGRESS_META progress_meta;
+
+		PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+		backend_size = progress_meta.backend_size;
+		total_backend_blocks = progress_meta.total_backend_blocks;
+		if (progress_meta.finish_init_backend_data == FALSE) {
+			write_log(2, "Crash before uploading, do nothing and"
+				" cancel uploading\n");
+			fclose(toupload_metafptr);
+			unlink(toupload_metapath);
+			fclose(local_metafptr);		
+			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			return;
 		}
 	}
 

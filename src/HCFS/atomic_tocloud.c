@@ -53,6 +53,14 @@ int tag_status_on_fuse(ino_t this_inode, char status, int fd)
 	return ret;
 }
 
+static inline long long _get_filepos(long long block_index)
+{
+	long long offset;
+	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index 
+			+ sizeof(PROGRESS_META);
+	return offset;
+}
+
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
@@ -60,7 +68,7 @@ int get_progress_info(int fd, long long block_index,
 	int errcode;
 	long long ret_ssize;
 
-	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
+	offset = _get_filepos(block_index);
 
 	flock(fd, LOCK_EX);
 	PREAD(fd, block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
@@ -96,7 +104,7 @@ int set_progress_info(int fd, long long block_index,
 	ssize_t ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 
-	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
+	offset = _get_filepos(block_index);
 
 	flock(fd, LOCK_EX);
 	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
@@ -156,7 +164,7 @@ int set_progress_info(int fd, long long block_index,
 	ssize_t ret_ssize;
 	BLOCK_UPLOADING_STATUS block_uploading_status;
 
-	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
+	offset = _get_filepos(block_index);
 
 	flock(fd, LOCK_EX);
 	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
@@ -203,7 +211,7 @@ errcode_handle:
 }
 #endif
 
-
+/*
 int get_progress_info_nonlock(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
@@ -229,11 +237,12 @@ errcode_handle:
 	return errcode;
 
 }
+*/
 
 int open_progress_info(ino_t inode)
 {
 	int ret_fd;
-	int errcode;
+	int errcode, ret;
 	char filename[200];
 
 	if (access("upload_bullpen", F_OK) == -1)
@@ -241,6 +250,13 @@ int open_progress_info(ino_t inode)
 
 	sprintf(filename, "upload_bullpen/upload_progress_inode_%ld",
 		inode);
+	
+	if (access(filename, F_OK) == 0) {
+		write_log(0, "Error: Open \"%s\" but it exist. Unlink it\n",
+			filename);
+		UNLINK(filename);
+	}
+	
 	ret_fd = open(filename, O_CREAT | O_RDWR);
 	if (ret_fd < 0) {
 		errcode = errno;
@@ -253,9 +269,14 @@ int open_progress_info(ino_t inode)
 	}
 
 	return ret_fd;
+
+errcode_handle:
+	return -errcode;
+
 }
 
-int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
+int init_progress_info(int fd, long long backend_blocks,
+		long long backend_size, FILE *backend_metafptr)
 {
 	int errcode;
 	long long offset, ret_ssize;
@@ -266,11 +287,16 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 	BLOCK_ENTRY_PAGE block_page;
 	FILE_META_TYPE tempfilemeta;
 	char cloud_status;
+	PROGRESS_META progress_meta;
 
 	/* Do NOT need to lock file because this function will be called by
 	   the only one thread in sync_single_inode() */
-	if (backend_metafptr == NULL) {
-		offset = 0;
+	flock(fd, LOCK_EX);
+	memset(&progress_meta, 0, sizeof(PROGRESS_META));
+	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+	if (backend_metafptr == NULL) { /* backend meta does not exist */
+		offset = sizeof(PROGRESS_META);
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
 		for (block = 0; block < backend_blocks; block++) {
@@ -278,6 +304,12 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 					sizeof(BLOCK_UPLOADING_STATUS), offset);
 			offset += sizeof(BLOCK_UPLOADING_STATUS);
 		}
+
+		progress_meta.finish_init_backend_data = TRUE;
+		progress_meta.backend_size = 0;
+		progress_meta.total_backend_blocks = 0;
+		PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+		flock(fd, LOCK_UN);
 
 		return 0;
 	}
@@ -289,7 +321,7 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 
 	/* Write into progress info */
 	current_page = -1;
-	offset = 0;
+	offset = sizeof(PROGRESS_META);
 	for (block = 0; block < backend_blocks; block++) {
 		e_index = block % BLK_INCREMENTS;
 		which_page = block / BLK_INCREMENTS;
@@ -326,6 +358,14 @@ int init_progress_info(int fd, long long backend_blocks, FILE *backend_metafptr)
 				sizeof(BLOCK_UPLOADING_STATUS), offset);
 		offset += sizeof(BLOCK_UPLOADING_STATUS);
 	}
+
+	/* Finally write meta */
+	progress_meta.finish_init_backend_data = TRUE;
+	progress_meta.backend_size = backend_size;
+	progress_meta.total_backend_blocks = backend_blocks;
+	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+
+	flock(fd, LOCK_UN);
 
 	return 0;
 
@@ -536,13 +576,15 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	char toupload_meta_path[200];
 	char backend_meta_path[200];
 	int errcode;
-	off_t progress_size;
 	mode_t this_mode;
 	ino_t inode;
 	int progress_fd;
 	long long total_blocks;
-	int count;
+	ssize_t ret_ssize;
+	char finish_init;
+	PROGRESS_META progress_meta;
 
+	finish_init = FALSE;
 	this_mode = data_ptr->this_mode;
 	inode = data_ptr->inode;
 	progress_fd = data_ptr->progress_fd;
@@ -579,10 +621,16 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	}
 
 	/*** Begin to revert ***/
-	progress_size = lseek(progress_fd, 0, SEEK_END);
+	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	if (ret_ssize == 0) {
+		finish_init = FALSE;
+	} else {
+		total_blocks = progress_meta.total_backend_blocks;
+		finish_init = progress_meta.finish_init_backend_data;
+	}
 
 	if (toupload_meta_exist == TRUE) {
-		if ((backend_meta_exist == FALSE) && (progress_size != 0)) {
+		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
 
@@ -599,7 +647,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 			unlink(toupload_meta_path);
 		}
 	} else {
-		if (progress_size == 0) {
+		if (finish_init == FALSE) {
 		/* Crash before copying local meta, so just 
 		cancel uploading. case[1, 2] */
 			if (backend_meta_exist)
@@ -609,13 +657,15 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
 		case10 */
-			total_blocks = progress_size / 
-				sizeof(BLOCK_UPLOADING_STATUS);
 			delete_backend_blocks(progress_fd, total_blocks,
 				inode, BACKEND_BLOCKS);
 		}
 	}
 
+	return;
+
+errcode_handle:
+	write_log(0, "Error: Fail to revert uploading inode %ld\n", inode);
 	return;
 }
 
