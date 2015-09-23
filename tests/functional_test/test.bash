@@ -40,10 +40,14 @@ if [ "$mode" = "docker" ]; then
 	SWIFT_PROTOCOL = http
 	LOG_LEVEL = 10
 	EOF
+	: //////////////////////////////////////// "Start hcfs deamon"
 	hcfs &
+	: //////////////////////////////////////// "Wait hcfs mount"
 	while ! HCFSvol create autotest | grep Success; do sleep 1 ;done
+	: //////////////////////////////////////// "Mount should succeed"
 	HCFSvol mount autotest $WORKSPACE/tmp/mount
 	mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
+	: //////////////////////////////////////// "Unount should succeed"
 	HCFSvol terminate
 	! mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
 fi

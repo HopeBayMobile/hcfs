@@ -103,7 +103,7 @@ docker_slave | functional_test )
 	packages="$packages python-pip python-dev"
 	packages="$packages python-swiftclient"
 	;;&
-tests )
+docker_slave | docker_host )
 	# Install Docker
 	if ! hash docker; then
 		curl https://get.docker.com | sudo sh
@@ -111,10 +111,10 @@ tests )
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' \
 			| sudo tee -a /etc/default/docker
-		sudo service docker restart
 	fi
-	# Pull test image from local registry server
-	sudo docker pull docker:5000/docker_hcfs_test_slave
+	;;&
+docker_host )
+		sudo service docker restart
 	;;&
 esac
 
@@ -141,7 +141,9 @@ docker_slave )
 	fi
 	# Install oclint
 	if [ ! -d /oclint-0.8.1 ]; then
-		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz -O - | tar -zxv
+		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 	fi
 
 	# Install PMD for CPD(duplicate code)

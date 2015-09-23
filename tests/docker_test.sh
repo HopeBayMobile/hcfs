@@ -6,7 +6,7 @@ set -x -e
 local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 docker_workspace=/home/jenkins/workspace/HCFS
 
-$local_repo/utils/setup_dev_env.sh -v -m tests
+$local_repo/utils/setup_dev_env.sh -v -m docker_host
 
 # Start Swift server
 sudo docker rm -f swift_test || true
