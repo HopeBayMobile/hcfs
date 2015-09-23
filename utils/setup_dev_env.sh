@@ -124,9 +124,9 @@ install_pkg
 case "$setup_dev_env_mode" in
 docker_slave | functional_test )
 	if [ -f $local_repo/tests/functional_test/requirements.txt ]; then
-		sudo -H pip install -r $local_repo/tests/functional_test/requirements.txt
+		sudo -H pip install -q -r $local_repo/tests/functional_test/requirements.txt
 	else
-		sudo -H pip install -r requirements.txt
+		sudo -H pip install -q -r requirements.txt
 	fi
 	;;&
 docker_slave )

@@ -8,23 +8,13 @@ docker_workspace=/home/jenkins/workspace/HCFS
 
 $local_repo/utils/setup_dev_env.sh -v -m docker_host
 
-# Start Swift server
-sudo docker rm -f swift_test || true
-sudo rm -rf /tmp/swift_data
-sudo mkdir -p /tmp/swift_data
-SWIFT_ID=$(sudo docker run -d -t \
-		-v /tmp/swift_data:/srv \
-		--name=swift_test \
-		aerofs/swift)
-SWIFT_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SWIFT_ID)
-
 # Start test slave
 sudo docker rm -f hcfs_test 2>/dev/null || true
 SLAVE_ID=$(sudo docker run -d -t \
 		--privileged \
 		-v $local_repo:/home/jenkins/workspace/HCFS \
+		-v /var/run/docker.sock:/var/run/docker.sock \
 		--name=hcfs_test \
-		--link swift_test \
 		docker:5000/docker_hcfs_test_slave)
 SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)
 
@@ -44,5 +34,4 @@ $SSH sudo $docker_workspace/utils/setup_dev_env.sh -vm docker_slave
 # Running auto test
 $SSH "run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips"
 
-sudo docker stop $SWIFT_ID
 sudo docker stop $SLAVE_ID

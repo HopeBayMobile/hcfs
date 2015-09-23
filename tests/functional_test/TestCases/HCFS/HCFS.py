@@ -6,6 +6,7 @@ Classes:
 
 """
 import os
+import errno
 import re
 import time
 import pdb
@@ -135,9 +136,9 @@ class HCFSBin:
     """
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.hcfs_src_dir = os.path.join(self.current_dir, '../../../../src/HCFS')
-        self.cli_src_dir = os.path.join(self.current_dir, '../../../../src/CLI_utils')
-        self.hcfs_bin_folder = os.path.join(self.current_dir, 'hcfs_bin')
+        self.repo_dir = os.path.abspath(os.path.join(self.current_dir, '../../../..'))
+        self.hcfs_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/HCFS'))
+        self.cli_src_dir =  os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils'))
         self.hcfs_bin = 'hcfs'
         self.hcfsvol_bin = self._get_cli_dir()
         self.timeout = 30
@@ -155,17 +156,18 @@ class HCFSBin:
         """Launch the hcfs processes
         """
         try:
-            p = subprocess.Popen([self.hcfs_bin, '-d', '-oallow_root'])
+            p = subprocess.Popen([self.hcfs_bin, '-d'])
         except:
             self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-            p = subprocess.Popen([self.hcfs_bin, '-d', '-oallow_root'])
+            p = subprocess.Popen([self.hcfs_bin, '-d'])
         finally:
-            time.sleep(10)  # if use timeout for it?
+            #time.sleep(5)  # if use timeout for it?
+            pass
 
     def start_hcfs_background(self):
         self.hcfs_bin = os.path.join(os.path.abspath(self.hcfs_src_dir), 'hcfs')
         # cmds = self.hcfs_bin + ' -d -oallow_root'
-        cmds = [self.hcfs_bin, '-d', '-oallow_root']
+        cmds = [self.hcfs_bin, '-d']
         print self.hcfs_src_dir
         print self.hcfs_bin
 
@@ -238,11 +240,23 @@ class HCFSBin:
         else:
             return True, str(output)
 
+    def mkdir_p(self, path):
+        try:
+            os.makedirs(path)
+        except OSError as e: # Python >2.5
+            if e.errno == errno.EEXIST and os.path.isdir(path):
+                pass
+            else: raise
+
     def mount(self, filesystem, mount_point):
         """Mount HCFS to a mount point
         """
-        cmds = [self.hcfsvol_bin, 'mount', filesystem, mount_point, '-o allow_root']
+        cmds = [self.hcfsvol_bin, 'mount', filesystem, mount_point]
         print cmds
+        try:
+            self.mkdir_p(mount_point)
+        except OSError as error_msg:
+            return False, str(error_msg)
         p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
         if error_msg:
@@ -260,7 +274,9 @@ class HCFSBin:
 class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.fstest = FSTester('/mnt/hcfs2/fstest/tests')
+        self.repo_dir = os.path.normpath(os.path.join(self.current_dir, '../../../..'))
+        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
+        self.fstest = FSTester(os.path.join(self.mount_point, 'fstest/tests'))
         self.logger = logging.getLogger('CommonSetup')
         self.mount_point = '/mnt/hcfs2'
         # swift
@@ -374,7 +390,7 @@ class HCFS_0(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.fake_filesystem = 'fakeHCFS'
-        self.mount_point = '/mnt/hcfs2'
+        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount2')
         self.HCFSBin = HCFSBin()
 
     def run(self):
@@ -384,22 +400,22 @@ class HCFS_0(CommonSetup):
             logger.info('Create HCFS processes...')
         else:
             logger.info('HCFS process already exist!')
-        time.sleep(10)
+        time.sleep(1)
 
         # create a filesystem
         filesystems = self.HCFSBin.list_filesystems()
         if self.fake_filesystem not in filesystems:
-            (result, msg) = self.HCFSBin.create_filesystem(self.fake_filesystem)
             logger.info('fake filesystem no exist, create one: {0}'.format(self.fake_filesystem))
+            (result, msg) = self.HCFSBin.create_filesystem(self.fake_filesystem)
+            print result, msg
         else:
             logger.info('fake fiesystem already exist.')
 
         # create mount point
         if not self.check_hcfs_mount(self.mount_point):
+            logger.info('Mounting hcfs at {0}'.format(self.mount_point))
             (result, msg) = self.HCFSBin.mount(self.fake_filesystem, self.mount_point)
             print result, msg
-        else:
-            logger.info('Mount point: {0} already exist.'.format(self.mount_point))
 
         # check the df and mount
         if not self.check_hcfs_mount(self.mount_point):
@@ -788,7 +804,7 @@ class HCFS_20(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
-        self.mount_point = '/mnt/hcfs'
+        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
         self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_60M'
         self.first_time = ''
@@ -809,7 +825,7 @@ class HCFS_20(CommonSetup):
 
         # Copy the file to hcfs (upload)
         testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
-        testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename)
         self.first_time = datetime.now()
         cmds = ['cp', '-f', testfile_abs_local, testfile_abs_hcfs]
         p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
@@ -835,12 +851,12 @@ class HCFS_20(CommonSetup):
 class HCFS_21(CommonSetup):
     '''
     Upload – exceed hard limit
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
-        self.mount_point = '/mnt/hcfs'
+        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
         self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_160M'
         self.first_time = ''
@@ -861,7 +877,7 @@ class HCFS_21(CommonSetup):
 
         # Copy the file to hcfs (upload)
         testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
-        testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename)
         self.first_time = datetime.now()
         cmds = ['cp', '-f', testfile_abs_local, testfile_abs_hcfs]
         p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
@@ -910,7 +926,7 @@ class HCFS_22(CommonSetup):
         (output, error_msg) = p.communicate()
 
         # Copy the file from hcfs (download)
-        testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename_hcfs)
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
         testfile_abs_local_2 = os.path.join(self.current_dir, self.testfilename_local2)
         p = subprocess.Popen(['cp', '-f', testfile_abs_hcfs, testfile_abs_local_2], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
@@ -1053,7 +1069,7 @@ class HCFS_40(CommonSetup):
 
 class HCFS_41(CommonSetup):
     '''Delete big file
-    '''TODO
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
