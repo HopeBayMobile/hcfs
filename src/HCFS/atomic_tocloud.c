@@ -21,7 +21,7 @@ extern SYSTEM_CONF_STRUCT system_config;
 int tag_status_on_fuse(ino_t this_inode, char status, int fd)
 {
 	int sockfd;
-	int ret, resp;
+	int ret, resp, errcode;
 	struct sockaddr_un addr;
 	UPLOADING_COMMUNICATION_DATA data;
 
@@ -36,6 +36,14 @@ int tag_status_on_fuse(ino_t this_inode, char status, int fd)
 
 	ret = connect(sockfd, (struct sockaddr *)&addr,
 		sizeof(struct sockaddr_un));
+	if (ret < 0) {
+		errcode = errno;
+		write_log(0, "Error: Fail to connect socket in %s. Code %d\n",
+			__func__, errcode);
+		close(sockfd);
+		return -errcode;
+	}
+
 
 	send(sockfd, &data, sizeof(UPLOADING_COMMUNICATION_DATA), 0);
 	recv(sockfd, &resp, sizeof(int), 0);
@@ -211,34 +219,6 @@ errcode_handle:
 }
 #endif
 
-/*
-int get_progress_info_nonlock(int fd, long long block_index,
-	BLOCK_UPLOADING_STATUS *block_uploading_status)
-{
-	long long offset;
-	int errcode;
-	long long ret_ssize;
-
-	offset = sizeof(BLOCK_UPLOADING_STATUS) * block_index;
-
-	PREAD(fd, block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
-		offset);
-	if (ret_ssize == 0) {
-		memset(block_uploading_status, 0,
-			sizeof(BLOCK_UPLOADING_STATUS));
-		block_uploading_status->finish_uploading = FALSE;
-	}
-
-	return ret_ssize;
-
-errcode_handle:
-	write_log(0, "Error: Fail to get progress-info of block_%lld\n",
-			block_index);
-	return errcode;
-
-}
-*/
-
 int open_progress_info(ino_t inode)
 {
 	int ret_fd;
@@ -331,6 +311,8 @@ int init_progress_info(int fd, long long backend_blocks,
 				backend_metafptr, which_page, 0);
 			if (page_pos <= 0) {
 				block += (BLK_INCREMENTS - 1);
+				offset += BLK_INCREMENTS *
+					sizeof(BLOCK_UPLOADING_STATUS);
 				continue;
 			}
 			current_page = which_page;
@@ -346,7 +328,7 @@ int init_progress_info(int fd, long long backend_blocks,
 			(cloud_status != ST_TODELETE)) {
 			SET_CLOUD_BLOCK_EXIST(
 				block_uploading_status.block_exist);
-#ifdef DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 			memcpy(block_uploading_status.backend_objid,
 				block_page.block_entries[e_index].obj_id,
 				sizeof(char) * OBJID_LENGTH);
