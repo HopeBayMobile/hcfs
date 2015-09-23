@@ -732,62 +732,7 @@ static int increment_upload_seq(FILE *fptr, long long *upload_seq)
 	return 0;
 }
 
-int download_meta_from_backend(ino_t inode, const char *download_metapath,
-	FILE **backend_fptr)
-{
-	char backend_meta_name[500];
-	int ret, errcode;
 
-	fetch_backend_meta_objname(inode, backend_meta_name);
-
-	*backend_fptr = fopen(download_metapath, "w+");
-	if (*backend_fptr == NULL) {
-		write_log(0, "Error: Fail to open file in %s\n", __func__);
-		return -1;
-	}
-	setbuf(*backend_fptr, NULL);
-
-	sem_wait(&(sync_stat_ctl.stat_op_sem));
-
-#ifdef ENCRYPT_ENABLE
-	char  *get_fptr_data = NULL;
-	size_t len = 0;
-	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
-
-	ret = hcfs_get_object(get_fptr, backend_meta_name,
-		&(sync_stat_ctl.statcurl));
-#else
-	ret = hcfs_get_object(*backend_fptr, backend_meta_name,
-		&(sync_stat_ctl.statcurl));
-#endif
-#ifdef ENCRYPT_ENABLE
-	fclose(get_fptr);
-	unsigned char *key = get_key();
-	decrypt_to_fd(*backend_fptr, key, get_fptr_data, len);
-	free(get_fptr_data);
-	free(key);
-#endif
-	sem_post(&(sync_stat_ctl.stat_op_sem));
-
-	if ((ret >= 200) && (ret <= 299)) {
-		errcode = 0;
-		write_log(10, "Debug: Download meta %ld from backend\n", inode);
-	} else if (ret != 404) {
-		errcode = -EIO;
-		fclose(*backend_fptr);
-		unlink(download_metapath);
-		*backend_fptr = NULL;
-	} else {
-		errcode = 0;
-		fclose(*backend_fptr);
-		unlink(download_metapath);
-		*backend_fptr = NULL;
-		write_log(10, "Debug: meta %ld does not exist on cloud\n",
-			inode);
-	}
-
-	return errcode;
-}
 
 #ifdef DEDUP_ENABLE
 static inline int _choose_deleted_block(char delete_which_one, 

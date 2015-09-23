@@ -283,6 +283,16 @@ int main(int argc, char **argv)
 		run_cache_loop();
 		close_log();
 	} else {
+		/* Move from fuse-process to here because upload_loop()
+		need download meta. */
+		sem_init(&download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+
+		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+				count++)
+			_init_download_curl(count);
+
 		this_pid1 = fork();
 		if (this_pid1 == 0) {
 			open_log("backend_upload_log");
@@ -292,16 +302,8 @@ int main(int argc, char **argv)
 			upload_loop();
 			close_log();
 		} else {
-
 			open_log("fuse_log");
 			write_log(2, "\nStart logging fuse\n");
-			sem_init(&download_curl_sem, 0,
-					MAX_DOWNLOAD_CURL_HANDLE);
-			sem_init(&download_curl_control_sem, 0, 1);
-
-			for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
-								count++)
-				_init_download_curl(count);
 
 			hook_fuse(argc, argv);
 			write_log(2, "Waiting for subprocesses to terminate\n");
