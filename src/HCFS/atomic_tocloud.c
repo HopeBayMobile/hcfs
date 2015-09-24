@@ -120,7 +120,7 @@ int set_progress_info(int fd, long long block_index,
 	if (ret_ssize == 0) { /* Init because backend_blocks < now blocks */
 		memset(&block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
-		end_pos = lseek(fd, 0, SEEK_END);
+		/*end_pos = lseek(fd, 0, SEEK_END);
 		while (end_pos < offset) {
 			PWRITE(fd, &block_uploading_status,
 				sizeof(BLOCK_UPLOADING_STATUS), end_pos);
@@ -128,7 +128,7 @@ int set_progress_info(int fd, long long block_index,
 		}
 		if (end_pos > offset)
 			write_log(0, "Error: end_pos != offset?, in %s\n",
-				__func__);
+				__func__);*/
 	}
 
 	if (toupload_exist)
