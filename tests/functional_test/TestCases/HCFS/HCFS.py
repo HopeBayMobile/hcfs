@@ -1053,7 +1053,7 @@ class HCFS_40(CommonSetup):
 
 class HCFS_41(CommonSetup):
     '''Delete big file
-    '''
+    '''TODO
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
@@ -1070,31 +1070,15 @@ class HCFS_41(CommonSetup):
         # Delete the downloaded file
         # self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
 
-        # Parse the timestemp in log to calculate the duration time of deletion.
-        delete_end_dt = None
-        delete_start_dt = None
-        delta_min_str = None
-
         with open(self.backend_log, 'rb') as f:
             lines = f.read().split('\n')
+            print len(lines)
             for i in range(len(lines)-1, -1, -1):
-                r = re.search(r'.+\s(\d+\:\d+:\d+?)\.\d+\s+Debug meta deletion.+', lines[i])
+                r = re.search(r'.+\s(\d+\:\d+:\d+\.\d+?)\s+Debug meta deletion.+', lines[i])
                 if r:
-                    delete_end_dt = datetime.strptime(r.group(1), '%H:%M:%S')
-                    logger.info('Matched {0}'.format('.+\s(\d+\:\d+:\d+?)\.\d+\s+Debug meta deletion.+'))
+                    print lines[i], r.group(1)
 
-                r = re.search(r'.+\s(\d+\:\d+:\d+?)\.\d+\s+Start delete loop', lines[i])
-                if r:
-                    logger.info('Matched {0}'.format('.+\s(\d+\:\d+:\d+?)\.\d+\s+Start delete loop'))
-                    delete_start_dt = datetime.strptime(r.group(1), '%H:%M:%S')
-
-                if delete_end_dt is not None and delete_start_dt is not None:
-                    dt_delta = delete_end_dt - delete_start_dt
-                    delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60)
-                    logger.info('Spend seconds: {0}'.format(dt_delta.seconds))
-                    return True, 'It spend {0} mins.'.format(delta_min_str)
-
-        return False, 'Some problem in log.'
+        return True, ''
 
 
 class HCFS_99(CommonSetup):
