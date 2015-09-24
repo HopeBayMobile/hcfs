@@ -28,5 +28,5 @@ Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,HCFS_26,Compression,,0,,,
 ,HCFS_39,Upload big file,,1,Pass,Spend time: 9.48(min),1525
 ,HCFS_40,Download big file,,1,Pass,Spend time: 8.08(min),578
-,HCFS_41,Delete big file,,1,Pass,,0
+,HCFS_41,Delete big file,,1,Pass,It spend 9:58 mins.,0
 ,HCFS_99,Clear environment for file system operation test,,1,Pass,,5
