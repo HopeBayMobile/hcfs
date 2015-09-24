@@ -21,6 +21,7 @@ from subprocess import PIPE
 class RequestHandler(SimpleXMLRPCRequestHandler):
     rpc_paths = ('/RPC2',)
 
+
 #----Supported functions
 def exec_command_async(commands, shell_flag, cwd=None):
     try:
@@ -33,6 +34,7 @@ def exec_command_async(commands, shell_flag, cwd=None):
     output = False if error_msg else True    
     return output
 
+
 def exec_command_sync(commands, shell_flag, cwd=None):
     try:
         p = subprocess.Popen(commands, shell=shell_flag, stdout=PIPE, stderr=PIPE, cwd=cwd)
@@ -44,6 +46,7 @@ def exec_command_sync(commands, shell_flag, cwd=None):
     output = False if error_msg else True
     return output
 
+
 def receive_file(data, filename, path):
     file_path = path + '/' + filename
     try:
@@ -52,10 +55,12 @@ def receive_file(data, filename, path):
         return True
     except:
         return False
-    
+
+
 def ping():
     return 'pong'
-    
+
+
 #-----------------------------------------------------------
 
 def create_server(server_ip, port):

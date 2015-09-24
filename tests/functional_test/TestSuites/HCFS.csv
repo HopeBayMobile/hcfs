@@ -1,5 +1,5 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
-,HCFS_0,Setup environment,,1,Fail,Mount failed,10
+,HCFS_0,Setup environment,,1,Pass,,10
 ,HCFS_3,chflags,,1,Pass,,28
 ,HCFS_4,chmod,,1,Pass,,4
 ,HCFS_5,chown,,1,Pass,,12
@@ -18,11 +18,14 @@ Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,HCFS_17,Backend Setting – ArkFlex U (S3),,1,Fail,The process of hcfs number is wrong: 0,6
 ,HCFS_18,Backend Setting – Swift,,0,,,
 ,HCFS_19,Backend Setting – S3,,1,Pass,,40
-,HCFS_0,Setup environment,,1,Fail,Mount failed,10
-,HCFS_20,Upload – exceed soft limit,,0,Pass,,15
-,HCFS_21,Upload – exceed hard limit,,0,Pass,,33
-,HCFS_22,Download,,0,Pass,,56
+,HCFS_0,Setup environment,,1,Pass,,10
+,HCFS_20,Upload – exceed soft limit,,1,Pass,,14
+,HCFS_21,Upload – exceed hard limit,,1,Pass,,19
+,HCFS_22,Upload/Download,,1,Pass,,56
 ,HCFS_23,Delete,,0,,,
 ,HCFS_24,Deduplication,,0,,,
 ,HCFS_25,Encryption,,0,,,
 ,HCFS_26,Compression,,0,,,
+,HCFS_39,Upload big file,,1,Pass,Spend time: 9.48(min),1525
+,HCFS_40,Download big file,,1,Pass,Spend time: 8.08(min),578
+,HCFS_41,Delete big file,,1,Pass,,1

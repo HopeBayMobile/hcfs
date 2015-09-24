@@ -18,13 +18,14 @@ import swiftclient
 
 logger = logging.getLogger('HCFS Tester')
 
+
 class FSTester:
     """
     """
     def __init__(self, path_of_scripts):
         self.path_of_scripts = path_of_scripts
         self.harness = 'prove'
-        
+
     def execute(self, test_type, script_filename=''):
         """Execute the fstest
 
@@ -50,6 +51,7 @@ class FSTester:
 
         return result, output
 
+
 class FileGenerate:
     def __init__(self):
         self.block_num = 60
@@ -57,10 +59,11 @@ class FileGenerate:
     def gen_block(self, content, size):
         """Generate the block with specific content. one block is 1024*1024
 
-        :param content: data with string type, it only can use a singlge character.
+        :param content: data with string type, it only can use a singlge
+                        character.
         """
         block_data = ''
-        if type(content) != type('1'):
+        if isinstance(content, str):
             logger.error('Gen block failed!')
             return False
         else:
@@ -128,12 +131,12 @@ class FileGenerate:
 
 
 class HCFSBin:
-    """Wrap the HCFS executed file, that include hcfs and HCFSvol 
+    """Wrap the HCFS executed file, that include hcfs and HCFSvol
     """
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.hcfs_src_dir =  os.path.join(self.current_dir, '../../../../src/HCFS')
-        self.cli_src_dir =  os.path.join(self.current_dir, '../../../../src/CLI_utils')
+        self.hcfs_src_dir = os.path.join(self.current_dir, '../../../../src/HCFS')
+        self.cli_src_dir = os.path.join(self.current_dir, '../../../../src/CLI_utils')
         self.hcfs_bin_folder = os.path.join(self.current_dir, 'hcfs_bin')
         self.hcfs_bin = 'hcfs'
         self.hcfsvol_bin = self._get_cli_dir()
@@ -165,7 +168,7 @@ class HCFSBin:
         cmds = [self.hcfs_bin, '-d', '-oallow_root']
         print self.hcfs_src_dir
         print self.hcfs_bin
-        
+
         try:
             subprocess.Popen(['sh', 'TestCases/HCFS/start_hcfs.sh'])
             logger.info('Start the HCFS process..')
@@ -179,7 +182,7 @@ class HCFSBin:
         count = 0
         p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
-        for line in  output.split('\n'):
+        for line in output.split('\n'):
             if re.search('hcfs', line):
                 count = count + 1
 
@@ -191,12 +194,12 @@ class HCFSBin:
     def check_if_hcfs_terminated(self, timeout=None):
         """Check the process is not exist, timeout default is 30
         """
-        timeout = self.timeout if timeout == None else timeout
+        timeout = self.timeout if timeout is None else timeout
         while (timeout > 0):
-            process_exsit = 0    
+            process_exsit = 0
             p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
             (output, error_msg) = p.communicate()
-            for line in  output.split('\n'):
+            for line in output.split('\n'):
                 if re.search('hcfs', line):
                     process_exsit = 1
 
@@ -225,7 +228,10 @@ class HCFSBin:
     def create_filesystem(self, filesystem_name):
         """Create a filesystem of HCFS
         """
-        p = subprocess.Popen([self.hcfsvol_bin, 'create', filesystem_name], stdout=PIPE, stderr=PIPE)
+        p = subprocess.Popen(
+            [self.hcfsvol_bin, 'create', filesystem_name],
+            stdout=PIPE,
+            stderr=PIPE)
         (output, error_msg) = p.communicate()
         if error_msg:
             return False, str(error_msg)
@@ -250,6 +256,7 @@ class HCFSBin:
         self.terminate_hcfs()
         self.start_hcfs()
 
+
 class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -273,7 +280,8 @@ class CommonSetup:
         return output
 
     def replace_hcfs_config(self, source):
-        p = subprocess.Popen(['sudo', 'cp', source, '/etc/hcfs.conf'], stdout=PIPE, stderr=PIPE)
+        cmds = ['sudo', 'cp', source, '/etc/hcfs.conf']
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         if error_msg:
@@ -285,7 +293,9 @@ class CommonSetup:
             return True, ''
 
     def get_container_size(self):
-        cmds = ['swift', '--insecure', '-A', self.swift_url, '-U', self.swift_user, '-K', self.swift_key, 'stat']
+        cmds = ['swift', '--insecure', '-A', self.swift_url,
+                '-U', self.swift_user,
+                '-K', self.swift_key, 'stat']
         output = self.exec_command_sync(cmds, False)
         container_size = 0
 
@@ -298,10 +308,13 @@ class CommonSetup:
     def copy_file_to_hcfs(self, testfilename_local, testfilename_hcfs):
         """Copy file to hcfs (upload)
         """
-        p = subprocess.Popen(['cp', '-f', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        cmds = ['cp', '-f', testfilename_local, testfilename_hcfs]
+        self.logger.info('copy_file_to_hcfs: {0}'.format(cmds))
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         if error_msg:
+            self.logger.error(str(cmds))
             self.logger.error(str(error_msg))
             return False, error_msg
         else:
@@ -310,10 +323,13 @@ class CommonSetup:
     def copy_file_from_hcfs(self, testfilename_hcfs, testfilename_local):
         """Copy the file from hcfs (download)
         """
-        p = subprocess.Popen(['cp', '-f', testfile_abs_hcfs, testfilename_local], stdout=PIPE, stderr=PIPE)
+        cmds = ['cp', '-f', testfilename_hcfs, testfilename_local]
+        self.logger.info('copy_file_from_hcfs: {0}'.format(cmds))
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         if error_msg:
+            self.logger.error(str(cmds))
             self.logger.error(str(error_msg))
             return False, error_msg
         else:
@@ -322,7 +338,8 @@ class CommonSetup:
     def diff_files(self, testfile_abs_local, testfile_abs_local_2):
         """Diff these two files
         """
-        p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_local_2], stdout=PIPE, stderr=PIPE)
+        cmds = ['diff', '-q', testfile_abs_local, testfile_abs_local_2]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         if output == '':
@@ -350,9 +367,9 @@ class CommonSetup:
 
         return False
 
-
-
 # ============================ Test Case Start ================================
+
+
 class HCFS_0(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
@@ -362,7 +379,7 @@ class HCFS_0(CommonSetup):
 
     def run(self):
         (output, error_msg) = self.HCFSBin.verify_hcfs_processes()
-        if output == False:
+        if output is False:
             self.HCFSBin.start_hcfs()
             logger.info('Create HCFS processes...')
         else:
@@ -387,7 +404,7 @@ class HCFS_0(CommonSetup):
         # check the df and mount
         if not self.check_hcfs_mount(self.mount_point):
             return False, 'Mount failed'
-        
+
         if not self.check_hcfs_df(self.mount_point):
             return False, 'Missed df information'
 
@@ -404,11 +421,11 @@ class HCFS_0(CommonSetup):
 class HCFS_3(CommonSetup):
     '''
     chflags
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'chflags'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -419,16 +436,16 @@ class HCFS_3(CommonSetup):
             result = False
             msg = output
         return result, msg
-    
+
 
 class HCFS_4(CommonSetup):
     '''
     chmod
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'chmod'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -439,6 +456,7 @@ class HCFS_4(CommonSetup):
             result = False
             msg = output
         return result, msg
+
 
 class HCFS_5(CommonSetup):
     '''
@@ -578,11 +596,11 @@ class HCFS_11(CommonSetup):
 class HCFS_12(CommonSetup):
     '''
     symlink
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'symlink'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -598,11 +616,11 @@ class HCFS_12(CommonSetup):
 class HCFS_13(CommonSetup):
     '''
     truncate
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'truncate'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -614,14 +632,15 @@ class HCFS_13(CommonSetup):
             msg = output
         return result, msg
 
+
 class HCFS_14(CommonSetup):
     '''
     unlink
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'unlink'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -637,10 +656,10 @@ class HCFS_14(CommonSetup):
 class HCFS_15(CommonSetup):
     '''
     Multiple mount
-    '''    
+    '''
     def __init__(self):
         pass
-        
+
     def run(self):
         return False, ''
 
@@ -662,18 +681,18 @@ class HCFS_16(CommonSetup):
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
-        if result == False:
+        if result is False:
             return False, msg
         else:
             return True, ''
-        
+
     def run(self):
         result = True
         msg = ''
         self.replace_hcfs_config(self.config)
         (result, msg) = self.check_if_hcfs_start_success()
 
-        #self.replace_hcfs_config(self.origin_config)
+        # self.replace_hcfs_config(self.origin_config)
 
         time.sleep(5)
         # close the hcfs
@@ -686,13 +705,13 @@ class HCFS_16(CommonSetup):
 class HCFS_17(CommonSetup):
     '''
     Backend Setting – ArkFlex U (S3)
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
         self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
         self.config = 'TestCases/HCFS/hcfs_s3_easepro.conf'
-        
+
     def check_if_hcfs_start_success(self):
         # Start the hcfs
         self.hcfs_bin.start_hcfs_background()
@@ -717,10 +736,10 @@ class HCFS_17(CommonSetup):
 class HCFS_18(CommonSetup):
     '''
     Backend Setting – Swift (Pending)
-    '''    
+    '''
     def __init__(self):
         pass
-        
+
     def run(self):
         return False, ''
 
@@ -728,7 +747,7 @@ class HCFS_18(CommonSetup):
 class HCFS_19(CommonSetup):
     '''
     Backend Setting – S3
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
@@ -748,7 +767,7 @@ class HCFS_19(CommonSetup):
         self.hcfs_bin.check_if_hcfs_terminated()
 
         return result, msg
-        
+
     def run(self):
         self.replace_hcfs_config(self.config)
         (result, msg) = self.check_if_hcfs_start_success()
@@ -759,11 +778,11 @@ class HCFS_19(CommonSetup):
 class HCFS_20(CommonSetup):
     '''
     Upload – exceed soft limit
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
-        self.fileGenerate = FileGenerate() 
-        self.hcfsbin = HCFSBin()       
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
         self.mount_point = '/mnt/hcfs'
         self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_60M'
@@ -773,8 +792,8 @@ class HCFS_20(CommonSetup):
 
     def run(self):
         # Prepare the arkflex swift environment
-        #self.replace_hcfs_config(self.config)
-        #self.hcfsbin.restart_hcfs()
+        # self.replace_hcfs_config(self.config)
+        # self.hcfsbin.restart_hcfs()
 
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
@@ -787,11 +806,13 @@ class HCFS_20(CommonSetup):
         testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
         testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
         self.first_time = datetime.now()
-        p = subprocess.Popen(['cp', '-f', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        cmds = ['cp', '-f', testfile_abs_local, testfile_abs_hcfs]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         # Diff these two files
-        p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        cmds = ['diff', '-q', testfile_abs_local, testfile_abs_hcfs]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         # Delete the generated file
@@ -804,6 +825,7 @@ class HCFS_20(CommonSetup):
             return True, ''
         else:
             return False, output
+
 
 class HCFS_21(CommonSetup):
     '''
@@ -862,7 +884,6 @@ class HCFS_22(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate() 
         self.hcfsbin = HCFSBin()       
-        self.mount_point = '/mnt/hcfs'
         self.testfilename_local = 'testUpload_160M_local'
         self.testfilename_local2 = 'testUpload_160M_local2'
         self.testfilename_hcfs = 'testUpload_160M_hcfs'
@@ -901,6 +922,30 @@ class HCFS_22(CommonSetup):
             return False, output
 
 
+class HCFS_23(CommonSetup):
+    '''Delete
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+
+    def run(self):
+        return True, ''
+
+
+class HCFS_24(CommonSetup):
+    '''Delete
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+
+    def run(self):
+        return True, ''
+
+
 class HCFS_31(CommonSetup):
     '''
     Terminate
@@ -923,45 +968,111 @@ class HCFS_39(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate() 
         self.hcfsbin = HCFSBin()
-        self.mount_point = '/mnt/hcfs'
-        self.samples_dir = '/home/kentchen/TestSamples'
+        self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
         self.testfilename_local = 'matlabl2011-mac.iso'
         self.testfilename_local2 = 'matlabl2011-mac-2.iso'
         self.testfilename_hcfs = 'matlabl2011-mac.iso'
 
     def run(self):
         # Copy the file to hcfs (upload)
-        testfile_abs_local = os.path.join(self.samples_dir, testfilename_local)
-        testfile_abs_hcfs = os.path.join(mount_point, testfilename_hcfs)
-        (result, error_msg) = copy_file_to_hcfs(self, testfile_abs_local, testfile_abs_hcfs)
-        if not result:
-            return False, error_msg
+        testfile_abs_local = os.path.join(self.samples_dir, self.testfilename_local)
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
+        spend_time = ''
 
-        # Copy the file from hcfs (download)
-        testfile_abs_hcfs = os.path.join(mount_point, testfilename_hcfs)
-        testfile_abs_local_2 = os.path.join(self.samples_dir, testfilename_local2)
-        (result, error_msg) = copy_file_from_hcfs(self, testfilename_hcfs, testfilename_local2)
+        dt_ori = datetime.now()
+        (result, error_msg) = self.copy_file_to_hcfs(testfile_abs_local, testfile_abs_hcfs)
         if not result:
             return False, error_msg
+        dt_new = datetime.now()
+
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(round(dt_delta.seconds / 60.0, 2)) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min if dt_delta.seconds > 59 else dt_delta_sec_str
 
         # Diff these two files
-        (result, error_msg) = diff_files(self, testfile_abs_local, testfile_abs_local_2)
+        (result, error_msg) = self.diff_files(testfile_abs_local, testfile_abs_hcfs)
         if not result:
+            logger.error('diff failed!')
             return False, error_msg
+        else:
+            return True, 'Spend time: {0}'.format(spend_time)
 
         # Delete the generated file
-        self.exec_command_sync(['rm', '-f', testfile_abs_local], False)
+        # self.exec_command_sync(['rm', '-f', testfile_abs_local_2], False)
+
+
+class HCFS_40(CommonSetup):
+    '''Upload/Download big file
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+        self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
+        self.testfilename_local = 'matlabl2011-mac.iso'
+        self.testfilename_local2 = 'matlabl2011-mac-2.iso'
+        self.testfilename_hcfs = 'matlabl2011-mac.iso'
+
+    def run(self):
+        # Copy the file from hcfs (download)
+        testfile_abs_local = os.path.join(self.samples_dir, self.testfilename_local)
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
+        testfile_abs_local_2 = os.path.join(self.samples_dir, self.testfilename_local2)
+
+        dt_ori = datetime.now()
+        (result, error_msg) = self.copy_file_from_hcfs(testfile_abs_hcfs, testfile_abs_local_2)
+        if not result:
+            return False, error_msg
+        dt_new = datetime.now()
+
+        dt_delta = dt_new - dt_ori
+        dt_delta_min_str = str(round(dt_delta.seconds / 60.0, 2)) + '(min)'
+        dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
+
+        # Diff these two files
+        (result, error_msg) = self.diff_files(testfile_abs_local, testfile_abs_local_2)
+        if not result:
+            logger.error('diff failed!')
+            return False, error_msg
+
+        # Delete the downloaded file
         self.exec_command_sync(['rm', '-f', testfile_abs_local_2], False)
+
+        return True, 'Spend time: {0}'.format(spend_time)
+
+
+class HCFS_41(CommonSetup):
+    '''Delete big file
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+        self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
+        self.testfilename_local = 'matlabl2011-mac.iso'
+        self.testfilename_local2 = 'matlabl2011-mac-2.iso'
+        self.testfilename_hcfs = 'matlabl2011-mac.iso'
+
+    def run(self):
+        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
+
+        # Delete the downloaded file
+        self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
+
+        return True, ''
+
 
 class HCFS_99(CommonSetup):
     '''
     Clear environment for file system operation test
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfsbin = HCFSBin()
         self.fstest_path = os.path.join(self.mount_point, 'fstest')
-        
+
     def remove_fstest(self):
         try:
             subprocess.call('rm -rf ' + self.fstest_path)
@@ -974,16 +1085,14 @@ class HCFS_99(CommonSetup):
         self.hcfsbin.terminate_hcfs()
 
         if not self.hcfsbin.check_if_hcfs_terminated():
-            return False , 'HCFS did not terminate complete'
-        
+            return False, 'HCFS did not terminate complete'
+
         return True, ''
 
 
 if __name__ == '__main__':
-    current =  os.path.dirname(os.path.abspath(__file__))
+    current = os.path.dirname(os.path.abspath(__file__))
     print current
-    hcfs_src_folder =  os.path.join(current, '../../../../src/HCFS')
-    cli_src_folder =  os.path.join(os.path.join(current, '../../../../src/CLI_utils'), 'HCFSvol')
+    hcfs_src_folder = os.path.join(current, '../../../../src/HCFS')
+    cli_src_folder = os.path.join(os.path.join(current, '../../../../src/CLI_utils'), 'HCFSvol')
     print os.path.abspath(cli_src_folder)
-        
-
