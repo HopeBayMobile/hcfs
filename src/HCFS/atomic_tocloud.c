@@ -6,6 +6,7 @@
 #include "atomic_tocloud.h"
 #include "macro.h"
 #include "global.h"
+#include "metaops.h"
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 extern SYSTEM_CONF_STRUCT system_config;
@@ -61,6 +62,19 @@ int tag_status_on_fuse(ino_t this_inode, char status, int fd)
 	return ret;
 }
 
+static inline long long longpow(long long base, int power)
+{
+	long long tmp;
+	int count;
+
+	tmp = 1;
+
+	for (count = 0; count < power; count++)
+		tmp = tmp * base;
+
+	return tmp;
+}
+
 static inline long long _get_filepos(long long block_index)
 {
 	long long offset;
@@ -69,29 +83,216 @@ static inline long long _get_filepos(long long block_index)
 	return offset;
 }
 
+long long query_status_page(int fd, long long block_index)
+{	
+	long long target_page;
+	int which_indirect;
+	long long ret_pos;
+	int level, i;
+	int errcode;
+	ssize_t ret_ssize;
+	long long ptr_index, ptr_page_index; 
+	PROGRESS_META progress_meta;
+	PTR_ENTRY_PAGE temp_ptr_page;
+
+	target_page = block_index / MAX_BLOCK_ENTRIES_PER_PAGE;
+	which_indirect = check_page_level(target_page);
+	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	switch(which_indirect) {
+	case 0:
+		return progress_meta.direct;
+	case 1:
+		ret_pos = progress_meta.single_indirect;
+		break;
+	case 2:
+		ret_pos = progress_meta.double_indirect;
+		break;
+	case 3:
+		ret_pos = progress_meta.triple_indirect;
+		break;
+	case 4:
+		ret_pos = progress_meta.quadruple_indirect;
+	}
+	if (ret_pos == 0)
+		return ret_pos;
+
+	ptr_index = target_page - 1;
+	for (i = 1; i < which_indirect; i++)
+		ptr_index -= longpow(POINTERS_PER_PAGE, i);
+	
+	for(level = which_indirect - 1; level >= 0; level--) {
+		PREAD(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE), ret_pos);
+		if (level == 0)
+			break;	
+		ptr_page_index = ptr_index / longpow(POINTERS_PER_PAGE, level);
+		ptr_index = ptr_index % longpow(POINTERS_PER_PAGE, level);
+		if (temp_ptr_page.ptr[ptr_page_index] == 0)
+			return 0;
+
+		ret_pos = temp_ptr_page.ptr[ptr_page_index];
+	}
+
+	return temp_ptr_page.ptr[ptr_index];
+
+errcode_handle:
+	return 0;
+
+}
+
+long long create_status_page(int fd, long long block_index)
+{
+	int which_indirect;
+	long long target_page;
+	PROGRESS_META progress_meta;
+	long long ret_pos, end_pos;
+	BLOCK_UPLOADING_PAGE temp_page;
+	PTR_ENTRY_PAGE temp_ptr_page, zero_ptr_page;
+	long long tmp_pos;
+	long long ptr_page_index, ptr_index;
+	int errcode;
+	ssize_t ret_ssize;
+	int level, i;
+
+	target_page = block_index / MAX_BLOCK_ENTRIES_PER_PAGE;
+	
+	which_indirect = check_page_level(target_page);
+	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	write_log(10, "target_page = %lld,  which_indirect = %d\n", target_page, which_indirect);
+
+	switch(which_indirect) {
+	case 0:
+		if (progress_meta.direct == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			memset(&temp_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
+			PWRITE(fd, &temp_page, sizeof(BLOCK_UPLOADING_PAGE),
+				end_pos);
+			progress_meta.direct = end_pos;
+			PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+		}
+		return progress_meta.direct;
+	case 1:
+		if (progress_meta.single_indirect == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
+			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				end_pos);
+			progress_meta.single_indirect = end_pos;
+			PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);	
+		}
+		tmp_pos = progress_meta.single_indirect;
+		break;
+	case 2:
+		if (progress_meta.double_indirect == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
+			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				end_pos);
+			progress_meta.double_indirect = end_pos;
+			PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);	
+		}
+		tmp_pos = progress_meta.double_indirect;
+		break;
+	case 3:
+		if (progress_meta.triple_indirect == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
+			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				end_pos);
+			progress_meta.triple_indirect = end_pos;
+			PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);	
+		}
+		tmp_pos = progress_meta.triple_indirect;
+		break;
+	case 4:
+		if (progress_meta.quadruple_indirect == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			memset(&temp_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
+			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				end_pos);
+			progress_meta.quadruple_indirect = end_pos;
+			PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);	
+		}
+		tmp_pos = progress_meta.quadruple_indirect;
+		break;
+	default:
+		return 0;
+	}
+
+	ptr_index = target_page - 1;
+	for (i = 1; i < which_indirect; i++)
+		ptr_index -= longpow(POINTERS_PER_PAGE, i);
+
+	/* Create ptr page */
+	memset(&zero_ptr_page, 0, sizeof(PTR_ENTRY_PAGE));
+	for (level = which_indirect - 1; level >= 0 ; level--) {
+		PREAD(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE), tmp_pos);
+		if (level == 0)
+			break;
+		ptr_page_index = ptr_index / longpow(POINTERS_PER_PAGE, level);
+		ptr_index = ptr_index % longpow(POINTERS_PER_PAGE, level);
+
+		if (temp_ptr_page.ptr[ptr_page_index] == 0) {
+			end_pos = lseek(fd, 0, SEEK_END);
+			PWRITE(fd, &zero_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				end_pos);
+			temp_ptr_page.ptr[ptr_page_index] = end_pos;
+			PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE),
+				tmp_pos);
+		}
+		tmp_pos = temp_ptr_page.ptr[ptr_page_index];
+	}
+
+	/* Create status page */
+	if (temp_ptr_page.ptr[ptr_index] == 0) {	
+		end_pos = lseek(fd, 0, SEEK_END);
+		memset(&temp_page, 0, sizeof(BLOCK_UPLOADING_PAGE));
+		PWRITE(fd, &temp_page, sizeof(BLOCK_UPLOADING_PAGE),
+				end_pos);
+		temp_ptr_page.ptr[ptr_index] = end_pos;
+		PWRITE(fd, &temp_ptr_page, sizeof(PTR_ENTRY_PAGE), tmp_pos);
+	}
+
+	return temp_ptr_page.ptr[ptr_index];
+
+errcode_handle:
+	return 0;
+
+}
+
 int get_progress_info(int fd, long long block_index,
 	BLOCK_UPLOADING_STATUS *block_uploading_status)
 {
 	long long offset;
 	int errcode;
 	long long ret_ssize;
+	int entry_index;
+	BLOCK_UPLOADING_PAGE block_page;
 
-	offset = _get_filepos(block_index);
+	ret_ssize = 0;
+	entry_index = block_index % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	flock(fd, LOCK_EX);
-	PREAD(fd, block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
-		offset);
+	offset = query_status_page(fd, block_index);
+	if (offset > 0)
+		PREAD(fd, &block_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
-	if (ret_ssize == 0) {
+
+	if (offset == 0) {
 		/* Reading exceeds EOF. It may occur when backend
 		   has truncated data and this block has not been
 		   uploaded. */
+		write_log(0, "Why zero? block_%ld\n", block_index);
 		memset(block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		block_uploading_status->finish_uploading = FALSE;
+	} else {
+		memcpy(block_uploading_status,
+			&(block_page.status_entry[entry_index]),
+			sizeof(BLOCK_UPLOADING_STATUS));
+		write_log(10, "obj_id = %s\n", block_uploading_status->backend_objid);
 	}
 
-	return ret_ssize;
+	return offset;
 
 errcode_handle:
 	write_log(0, "Error: Fail to get progress-info of block_%lld\n",
@@ -110,47 +311,45 @@ int set_progress_info(int fd, long long block_index,
 	long long offset;
 	off_t end_pos;
 	ssize_t ret_ssize;
-	BLOCK_UPLOADING_STATUS block_uploading_status;
+	int entry_index;
+	BLOCK_UPLOADING_STATUS *block_uploading_status;
+	BLOCK_UPLOADING_PAGE status_page;
 
-	offset = _get_filepos(block_index);
+	entry_index = block_index % MAX_BLOCK_ENTRIES_PER_PAGE;
 
 	flock(fd, LOCK_EX);
-	PREAD(fd, &block_uploading_status, sizeof(BLOCK_UPLOADING_STATUS),
-		offset);
-	if (ret_ssize == 0) { /* Init because backend_blocks < now blocks */
-		memset(&block_uploading_status, 0,
-			sizeof(BLOCK_UPLOADING_STATUS));
-		/*end_pos = lseek(fd, 0, SEEK_END);
-		while (end_pos < offset) {
-			PWRITE(fd, &block_uploading_status,
-				sizeof(BLOCK_UPLOADING_STATUS), end_pos);
-			end_pos += sizeof(BLOCK_UPLOADING_STATUS);
-		}
-		if (end_pos > offset)
-			write_log(0, "Error: end_pos != offset?, in %s\n",
-				__func__);*/
+	offset = create_status_page(fd, block_index);
+	if (offset > 0) {
+		write_log(10, "---------offset = %lld\n", offset);
+		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
+		block_uploading_status = 
+			&(status_page.status_entry[entry_index]);
+	write_log(10, "obj_id = %s\n", block_uploading_status->backend_objid);
+	} else {
+		write_log(0, "Error: Fail to set progress\n");
+		flock(fd, LOCK_UN);
+		return -1;
 	}
 
 	if (toupload_exist)
-		block_uploading_status.block_exist = ((*toupload_exist) & 1) |
-			(block_uploading_status.block_exist & 2);
+		block_uploading_status->block_exist = ((*toupload_exist) & 1) |
+			(block_uploading_status->block_exist & 2);
 	if (backend_exist)
-		block_uploading_status.block_exist = ((*backend_exist) & 2) |
-			(block_uploading_status.block_exist & 1);
+		block_uploading_status->block_exist = ((*backend_exist) & 2) |
+			(block_uploading_status->block_exist & 1);
 	if (toupload_objid)
-		memcpy(block_uploading_status.to_upload_objid, toupload_objid,
+		memcpy(block_uploading_status->to_upload_objid, toupload_objid,
 			sizeof(unsigned char) * OBJID_LENGTH);
 	if (backend_objid)
-		memcpy(block_uploading_status.backend_objid, backend_objid,
+		memcpy(block_uploading_status->backend_objid, backend_objid,
 			sizeof(unsigned char) * OBJID_LENGTH);
 	if (finish)
-		block_uploading_status.finish_uploading = *finish;
+		block_uploading_status->finish_uploading = *finish;
 
-	PWRITE(fd, &block_uploading_status,
-		sizeof(BLOCK_UPLOADING_STATUS), offset);
+	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
-	if (block_uploading_status.finish_uploading == TRUE)
+	if (block_uploading_status->finish_uploading == TRUE)
 		write_log(10, "Debug: block_%lld finished uploading - "
 			"fd = %d\n", block_index, fd);
 
@@ -268,6 +467,8 @@ int init_progress_info(int fd, long long backend_blocks,
 	FILE_META_TYPE tempfilemeta;
 	char cloud_status;
 	PROGRESS_META progress_meta;
+	BLOCK_UPLOADING_PAGE status_page;
+	int entry_index;
 
 	/* Do NOT need to lock file because this function will be called by
 	   the only one thread in sync_single_inode() */
@@ -276,15 +477,6 @@ int init_progress_info(int fd, long long backend_blocks,
 	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 
 	if (backend_metafptr == NULL) { /* backend meta does not exist */
-		offset = sizeof(PROGRESS_META);
-		memset(&block_uploading_status, 0,
-				sizeof(BLOCK_UPLOADING_STATUS));
-		for (block = 0; block < backend_blocks; block++) {
-			PWRITE(fd, &block_uploading_status,
-					sizeof(BLOCK_UPLOADING_STATUS), offset);
-			offset += sizeof(BLOCK_UPLOADING_STATUS);
-		}
-
 		progress_meta.finish_init_backend_data = TRUE;
 		progress_meta.backend_size = 0;
 		progress_meta.total_backend_blocks = 0;
@@ -301,7 +493,6 @@ int init_progress_info(int fd, long long backend_blocks,
 
 	/* Write into progress info */
 	current_page = -1;
-	offset = sizeof(PROGRESS_META);
 	for (block = 0; block < backend_blocks; block++) {
 		e_index = block % BLK_INCREMENTS;
 		which_page = block / BLK_INCREMENTS;
@@ -311,8 +502,6 @@ int init_progress_info(int fd, long long backend_blocks,
 				backend_metafptr, which_page, 0);
 			if (page_pos <= 0) {
 				block += (BLK_INCREMENTS - 1);
-				offset += BLK_INCREMENTS *
-					sizeof(BLOCK_UPLOADING_STATUS);
 				continue;
 			}
 			current_page = which_page;
@@ -336,12 +525,21 @@ int init_progress_info(int fd, long long backend_blocks,
 			block_uploading_status.backend_seq = 0; /* temp */
 #endif
 		}
-		PWRITE(fd, &block_uploading_status,
-				sizeof(BLOCK_UPLOADING_STATUS), offset);
-		offset += sizeof(BLOCK_UPLOADING_STATUS);
+		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
+		offset = create_status_page(fd, block);
+		write_log(10, "offset = %lld\n", offset);
+		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
+		memcpy(&(status_page.status_entry[entry_index]),
+			&block_uploading_status,
+			sizeof(BLOCK_UPLOADING_STATUS));
+		PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
+		int i;
+		for (i=0 ; i<5 ; i++)
+			write_log(10, "obj_id = %s\n", status_page.status_entry[i].backend_objid);
 	}
 
-	/* Finally write meta */
+	/* Finally write meta */	
+	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	progress_meta.finish_init_backend_data = TRUE;
 	progress_meta.backend_size = backend_size;
 	progress_meta.total_backend_blocks = backend_blocks;

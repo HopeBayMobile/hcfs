@@ -60,4 +60,6 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int startup_finish_delete(void);
 
 int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
+
+int check_page_level(long long page_index);
 #endif /* GW20_HCFS_METAOPS_H_ */

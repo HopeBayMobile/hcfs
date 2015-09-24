@@ -32,9 +32,19 @@ typedef struct {
 } BLOCK_UPLOADING_STATUS;
 
 typedef struct {
+	BLOCK_UPLOADING_STATUS status_entry[MAX_BLOCK_ENTRIES_PER_PAGE];
+} BLOCK_UPLOADING_PAGE;
+
+
+typedef struct {
 	char finish_init_backend_data;
 	long long backend_size;
 	long long total_backend_blocks;
+	long long direct;
+	long long single_indirect;
+	long long double_indirect;
+	long long triple_indirect;
+	long long quadruple_indirect;
 } PROGRESS_META;
 
 int tag_status_on_fuse(ino_t this_inode, char status, int fd);

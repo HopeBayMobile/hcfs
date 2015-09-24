@@ -670,7 +670,7 @@ static inline long long longpow(long long base, int power)
 	return tmp;
 }
 /* Checks if page_index belongs to direct or what indirect page */
-int _check_page_level(long long page_index)
+int check_page_level(long long page_index)
 {
 	long long tmp_index;
 
@@ -805,7 +805,7 @@ long long seek_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page,
 	if (ret < 0)
 		return ret;
 
-	which_indirect = _check_page_level(target_page);
+	which_indirect = check_page_level(target_page);
 
 	switch (which_indirect) {
 	case 0:
@@ -1036,7 +1036,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	if (ret < 0)
 		return ret;
 
-	which_indirect = _check_page_level(target_page);
+	which_indirect = check_page_level(target_page);
 	switch (which_indirect) {
 	case 0:
 		filepos = temp_meta.direct;
@@ -1124,7 +1124,7 @@ long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 	if (target_page < 0)
 		return -EPERM;
 
-	which_indirect = _check_page_level(target_page);
+	which_indirect = check_page_level(target_page);
 
 	switch (which_indirect) {
 	case 0:
