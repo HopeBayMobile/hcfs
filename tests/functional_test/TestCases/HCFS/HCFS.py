@@ -461,11 +461,11 @@ class HCFS_4(CommonSetup):
 class HCFS_5(CommonSetup):
     '''
     chmown
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'chown'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -476,15 +476,16 @@ class HCFS_5(CommonSetup):
             result = False
             msg = output
         return result, msg
+
 
 class HCFS_6(CommonSetup):
     '''
     link
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'link'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -495,15 +496,16 @@ class HCFS_6(CommonSetup):
             result = False
             msg = output
         return result, msg
+
 
 class HCFS_7(CommonSetup):
     '''
     mkdir
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'mkdir'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -515,14 +517,15 @@ class HCFS_7(CommonSetup):
             msg = output
         return result, msg
 
+
 class HCFS_8(CommonSetup):
     '''
     mkfifo
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'mkfifo'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -534,14 +537,15 @@ class HCFS_8(CommonSetup):
             msg = output
         return True, 'mkfifo not supported now'
 
+
 class HCFS_9(CommonSetup):
     '''
     open
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'open'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -551,16 +555,17 @@ class HCFS_9(CommonSetup):
         else:
             result = False
             msg = output
-        return result, msg       
+        return result, msg
+
 
 class HCFS_10(CommonSetup):
     '''
     rename
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'rename'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -576,11 +581,11 @@ class HCFS_10(CommonSetup):
 class HCFS_11(CommonSetup):
     '''
     rmdir
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.type = 'rmdir'
-        
+
     def run(self):
         (result, output) = self.fstest.execute(self.type)
 
@@ -833,8 +838,8 @@ class HCFS_21(CommonSetup):
     '''    
     def __init__(self):
         CommonSetup.__init__(self)
-        self.fileGenerate = FileGenerate() 
-        self.hcfsbin = HCFSBin()       
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
         self.mount_point = '/mnt/hcfs'
         self.config = 'hcfs_swift_easepro.conf'
         self.testfilename = 'testUpload_160M'
@@ -844,8 +849,8 @@ class HCFS_21(CommonSetup):
 
     def run(self):
         # Prepare the arkflex swift environment
-        #self.replace_hcfs_config(self.config)
-        #self.hcfsbin.restart_hcfs()
+        # self.replace_hcfs_config(self.config)
+        # self.hcfsbin.restart_hcfs()
 
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
@@ -858,11 +863,13 @@ class HCFS_21(CommonSetup):
         testfile_abs_local = os.path.join(self.current_dir, self.testfilename)
         testfile_abs_hcfs = os.path.join('/mnt/hcfs', self.testfilename)
         self.first_time = datetime.now()
-        p = subprocess.Popen(['cp', '-f', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        cmds = ['cp', '-f', testfile_abs_local, testfile_abs_hcfs]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         # Diff these two files
-        p = subprocess.Popen(['diff', '-q', testfile_abs_local, testfile_abs_hcfs], stdout=PIPE, stderr=PIPE)
+        cmds = ['diff', '-q', testfile_abs_local, testfile_abs_hcfs]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
 
         # Delete the generated file
@@ -879,15 +886,15 @@ class HCFS_21(CommonSetup):
 
 class HCFS_22(CommonSetup):
     '''Upload/Download
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
-        self.fileGenerate = FileGenerate() 
-        self.hcfsbin = HCFSBin()       
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
         self.testfilename_local = 'testUpload_160M_local'
         self.testfilename_local2 = 'testUpload_160M_local2'
         self.testfilename_hcfs = 'testUpload_160M_hcfs'
-        
+
     def run(self):
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
@@ -949,10 +956,10 @@ class HCFS_24(CommonSetup):
 class HCFS_31(CommonSetup):
     '''
     Terminate
-    '''    
+    '''
     def __init__(self):
         self.hcfsbin = HCFSBin()
-        
+
     def run(self):
         self.hcfsbin.terminate_hcfs()
         result = self.hcfsbin.check_if_hcfs_terminated()
@@ -961,12 +968,13 @@ class HCFS_31(CommonSetup):
         else:
             return False, 'The HCFS did not terminate successfully'
 
+
 class HCFS_39(CommonSetup):
     '''Upload big file
-    '''    
+    '''
     def __init__(self):
         CommonSetup.__init__(self)
-        self.fileGenerate = FileGenerate() 
+        self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
         self.testfilename_local = 'matlabl2011-mac.iso'
@@ -1045,7 +1053,7 @@ class HCFS_40(CommonSetup):
 
 class HCFS_41(CommonSetup):
     '''Delete big file
-    '''
+    '''TODO
     def __init__(self):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
@@ -1054,12 +1062,21 @@ class HCFS_41(CommonSetup):
         self.testfilename_local = 'matlabl2011-mac.iso'
         self.testfilename_local2 = 'matlabl2011-mac-2.iso'
         self.testfilename_hcfs = 'matlabl2011-mac.iso'
+        self.backend_log = 'backend_upload_log'
 
     def run(self):
         testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
 
         # Delete the downloaded file
-        self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
+        # self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
+
+        with open(self.backend_log, 'rb') as f:
+            lines = f.read().split('\n')
+            print len(lines)
+            for i in range(len(lines)-1, -1, -1):
+                r = re.search(r'.+\s(\d+\:\d+:\d+\.\d+?)\s+Debug meta deletion.+', lines[i])
+                if r:
+                    print lines[i], r.group(1)
 
         return True, ''
 
