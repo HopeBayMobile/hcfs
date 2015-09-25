@@ -37,7 +37,7 @@ if [ $verbose -eq 0 ]; then set +x; else set -x; fi
 
 export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 
-function install_pkg {
+function install_pkg (){
 	set +x
 	for pkg in $packages;
 	do
@@ -111,10 +111,13 @@ docker_slave | docker_host )
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' \
 			| sudo tee -a /etc/default/docker
+		CHANGED_DOCKER_SETTING=1
 	fi
 	;;&
 docker_host )
+	if [[ $CHANGED_DOCKER_SETTING == 1 ]]; then
 		sudo service docker restart
+	fi
 	;;&
 esac
 

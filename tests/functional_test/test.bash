@@ -20,13 +20,13 @@ function cleanup {
 	sudo umount $WORKSPACE/tmp/mount* || :
 	sudo killall -9 hcfs || :
 	sudo docker rm -f swift_test || :
-	ls -l  /home/jethro/hcfs/tmp/*
+	[ -d $WORKSPACE/tmp/ ] && -l $WORKSPACE/tmp/* || :
 	sudo rm -rf $WORKSPACE/tmp/{meta,block,mount*,swift_data}
 	mkdir -p $WORKSPACE/tmp/{meta,block,mount,swift_data}
 }
 #trap cleanup EXIT
 
-set -e
+set -e -x
 
 # Setup Test Env
 . $WORKSPACE/utils/setup_dev_env.sh -m functional_test
@@ -88,15 +88,18 @@ if [ -S /var/run/docker.sock ]; then
 
 	echo "########## Unmount should succeed"
 	HCFSvol unmount autotest
+	! mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
 	echo "########## delete should succeed"
 	HCFSvol delete autotest
+	! HCFSvol list | grep autotest
 	echo "########## terminate should succeed"
 	HCFSvol terminate
-	! mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
 	echo "########## Wait hcfs to terminate"
 	wait
 
+	pushd "$here"
 	python pi_tester.py -d debug -c HCFS_0
+	popd
 
-	#cleanup
+	cleanup
 fi
