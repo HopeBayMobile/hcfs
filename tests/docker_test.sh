@@ -14,6 +14,7 @@ SLAVE_ID=$(sudo docker run -d -t \
 		--privileged \
 		-v $local_repo:/home/jenkins/workspace/HCFS \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+		-v /etc/localtime:/etc/localtime:ro \
 		--name=hcfs_test \
 		docker:5000/docker_hcfs_test_slave)
 SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)

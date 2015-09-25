@@ -53,7 +53,9 @@ if [ -S /var/run/docker.sock ]; then
 	cleanup
 
 	echo "########## Start Swift server"
-	SWIFT_ID=$(sudo docker run -d -t -v $WORKSPACE/tmp/swift_data:/srv \
+	SWIFT_ID=$(sudo docker run -d -t \
+			-v $WORKSPACE/tmp/swift_data:/srv \
+			-v /etc/localtime:/etc/localtime:ro \
 			--name=swift_test aerofs/swift)
 
 	echo "########## Get dynamic swift IP"
