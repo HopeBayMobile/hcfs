@@ -387,6 +387,8 @@ class CommonSetup:
 
 
 class HCFS_0(CommonSetup):
+    """Environment Setup
+    """
     def __init__(self):
         CommonSetup.__init__(self)
         self.fake_filesystem = 'fakeHCFS'
@@ -958,7 +960,31 @@ class HCFS_23(CommonSetup):
 
 
 class HCFS_24(CommonSetup):
-    '''Delete
+    '''Deduplication
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+
+    def run(self):
+        return True, ''
+
+
+class HCFS_25(CommonSetup):
+    '''Encryption
+    '''
+    def __init__(self):
+        CommonSetup.__init__(self)
+        self.fileGenerate = FileGenerate()
+        self.hcfsbin = HCFSBin()
+
+    def run(self):
+        return True, ''
+
+
+class HCFS_26(CommonSetup):
+    '''Compression
     '''
     def __init__(self):
         CommonSetup.__init__(self)
