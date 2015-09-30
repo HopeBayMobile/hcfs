@@ -828,11 +828,13 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 
 	for (block_count = 0; block_count < total_blocks; block_count++) {
 		ret = get_progress_info(progress_fd, block_count,
-			&block_info);
-		if (ret == 0) /* Remaining are empty blocks */
-			break;
-		else if (ret < 0) /* error */
+			&block_info); // TODO: read just one time for a page?
+		if (ret == 0) { /* Both block entry and whole page are empty */
+			block_count += (MAX_BLOCK_ENTRIES_PER_PAGE - 1);
 			continue;
+		} else if (ret < 0) { /* TODO: error handling */
+			continue;
+		}
 
 #if (DEDUP_ENABLE)
 		ret = _choose_deleted_block(delete_which_one,

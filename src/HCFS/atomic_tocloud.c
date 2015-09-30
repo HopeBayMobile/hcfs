@@ -281,7 +281,6 @@ int get_progress_info(int fd, long long block_index,
 		/* Reading exceeds EOF. It may occur when backend
 		   has truncated data and this block has not been
 		   uploaded. */
-		write_log(0, "Why zero? block_%ld\n", block_index);
 		memset(block_uploading_status, 0,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		block_uploading_status->finish_uploading = FALSE;
@@ -289,10 +288,9 @@ int get_progress_info(int fd, long long block_index,
 		memcpy(block_uploading_status,
 			&(block_page.status_entry[entry_index]),
 			sizeof(BLOCK_UPLOADING_STATUS));
-		write_log(10, "obj_id = %s\n", block_uploading_status->backend_objid);
 	}
 
-	return offset;
+	return ret_ssize;
 
 errcode_handle:
 	write_log(0, "Error: Fail to get progress-info of block_%lld\n",
@@ -320,11 +318,9 @@ int set_progress_info(int fd, long long block_index,
 	flock(fd, LOCK_EX);
 	offset = create_status_page(fd, block_index);
 	if (offset > 0) {
-		write_log(10, "---------offset = %lld\n", offset);
 		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 		block_uploading_status = 
 			&(status_page.status_entry[entry_index]);
-	write_log(10, "obj_id = %s\n", block_uploading_status->backend_objid);
 	} else {
 		write_log(0, "Error: Fail to set progress\n");
 		flock(fd, LOCK_UN);
@@ -533,9 +529,6 @@ int init_progress_info(int fd, long long backend_blocks,
 			&block_uploading_status,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
-		int i;
-		for (i=0 ; i<5 ; i++)
-			write_log(10, "obj_id = %s\n", status_page.status_entry[i].backend_objid);
 	}
 
 	/* Finally write meta */	

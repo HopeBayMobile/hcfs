@@ -826,10 +826,10 @@ int hcfs_swift_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	return ret_val;
 
 errcode_handle:
-	if (swift_header_fptr == NULL) {
+	if (swift_header_fptr != NULL) {
 		fclose(swift_header_fptr);
 		unlink(header_filename);
-		curl_slist_free_all(chunk);
+		//curl_slist_free_all(chunk);
 	}
 
 	return -1;
