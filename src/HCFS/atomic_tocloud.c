@@ -466,8 +466,6 @@ int init_progress_info(int fd, long long backend_blocks,
 	BLOCK_UPLOADING_PAGE status_page;
 	int entry_index;
 
-	/* Do NOT need to lock file because this function will be called by
-	   the only one thread in sync_single_inode() */
 	flock(fd, LOCK_EX);
 	memset(&progress_meta, 0, sizeof(PROGRESS_META));
 	PWRITE(fd, &progress_meta, sizeof(PROGRESS_META), 0);
@@ -520,7 +518,7 @@ int init_progress_info(int fd, long long backend_blocks,
 #else
 			block_uploading_status.backend_seq = 0; /* temp */
 #endif
-		}
+		
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
 		offset = create_status_page(fd, block);
 		write_log(10, "offset = %lld\n", offset);
@@ -529,6 +527,7 @@ int init_progress_info(int fd, long long backend_blocks,
 			&block_uploading_status,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
+		}
 	}
 
 	/* Finally write meta */	

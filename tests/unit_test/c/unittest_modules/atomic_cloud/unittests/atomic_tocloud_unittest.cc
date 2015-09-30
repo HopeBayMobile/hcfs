@@ -1,5 +1,6 @@
 extern "C" {
 #include "atomic_tocloud.h"
+#include "fuseop.h"
 #include "global.h"
 }
 #include "gtest/gtest.h"
@@ -120,12 +121,16 @@ protected:
 		strcpy(mock_progress_path, "/tmp/mock_progress_file");
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		if (access("/tmp/file_meta_init_progress_info", F_OK) == 0)
+			unlink("/tmp/file_meta_init_progress_info");
 	}
 
 	void TearDown()
 	{
 		if (access(mock_progress_path, F_OK) == 0)
 			unlink(mock_progress_path);
+		if (access("/tmp/file_meta_init_progress_info", F_OK) == 0)
+			unlink("/tmp/file_meta_init_progress_info");
 	}
 };
 
@@ -166,28 +171,127 @@ TEST_F(init_progress_infoTest, Init_backend_fptr_Is_NULL)
 	close(fd);
 }
 
-TEST_F(init_progress_infoTest, Init_BackendData_Success)
+TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 {
 	int fd;
 	int ret;
 	long long size;
 	PROGRESS_META progress_meta;
+	FILE_META_TYPE tmp_file_meta;
+	BLOCK_ENTRY_PAGE tmp_entry_page;
+	FILE *file_metafptr;
+	int num_pages;
+	struct stat tmp_stat;
 
+	/* Prepare mock metadata that all blocks are TODELETE and NONE */
 	fd = open(mock_progress_path, O_CREAT | O_RDWR);
 	ASSERT_GT(fd, 0);
+	file_metafptr = fopen("/tmp/file_meta_init_progress_info", "w+");
+	ASSERT_TRUE(NULL != file_metafptr);
+	setbuf(file_metafptr, NULL);
+	memset(&tmp_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
+	for (int i = 0; i < MAX_BLOCK_ENTRIES_PER_PAGE; i++) {
+		tmp_entry_page.block_entries[i].status = 
+			(i % 2 ? ST_TODELETE : ST_NONE);
+	}
+	num_pages = 1000;
+	memset(&tmp_stat, 0, sizeof(struct stat));
+	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
+	
+	fseek(file_metafptr, 0, SEEK_SET);
+	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
+	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
+	for (int i = 0; i < num_pages ; i++) { // Linearly mock metadata
+		fwrite(&tmp_entry_page, sizeof(BLOCK_ENTRY_PAGE), 1,
+			file_metafptr);
+	}
 
 	/* run */
-	ret = init_progress_info(fd, 0, 0, NULL);
+	ret = init_progress_info(fd, num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
+		0, file_metafptr);
 
 	/* verify */
 	ASSERT_EQ(0, ret);
 	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
 	EXPECT_EQ(0, progress_meta.backend_size);
-	EXPECT_EQ(0, progress_meta.total_backend_blocks);
+	EXPECT_EQ(num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
+		progress_meta.total_backend_blocks);
+	EXPECT_EQ(0, progress_meta.direct);
+	EXPECT_EQ(0, progress_meta.single_indirect);
 	size = lseek(fd, 0, SEEK_END);
 	EXPECT_EQ(sizeof(PROGRESS_META), size);
 
 	/* recycle */
 	close(fd);
+	fclose(file_metafptr);
+}
+
+TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
+{
+	int fd;
+	int ret;
+	long long size;
+	PROGRESS_META progress_meta;
+	FILE_META_TYPE tmp_file_meta;
+	BLOCK_ENTRY_PAGE tmp_entry_page;
+	FILE *file_metafptr;
+	int num_pages;
+	struct stat tmp_stat;
+
+	/* Prepare mock metadata that all blocks are TODELETE and NONE */
+	fd = open(mock_progress_path, O_CREAT | O_RDWR);
+	ASSERT_GT(fd, 0);
+	file_metafptr = fopen("/tmp/file_meta_init_progress_info", "w+");
+	ASSERT_TRUE(NULL != file_metafptr);
+	setbuf(file_metafptr, NULL);
+	memset(&tmp_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
+	for (int i = 0; i < MAX_BLOCK_ENTRIES_PER_PAGE; i++) {
+		tmp_entry_page.block_entries[i].status =
+			(i % 2 ? ST_CLOUD : ST_LDISK);
+	}
+	num_pages = 1500;
+	memset(&tmp_stat, 0, sizeof(struct stat));
+	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
+	
+	fseek(file_metafptr, 0, SEEK_SET);
+	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
+	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
+	for (int i = 0; i < num_pages ; i++) { // Linearly mock metadata
+		fwrite(&tmp_entry_page, 1, sizeof(BLOCK_ENTRY_PAGE),
+			file_metafptr);
+	}
+
+	/* run */
+	ret = init_progress_info(fd, num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
+		123, file_metafptr);
+
+	/* verify */
+	ASSERT_EQ(0, ret);
+	pread(fd, &progress_meta, sizeof(PROGRESS_META), 0);
+	EXPECT_EQ(TRUE, progress_meta.finish_init_backend_data);
+	EXPECT_EQ(123, progress_meta.backend_size);
+	EXPECT_EQ(num_pages * MAX_BLOCK_ENTRIES_PER_PAGE,
+		progress_meta.total_backend_blocks);
+	EXPECT_EQ(sizeof(PROGRESS_META), progress_meta.direct);
+	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE),
+		progress_meta.single_indirect);
+	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE) +
+		sizeof(PTR_ENTRY_PAGE) + sizeof(BLOCK_UPLOADING_PAGE) * 
+		POINTERS_PER_PAGE, progress_meta.double_indirect);
+	EXPECT_EQ(0, progress_meta.triple_indirect);
+	EXPECT_EQ(0, progress_meta.quadruple_indirect);
+	for (int i = 0; i < num_pages * MAX_BLOCK_ENTRIES_PER_PAGE ; i++) {
+		BLOCK_UPLOADING_STATUS tmp_block_status;
+		int ret;
+		ret = get_progress_info(fd, i, &tmp_block_status);
+		EXPECT_GT(ret, 0);
+		EXPECT_EQ(TRUE,
+			CLOUD_BLOCK_EXIST(tmp_block_status.block_exist));
+		EXPECT_EQ(FALSE,
+			TOUPLOAD_BLOCK_EXIST(tmp_block_status.block_exist));
+	}
+	/* recycle */
+	close(fd);
+	fclose(file_metafptr);
 }

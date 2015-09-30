@@ -19,5 +19,35 @@ int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
 		long long target_page, long long hint_page)
 {
-	return 0;
+	return (sizeof(struct stat) + sizeof(FILE_META_TYPE) +
+		target_page * sizeof(BLOCK_ENTRY_PAGE));
+}
+
+int check_page_level(long long page_index)
+{
+	long long tmp_index;
+
+	if (page_index == 0)
+		return 0;   
+
+	tmp_index = page_index - 1; 
+
+	if (tmp_index < POINTERS_PER_PAGE)
+		return 1;
+
+	tmp_index = tmp_index - POINTERS_PER_PAGE;
+
+	if (tmp_index < (POINTERS_PER_PAGE * POINTERS_PER_PAGE)) 
+		return 2;
+
+	tmp_index = tmp_index - (POINTERS_PER_PAGE * POINTERS_PER_PAGE); 
+
+	if (tmp_index < (POINTERS_PER_PAGE * POINTERS_PER_PAGE *
+		POINTERS_PER_PAGE))
+		return 3;
+
+	tmp_index = tmp_index - (POINTERS_PER_PAGE * POINTERS_PER_PAGE *
+		POINTERS_PER_PAGE); 
+
+	return 4;
 }
