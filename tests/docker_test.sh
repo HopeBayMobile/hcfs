@@ -11,6 +11,7 @@ $local_repo/utils/setup_dev_env.sh -v -m docker_host
 
 # Start test slave
 sudo docker rm -f hcfs_test 2>/dev/null || true
+sudo docker pull docker:5000/docker_hcfs_test_slave
 SLAVE_ID=$(sudo docker run -d -t \
 		--privileged \
 		-v $local_repo:/home/jenkins/workspace/HCFS \
