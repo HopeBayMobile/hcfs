@@ -47,13 +47,21 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 
 # House-keeping build targets.
 
-all : $(TESTS)
+all : setup $(TESTS)
 
 clean :
-	rm -rf $(TESTS) gtest.a gtest_main.a *.o  *.gcda *.gcov *.gcno
+	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test :
+test : setup $(TESTS)
 	./dedup_table_unittest
+	gcovr -r $(USER_DIR) .
+
+.PHONY : setup
+setup :
+	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+
+export PATH := /usr/lib/ccache:$(PATH)
+export USE_CCACHE := 1
 
 # Builds gtest.a and gtest_main.a.
 
