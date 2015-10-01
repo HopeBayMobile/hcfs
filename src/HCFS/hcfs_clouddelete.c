@@ -333,8 +333,9 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 	backend_metafptr = NULL;
 	if (S_ISREG(ptr->this_mode)) {
 		is_meta_on_cloud = TRUE;
-		sprintf(backend_metapath, "upload_bullpen/backend_meta_%ld.del",
-				this_inode);
+		sprintf(backend_metapath, 
+			"%s/upload_bullpen/backend_meta_%ld.del",
+			METAPATH, this_inode);
 		ret = download_meta_from_backend(this_inode, backend_metapath,
 				&backend_metafptr);
 		if (ret < 0) {

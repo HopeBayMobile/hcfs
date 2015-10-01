@@ -255,8 +255,8 @@ long long create_status_page(int fd, long long block_index)
 	return temp_ptr_page.ptr[ptr_index];
 
 errcode_handle:
-	return 0;
-
+	write_log(0, "Fail to create page in %s\n", __func__);
+	return errcode;
 }
 
 int get_progress_info(int fd, long long block_index,
@@ -299,7 +299,7 @@ errcode_handle:
 
 }
 
-#ifdef DEDUP_ENABLE
+#if (DEDUP_ENABLE)
 int set_progress_info(int fd, long long block_index,
 	const char *toupload_exist, const char *backend_exist,
 	const unsigned char *toupload_objid, const unsigned char *backend_objid,
@@ -324,15 +324,15 @@ int set_progress_info(int fd, long long block_index,
 	} else {
 		write_log(0, "Error: Fail to set progress\n");
 		flock(fd, LOCK_UN);
-		return -1;
+		return offset;
 	}
 
 	if (toupload_exist)
-		block_uploading_status->block_exist = ((*toupload_exist) & 1) |
-			(block_uploading_status->block_exist & 2);
+		block_uploading_status->block_exist = (((*toupload_exist) & 1) |
+			(block_uploading_status->block_exist & 2));
 	if (backend_exist)
-		block_uploading_status->block_exist = ((*backend_exist) & 2) |
-			(block_uploading_status->block_exist & 1);
+		block_uploading_status->block_exist = (((*backend_exist) << 1) |
+			(block_uploading_status->block_exist & 1));
 	if (toupload_objid)
 		memcpy(block_uploading_status->to_upload_objid, toupload_objid,
 			sizeof(unsigned char) * OBJID_LENGTH);
@@ -352,6 +352,7 @@ int set_progress_info(int fd, long long block_index,
 	return 0;
 
 errcode_handle:
+	flock(fd, LOCK_UN);
 	return errcode;
 }
 
@@ -419,12 +420,15 @@ int open_progress_info(ino_t inode)
 	int ret_fd;
 	int errcode, ret;
 	char filename[200];
+	char pathname[200];
 
-	if (access("upload_bullpen", F_OK) == -1)
-		mkdir("upload_bullpen", 0700);
+	sprintf(pathname, "%s/upload_bullpen", METAPATH);
 
-	sprintf(filename, "upload_bullpen/upload_progress_inode_%ld",
-		inode);
+	if (access(pathname, F_OK) == -1)
+		mkdir(pathname, 0700);
+
+	sprintf(filename, "%s/upload_progress_inode_%ld",
+		pathname, inode);
 	
 	if (access(filename, F_OK) == 0) {
 		write_log(0, "Error: Open \"%s\" but it exist. Unlink it\n",
@@ -446,10 +450,26 @@ int open_progress_info(ino_t inode)
 	return ret_fd;
 
 errcode_handle:
-	return -errcode;
-
+	return errcode;
 }
 
+/**
+ * Init uploading progress file
+ *
+ * @fd File descriptor of progress file
+ * @backend_blocks Number of blocks of backend Regfile
+ * @backend_size Size of RegFile of backend data
+ * @backend_metafptr File pointer of downloaded backend RegFile
+ *
+ * This function initializes object-id and seq number of given backend data.
+ * Other info is set as none, that is all zeros. Backend info of given
+ * data block will not be set if status is ST_NONE or ST_TODELETE. After init
+ * all backend data blocks, The field "finish_init" in progress meta will be
+ * set as TRUE.
+ *
+ * @return 0 if succeed. Otherwise negative error code.
+ *
+ */
 int init_progress_info(int fd, long long backend_blocks,
 		long long backend_size, FILE *backend_metafptr)
 {
@@ -503,31 +523,34 @@ int init_progress_info(int fd, long long backend_blocks,
 					sizeof(BLOCK_ENTRY_PAGE), page_pos);
 		}
 
+		/* Skip if status is todelete or none */
+		cloud_status = block_page.block_entries[e_index].status;
+		if ((cloud_status == ST_NONE) || (cloud_status == ST_TODELETE))
+			continue;
+			
 		memset(&block_uploading_status, 0,
 				sizeof(BLOCK_UPLOADING_STATUS));
-
-		cloud_status = block_page.block_entries[e_index].status;
-		if ((cloud_status != ST_NONE) &&
-			(cloud_status != ST_TODELETE)) {
-			SET_CLOUD_BLOCK_EXIST(
-				block_uploading_status.block_exist);
+		SET_CLOUD_BLOCK_EXIST(block_uploading_status.block_exist);
 #if (DEDUP_ENABLE)
-			memcpy(block_uploading_status.backend_objid,
+		memcpy(block_uploading_status.backend_objid,
 				block_page.block_entries[e_index].obj_id,
 				sizeof(char) * OBJID_LENGTH);
 #else
-			block_uploading_status.backend_seq = 0; /* temp */
+		block_uploading_status.backend_seq = 0; /* temp */
 #endif
 		
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
 		offset = create_status_page(fd, block);
+		if (offset < 0) {
+			errcode = offset;
+			goto errcode_handle;
+		}
 		write_log(10, "offset = %lld\n", offset);
 		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 		memcpy(&(status_page.status_entry[entry_index]),
 			&block_uploading_status,
 			sizeof(BLOCK_UPLOADING_STATUS));
 		PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
-		}
 	}
 
 	/* Finally write meta */	
@@ -542,6 +565,7 @@ int init_progress_info(int fd, long long backend_blocks,
 	return 0;
 
 errcode_handle:
+	flock(fd, LOCK_UN);
 	return errcode;
 }
 
@@ -550,8 +574,8 @@ int close_progress_info(int fd, ino_t inode)
 	char filename[200];
 	int ret, errcode;
 
-	sprintf(filename, "upload_bullpen/upload_progress_inode_%ld",
-		inode);
+	sprintf(filename, "%s/upload_bullpen/upload_progress_inode_%ld",
+		METAPATH, inode);
 
 	close(fd);
 	UNLINK(filename);
@@ -568,14 +592,17 @@ errcode_handle:
 int fetch_toupload_meta_path(char *pathname, ino_t inode)
 {
 	int errcode, ret;
+	char path[200];
 
-	if (access("upload_bullpen", F_OK) == -1)
-		MKDIR("upload_bullpen", 0700);
+	sprintf(path, "%s/upload_bullpen", METAPATH);
+
+	if (access(path, F_OK) == -1)
+		MKDIR(path, 0700);
 
 #ifdef ARM_32bit_
-	sprintf(pathname, "upload_bullpen/hcfs_local_meta_%lld.tmp", inode);
+	sprintf(pathname, "%s/hcfs_local_meta_%lld.tmp", path, inode);
 #else
-	sprintf(pathname, "upload_bullpen/hcfs_local_meta_%ld.tmp", inode);
+	sprintf(pathname, "%s/hcfs_local_meta_%ld.tmp", path, inode);
 #endif
 
 	return 0;
@@ -601,12 +628,24 @@ int fetch_toupload_block_path(char *pathname, ino_t inode,
 
 int fetch_backend_meta_path(char *pathname, ino_t inode)
 {
+	char path[200];
+	int errcode;
+	int ret;
+
+	sprintf(path, "%s/upload_bullpen", METAPATH);
+
+	if (access(path, F_OK) == -1)
+		MKDIR(path, 0700);
+
 #ifdef ARM_32bit_
-	sprintf(pathname, "upload_bullpen/hcfs_backend_meta_%lld.tmp", inode);
+	sprintf(pathname, "%s/hcfs_backend_meta_%lld.tmp", path, inode);
 #else
-	sprintf(pathname, "upload_bullpen/hcfs_backend_meta_%ld.tmp", inode);
+	sprintf(pathname, "%s/hcfs_backend_meta_%ld.tmp", path, inode);
 #endif
 	return 0;
+
+errcode_handle:
+	return errcode;
 }
 
 /**
@@ -853,7 +892,7 @@ int uploading_revert()
 	ino_t inode;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 
-	sprintf(upload_pathname, "upload_bullpen");
+	sprintf(upload_pathname, "%s/upload_bullpen", METAPATH);
 	if (access(upload_pathname, F_OK) < 0)
 		return 0;
 

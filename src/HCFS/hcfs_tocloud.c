@@ -1002,7 +1002,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			backend_size = tempfilestat.st_size;
 			total_backend_blocks = (backend_size == 0) ? 
 				0 : (backend_size - 1) / MAX_BLOCK_SIZE + 1;
-			init_progress_info(progress_fd,
+			ret = init_progress_info(progress_fd,
 				total_backend_blocks, backend_size,
 				backend_metafptr);
 
@@ -1010,10 +1010,18 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			backend_metafptr = NULL;
 			UNLINK(backend_metapath);
 		} else {
-			init_progress_info(progress_fd, 0, 0,
+			ret = init_progress_info(progress_fd, 0, 0,
 				backend_metafptr);
 			backend_size = 0;
 			total_backend_blocks = 0; 
+		}
+
+		if (ret < 0) { /* init progress fail */
+			super_block_update_transit(ptr->inode, FALSE, TRUE);
+			fclose(toupload_metafptr);
+			unlink(toupload_metapath);
+			fclose(local_metafptr);
+			return;
 		}
 	}
 
