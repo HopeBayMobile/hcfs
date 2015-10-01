@@ -139,16 +139,16 @@ class HCFSBin:
         self.repo_dir = os.path.abspath(os.path.join(self.current_dir, '../../../..'))
         self.hcfs_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/HCFS'))
         self.cli_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils'))
-        self.hcfs_bin = 'hcfs'
+        self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
         self.hcfsvol_bin = self._get_cli_dir()
         self.timeout = 30
 
     def _get_cli_dir(self):
         try:
             p = subprocess.Popen(['HCFSvol'])
-            cli = 'HCFSvol'
+            self.cli = 'HCFSvol'
         except:
-            cli = os.path.abspath(os.path.join(self.cli_src_dir, 'HCFSvol'))
+            self.cli = os.path.abspath(os.path.join(self.cli_src_dir, 'HCFSvol'))
         finally:
             return cli
 
@@ -156,7 +156,7 @@ class HCFSBin:
         """Launch the hcfs processes
         """
         try:
-            cmds = [self.hcfs_bin, '-d', '-oallow_root']
+            cmds = [self.hcfs_bin, '-d', '-oallow_other']
             logger.info(str(cmds))
             p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
             (output, error_msg) = p.communicate()
@@ -165,7 +165,7 @@ class HCFSBin:
                 raise
         except:
             self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-            cmds = [self.hcfs_bin, '-d', '-oallow_root']
+            cmds = [self.hcfs_bin, '-d', '-oallow_other']
             logger.info('Use another hcfs: {0}'.format(cmds))
             p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         finally:
@@ -323,7 +323,7 @@ class HCFSBin:
 class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.repo_dir = os.path.normpath(os.path.join(self.current_dir, '../../../..'))
+        self.repo_dir = os.path.abspath(os.path.join(self.current_dir, '../../../..'))
         self.mount_point = os.path.join(self.repo_dir, 'tmp/mount2')
         self.fstest = FSTester(os.path.join(self.mount_point, 'fstest/tests'))
         self.logger = logging.getLogger('CommonSetup')
@@ -1195,8 +1195,4 @@ class HCFS_99(CommonSetup):
 
 
 if __name__ == '__main__':
-    current = os.path.dirname(os.path.abspath(__file__))
-    print current
-    hcfs_src_folder = os.path.join(current, '../../../../src/HCFS')
-    cli_src_folder = os.path.join(os.path.join(current, '../../../../src/CLI_utils'), 'HCFSvol')
-    print os.path.abspath(cli_src_folder)
+    pass
