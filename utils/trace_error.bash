@@ -1,12 +1,12 @@
 error() {
-	local parent_lineno="$1"
-	local message="$2"
-	local code="${3:-1}"
+	local script="$1"
+	local parent_lineno="$2"
+	local message="$3"
+	local code="${4:-1}"
+	echo "Error near ${script} line ${parent_lineno}; exiting with status ${code}"
 	if [[ -n "$message" ]] ; then
-		echo "Error on or near line ${parent_lineno}echo ${message}; exiting with status ${code}"
-	else
-		echo "Error on or near line ${parent_lineno}; exiting with status ${code}"
+		echo -e "Message: ${message}"
 	fi
 	exit "${code}"
 }
-trap 'error ${LINENO}' ERR
+trap 'error "${BASH_SOURCE[0]}" ${LINENO}' ERR
