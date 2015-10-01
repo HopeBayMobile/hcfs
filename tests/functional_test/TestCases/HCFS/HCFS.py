@@ -138,7 +138,7 @@ class HCFSBin:
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
         self.repo_dir = os.path.abspath(os.path.join(self.current_dir, '../../../..'))
         self.hcfs_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/HCFS'))
-        self.cli_src_dir =  os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils'))
+        self.cli_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils'))
         self.hcfs_bin = 'hcfs'
         self.hcfsvol_bin = self._get_cli_dir()
         self.timeout = 30
@@ -156,27 +156,31 @@ class HCFSBin:
         """Launch the hcfs processes
         """
         try:
-            p = subprocess.Popen([self.hcfs_bin, '-d'])
+            cmds = [self.hcfs_bin, '-d', '-oallow_root']
+            logger.info(str(cmds))
+            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
+            (output, error_msg) = p.communicate()
+            if error_msg:
+                logger.warning('error_msg: ' + str(error_msg))
+                raise
         except:
             self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-            p = subprocess.Popen([self.hcfs_bin, '-d'])
+            cmds = [self.hcfs_bin, '-d', '-oallow_root']
+            logger.info('Use another hcfs: {0}'.format(cmds))
+            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         finally:
-            #time.sleep(5)  # if use timeout for it?
+            # time.sleep(5)  # if use timeout for it?
             pass
 
     def start_hcfs_background(self):
-        self.hcfs_bin = os.path.join(os.path.abspath(self.hcfs_src_dir), 'hcfs')
-        # cmds = self.hcfs_bin + ' -d -oallow_root'
-        cmds = [self.hcfs_bin, '-d']
-        print self.hcfs_src_dir
-        print self.hcfs_bin
-
+        """Not with allow_root
+        """
+        cmds = ['sh', 'TestCases/HCFS/start_hcfs.sh']
         try:
-            subprocess.Popen(['sh', 'TestCases/HCFS/start_hcfs.sh'])
+            subprocess.Popen(cmds)
             logger.info('Start the HCFS process..')
         except:
-            logger.error(cmds)
-            logger.error('Start hcfs in background failed.')
+            logger.error('Start hcfs in background failed. cmds: {0}'.format(cmds))
 
     def verify_hcfs_processes(self):
         """Check the processes are exist, expect it has three.
@@ -222,20 +226,42 @@ class HCFSBin:
         p = subprocess.Popen([self.hcfsvol_bin, 'terminate'], stdout=PIPE, stderr=PIPE)
 
     def list_filesystems(self):
-        p = subprocess.Popen([self.hcfsvol_bin, 'list'], stdout=PIPE, stderr=PIPE)
-        (output, error_msg) = p.communicate()
-        filesystems = output.split('\n')
-        return filesystems[1:]
+        cmds = [self.hcfsvol_bin, 'list']
+        count = 0
+        for i in range(60):
+            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
+            (output, error_msg) = p.communicate()
+            output_lines = output.split('\n')
+
+            # check the return message
+            for output_line in output_lines:
+                r = re.search(r'status is (.+?),\s.+', output_line)
+                if r and r.group(1) == '-1':
+                    result = r.group(1)
+                    logger.error('[list_filesystems] cmds: ' + str(cmds))
+                    logger.error('[list_filesystems] ' + str(output))
+                    logger.error('[list_filesystems] retry: ' + str(count))
+                elif r and r.group(1) == '0':
+                    logger.info('List filesystems: ' + str(output_lines))
+                    return output_lines[1:]
+                else:
+                    logger.error('The output can not be parse: {0}'.format(output_line))
+
+            if count < 60:
+                count = count + 1
+            else:
+                return None
+
+            time.sleep(1)
 
     def create_filesystem(self, filesystem_name):
         """Create a filesystem of HCFS
         """
-        p = subprocess.Popen(
-            [self.hcfsvol_bin, 'create', filesystem_name],
-            stdout=PIPE,
-            stderr=PIPE)
+        cmds = [self.hcfsvol_bin, 'create', filesystem_name]
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
         if error_msg:
+            logger.error(str(error_msg))
             return False, str(error_msg)
         else:
             return True, str(output)
@@ -243,26 +269,49 @@ class HCFSBin:
     def mkdir_p(self, path):
         try:
             os.makedirs(path)
-        except OSError as e: # Python >2.5
+        except OSError as e:  # Python >2.5
             if e.errno == errno.EEXIST and os.path.isdir(path):
                 pass
-            else: raise
+            else:
+                raise
+
+    def create_folder(self, path):
+        cmds = ['mkdir', '-p', path]
+        try:
+            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
+            return True
+        except:
+            (output, error_msg) = p.communicate()
+            logger.error(str(error_msg))
+            return False
 
     def mount(self, filesystem, mount_point):
         """Mount HCFS to a mount point
         """
+        # Create the mount point
+        self.create_folder(mount_point)
+
+        # Execute the mount command.
         cmds = [self.hcfsvol_bin, 'mount', filesystem, mount_point]
-        print cmds
-        try:
-            self.mkdir_p(mount_point)
-        except OSError as error_msg:
-            return False, str(error_msg)
         p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
+
         if error_msg:
+            logger.error(str(cmds))
             return False, str(error_msg)
         else:
-            return True, str(output)
+            output_lines = output.split('\n')
+            for line in output_lines:
+                r = re.search(r'status is (.+?),\s.+', line)
+                if r:
+                    if r.group(1) == '-1':
+                        logger.error(str(output))
+                        return False, str(output)
+                    else:
+                        return True, str(output)
+            else:
+                logger.info('outputs: ' + str(output_lines))
+                return False, 'No output.'
 
     def restart_hcfs(self):
         """Restart the hcfs process
@@ -275,10 +324,9 @@ class CommonSetup:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
         self.repo_dir = os.path.normpath(os.path.join(self.current_dir, '../../../..'))
-        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
+        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount2')
         self.fstest = FSTester(os.path.join(self.mount_point, 'fstest/tests'))
         self.logger = logging.getLogger('CommonSetup')
-        self.mount_point = '/mnt/hcfs2'
         # swift
         self.swift_url = 'https://10.10.99.118:8080/auth/v1.0'
         self.swift_key = '0qrrbOCHoNUM'
@@ -392,26 +440,27 @@ class HCFS_0(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.fake_filesystem = 'fakeHCFS'
-        self.mount_point = os.path.join(self.repo_dir, 'tmp/mount2')
+        # self.mount_point = os.path.join(self.repo_dir, 'tmp/mount2')
         self.HCFSBin = HCFSBin()
 
     def run(self):
         (output, error_msg) = self.HCFSBin.verify_hcfs_processes()
         if output is False:
-            self.HCFSBin.start_hcfs()
+            self.HCFSBin.start_hcfs_background()
             logger.info('Create HCFS processes...')
         else:
             logger.info('HCFS process already exist!')
-        time.sleep(1)
 
         # create a filesystem
         filesystems = self.HCFSBin.list_filesystems()
-        if self.fake_filesystem not in filesystems:
-            logger.info('fake filesystem no exist, create one: {0}'.format(self.fake_filesystem))
-            (result, msg) = self.HCFSBin.create_filesystem(self.fake_filesystem)
-            print result, msg
+        if filesystems is not None:
+            if self.fake_filesystem not in filesystems:
+                logger.info('Fake filesystem no exist, create one: {0}'.format(self.fake_filesystem))
+                self.HCFSBin.create_filesystem(self.fake_filesystem)
+            else:
+                logger.info('fake fiesystem already exist.')
         else:
-            logger.info('fake fiesystem already exist.')
+            return False, 'The file system list is None, it seems CLI has problems'
 
         # create mount point
         if not self.check_hcfs_mount(self.mount_point):
@@ -427,7 +476,7 @@ class HCFS_0(CommonSetup):
             return False, 'Missed df information'
 
         # copy fstest tool to HCFS
-        cmds = 'cp -rf TestCases/HCFS/fstest ' + self.mount_point
+        cmds = 'sudo cp -rf TestCases/HCFS/fstest ' + self.mount_point
         try:
             subprocess.call(cmds, shell=True)
         except:
@@ -866,10 +915,6 @@ class HCFS_21(CommonSetup):
         self.log_timeformat = '%Y-%m-%d %H:%M:%s'
 
     def run(self):
-        # Prepare the arkflex swift environment
-        # self.replace_hcfs_config(self.config)
-        # self.hcfsbin.restart_hcfs()
-
         # Get the size of the remote storage.
         origin_container_size = self.get_container_size()
 
@@ -1038,7 +1083,7 @@ class HCFS_39(CommonSetup):
         dt_delta = dt_new - dt_ori
         dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
         dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
-        spend_time = dt_delta_min if dt_delta.seconds > 59 else dt_delta_sec_str
+        spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
 
         # Diff these two files
         (result, error_msg) = self.diff_files(testfile_abs_local, testfile_abs_hcfs)
@@ -1094,7 +1139,7 @@ class HCFS_40(CommonSetup):
 
 
 class HCFS_41(CommonSetup):
-    '''Delete big file
+    '''Delete big file (Doing...)
     '''
     def __init__(self):
         CommonSetup.__init__(self)

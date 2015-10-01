@@ -1,1 +1,1 @@
-../../src/HCFS/hcfs -d &
+../../src/HCFS/hcfs -d -oallow_other &
