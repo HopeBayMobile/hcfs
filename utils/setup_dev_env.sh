@@ -40,12 +40,10 @@ while getopts ":vm:" opt; do
 done
 
 setup_status_file="${here}/.setup_$setup_dev_env_mode"
-if [ -f $setup_status_file ]; then
-	sudo chmod a+w "$setup_status_file"
-fi
 if md5sum --quiet -c "$setup_status_file"; then
 	exit
 fi
+sudo rm -f "$setup_status_file"
 
 echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
 
