@@ -3,9 +3,9 @@ echo -e "\n======== ${BASH_SOURCE[0]} ========"
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../.. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+echo "########## Setup Test Env"
+$WORKSPACE/utils/setup_dev_env.sh -m functional_test
 if [ $(id -gn) != fuse ]; then
-	echo "########## Setup Test Env"
-	$WORKSPACE/utils/setup_dev_env.sh -m functional_test
 	echo "########## Reload script with fuse group permission"
 	exec sg fuse "${BASH_SOURCE[0]}"
 fi

@@ -6,6 +6,7 @@ set -x -e
 local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 docker_workspace=/home/jenkins/workspace/HCFS
 
+sudo rm -rf $local_repo/utils/.setup_*
 $local_repo/utils/setup_dev_env.sh -v -m docker_host
 
 # Start test slave
@@ -30,7 +31,7 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -i $key jenk
 while ! $SSH true; do sleep 1; done
 
 # Setup docker slave
-$SSH sudo $docker_workspace/utils/setup_dev_env.sh -vm docker_slave
+$SSH $docker_workspace/utils/setup_dev_env.sh -vm docker_slave
 
 # Running auto test
 $SSH "run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips"

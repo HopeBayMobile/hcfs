@@ -3,13 +3,16 @@ echo -e "\n======== ${BASH_SOURCE[0]} ========"
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../.. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 configfile="$here/path_config.sh"
+if [ -f $configfile ]; then
+	sudo chmod a+w $configfile
+fi
 
 $WORKSPACE/utils/setup_dev_env.sh -m functional_test
 . $WORKSPACE/utils/env_config.sh
 . $WORKSPACE/utils/trace_error.bash
 set -e
 
-echo "##########  Compile binary files"
+echo "########## Compile binary files"
 make -s -C $WORKSPACE/src/HCFS clean
 make -s -C $WORKSPACE/src/CLI_utils clean
 CFLAGS_ARG="`sed -rn -e '/^CFLAGS/s/ -Wall| -Wextra//g' \

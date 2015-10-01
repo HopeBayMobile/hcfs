@@ -6,8 +6,8 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 function cleanup {
 	echo "########## Cleanup"
 	sudo docker rm -f swift_test || :
-	sudo rm -rf $WORKSPACE/tmp/swift_data
-	mkdir -p $WORKSPACE/tmp/swift_data
+	sudo rm -rvf $WORKSPACE/tmp/swift_data
+	mkdir -vp $WORKSPACE/tmp/swift_data
 }
 
 
@@ -41,24 +41,32 @@ sed -r -e "s@\%WORKSPACE\%@$WORKSPACE@g" -e "s@\%SWIFT_IP\%@$SWIFT_IP@g" \
 	$here/hcfs_docker_swift.conf | sudo tee /etc/hcfs.conf
 
 echo "########## Wait swift ready"
+# Fix proxy error
+unset http_proxy
 SWIFT="swift -A http://$SWIFT_IP:8080/auth/v1.0 -U test:tester -K testing"
 while :; do
-	out=`$SWIFT stat`
+	out=`$SWIFT stat 2>&1`
 	code=$?
 	echo -e "$out"
-	if [ $code -eq 0 ]; then
-		break
+	if grep -q failed <<<"$out"; then
+		sleep 1
+		continue
 	fi
-	sleep 1
+	break
 done
 
 echo "########## Create Container"
 while :; do
 	$SWIFT post autotest_private_container
-	out=`$SWIFT stat autotest_private_container`
-	echo -e "$out"
-	if grep -q Container <<<"$out"; then
-		break
+	if [[ $? -ne 0 ]]; then
+		sleep 1
+		continue
 	fi
-	sleep 1
+	out=`$SWIFT stat autotest_private_container 2>&1`
+	echo -e "$out"
+	if ! grep -q Container <<<"$out"; then
+		sleep 1
+		continue
+	fi
+	break
 done

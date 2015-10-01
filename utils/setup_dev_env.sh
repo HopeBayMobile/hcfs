@@ -1,7 +1,9 @@
 #!/bin/bash
 
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 configfile="$WORKSPACE/utils/env_config.sh"
+touch "$configfile"
 
 . $WORKSPACE/utils/trace_error.bash
 set -e
@@ -34,6 +36,14 @@ while getopts ":vm:" opt; do
 	esac
 done
 
+setup_status_file="${here}/.setup_$setup_dev_env_mode"
+if [ -f $setup_status_file ]l then
+	sudo chmod a+w "$setup_status_file"
+fi
+if md5sum --quiet -c "$setup_status_file"; then
+	exit
+fi
+
 echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
 
 if [ $verbose -eq 0 ]; then set +x; else set -x; fi
@@ -65,7 +75,7 @@ case "$setup_dev_env_mode" in
 docker_slave )
 	echo 'Acquire::http::Proxy "http://cache:8000";' | sudo tee /etc/apt/apt.conf.d/30autoproxy
 	export http_proxy="http://cache:8000"
-	echo export "http_proxy=\"http://cache:8000\"" >> $configfile
+	echo export "http_proxy=\"http://cache:8000\"" >> "$configfile"
 	sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list
 	packages="$packages cmake git"					# Required by oclint / bear
 	packages="$packages openjdk-7-jdk wget unzip"	# Required by PMD for CPD(duplicate code)
@@ -84,7 +94,7 @@ docker_slave | unit_test | functional_test )
 	"
 	# Use ccache to speedup compile
 	if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
-		echo "export PATH=\"/usr/lib/ccache:$PATH\"" >> $configfile
+		echo "export PATH=\"/usr/lib/ccache:$PATH\"" >> "$configfile"
 	fi
 	if ! ccache -V | grep 3.2; then
 		if ! apt-cache policy ccache | grep 3.2; then
@@ -96,7 +106,7 @@ docker_slave | unit_test | functional_test )
 		fi
 		force_install="$force_install ccache"
 	fi
-	echo "export USE_CCACHE=1" >> $configfile
+	echo "export USE_CCACHE=1" >> "$configfile"
 	;;&
 docker_slave | unit_test )
 	packages="$packages gcovr"
@@ -141,6 +151,9 @@ docker_slave | functional_test )
 	if [[ -n "$USER" && "$USER" != root && `groups $USER` != *fuse* ]]; then
 		sudo addgroup "$USER" fuse
 	fi
+	if [[ `groups jenkins` != *fuse* ]]; then
+		sudo addgroup jenkins fuse || :
+	fi
 	;;&
 docker_slave )
 	pushd /
@@ -183,4 +196,5 @@ esac
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > awk_tmp
 mv -f awk_tmp "$configfile"
 
+md5sum --tag "${BASH_SOURCE[0]}" "$configfile" > "$setup_status_file"
 set $flag_x
