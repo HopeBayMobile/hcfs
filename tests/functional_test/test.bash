@@ -22,5 +22,16 @@ $here/Scripts/compile_hcfs_bin.bash
 $here/Scripts/start_swift.bash
 #$here/Scripts/test_mount.bash
 
+function cleanup {
+	echo "########## Cleanup"
+	sudo umount $WORKSPACE/tmp/mount* |& grep -v "not mounted" || :
+	sudo pgrep -a "hcfs " || :
+	sudo pkill 'hcfs' || :
+	mkdir -p $WORKSPACE/tmp/{meta,block,mount}
+	sudo find $WORKSPACE/tmp/{meta,block,mount*} -mindepth 1 -delete
+}
+cleanup
+trap cleanup EXIT
+
 cd "$here"
 python pi_tester.py -d debug -c HCFS_0

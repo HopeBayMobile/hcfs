@@ -18,8 +18,8 @@ function cleanup {
 	sudo umount $WORKSPACE/tmp/mount* |& grep -v "not mounted" || :
 	sudo pgrep -a "hcfs " || :
 	sudo pkill 'hcfs' || :
-	sudo rm -rf $WORKSPACE/tmp/{meta,block,mount*}
 	mkdir -p $WORKSPACE/tmp/{meta,block,mount}
+	sudo find $WORKSPACE/tmp/{meta,block,mount*} -mindepth 1 -delete
 }
 trap cleanup EXIT
 
