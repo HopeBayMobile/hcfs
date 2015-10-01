@@ -13,8 +13,8 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	chown -R jenkins:jenkins /home/jenkins/.ssh && \
 	chmod 600 /home/jenkins/.ssh/*
 
-ADD setup_dev_env.sh requirements.txt /
-RUN /setup_dev_env.sh -v -m docker_slave && \
+ADD utils/ /utils/
+RUN /utils/setup_dev_env.sh -v -m docker_slave && \
 	apt-get upgrade -y && \
 	apt-get clean && \
 	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /etc/service/sshd/down

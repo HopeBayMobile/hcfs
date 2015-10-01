@@ -60,7 +60,8 @@ function install_pkg (){
 		fi
 	done
 	if [ $verbose -eq 0 ]; then set +x; else set -x; fi
-	if [ "$install $force_install" != " " ]; then
+	install="$(echo -e "$install $force_install" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+	if [ -n "$install" ]; then
 		sudo apt-get update
 		sudo apt-get install -y $install $force_install
 		packages=""
@@ -78,8 +79,6 @@ fi
 case "$setup_dev_env_mode" in
 docker_slave )
 	echo 'Acquire::http::Proxy "http://cache:8000";' | sudo tee /etc/apt/apt.conf.d/30autoproxy
-	export http_proxy="http://cache:8000"
-	echo export "http_proxy=\"http://cache:8000\"" >> "$configfile"
 	sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list
 	packages="$packages cmake git"					# Required by oclint / bear
 	packages="$packages openjdk-7-jdk wget unzip"	# Required by PMD for CPD(duplicate code)
@@ -123,6 +122,7 @@ docker_slave | functional_test )
 docker_slave | docker_host )
 	# Install/upgrade Docker
 	if ! hash docker || [[ $(sudo docker version | grep -c "Version:      1.8.2") -ne 2 ]]; then
+		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 		curl https://get.docker.com | sudo sh
 	fi
 	if ! grep -q docker:5000 /etc/default/docker; then
@@ -146,7 +146,7 @@ docker_slave | functional_test )
 	if [ -f $WORKSPACE/tests/functional_test/requirements.txt ]; then
 		sudo -H pip install -q -r $WORKSPACE/tests/functional_test/requirements.txt
 	else
-		sudo -H pip install -q -r requirements.txt
+		sudo -H pip install -q -r /utils/requirements.txt
 	fi
 	echo "########## Configure user_allow_other in /etc/fuse.conf"
 	if sudo grep "#user_allow_other" /etc/fuse.conf; then
@@ -160,6 +160,7 @@ docker_slave | functional_test )
 	fi
 	;;&
 docker_slave )
+	export http_proxy="http://cache:8000"
 	pushd /
 	# install BEAR
 	if [ ! -d Bear ]; then
