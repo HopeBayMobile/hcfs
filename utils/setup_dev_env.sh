@@ -199,7 +199,7 @@ docker_slave )
 esac
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > awk_tmp
-mv -f awk_tmp "$configfile"
+sudo mv -f awk_tmp "$configfile"
 
 md5sum --tag "${BASH_SOURCE[0]}" "$configfile" > "$setup_status_file"
 set $flag_x

@@ -33,4 +33,4 @@ echo "export hcfs=\"`type -a hcfs | sed -s 's/.* is //'`\"" >> $configfile
 echo "export HCFSvol=\"`type -a HCFSvol | sed -s 's/.* is //'`\"" >> $configfile
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' $configfile > awk_tmp
-mv -f awk_tmp $configfile
+sudo mv -f awk_tmp $configfile
