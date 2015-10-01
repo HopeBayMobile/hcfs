@@ -4,6 +4,9 @@ WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 configfile="$WORKSPACE/utils/env_config.sh"
 touch "$configfile"
+if [[ -n "$USER" && "$USER" != root ]]; then
+	sudo chown $USER "$configfile"
+fi
 
 . $WORKSPACE/utils/trace_error.bash
 set -e
@@ -58,6 +61,7 @@ function install_pkg (){
 	done
 	if [ $verbose -eq 0 ]; then set +x; else set -x; fi
 	if [ "$install $force_install" != " " ]; then
+		sudo apt-get update
 		sudo apt-get install -y $install $force_install
 		packages=""
 		install=""
@@ -117,8 +121,8 @@ docker_slave | functional_test )
 	packages="$packages openssl units pv"
 	;;&
 docker_slave | docker_host )
-	# Install Docker
-	if ! hash docker; then
+	# Install/upgrade Docker
+	if ! hash docker || [[ $(sudo docker version | grep -c "Version:      1.8.2") -ne 2 ]]; then
 		curl https://get.docker.com | sudo sh
 	fi
 	if ! grep -q docker:5000 /etc/default/docker; then
