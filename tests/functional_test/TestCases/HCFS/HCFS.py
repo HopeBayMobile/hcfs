@@ -137,20 +137,32 @@ class HCFSBin:
     def __init__(self):
         self.current_dir = os.path.dirname(os.path.abspath(__file__))
         self.repo_dir = os.path.abspath(os.path.join(self.current_dir, '../../../..'))
-        self.hcfs_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/HCFS'))
-        self.cli_src_dir = os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils'))
-        self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-        self.hcfsvol_bin = self._get_cli_dir()
+        self.hcfs_bin = self.which('hcfs')
+        self.hcfsvol_bin = self.which('HCFSvol')
+        # Fallback to default binary path if not exist
+        if not self.hcfs_bin:
+            self.hcfs_bin = os.path.abspath(os.path.join(self.repo_dir, 'src/HCFS/hcfs'))
+        if not self.hcfsvol_bin:
+            self.hcfsvol_bin = os.path.abspath(os.path.join(self.repo_dir, 'src/CLI_utils/HCFSvol'))
         self.timeout = 30
 
-    def _get_cli_dir(self):
-        try:
-            p = subprocess.Popen(['HCFSvol'])
-            self.cli = 'HCFSvol'
-        except:
-            self.cli = os.path.abspath(os.path.join(self.cli_src_dir, 'HCFSvol'))
-        finally:
-            return cli
+    def which(self, program):
+        import os
+        def is_exe(fpath):
+            return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+        fpath, fname = os.path.split(program)
+        if fpath:
+            if is_exe(program):
+                return program
+        else:
+            for path in os.environ["PATH"].split(os.pathsep):
+                path = path.strip('"')
+                exe_file = os.path.join(path, program)
+                if is_exe(exe_file):
+                    return exe_file
+
+        return None
 
     def start_hcfs(self):
         """Launch the hcfs processes
@@ -163,11 +175,6 @@ class HCFSBin:
             if error_msg:
                 logger.warning('error_msg: ' + str(error_msg))
                 raise
-        except:
-            self.hcfs_bin = os.path.join(self.hcfs_src_dir, 'hcfs')
-            cmds = [self.hcfs_bin, '-d', '-oallow_other']
-            logger.info('Use another hcfs: {0}'.format(cmds))
-            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
         finally:
             # time.sleep(5)  # if use timeout for it?
             pass
