@@ -34,5 +34,5 @@ $here/compile_hcfs_bin.bash
 echo "########## Start hcfs deamon"
 cleanup
 set -x
-$hcfs "$WORKSPACE/tmp" -d -oallow_other &
+$hcfs "$WORKSPACE/tmp" -d -oallow_other |& cut -c -120 &
 set +x
