@@ -727,7 +727,6 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 
 		flock(fileno(src_ptr), LOCK_UN);
 		fclose(src_ptr);
-		fclose(src_ptr);
 		return -errcode;
 	}
 
@@ -755,16 +754,16 @@ int check_and_copy_file(const char *srcpath, const char *tarpath)
 	}
 
 	/* Unlock soruce file */
-	flock(fileno(src_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
+	flock(fileno(src_ptr), LOCK_UN);
 
 	return 0;
 
 errcode_handle:
-	flock(fileno(src_ptr), LOCK_UN);
 	fclose(src_ptr);
 	fclose(tar_ptr);
+	flock(fileno(src_ptr), LOCK_UN);
 	return -errcode;
 }
 
@@ -803,6 +802,8 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	fetch_backend_meta_path(backend_meta_path, inode);
 	fetch_toupload_meta_path(toupload_meta_path, inode);
 
+	write_log(10, "Debug: Now begin to revert uploading inode_%ld\n", inode);
+	printf("begin to check backend meta\n");
 	/* Check backend meta exist */
 	if (access(backend_meta_path, F_OK) == 0) {
 		backend_meta_exist = TRUE;
@@ -817,6 +818,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
+	printf("begin to check toupload meta\n");
 	/* Check to-upload meta exist */
 	if (access(toupload_meta_path, F_OK) == 0) {
 		toupload_meta_exist = TRUE;
@@ -831,6 +833,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
+	printf("before reverting\n");
 	/*** Begin to revert ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (ret_ssize == 0) {
@@ -840,6 +843,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		finish_init = progress_meta.finish_init_backend_data;
 	}
 
+	printf("begin to revert\n");
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
@@ -863,7 +867,7 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		cancel uploading. case[1, 2] */
 			if (backend_meta_exist)
 				unlink(backend_meta_path);
-
+			printf("haha\n");
 		} else {
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
@@ -888,13 +892,19 @@ int uploading_revert()
 	struct dirent *direntptr;
 	char upload_pathname[100];
 	char progress_filepath[300];
-	int errcode, ret, count;
+	int errcode, ret, count, inode_count;
+	int total_reverted_inode;
+	char all_finish;
 	ino_t inode;
+	ino_t reverted_inode[5 * MAX_SYNC_CONCURRENCY];
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];
 
+
 	sprintf(upload_pathname, "%s/upload_bullpen", METAPATH);
-	if (access(upload_pathname, F_OK) < 0)
+	if (access(upload_pathname, F_OK) < 0) {
+		write_log(2, "Upload bullpen does not exist\n");
 		return 0;
+	}
 
 	dirptr = opendir(upload_pathname);
 	if (dirptr == NULL) {
@@ -906,7 +916,7 @@ int uploading_revert()
 
 	ret = readdir_r(dirptr, &temp_dirent, &direntptr);
 	if (ret > 0) {
-		errcode = errno;
+		errcode = ret;
 		write_log(0, "Fail to read %s. Code %d, %s\n",
 			upload_pathname, errcode, strerror(errcode));
 		closedir(dirptr);
@@ -914,10 +924,12 @@ int uploading_revert()
 	}
 
 	errcode = 0;
+	total_reverted_inode = 0;
 	while (direntptr) {
 		if (strncmp("upload_progress", temp_dirent.d_name, 15) == 0) {
 			ret = sscanf(temp_dirent.d_name,
 				"upload_progress_inode_%ld", &inode);
+			printf("name = %s\n", temp_dirent.d_name);
 			sprintf(progress_filepath, "%s/%s", upload_pathname,
 				temp_dirent.d_name);
 			fd = open(progress_filepath, O_RDWR);
@@ -931,6 +943,14 @@ int uploading_revert()
 				continue;
 			}
 
+			/* Error on total_reverted_inode >= MAX_SYNC_CONCURRENCY -1.
+			Because number of threads to sync inode is less than
+			MAX_SYNC_CONCURRENCY, then number of all undone threads
+			shoud be less than it. */
+			if (total_reverted_inode >= MAX_SYNC_CONCURRENCY - 1) {
+				write_log(0, "Error: Why does number of reverted"
+					" inode exceed MAX_SYNC_CONCURRENCY?\n");
+			}
 			sem_wait(&(sync_ctl.sync_queue_sem));
 			sem_wait(&(sync_ctl.sync_op_sem));
 			for (count = 0; count < MAX_SYNC_CONCURRENCY; 
@@ -954,14 +974,16 @@ int uploading_revert()
 			sync_ctl.total_active_sync_threads++;
 
 			sem_post(&(sync_ctl.sync_op_sem));
-		} else {
-			ret = readdir_r(dirptr, &temp_dirent,
-					&direntptr);
-			if (ret > 0) {
-				errcode = errno;
-				break;
-			}
+			reverted_inode[total_reverted_inode++] = inode;
 		}
+		
+		ret = readdir_r(dirptr, &temp_dirent,
+				&direntptr);
+		if (ret > 0) {
+			errcode = errno;
+			break;
+		}
+
 	}
 
 	closedir(dirptr);
@@ -969,6 +991,25 @@ int uploading_revert()
 		write_log(0, "Fail to traverse dir %s. Code %d, %s\n",
 			upload_pathname, errcode , strerror(errcode));
 		return -errcode;
+	}
+
+	/* Wait for all reveting threads */
+	all_finish = TRUE;
+	for (inode_count = 0; inode_count < total_reverted_inode ; inode_count++) {
+		inode = reverted_inode[inode_count];
+		sem_wait(&(sync_ctl.sync_op_sem));
+		for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
+			if (sync_ctl.threads_in_use[count] == inode) {
+				all_finish = FALSE;
+				break;
+			}
+		}
+		sem_post(&(sync_ctl.sync_op_sem));
+		if (all_finish == FALSE) {
+			usleep(100000);
+			inode_count--;
+			all_finish = TRUE;
+		}
 	}
 
 	return 0;

@@ -86,7 +86,7 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseFail)
 	ino_t inode = 1;
 
 	pthread_create(&tid, NULL, mock_sock_connector, NULL);
-	
+
 	usleep(100000); /* Wait for connector */
 	ret = 0;
 	ret = tag_status_on_fuse(inode, status, fd);
@@ -105,7 +105,7 @@ TEST_F(tag_status_on_fuseTest, SucceedToConn_ResponseSuccess)
 	ino_t inode = 1;
 
 	pthread_create(&tid, NULL, mock_sock_connector, NULL);
-	
+
 	usleep(100000); /* Wait for connector */
 	ret = 0;
 	ret = tag_status_on_fuse(inode, status, fd);
@@ -194,13 +194,13 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_TODELETE_NONE)
 	setbuf(file_metafptr, NULL);
 	memset(&tmp_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
 	for (int i = 0; i < MAX_BLOCK_ENTRIES_PER_PAGE; i++) {
-		tmp_entry_page.block_entries[i].status = 
+		tmp_entry_page.block_entries[i].status =
 			(i % 2 ? ST_TODELETE : ST_NONE);
 	}
 	num_pages = 1000;
 	memset(&tmp_stat, 0, sizeof(struct stat));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
-	
+
 	fseek(file_metafptr, 0, SEEK_SET);
 	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
@@ -256,7 +256,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 	num_pages = 1 + POINTERS_PER_PAGE + POINTERS_PER_PAGE / 5;
 	memset(&tmp_stat, 0, sizeof(struct stat));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
-	
+
 	fseek(file_metafptr, 0, SEEK_SET);
 	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
@@ -280,7 +280,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_All_BOTH_CLOUD_LDISK)
 	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE),
 		progress_meta.single_indirect);
 	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE) +
-		sizeof(PTR_ENTRY_PAGE) + sizeof(BLOCK_UPLOADING_PAGE) * 
+		sizeof(PTR_ENTRY_PAGE) + sizeof(BLOCK_UPLOADING_PAGE) *
 		POINTERS_PER_PAGE, progress_meta.double_indirect);
 	EXPECT_EQ(0, progress_meta.triple_indirect);
 	EXPECT_EQ(0, progress_meta.quadruple_indirect);
@@ -318,12 +318,12 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 	ASSERT_TRUE(NULL != file_metafptr);
 	setbuf(file_metafptr, NULL);
 	memset(&tmp_entry_page, 0, sizeof(BLOCK_ENTRY_PAGE));
-	tmp_entry_page.block_entries[MAX_BLOCK_ENTRIES_PER_PAGE - 1].status = 
+	tmp_entry_page.block_entries[MAX_BLOCK_ENTRIES_PER_PAGE - 1].status =
 		ST_LDISK; // Last element is LDISK
 	num_pages = 1 + POINTERS_PER_PAGE + POINTERS_PER_PAGE / 5;
 	memset(&tmp_stat, 0, sizeof(struct stat));
 	memset(&tmp_file_meta, 0, sizeof(FILE_META_TYPE));
-	
+
 	fseek(file_metafptr, 0, SEEK_SET);
 	fwrite(&tmp_stat, 1, sizeof(struct stat), file_metafptr);
 	fwrite(&tmp_file_meta, 1, sizeof(FILE_META_TYPE), file_metafptr);
@@ -347,7 +347,7 @@ TEST_F(init_progress_infoTest, Init_BackendData_Success_NONE_EndWith_LDISK)
 	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE),
 		progress_meta.single_indirect);
 	EXPECT_EQ(sizeof(PROGRESS_META) + sizeof(BLOCK_UPLOADING_PAGE) +
-		sizeof(PTR_ENTRY_PAGE) + sizeof(BLOCK_UPLOADING_PAGE) * 
+		sizeof(PTR_ENTRY_PAGE) + sizeof(BLOCK_UPLOADING_PAGE) *
 		POINTERS_PER_PAGE, progress_meta.double_indirect);
 	EXPECT_EQ(0, progress_meta.triple_indirect);
 	EXPECT_EQ(0, progress_meta.quadruple_indirect);
@@ -547,7 +547,7 @@ TEST_F(open_progress_infoTest, upload_pullpen_NotExist_OpenSuccess)
 {
 	int fd;
 	int inode;
-	
+
 	inode = 3;
 	fd = open_progress_info(inode);
 
@@ -568,7 +568,7 @@ TEST_F(open_progress_infoTest, progressfile_Exist_ReOpenSuccess)
 	int fd;
 	int inode;
 	struct stat new_stat, old_stat;
-	
+
 	inode = 3;
 	sprintf(path, "%s/upload_progress_inode_%d",
 		upload_bullpen_path, inode);
@@ -619,7 +619,7 @@ TEST_F(close_progress_infoTest, CloseSuccess)
 	int fd;
 	int inode;
 	int ret;
-	
+
 	inode = 3;
 	sprintf(path, "%s/upload_progress_inode_%d",
 		upload_bullpen_path, inode);
@@ -628,9 +628,403 @@ TEST_F(close_progress_infoTest, CloseSuccess)
 
 	/* Run */
 	ret = close_progress_info(fd, inode);
-	
+
 	/* Verify */
 	EXPECT_EQ(0, ret);
 	EXPECT_EQ(0, access(upload_bullpen_path, F_OK));
 	EXPECT_EQ(-1, access(path, F_OK));
+
+	rmdir(upload_bullpen_path);
+}
+
+class check_and_copy_fileTest : public ::testing::Test {
+protected:
+	char *mock_source, *mock_target;
+
+	virtual void SetUp()
+	{
+		if (!access(mock_target, F_OK))
+			unlink(mock_target);
+	}
+
+	virtual void TearDown()
+	{
+		if (!access(mock_target, F_OK))
+			unlink(mock_target);
+	}
+};
+
+TEST_F(check_and_copy_fileTest, SourceFileNotExist)
+{
+	int ret;
+
+	mock_source = "/tmp/hahaha";
+	mock_target = "/tmp/copy_target";
+
+	ret = check_and_copy_file(mock_source, mock_target);
+
+	EXPECT_EQ(-ENOENT, ret);
+	EXPECT_EQ(-1, access(mock_source, F_OK));
+	EXPECT_EQ(-1, access(mock_target, F_OK));
+}
+
+TEST_F(check_and_copy_fileTest, TargetFileExist)
+{
+	int ret;
+
+	mock_source = "unittests/atomic_tocloud_unittest.cc";
+	mock_target = "/tmp/copy_target";
+
+	mknod(mock_target, 0700, 0);
+	ret = check_and_copy_file(mock_source, mock_target);
+
+	EXPECT_EQ(-EEXIST, ret);
+	EXPECT_EQ(0, access(mock_source, F_OK));
+	EXPECT_EQ(0, access(mock_target, F_OK));
+
+	unlink(mock_target);
+}
+
+TEST_F(check_and_copy_fileTest, CopySuccess)
+{
+	int ret;
+	FILE *src, *tar;
+	char src_buf[200], tar_buf[200];
+
+	mock_source = "unittests/atomic_tocloud_unittest.cc";
+	mock_target = "/tmp/copy_target";
+
+	ret = check_and_copy_file(mock_source, mock_target);
+
+	EXPECT_EQ(0, ret);
+	EXPECT_EQ(0, access(mock_source, F_OK));
+	EXPECT_EQ(0, access(mock_target, F_OK));
+	src = fopen(mock_source, "r");
+	tar = fopen(mock_target, "r");
+	ASSERT_TRUE(src != NULL);
+	ASSERT_TRUE(tar != NULL);
+	while (fgets(src_buf, 150, src)) {
+		fgets(tar_buf, 150, tar);
+		ASSERT_EQ(0, strcmp(src_buf, tar_buf));
+	}
+
+	/* Recycle */
+	fclose(src);
+	fclose(tar);
+	unlink(mock_target);
+}
+
+class uploading_revertTest : public ::testing::Test {
+public:
+	static char keep_on;
+
+protected:
+	char bullpen_path[200];
+	char progress_path[200];
+	char toupload_metapath[200];
+	char backend_metapath[200];
+
+	virtual void SetUp()
+	{
+		METAPATH = "/tmp";
+		sprintf(bullpen_path, "%s/upload_bullpen", METAPATH);
+		if (!access(bullpen_path, F_OK))
+			rmdir(bullpen_path);
+		init_sync_control();
+	}
+
+	virtual void TearDown()
+	{
+		if (!access(bullpen_path, F_OK))
+			rmdir(bullpen_path);
+		if (!access(progress_path, F_OK))
+			unlink(progress_path);
+		sem_destroy(&(sync_ctl.sync_op_sem));
+		sem_destroy(&(sync_ctl.sync_queue_sem));
+	}
+
+	void init_sync_control(void)
+	{
+		memset(&sync_ctl, 0, sizeof(SYNC_THREAD_CONTROL));
+		sem_init(&(sync_ctl.sync_op_sem), 0, 1);
+		sem_init(&(sync_ctl.sync_queue_sem), 0, MAX_SYNC_CONCURRENCY);
+		memset(&(sync_ctl.threads_in_use), 0,
+				sizeof(ino_t) * MAX_SYNC_CONCURRENCY);
+		memset(&(sync_ctl.threads_created), 0,
+				sizeof(char) * MAX_SYNC_CONCURRENCY);
+		sync_ctl.total_active_sync_threads = 0;
+
+	}
+
+};
+
+char uploading_revertTest::keep_on = TRUE;
+void *terminate_sync_threads(void *data)
+{
+	int ret;
+
+	while (uploading_revertTest::keep_on) {
+		for (int count = 0; count < MAX_SYNC_CONCURRENCY;
+				count++) {
+			if (sync_ctl.threads_in_use[count] != 0) {
+				ret = pthread_tryjoin_np(
+						sync_ctl.inode_sync_thread[count],
+						NULL);
+				if (ret == 0) {
+					close_progress_info(
+						sync_ctl.progress_fd[count],
+						sync_ctl.threads_in_use[count]);
+					sync_ctl.threads_in_use[count] = 0;
+				}
+			}
+		}
+	}
+}
+
+TEST_F(uploading_revertTest, BullpenNotExist)
+{
+	int ret;
+
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+}
+
+TEST_F(uploading_revertTest, BullpenCannotBeOpened)
+{
+	int ret;
+
+	mkdir(bullpen_path, 0000);
+
+	ret = uploading_revert();
+	EXPECT_EQ(-EACCES, ret);
+
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_AfterOpenProgressFile)
+{
+	int ret;
+	int fd;
+	int inode;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	close(fd);
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_AfterCopyLocalMeta)
+{
+	int ret;
+	int fd;
+	int inode;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_AfterDownloadBackendMeta)
+{
+	int ret;
+	int fd;
+	int inode;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	fetch_backend_meta_path(backend_metapath, inode);
+	mknod(backend_metapath, 0700, 0); // make a backend_meta
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(backend_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_BeforeFinishInit_ProgressFile)
+{
+	int ret;
+	int fd;
+	int inode;
+	PROGRESS_META tmp_meta;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	fetch_backend_meta_path(backend_metapath, inode);
+	mknod(backend_metapath, 0700, 0); // make a backend_meta
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(backend_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_AfterFinishInit_ProgressFile)
+{
+	int ret;
+	int fd;
+	int inode;
+	PROGRESS_META tmp_meta;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	fetch_backend_meta_path(backend_metapath, inode);
+	mknod(backend_metapath, 0700, 0); // make a backend_meta
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(backend_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
+{
+	int ret;
+	int fd;
+	int inode;
+	PROGRESS_META tmp_meta;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	fetch_backend_meta_path(backend_metapath, inode);
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(backend_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+
+	/* Recycle */
+	rmdir(bullpen_path);
 }

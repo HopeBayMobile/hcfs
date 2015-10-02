@@ -1,4 +1,5 @@
 #include "hcfs_tocloud.h"
+#include "mock_params.h"
 
 int write_log(int level, char *format, ...)
 {
@@ -7,6 +8,10 @@ int write_log(int level, char *format, ...)
 
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
+	sem_wait(&record_sem);
+	record_uploading_inode.push_back(ptr->inode);
+	sem_post(&record_sem);
+
 	return;
 }
 

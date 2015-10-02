@@ -85,4 +85,5 @@ int fetch_backend_meta_path(char *pathname, ino_t inode);
 
 char did_block_finish_uploading(int fd, long long blockno);
 
+int uploading_revert();
 #endif
