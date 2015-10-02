@@ -185,7 +185,7 @@ class HCFSBin:
         cmds = ['bash', 'TestCases/HCFS/start_hcfs.bash']
         try:
             logger.info('Start the HCFS process..')
-            subprocess.Popen(cmds)
+            subprocess.call(cmds)
         except:
             logger.error('Start hcfs in background failed. cmds: {0}'.format(cmds))
 
