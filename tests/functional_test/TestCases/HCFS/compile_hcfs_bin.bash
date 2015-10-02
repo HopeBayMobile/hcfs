@@ -1,16 +1,21 @@
 #!/bin/bash
+exec 1> >(while read line; do echo -e "        $line"; done;)
+exec 2> >(while read line; do echo -e "        $line" >&2; done;)
+set -e
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../.. && pwd )"
+WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../../.. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-configfile="$here/path_config.sh"
-if [ -f $configfile ]; then
-	sudo chmod a+w $configfile
-fi
 
+echo "########## Setup Test Env"
+. $WORKSPACE/utils/trace_error.bash
 $WORKSPACE/utils/setup_dev_env.sh -m functional_test
 . $WORKSPACE/utils/env_config.sh
-. $WORKSPACE/utils/trace_error.bash
-set -e
+
+# Main cource code
+configfile="$here/path_config.sh"
+if [ -f $configfile ]; then
+	sudo chown $USER $configfile
+fi
 
 echo "########## Compile binary files"
 make -s -C $WORKSPACE/src/HCFS clean
@@ -25,12 +30,12 @@ eval "make -s -C $WORKSPACE/src/CLI_utils $CFLAGS_ARG"
 
 echo "########## Setup PATH for test"
 if ! grep -E "(^|:)$WORKSPACE/src/HCFS:$WORKSPACE/src/CLI_utils(:|$)" <<< `echo $PATH`; then
+	echo "export PATH=\"$WORKSPACE/src/HCFS:$WORKSPACE/src/CLI_utils:$PATH\"" >> $configfile
 	export PATH="$WORKSPACE/src/HCFS:$WORKSPACE/src/CLI_utils:$PATH"
-	hash -r
 fi
 
-echo "export hcfs=\"`type -a hcfs | sed -s 's/.* is //'`\"" >> $configfile
-echo "export HCFSvol=\"`type -a HCFSvol | sed -s 's/.* is //'`\"" >> $configfile
+echo "export hcfs=\"`type -a hcfs | head -1 | sed -s 's/.* is //'`\"" >> $configfile
+echo "export HCFSvol=\"`type -a HCFSvol | head -1 | sed -s 's/.* is //'`\"" >> $configfile
 
 awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' $configfile > awk_tmp
 sudo mv -f awk_tmp $configfile

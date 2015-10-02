@@ -1,13 +1,15 @@
 #!/bin/bash
+exec 1> >(while read line; do echo -e "        $line"; done;)
+exec 2> >(while read line; do echo -e "        $line" >&2; done;)
 echo -e "\n======== ${BASH_SOURCE[0]} ========"
-WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../.. && pwd )"
+WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../../../.. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 function cleanup {
 	echo "########## Cleanup"
 	sudo docker rm -f swift_test || :
-	sudo rm -rvf $WORKSPACE/tmp/swift_data
-	mkdir -vp $WORKSPACE/tmp/swift_data
+	mkdir -p $WORKSPACE/tmp/{swift_data,meta,block}
+	sudo find $WORKSPACE/tmp/{swift_data,meta,block} -mindepth 1 -delete
 }
 
 

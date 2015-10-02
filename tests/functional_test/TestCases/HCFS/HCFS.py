@@ -180,12 +180,12 @@ class HCFSBin:
             pass
 
     def start_hcfs_background(self):
-        """Not with allow_root
+        """with allow_other
         """
-        cmds = ['sh', 'TestCases/HCFS/start_hcfs.sh']
+        cmds = ['bash', 'TestCases/HCFS/start_hcfs.bash']
         try:
-            subprocess.Popen(cmds)
             logger.info('Start the HCFS process..')
+            subprocess.Popen(cmds)
         except:
             logger.error('Start hcfs in background failed. cmds: {0}'.format(cmds))
 
@@ -196,7 +196,7 @@ class HCFSBin:
         p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
         for line in output.split('\n'):
-            if re.search('hcfs', line):
+            if re.search("/hcfs( |$)", line):
                 count = count + 1
 
         if count == 3:
@@ -213,7 +213,7 @@ class HCFSBin:
             p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
             (output, error_msg) = p.communicate()
             for line in output.split('\n'):
-                if re.search('hcfs', line):
+                if re.search("/hcfs( |$)", line):
                     process_exsit = 1
 
             time.sleep(1)
@@ -361,6 +361,17 @@ class CommonSetup:
             return False, str(error_msg)
         else:
             self.logger.info('Replace file: {0}'.format(source))
+
+        cmds = ['sudo', 'sed', '-i', '-e', "s@%WORKSPACE%@"+self.repo_dir+"@", '/etc/hcfs.conf']
+        p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
+
+        if error_msg:
+            self.logger.error('Update config file failed: {0}'.format(source))
+            self.logger.error(str(error_msg))
+            return False, str(error_msg)
+        else:
+            self.logger.info('Update config file: {0}'.format(source))
             return True, ''
 
     def get_container_size(self):
@@ -451,6 +462,14 @@ class HCFS_0(CommonSetup):
         self.HCFSBin = HCFSBin()
 
     def run(self):
+        # start local swift
+        cmds = ['bash', 'TestCases/HCFS/setup_local_swift_env.bash']
+        try:
+            logger.info('Start a local Swift server')
+            subprocess.call(cmds)
+        except:
+            logger.error('Start local Swift server failed. cmds: {0}'.format(cmds))
+        # start hcfs service
         (output, error_msg) = self.HCFSBin.verify_hcfs_processes()
         if output is False:
             self.HCFSBin.start_hcfs_background()
@@ -484,6 +503,7 @@ class HCFS_0(CommonSetup):
 
         # copy fstest tool to HCFS
         cmds = 'sudo cp -rf TestCases/HCFS/fstest ' + self.mount_point
+        logger.info('Copy fstest tool to HCFS: {0}'.format(cmds))
         try:
             subprocess.call(cmds, shell=True)
         except:
@@ -745,13 +765,13 @@ class HCFS_15(CommonSetup):
 
 class HCFS_16(CommonSetup):
     '''
-    Backend Setting – ArkFlex U (Swift)
+    Backend Setting – ArkFlex One (Swift)
     '''
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
-        self.config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
+        self.config = 'TestCases/HCFS/swift_arkflex_one.conf'
 
     def check_if_hcfs_start_success(self):
         # Start the hcfs
@@ -788,7 +808,7 @@ class HCFS_17(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
         self.config = 'TestCases/HCFS/hcfs_s3_easepro.conf'
 
     def check_if_hcfs_start_success(self):
@@ -830,7 +850,7 @@ class HCFS_19(CommonSetup):
     def __init__(self):
         CommonSetup.__init__(self)
         self.hcfs_bin = HCFSBin()
-        self.origin_config = 'TestCases/HCFS/hcfs_swift_easepro.conf'
+        self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
         self.config = 'TestCases/HCFS/hcfs_s3.conf'
 
     def check_if_hcfs_start_success(self):
@@ -863,7 +883,7 @@ class HCFS_20(CommonSetup):
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
-        self.config = 'hcfs_swift_easepro.conf'
+        self.config = 'swift_arkflex_one.conf'
         self.testfilename = 'testUpload_60M'
         self.first_time = ''
         self.new_time = ''
@@ -915,7 +935,7 @@ class HCFS_21(CommonSetup):
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.mount_point = os.path.join(self.repo_dir, 'tmp/mount')
-        self.config = 'hcfs_swift_easepro.conf'
+        self.config = 'swift_arkflex_one.conf'
         self.testfilename = 'testUpload_160M'
         self.first_time = ''
         self.new_time = ''
@@ -1070,10 +1090,9 @@ class HCFS_39(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
-        self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
-        self.testfilename_local = 'matlabl2011-mac.iso'
-        self.testfilename_local2 = 'matlabl2011-mac-2.iso'
-        self.testfilename_hcfs = 'matlabl2011-mac.iso'
+        self.samples_dir = os.path.abspath(os.path.join(self.current_dir, 'TestSamples'))
+        self.testfilename_local = '4G'
+        self.testfilename_hcfs = '4G'
 
     def run(self):
         # Copy the file to hcfs (upload)
@@ -1111,10 +1130,10 @@ class HCFS_40(CommonSetup):
         CommonSetup.__init__(self)
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
-        self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
-        self.testfilename_local = 'matlabl2011-mac.iso'
-        self.testfilename_local2 = 'matlabl2011-mac-2.iso'
-        self.testfilename_hcfs = 'matlabl2011-mac.iso'
+        self.samples_dir = os.path.abspath(os.path.join(self.current_dir, 'TestSamples'))
+        self.testfilename_local = '4G'
+        self.testfilename_local2 = '4G-2'
+        self.testfilename_hcfs = '4G'
 
     def run(self):
         # Copy the file from hcfs (download)
@@ -1153,9 +1172,9 @@ class HCFS_41(CommonSetup):
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.samples_dir = '/home/kentchen/TestSamples'     # hardcode
-        self.testfilename_local = 'matlabl2011-mac.iso'
-        self.testfilename_local2 = 'matlabl2011-mac-2.iso'
-        self.testfilename_hcfs = 'matlabl2011-mac.iso'
+        self.testfilename_local = '4GB'
+        self.testfilename_local2 = '4GB-2'
+        self.testfilename_hcfs = '4GB'
         self.backend_log = 'backend_upload_log'
 
     def run(self):
@@ -1186,13 +1205,16 @@ class HCFS_99(CommonSetup):
 
     def remove_fstest(self):
         try:
-            subprocess.call('rm -rf ' + self.fstest_path)
+            subprocess.call('rm -rvf ' + self.fstest_path)
             return True
         except:
             return False
 
     def run(self):
+
+        logger.info('remove_fstest')
         self.remove_fstest()
+        logger.info('terminate_hcfs')
         self.hcfsbin.terminate_hcfs()
 
         if not self.hcfsbin.check_if_hcfs_terminated():
