@@ -1091,17 +1091,15 @@ class HCFS_39(CommonSetup):
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.samples_dir = os.path.abspath(os.path.join(self.current_dir, 'TestSamples'))
-        self.testfilename_local = '4G'
-        self.testfilename_hcfs = '4G'
+        self.testfile_abs_local = os.path.join(self.samples_dir, '4G')
+        self.testfile_abs_hcfs = os.path.join(self.mount_point, '4G')
 
     def run(self):
         # Copy the file to hcfs (upload)
-        testfile_abs_local = os.path.join(self.samples_dir, self.testfilename_local)
-        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
         spend_time = ''
 
         dt_ori = datetime.now()
-        (result, error_msg) = self.copy_file_to_hcfs(testfile_abs_local, testfile_abs_hcfs)
+        (result, error_msg) = self.copy_file_to_hcfs(self.testfile_abs_local, self.testfile_abs_hcfs)
         if not result:
             return False, error_msg
         dt_new = datetime.now()
@@ -1112,7 +1110,7 @@ class HCFS_39(CommonSetup):
         spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
 
         # Diff these two files
-        (result, error_msg) = self.diff_files(testfile_abs_local, testfile_abs_hcfs)
+        (result, error_msg) = self.diff_files(self.testfile_abs_local, self.testfile_abs_hcfs)
         if not result:
             logger.error('diff failed!')
             return False, error_msg
@@ -1131,19 +1129,17 @@ class HCFS_40(CommonSetup):
         self.fileGenerate = FileGenerate()
         self.hcfsbin = HCFSBin()
         self.samples_dir = os.path.abspath(os.path.join(self.current_dir, 'TestSamples'))
-        self.testfilename_local = '4G'
-        self.testfilename_local2 = '4G-2'
-        self.testfilename_hcfs = '4G'
+        self.testfile_abs_local = os.path.join(self.samples_dir, '4G')
+        self.testfile_abs_hcfs = os.path.join(self.mount_point, '4G')
 
     def run(self):
         # Copy the file from hcfs (download)
-        testfile_abs_local = os.path.join(self.samples_dir, self.testfilename_local)
-        testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
-        testfile_abs_local_2 = os.path.join(self.samples_dir, self.testfilename_local2)
 
         dt_ori = datetime.now()
-        (result, error_msg) = self.copy_file_from_hcfs(testfile_abs_hcfs, testfile_abs_local_2)
+        # Diff these two files (also read/download file from hcfs)
+        (result, error_msg) = self.diff_files(self.testfile_abs_hcfs, self.testfile_abs_local)
         if not result:
+            logger.error('diff failed!')
             return False, error_msg
         dt_new = datetime.now()
 
@@ -1151,15 +1147,6 @@ class HCFS_40(CommonSetup):
         dt_delta_min_str = str(dt_delta.seconds / 60) + '.' + str(dt_delta.seconds % 60) + '(min)'
         dt_delta_sec_str = str(dt_delta.seconds) + '(sec)'
         spend_time = dt_delta_min_str if dt_delta.seconds > 59 else dt_delta_sec_str
-
-        # Diff these two files
-        (result, error_msg) = self.diff_files(testfile_abs_local, testfile_abs_local_2)
-        if not result:
-            logger.error('diff failed!')
-            return False, error_msg
-
-        # Delete the downloaded file
-        self.exec_command_sync(['rm', '-f', testfile_abs_local_2], False)
 
         return True, 'Spend time: {0}'.format(spend_time)
 
