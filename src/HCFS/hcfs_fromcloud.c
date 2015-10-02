@@ -49,9 +49,9 @@
 *************************************************************************/
 int fetch_from_cloud(FILE *fptr,
 #if (DEDUP_ENABLE)
-		unsigned char *obj_id)
+		     unsigned char *obj_id)
 #else
-		ino_t this_inode, long long block_no)
+		     ino_t this_inode, long long block_no)
 #endif
 {
 	char objname[1000];
@@ -90,22 +90,29 @@ int fetch_from_cloud(FILE *fptr,
 	char *get_fptr_data = NULL;
 	size_t len = 0;
 	FILE *get_fptr = open_memstream(&get_fptr_data, &len);
+	HCFS_encode_object_meta *object_meta =
+	    calloc(1, sizeof(HCFS_encode_object_meta));
 
 	status = hcfs_get_object(get_fptr, objname,
-				 &(download_curl_handles[which_curl_handle]));
+				 &(download_curl_handles[which_curl_handle]),
+				 object_meta);
 
 	fclose(get_fptr);
-	unsigned char *key = NULL;
+	unsigned char *object_key = NULL;
 #if ENCRYPT_ENABLE
-	key = get_key();
+	unsigned char *key = get_key();
+	object_key = calloc(KEY_SIZE, sizeof(unsigned char));
+	decrypt_session_key(object_key, object_meta->enc_session_key, key);
+	OPENSSL_free(key);
 #endif
 
-	decode_to_fd(fptr, key, (unsigned char *)get_fptr_data, len,
-		     ENCRYPT_ENABLE, COMPRESS_ENABLE);
+	decode_to_fd(fptr, object_key, (unsigned char *)get_fptr_data, len,
+		     object_meta->enc_alg, object_meta->comp_alg);
 
+	free_object_meta(object_meta);
 	free(get_fptr_data);
-	if (key != NULL)
-		OPENSSL_free(key);
+	if (object_key != NULL)
+		OPENSSL_free(object_key);
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
