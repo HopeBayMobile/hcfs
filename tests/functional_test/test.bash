@@ -35,7 +35,7 @@ echo "########## Current hcfs daemons"
 pgrep -a -f ".*hcfs (.*|$)" || :
 
 s=4G
-prefix=TestCases/HCFS/TestSamples
+prefix="$here/TestCases/HCFS/TestSamples"
 mkdir -p $prefix
 if [ ! -f $prefix/$s ]; then
 	echo "########## Prepare large file: $s"
