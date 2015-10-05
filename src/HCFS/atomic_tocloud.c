@@ -157,7 +157,6 @@ long long create_status_page(int fd, long long block_index)
 	
 	which_indirect = check_page_level(target_page);
 	PREAD(fd, &progress_meta, sizeof(PROGRESS_META), 0);
-	write_log(10, "target_page = %lld,  which_indirect = %d\n", target_page, which_indirect);
 
 	switch(which_indirect) {
 	case 0:
@@ -545,7 +544,6 @@ int init_progress_info(int fd, long long backend_blocks,
 			errcode = offset;
 			goto errcode_handle;
 		}
-		write_log(10, "offset = %lld\n", offset);
 		PREAD(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 		memcpy(&(status_page.status_entry[entry_index]),
 			&block_uploading_status,
@@ -779,7 +777,7 @@ errcode_handle:
 	fclose(src_ptr);
 	fclose(tar_ptr);
 	flock(fileno(src_ptr), LOCK_UN);
-	return -errcode;
+	return errcode;
 }
 
 char did_block_finish_uploading(int fd, long long blockno)

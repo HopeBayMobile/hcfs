@@ -1990,11 +1990,13 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				if (progress_fd < 0)
 					break;	
 				sync_ctl.is_revert[count] = TRUE;
+				sync_threads[count].is_revert = TRUE;
 			} else {
 				progress_fd = open_progress_info(this_inode);
 				if (progress_fd < 0)
 					break;
 				sync_ctl.is_revert[count] = FALSE;
+				sync_threads[count].is_revert = FALSE;
 			}
 			/* Notify fuse process that it is going to upload */
 			ret = tag_status_on_fuse(this_inode, TRUE, progress_fd);
