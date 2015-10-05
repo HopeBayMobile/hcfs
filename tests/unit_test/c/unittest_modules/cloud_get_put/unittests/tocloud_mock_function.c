@@ -61,7 +61,7 @@ int super_block_update_transit(ino_t this_inode, char is_start_transit,
 	return 0;
 }
 
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_encode_object_meta *meta)
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_meta *meta)
 {
 	char objectpath[40];
 	FILE *objptr;
