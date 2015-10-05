@@ -30,7 +30,7 @@ cleanup
 
 echo "########## Start Swift server"
 if [ -f /.dockerinit ]; then
-	HOST_WORKSPACE="$(docker inspect hcfs_test | grep -e /home/jenkins/workspace/HCFS | tr ':"' $'\n' | sed -n "2p")"
+	HOST_WORKSPACE="$(sudo docker inspect hcfs_test | grep -e /home/jenkins/workspace/HCFS | tr ':"' $'\n' | sed -n "2p")"
 else
 	HOST_WORKSPACE="$WORKSPACE"
 fi
