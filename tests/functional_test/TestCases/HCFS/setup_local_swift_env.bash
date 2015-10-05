@@ -29,8 +29,15 @@ fi
 cleanup
 
 echo "########## Start Swift server"
+if [ -f /.dockerinit ]; then
+	HOST_WORKSPACE="$(docker inspect hcfs_test | grep -e /home/jenkins/workspace/HCFS | tr ':"' $'\n' | sed -n "2p")"
+else
+	HOST_WORKSPACE="$WORKSPACE"
+fi
+echo "HOST_WORKSPACE = $HOST_WORKSPACE"
+
 SWIFT_ID=$(sudo docker run -d -t \
-		-v $WORKSPACE/tmp/swift_data:/srv \
+		-v $HOST_WORKSPACE/tmp/swift_data:/srv \
 		-v /etc/localtime:/etc/localtime:ro \
 		--name=swift_test aerofs/swift)
 
