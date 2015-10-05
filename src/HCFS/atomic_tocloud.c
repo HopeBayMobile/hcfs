@@ -648,6 +648,21 @@ errcode_handle:
 	return errcode;
 }
 
+int fetch_progress_file_path(char *pathname, ino_t inode)
+{
+
+#ifdef ARM_32bit_
+	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%lld",
+		METAPATH, inode);
+#else
+	sprintf(pathname, "%s/upload_bullpen/upload_progress_inode_%ld",
+		METAPATH, inode);
+#endif
+	return 0;
+
+
+}
+
 /**
  * Check whether target file exists or not and copy source file.
  *
@@ -780,7 +795,24 @@ char did_block_finish_uploading(int fd, long long blockno)
 	return block_uploading_status.finish_uploading;
 }
 
-void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
+
+/**
+ * Revert uploading for given inode
+ *
+ * Following are some crash points:
+ * 1. open progress info file
+ * 2. copy from local meta to to-upload meta
+ * 3. download backend meta
+ * 4. init all backend block (seq or obj-id)
+ * 5. unlink downloaded meta
+ * 6. upload blocks
+ * 7. upload to-upload meta
+ * 8. unlink to-upload meta
+ * 9. delete all backend old blocks
+ * 10. close progress info file
+ *
+ */
+void revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 {
 	char toupload_meta_exist, backend_meta_exist;
 	char toupload_meta_path[200];
@@ -803,7 +835,6 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 	fetch_toupload_meta_path(toupload_meta_path, inode);
 
 	write_log(10, "Debug: Now begin to revert uploading inode_%ld\n", inode);
-	printf("begin to check backend meta\n");
 	/* Check backend meta exist */
 	if (access(backend_meta_path, F_OK) == 0) {
 		backend_meta_exist = TRUE;
@@ -818,7 +849,6 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
-	printf("begin to check toupload meta\n");
 	/* Check to-upload meta exist */
 	if (access(toupload_meta_path, F_OK) == 0) {
 		toupload_meta_exist = TRUE;
@@ -833,7 +863,6 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		}
 	}
 
-	printf("before reverting\n");
 	/*** Begin to revert ***/
 	PREAD(progress_fd, &progress_meta, sizeof(PROGRESS_META), 0);
 	if (ret_ssize == 0) {
@@ -843,13 +872,12 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		finish_init = progress_meta.finish_init_backend_data;
 	}
 
-	printf("begin to revert\n");
 	if (toupload_meta_exist == TRUE) {
 		if ((backend_meta_exist == FALSE) && (finish_init == TRUE)) {
 		/* Keep on uploading. case[5, 6], case6, case[6, 7],
 		case7, case[7, 8], case8 */
 
-			write_log(10, "Debug: begin revert uploading inode %ld",
+			write_log(10, "Debug: begin revert uploading inode %ld\n",
 				inode);
 			sync_single_inode((void *)data_ptr);
 
@@ -867,7 +895,6 @@ void _revert_inode_uploading(SYNC_THREAD_TYPE *data_ptr)
 		cancel uploading. case[1, 2] */
 			if (backend_meta_exist)
 				unlink(backend_meta_path);
-			printf("haha\n");
 		} else {
 		/* Finish uploading all blocks and meta,
 		remove backend old block. case[8, 9], case9, case[9. 10],
@@ -929,7 +956,6 @@ int uploading_revert()
 		if (strncmp("upload_progress", temp_dirent.d_name, 15) == 0) {
 			ret = sscanf(temp_dirent.d_name,
 				"upload_progress_inode_%ld", &inode);
-			printf("name = %s\n", temp_dirent.d_name);
 			sprintf(progress_filepath, "%s/%s", upload_pathname,
 				temp_dirent.d_name);
 			fd = open(progress_filepath, O_RDWR);
@@ -968,7 +994,7 @@ int uploading_revert()
 			sync_threads[count].progress_fd = fd;
 			sync_threads[count].is_revert = TRUE;
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
-					NULL, (void *)&_revert_inode_uploading,
+					NULL, (void *)&revert_inode_uploading,
 					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;

@@ -119,13 +119,11 @@ static inline void _sync_terminate_thread(int index)
 		if (ret == 0) {
 			inode = sync_ctl.threads_in_use[index];
 			/* Reverting do not need communicate with fuse */
-			if (sync_ctl.is_revert[index] == FALSE) {
-				tag_ret = tag_status_on_fuse(inode, FALSE, 0);
-				if (tag_ret < 0) {
-					write_log(0, "Fail to tag inode %lld "
+			tag_ret = tag_status_on_fuse(inode, FALSE, 0);
+			if (tag_ret < 0) {
+				write_log(0, "Fail to tag inode %lld "
 						"as NOT_UPLOADING in %s\n",
 						inode, __func__);
-				}
 			}
 			close_progress_info(sync_ctl.progress_fd[index], inode);
 
@@ -174,7 +172,7 @@ static inline int _upload_terminate_thread(int index)
 	int ret, errcode;
 	FILE *metafptr, *toupload_metafptr;
 	char thismetapath[METAPATHLEN], toupload_metapath[200];
-	char blockpath[400];
+	char blockpath[400], toupload_blockpath[400];
 	unsigned char blk_obj_id[OBJID_LENGTH];
 	ino_t this_inode;
 	off_t page_filepos;
@@ -310,6 +308,10 @@ static inline int _upload_terminate_thread(int index)
 		TOUPLOAD_BLOCKS);
 	/* TODO: if to_upload_seq == backend_seq, then return ? */
 #endif
+	fetch_toupload_block_path(toupload_blockpath, this_inode, blockno, 0);
+	if (access(toupload_blockpath, F_OK) == 0)
+		UNLINK(toupload_blockpath);
+
 
 	need_delete_object = FALSE;
 	/* Perhaps the file is deleted already. If not, modify the block
@@ -1973,14 +1975,28 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 {
 	int count, ret;
 	int progress_fd;
+	char progress_file_path[300];
 
 	ret = -1;
 
 	for (count = 0; count < MAX_SYNC_CONCURRENCY; count++) {
 		if (sync_ctl.threads_in_use[count] == 0) {
-			progress_fd = open_progress_info(this_inode);
-			if (progress_fd < 0)
-				break;
+			/* Open progress file. If it exist, then revert
+			uploading. Otherwise open a new progress file */
+			fetch_progress_file_path(progress_file_path,
+				this_inode);
+			if (access(progress_file_path, F_OK) == 0) {
+				progress_fd = open(progress_file_path, O_RDWR);
+				if (progress_fd < 0)
+					break;	
+				sync_ctl.is_revert[count] = TRUE;
+			} else {
+				progress_fd = open_progress_info(this_inode);
+				if (progress_fd < 0)
+					break;
+				sync_ctl.is_revert[count] = FALSE;
+			}
+			/* Notify fuse process that it is going to upload */
 			ret = tag_status_on_fuse(this_inode, TRUE, progress_fd);
 			if (ret < 0) {
 				write_log(0, "Error on tagging inode %lld as "
@@ -1989,15 +2005,14 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				ret = -1;
 				break;
 			}
+			/* Prepare data */
 			sync_ctl.threads_in_use[count] = this_inode;
 			sync_ctl.threads_created[count] = FALSE;
 			sync_ctl.threads_error[count] = FALSE;
 			sync_ctl.progress_fd[count] = progress_fd;
-			sync_ctl.is_revert[count] = FALSE;
 			sync_threads[count].inode = this_inode;
 			sync_threads[count].this_mode = this_mode;
 			sync_threads[count].progress_fd = progress_fd;
-			sync_threads[count].is_revert = FALSE;
 
 #ifdef ARM_32bit_
 			write_log(10, "Before syncing: inode %lld, mode %d\n",
@@ -2008,9 +2023,17 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 				  sync_threads[count].inode,
 				  sync_threads[count].this_mode);
 #endif
-			pthread_create(&(sync_ctl.inode_sync_thread[count]),
-				       NULL, (void *)&sync_single_inode,
-				       (void *)&(sync_threads[count]));
+
+			if (sync_ctl.is_revert[count] == TRUE)
+				pthread_create(
+					&(sync_ctl.inode_sync_thread[count]),
+					NULL, (void *)&revert_inode_uploading,
+					(void *)&(sync_threads[count]));
+			else
+				pthread_create(
+					&(sync_ctl.inode_sync_thread[count]),
+					NULL, (void *)&sync_single_inode,
+					(void *)&(sync_threads[count]));
 			sync_ctl.threads_created[count] = TRUE;
 			sync_ctl.total_active_sync_threads++;
 			ret = count;

@@ -5,7 +5,7 @@ extern "C" {
 #include "params.h"
 }
 #include "gtest/gtest.h"
-
+#include "mock_params.h"
 
 #define RESPONSE_FAIL 0
 #define RESPONSE_SUCCESS 1
@@ -468,6 +468,98 @@ TEST_F(set_progress_infoTest, SetProgressSuccess)
 	close(fd);
 }
 
+TEST_F(set_progress_infoTest, SetProgressSuccess_ManyDifferentBlockLevel)
+{
+	int fd;
+	int ret;
+	ssize_t tmp_size;
+	long long block_index[5];
+	BLOCK_UPLOADING_STATUS ans_status, empty_status;
+	PROGRESS_META tmp_meta;
+
+	fd = open(mock_progress_path, O_CREAT | O_RDWR);
+	ASSERT_GT(fd, 0);
+	tmp_size = lseek(fd, 0, SEEK_END);
+	ASSERT_EQ(0, tmp_size);
+
+	block_index[0] = MAX_BLOCK_ENTRIES_PER_PAGE / 2;
+	block_index[1] = MAX_BLOCK_ENTRIES_PER_PAGE +
+		(POINTERS_PER_PAGE / 2) * MAX_BLOCK_ENTRIES_PER_PAGE;
+	block_index[2] = MAX_BLOCK_ENTRIES_PER_PAGE + 
+		POINTERS_PER_PAGE * MAX_BLOCK_ENTRIES_PER_PAGE +
+		(POINTERS_PER_PAGE / 2) * POINTERS_PER_PAGE * 
+		MAX_BLOCK_ENTRIES_PER_PAGE;
+	block_index[3] = MAX_BLOCK_ENTRIES_PER_PAGE + 
+		POINTERS_PER_PAGE * MAX_BLOCK_ENTRIES_PER_PAGE +
+		(long long)POINTERS_PER_PAGE * POINTERS_PER_PAGE * 
+		MAX_BLOCK_ENTRIES_PER_PAGE +
+		(long long)(POINTERS_PER_PAGE / 2) * POINTERS_PER_PAGE *
+		POINTERS_PER_PAGE * MAX_BLOCK_ENTRIES_PER_PAGE;
+	block_index[4] = MAX_BLOCK_ENTRIES_PER_PAGE + 
+		POINTERS_PER_PAGE * MAX_BLOCK_ENTRIES_PER_PAGE +
+		(long long)POINTERS_PER_PAGE * POINTERS_PER_PAGE * MAX_BLOCK_ENTRIES_PER_PAGE +
+		(long long)POINTERS_PER_PAGE * POINTERS_PER_PAGE * POINTERS_PER_PAGE * 
+		MAX_BLOCK_ENTRIES_PER_PAGE + MAX_BLOCK_ENTRIES_PER_PAGE / 2;
+	
+
+#if (DEDUP_ENABLE)
+	unsigned char toupload_objid[OBJID_LENGTH], backend_objid[OBJID_LENGTH];
+
+	memset(toupload_objid, 'K', OBJID_LENGTH);
+	memset(backend_objid, 'W', OBJID_LENGTH);
+#else
+	long long toupload_seq, backend_seq;
+
+	toupload_seq = 123;
+	backend_seq = 456;
+#endif
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+
+
+	/* Run tested function. Set progress info for even blocks */
+	for (int i = 0; i < 5; i ++) {
+		char toupload_exist = TRUE;
+		char backend_exist = TRUE;
+		char finish = TRUE;
+		int ret = -1;
+
+#if (DEDUP_ENABLE)
+		ret = set_progress_info(fd, block_index[i], &toupload_exist,
+			&backend_exist, toupload_objid, backend_objid, &finish);
+#else
+#endif
+		ASSERT_EQ(0, ret);
+	}
+
+	/* Verify */
+	memset(&empty_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
+	memset(&ans_status, 0, sizeof(BLOCK_UPLOADING_STATUS));
+#if (DEDUP_ENABLE)
+	memcpy(ans_status.to_upload_objid, toupload_objid, OBJID_LENGTH);
+	memcpy(ans_status.backend_objid, backend_objid, OBJID_LENGTH);
+#else
+	ans_status.to_upload_seq = toupload_seq;
+	ans_status.backend_seq = backend_seq;
+#endif
+	ans_status.finish_uploading = TRUE;
+	SET_TOUPLOAD_BLOCK_EXIST(ans_status.block_exist);
+	SET_CLOUD_BLOCK_EXIST(ans_status.block_exist);
+
+	for(int i = 0; i < 5; i++) {
+		BLOCK_UPLOADING_STATUS block_status, *tmp_status;
+
+		ret = get_progress_info(fd, block_index[i], &block_status);
+		ASSERT_EQ(sizeof(BLOCK_UPLOADING_PAGE), ret);
+
+		ASSERT_EQ(0, memcmp(&ans_status, &block_status,
+			sizeof(BLOCK_UPLOADING_STATUS))) << "i = " << i;
+	}
+
+	/* Recycle */
+	close(fd);
+}
+
 class get_progress_infoTest : public ::testing::Test {
 protected:
 	char mock_progress_path[100];
@@ -731,14 +823,20 @@ protected:
 		if (!access(bullpen_path, F_OK))
 			rmdir(bullpen_path);
 		init_sync_control();
+		memset(&test_sync_struct, 0, sizeof(TEST_REVERT_STRUCT));
+		sem_init(&test_sync_struct.record_sem, 0, 1);
+		memset(&test_delete_struct, 0, sizeof(TEST_REVERT_STRUCT));
+		sem_init(&test_delete_struct.record_sem, 0, 1);
 	}
 
 	virtual void TearDown()
 	{
-		if (!access(bullpen_path, F_OK))
-			rmdir(bullpen_path);
 		if (!access(progress_path, F_OK))
 			unlink(progress_path);
+		if (!access(toupload_metapath, F_OK))
+			unlink(toupload_metapath);
+		if (!access(bullpen_path, F_OK))
+			rmdir(bullpen_path);
 		sem_destroy(&(sync_ctl.sync_op_sem));
 		sem_destroy(&(sync_ctl.sync_queue_sem));
 	}
@@ -774,7 +872,12 @@ void *terminate_sync_threads(void *data)
 					close_progress_info(
 						sync_ctl.progress_fd[count],
 						sync_ctl.threads_in_use[count]);
+					sem_wait(&sync_ctl.sync_op_sem);
 					sync_ctl.threads_in_use[count] = 0;
+					sync_ctl.threads_created[count] = FALSE;
+					sync_ctl.total_active_sync_threads--;
+					sem_post(&sync_ctl.sync_queue_sem);
+					sem_post(&sync_ctl.sync_op_sem);
 				}
 			}
 		}
@@ -1024,7 +1127,107 @@ TEST_F(uploading_revertTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading)
 	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
 	EXPECT_EQ(-1, access(backend_metapath, F_OK));
 	EXPECT_EQ(-1, access(progress_path, F_OK));
+	EXPECT_EQ(1, test_sync_struct.total_inode);
+	EXPECT_EQ(inode, test_sync_struct.record_uploading_inode[0]);
+
+	/* Recycle */
+	unlink(toupload_metapath);
+	rmdir(bullpen_path);
+}
+
+TEST_F(uploading_revertTest, Crash_When_DeleteOldData_KeepDeleting)
+{
+	int ret;
+	int fd;
+	int inode;
+	PROGRESS_META tmp_meta;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	inode = 3;
+	sprintf(progress_path, "%s/upload_progress_inode_%d",
+		bullpen_path, inode);
+	fd = open(progress_path, O_CREAT | O_RDWR);
+	memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+	tmp_meta.finish_init_backend_data = TRUE; // Finish init
+	pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+	close(fd);
+	
+	fetch_toupload_meta_path(toupload_metapath, inode);
+	fetch_backend_meta_path(backend_metapath, inode);
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+	EXPECT_EQ(-1, access(backend_metapath, F_OK));
+	EXPECT_EQ(-1, access(progress_path, F_OK));
+	EXPECT_EQ(1, test_delete_struct.total_inode);
+	EXPECT_EQ(inode, test_delete_struct.record_uploading_inode[0]);
 
 	/* Recycle */
 	rmdir(bullpen_path);
 }
+
+TEST_F(uploading_revertTest, Crash_AfterUnlinkBackendmeta_KeepOnUploading_ManyInode)
+{
+	int ret;
+	int fd;
+	int num_inode = 15; // Cannot exceed MAX_SYNC_CONCURRENCY
+	int inode[num_inode];
+	PROGRESS_META tmp_meta;
+	pthread_t terminate_tid;
+
+	/* Prepare mock data */
+	mkdir(bullpen_path, 0700);
+	
+	for (int i = 1; i <= num_inode; i++) {
+		sprintf(progress_path, "%s/upload_progress_inode_%d",
+				bullpen_path, i);
+		fd = open(progress_path, O_CREAT | O_RDWR);
+		memset(&tmp_meta, 0, sizeof(PROGRESS_META));
+		tmp_meta.finish_init_backend_data = TRUE; // Finish init
+		pwrite(fd, &tmp_meta, sizeof(PROGRESS_META), 0);
+		close(fd);
+
+		fetch_toupload_meta_path(toupload_metapath, i);
+		mknod(toupload_metapath, 0700, 0); // make a toupload_meta
+	}
+
+	keep_on = TRUE;
+	pthread_create(&terminate_tid, NULL,
+			terminate_sync_threads, NULL);
+	/* Run */
+	ret = uploading_revert();
+	EXPECT_EQ(0, ret);
+	keep_on = FALSE;
+	pthread_join(terminate_tid, NULL);	
+
+	/* Verify */
+	for (int i = 1; i <= num_inode; i++) {	
+		fetch_toupload_meta_path(toupload_metapath, i);
+		EXPECT_EQ(-1, access(toupload_metapath, F_OK));
+
+		fetch_backend_meta_path(backend_metapath, i);
+		EXPECT_EQ(-1, access(backend_metapath, F_OK));
+
+		sprintf(progress_path, "%s/upload_progress_inode_%d",
+				bullpen_path, i);
+		EXPECT_EQ(-1, access(progress_path, F_OK));
+	}
+	EXPECT_EQ(num_inode, test_sync_struct.total_inode);
+	//EXPECT_EQ(inode, test_sync_struct.record_uploading_inode[0]);
+
+	/* Recycle */
+	unlink(toupload_metapath);
+	rmdir(bullpen_path);
+}
+

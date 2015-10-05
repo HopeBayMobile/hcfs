@@ -1,4 +1,10 @@
-#include <vector.h>
+#include <semaphore.h>
 
-sem_t record_sem;
-vector<ino_t> record_uploading_inode;
+typedef struct {
+	sem_t record_sem;
+	ino_t record_uploading_inode[500];
+	int total_inode;
+} TEST_REVERT_STRUCT;
+
+TEST_REVERT_STRUCT test_sync_struct;
+TEST_REVERT_STRUCT test_delete_struct;

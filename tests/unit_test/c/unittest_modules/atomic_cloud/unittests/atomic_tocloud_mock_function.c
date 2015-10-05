@@ -8,9 +8,14 @@ int write_log(int level, char *format, ...)
 
 void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 {
-	sem_wait(&record_sem);
-	record_uploading_inode.push_back(ptr->inode);
-	sem_post(&record_sem);
+	char toupload_metapath[200];
+
+	sem_wait(&test_sync_struct.record_sem);
+	test_sync_struct.record_uploading_inode[test_sync_struct.total_inode++] = ptr->inode;
+	sem_post(&test_sync_struct.record_sem);
+
+	fetch_toupload_meta_path(toupload_metapath, ptr->inode);
+	unlink(toupload_metapath);
 
 	return;
 }
@@ -18,6 +23,10 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 int delete_backend_blocks(int progress_fd, long long total_blocks, ino_t inode,
 		char delete_which_one)
 {
+	sem_wait(&test_delete_struct.record_sem);
+	if (delete_which_one == BACKEND_BLOCKS)
+	test_delete_struct.record_uploading_inode[test_delete_struct.total_inode++] = inode;
+	sem_post(&test_delete_struct.record_sem);
 	return 0;
 }
 
