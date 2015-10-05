@@ -165,22 +165,7 @@ class HCFSBin:
         return None
 
     def start_hcfs(self):
-        """Launch the hcfs processes
-        """
-        try:
-            cmds = [self.hcfs_bin, '-d', '-oallow_other']
-            logger.info(str(cmds))
-            p = subprocess.Popen(cmds, stdout=PIPE, stderr=PIPE)
-            (output, error_msg) = p.communicate()
-            if error_msg:
-                logger.warning('error_msg: ' + str(error_msg))
-                raise
-        finally:
-            # time.sleep(5)  # if use timeout for it?
-            pass
-
-    def start_hcfs_background(self):
-        """with allow_other
+        """Launch the hcfs processes with allow_other
         """
         cmds = ['bash', 'TestCases/HCFS/start_hcfs.bash']
         try:
@@ -189,10 +174,14 @@ class HCFSBin:
         except:
             logger.error('Start hcfs in background failed. cmds: {0}'.format(cmds))
 
+        # Make Sure it's actually start by test list command
+        self.list_filesystems()
+
     def verify_hcfs_processes(self):
         """Check the processes are exist, expect it has three.
         """
         count = 0
+        logger.info('Verify hcfs processes')
         p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
         (output, error_msg) = p.communicate()
         for line in output.split('\n'):
@@ -202,12 +191,13 @@ class HCFSBin:
         if count == 3:
             return True, ''
         else:
-            return False, 'The process of hcfs number is wrong: {0}'.format(count)
+            return False, 'The process of hcfs number "{0}" is wrong'.format(count)
 
     def check_if_hcfs_terminated(self, timeout=None):
         """Check the process is not exist, timeout default is 30
         """
         timeout = self.timeout if timeout is None else timeout
+        logger.info('Check the process is not exist, timeout is {0}'.format(timeout))
         while (timeout > 0):
             process_exsit = 0
             p = subprocess.Popen(['ps', 'aux'], stdout=PIPE, stderr=PIPE)
@@ -230,7 +220,13 @@ class HCFSBin:
     def terminate_hcfs(self):
         """Terminate the processes of hcfs
         """
+        logger.info('Terminate the HCFS process..')
         p = subprocess.Popen([self.hcfsvol_bin, 'terminate'], stdout=PIPE, stderr=PIPE)
+        (output, error_msg) = p.communicate()
+        if error_msg:
+            logger.error(str(error_msg))
+        else:
+            logger.info(output)
 
     def list_filesystems(self):
         cmds = [self.hcfsvol_bin, 'list']
@@ -472,8 +468,8 @@ class HCFS_0(CommonSetup):
         # start hcfs service
         (output, error_msg) = self.HCFSBin.verify_hcfs_processes()
         if output is False:
-            self.HCFSBin.start_hcfs_background()
             logger.info('Create HCFS processes...')
+            self.HCFSBin.start_hcfs()
         else:
             logger.info('HCFS process already exist!')
 
@@ -773,10 +769,9 @@ class HCFS_16(CommonSetup):
         self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
         self.config = 'TestCases/HCFS/swift_arkflex_one.conf'
 
-    def check_if_hcfs_start_success(self):
+    def start_hcfs_and_check_result(self):
         # Start the hcfs
-        self.hcfs_bin.start_hcfs_background()
-        time.sleep(5)   # lazy magic
+        self.hcfs_bin.start_hcfs()
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
@@ -789,11 +784,10 @@ class HCFS_16(CommonSetup):
         result = True
         msg = ''
         self.replace_hcfs_config(self.config)
-        (result, msg) = self.check_if_hcfs_start_success()
+        (result, msg) = self.start_hcfs_and_check_result()
 
         # self.replace_hcfs_config(self.origin_config)
 
-        time.sleep(5)
         # close the hcfs
         self.hcfs_bin.terminate_hcfs()
         self.hcfs_bin.check_if_hcfs_terminated()
@@ -811,10 +805,9 @@ class HCFS_17(CommonSetup):
         self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
         self.config = 'TestCases/HCFS/hcfs_s3_easepro.conf'
 
-    def check_if_hcfs_start_success(self):
+    def start_hcfs_and_check_result(self):
         # Start the hcfs
-        self.hcfs_bin.start_hcfs_background()
-        time.sleep(5)
+        self.hcfs_bin.start_hcfs()
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
@@ -827,7 +820,7 @@ class HCFS_17(CommonSetup):
 
     def run(self):
         self.replace_hcfs_config(self.config)
-        (result, msg) = self.check_if_hcfs_start_success()
+        (result, msg) = self.start_hcfs_and_check_result()
         self.replace_hcfs_config(self.origin_config)
         return result, msg
 
@@ -853,10 +846,9 @@ class HCFS_19(CommonSetup):
         self.origin_config = 'TestCases/HCFS/swift_arkflex_one.conf'
         self.config = 'TestCases/HCFS/hcfs_s3.conf'
 
-    def check_if_hcfs_start_success(self):
+    def start_hcfs_and_check_result(self):
         # Start the hcfs
-        self.hcfs_bin.start_hcfs_background()
-        time.sleep(5)
+        self.hcfs_bin.start_hcfs()
 
         # Check the process exist
         (result, msg) = self.hcfs_bin.verify_hcfs_processes()
@@ -869,7 +861,7 @@ class HCFS_19(CommonSetup):
 
     def run(self):
         self.replace_hcfs_config(self.config)
-        (result, msg) = self.check_if_hcfs_start_success()
+        (result, msg) = self.start_hcfs_and_check_result()
         self.replace_hcfs_config(self.origin_config)
         return result, msg
 
