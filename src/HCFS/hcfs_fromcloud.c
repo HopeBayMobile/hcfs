@@ -211,11 +211,11 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(blockfptr,
-				temppage.block_entries[entry_index].obj_id);
+		ret = fetch_from_cloud(
+		    blockfptr, temppage.block_entries[entry_index].obj_id);
 #else
-		ret = fetch_from_cloud(blockfptr,
-				ptr->this_inode, ptr->block_no);
+		ret =
+		    fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
 #endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");

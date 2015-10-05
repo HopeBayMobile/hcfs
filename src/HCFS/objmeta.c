@@ -3,6 +3,7 @@
 HTTP_meta *new_http_meta()
 {
 	HTTP_meta *meta = calloc(1, sizeof(HTTP_meta));
+
 	meta->count = 0;
 	meta->data = NULL;
 	return meta;
@@ -15,6 +16,7 @@ void delete_http_meta(HTTP_meta *meta)
 
 	if (meta->data != NULL) {
 		int i;
+
 		for (i = 0; i < 2 * (meta->count); i++) {
 			free(meta->data[i]);
 		}

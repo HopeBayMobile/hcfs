@@ -55,7 +55,6 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include "dedup_table.h"
 #include "utils.h"
 
-
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
 extern SYSTEM_CONF_STRUCT system_config;
@@ -177,7 +176,8 @@ static inline int _upload_terminate_thread(int index)
 	sem_post(&(sync_ctl.sync_op_sem));
 
 #if (DEDUP_ENABLE)
-	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id, OBJID_LENGTH);
+	memcpy(blk_obj_id, upload_ctl.upload_threads[index].obj_id,
+	       OBJID_LENGTH);
 #endif
 	this_inode = upload_ctl.upload_threads[index].inode;
 	is_delete = upload_ctl.upload_threads[index].is_delete;
@@ -218,10 +218,11 @@ static inline int _upload_terminate_thread(int index)
 					tmp_entry->uploaded = TRUE;
 #if (DEDUP_ENABLE)
 					// Store hash in block meta too
-					memcpy(tmp_entry->obj_id, blk_obj_id, OBJID_LENGTH);
+					memcpy(tmp_entry->obj_id, blk_obj_id,
+					       OBJID_LENGTH);
 #endif
-					ret = fetch_block_path(blockpath,
-						this_inode, blockno);
+					ret = fetch_block_path(
+					    blockpath, this_inode, blockno);
 					if (ret < 0) {
 						errcode = ret;
 						goto errcode_handle;
@@ -279,7 +280,8 @@ static inline int _upload_terminate_thread(int index)
 				tmp_del->blockno = blockno;
 				tmp_del->which_curl = count2;
 #if (DEDUP_ENABLE)
-				memcpy(tmp_del->obj_id, blk_obj_id, OBJID_LENGTH);
+				memcpy(tmp_del->obj_id, blk_obj_id,
+				       OBJID_LENGTH);
 #endif
 
 				delete_ctl.total_active_delete_threads++;
@@ -456,10 +458,11 @@ errcode_handle:
 
 static inline int _select_upload_thread(char is_block, char is_delete,
 #if (DEDUP_ENABLE)
-				char is_upload, unsigned char old_obj_id[],
+					char is_upload,
+					unsigned char old_obj_id[],
 #endif
-				ino_t this_inode, long long block_count,
-				off_t page_pos, long long e_index)
+					ino_t this_inode, long long block_count,
+					off_t page_pos, long long e_index)
 {
 	int which_curl, count;
 
@@ -481,7 +484,7 @@ static inline int _select_upload_thread(char is_block, char is_delete,
 			upload_ctl.upload_threads[count].is_upload = is_upload;
 			if (is_upload == TRUE) {
 				memcpy(upload_ctl.upload_threads[count].obj_id,
-						old_obj_id, OBJID_LENGTH);
+				       old_obj_id, OBJID_LENGTH);
 			}
 #endif
 
@@ -679,15 +682,14 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(TRUE, FALSE,
-						tmp_entry->uploaded,
-						tmp_entry->obj_id,
-						ptr->inode, block_count,
-						page_pos, e_index);
+				which_curl = _select_upload_thread(
+				    TRUE, FALSE, tmp_entry->uploaded,
+				    tmp_entry->obj_id, ptr->inode, block_count,
+				    page_pos, e_index);
 #else
 				which_curl = _select_upload_thread(
-						TRUE, FALSE, ptr->inode, block_count,
-						page_pos, e_index);
+				    TRUE, FALSE, ptr->inode, block_count,
+				    page_pos, e_index);
 #endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				ret = dispatch_upload_block(which_curl);
@@ -704,14 +706,13 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 				sem_wait(&(upload_ctl.upload_queue_sem));
 				sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-				which_curl = _select_upload_thread(TRUE, TRUE, TRUE,
-						tmp_entry->obj_id,
-						ptr->inode, block_count,
-						page_pos, e_index);
+				which_curl = _select_upload_thread(
+				    TRUE, TRUE, TRUE, tmp_entry->obj_id,
+				    ptr->inode, block_count, page_pos, e_index);
 #else
 				which_curl = _select_upload_thread(
-						TRUE, TRUE, ptr->inode, block_count,
-						page_pos, e_index);
+				    TRUE, TRUE, ptr->inode, block_count,
+				    page_pos, e_index);
 #endif
 				sem_post(&(upload_ctl.upload_op_sem));
 				dispatch_delete_block(which_curl);
@@ -756,7 +757,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	sem_wait(&(upload_ctl.upload_queue_sem));
 	sem_wait(&(upload_ctl.upload_op_sem));
 #if (DEDUP_ENABLE)
-	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL, ptr->inode, 0, 0, 0);
+	which_curl = _select_upload_thread(FALSE, FALSE, FALSE, NULL,
+					   ptr->inode, 0, 0, 0);
 #else
 	which_curl = _select_upload_thread(FALSE, FALSE, ptr->inode, 0, 0, 0);
 #endif
@@ -1087,17 +1089,18 @@ void con_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 #if (DEDUP_ENABLE)
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				&(upload_curl_handles[which_curl]), thread_ptr->tempfilename,
-				thread_ptr->is_upload, thread_ptr->obj_id);
+				    &(upload_curl_handles[which_curl]),
+				    thread_ptr->tempfilename,
+				    thread_ptr->is_upload, thread_ptr->obj_id);
 #else
 		ret = do_block_sync(thread_ptr->inode, thread_ptr->blockno,
-				&(upload_curl_handles[which_curl]),
-				thread_ptr->tempfilename);
+				    &(upload_curl_handles[which_curl]),
+				    thread_ptr->tempfilename);
 #endif
 	else
 		ret = do_meta_sync(thread_ptr->inode,
-				&(upload_curl_handles[which_curl]),
-				thread_ptr->tempfilename);
+				   &(upload_curl_handles[which_curl]),
+				   thread_ptr->tempfilename);
 	if (ret < 0)
 		goto errcode_handle;
 
@@ -1124,11 +1127,11 @@ void delete_object_sync(UPLOAD_THREAD_TYPE *thread_ptr)
 	if (thread_ptr->is_block == TRUE)
 #if (DEDUP_ENABLE)
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
-					thread_ptr->obj_id,
-					&(upload_curl_handles[which_curl]));
+				      thread_ptr->obj_id,
+				      &(upload_curl_handles[which_curl]));
 #else
 		ret = do_block_delete(thread_ptr->inode, thread_ptr->blockno,
-					&(upload_curl_handles[which_curl]));
+				      &(upload_curl_handles[which_curl]));
 #endif
 	if (ret < 0)
 		goto errcode_handle;
@@ -1569,7 +1572,8 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 			goto errcode_handle;
 		}
 		is_fopen = TRUE;
-		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl), NULL);
+		ret = hcfs_get_object(fptr, objname, &(sync_stat_ctl.statcurl),
+				      NULL);
 		if ((ret >= 200) && (ret <= 299)) {
 			ret = 0;
 			errcode = 0;
