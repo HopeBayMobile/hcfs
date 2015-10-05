@@ -1,17 +1,13 @@
 #!/bin/bash
 
-CURPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+UNITTEST_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+WORKSPACE="$( cd "$UNITTEST_DIR/../.." && pwd )"
 
 # Install dependencies
-packages="libattr1-dev"
-packages="$packages gcovr"
-packages_to_install=""
-for P in $packages; do
-	if ! dpkg -s "$P" >/dev/null 2>&1; then
-		packages_to_install="$packages_to_install $P"
-	fi
-done
-[ -n "$packages_to_install" ] && sudo apt-get install -y $packages_to_install
+. $WORKSPACE/utils/setup_dev_env.sh -vm unit_test
 
-cd $CURPATH
-make clean test
+# Unit test
+cd $UNITTEST_DIR
+make clean
+make test
+gcovr -r $WORKSPACE/src .

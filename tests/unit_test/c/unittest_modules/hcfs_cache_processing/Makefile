@@ -17,10 +17,10 @@
 GTEST_DIR = ../../gtest-1.7.0
 
 # Where to find user code.
-USER_DIR = ../../../../../src/HCFS
+USER_DIR = $(realpath ../../../../../src/HCFS)
 
 # Location for unittest code
-UNITTEST_DIR = ./unittests
+UNITTEST_DIR = $(realpath ./unittests)
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
@@ -41,20 +41,26 @@ TESTS = hcfs_cachebuild_unittest hcfs_cacheops_unittest
 # All Google Test headers. Usually you shouldn't change this
 # definition.
 GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
-$(GTEST_DIR)/include/gtest/internal/*.h
+                $(GTEST_DIR)/include/gtest/internal/*.h
 
 # House-keeping build targets.
 
-all : $(TESTS)
+all : setup $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o
-	rm -f *.gcno
-	rm -f *.gcda
+	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : $(TESTS)
+test : setup $(TESTS)
 	./hcfs_cachebuild_unittest
 	./hcfs_cacheops_unittest
+	gcovr -r $(USER_DIR) .
+
+.PHONY : setup
+setup :
+	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+
+export PATH := /usr/lib/ccache:$(PATH)
+export USE_CCACHE := 1
 
 # Builds gtest.a and gtest_main.a.
 

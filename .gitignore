@@ -27,10 +27,21 @@ pip-log.txt
 # Unit test / coverage reports
 .coverage
 .tox
-nosetests.xml
+/ccm-result.xml
+/cloc-result.xml
+/compile_commands.json
+/coverage.xml
+/cpd-result.xml
+/hb_clint.xml
+/nosetests.xml
+/oclint-report.xml
 *.gcda
 *.gcno
+*.gcov
 /tests/unit_test/c/unittest_modules/*/*_unittest
+
+# Auto tests
+/tmp
 
 # Virtualenv
 .venv
@@ -51,5 +62,6 @@ cache_maintain_log
 fuse_log
 
 # Build 
-HCFSvol
-HCFS
+/src/CLI_utils/HCFSvol
+/src/HCFS/hcfs
+/src/HCFS/hcfs.log
