@@ -23,7 +23,7 @@
 
 #include "hcfscurl.h"
 #include "compress.h"
-#include "enc.h"
+#include "objmeta.h"
 #include "fuseop.h"
 #include "dedup_table.h"
 

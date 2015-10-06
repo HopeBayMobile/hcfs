@@ -96,15 +96,23 @@ gtest_main.a : gtest-all.o gtest_main.o
 dedup_mock_function.o : $(UNITTEST_DIR)/dedup_mock_function.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/dedup_mock_function.c
 
-# hcfs_fromcloud testing
+b64encode.o : $(USER_DIR)/b64encode.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+                     $(USER_DIR)/fuseop.h $(USER_DIR)/b64encode.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/b64encode.c
+
 enc.o : $(USER_DIR)/enc.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
         $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/enc.c
 
 compress.o : $(USER_DIR)/compress.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
-        $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(GTEST_HEADERS)
+        $(USER_DIR)/fuseop.h $(USER_DIR)/compress.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/compress.c
 
+objmeta.o : $(USER_DIR)/objmeta.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
+        $(USER_DIR)/fuseop.h $(USER_DIR)/objmeta.h $(GTEST_HEADERS)
+	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/objmeta.c
+
+# hcfs_fromcloud testing
 hcfs_fromcloud.o : $(USER_DIR)/hcfs_fromcloud.c $(USER_DIR)/global.h $(USER_DIR)/params.h \
                      $(USER_DIR)/fuseop.h $(USER_DIR)/enc.h $(USER_DIR)/hcfs_fromcloud.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_fromcloud.c
@@ -134,7 +142,7 @@ hcfs_tocloud_unittest.o : $(UNITTEST_DIR)/hcfs_tocloud_unittest.cc \
 tocloud_mock_function.o : $(UNITTEST_DIR)/tocloud_mock_function.c
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/tocloud_mock_function.c
 
-hcfs_tocloud_unittest : enc.o compress.o dedup_mock_function.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
+hcfs_tocloud_unittest : b64encode.o enc.o compress.o objmeta.o dedup_mock_function.o tocloud_mock_function.o hcfs_tocloud.o hcfs_tocloud_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
 
 # hcfs_clouddelete testing

@@ -102,7 +102,8 @@ void hcfs_destroy_backend(CURL *curl)
 {
 	return 200;
 }
-int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+		    HTTP_meta *meta)
 {
 	if (failedput == TRUE)
 		return 404;
@@ -110,7 +111,8 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
 	fread(&headbuf, sizeof(DIR_META_TYPE), 1, fptr);
 	return 200;
 }
-int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle)
+int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
+		    HCFS_encode_object_meta *object_meta)
 {
 	if (failedget == TRUE)
 		return 404;

@@ -93,7 +93,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 # hcfscurl testing
 
-hcfscurl.o : $(USER_DIR)/hcfscurl.c $(USER_DIR)/global.h $(USER_DIR)/hcfscurl.h 
+hcfscurl.o : $(USER_DIR)/hcfscurl.c $(USER_DIR)/global.h $(USER_DIR)/hcfscurl.h $(USER_DIR)/enc.h
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfscurl.c
 
 hcfscurl_unittest.o : $(UNITTEST_DIR)/hcfscurl_unittest.cc \
