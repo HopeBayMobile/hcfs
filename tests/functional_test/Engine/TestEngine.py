@@ -96,6 +96,7 @@ class Runner:
         run_count = 0
         passed_num = 0
         failed_num = 0
+        fail_tag = 0    # indicate pass or fail for whole tests.
         spec_case_id = '\w' if spec_case_id == '' else spec_case_id
         self.feedback.feedback_to_server(self.test_result)
 
@@ -134,6 +135,7 @@ class Runner:
                     total_run_time = total_run_time + run_time
             else:
                 csv_file_path = self.test_case_suites[case_classify]['csv_file_path']
+                fail_tag = 1 if failed_num > 0 else 0
                 self._save_csv_path(case_classify, csv_file_path)  # save csv_file_path in test_result
                 self._save_summary(case_classify, run_count, passed_num, failed_num, total_run_time)
                 run_count = passed_num = failed_num = 0
@@ -147,6 +149,9 @@ class Runner:
             logger.error('Please check the server configuration!')
 
         self.reporter.output_report(self.test_result)
+
+        return fail_tag
+
 
 def _write_template(script_filename_path, cases):
     if not os.path.exists(script_filename_path):    # Don't overwrite the test scripts
