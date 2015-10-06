@@ -37,7 +37,7 @@ cd $testdir/unit_test
 ./run_unittests
 
 # Cehck code style
-$testdir/code_checking/hb_clint.py --output=vs7 `find $srcdir -name '*.[ch]'` 2>&1 | tee $WORKSPACE/hb_clint.xml
+$testdir/code_checking/hb_clint.py `find $srcdir -name '*.[ch]'` 2>&1 | tee $WORKSPACE/hb_clint.xml
 $testdir/code_checking/checkpatch.pl --terse --no-tree --no-signoff -f `find $srcdir -name '*.[ch]'` || true
 
 # Unit test coverage report
