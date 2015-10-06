@@ -4,7 +4,8 @@ UNITTEST_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WORKSPACE="$( cd "$UNITTEST_DIR/../.." && pwd )"
 
 # Install dependencies
-. $WORKSPACE/utils/setup_dev_env.sh -vm unit_test
+$WORKSPACE/utils/setup_dev_env.sh -vm unit_test
+. $WORKSPACE/utils/env_config.sh
 
 # Unit test
 cd $UNITTEST_DIR
