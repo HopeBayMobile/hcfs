@@ -1158,19 +1158,34 @@ class HCFS_41(CommonSetup):
 
     def run(self):
         testfile_abs_hcfs = os.path.join(self.mount_point, self.testfilename_hcfs)
+        start_time, end_time, duration = ('', '', '')
+        found_start, found_end = (False, False)
 
         # Delete the downloaded file
-        # self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
+        self.exec_command_sync(['rm', '-f', testfile_abs_hcfs], False)
 
-        with open(self.backend_log, 'rb') as f:
-            lines = f.read().split('\n')
-            print len(lines)
-            for i in range(len(lines)-1, -1, -1):
-                r = re.search(r'.+\s(\d+\:\d+:\d+\.\d+?)\s+Debug meta deletion.+', lines[i])
-                if r:
-                    print lines[i], r.group(1)
+        for i in range(25):
+            with open(self.backend_log, 'rb') as f:
+                lines = f.read().split('\n')
+                for i in range(len(lines)-1, -1, -1):
+                    r = re.search(r'.+\s(\d+\:\d+:\d+?)\.\d+\s+Debug meta deletion.+', lines[i])
+                    if r and found_start is False:
+                        end_time = datetime.strptime(r.group(1), '%H:%M:%S')
+                        found_start = True
+                    else:
+                        r = re.search(r'.+\s(\d+\:\d+:\d+?)\.\d+\s+Start delete loop', lines[i])
+                        if r and found_end is False:
+                            start_time = datetime.strptime(r.group(1), '%H:%M:%S')
+                            found_end = True
 
-        return True, ''
+                duration = end_time - start_time
+                duration_str = str(duration.seconds / 60) + '.' + str(duration.seconds % 60) + '(min)'
+
+            if found_start is True and found_end is True:
+                break
+
+            time.sleep(60)
+        return True, 'Spend: {0}'.format(duration_str)
 
 
 class HCFS_99(CommonSetup):
@@ -1182,11 +1197,26 @@ class HCFS_99(CommonSetup):
         self.hcfsbin = HCFSBin()
         self.fstest_path = os.path.join(self.mount_point, 'fstest')
 
+        self.backend_upload_log = 'backend_upload_log'
+        self.cache_maintain_log = 'cache_maintain_log'
+        self.fuse_log = 'fuse_log'
+
     def remove_fstest(self):
         try:
-            subprocess.call('rm -rvf ' + self.fstest_path)
+            subprocess.call('rm -rvf ' + self.fstest_path, shell=True)
             return True
         except:
+            logger.error('remove fstest failed')
+            return False
+
+    def remove_logs(self):
+        try:
+            subprocess.call('rm -rf ' + self.backend_upload_log, shell=True)
+            subprocess.call('rm -rf ' + self.cache_maintain_log, shell=True)
+            subprocess.call('rm -rf ' + self.fuse_log, shell=True)
+            return True
+        except:
+            logger.error('remove logs failed')
             return False
 
     def run(self):
@@ -1194,6 +1224,7 @@ class HCFS_99(CommonSetup):
         logger.info('remove_fstest')
         self.remove_fstest()
         logger.info('terminate_hcfs')
+        self.remove_logs()
         self.hcfsbin.terminate_hcfs()
 
         if not self.hcfsbin.check_if_hcfs_terminated():
