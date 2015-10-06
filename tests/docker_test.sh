@@ -14,6 +14,7 @@ sudo docker rm -f hcfs_test 2>/dev/null || true
 sudo docker pull docker:5000/docker_hcfs_test_slave
 SLAVE_ID=$(sudo docker run -d -t \
 		--privileged \
+		-v /tmp/ccache:/home/jenkins/.ccache \
 		-v $local_repo:/home/jenkins/workspace/HCFS \
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-v /etc/localtime:/etc/localtime:ro \
