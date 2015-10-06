@@ -1,51 +1,50 @@
 #!/bin/bash
+set -e
 echo ======== ${BASH_SOURCE[0]} ========
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd ../.. && pwd )"
-set -x -e
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# Setup Test Env
-. $WORKSPACE/utils/setup_dev_env.sh -m functional_test
+echo "########## Setup Test Env"
+. $WORKSPACE/utils/trace_error.bash
+$WORKSPACE/utils/setup_dev_env.sh -m functional_test
+. $WORKSPACE/utils/env_config.sh
 
-# Compile binary files
-make -C $WORKSPACE/src/HCFS
-make -C $WORKSPACE/src/CLI_utils
-
-# Setup PATH for test
-if ! grep -E "(^|:)$WORKSPACE/src/HCFS:$WORKSPACE/src/CLI_utils(:|$)" <<< `echo $PATH`; then
-	export PATH="$WORKSPACE/src/HCFS:$WORKSPACE/src/CLI_utils:$PATH"
+if [[ $(id -Gn) != *fuse* ]]; then
+	echo "########## Reload script with fuse group permission"
+	exec sg fuse "${BASH_SOURCE[0]}"
 fi
+id
+groups
 
-# Simple mount & umount test with docker aerofs/swift
-if [ "$mode" = "docker" ]; then
-	# Wait swift ready
-	SWIFT="swift -A http://swift_test:8080/auth/v1.0 -U test:tester -K testing"
-	while ! $SWIFT stat; do sleep 1; done
-	# Create Container
-	while $SWIFT post autotest_private_container |& grep failed; do sleep 1; done
+# Main cource code
+function cleanup {
+	echo "########## Cleanup"
+	sudo umount $WORKSPACE/tmp/mount* |& grep -v "not mounted" || :
+	sudo pgrep -a "hcfs " || :
+	sudo pkill 'hcfs' || :
 	mkdir -p $WORKSPACE/tmp/{meta,block,mount}
-	sudo rm -rf $WORKSPACE/tmp/{meta,block,mount}/*
-	sudo tee /etc/hcfs.conf <<-EOF
-	METAPATH= $WORKSPACE/tmp/meta
-	BLOCKPATH = $WORKSPACE/tmp/block
-	CACHE_SOFT_LIMIT = 53687091
-	CACHE_HARD_LIMIT = 107374182
-	CACHE_DELTA = 10485760
-	MAX_BLOCK_SIZE = 1048576
-	CURRENT_BACKEND = swift
-	SWIFT_ACCOUNT = test
-	SWIFT_USER = tester
-	SWIFT_PASS = testing
-	SWIFT_URL = swift_test:8080
-	SWIFT_CONTAINER = autotest_private_container
-	SWIFT_PROTOCOL = http
-	LOG_LEVEL = 10
-	EOF
-	hcfs &
-	while ! HCFSvol create autotest | grep Success; do sleep 1 ;done
-	HCFSvol mount autotest $WORKSPACE/tmp/mount
-	mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
-	HCFSvol terminate
-	! mount | grep "hcfs on $WORKSPACE/tmp/mount type fuse.hcfs"
+	sudo find $WORKSPACE/tmp/{meta,block,mount*} -mindepth 1 -delete
+}
+trap cleanup EXIT
+
+# Setup for $hcfs and $HCFSvol
+$here/TestCases/HCFS/compile_hcfs_bin.bash
+. $here/TestCases/HCFS/path_config.sh
+
+echo "########## Current hcfs daemons"
+pgrep -a -f ".*hcfs (.*|$)" || :
+
+s=4G
+prefix="$here/TestCases/HCFS/TestSamples"
+mkdir -p $prefix
+if [ ! -f $prefix/$s ]; then
+	echo "########## Prepare large file: $s"
+	bs=4K
+	count=`units ${s}iB ${bs}iB -1 -t --out="%.f"`
+	openssl enc -aes-256-ctr -pass pass:`date +%s%N` -nosalt < /dev/zero 2>/dev/null | dd iflag=fullblock bs=$bs count=$count | tee $prefix/$s | pv -s $s | md5sum | sed -e "s/-/$s/" > $prefix/${s}.md5
+	#openssl enc -aes-256-ctr -pass pass:`date +%s%N` -nosalt < /dev/zero 2>/dev/null | dd iflag=fullblock bs=$bs count=$count | pv -s $s > $prefix/$s
 fi
 
-#python pi_tester.py -s TestSuites/HCFS.csv
+echo "########## pi_tester.py"
+cd "$here"
+python pi_tester.py -d debug -s TestSuites/HCFS.csv

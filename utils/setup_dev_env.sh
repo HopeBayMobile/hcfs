@@ -1,7 +1,15 @@
 #!/bin/bash
 
+WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+configfile="$WORKSPACE/utils/env_config.sh"
+touch "$configfile"
+if [[ -n "$USER" && "$USER" != root ]]; then
+	sudo chown $USER "$configfile"
+fi
+
+. $WORKSPACE/utils/trace_error.bash
 set -e
-flags=$-
 set +x # Pause debug, enable if verbose on
 [[ "$flags" =~ "x" ]] && flag_x="-x" || flag_x="+x"
 
@@ -10,7 +18,7 @@ OPTIND=1         # Reset in case getopts has been used previously in the shell.
 
 # Initialize our own variables:
 output_file=""
-verbose=0
+verbose=${verbose-0}
 
 while getopts ":vm:" opt; do
 	case $opt in
@@ -31,13 +39,17 @@ while getopts ":vm:" opt; do
 	esac
 done
 
-echo ======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========
+setup_status_file="${here}/.setup_$setup_dev_env_mode"
+if md5sum --quiet -c "$setup_status_file"; then
+	exit
+fi
+sudo rm -f "$setup_status_file"
+
+echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
 
 if [ $verbose -eq 0 ]; then set +x; else set -x; fi
 
-export local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-
-function install_pkg {
+function install_pkg (){
 	set +x
 	for pkg in $packages;
 	do
@@ -46,7 +58,9 @@ function install_pkg {
 		fi
 	done
 	if [ $verbose -eq 0 ]; then set +x; else set -x; fi
-	if [ "$install $force_install" != " " ]; then
+	install="$(echo -e "$install $force_install" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+	if [ -n "$install" ]; then
+		sudo apt-get update
 		sudo apt-get install -y $install $force_install
 		packages=""
 		install=""
@@ -63,7 +77,6 @@ fi
 case "$setup_dev_env_mode" in
 docker_slave )
 	echo 'Acquire::http::Proxy "http://cache:8000";' | sudo tee /etc/apt/apt.conf.d/30autoproxy
-	export http_proxy="http://cache:8000"
 	sudo sed -r -i"" "s/archive.ubuntu.com/free.nchc.org.tw/" /etc/apt/sources.list
 	packages="$packages cmake git"					# Required by oclint / bear
 	packages="$packages openjdk-7-jdk wget unzip"	# Required by PMD for CPD(duplicate code)
@@ -82,7 +95,7 @@ docker_slave | unit_test | functional_test )
 	"
 	# Use ccache to speedup compile
 	if ! echo $PATH | grep -E "(^|:)/usr/lib/ccache(:|$)"; then
-		export PATH="/usr/lib/ccache:$PATH"
+		echo "export PATH=\"/usr/lib/ccache:$PATH\"" >> "$configfile"
 	fi
 	if ! ccache -V | grep 3.2; then
 		if ! apt-cache policy ccache | grep 3.2; then
@@ -94,27 +107,32 @@ docker_slave | unit_test | functional_test )
 		fi
 		force_install="$force_install ccache"
 	fi
-	export USE_CCACHE=1
+	echo "export USE_CCACHE=1" >> "$configfile"
 	;;&
 docker_slave | unit_test )
 	packages="$packages gcovr"
 	;;&
 docker_slave | functional_test )
-	packages="$packages python-pip python-dev"
-	packages="$packages python-swiftclient"
+	packages="$packages python-pip python-dev python-swiftclient"
+	# generate large file
+	packages="$packages openssl units pv"
 	;;&
-tests )
-	# Install Docker
-	if ! hash docker; then
+docker_slave | docker_host )
+	# Install/upgrade Docker
+	if ! hash docker || [[ $(sudo docker version | grep -c "Version:      1.8.2") -ne 2 ]]; then
+		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 		curl https://get.docker.com | sudo sh
 	fi
 	if ! grep -q docker:5000 /etc/default/docker; then
 		echo 'DOCKER_OPTS="$DOCKER_OPTS --insecure-registry docker:5000"' \
 			| sudo tee -a /etc/default/docker
+		CHANGED_DOCKER_SETTING=1
+	fi
+	;;&
+docker_host )
+	if [[ $CHANGED_DOCKER_SETTING == 1 ]]; then
 		sudo service docker restart
 	fi
-	# Pull test image from local registry server
-	sudo docker pull docker:5000/docker_hcfs_test_slave
 	;;&
 esac
 
@@ -123,13 +141,24 @@ install_pkg
 # Post-install
 case "$setup_dev_env_mode" in
 docker_slave | functional_test )
-	if [ -f $local_repo/tests/functional_test/requirements.txt ]; then
-		sudo -H pip install -r $local_repo/tests/functional_test/requirements.txt
+	if [ -f $WORKSPACE/tests/functional_test/requirements.txt ]; then
+		sudo -H pip install -q -r $WORKSPACE/tests/functional_test/requirements.txt
 	else
-		sudo -H pip install -r requirements.txt
+		sudo -H pip install -q -r /utils/requirements.txt
+	fi
+	echo "########## Configure user_allow_other in /etc/fuse.conf"
+	if sudo grep "#user_allow_other" /etc/fuse.conf; then
+		sudo sed -ir -e "s/#user_allow_other/user_allow_other/" /etc/fuse.conf
+	fi
+	if [[ -n "$USER" && "$USER" != root && `groups $USER` != *fuse* ]]; then
+		sudo addgroup "$USER" fuse
+	fi
+	if [[ `groups jenkins` != *fuse* ]]; then
+		sudo addgroup jenkins fuse || :
 	fi
 	;;&
 docker_slave )
+	export http_proxy="http://cache:8000"
 	pushd /
 	# install BEAR
 	if [ ! -d Bear ]; then
@@ -141,12 +170,14 @@ docker_slave )
 	fi
 	# Install oclint
 	if [ ! -d /oclint-0.8.1 ]; then
-		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz -O - | tar -zxv
+		wget http://archives.oclint.org/releases/0.8/oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		tar -zxf oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
+		rm -f oclint-0.8.1-x86_64-linux-3.13.0-35-generic.tar.gz
 	fi
 
 	# Install PMD for CPD(duplicate code)
 	if [ ! -d /pmd-bin-5.2.2 ]; then
-		wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip 
+		wget http://downloads.sourceforge.net/project/pmd/pmd/5.2.2/pmd-bin-5.2.2.zip
 		unzip pmd-bin-5.2.2.zip
 		rm -f pmd-bin-5.2.2.zip
 	fi
@@ -165,4 +196,8 @@ docker_slave )
 	;;
 esac
 
+awk -F'=' '{seen[$1]=$0} END{for (x in seen) print seen[x]}' "$configfile" > awk_tmp
+sudo mv -f awk_tmp "$configfile"
+
+md5sum --tag "${BASH_SOURCE[0]}" "$configfile" | sudo tee "$setup_status_file"
 set $flag_x

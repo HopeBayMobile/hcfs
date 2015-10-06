@@ -1,4 +1,4 @@
-FROM docker:5000/baseimage:0.9.17
+FROM phusion/baseimage:0.9.17
 MAINTAINER Jethro Yu <jethro.yu@hopebaytech.com>
 
 # Use baseimage-docker's init system.
@@ -13,11 +13,8 @@ RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	chown -R jenkins:jenkins /home/jenkins/.ssh && \
 	chmod 600 /home/jenkins/.ssh/*
 
-
-ADD setup_dev_env.sh requirements.txt /
-RUN /setup_dev_env.sh -v -m docker_slave
-RUN apt-get upgrade -y
-
-RUN apt-get clean
-RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-RUN rm -f /etc/service/sshd/down
+ADD utils/ /utils/
+RUN /utils/setup_dev_env.sh -v -m docker_slave && \
+	apt-get upgrade -y && \
+	apt-get clean && \
+	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /etc/service/sshd/down
