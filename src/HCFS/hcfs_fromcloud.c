@@ -296,7 +296,7 @@ int download_meta_from_backend(ino_t inode, const char *download_metapath,
 	curl_handle_mask[curl_idx] = TRUE;
 	sem_post(&download_curl_control_sem);
 
-
+	write_log(10, "Debug: Begin to download meta. Inode %ld\n", inode);
 #ifdef ENCRYPT_ENABLE
 	char  *get_fptr_data = NULL;
 	size_t len = 0;

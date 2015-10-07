@@ -1392,7 +1392,6 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			/* TODO: Revert info re last upload if upload
 				fails */
 		}
-		super_block_update_transit(ptr->inode, FALSE, sync_error);
 	} else {
 
 		flock(fileno(local_metafptr), LOCK_UN);
@@ -1410,6 +1409,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		upload_ctl.total_active_upload_threads--;
 		sem_post(&(upload_ctl.upload_op_sem));
 		sem_post(&(upload_ctl.upload_queue_sem));
+		return;
 	}
 
 	if (sync_error == TRUE) /* TODO: Something has to be done? */
@@ -1427,6 +1427,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 	else if (size_diff != 0)
 		update_backend_stat(root_inode, size_diff, 0);
 
+	super_block_update_transit(ptr->inode, FALSE, sync_error);
 	return;
 
 errcode_handle:

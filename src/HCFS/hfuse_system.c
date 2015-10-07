@@ -185,12 +185,12 @@ int init_hfuse(void)
 }
 
 /* Helper function to initialize curl handles for downloading objects */
-int _init_download_curl(int count)
+int _init_download_curl(int count, const char *suffix)
 {
 	int ret_val;
 
 	snprintf(download_curl_handles[count].id, 255,
-				"download_thread_%d", count);
+				"download_thread_%d.%s", count, suffix);
 
 	curl_handle_mask[count] = FALSE;
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
@@ -284,26 +284,38 @@ int main(int argc, char **argv)
 		close_log();
 	} else {
 		/* Move from fuse-process to here because upload_loop()
-		need download meta. */
-		sem_init(&download_curl_sem, 0,
-				MAX_DOWNLOAD_CURL_HANDLE);
-		sem_init(&download_curl_control_sem, 0, 1);
-
-		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
-				count++)
-			_init_download_curl(count);
+		need to download meta. */
 
 		this_pid1 = fork();
 		if (this_pid1 == 0) {
 			open_log("backend_upload_log");
 			write_log(2, "\nStart logging backend upload\n");
-			pthread_create(&delete_loop_thread, NULL, &delete_loop,
+
+			/* Init curl handle */
+			sem_init(&download_curl_sem, 0,
+					MAX_DOWNLOAD_CURL_HANDLE);
+			sem_init(&download_curl_control_sem, 0, 1);
+			for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+					count++)
+				_init_download_curl(count, "upload_loop");
+			
+			pthread_create(&delete_loop_thread, NULL, &delete_loop,	
 									NULL);
 			upload_loop();
 			close_log();
+			for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
+				hcfs_destroy_backend(download_curl_handles[count].curl);
 		} else {
 			open_log("fuse_log");
 			write_log(2, "\nStart logging fuse\n");
+
+			/* Init curl handle */
+			sem_init(&download_curl_sem, 0,
+					MAX_DOWNLOAD_CURL_HANDLE);
+			sem_init(&download_curl_control_sem, 0, 1);
+			for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+					count++)
+				_init_download_curl(count, "fuse_proc");
 
 			hook_fuse(argc, argv);
 			write_log(2, "Waiting for subprocesses to terminate\n");
