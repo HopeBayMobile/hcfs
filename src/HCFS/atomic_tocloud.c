@@ -665,7 +665,9 @@ int fetch_progress_file_path(char *pathname, ino_t inode)
  * Check whether target file exists or not and copy source file.
  *
  * This function first checks whether source file exist and whether target file
- * does not exist and then lock source file and copy it if.
+ * does not exist. Then lock source file and copy it. The method of copying a
+ * file is based on argument "copy", which is a function pointer that decides
+ * how to copy a file from source to target. This function is thread-safe.
  *
  * @return 0 if succeed in copy, -EEXIST in case of target file existing.
  */
