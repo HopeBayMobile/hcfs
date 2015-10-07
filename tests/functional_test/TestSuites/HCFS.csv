@@ -14,8 +14,8 @@ Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
 ,HCFS_14,unlink,,1,Pass,,5
 ,HCFS_99,Clear environment for file system operation test,,1,Pass,,1
 ,HCFS_15,Multiple Mount,,0,,,
-,HCFS_16,Backend Setting – ArkFlex U (Swift),,1,Fail,The process of hcfs number is wrong: 4,114
-,HCFS_17,Backend Setting – ArkFlex U (S3),,1,Fail,The process of hcfs number is wrong: 0,6
+,HCFS_16,Backend Setting – ArkFlex One (Swift),,1,Pass,,32
+,HCFS_17,Backend Setting – ArkFlex U (S3),,0,,,
 ,HCFS_18,Backend Setting – Swift,,0,,,
 ,HCFS_19,Backend Setting – S3,,1,Fail,The process of hcfs number is wrong: 0,6
 ,HCFS_0,Setup environment,,1,Pass,,0
