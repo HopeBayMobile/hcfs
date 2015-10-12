@@ -344,9 +344,10 @@ int set_progress_info(int fd, long long block_index,
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
-	if (block_uploading_status->finish_uploading == TRUE)
-		write_log(10, "Debug: block_%lld finished uploading - "
-			"fd = %d\n", block_index, fd);
+	if (finish)
+		if (block_uploading_status->finish_uploading == TRUE)
+			write_log(10, "Debug: block_%lld finished uploading - "
+				"fd = %d\n", block_index, fd);
 
 	return 0;
 
@@ -399,9 +400,10 @@ int set_progress_info(int fd, long long block_index,
 	PWRITE(fd, &status_page, sizeof(BLOCK_UPLOADING_PAGE), offset);
 	flock(fd, LOCK_UN);
 
-	if (block_uploading_status->finish_uploading == TRUE)
-		write_log(10, "Debug: block_%lld finished uploading - "
-			"fd = %d\n", block_index, fd);
+	if (finish)
+		if (block_uploading_status->finish_uploading == TRUE)
+			write_log(10, "Debug: block_%lld finished uploading - "
+				"fd = %d\n", block_index, fd);
 
 	return 0;
 
@@ -535,8 +537,8 @@ int init_progress_info(int fd, long long backend_blocks,
 		block_uploading_status.backend_seq = 
 			MAX(block_page.block_entries[e_index].seqnum[0],
 			block_page.block_entries[e_index].seqnum[1]);
-#endif
 		write_log(10, "Debug: init progress file block%ld_%lld", block, block_uploading_status.backend_seq);
+#endif
 		entry_index = block % MAX_BLOCK_ENTRIES_PER_PAGE;
 		offset = create_status_page(fd, block);
 		if (offset < 0) {

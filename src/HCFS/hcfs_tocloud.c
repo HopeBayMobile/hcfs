@@ -2121,6 +2121,8 @@ void upload_loop(void)
 				ino_check = 0;
 			} else {
 				if (tempentry.in_transit == TRUE) {
+					/* TODO: Revert in_transit inode after
+					crashing. (Maybe in superblock?) */
 					ino_check = tempentry.util_ll_next;
 				} else {
 					tempentry.in_transit = TRUE;
