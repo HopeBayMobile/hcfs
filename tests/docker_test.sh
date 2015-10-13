@@ -33,7 +33,7 @@ SSH="ssh -o UserKnownHostsFile=/dev/null -oStrictHostKeyChecking=no -i $key jenk
 while ! $SSH true; do sleep 1; done
 
 # Setup docker slave
-$SSH $docker_workspace/utils/setup_dev_env.sh -vm docker_slave
+$SSH sudo $docker_workspace/utils/setup_ci_env.sh
 
 # Running auto test
 $SSH "run-parts --exit-on-error --verbose $docker_workspace/tests/docker_scrips"

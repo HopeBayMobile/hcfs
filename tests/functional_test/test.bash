@@ -41,7 +41,7 @@ if [ ! -f $prefix/$s ]; then
 	echo "########## Prepare large file: $s"
 	bs=4K
 	count=`units ${s}iB ${bs}iB -1 -t --out="%.f"`
-	openssl enc -aes-256-ctr -pass pass:`date +%s%N` -nosalt < /dev/zero 2>/dev/null | dd iflag=fullblock bs=$bs count=$count | tee $prefix/$s | pv -s $s | md5sum | sed -e "s/-/$s/" > $prefix/${s}.md5
+	openssl enc -aes-256-ctr -pass pass:`date +%s%N` -nosalt < /dev/zero 2>/dev/null | dd iflag=fullblock bs=$bs count=$count | tee $prefix/$s | pv -fs $s | md5sum | sed -e "s/-/$s/" > $prefix/${s}.md5
 	#openssl enc -aes-256-ctr -pass pass:`date +%s%N` -nosalt < /dev/zero 2>/dev/null | dd iflag=fullblock bs=$bs count=$count | pv -s $s > $prefix/$s
 fi
 

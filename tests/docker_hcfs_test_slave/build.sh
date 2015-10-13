@@ -5,6 +5,7 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 set -x -e
 $repo/utils/setup_dev_env.sh -v -m docker_host
+sudo git clean -dXf $repo
 
 rsync -avz --delete ../../utils/ $here/utils/
 cp -f ../functional_test/requirements.txt $here/utils/
