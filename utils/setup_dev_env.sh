@@ -1,10 +1,10 @@
 #!/bin/bash
 
-source $WORKSPACE/utils/common_header.bash
-
 WORKSPACE="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $here
+
+source $WORKSPACE/utils/common_header.bash
 
 configfile="$WORKSPACE/utils/env_config.sh"
 if [[ -f /.dockerinit && "$USER" = jenkins ]]; then
