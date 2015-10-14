@@ -998,7 +998,7 @@ int get_block_dirty_status(char *path, FILE *fptr, char *status)
 		if (strncmp(tmpstr, "T", 1) == 0)
 			*status = TRUE;
 		else
-			*status = FALSE
+			*status = FALSE;
 	} else if (fptr != NULL) {
 		ret = fgetxattr(fileno(fptr), "user.dirty",
 				(void *) tmpstr, 1);
@@ -1013,7 +1013,7 @@ int get_block_dirty_status(char *path, FILE *fptr, char *status)
 		if (strncmp(tmpstr, "T", 1) == 0)
 			*status = TRUE;
 		else
-			*status = FALSE
+			*status = FALSE;
 	} else {
 		/* Cannot get block dirty status */
 		write_log(0, "Unexpected error\n");

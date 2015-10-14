@@ -849,7 +849,8 @@ int update_FS_statistics(MOUNT_T *mptr)
 
 	PWRITE(tmpfd, &(mptr->FS_stat), sizeof(FS_STAT_T), 0);
 
-	FSYNC(tmpfd);
+	/* Remove fsync for the purpose of write performance */
+	//FSYNC(tmpfd);
 
 	return 0;
 
