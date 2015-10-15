@@ -523,31 +523,8 @@ processing the new one */
 
 	int ret, errcode;
 	size_t ret_size;
-	char toupload_metapath[300];
-	char local_metapath[300];
 
 	_ASSERT_CACHE_LOCK_IS_LOCKED_(&(body_ptr->access_sem));
-
-	if (is_now_uploading(body_ptr)) {
-		fetch_toupload_meta_path(toupload_metapath, this_inode);
-		if (access(toupload_metapath, F_OK) < 0) {
-			errcode = errno;
-			if (errcode != ENOENT) {
-				write_log(0, "Error: Fail to access toupload"
-				" meta path in %s. Code %d.", __func__,
-				errcode);
-				return -errcode;
-			}
-			// TODO: flush
-			fetch_meta_path(local_metapath, this_inode);
-			ret = check_and_copy_file(local_metapath,
-				toupload_metapath, directly_copy);
-			if (ret < 0) {
-				if (ret != -EEXIST)
-					return ret;
-			}
-		}
-	}
 
 	if (inode_stat != NULL) {
 		memcpy(&(body_ptr->this_stat), inode_stat, sizeof(struct stat));
