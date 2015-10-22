@@ -17,10 +17,10 @@
 GTEST_DIR = ../../gtest-1.7.0
 
 # Where to find user code.
-USER_DIR = ../../../../../src/HCFS
+USER_DIR = $(realpath ../../../../../src/HCFS)
 
 # Location for unittest code
-UNITTEST_DIR = ./unittests
+UNITTEST_DIR = $(realpath ./unittests)
 
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
@@ -45,13 +45,21 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 
 # House-keeping build targets.
 
-all : $(TESTS)
+all : setup $(TESTS)
 
 clean :
-	rm -f $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
-test : $(TESTS)
+test : setup $(TESTS)
 	./hcfscurl_unittest
+	gcovr -r $(USER_DIR) .
+
+.PHONY : setup
+setup :
+	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+
+export PATH := /usr/lib/ccache:$(PATH)
+export USE_CCACHE := 1
 
 # Builds gtest.a and gtest_main.a.
 
@@ -85,7 +93,7 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 # hcfscurl testing
 
-hcfscurl.o : $(USER_DIR)/hcfscurl.c $(USER_DIR)/global.h $(USER_DIR)/hcfscurl.h 
+hcfscurl.o : $(USER_DIR)/hcfscurl.c $(USER_DIR)/global.h $(USER_DIR)/hcfscurl.h $(USER_DIR)/enc.h
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfscurl.c
 
 hcfscurl_unittest.o : $(UNITTEST_DIR)/hcfscurl_unittest.cc \

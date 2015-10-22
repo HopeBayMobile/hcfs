@@ -1,14 +1,32 @@
 Prefix,TestCase ID,Title,Type,Run,Result,Log,Duration Time
-,HCFS_0,Setup environment,,0,Fail,,0
-,HCFS_3,chflags,,1,Pass,,0
-,HCFS_4,chmod,,1,Pass,,8
-,HCFS_5,chown,,1,Pass,,16
-,HCFS_6,link,,1,Pass,,4
+,HCFS_0,Setup environment,,1,Pass,,0
+,HCFS_3,chflags,,1,Fail,,4
+,HCFS_4,chmod,,1,Pass,,4
+,HCFS_5,chown,,1,Pass,,12
+,HCFS_6,link,,1,Pass,,2
 ,HCFS_7,mkdir,,1,Pass,,1
-,HCFS_8,mkfifo,,1,Pass,,1
+,HCFS_8,mkfifo,,1,Pass,mkfifo not supported now,0
 ,HCFS_9,open,,1,Pass,,3
-,HCFS_10,rename,,1,Pass,,9
+,HCFS_10,rename,,1,Pass,,6
 ,HCFS_11,rmdir,,1,Pass,,1
 ,HCFS_12,symlink,,1,Pass,,1
 ,HCFS_13,truncate,,1,Pass,,2
-,HCFS_14,unlink,,1,Pass,,8
+,HCFS_14,unlink,,1,Pass,,5
+,HCFS_99,Clear environment for file system operation test,,1,Pass,,1
+,HCFS_15,Multiple Mount,,0,,,
+,HCFS_16,Backend Setting – ArkFlex One (Swift),,1,Pass,,32
+,HCFS_17,Backend Setting – ArkFlex U (S3),,0,,,
+,HCFS_18,Backend Setting – Swift,,0,,,
+,HCFS_19,Backend Setting – S3,,1,Fail,The process of hcfs number is wrong: 0,6
+,HCFS_0,Setup environment,,1,Pass,,0
+,HCFS_20,Upload – exceed soft limit,,1,Pass,,10
+,HCFS_21,Upload – exceed hard limit,,1,Pass,,10
+,HCFS_22,Upload/Download,,1,Pass,,10
+,HCFS_23,Delete,,0,,,
+,HCFS_24,Deduplication,,0,,,
+,HCFS_25,Encryption,,0,,,
+,HCFS_26,Compression,,0,,,
+,HCFS_39,Upload big file,,1,Pass,Spend time: 9.48(min),969
+,HCFS_40,Download big file,,1,Pass,Spend time: 1.17(min),159
+,HCFS_41,Delete big file,,1,Pass,Spend: 20.27(min),5
+,HCFS_99,Clear environment for file system operation test,,1,Pass,,1

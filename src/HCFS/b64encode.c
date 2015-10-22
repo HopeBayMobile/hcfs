@@ -22,8 +22,7 @@
 #include "logger.h"
 
 unsigned char base64_codes[64] =
-	"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 /************************************************************************
 *
@@ -36,7 +35,7 @@ unsigned char base64_codes[64] =
 *
 *************************************************************************/
 int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
-						int *outlen, int inputlen)
+		  int *outlen, int inputlen)
 {
 	unsigned char *tmpstr;
 	int count, input_index, output_index;
@@ -45,7 +44,7 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 	unsigned long long tmp_index;
 
 	origin_str_len = inputlen;
-	tmpstr = malloc(1+((origin_str_len+2)/3)*3);
+	tmpstr = malloc(1 + ((origin_str_len + 2) / 3) * 3);
 
 	if (tmpstr == NULL) {
 		write_log(0, "Out of memory in %s\n", __func__);
@@ -54,39 +53,40 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 
 	memcpy(tmpstr, inputstr, origin_str_len);
 
-	for (count = origin_str_len; count < (1+((origin_str_len+2)/3)*3);
-								count++)
+	for (count = origin_str_len;
+	     count < (1 + ((origin_str_len + 2) / 3) * 3); count++)
 		tmpstr[count] = 0;
 
 	output_index = 0;
 	input_index = 0;
 
-	for (input_index = 0; input_index < ((origin_str_len+2)/3)*3;
-			input_index += 3) {
-		tmp = (unsigned long long) tmpstr[input_index];
+	for (input_index = 0; input_index < ((origin_str_len + 2) / 3) * 3;
+	     input_index += 3) {
+		tmp = (unsigned long long)tmpstr[input_index];
 		tmp = tmp << 16;
-		tmp = tmp + (((unsigned long long) tmpstr[input_index+1]) << 8);
-		tmp = tmp + ((unsigned long long) tmpstr[input_index+2]);
+		tmp =
+		    tmp + (((unsigned long long)tmpstr[input_index + 1]) << 8);
+		tmp = tmp + ((unsigned long long)tmpstr[input_index + 2]);
 
 		tmp_index = (tmp & 0xFC0000) >> 18;
 		outputstr[output_index] = base64_codes[tmp_index];
 
 		tmp_index = (tmp & 0x3F000) >> 12;
-		outputstr[output_index+1] = base64_codes[tmp_index];
+		outputstr[output_index + 1] = base64_codes[tmp_index];
 
-		if ((input_index+1) >= origin_str_len) {
-			outputstr[output_index+2] = '=';
-			outputstr[output_index+3] = '=';
+		if ((input_index + 1) >= origin_str_len) {
+			outputstr[output_index + 2] = '=';
+			outputstr[output_index + 3] = '=';
 		} else {
 			tmp_index = (tmp & 0xFC0) >> 6;
-			outputstr[output_index+2] = base64_codes[tmp_index];
+			outputstr[output_index + 2] = base64_codes[tmp_index];
 
-			if ((input_index+2) >= origin_str_len) {
-				outputstr[output_index+3] = '=';
+			if ((input_index + 2) >= origin_str_len) {
+				outputstr[output_index + 3] = '=';
 			} else {
 				tmp_index = (tmp & 0x3F);
-				outputstr[output_index+3] =
-						base64_codes[tmp_index];
+				outputstr[output_index + 3] =
+				    base64_codes[tmp_index];
 			}
 		}
 		output_index += 4;
@@ -101,8 +101,7 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 	return 0;
 }
 
-static
-char decode_table(char c)
+static char decode_table(char c)
 {
 	if (c >= 'A' && c <= 'Z') {
 		return c - 'A';
@@ -122,13 +121,12 @@ char decode_table(char c)
 		case ' ':
 		case '=':
 		case '\0':
-			return 64;  /* ignore */
+			return 64; /* ignore */
 		default:
 			return -1;
 		}
 	}
 }
-
 
 /************************************************************************
 *
@@ -142,8 +140,9 @@ char decode_table(char c)
 *                -2 if impossible format occurs
 *
 *************************************************************************/
-int b64decode_str(char *inputstr, unsigned char *outputstr,
-		  int *outlen, int inputlen) {
+int b64decode_str(char *inputstr, unsigned char *outputstr, int *outlen,
+		  int inputlen)
+{
 	int i = 0;
 	int out_index = 0;
 	int group_count = 0;
@@ -161,12 +160,11 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 			buf[group_count++] = decode;
 			if (group_count == 4) {
 				group_count = 0;
-				outputstr[out_index++] = (buf[0] << 2) +
-					((buf[1] & 0x30) >> 4);
-				outputstr[out_index++] = (buf[1] << 4) +
-					(buf[2] >> 2);
-				outputstr[out_index++] = (buf[2] << 6) +
-					buf[3];
+				outputstr[out_index++] =
+				    (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
+				outputstr[out_index++] =
+				    (buf[1] << 4) + (buf[2] >> 2);
+				outputstr[out_index++] = (buf[2] << 6) + buf[3];
 			}
 		}
 	}
@@ -177,7 +175,7 @@ int b64decode_str(char *inputstr, unsigned char *outputstr,
 	} else if (group_count == 2) {
 		outputstr[out_index++] = (buf[0] << 2) + ((buf[1] & 0x30) >> 4);
 		outputstr[out_index++] = (buf[1] << 4);
-	} else {
+	} else if (group_count != 0) {
 		/* impossible situation */
 		return -2;
 	}

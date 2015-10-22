@@ -1,9 +1,9 @@
 CC = gcc
-CPPFLAGS = -DENCRYPT_ENABLE -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
+CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
 CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -Wall -Wextra
 
-hcfs: mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o
-	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: objmeta.o mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o
+	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o objmeta.o -lfuse -lcurl -pthread -lssl -lcrypto -llz4
 
 mount_manager.o: mount_manager.c mount_manager.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c mount_manager.c
@@ -47,7 +47,7 @@ filetables.o: filetables.c fuseop.h
 hcfscurl.o: hcfscurl.c hcfscurl.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfscurl.c
 
-hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h
+hcfs_tocloud.o: hcfs_tocloud.c hcfs_tocloud.h params.h hcfscurl.h super_block.h fuseop.h 
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c hcfs_tocloud.c
 
 hcfs_fromcloud.o: hcfs_fromcloud.c hcfscurl.h params.h fuseop.h
@@ -74,6 +74,14 @@ xattr_ops.o: xattr_ops.c xattr_ops.h
 enc.o: enc.h enc.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c enc.c
 
+compress.o: compress.h compress.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c compress.c
+
+objmeta.o: objmeta.h objmeta.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c objmeta.c
+
+dedup_table.o: dedup_table.c dedup_table.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c dedup_table.c
 
 clean:
 	rm -rf *.o hcfs
