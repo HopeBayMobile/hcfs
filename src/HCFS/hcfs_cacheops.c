@@ -8,6 +8,7 @@
 * Revision History
 * 2015/2/11~12 Jiahong added header for this file, and revising coding style.
 * 2015/6/3 Jiahong added error handling
+* 2015/10/22 Kewei added mechanism skipping pinned inodes.
 *
 **************************************************************************/
 
@@ -112,8 +113,22 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 		current_block = 0;
 
 		FREAD(&temphead_stat, sizeof(struct stat), 1, metafptr);
-
 		FREAD(&temphead, sizeof(FILE_META_TYPE), 1, metafptr);
+
+		/* Skip if inode is pinned */
+		if (temphead.local_pin == TRUE) {
+#ifdef ARM_32bit_
+			write_log(10, "Debug: inode %lld is pinned."
+				" Skip to page it out.\n", this_inode);
+#else
+			write_log(10, "Debug: inode %ld is pinned."
+				" Skip to page it out.\n", this_inode);
+#endif
+			flock(fileno(metafptr), LOCK_UN);
+			fclose(metafptr);
+			return 0;
+		}
+
 		total_blocks = (temphead_stat.st_size +
 					(MAX_BLOCK_SIZE - 1)) / MAX_BLOCK_SIZE;
 
