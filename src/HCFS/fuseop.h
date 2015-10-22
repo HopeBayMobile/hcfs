@@ -93,6 +93,7 @@ typedef struct {
 	long long entry_page_gc_list;
 	long long tree_walk_list_head;
 	unsigned long generation;
+	unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
@@ -143,6 +144,7 @@ typedef struct {
 	long long triple_indirect;
 	long long quadruple_indirect;
 	unsigned long generation;
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
@@ -155,6 +157,7 @@ typedef struct {
 	unsigned link_len;
 	unsigned long generation;
 	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;

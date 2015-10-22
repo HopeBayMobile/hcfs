@@ -180,6 +180,7 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
+	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
@@ -255,6 +256,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.generation = this_gen;
 	this_meta.metaver = CURRENT_META_VER;
+        this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
@@ -476,6 +478,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.link_len = strlen(link);
 	symlink_meta.generation = generation;
 	symlink_meta.metaver = CURRENT_META_VER;
+        symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 

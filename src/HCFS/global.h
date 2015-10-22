@@ -18,8 +18,15 @@
 #define FALSE 0
 
 /* Defines the version of the current meta defs */
-#define CURRENT_META_VER 1
-#define BACKWARD_COMPATIBILITY 1
+#define CURRENT_META_VER 3
+#define BACKWARD_COMPATIBILITY 3
+/* TODO: force backward compability check when reading meta file */
+
+#define X64 1
+#define ARM_32BIT 2
+#define ANDROID_32BIT 3
+
+#define ARCH_CODE ANDROID_32BIT
 
 /* List of API codes */
 #define TERMINATE 0
