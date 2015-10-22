@@ -25,19 +25,27 @@ UNITTEST_DIR = $(realpath ./unittests)
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1
+CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS)
 
+# Flags passed to C and C++ compilers
+CPPFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs \
+	    -D_FILE_OFFSET_BITS=64 \
+	    -DDEDUP_ENABLE=0 \
+	    -DENCRYPT_ENABLE=1 \
+	    -DCOMPRESS_ENABLE=0 \
+	    -DARM_32bit_ \
+	    -D_ANDROID_ENV_
+# Flags passed to the C compiler. (We trace coverage of hcfs source only)
+CFLAGS += -ftest-coverage
+CFAKEFLAGS +=
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
-
+CXXFLAGS +=
+# gcc will compile: *.c/*.cpp files as C and C++ respectively.
 CXX = gcc
-
-CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
-CPPFLAGS += -DCOMPRESS_ENABLE=0 -DARM_32bit_ -D_ANDROID_ENV_
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest 
+TESTS = hcfs_tocloud_unittest hcfs_fromcloud_unittest hcfs_clouddelete_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
