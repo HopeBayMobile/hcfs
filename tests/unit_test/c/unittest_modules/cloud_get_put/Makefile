@@ -25,7 +25,7 @@ UNITTEST_DIR = $(realpath ./unittests)
 # Flags passed to the preprocessor.
 # Set Google Test's header directory as a system directory, such that
 # the compiler doesn't generate warnings in Google Test headers.
-CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=1
+CPPFLAGS += -isystem $(GTEST_DIR)/include -iquote$(USER_DIR) $(EXTRACPPFLAGS) -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1
 
 # Flags passed to the C++ compiler.
 CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
@@ -33,6 +33,7 @@ CXXFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 CXX = gcc
 
 CFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -ftest-coverage -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -DCOMPRESS_ENABLE=0 -DARM_32bit_ -D_ANDROID_ENV_
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.

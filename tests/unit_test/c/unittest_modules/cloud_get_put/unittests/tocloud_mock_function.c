@@ -178,3 +178,15 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HCFS_en
 	return 200;
 }
 
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	setxattr(path, "user.dirty", "F", 1, 0);
+	return 0;
+}
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+

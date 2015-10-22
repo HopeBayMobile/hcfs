@@ -65,3 +65,9 @@ int decrypt_session_key(unsigned char *session_key, char *enc_session_key,
     return 0;
 }
 
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	fsetxattr(fileno(fptr), "user.dirty", "F", 1, 0);
+	return 0;
+}
+

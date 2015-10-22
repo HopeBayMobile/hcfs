@@ -107,3 +107,10 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 {
 	return 0;
 }
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+
