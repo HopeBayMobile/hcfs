@@ -277,3 +277,161 @@ errcode_handle:
 		fclose(metafptr);
 	free(ptr);
 }
+
+static void *_fetch_block(void *ptr)
+{
+	char block_path[400];
+	long long blkno;
+	FILE *block_ptr;
+	ino_t inode;
+	DOWNLOAD_BLOCK_INFO *block_info;
+	int ret;
+
+
+	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
+	fetch_block_path(block_path, block_info->this_inode,
+						block_info->block_no);
+	//if (access(block_path, F_OK) == 0) {
+		/* It is downloaded by another thread... */
+	//}
+
+	block_ptr = fopen(block_path, "w+"); /* create or erase it */
+	if (block_ptr == NULL) {
+		write_log(0, "Error: Fail to open block path %s in %s\n",
+							block_path, __func__);
+		block_info->dl_error = TRUE;
+		return;
+	}
+
+	flock(block_ptr, LOCK_EX);
+	setbuf(block_ptr, NULL);
+
+	ret = fetch_from_cloud(block_ptr, block_info->this_inode,
+						block_info->block_no);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
+		block_info->dl_error = TRUE;
+		return;
+	}
+	flock(block_ptr, LOCK_UN);
+	fclose(block_ptr);
+
+	return;
+}
+
+static inline int _select_thread()
+{
+	int count;
+	for (count = 0; count < MAX_DL_CONCURRENCY; count++) {
+		if (download_thread_ctl.block_info[count].this_inode == 0)
+			break;
+	}
+	return count;
+}
+
+static int _check_fetch_block(const char *mathpath, FILE *fptr,
+	ino_t inode, long long blkno, long long page_pos)
+{
+	BLOCK_ENTRY_PAGE entry_page;
+	BLOCK_ENTRY *temp_entry;
+	int e_index;
+	int which_th;
+
+	e_index = blkno % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0) {
+		write_log(10, "Debug: %s is removed when pinning.");
+		return -ENOENT;
+	}
+
+	/* Re-load block entry page */
+	FSEEK(fptr, page_pos, SEEK_SET);
+	FREAD(&entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	temp_entry = &(entry_page.block_entries[e_index]);
+
+	if (temp_entry->status == ST_CLOUD) {
+		temp_entry->status = ST_CtoL;
+		FSEEK(fptr, page_pos, SEEK_SET);
+		FWRITE(&entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+		flock(fileno(fptr), LOCK_UN);
+
+		/* Create thread to download */
+		sem_wait(&dl_th_sem);
+		sem_wait(&ctl_op_sem);
+		which_th = _select_thread();
+		download_thread_ctl.block_info[which_th].this_inode = inode;
+		download_thread_ctl.block_info[which_th].block_no = blkno;
+		download_thread_ctl.block_info[which_th].page_start_fpos =
+								page_pos;
+		download_thread_ctl.block_info[which_th].dl_error = FALSE;
+		pthread_create(&(download_thread[which_th]),
+			NULL, (void *)&_fetch_block, NULL);
+
+		download_thread_ctl.active_th++;
+		sem_post(&ctl_op_sem);
+	}
+	/* TODO: How about ST_CtoL? */
+
+	return 0;
+}
+
+int fetch_pinned_blocks(ino_t inode)
+{
+	char metapath[300];
+	FILE *fptr;
+	struct stat tempstat;
+	off_t total_size;
+	long long total_blocks, blkno;
+	long long which_page, current_page, page_pos;
+	FILE_META_TYPE this_meta;
+	int ret, ret_code;
+
+	fetch_meta_path(metapath, inode);
+	fptr = fopen(metapath, "r+");
+	if (fptr == NULL) {
+		write_log(2, "Cannot open %s in %s\n", metapath, __func__);
+		return 0;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	FSEEK(fptr, 0, SEEK_SET);
+	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+	/* Do not need to re-load meta in loop because just need to check those
+	blocks that existing before setting local_pin = true.*/
+	FREAD(&this_meta, sizeof(FILE_META_TYPE), fptr);
+	flock(fileno(fptr), LOCK_UN);
+
+	total_size = tempstat.st_size;
+	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
+
+	ret_code = 0;
+	current_page = -1;
+	for (blkno = 0 ; blkno < total_blocks ; blkno++) {
+		if (access(metapath, F_OK) < 0) {
+			write_log(10, "Debug: %s is removed when pinning.");
+			ret_code = -ENOENT;
+			break;
+		}
+		which_page = blkno / MAX_BLOCK_ENTRIES_PER_PAGE;
+
+		if (current_page != which_page) {
+			flock(fileno(fptr), LOCK_EX);
+			page_pos = seek_page2(&this_meta, fptr, which_page, 0);
+			if (page_pos <= 0) {
+				blkno += MAX_BLOCK_ENTRIES_PER_PAGE - 1;
+				flock(fileno(fptr), LOCK_UN);
+				continue;
+			}
+			flock(fileno(fptr), LOCK_UN);
+			current_page = which_page;
+		}
+		ret_code = _check_fetch_block(mathpath, fptr, inode, blkno, page_pos);
+		if (ret_code < 0)
+			break;
+
+	}
+
+	fclose(fptr);
+	return ret_code;
+}
