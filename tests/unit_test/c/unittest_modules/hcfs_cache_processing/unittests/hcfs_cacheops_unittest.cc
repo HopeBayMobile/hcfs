@@ -58,26 +58,14 @@ protected:
 		for (int i = 0 ; i < CACHE_USAGE_NUM_ENTRIES ; i += 5) {
 			ino_t inode = inode_cache_usage_hash[i]->this_inode;
 
-#ifdef ARM_32bit_
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_filemeta%lld",
+				"/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
 				inode);
-#else
-			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
 			unlink(meta_name);
 			for (int blockno = 0; blockno < 10 ; blockno++) {	
-#ifdef ARM_32bit_
 				sprintf(block_name,
-					"/tmp/testHCFS/run_cache_loop_block%lld_%d", 
+					"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d", 
 					inode, blockno);
-#else
-				sprintf(block_name,
-					"/tmp/testHCFS/run_cache_loop_block%ld_%d", 
-					inode, blockno);
-#endif
 				unlink(block_name);
 			}
 		}
@@ -135,13 +123,8 @@ private:
 		for (int i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
 
-#ifdef ARM_32bit_
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
 				inode);
-#else
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
 		fptr = fopen(meta_name, "w+");
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(struct stat), 1, fptr);
@@ -150,15 +133,9 @@ private:
 		fclose(fptr);
 
 		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
-#ifdef ARM_32bit_
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
+				"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d",
 				inode, blockno);
-#else
-			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
-				inode, blockno);
-#endif
 			mknod(meta_name, 0700, 0);
 			truncate(meta_name, MAX_BLOCK_SIZE);
 		}
@@ -212,13 +189,8 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 		ino_t inode;
 		
 		inode = inode_cache_usage_hash[i]->this_inode;
-#ifdef ARM_32bit_
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
 				inode);
-#else
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
-				inode);
-#endif
 		fptr = fopen(meta_name, "r");
 		
 		fseek(fptr, 0, SEEK_SET);
@@ -231,15 +203,9 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 			char block_name[200];
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
-#ifdef ARM_32bit_
 			sprintf(block_name,
-				"/tmp/testHCFS/run_cache_loop_block%lld_%d",
+				"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d",
 				inode, entry);
-#else
-			sprintf(block_name,
-				"/tmp/testHCFS/run_cache_loop_block%ld_%d",
-				inode, entry);
-#endif
 			ASSERT_TRUE(access(block_name, F_OK) < 0);
 
 			expected_block_num--;

@@ -195,11 +195,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
-#ifdef ARM_32bit_
-			sprintf(path, "/tmp/testHCFS/data_%lld_%d",inode, i);
-#else
-			sprintf(path, "/tmp/testHCFS/data_%d_%d",inode, i);
-#endif
+			sprintf(path, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -619,21 +615,11 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[20];
-#ifdef ARM_32bit_
-		sprintf(expected_objname, "data_%lld_%d",
+		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
-#else
-		sprintf(expected_objname, "data_%d_%d",
-				mock_thread_type.inode, blockno);
-#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-#ifdef ARM_32bit_
-		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+		sprintf(expected_objname, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
-#else
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
-				mock_thread_type.inode, blockno);
-#endif
 		unlink(expected_objname);
 	}
 	metaptr = fopen(metapath, "r+");
@@ -676,21 +662,11 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
 		char expected_objname[20];
-#ifdef ARM_32bit_
-		sprintf(expected_objname, "data_%lld_%d",
+		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
-#else
-		sprintf(expected_objname, "data_%d_%d",
-				mock_thread_type.inode, blockno);
-#endif
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-#ifdef ARM_32bit_
-		sprintf(expected_objname, "/tmp/testHCFS/data_%lld_%d",
+		sprintf(expected_objname, "/tmp/testHCFS/data_"FMT_INO_T"d_%d",
 				mock_thread_type.inode, blockno);
-#else
-		sprintf(expected_objname, "/tmp/testHCFS/data_%d_%d",
-				mock_thread_type.inode, blockno);
-#endif
 		unlink(expected_objname);
 	}
 	unlink(metapath);

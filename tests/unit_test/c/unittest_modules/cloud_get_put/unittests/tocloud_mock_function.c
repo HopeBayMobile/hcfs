@@ -19,13 +19,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-#ifdef ARM_32bit_
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%lld_%lld",
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%"FMT_INO_T"_%lld",
 		this_inode, block_num);
-#else
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%ld_%lld",
-		this_inode, block_num);
-#endif
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -86,11 +81,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
 	char deleteobjname[30];
-#ifdef ARM_32bit_
-	sprintf(deleteobjname, "data_%lld_%lld", this_inode, block_no);
-#else
-	sprintf(deleteobjname, "data_%ld_%lld", this_inode, block_no);
-#endif
+	sprintf(deleteobjname, "data_%"FMT_INO_T"_%lld", this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
 	usleep(200000); // Let thread busy

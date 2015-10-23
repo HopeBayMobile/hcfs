@@ -82,13 +82,8 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug lookup increase for inode %lld, amount %d\n",
+	write_log(10, "Debug lookup increase for inode %"FMT_INO_T", amount %d\n",
 			this_inode, amount);
-#else
-	write_log(10, "Debug lookup increase for inode %ld, amount %d\n",
-			this_inode, amount);
-#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -167,13 +162,8 @@ int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug lookup decrease for inode %lld, amount %d\n",
+	write_log(10, "Debug lookup decrease for inode %"FMT_INO_T", amount %d\n",
 			this_inode, amount);
-#else
-	write_log(10, "Debug lookup decrease for inode %ld, amount %d\n",
-			this_inode, amount);
-#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -260,13 +250,8 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug lookup markdelete for inode %lld\n",
+	write_log(10, "Debug lookup markdelete for inode %"FMT_INO_T"\n",
 			this_inode);
-#else
-	write_log(10, "Debug lookup markdelete for inode %ld\n",
-			this_inode);
-#endif
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -352,13 +337,8 @@ int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 		ptr = lookup_table[count].head;
 
 		while (ptr != NULL) {
-#ifdef ARM_32bit_
-			write_log(10, "Debug check delete %lld\n",
+			write_log(10, "Debug check delete %"FMT_INO_T"\n",
 				ptr->this_inode);
-#else
-			write_log(10, "Debug check delete %ld\n",
-				ptr->this_inode);
-#endif
 			ret_val = disk_checkdelete(ptr->this_inode,
 						tmpptr->f_ino);
 
