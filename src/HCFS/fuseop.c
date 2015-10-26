@@ -5096,7 +5096,3 @@ int hook_fuse(int argc, char **argv)
 	return 0;
 }
 
-/* TODO: Operations to implement
-int hfuse_ll_link
-int hfuse_ll_create
-*/

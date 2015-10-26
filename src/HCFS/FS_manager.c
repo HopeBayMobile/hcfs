@@ -245,6 +245,10 @@ ino_t _create_root_inode(void)
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	this_meta.metaver = CURRENT_META_VER;
+#ifdef _ANDROID_ENV_
+	this_meta.parent_inode = 0;
+#endif
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
