@@ -455,14 +455,14 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		fuse_reply_attr(req, &tmp_stat, 0);
-	 } else {
+	} else {
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		fuse_reply_err(req, ENOENT);
-	 }
+	}
 }
 
 /************************************************************************
@@ -861,7 +861,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
-	write_log(10, "Debug rmdir: name %s, %"FMT_INO_T"\n", 
+	write_log(10, "Debug rmdir: name %s, %"FMT_INO_T"\n",
 			temp_dentry.d_name, this_inode);
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
@@ -950,7 +950,7 @@ a directory (for NFS) */
 	}
 
 	output_param.generation = this_gen;
-	write_log(10, "Debug lookup inode %"FMT_INO_T", gen %ld\n", 
+	write_log(10, "Debug lookup inode %"FMT_INO_T", gen %ld\n",
 			this_inode, this_gen);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -2987,7 +2987,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
 		case ST_TODELETE:
-			 /*If not stored anywhere, make it on local disk*/
+			/*If not stored anywhere, make it on local disk*/
 			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
 			if (fh_ptr->blockfptr == NULL) {
 				errnum = errno;
@@ -4818,7 +4818,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(10, "DEBUG parent %"FMT_INO_T", name %s mode %d\n", 
+	write_log(10, "DEBUG parent %"FMT_INO_T", name %s mode %d\n",
 			parent_inode, name, mode);
 
 	/* Reject if not creating a regular file */
