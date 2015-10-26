@@ -9,12 +9,12 @@ import TestLibs.VMRUN as vmrun
 vmrunner = vmrun.VMRUNNer('10.1.25.55', 'root', 'toolqa#!')
 
 GUEST_NAME = 'Administrator'
-GUEST_PASSWORD = '1111' 
+GUEST_PASSWORD = '1111'
 
 class TestDummyOnVMs_000001:
     '''
     Setup Clone_SANDBOX_22
-    '''    
+    ''' 
     def __init__(self):
         self.vm_path = [
                         "[datastore1] Clone_SANDBOX_22/Clone_SANDBOX_22.vmx",

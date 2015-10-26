@@ -60,7 +60,7 @@ static void _mount_test_fuse(MOUNT_T *tmpmount) {
 
   memset(tmpmount, 0, sizeof(MOUNT_T));
   tmpmount->f_ino = 1;
-  sem_init(&((tmpmount->FS_stat).lock), 0, 1);
+  sem_init(&(tmpmount->stat_lock), 0, 1);
   fuse_parse_cmdline(&tmp_args, &mount, &mt, &fg);
   tmp_channel = fuse_mount(mount, &tmp_args);
   tmp_session = fuse_lowlevel_new(&tmp_args,
@@ -1841,6 +1841,7 @@ TEST_F(hfuse_ll_readdirTest, TwoMaxPageEntries) {
 
 /* End of the test case for the function hfuse_ll_readdir */
 
+#ifndef _ANDROID_ENV_
 /* 
 	Unittest of hfuse_ll_setxattr()
  */
@@ -2132,6 +2133,7 @@ TEST_F(hfuse_ll_removexattrTest, RemoveXattrSuccess)
 	End of unittest of hfuse_ll_removexattr()
  */
 
+#endif
 /*
 	Unittest of hfuse_ll_symlink()
  */

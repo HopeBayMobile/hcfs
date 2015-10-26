@@ -46,4 +46,7 @@ int change_system_meta(long long system_size_delta,
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
 
+/* Will copy the filename of ddt meta file to pathname */
+int fetch_ddt_path(char *pathname, unsigned char last_char);
+
 #endif  /* GW20_SRC_UTILS_H_ */

@@ -781,3 +781,26 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	else
 		return 0;
 }
+
+int set_block_dirty_status(char *path, FILE *fptr, char status)
+{
+	if (path != NULL) {
+		if (status == TRUE)
+			setxattr(path, "user.dirty", "T", 1, 0);
+		else
+			setxattr(path, "user.dirty", "F", 1, 0);
+	} else {
+		if (status == TRUE)
+			fsetxattr(fileno(fptr), "user.dirty", "T", 1, 0);
+		else
+			fsetxattr(fileno(fptr), "user.dirty", "F", 1, 0);
+	}
+	return 0;
+}
+
+int fetch_trunc_path(char *pathname, ino_t this_inode)
+{
+	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
+	return 0;
+}
+

@@ -28,6 +28,7 @@
 #include <fuse/fuse_opt.h>
 
 #include "params.h"
+#include "dedup_table.h"
 
 /*BEGIN META definition*/
 
@@ -92,6 +93,7 @@ typedef struct {
 	long long entry_page_gc_list;
 	long long tree_walk_list_head;
 	unsigned long generation;
+	unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
@@ -117,6 +119,9 @@ typedef struct {
 typedef struct {
 	unsigned char status;
 	unsigned char uploaded;
+#if (DEDUP_ENABLE)
+	unsigned char obj_id[OBJID_LENGTH];
+#endif
 } BLOCK_ENTRY;
 
 /* Defining the structure of one page of block status page */
@@ -139,6 +144,7 @@ typedef struct {
 	long long triple_indirect;
 	long long quadruple_indirect;
 	unsigned long generation;
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
@@ -151,6 +157,7 @@ typedef struct {
 	unsigned link_len;
 	unsigned long generation;
 	char link_path[MAX_LINK_PATH]; /* NOT null-terminated string */
+        unsigned char source_arch;
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
