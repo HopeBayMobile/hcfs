@@ -77,8 +77,6 @@ compress_bound_func compress_bound_f = LZ4_compressBound;
  * *************************************************************************/
 FILE *transform_compress_fd(FILE *in_fd, unsigned char **data)
 {
-/* TODO: If need compression in android, change this function to remove
-the need of fmemopen (similar to how LT changed transform_enc_fd) */
 #if COMPRESS_ENABLE
 	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
 
