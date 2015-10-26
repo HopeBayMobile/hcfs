@@ -103,12 +103,9 @@ gtest_main.a : gtest-all.o gtest_main.o
 
 # hcfs_cachebuild testing
 
-utils.o: $(USER_DIR)/utils.c $(USER_DIR)/fuseop.h $(USER_DIR)/params.h
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/utils.c
-
 hcfs_cachebuild.o : $(USER_DIR)/hcfs_cachebuild.c $(USER_DIR)/params.h \
 		$(USER_DIR)/fuseop.h $(USER_DIR)/super_block.h $(USER_DIR)/hcfs_cachebuild.h \
-		$(USER_DIR)/utils.h $(GTEST_HEADERS)
+		$(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/hcfs_cachebuild.c
 
 hcfs_cachebuild_unittest.o : $(UNITTEST_DIR)/hcfs_cachebuild_unittest.cc \
@@ -118,7 +115,7 @@ hcfs_cachebuild_unittest.o : $(UNITTEST_DIR)/hcfs_cachebuild_unittest.cc \
 cachebuild_mock_function.o : $(UNITTEST_DIR)/cachebuild_mock_function.c $(UNITTEST_DIR)/mock_params.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/cachebuild_mock_function.c
 
-hcfs_cachebuild_unittest : cachebuild_mock_function.o hcfs_cachebuild.o hcfs_cachebuild_unittest.o utils.o gtest_main.a
+hcfs_cachebuild_unittest : cachebuild_mock_function.o hcfs_cachebuild.o hcfs_cachebuild_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 
 

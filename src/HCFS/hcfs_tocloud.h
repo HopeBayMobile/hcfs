@@ -19,7 +19,6 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <curl/curl.h>
 
 #include "hcfscurl.h"
 #include "compress.h"

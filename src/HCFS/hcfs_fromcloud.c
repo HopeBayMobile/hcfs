@@ -23,7 +23,6 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <sys/file.h>
-#include <curl/curl.h>
 
 #include "params.h"
 #include "enc.h"
