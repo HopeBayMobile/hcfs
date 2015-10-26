@@ -182,6 +182,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
 	this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
+#ifdef _ANDROID_ENV_
+	this_meta.parent_inode = parent_inode;
+#endif
+
 	/* Store the inode and file meta of the new file to meta cache */
 	body_ptr = meta_cache_lock_entry(self_inode);
 	if (body_ptr == NULL)
@@ -258,6 +262,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
+#ifdef _ANDROID_ENV_
+	this_meta.parent_inode = parent_inode;
+#endif
+
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
 						this_meta.root_entry_page);
 	if (ret_val < 0)
@@ -480,6 +488,9 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	symlink_meta.metaver = CURRENT_META_VER;
         symlink_meta.source_arch = ARCH_CODE;
 	symlink_meta.root_inode = root_ino;
+#ifdef _ANDROID_ENV_
+	symlink_meta.parent_inode = parent_inode;
+#endif
 	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
 
 	/* Update self meta data */

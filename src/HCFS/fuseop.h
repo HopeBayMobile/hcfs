@@ -97,6 +97,9 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+#ifdef _ANDROID_ENV_
+	ino_t parent_inode;
+#endif
 } DIR_META_TYPE;
 
 /* Defining the structure for a page of directory entries */
@@ -149,6 +152,9 @@ typedef struct {
 	ino_t root_inode;
 	long long upload_seq;
 	long long size_last_upload;
+#ifdef _ANDROID_ENV_
+	ino_t parent_inode;
+#endif
 } FILE_META_TYPE;
 
 /* Defining the structure of symbolic link meta */
@@ -161,6 +167,9 @@ typedef struct {
 	unsigned long long metaver;
 	ino_t root_inode;
 	long long upload_seq;
+#ifdef _ANDROID_ENV_
+	ino_t parent_inode;
+#endif
 } SYMLINK_META_TYPE;
 
 /*END META definition*/
