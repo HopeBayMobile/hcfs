@@ -281,16 +281,24 @@ unsigned char *get_key()
 FILE *transform_encrypt_fd(FILE *in_fd, unsigned char *key,
 			   unsigned char **data)
 {
+#if COMPRESS_ENABLE
 	unsigned char *buf =
 	    calloc(compress_bound_f(MAX_BLOCK_SIZE), sizeof(unsigned char));
-
+#else
+	unsigned char *buf = calloc(MAX_BLOCK_SIZE, sizeof(unsigned char));
+#endif
 	if (buf == NULL) {
 		write_log(
 		    0, "Failed to allocate memory in transform_encrypt_fd\n");
 		return NULL;
 	}
+#if COMPRESS_ENABLE
 	int read_count = fread(buf, sizeof(unsigned char),
 			       compress_bound_f(MAX_BLOCK_SIZE), in_fd);
+#else
+	int read_count = fread(buf, sizeof(unsigned char),
+			       MAX_BLOCK_SIZE, in_fd);
+#endif
 	unsigned char *new_data =
 	    calloc(read_count + TAG_SIZE, sizeof(unsigned char));
 	if (new_data == NULL) {

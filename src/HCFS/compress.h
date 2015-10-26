@@ -12,7 +12,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#if COMPRESS_ENABLE
 #include <lz4.h>
+#endif
 
 #include "params.h"
 
