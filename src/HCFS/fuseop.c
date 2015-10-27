@@ -564,6 +564,11 @@ errcode_handle:
 *        Inputs: fuse_req_t req, fuse_ino_t ino, struct fuse_file_info *fi
 *       Summary: Read the stat of the inode "ino" and reply to FUSE
 *
+*                Get file attributes.
+*
+*                Similar to stat().  The 'st_dev' and 'st_blksize' fields
+*                are ignored.	 The 'st_ino' field is ignored except if
+*                the 'use_ino' mount option is given.
 *************************************************************************/
 static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 					struct fuse_file_info *fi)
@@ -625,6 +630,12 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 *                with the permission specified by mode. "dev" is ignored
 *                as only regular file will be created.
 *
+*                Create a file node
+*
+*                This is called for creation of all non-directory,
+*                non-symlink nodes.  If the filesystem defines a create()
+*                method (hfuse_ll_create), then for regular files that
+*                will be called instead.
 *************************************************************************/
 static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		const char *selfname, mode_t mode, dev_t dev)
@@ -774,6 +785,12 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 *       Summary: Create a subdirectory "selfname" under "parent" with the
 *                permission specified by mode.
 *
+*                Create a directory
+*
+*                Note that the mode argument may not have the type
+*                specification bits set, i.e. S_ISDIR(mode) can be false.
+*                To obtain the correct directory type bits use
+*                mode|S_IFDIR
 *************************************************************************/
 static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 				const char *selfname, mode_t mode)
@@ -1062,6 +1079,15 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 *                "parent_inode" and name "selfname". Will return proper
 *                error value if cannot find the name.
 *
+*                Look up a directory entry by name and get its attributes.
+*
+*                Valid replies:
+*                  fuse_reply_entry
+*                  fuse_reply_err
+*
+*                @param req request handle
+*                @param parent inode number of the parent directory
+*                @param name the name to look up
 *************************************************************************/
 void hfuse_ll_lookup(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
@@ -2378,6 +2404,23 @@ errcode_handle:
 *                handle info to the structure pointed by "file_info".
 *
 *************************************************************************/
+/**                File open operation
+*
+*                No creation (O_CREAT, O_EXCL) and by default also no
+* truncation (O_TRUNC) flags will be passed to open(). If an
+* application specifies O_TRUNC, fuse first calls truncate()
+* and then open(). Only if 'atomic_o_trunc' has been
+* specified and kernel version is 2.6.24 or later, O_TRUNC is
+* passed on to open.
+*
+*                Unless the 'default_permissions' mount option is given,
+* open should check if the operation is permitted for the
+* given flags. Optionally open may also return an arbitrary
+* filehandle in the fuse_file_info structure, which will be
+* passed to all file operations.
+*
+*                Changed in version 2.2
+*/
 void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -2920,6 +2963,17 @@ errcode_handle:
 *                File handle is provided by the structure in "file_info".
 *
 *************************************************************************/
+/**                Read data from an open file
+*
+*                Read should return exactly the number of bytes requested except
+* on EOF or error, otherwise the rest of the data will be
+* substituted with zeroes.	 An exception to this is when the
+* 'direct_io' mount option is specified, in which case the return
+* value of the read system call will reflect the return value of
+* this operation.
+*
+*                Changed in version 2.2
+*/
 void hfuse_ll_read(fuse_req_t req, fuse_ino_t ino,
 	size_t size_org, off_t offset, struct fuse_file_info *file_info)
 {
@@ -3594,6 +3648,14 @@ errcode_handle:
 *                is provided by the structure in "file_info".
 *
 *************************************************************************/
+/**                Write data to an open file
+*
+*                Write should return exactly the number of bytes requested
+* except on error.	 An exception to this is when the 'direct_io'
+* mount option is specified (see read operation).
+*
+*                Changed in version 2.2
+*/
 void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		size_t size, off_t offset, struct fuse_file_info *file_info)
 {
@@ -3881,6 +3943,29 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 *                write back.
 *
 *************************************************************************/
+/**                Possibly flush cached data
+*
+*                BIG NOTE: This is not equivalent to fsync().  It's not a
+* request to sync dirty data.
+*
+*                Flush is called on each close() of a file descriptor.  So if a
+* filesystem wants to return write errors in close() and the file
+* has cached dirty data, this is a good place to write back data
+* and return any errors.  Since many applications ignore close()
+* errors this is not always useful.
+*
+*                NOTE: The flush() method may be called more than once for each
+* open().	This happens if more than one file descriptor refers
+* to an opened file due to dup(), dup2() or fork() calls.	It is
+* not possible to determine if a flush is final, so each flush
+* should be treated equally.  Multiple write-flush sequences are
+* relatively rare, so this shouldn't be a problem.
+*
+*                Filesystems shouldn't assume that flush will always be called
+* after some writes, or that if will be called at all.
+*
+*                Changed in version 2.2
+*/
 void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 				struct fuse_file_info *file_info)
 {
@@ -3899,6 +3984,20 @@ void hfuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Close the file handle pointed by "file_info".
 *
 *************************************************************************/
+/**                Release an open file
+*
+*                Release is called when there are no more references to an open
+*                file: all file descriptors are closed and all memory mappings
+* are unmapped.
+*
+*                For every open() call there will be exactly one release() call
+*                with the same flags and file descriptor.	 It is possible to
+* have a file opened more than once, in which case only the last
+* release will mean, that no more reads/writes will happen on the
+* file.  The return value of release is ignored.
+*
+* Changed in version 2.2
+*/
 void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -3939,6 +4038,13 @@ void hfuse_ll_release(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Conduct "fsync". Do nothing now (see hfuse_flush).
 *
 *************************************************************************/
+/**                Synchronize file contents
+*
+*                If the datasync parameter is non-zero, then only the user data
+* should be flushed, not the meta data.
+*
+*                Changed in version 2.2
+*/
 void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 					struct fuse_file_info *file_info)
 {
@@ -3957,6 +4063,16 @@ void hfuse_ll_fsync(fuse_req_t req, fuse_ino_t ino, int isdatasync,
 *       Summary: Check permission and open directory for access.
 *
 *************************************************************************/
+/**                Open directory
+*
+*                Unless the 'default_permissions' mount option is given,
+* this method should check if opendir is permitted for this
+* directory. Optionally opendir may also return an arbitrary
+* filehandle in the fuse_file_info structure, which will be
+* passed to readdir, closedir and fsyncdir.
+*
+*                Introduced in version 2.3
+*/
 static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 			struct fuse_file_info *file_info)
 {
@@ -4012,6 +4128,27 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 *                reading in follow-up calls.
 *
 *************************************************************************/
+/**                Read directory
+*
+*                This supersedes the old getdir() interface.  New applications
+* should use this.
+*
+*                The filesystem may choose between two modes of operation:
+*
+*                1) The readdir implementation ignores the offset parameter, and
+* passes zero to the filler function's offset.  The filler
+* function will not return '1' (unless an error happens), so the
+* whole directory is read in a single readdir operation.  This
+* works just like the old getdir() method.
+*
+*                2) The readdir implementation keeps track of the offsets of the
+* directory entries.  It uses the offset parameter and always
+* passes non-zero offset to the filler function.  When the buffer
+* is full (or an error happens) the filler function will return
+* '1'.
+*
+*                Introduced in version 2.3
+*/
 void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 			off_t offset, struct fuse_file_info *file_info)
 {
@@ -4214,6 +4351,16 @@ void hfuse_ll_releasedir(fuse_req_t req, fuse_ino_t ino,
 *       Summary: Initiate a FUSE mount
 *
 *************************************************************************/
+/**
+*                Initialize filesystem
+*
+*                The return value will passed in the private_data field of
+* fuse_context to all file operations and as a parameter to the
+* destroy() method.
+*
+*                Introduced in version 2.3
+*                Changed in version 2.6
+*/
 void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 {
 	MOUNT_T *tmpptr;
@@ -4231,6 +4378,13 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 *       Summary: Destroy a FUSE mount
 *
 *************************************************************************/
+/**
+* Clean up filesystem
+*
+* Called on filesystem exit.
+*
+* Introduced in version 2.3
+*/
 void hfuse_ll_destroy(void *userdata)
 {
 	MOUNT_T *tmpptr;
@@ -4248,6 +4402,34 @@ void hfuse_ll_destroy(void *userdata)
 *                routines such as chmod, chown, truncate, utimens.
 *
 *************************************************************************/
+/**
+*                Set file attributes
+*
+*                In the 'attr' argument only members indicated by the 'to_set'
+* bitmask contain valid values.  Other members contain undefined
+* values.
+*
+*                If the setattr was invoked from the ftruncate() system
+*                call under Linux kernel versions 2.6.15 or later, the
+*                fi->fh will contain the value set by the open method or
+*                will be undefined if the open method didn't set any
+*                value.  Otherwise (not ftruncate call, or kernel
+*                version earlier than 2.6.15) the fi parameter will be
+*                NULL.
+*
+*                Valid replies:
+*                  fuse_reply_attr
+*                  fuse_reply_err
+*
+*                @param req request handle
+*                @param ino the inode number
+*                @param attr the attributes
+*                @param to_set bit mask of attributes which should be set
+*                @param fi file information, or NULL
+*
+*                Changed in version 2.5:
+*                    file information filled in for ftruncate
+*/
 void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 	int to_set, struct fuse_file_info *fi)
 {
@@ -4477,6 +4659,15 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 *        Inputs: fuse_req_t req, fuse_ino_t ino, int mode
 *       Summary: Checks the permission for object "ino" against "mode".
 *
+*                Check file access permissions
+*
+*                This will be called for the access() system call. If the
+*                'default_permissions' mount option is given, this method is not
+*                called.
+*
+*                This method is not called under Linux kernel versions 2.4.x
+*
+*                Introduced in version 2.5
 *************************************************************************/
 static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 {
@@ -4530,6 +4721,41 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 *       Summary: Decrease lookup count for object "ino" by "nlookup", and
 *                handle actual filesystem object deletion if count is 0.
 *
+*                Forget about an inode
+*
+*                This function is called when the kernel removes an inode
+*                from its internal caches.
+*
+*                The inode's lookup count increases by one for every call
+*                to fuse_reply_entry and fuse_reply_create. The nlookup
+*                parameter indicates by how much the lookup count should
+*                be decreased.
+*
+*                Inodes with a non-zero lookup count may receive request
+*                from the kernel even after calls to unlink, rmdir or
+*                (when overwriting an existing file) rename. Filesystems
+*                must handle such requests properly and it is recommended
+*                to defer removal of the inode until the lookup count
+*                reaches zero. Calls to unlink, remdir or rename will be
+*                followed closely by forget unless the file or directory
+*                is open, in which case the kernel issues forget only
+*                after the release or releasedir calls.
+*
+*                Note that if a file system will be exported over NFS the
+*                inodes lifetime must extend even beyond forget. See the
+*                generation field in struct fuse_entry_param above.
+*
+*                On unmount the lookup count for all inodes implicitly
+*                drops to zero. It is not guaranteed that the file system
+*                will receive corresponding forget messages for the
+*                affected inodes.
+*
+*                Valid replies:
+*                  fuse_reply_none
+*
+*                @param req request handle
+*                @param ino the inode number
+*                @param nlookup the number of lookups to forget
 *************************************************************************/
 static void hfuse_ll_forget(fuse_req_t req, fuse_ino_t ino,
 	unsigned long nlookup)
@@ -4748,6 +4974,16 @@ error_handle:
 *        Inputs: fuse_req_t req, fuse_ino_t ino
 *       Summary: Read symbolic link target path and reply to fuse.
 *
+*                Read the target of a symbolic link
+*
+*                The buffer should be filled with a null terminated
+*                string.  The buffer size argument includes the space for
+*                the terminating null character. 
+*                If the linkname is too long to fit in the buffer, it
+*                should be truncated.
+*
+*                The return value should be 0 for success.
+*/
 *************************************************************************/
 static void hfuse_ll_readlink(fuse_req_t req, fuse_ino_t ino)
 {
@@ -5388,6 +5624,16 @@ error_handle:
 *                create a file handle and store it in "fi->fh". Finally
 *                reply the fuse entry about the file and fuse file info "fi".
 *
+*                Create and open a file
+*  
+*                If the file does not exist, first create it with the
+*                specified mode, and then open it.
+*  
+*                If this method is not implemented or under Linux kernel
+*                versions earlier than 2.6.15, the mknod() and open()
+*                methods will be called instead.
+*  
+*                Introduced in version 2.5
 *************************************************************************/
 static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	const char *name, mode_t mode, struct fuse_file_info *fi)
@@ -5528,7 +5774,27 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	fuse_reply_create(req, &tmp_param, fi);
 }
 
-/* Specify the functions used for the FUSE operations */
+/* Specify the functions used for the FUSE operations
+*
+* Most of these should work very similarly to the well known UNIX file
+* system operations.  A major exception is that instead of returning an
+* error in 'errno', the operation should return the negated error value
+* (-errno) directly.
+*
+* All methods are optional, but some are essential for a useful
+* filesystem (e.g. getattr).  Open, flush, release, fsync, opendir,
+* releasedir, fsyncdir, access, create, ftruncate, fgetattr, lock, init
+* and destroy are special purpose methods, without which a full featured
+* filesystem can still be implemented.
+*
+* Almost all operations take a path which can be of any length.
+*
+* Changed in fuse 2.8.0 (regardless of API version) Previously, paths
+* were limited to a length of PATH_MAX.
+*
+* See http://fuse.sourceforge.net/wiki/ for more information.  There is
+* also a snapshot of the relevant wiki pages in the doc/ folder.
+*/
 struct fuse_lowlevel_ops hfuse_ops = {
 	.getattr = hfuse_ll_getattr,
 	.mknod = hfuse_ll_mknod,
