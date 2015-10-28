@@ -247,7 +247,11 @@ ino_t _create_root_inode(void)
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
 #ifdef _ANDROID_ENV_
-	this_meta.parent_inode = 0;
+	ret = pathlookup_write_parent(root_inode, 0);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 #endif
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
