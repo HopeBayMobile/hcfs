@@ -47,6 +47,7 @@
 #include "logger.h"
 #include "mount_manager.h"
 #include "FS_manager.h"
+#include "path_reconstruct.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -283,6 +284,10 @@ int main(int argc, char **argv)
 
 	/* TODO: error handling for log files */
 #ifdef _ANDROID_ENV_
+	ret_val = init_pathlookup();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
 	pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
@@ -299,7 +304,7 @@ int main(int argc, char **argv)
 	pthread_join(upload_loop_thread, NULL);
 
 	close_log();
-
+	destroy_pathlookup();
 #else
 	this_pid = fork();
 	if (this_pid == 0) {

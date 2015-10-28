@@ -74,6 +74,7 @@
 #include "metaops.h"
 #include "lookup_count.h"
 #include "FS_manager.h"
+#include "path_reconstruct.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -1355,6 +1356,18 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 	}
+#ifdef _ANDROID_ENV_
+	if (parent_inode1 != parent_inode2) {
+		ret_val = pathlookup_write_parent(self_inode, parent_inode2);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+	}
+#endif
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
 
@@ -3524,7 +3537,6 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	this_inode = real_ino(req, ino);
 
-/*TODO: Need to include symlinks*/
 	write_log(10, "DEBUG readdir entering readdir, ");
 	write_log(10, "size %ld, offset %ld\n", size, offset);
 
