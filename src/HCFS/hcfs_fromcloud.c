@@ -288,6 +288,8 @@ int init_download_control()
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
+
+	write_log(5, "Init download thread control\n");
 	return 0;
 }
 
@@ -297,7 +299,7 @@ int destroy_download_control()
 	sem_destroy(&(download_thread_ctl.ctl_op_sem));
 	sem_destroy(&(download_thread_ctl.dl_th_sem));
 
-	write_log(4, "Terminate manager thread of downloading\n");
+	write_log(5, "Terminate manager thread of downloading\n");
 
 	return 0;
 }
@@ -311,46 +313,6 @@ int destroy_download_control()
  * active threads later.
  *
  */
-
-int _modify_block_status(DOWNLOAD_BLOCK_INFO *block_info)
-{
-	char metapath[300];
-	FILE *fptr;
-	BLOCK_ENTRY_PAGE temppage;
-	BLOCK_ENTRY *temp_entry;
-	int e_index, ret, errcode;
-	size_t ret_size;
-
-	e_index = block_info->block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
-
-	fetch_meta_path(metapath, block_info->this_inode);
-	fptr = fopen(metapath, "r+");
-	if (fptr == NULL) {
-		fclose(fptr);
-		return -EIO;
-	}
-	flock(fileno(fptr), LOCK_EX);
-
-	FSEEK(fptr, block_info->page_pos, SEEK_SET);
-	FREAD(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-
-	temp_entry = &(temppage.block_entries[e_index]);
-	if (temp_entry->status == ST_CtoL) {
-		temp_entry->status = ST_BOTH;
-		FSEEK(fptr, block_info->page_pos, SEEK_SET);
-		FWRITE(&temppage, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-	}
-
-	flock(fileno(fptr), LOCK_UN);	
-	fclose(fptr);
-	return 0;
-
-errcode_handle:
-	flock(fileno(fptr), LOCK_UN);	
-	fclose(fptr);
-	return errcode;
-}
-
 void download_block_manager()
 {
 	int t_idx;
@@ -411,14 +373,6 @@ void download_block_manager()
 						__func__);
 				else
 					fclose(fptr);
-			/* Modify block status if succeeded. */
-			} else {
-				ret = _modify_block_status(block_info);
-				if (ret < 0) {
-					write_log(0, "Error: Fail to modify "
-						"block status in %s.\n",
-						__func__);
-				}
 			}
 
 			/* Reset thread */
@@ -435,66 +389,136 @@ void download_block_manager()
 	}
 }
 
+static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
+	char from_st, char to_st)
+{
+	BLOCK_ENTRY_PAGE block_page;
+	int e_index, ret;
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+
+	e_index = block_info->block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
+
+	meta_cache_entry = meta_cache_lock_entry(block_info->this_inode);
+	if (meta_cache_entry == NULL) {
+		return -ENOMEM;
+	}
+	ret = meta_cache_lookup_file_data(block_info->this_inode, NULL, NULL,
+		&block_page, block_info->page_pos, meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	if (block_page.block_entries[e_index].status == from_st) {
+		block_page.block_entries[e_index].status = to_st; 
+	} else {
+		meta_cache_unlock_entry(meta_cache_entry);
+		/* return status if not match "from_st" */
+		return block_page.block_entries[e_index].status;
+	}
+
+	ret = meta_cache_update_file_data(block_info->this_inode, NULL, NULL,
+		&block_page, block_info->page_pos, meta_cache_entry);
+	if (ret < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		return ret;
+	}
+
+	ret = meta_cache_unlock_entry(meta_cache_entry);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return 0;
+}
+
 static void _fetch_block(void *ptr)
 {
 	char block_path[400];
-	FILE *block_ptr;
+	FILE *block_fptr;
 	DOWNLOAD_BLOCK_INFO *block_info;
 	int ret;
-
+	struct stat blockstat;
 
 	block_info = (DOWNLOAD_BLOCK_INFO *)ptr;
 	fetch_block_path(block_path, block_info->this_inode,
 						block_info->block_no);
 
+	write_log(10, "Debug: block path is %s\n", block_path)
 	/* Create it if it does not exists, or do nothing */
-	block_ptr = fopen(block_path, "a+"); 
-	if (block_ptr == NULL) {
+	block_fptr = fopen(block_path, "a+"); 
+	if (block_fptr == NULL) {
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
-		block_info->dl_error = TRUE;
+		//block_info->dl_error = TRUE;
 		return;
 	}
-	fclose(block_ptr);
+	fclose(block_fptr);
 
-	block_ptr = fopen(block_path, "r+"); /* Write it */
-	if (block_ptr == NULL) {
+	block_fptr = fopen(block_path, "r+"); /* Write it */
+	if (block_fptr == NULL) {
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
-		block_info->dl_error = TRUE;
+		//block_info->dl_error = TRUE;
 		return;
 	}
 
-	flock(fileno(block_ptr), LOCK_EX);
-	setbuf(block_ptr, NULL);
+	/* Lock block ptr so that status ST_CtoL cannot be met */
+	flock(fileno(block_fptr), LOCK_EX);
+	setbuf(block_fptr, NULL);
 
-	//TODO: lock mem entry and check status
-
-	ret = fetch_from_cloud(block_ptr, block_info->this_inode,
+	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to modify block status in %s."
+			" Code %d", __func__, ret);
+		goto thread_error;
+	} else if (ret > 0){ /* Status is not match ST_CLOUD */
+		flock(fileno(block_fptr), LOCK_UN);
+		fclose(block_fptr);
+		return;
+	}
+		
+	/* Fetch block from cloud */
+	ret = fetch_from_cloud(block_fptr, block_info->this_inode,
 						block_info->block_no);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
-		block_info->dl_error = TRUE;
-		flock(fileno(block_ptr), LOCK_UN);
-		fclose(block_ptr);
+		goto thread_error;
+	}
+
+	/* Update status */	
+	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to modify block status in %s."
+			" Code %d", __func__, ret);
+		goto thread_error;
+	} else if (ret > 0){ /* Status is not match ST_CtoL */
+		flock(fileno(block_fptr), LOCK_UN);
+		fclose(block_fptr);
 		return;
 	}
 
 	/* Update dirty status and system meta */
 	if (stat(block_path, &blockstat) == 0) {
-		ret = set_block_dirty_status(NULL, block_fptr, FALSE);
-		//if (ret < 0) {
-		//	block_info->dl_error = TRUE;
-		//	return;
-		//}
+		set_block_dirty_status(NULL, block_fptr, FALSE);
 		change_system_meta(0, blockstat.st_size, 1);
+		write_log(10, "Debug: Now cache size %lld",
+			hcfs_system->systemdata.cache_size);
+	} else {
+		ret = errno;
+		write_log(0, "Error: stat error in %s. Code %d\n",
+			__func__, ret);
 	}
 
-	//TODO: lock mem and change status to ST_BOTH?
+	flock(fileno(block_fptr), LOCK_UN);
+	fclose(block_fptr);
 
-	flock(fileno(block_ptr), LOCK_UN);
-	fclose(block_ptr);
+	return;
 
+thread_error:
+	block_info->dl_error = TRUE;
+	flock(fileno(block_fptr), LOCK_UN);
+	fclose(block_fptr);
 	return;
 }
 
@@ -502,7 +526,7 @@ static inline int _select_thread()
 {
 	int count;
 	for (count = 0; count < MAX_DL_CONCURRENCY; count++) {
-		if (download_thread_ctl.block_info[count].this_inode == 0)
+		if (download_thread_ctl.block_info[count].active == FALSE)
 			break;
 	}
 	return count;
@@ -529,14 +553,10 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 	/* Re-load block entry page */
 	FSEEK(fptr, page_pos, SEEK_SET);
 	FREAD(&entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
+	flock(fileno(fptr), LOCK_UN);
+	
 	temp_entry = &(entry_page.block_entries[e_index]);
-
 	if (temp_entry->status == ST_CLOUD) {
-		temp_entry->status = ST_CtoL;
-		FSEEK(fptr, page_pos, SEEK_SET);
-		FWRITE(&entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
-		flock(fileno(fptr), LOCK_UN);
-
 		/* Create thread to download */
 		sem_wait(&(download_thread_ctl.dl_th_sem));
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
@@ -547,7 +567,8 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;
 		pthread_create(&(download_thread_ctl.download_thread[which_th]),
-				NULL, (void *)&_fetch_block, NULL);
+				NULL, (void *)&_fetch_block,
+				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
 		sem_post(&(download_thread_ctl.ctl_op_sem));
@@ -575,6 +596,7 @@ int fetch_pinned_blocks(ino_t inode)
 	char all_thread_terminate;
 	struct timespec time_to_sleep;
 	char error_path[200];
+	DOWNLOAD_BLOCK_INFO *temp_info;
 
 	time_to_sleep.tv_sec = 0;
 	time_to_sleep.tv_nsec = 99999999; /*0.1 sec sleep*/
@@ -598,8 +620,11 @@ int fetch_pinned_blocks(ino_t inode)
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
 
 	fetch_error_download_path(error_path, inode);
+	if (access(error_path, F_OK) == 0)
+		UNLINK(error_path);
 	ret_code = 0;
 	current_page = -1;
+	write_log(10, "Debug: Begin to check all blocks\n");
 	for (blkno = 0 ; blkno < total_blocks ; blkno++) {
 		if (access(metapath, F_OK) < 0) {
 			write_log(10, "Debug: %s is removed when pinning.",
@@ -612,6 +637,15 @@ int fetch_pinned_blocks(ino_t inode)
 			ret_code = -EIO;
 			break;
 		}
+
+		sem_wait(&(hcfs_system->access_sem));
+		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			sem_post(&(hcfs_system->access_sem));
+			write_log(0, "Error: Cache space is full.\n");
+			ret_code = -ENOSPC;
+			break;
+		}
+		sem_post(&(hcfs_system->access_sem));
 
 		which_page = blkno / MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -633,12 +667,14 @@ int fetch_pinned_blocks(ino_t inode)
 	}
 
 	/* Wait for all threads */
+	all_thread_terminate = FALSE;
 	while (all_thread_terminate == FALSE) {
 		all_thread_terminate = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		for (t_idx = 0; t_idx < MAX_DL_CONCURRENCY ; t_idx++) {
-			if (download_thread_ctl.block_info[t_idx].this_inode ==
-				inode) {
+			temp_info = &(download_thread_ctl.block_info[t_idx]);
+			if ((temp_info->active == TRUE) && 
+				(temp_info->this_inode == inode)) {
 				all_thread_terminate = FALSE;
 				break;
 			}

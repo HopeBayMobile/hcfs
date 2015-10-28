@@ -5374,6 +5374,7 @@ int hook_fuse(int argc, char **argv)
 	init_api_interface();
 	init_meta_cache_headers();
 	startup_finish_delete();
+	init_download_control();
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
@@ -5381,6 +5382,7 @@ int hook_fuse(int argc, char **argv)
 	destroy_mount_mgr();
 	destroy_fs_manager();
 	release_meta_cache_headers();
+	destroy_download_control();
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));

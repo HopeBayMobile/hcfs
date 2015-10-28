@@ -300,6 +300,20 @@ int unmount_all_handle(void)
 	return ret;
 }
 
+int pin_inode_handle(int arg_len, char *largebuf)
+{
+	ino_t pinned_inode;
+	int retcode;
+
+	retcode = 0;
+	memcpy(&pinned_inode, largebuf, sizeof(ino_t));
+	largebuf[arg_len] = 0;
+	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, arg_len = %d, str = %s", pinned_inode, sizeof(ino_t), arg_len, largebuf);
+	retcode = pin_inode(pinned_inode);
+	
+	return retcode;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -440,6 +454,12 @@ void api_module(void *index)
 
 		switch (api_code) {
 		case PIN:
+			retcode = pin_inode_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
 			break;
 		case UNPIN:
 			break;

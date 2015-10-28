@@ -832,3 +832,43 @@ error_handle:
 	meta_cache_unlock_entry(link_meta_cache_entry);
 	return ret_val;
 }
+
+int pin_inode(ino_t this_inode)
+{
+	int ret;
+	struct stat tempstat;
+
+	ret = fetch_inode_stat(this_inode, &tempstat, NULL);
+	if (ret < 0)
+		return ret;
+	
+	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
+	if (ret < 0) {
+		return ret;
+	} else if (ret > 0) {
+#ifdef ARM_32bit
+		write_log(10, "Debug: inode%lld had been pinned\n", this_inode);
+#else
+		write_log(10, "Debug: inode%ld had been pinned\n", this_inode);
+#endif
+		return ret;
+	}
+	
+	if (S_ISREG(tempstat.st_mode)) {
+		ret = fetch_pinned_blocks(this_inode);
+		if (ret < 0) {
+			change_pin_flag(this_inode, tempstat.st_mode, FALSE);
+#ifdef ARM_32bit
+			write_log(0, "Error: Fail to pin inode %lld in %s."
+				" Code %d\n", this_inode, __func__, ret);
+#else
+			write_log(0, "Error: Fail to pin inode %ld in %s."
+				" Code %d\n", this_inode, __func__, ret);
+#endif
+			return ret;
+		}
+	}
+
+	return 0;
+}
+

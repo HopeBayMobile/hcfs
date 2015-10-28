@@ -1584,3 +1584,97 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 			sizeof(DIR_ENTRY));
 	return 0;
 }
+
+/**
+ *
+ *
+ * @return 0 when succeding in change pin-flag, 1 when new pin-flag is the
+ *         same as old one. Otherwise return negative error code.
+ */
+int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+{
+	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	FILE_META_TYPE file_meta;
+	DIR_META_TYPE dir_meta;
+	SYMLINK_META_TYPE symlink_meta;
+	int ret, ret_code;
+
+	meta_cache_entry = meta_cache_lock_entry(this_inode);
+	if (meta_cache_entry == NULL) {
+		return -ENOMEM;
+	}
+
+	ret_code = 0;
+	/* Case regfile */
+	if (S_ISREG(this_mode)) {
+		ret = meta_cache_lookup_file_data(this_inode, NULL, &file_meta,
+				NULL, 0, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (file_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			file_meta.local_pin = new_pin_status;	
+			ret = meta_cache_update_file_data(this_inode, NULL,
+				&file_meta, NULL, 0, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+	/* Case dir */
+	} else if (S_ISDIR(this_mode)){
+		ret = meta_cache_lookup_dir_data(this_inode, NULL, &dir_meta,
+				NULL, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (file_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			file_meta.local_pin = new_pin_status;	
+			ret = meta_cache_update_dir_data(this_inode, NULL,
+				&dir_meta, NULL, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+
+	/* Case symlink */
+	} else if (S_ISLNK(this_mode)) {
+		ret = meta_cache_lookup_symlink_data(this_inode, NULL,
+			&symlink_meta, meta_cache_entry);
+		if (ret < 0) {
+			ret_code = ret;
+			goto error_handling;
+		}
+
+		if (file_meta.local_pin == new_pin_status) {
+			ret_code = 1;
+		} else {
+			file_meta.local_pin = new_pin_status;	
+			ret = meta_cache_update_symlink_data(this_inode, NULL,
+					&symlink_meta, meta_cache_entry);
+			if (ret < 0) {
+				ret_code = ret;
+				goto error_handling;
+			}
+		}
+	}
+
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return ret_code;
+
+error_handling:
+	meta_cache_close_file(meta_cache_entry);
+	meta_cache_unlock_entry(meta_cache_entry);
+	return ret_code;
+}
+
