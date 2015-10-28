@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <limits.h>
 
 #include "logger.h"
 #include "meta_mem_cache.h"
@@ -355,7 +356,12 @@ int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 	}
 	pathlen = bufsize + strlen(cachenode.childname) + 1;
 
-/* TODO: Check if the path name exceed the max allowed */
+	if (pathlen > PATH_MAX) {
+		errcode = -ENAMETOOLONG;
+		write_log(0, "Unexpected error %d\n", ENAMETOOLONG);
+		goto errcode_handle;
+	}
+
 	snprintf(current_path, pathlen, "%s/%s", cachenode.childname, *result);
 
 	if (parent_inode == cacheptr->root_inode) {
