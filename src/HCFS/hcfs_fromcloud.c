@@ -351,7 +351,10 @@ void download_block_manager()
 				continue;
 			/* Try to terminate thread */
 			tid = &(download_thread_ctl.download_thread[t_idx]);
-			ret = pthread_tryjoin_np(*tid, NULL);
+			/* Do not lock download-control */
+			sem_post(&(download_thread_ctl.ctl_op_sem));
+			ret = pthread_join(*tid, NULL);
+			sem_wait(&(download_thread_ctl.ctl_op_sem));
 			if (ret < 0) {
 				if (ret == EBUSY)
 					continue;
@@ -382,6 +385,7 @@ void download_block_manager()
 				FALSE;
 
 			download_thread_ctl.active_th--;
+			sem_post(&(download_thread_ctl.dl_th_sem));
 		}
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 
@@ -444,7 +448,6 @@ static void _fetch_block(void *ptr)
 	fetch_block_path(block_path, block_info->this_inode,
 						block_info->block_no);
 
-	write_log(10, "Debug: block path is %s\n", block_path)
 	/* Create it if it does not exists, or do nothing */
 	block_fptr = fopen(block_path, "a+"); 
 	if (block_fptr == NULL) {
@@ -529,6 +532,7 @@ static inline int _select_thread()
 		if (download_thread_ctl.block_info[count].active == FALSE)
 			break;
 	}
+	write_log(10, "Debug: Using downloading thread %d\n", count);
 	return count;
 }
 
@@ -546,7 +550,7 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 
 	flock(fileno(fptr), LOCK_EX);
 	if (access(metapath, F_OK) < 0) {
-		write_log(10, "Debug: %s is removed when pinning.");
+		write_log(0, "Error: %s is removed when pinning.");
 		return -ENOENT;
 	}
 
@@ -590,6 +594,7 @@ int fetch_pinned_blocks(ino_t inode)
 	off_t total_size;
 	long long total_blocks, blkno;
 	long long which_page, current_page, page_pos;
+	long long cache_size;
 	size_t ret_size;
 	FILE_META_TYPE this_meta;
 	int ret, ret_code, errcode, t_idx;
@@ -638,14 +643,12 @@ int fetch_pinned_blocks(ino_t inode)
 			break;
 		}
 
-		sem_wait(&(hcfs_system->access_sem));
-		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
-			sem_post(&(hcfs_system->access_sem));
+		get_system_size(&cache_size);
+		if (cache_size > CACHE_HARD_LIMIT) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 			break;
 		}
-		sem_post(&(hcfs_system->access_sem));
 
 		which_page = blkno / MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -682,6 +685,14 @@ int fetch_pinned_blocks(ino_t inode)
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 	}
+	/* Check cache size again */
+	if (ret_code == 0) {
+		get_system_size(&cache_size);
+		if (cache_size > CACHE_HARD_LIMIT) {
+			write_log(0, "Error: Cache space is full.\n");
+			ret_code = -ENOSPC;
+		}
+	}
 
 	/* Delete error object */
 	if (access(error_path, F_OK) == 0) {
@@ -690,6 +701,8 @@ int fetch_pinned_blocks(ino_t inode)
 #else
 		write_log(0, "Error: Fail to pin inode %ld\n", inode);
 #endif
+		if (ret_code == 0)
+			ret_code = -EIO;
 		UNLINK(error_path);
 	}
 

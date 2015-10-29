@@ -216,6 +216,10 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					(CACHE_HARD_LIMIT - CACHE_DELTA))
 				notify_sleep_on_cache();
 
+			/* If cache size < soft limit, take a break and wait
+			for exceeding soft limit. Stop paging out these blocks
+			if cache size is still < soft limit after 5 mins.
+			Otherwise lock meta and remove next block. */
 			if (hcfs_system->systemdata.cache_size <
 						CACHE_SOFT_LIMIT) {
 				flock(fileno(metafptr), LOCK_UN);
@@ -252,6 +256,23 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					break;
 
 				flock(fileno(metafptr), LOCK_EX);
+				
+				/* Check pin status before paging blocks out */
+				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+				FREAD(&temphead, sizeof(FILE_META_TYPE),
+					1, metafptr);
+				if (temphead.local_pin == TRUE) {
+#ifdef ARM_32bit
+					write_log(10, "Debug: inode %lld is "
+						"pinned when paging it out."
+						" Stop\n");
+#else
+					write_log(10, "Debug: inode %ld is "
+						"pinned when paging it out."
+						" Stop\n");
+#endif
+					break;
+				}
 
 				/*If meta file does not exist, do nothing*/
 				if (access(thismetapath, F_OK) < 0)

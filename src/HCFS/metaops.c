@@ -1634,10 +1634,10 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			goto error_handling;
 		}
 
-		if (file_meta.local_pin == new_pin_status) {
+		if (dir_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
-			file_meta.local_pin = new_pin_status;	
+			dir_meta.local_pin = new_pin_status;	
 			ret = meta_cache_update_dir_data(this_inode, NULL,
 				&dir_meta, NULL, meta_cache_entry);
 			if (ret < 0) {
@@ -1655,10 +1655,10 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 			goto error_handling;
 		}
 
-		if (file_meta.local_pin == new_pin_status) {
+		if (symlink_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
-			file_meta.local_pin = new_pin_status;	
+			symlink_meta.local_pin = new_pin_status;	
 			ret = meta_cache_update_symlink_data(this_inode, NULL,
 					&symlink_meta, meta_cache_entry);
 			if (ret < 0) {
