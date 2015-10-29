@@ -227,12 +227,18 @@ int main(int argc, char **argv)
 {
 	CURL_HANDLE curl_handle;
 	int ret_val;
-	pid_t this_pid, this_pid1;
-	int count;
 	struct rlimit nofile_limit;
+#ifdef _ANDROID_ENV_
 	pthread_t delete_loop_thread;
 	pthread_t upload_loop_thread;
 	pthread_t cache_loop_thread;
+#else
+	pid_t child_pids[NUMBER_OF_CHILDREN];
+	pid_t this_pid;
+	int process_num;
+#endif  /* _ANDROID_ENV_ */
+	int count;
+
 
 	logptr = NULL;
 
@@ -321,40 +327,57 @@ int main(int argc, char **argv)
 	close_log();
 	destroy_pathlookup();
 #else
-	this_pid = fork();
-	if (this_pid == 0) {
-		open_log("cache_maintain_log");
+	/* Start up children */
+	for (process_num = 0; process_num < NUMBER_OF_CHILDREN; ++process_num) {
+		this_pid = fork();
+		if (this_pid == 0)
+			break;
+		else
+			child_pids[process_num] = this_pid;
+	}
+
+	if(process_num == 0) {
+		open_log("cache_maintain.log");
 		write_log(2, "\nStart logging cache cleanup\n");
 
 		run_cache_loop();
 		close_log();
-	} else {
-		this_pid1 = fork();
-		if (this_pid1 == 0) {
-			open_log("backend_upload_log");
-			write_log(2, "\nStart logging backend upload\n");
-			pthread_create(&delete_loop_thread, NULL, &delete_loop,
-									NULL);
-			upload_loop();
-			close_log();
-		} else {
+	}
+	else if(process_num == 1) {
+		open_log("backend_upload.log");
+		write_log(2, "\nStart logging backend upload\n");
+		pthread_create(&delete_loop_thread, NULL, &delete_loop,
+				NULL);
+		upload_loop();
+		pthread_join(delete_loop_thread, NULL);
+		close_log();
+		break;
+	}
+	else if(process_num == 2) {
+		open_log("backend_connection.log");
+		write_log(2, "\nStart logging backend connection\n");
+		monitor_loop();
+		close_log();
+		break;
+	}
+	else if(process_num == 3) {
+		/* Parent process: Wait for children to exit */
+		open_log("fuse.log");
+		write_log(2, "\nStart logging fuse\n");
+		sem_init(&download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
 
-			open_log("fuse_log");
-			write_log(2, "\nStart logging fuse\n");
-			sem_init(&download_curl_sem, 0,
-					MAX_DOWNLOAD_CURL_HANDLE);
-			sem_init(&download_curl_control_sem, 0, 1);
+		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
+				count++)
+			_init_download_curl(count);
 
-			for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE;
-								count++)
-				_init_download_curl(count);
-
-			hook_fuse(argc, argv);
-			write_log(2, "Waiting for subprocesses to terminate\n");
-			waitpid(this_pid, NULL, 0);
-			waitpid(this_pid1, NULL, 0);
-			close_log();
-		}
+		hook_fuse(argc, argv);
+		write_log(2, "Waiting for subprocesses to terminate\n");
+		waitpid(child_pids[0], NULL, 0);
+		waitpid(child_pids[1], NULL, 0);
+		waitpid(child_pids[2], NULL, 0);
+		close_log();
 	}
 #endif  /* _ANDROID_ENV_ */
 	return 0;
