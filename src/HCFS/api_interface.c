@@ -174,13 +174,20 @@ errcode_handle:
 int create_FS_handle(int arg_len, char *largebuf)
 {
 	DIR_ENTRY tmp_entry;
-	char *buf;
+	char *buf, tmptype;
 	int ret;
 
 	buf = malloc(arg_len + 10);
+#ifdef _ANDROID_ENV_
+	memcpy(buf, largebuf, arg_len -1);
+	buf[arg_len - 1] = 0;
+	tmptype = largebuf[arg_len - 1];
+	ret = add_filesystem(buf, tmptype, &tmp_entry);
+#else
 	memcpy(buf, largebuf, arg_len);
 	buf[arg_len] = 0;
 	ret = add_filesystem(buf, &tmp_entry);
+#endif
 
 	free(buf);
 	return ret;

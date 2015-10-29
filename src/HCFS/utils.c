@@ -440,6 +440,8 @@ int read_system_config(char *config_path)
 				CURRENT_BACKEND = SWIFT;
 			if (strcasecmp(argval, "S3") == 0)
 				CURRENT_BACKEND = S3;
+			if (strcasecmp(argval, "NONE") == 0)
+				CURRENT_BACKEND = NONE;
 			if (CURRENT_BACKEND == -1) {
 				fclose(fptr);
 				write_log(0, "Unsupported backend\n");
