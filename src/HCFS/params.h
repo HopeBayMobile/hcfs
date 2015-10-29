@@ -41,8 +41,9 @@ typedef struct {
 
 #define LOG_LEVEL system_config.log_level
 
-#define S3 1
-#define SWIFT 0
+#define S3 2
+#define SWIFT 1
+#define NONE 0
 
 #define CURRENT_BACKEND system_config.current_backend
 

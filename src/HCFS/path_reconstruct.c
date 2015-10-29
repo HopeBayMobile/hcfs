@@ -153,13 +153,17 @@ void add_cache_entry(PATH_CACHE *cacheptr, PATH_LOOKUP *newnode)
 	hashindex = (newnode->child) % NUM_LOOKUP_ENTRY;
 
 	/* Change the ring structure */
-	((cacheptr->hashtable[hashindex]).last)->next = newnode;
+	if ((cacheptr->hashtable[hashindex]).last != NULL)
+		((cacheptr->hashtable[hashindex]).last)->next = newnode;
+	else
+		(cacheptr->hashtable[hashindex]).first = newnode;
 	newnode->prev = (cacheptr->hashtable[hashindex]).last;
 	newnode->next = NULL;
 	(cacheptr->hashtable[hashindex]).last = newnode;
 
 	/* Change the global linked list */
-	(cacheptr->gfirst)->gprev = newnode;
+	if (cacheptr->gfirst != NULL)
+		(cacheptr->gfirst)->gprev = newnode;
 	newnode->gnext = cacheptr->gfirst;
 	newnode->gprev = NULL;
 	cacheptr->gfirst = newnode;
@@ -389,8 +393,10 @@ int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 	return construct_path_iterate(cacheptr, parent_inode, result, pathlen);
 errcode_handle:
 	tmpptr = *result;
-	if (tmpptr != NULL)
+	if (tmpptr != NULL) {
+		*result = NULL;
 		free(tmpptr);
+	}
 	return errcode;
 }
 
@@ -426,10 +432,14 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
 	} 
 
 	*result = tmpbuf;
-	ret = construct_path_iterate(cacheptr, thisinode, result, 10);
-	if (ret < 0) {
-		errcode = ret;
-		goto errcode_handle;
+	if (thisinode == cacheptr->root_inode) {
+		snprintf(*result, 10, "/");
+	} else {
+		ret = construct_path_iterate(cacheptr, thisinode, result, 10);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
 	}
 
 	sem_post(&(cacheptr->pathcache_lock));
@@ -491,6 +501,7 @@ int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 				cacheptr->gfirst = tmpptr->gnext;
 
 			free(tmpptr);
+			(cacheptr->num_nodes)--;
 			sem_post(&(cacheptr->pathcache_lock));
 			return 0;
 		}

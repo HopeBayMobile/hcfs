@@ -259,23 +259,26 @@ int main(int argc, char **argv)
 		exit(-1);
 */
 	}
-	sprintf(curl_handle.id, "main");
-	ret_val = hcfs_init_backend(&curl_handle);
-	if ((ret_val < 200) || (ret_val > 299)) {
-		write_log(0, "Error in connecting to backend. Code %d\n",
+	if (CURRENT_BACKEND != NONE) {
+		sprintf(curl_handle.id, "main");
+		ret_val = hcfs_init_backend(&curl_handle);
+		if ((ret_val < 200) || (ret_val > 299)) {
+			write_log(0,
+				"Error in connecting to backend. Code %d\n",
 				ret_val);
-		write_log(0, "Backend %d\n", CURRENT_BACKEND);
-		exit(-1);
-	}
+			write_log(0, "Backend %d\n", CURRENT_BACKEND);
+			exit(-1);
+		}
 
-	ret_val = hcfs_list_container(&curl_handle);
-	if (((ret_val < 200) || (ret_val > 299)) && (ret_val != 404)) {
-		write_log(0, "Error in connecting to backend\n");
-		exit(-1);
-	}
-	write_log(10, "ret code %d\n", ret_val);
+		ret_val = hcfs_list_container(&curl_handle);
+		if (((ret_val < 200) || (ret_val > 299)) && (ret_val != 404)) {
+			write_log(0, "Error in connecting to backend\n");
+			exit(-1);
+		}
+		write_log(10, "ret code %d\n", ret_val);
 
-	hcfs_destroy_backend(curl_handle.curl);
+		hcfs_destroy_backend(curl_handle.curl);
+	}
 
 	ret_val = init_hfuse();
 	if (ret_val < 0)
@@ -289,19 +292,24 @@ int main(int argc, char **argv)
 
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
-	pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-	pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
-	pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
-	sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-	sem_init(&download_curl_control_sem, 0, 1);
-	for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
-		_init_download_curl(count);
-
+	if (CURRENT_BACKEND != NONE) {
+		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
+		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
+			_init_download_curl(count);
+	}
 	hook_fuse(argc, argv);
-	pthread_join(cache_loop_thread, NULL);
-	pthread_join(delete_loop_thread, NULL);
-	pthread_join(upload_loop_thread, NULL);
+	/* TODO: modify this so that backend config can be turned on
+	even when volumes are mounted */
 
+	if (CURRENT_BACKEND != NONE) {
+		pthread_join(cache_loop_thread, NULL);
+		pthread_join(delete_loop_thread, NULL);
+		pthread_join(upload_loop_thread, NULL);
+	}
 	close_log();
 	destroy_pathlookup();
 #else

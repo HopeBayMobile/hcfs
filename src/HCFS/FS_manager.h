@@ -20,6 +20,13 @@
 /* We will use DIR_ENTRY_PAGE as the b-tree node */
 /* Filesystem name ==> d_name in DIR_ENTRY */
 /* Filesystem root inode number ==> d_ino in DIR_ENTRY */
+/* For Android, use d_type to identify whether this mount is internal
+or external */
+
+#ifdef _ANDROID_ENV_
+#define ANDROID_INTERNAL 1
+#define ANDROID_EXTERNAL 2
+#endif
 
 typedef struct {
 	unsigned long num_FS;
@@ -33,7 +40,11 @@ char *fs_mgr_path;
 
 int init_fs_manager(void);
 void destroy_fs_manager(void);
+#ifdef _ANDROID_ENV_
+int add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry);
+#else
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry);
+#endif
 int delete_filesystem(char *fsname);
 int check_filesystem(char *fsname, DIR_ENTRY *ret_entry);
 int check_filesystem_core(char *fsname, DIR_ENTRY *ret_entry);

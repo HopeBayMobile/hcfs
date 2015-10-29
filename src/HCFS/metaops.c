@@ -40,6 +40,10 @@
 #include "mount_manager.h"
 #include "lookup_count.h"
 #include "super_block.h"
+#ifdef _ANDROID_ENV_
+#include "path_reconstruct.h"
+#include "FS_manager.h"
+#endif
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -1200,13 +1204,32 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	FILE *fptr;
 	FS_STAT_T tmpstat;
 
+#ifdef _ANDROID_ENV_
+	ret = pathlookup_write_parent(this_inode, 0);
+	if (ret < 0)
+		return ret;
+	if (mptr != NULL) {
+		if (mptr->volume_type == ANDROID_EXTERNAL) {
+			ret = delete_pathcache_node(mptr->vol_path_cache,
+							this_inode);
+			if (ret < 0)
+				return ret;
+		}
+	}
+#endif
+
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)
 			return ret;
 		fptr = fopen(rootpath, "r+");
-		if (fptr == NULL)
-			return ret;
+		if (fptr == NULL) {
+			errcode = errno;
+			write_log(0, "Unexpected error %d, %s\n", errcode,
+				strerror(errcode));
+			errcode = -errcode;
+			return errcode;
+		}
 		setbuf(fptr, NULL);
 		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 	}
