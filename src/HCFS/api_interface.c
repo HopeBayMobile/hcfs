@@ -306,11 +306,26 @@ int pin_inode_handle(int arg_len, char *largebuf)
 	int retcode;
 
 	retcode = 0;
-	memcpy(&pinned_inode, largebuf, sizeof(ino_t));
-	largebuf[arg_len] = 0;
-	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, arg_len = %d, str = %s", pinned_inode, sizeof(ino_t), arg_len, largebuf);
+	/* Error on transforming between 32bit and 64 bit ino_t? */
+	memcpy(&pinned_inode, largebuf, sizeof(ino_t)); 
+	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
+		"arg_len = %d", pinned_inode, sizeof(ino_t), arg_len);
 	retcode = pin_inode(pinned_inode);
-	
+
+	return retcode;
+}
+
+int unpin_inode_handle(int arg_len, char *largebuf)
+{
+	ino_t unpinned_inode;
+	int retcode;
+
+	retcode = 0;
+	memcpy(&unpinned_inode, largebuf, sizeof(ino_t));
+	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
+		"arg_len = %d", unpinned_inode, sizeof(ino_t), arg_len);
+	retcode = unpin_inode(unpinned_inode);
+
 	return retcode;
 }
 
@@ -462,6 +477,12 @@ void api_module(void *index)
 			}
 			break;
 		case UNPIN:
+			retcode = unpin_inode_handle(arg_len, largebuf);
+			if (retcode == 0) {
+				ret_len = sizeof(int);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &retcode, sizeof(int), 0);
+			}
 			break;
 		case TERMINATE:
 			/* Terminate the system */

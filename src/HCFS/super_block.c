@@ -85,7 +85,6 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	ssize_t ret_val;
 	int errcode;
 
-	write_log(10, "Debug: fptr = %p, inode = %lld\n", sys_super_block->iofptr, this_inode);
 	ret_val = pread(sys_super_block->iofptr, inode_ptr, SB_ENTRY_SIZE,
 			SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (ret_val < 0) {
