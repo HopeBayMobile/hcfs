@@ -44,7 +44,7 @@
 #define PIN 12
 #define UNPIN 13
 
-#define DEFAULT_PIN FALSE
+#define DEFAULT_PIN TRUE
 
 /* Print format for ino_t is different in raspberry pi */
 #ifdef ARM_32bit_

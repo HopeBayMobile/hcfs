@@ -284,7 +284,8 @@ int init_download_control()
 {
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
-	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_DL_CONCURRENCY);
+	sem_init(&(download_thread_ctl.dl_th_sem), 0, 1); // TODO
+	//sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_DL_CONCURRENCY);
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
@@ -466,6 +467,7 @@ static void _fetch_block(void *ptr)
 		return;
 	}
 
+	/* TODO: Error handling when meta is removed */
 	/* Lock block ptr so that status ST_CtoL cannot be met */
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
@@ -539,6 +541,7 @@ static inline int _select_thread()
 static int _check_fetch_block(const char *metapath, FILE *fptr,
 	ino_t inode, long long blkno, long long page_pos)
 {
+	FILE_META_TYPE filemeta;
 	BLOCK_ENTRY_PAGE entry_page;
 	BLOCK_ENTRY *temp_entry;
 	int e_index;
@@ -550,8 +553,23 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 
 	flock(fileno(fptr), LOCK_EX);
 	if (access(metapath, F_OK) < 0) {
-		write_log(0, "Error: %s is removed when pinning.");
+		write_log(0, "Error: %s is removed when pinning.", metapath);
 		return -ENOENT;
+	}
+
+	/* Check pin-status. It may be modified to UNPIN by other processes */
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
+	if (filemeta.local_pin == FALSE) {
+		flock(fileno(fptr), LOCK_UN);
+#ifdef ARM_32bit
+		write_log(5, "Warning: Inode %lld is detected to be unpinned"
+			" in pin-process.\n", inode);
+#else
+		write_log(5, "Warning: Inode %ld is detected to be unpinned"
+			" in pin-process.\n", inode);
+#endif
+		return -EPERM;
 	}
 
 	/* Re-load block entry page */
@@ -669,6 +687,8 @@ int fetch_pinned_blocks(ino_t inode)
 
 	}
 
+	fclose(fptr);
+
 	/* Wait for all threads */
 	all_thread_terminate = FALSE;
 	while (all_thread_terminate == FALSE) {
@@ -706,7 +726,6 @@ int fetch_pinned_blocks(ino_t inode)
 		UNLINK(error_path);
 	}
 
-	fclose(fptr);
 	return ret_code;
 
 errcode_handle:
