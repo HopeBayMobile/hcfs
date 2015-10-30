@@ -13,7 +13,6 @@
 #ifndef GW20_SRC_HFUSE_SYSTEM_H_
 #define GW20_SRC_HFUSE_SYSTEM_H_
 
-#define NUMBER_OF_CHILDREN 3
 
 int init_hfuse(void);
 int init_hcfs_system_data(void);
