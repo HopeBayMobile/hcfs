@@ -1203,7 +1203,6 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	char rootpath[METAPATHLEN];
 	FILE *fptr;
 	FS_STAT_T tmpstat;
-
 #ifdef _ANDROID_ENV_
 	ret = pathlookup_write_parent(this_inode, 0);
 	if (ret < 0)
@@ -1217,7 +1216,6 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 	}
 #endif
-
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
 		if (ret < 0)

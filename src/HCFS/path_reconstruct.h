@@ -32,6 +32,7 @@ struct path_lookup {
 	struct path_lookup *next;
 	struct path_lookup *gprev;
 	struct path_lookup *gnext;
+	struct path_lookup *self;
 };
 typedef struct path_lookup PATH_LOOKUP;
 

@@ -116,13 +116,14 @@ void drop_cache_entry(PATH_CACHE *cacheptr)
 	PATH_LOOKUP *tmpptr;
 
 	num_dropped = 0;
-	tmpptr = cacheptr->gfirst;
 	while (num_dropped < NUM_NODES_DROP) {
+		tmpptr = cacheptr->gfirst;
 		if (cacheptr->num_nodes <= 0)
 			break;
 		cacheptr->gfirst = tmpptr->gnext;
 		if (cacheptr->gfirst != NULL)
 			(cacheptr->gfirst)->gprev = NULL;
+
 		if (tmpptr->prev == NULL) {
 			hashval = (tmpptr->child) % NUM_LOOKUP_ENTRY;
 			(cacheptr->hashtable[hashval]).first = tmpptr->next;
@@ -171,13 +172,21 @@ void add_cache_entry(PATH_CACHE *cacheptr, PATH_LOOKUP *newnode)
 }
 
 /* Helper function for repositioning the node according to usage */
-void _node_reposition(PATH_LOOKUP *tmpptr)
+void _node_reposition(PATH_LOOKUP *tmpptr, int hashindex, PATH_CACHE *cacheptr)
 {
 	PATH_LOOKUP *tmpprev, *tmpgnext;
-	while (tmpptr->prev != 0) {
+	while (tmpptr->prev != NULL) {
 		if ((tmpptr->lookupcount) > ((tmpptr->prev)->lookupcount)) {
 			/* Exchange tmpptr with tmpptr->prev */
 			tmpprev = tmpptr->prev;
+			if (tmpptr->next == NULL)
+				(cacheptr->hashtable[hashindex]).last = tmpprev;
+			else
+				(tmpptr->next)->prev = tmpprev;
+			if (tmpprev->prev == NULL)
+				(cacheptr->hashtable[hashindex]).first = tmpptr;
+			else
+				(tmpprev->prev)->next = tmpptr;
 			tmpptr->prev = tmpprev->prev;
 			tmpprev->next = tmpptr->next;
 			tmpptr->next = tmpprev;
@@ -187,10 +196,16 @@ void _node_reposition(PATH_LOOKUP *tmpptr)
 		}
 	}
 
-	while (tmpptr->gnext != 0) {
+	while (tmpptr->gnext != NULL) {
 		if ((tmpptr->lookupcount) > ((tmpptr->gnext)->lookupcount)) {
 			/* Exchange tmpptr with tmpptr->gnext */
 			tmpgnext = tmpptr->gnext;
+			if (tmpptr->gprev == NULL)
+				cacheptr->gfirst = tmpgnext;
+			else
+				(tmpptr->gprev)->gnext = tmpgnext;
+			if (tmpgnext->gnext != NULL)
+				(tmpgnext->gnext)->gprev = tmpptr;
 			tmpptr->gnext = tmpgnext->gnext;
 			tmpgnext->gprev = tmpptr->gprev;
 			tmpptr->gprev = tmpgnext;
@@ -283,7 +298,7 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 			and the position if needed, and return the result */
 			memcpy(retnode, tmpptr, sizeof(PATH_LOOKUP));
 			(tmpptr->lookupcount)++;
-			_node_reposition(tmpptr);
+			_node_reposition(tmpptr, hashindex, cacheptr);
 			return 0;
 		}
 		tmpptr = tmpptr->next;
@@ -296,6 +311,8 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 		goto errcode_handle;
 	}
 
+	write_log(10, "Debug parent lookup %lld %lld\n", thisinode,
+				parentinode);
 	ret = search_inode(parentinode, thisinode, &tmpentry);
 	if (ret < 0) {
 		errcode = ret;
@@ -308,7 +325,9 @@ int lookup_name(PATH_CACHE *cacheptr, ino_t thisinode, PATH_LOOKUP *retnode)
 		write_log(0, "Out of memory\n");
 		goto errcode_handle;
 	}
-
+	memset(tmpptr, 0, sizeof(PATH_LOOKUP));
+	write_log(10, "Sizeof path_lookup %d\n", sizeof(PATH_LOOKUP));
+	tmpptr->self = tmpptr;
 	tmpptr->child = thisinode;
 	tmpptr->parent = parentinode;
 	snprintf((tmpptr->childname), MAX_FILENAME_LEN+1, "%s",
@@ -366,7 +385,11 @@ int construct_path_iterate(PATH_CACHE *cacheptr, ino_t thisinode, char **result,
 		goto errcode_handle;
 	}
 
-	snprintf(current_path, pathlen, "%s/%s", cachenode.childname, *result);
+	if ((*result)[0] == '\0')
+		snprintf(current_path, pathlen, "%s", cachenode.childname);
+	else
+		snprintf(current_path, pathlen, "%s/%s",
+			cachenode.childname, *result);
 
 	if (parent_inode == cacheptr->root_inode) {
 		tmpptr = *result;
@@ -431,6 +454,7 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
 		goto errcode_handle;
 	} 
 
+	tmpbuf[0] = '\0';
 	*result = tmpbuf;
 	if (thisinode == cacheptr->root_inode) {
 		snprintf(*result, 10, "/");
@@ -458,9 +482,6 @@ errcode_handle:
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-/* TODO: Need to delete cache node in forget routine (when no meta cache
-is locked) */
-/* TODO: Should reset the parent in pathlookup as well */
 int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 {
 	int ret, errcode;
@@ -493,6 +514,7 @@ int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 			else
 				(cacheptr->hashtable[hashindex]).first =
 						tmpptr->next;
+
 			if (tmpptr->gnext != NULL)
 				(tmpptr->gnext)->gprev = tmpptr->gprev;
 			if (tmpptr->gprev != NULL)
@@ -500,6 +522,7 @@ int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
 			else
 				cacheptr->gfirst = tmpptr->gnext;
 
+			memset(tmpptr, 0, sizeof(PATH_LOOKUP));
 			free(tmpptr);
 			(cacheptr->num_nodes)--;
 			sem_post(&(cacheptr->pathcache_lock));
