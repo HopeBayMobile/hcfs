@@ -5,7 +5,9 @@ extern "C" {
 #include "params.h"
 #include "b64encode.h"
 #include "enc.h"
+#ifndef _ANDROID_ENV_
 #include "compress.h"
+#endif
 }
 
 extern SYSTEM_CONF_STRUCT system_config;
@@ -26,6 +28,7 @@ class enc : public testing::Test
 	virtual void TearDown() { free(input); }
 };
 
+#ifndef _ANDROID_ENV_
 class compress : public testing::Test
 {
       protected:
@@ -82,6 +85,7 @@ TEST_F(compress, transform_compress_fd)
 	free(ptr);
 	free(ptr2);
 }
+#endif
 
 TEST(base64, encode_then_decode)
 {
@@ -224,6 +228,7 @@ TEST_F(enc, transform_fd_enc_flag)
 	free(ptr2);
 }
 
+#ifndef _ANDROID_ENV_
 TEST_F(enc, transform_fd_compress_flag)
 {
 	FILE *in_file = fmemopen((void *)input, input_size, "r");
@@ -279,6 +284,7 @@ TEST_F(enc, transform_fd_both_flag)
 	free(ptr);
 	free(ptr2);
 }
+#endif
 
 TEST_F(enc, get_decode_meta){
   HCFS_encode_object_meta object_meta;
