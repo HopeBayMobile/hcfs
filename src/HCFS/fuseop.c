@@ -4097,7 +4097,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		attr_changed = TRUE;
 	}
 
-#ifndef _ANDROID_ENV_
 	if (to_set & FUSE_SET_ATTR_MODE) {
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
@@ -4151,7 +4150,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
-#endif
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
 		if ((temp_context->uid != 0) &&
