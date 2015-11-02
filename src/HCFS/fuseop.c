@@ -32,7 +32,13 @@
 
 #include <time.h>
 #include <math.h>
+
+#ifdef _ANDROID_ENV_
+#include <fuse/sys/statvfs.h>
+#else
 #include <sys/statvfs.h>
+#endif
+
 #include <unistd.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -130,20 +136,26 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 		ctime(&(timenow.tv_sec)), ret);
 	if (mode & ATIME) {
 		thisstat->st_atime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_atim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 
 	if (mode & MTIME) {
 		thisstat->st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_mtim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 
 	if (mode & CTIME) {
 		thisstat->st_ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_ctim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 }
 /* Helper function for checking permissions.
@@ -3590,8 +3602,13 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	buf->f_ffree = buf->f_files - num_inodes;
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
+
+#ifndef _ANDROID_ENV_
 	buf->f_favail = buf->f_ffree;
 	buf->f_namemax = MAX_FILENAME_LEN;
+#else
+        buf->f_namelen = MAX_FILENAME_LEN;
+#endif
 
 	write_log(10, "Debug statfs, returning info\n");
 
@@ -4106,8 +4123,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		}
 
 		newstat.st_atime = attr->st_atime;
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_atim), &(attr->st_atim),
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -4122,8 +4141,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_mtime = attr->st_mtime;
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -4142,8 +4163,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_atime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_atim), &timenow,
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -4160,19 +4183,25 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_mtim), &timenow,
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
 	if (attr_changed == TRUE) {
 		newstat.st_ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_ctim), &timenow,
 			sizeof(struct timespec));
+#endif
 		if (to_set & FUSE_SET_ATTR_SIZE) {
 			newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 			memcpy(&(newstat.st_mtim), &timenow,
 				sizeof(struct timespec));
+#endif
 		}
 	}
 
