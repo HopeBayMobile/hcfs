@@ -483,7 +483,7 @@ int get_decode_meta(HCFS_encode_object_meta *meta, unsigned char *session_key,
 		    expect_b64_encode_length(len_cipher);
 		meta->enc_session_key =
 		    calloc(meta->len_enc_session_key, sizeof(char));
-		b64encode_str(buf, meta->enc_session_key, &outlen, len_cipher);
+		b64encode_str(buf, (unsigned char*)meta->enc_session_key, &outlen, len_cipher);
 	}
 	goto end;
 

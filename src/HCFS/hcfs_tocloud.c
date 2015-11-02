@@ -946,8 +946,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	off_t obj_size;
 	FILE *fptr, *ddt_fptr;
 	int ret_val, errcode, ret;
-	int ddt_fd;
-	int ver_tag, result_idx;
+	int ddt_fd=-1;
+	int ver_tag, result_idx=-1;
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
