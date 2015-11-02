@@ -665,7 +665,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_"FMT_INO_T"d_%d",
+		sprintf(expected_objname, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
