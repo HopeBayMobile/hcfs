@@ -20,6 +20,10 @@
 
 #include "fuseop.h"
 
+#ifdef _ANDROID_ENV_
+#include <pthread.h>
+#endif
+
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
