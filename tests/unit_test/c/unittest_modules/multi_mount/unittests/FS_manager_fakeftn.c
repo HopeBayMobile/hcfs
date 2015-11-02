@@ -72,6 +72,12 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	snprintf(pathname, 100, "%s/meta%ld", METAPATH, this_inode);
 	return 0;
 }
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
+}
+
 
 ino_t super_block_new_inode(struct stat *in_stat,
 				unsigned long *ret_generation)

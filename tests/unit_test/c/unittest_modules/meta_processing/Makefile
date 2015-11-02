@@ -39,7 +39,8 @@ CFAKEFLAGS += -g -Wall -Wextra -pthread -fprofile-arcs -D_FILE_OFFSET_BITS=64
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.
-TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
+#TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest xattr_ops_unittest
+TESTS = metaops_unittest file_present_unittest super_block_unittest lookup_count_unittest
 
 # All Google Test headers.  Usually you shouldn't change this
 # definition.
@@ -58,7 +59,7 @@ test : setup $(TESTS)
 	./file_present_unittest
 	./super_block_unittest
 	./lookup_count_unittest
-	./xattr_ops_unittest
+#	./xattr_ops_unittest
 	gcovr -r $(USER_DIR) .
 
 .PHONY : setup
@@ -154,15 +155,15 @@ lookup_count_unittest : lookup_count_mock_function.o lookup_count.o lookup_count
 
 
 # xattr_ops.c
-xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
+#xattr_ops.o : $(USER_DIR)/xattr_ops.c $(USER_DIR)/logger.h $(USER_DIR)/meta_mem_cache.h $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/xattr_ops.c
 
-xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
+#xattr_ops_mock_function.o : $(UNITTEST_DIR)/xattr_ops_mock_function.c $(UNITTEST_DIR)/mock_param.h
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_mock_function.c
 
-xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
+#xattr_ops_unittest.o : $(UNITTEST_DIR)/xattr_ops_unittest.cc $(GTEST_HEADERS)
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/xattr_ops_unittest.cc
 
-xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
+#xattr_ops_unittest : xattr_ops_mock_function.o xattr_ops.o xattr_ops_unittest.o gtest_main.a
+#	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
 

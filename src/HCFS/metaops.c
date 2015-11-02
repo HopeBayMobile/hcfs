@@ -555,6 +555,7 @@ int delete_inode_meta(ino_t this_inode)
 
 	/*Try a rename first*/
 	ret = rename(thismetapath, todelete_metapath);
+	write_log(10, "%s, %s, %d\n", thismetapath, todelete_metapath, ret);
 	if (ret < 0) {
 		/*If not successful, copy the meta*/
 		todeletefptr = NULL;

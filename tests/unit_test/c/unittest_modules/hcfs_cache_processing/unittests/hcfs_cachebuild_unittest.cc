@@ -4,6 +4,8 @@
 #include <sys/xattr.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 extern "C" {
 #include "mock_params.h"
 #include "hcfs_cachebuild.h"
@@ -248,11 +250,23 @@ protected:
 				fd = creat(path, 0700);
 				rand_size = rand() % 100;
 				ftruncate(fd, rand_size);
+#ifdef _ANDROID_ENV_
+				struct stat tmpstat;
+				stat(path, &tmpstat);
+#endif
 				if (block_id % 2) {
+#ifdef _ANDROID_ENV_
+					chmod(path, tmpstat.st_mode | S_ISVTX);
+#else
 					setxattr(path, "user.dirty", "T", 1, XATTR_CREATE);
+#endif
 					answer_node->dirty_cache_size += rand_size;
 				} else {
+#ifdef _ANDROID_ENV_
+					chmod(path, tmpstat.st_mode & ~S_ISVTX);
+#else
 					setxattr(path, "user.dirty", "F", 1, XATTR_CREATE);
+#endif
 					answer_node->clean_cache_size += rand_size;
 				}
 				if (block_id == num_block_per_node - 1) {

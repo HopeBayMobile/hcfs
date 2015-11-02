@@ -22,6 +22,10 @@
 
 void sleep_on_cache_full(void);
 void notify_sleep_on_cache(void);
+#ifdef _ANDROID_ENV_
+void *run_cache_loop(void *ptr);
+#else
 void run_cache_loop(void);
+#endif
 
 #endif  /* GW20_HCFS_HCFS_CACHEOPS_H_ */

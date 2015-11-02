@@ -68,7 +68,7 @@ int init_hcfs_system_data(void)
 	size_t ret_size;
 
 #ifdef _ANDROID_ENV_
-	hcfs_system = malloc(sizeof(SYSTEM_DATA_HEAD));
+	hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 #else
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {
@@ -285,9 +285,9 @@ int main(int argc, char **argv)
 #ifdef _ANDROID_ENV_
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
-	pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
-	pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
-	pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+	pthread_create(&cache_loop_thread, NULL, run_cache_loop, NULL);
+	pthread_create(&delete_loop_thread, NULL, delete_loop, NULL);
+	pthread_create(&upload_loop_thread, NULL, upload_loop, NULL);
 	sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 	sem_init(&download_curl_control_sem, 0, 1);
 	for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)

@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <fuse/fuse_lowlevel.h>
 
 #include "mock_param.h"
@@ -315,6 +316,11 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 
 int write_log(int level, char *format, ...)
 {
+	va_list alist;
+
+	va_start(alist, format);
+	vprintf(format, alist);
+	va_end(alist);
 	return 0;
 }
 MOUNT_T tmpmount;
@@ -323,17 +329,6 @@ void* fuse_req_userdata(fuse_req_t req)
 {
 	tmpmount.f_ino = ROOT_INODE;
 	return &tmpmount;
-}
-
-int read_FS_statistics(char *pathname, long long *system_size_ptr, 
-	long long *num_inodes_ptr)
-{
-	return 0;
-}
-int update_FS_statistics(char *pathname, long long system_size, 
-	long long num_inodes)
-{
-	return 0;
 }
 
 int change_mount_stat(MOUNT_T *mptr, long long system_size_delta, 
@@ -345,4 +340,9 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 int flush_single_entry(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
 	return 0;
+}
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
 }

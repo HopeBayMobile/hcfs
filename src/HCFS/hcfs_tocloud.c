@@ -1479,7 +1479,11 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 	return count;
 }
 
+#ifdef _ANDROID_ENV_
+void *upload_loop(void *ptr)
+#else
 void upload_loop(void)
+#endif
 {
 	ino_t ino_sync, ino_check;
 	SYNC_THREAD_TYPE sync_threads[MAX_SYNC_CONCURRENCY];

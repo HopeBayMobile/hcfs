@@ -167,7 +167,11 @@ private:
 
 void *cache_loop_function(void *ptr)
 {
+#ifdef _ANDROID_ENV_
+	run_cache_loop(NULL);
+#else
 	run_cache_loop();
+#endif
 	printf("Test: run_cache_loop() thread leave\n");
 	return NULL;
 }

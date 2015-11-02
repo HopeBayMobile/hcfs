@@ -283,7 +283,11 @@ out. Will need to consider whether to force checking of replacement? */
 *  Return value: None
 *
 *************************************************************************/
+#ifdef _ANDROID_ENV_
+void *run_cache_loop(void *ptr)
+#else
 void run_cache_loop(void)
+#endif
 {
 	ino_t this_inode;
 	struct timeval builttime, currenttime;
