@@ -17,6 +17,9 @@ ps. Before launch the hcfs, please make sure the permission setting of /etc/fuse
 #### **Creating and mounting a HCFS FS**
 
 1. Use './HCFSvol create FSname' for creating the FS 'FSname'.
+(For Android, need to specify whether the mount is for internal or
+external storage, using './HCFSvol create FSname internal' or
+'./HCFSvol create FSname external'.
 
 2. Use './HCFSvol mount FSname MntPoint' for mounting the FS 'FSname'
 to the mountpoint 'MntPoint'.
