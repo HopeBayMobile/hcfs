@@ -428,11 +428,20 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 #ifdef _ANDROID_ENV_
 /* Internal function for generating the ownership / permission for
 Android external storage */
+uid_t lookup_pkg(char *pkgname)
+{
+/* TODO: This is now a fake. Need to link to real function */
+	return 1010;
+}
+
 int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 {
 	int ret, errcode;
 	char *tmppath;
-	mode_t tmpmask;
+	mode_t tmpmask, newpermission;
+	char *tmptok, *tmptoksave, *tmptok_prev;
+	int count;
+	uid_t tmpuid;
 
 	tmppath = NULL;
 	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
@@ -444,14 +453,92 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 		goto errcode_handle;
 	}
 	write_log(10, "Debug path lookup %s\n", tmppath);
-/* TODO: Convert path to ownership / permission */
 
-	thisstat->st_uid = 0;
-	thisstat->st_gid = 1028;
+	for (count = 0; count < 4; count++) {
+		if (count == 0)
+			tmptok = strtok_r(tmppath, "/", &tmptoksave);
+		else
+			tmptok = strtok_r(NULL, "/", &tmptoksave);
+
+		write_log(10, "%s, %s\n", tmptok, tmptok_prev);
+		if (tmptok == NULL) {
+			switch (count) {
+			case 0:
+				/* Is root */
+				thisstat->st_uid = 0;
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
+				break;
+			case 1:
+				/* Is /Android */
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0771;
+				}
+				break;
+			case 2:
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					/* If a subfolder under /Android */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0771;
+				}
+				break;
+			case 3:
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					/* If this is a package folder */
+					/* Need to lookup package uid */
+					tmpuid = lookup_pkg(tmptok_prev);
+					thisstat->st_uid = tmpuid;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				}
+				break;
+			default:
+				thisstat->st_uid = 0;
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
+				break;
+			}
+			break;
+		}
+		if (count == 3) {
+			tmpuid = lookup_pkg(tmptok_prev);
+			thisstat->st_uid = tmpuid;
+			thisstat->st_gid = 1028;
+			newpermission = 0770;
+			break;
+		}
+		tmptok_prev = tmptok;
+		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
+			/* Not under /Android */
+			thisstat->st_uid = 0;
+			thisstat->st_gid = 1028;
+			newpermission = 0770;
+			break;
+		}
+	}
+
 	tmpmask = 0777;
 	tmpmask = ~tmpmask;
 	tmpmask = tmpmask & thisstat->st_mode;
-	thisstat->st_mode = tmpmask | 0770;
+	thisstat->st_mode = tmpmask | newpermission;
 	free(tmppath);
 	return 0;
 errcode_handle:
