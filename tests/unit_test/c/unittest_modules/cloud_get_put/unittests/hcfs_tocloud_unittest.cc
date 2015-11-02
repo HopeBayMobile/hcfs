@@ -687,7 +687,11 @@ int inode_cmp(const void *a, const void *b)
 
 static void *upload_loop_thread_function(void *ptr)
 {
+#ifdef _ANDROID_ENV_
+	upload_loop(NULL);
+#else
 	upload_loop();
+#endif
 
 	return NULL;
 }

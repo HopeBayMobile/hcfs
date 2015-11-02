@@ -87,7 +87,17 @@ void *delete_loop(void *arg)
 {
 	return NULL;
 }
+#ifdef _ANDROID_ENV_
+void *upload_loop(void *ptr)
+{
+	return NULL;
+}
 
+void *run_cache_loop(void *ptr)
+{
+	return NULL;
+}
+#else
 void upload_loop(void)
 {
 	/* kill child process */
@@ -99,7 +109,7 @@ void run_cache_loop(void)
 	/* kill child process */
 	exit(0);
 }
-
+#endif
 int hook_fuse(int argc, char **argv)
 {
 	return 0;

@@ -212,6 +212,10 @@ TEST_F(mainTest, MainFunctionSuccess)
 	EXPECT_EQ(0, main(1, tmp_argv));
 	sleep(1); // Waiting for child process finishing their work
 	/* Check */
+#ifdef _ANDROID_ENV_
+	EXPECT_EQ(0, access("hcfs_android_log", F_OK));
+	EXPECT_EQ(0, unlink("hcfs_android_log"));
+#else
 	EXPECT_EQ(0, access("backend_upload_log", F_OK));
 	EXPECT_EQ(0, access("cache_maintain_log", F_OK));
 	EXPECT_EQ(0, access("fuse_log", F_OK));
@@ -219,6 +223,7 @@ TEST_F(mainTest, MainFunctionSuccess)
 	EXPECT_EQ(0, unlink("backend_upload_log"));
 	EXPECT_EQ(0, unlink("cache_maintain_log"));
 	EXPECT_EQ(0, unlink("fuse_log"));
+#endif
 	unlink("/tmp/root_meta_path");
 	unlink(HCFSSYSTEM);
 	dup2(saved_stdout, fileno(stdout));
