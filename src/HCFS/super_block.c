@@ -85,6 +85,16 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	ssize_t ret_val;
 	int errcode;
 
+	if (this_inode <= 0) {
+		errcode = EINVAL;
+#ifdef ARM_32bit_
+		write_log(0,
+			"Error in %s, inode number is %lld. Code %d, %s\n",
+			__func__, this_inode, errcode, strerror(errcode));
+#else
+#endif
+		return -errcode;
+	}
 	ret_val = pread(sys_super_block->iofptr, inode_ptr, SB_ENTRY_SIZE,
 			SB_HEAD_SIZE + (this_inode-1) * SB_ENTRY_SIZE);
 	if (ret_val < 0) {

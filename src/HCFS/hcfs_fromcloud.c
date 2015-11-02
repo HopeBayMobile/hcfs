@@ -284,8 +284,7 @@ int init_download_control()
 {
 	memset(&download_thread_ctl, 0, sizeof(DOWNLOAD_THREAD_CTL));
 	sem_init(&(download_thread_ctl.ctl_op_sem), 0, 1);
-	sem_init(&(download_thread_ctl.dl_th_sem), 0, 1); // TODO
-	//sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_DL_CONCURRENCY);
+	sem_init(&(download_thread_ctl.dl_th_sem), 0, MAX_DL_CONCURRENCY);
 
 	pthread_create(&(download_thread_ctl.manager_thread), NULL,
 		(void *)&download_block_manager, NULL);
@@ -309,8 +308,8 @@ int destroy_download_control()
  * download_block_manager
  *
  * This routine is a manager collecting and terminating those threads
- * downloading block. It waits for all active threads terminating when number 
- * of active threads > 0. Otherwise, it will sleep for a while and check 
+ * downloading block. It waits for all active threads terminating when number
+ * of active threads > 0. Otherwise, it will sleep for a while and check
  * active threads later.
  *
  */
@@ -400,6 +399,7 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	BLOCK_ENTRY_PAGE block_page;
 	int e_index, ret;
 	META_CACHE_ENTRY_STRUCT *meta_cache_entry;
+	char metapath[300];
 
 	e_index = block_info->block_no % MAX_BLOCK_ENTRIES_PER_PAGE;
 
@@ -407,6 +407,17 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	if (meta_cache_entry == NULL) {
 		return -ENOMEM;
 	}
+
+	/* Check whether meta exists or not. Stop to update block status
+	if meta is removed. */
+	fetch_meta_path(metapath, block_info->this_inode);
+	if (access(metapath, F_OK) < 0) {
+		meta_cache_unlock_entry(meta_cache_entry);
+		write_log(0, "Error: %s does not exist. In %s\n",
+			metapath, __func__);
+		return -ENOENT;
+	}
+
 	ret = meta_cache_lookup_file_data(block_info->this_inode, NULL, NULL,
 		&block_page, block_info->page_pos, meta_cache_entry);
 	if (ret < 0) {
@@ -415,7 +426,7 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	}
 
 	if (block_page.block_entries[e_index].status == from_st) {
-		block_page.block_entries[e_index].status = to_st; 
+		block_page.block_entries[e_index].status = to_st;
 	} else {
 		meta_cache_unlock_entry(meta_cache_entry);
 		/* return status if not match "from_st" */
@@ -450,7 +461,7 @@ static void _fetch_block(void *ptr)
 						block_info->block_no);
 
 	/* Create it if it does not exists, or do nothing */
-	block_fptr = fopen(block_path, "a+"); 
+	block_fptr = fopen(block_path, "a+");
 	if (block_fptr == NULL) {
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
@@ -476,13 +487,15 @@ static void _fetch_block(void *ptr)
 	if (ret < 0) {
 		write_log(0, "Error: Fail to modify block status in %s."
 			" Code %d", __func__, ret);
+		if (ret == -ENOENT) // Remove block because status is st_cloud
+			unlink(block_path);
 		goto thread_error;
-	} else if (ret > 0){ /* Status is not match ST_CLOUD */
+	} else if (ret > 0){ /* Status does not match ST_CLOUD */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
 	}
-		
+
 	/* Fetch block from cloud */
 	ret = fetch_from_cloud(block_fptr, block_info->this_inode,
 						block_info->block_no);
@@ -491,13 +504,13 @@ static void _fetch_block(void *ptr)
 		goto thread_error;
 	}
 
-	/* Update status */	
+	/* Update status */
 	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to modify block status in %s."
 			" Code %d", __func__, ret);
 		goto thread_error;
-	} else if (ret > 0){ /* Status is not match ST_CtoL */
+	} else if (ret > 0){ /* Status does not match ST_CtoL */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
@@ -576,7 +589,7 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 	FSEEK(fptr, page_pos, SEEK_SET);
 	FREAD(&entry_page, sizeof(BLOCK_ENTRY_PAGE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
-	
+
 	temp_entry = &(entry_page.block_entries[e_index]);
 	if (temp_entry->status == ST_CLOUD) {
 		/* Create thread to download */
@@ -632,6 +645,7 @@ int fetch_pinned_blocks(ino_t inode)
 	}
 
 	flock(fileno(fptr), LOCK_EX);
+	setbuf(fptr, NULL);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
 	/* Do not need to re-load meta in loop because just need to check those
@@ -643,18 +657,18 @@ int fetch_pinned_blocks(ino_t inode)
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
 
 	fetch_error_download_path(error_path, inode);
-	if (access(error_path, F_OK) == 0)
+	if (access(error_path, F_OK) == 0) /* Delete error path */
 		UNLINK(error_path);
 	ret_code = 0;
 	current_page = -1;
 	write_log(10, "Debug: Begin to check all blocks\n");
 	for (blkno = 0 ; blkno < total_blocks ; blkno++) {
-		if (access(metapath, F_OK) < 0) {
+		/*if (access(metapath, F_OK) < 0) {
 			write_log(10, "Debug: %s is removed when pinning.",
 				metapath);
 			ret_code = -ENOENT;
 			break;
-		}
+		}*/
 
 		if (access(error_path, F_OK) == 0) { /* Some error happened */
 			ret_code = -EIO;
@@ -696,7 +710,7 @@ int fetch_pinned_blocks(ino_t inode)
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		for (t_idx = 0; t_idx < MAX_DL_CONCURRENCY ; t_idx++) {
 			temp_info = &(download_thread_ctl.block_info[t_idx]);
-			if ((temp_info->active == TRUE) && 
+			if ((temp_info->active == TRUE) &&
 				(temp_info->this_inode == inode)) {
 				all_thread_terminate = FALSE;
 				break;
