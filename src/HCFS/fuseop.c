@@ -1722,6 +1722,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	struct stat tempstat;
 	off_t old_block_size, new_block_size;
 	int ret, errcode;
+	BLOCK_ENTRY *last_block_entry;
 
 	/*Offset not on the boundary of the block. Will need to truncate the
 	last block*/
@@ -1735,8 +1736,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	if (ret < 0)
 		return ret;
 
-	if (((temppage->block_entries[last_index]).status == ST_CLOUD) ||
-		((temppage->block_entries[last_index]).status == ST_CtoL)) {
+	last_block_entry = &(temppage->block_entries[last_index]);
+	if ((last_block_entry->status == ST_CLOUD) ||
+		(last_block_entry->status == ST_CtoL)) {
 		/*Download from backend */
 		blockfptr = fopen(thisblockpath, "a+");
 		if (blockfptr == NULL) {
@@ -1776,14 +1778,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			return ret;
 		}
 
-		if (((temppage->block_entries[last_index]).status ==
-			 ST_CLOUD) ||
-			((temppage->block_entries[last_index]).status ==
-				ST_CtoL)) {
-			if ((temppage->block_entries[last_index]).status ==
-				ST_CLOUD) {
-				(temppage->block_entries[last_index]).status =
-					ST_CtoL;
+		if ((last_block_entry->status == ST_CLOUD) ||
+				(last_block_entry->status == ST_CtoL)) {
+			if (last_block_entry->status == ST_CLOUD) {
+				last_block_entry->status = ST_CtoL;
 				ret = meta_cache_update_file_data(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
@@ -1799,7 +1797,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_unlock_entry(*body_ptr);
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, temppage->block_entries[last_index].obj_id);
+			ret = fetch_from_cloud(blockfptr, last_block_entry->obj_id);
 #else
 			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
 					last_block);
@@ -1834,8 +1832,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			}
 
 			if (stat(thisblockpath, &tempstat) == 0) {
-				(temppage->block_entries[last_index]).status =
-					ST_LDISK;
+				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
@@ -1860,8 +1857,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			}
 		} else {
 			if (stat(thisblockpath, &tempstat) == 0) {
-				(temppage->block_entries[last_index]).status =
-					ST_LDISK;
+				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
@@ -1892,7 +1888,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
 	} else {
-		if ((temppage->block_entries[last_index]).status == ST_NONE)
+		if (last_block_entry->status == ST_NONE)
 			return 0;
 
 		/* TODO: Error handling here if block status is not ST_NONE
@@ -1920,7 +1916,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		/* TODO: check if it is possible for a block to be deleted
 			when truncate is conducted (meta is locked) */
 		if (stat(thisblockpath, &tempstat) == 0) {
-			(temppage->block_entries[last_index]).status = ST_LDISK;
+			last_block_entry->status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 			if (ret < 0) {
