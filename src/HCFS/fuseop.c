@@ -452,6 +452,9 @@ int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
 	uid_t tmpuid;
 
 	tmppath = NULL;
+	tmptok_prev = NULL;
+	tmptok = NULL;
+	tmptoksave = NULL;
 	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
 				&tmppath);
 	if (ret < 0) {
