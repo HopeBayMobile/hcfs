@@ -33,8 +33,8 @@
 #include <time.h>
 #include <math.h>
 
-#ifdef _ANDROID_ENV_
-#include <fuse/sys/statvfs.h>
+#ifdef STAT_VFS_H
+#include STAT_VFS_H
 #else
 #include <sys/statvfs.h>
 #endif
@@ -109,8 +109,8 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Will need to implement rollback or error marking when ops failed*/
 
 /* TODO: Pending design for a single cache device, and use pread/pwrite to
-/*   allow multiple threads to access cache concurrently without the need for
-/*   file handles */
+   allow multiple threads to access cache concurrently without the need for
+   file handles */
 
 /* TODO: Need to be able to perform actual operations according to type of
 	folders (cached, non-cached, local) */
@@ -3603,11 +3603,11 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
 
-#ifndef _ANDROID_ENV_
+#ifdef STAT_VFS_H
+        buf->f_namelen = MAX_FILENAME_LEN;
+#else
 	buf->f_favail = buf->f_ffree;
 	buf->f_namemax = MAX_FILENAME_LEN;
-#else
-        buf->f_namelen = MAX_FILENAME_LEN;
 #endif
 
 	write_log(10, "Debug statfs, returning info\n");
