@@ -280,6 +280,7 @@ int read_system_config(char *config_path)
 
 	CURRENT_BACKEND = -1;
 	LOG_LEVEL = 0;
+	LOG_PATH = NULL;
 
 	while (!feof(fptr)) {
 		ret_ptr = fgets(tempbuf, 180, fptr);
@@ -349,6 +350,19 @@ int read_system_config(char *config_path)
 				return -1;
 			}
 			LOG_LEVEL = temp_val;
+			continue;
+		}
+
+		if (strcasecmp(argname, "log_path") == 0) {
+			LOG_PATH = (char *) malloc(strlen(argval) + 10);
+			if (LOG_PATH == NULL) {
+				write_log(0,
+					"Out of memory when reading config\n");
+				fclose(fptr);
+				return -1;
+			}
+
+			strcpy(LOG_PATH, argval);
 			continue;
 		}
 
@@ -622,6 +636,29 @@ int validate_system_config(void)
 	if (CURRENT_BACKEND < 0) {
 		write_log(0, "Backend selection does not exist\n");
 		return -1;
+	}
+
+	/* Write log to current path if log path is invalid */
+	if (LOG_PATH != NULL) {
+		if(access(LOG_PATH, F_OK) != 0) {
+			write_log(0, "Cannot access log path %s. Default"
+				" write log to current path\n", LOG_PATH);
+			LOG_PATH = NULL;
+		} else {
+			sprintf(pathname, "%s/testfile", LOG_PATH);
+			fptr = fopen(pathname, "w");
+			if (fptr == NULL) {
+				errcode = errno;
+				write_log(0, "Error when testing log dir"
+					" writing. Code %d, %s\n",
+					errcode, strerror(errcode));
+				write_log(0, "Write to current path\n");
+				LOG_PATH = NULL;
+			} else {
+				fclose(fptr);
+				unlink(pathname);
+			}
+		}
 	}
 
 	if (access(METAPATH, F_OK) != 0) {
