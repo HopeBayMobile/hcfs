@@ -12,6 +12,7 @@
 * 2015/6/1 Jiahong changing logger
 *
 **************************************************************************/
+#define _GNU_SOURCE
 #include "hfuse_system.h"
 
 #include <sys/time.h>
@@ -39,6 +40,7 @@
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "hcfs_cacheops.h"
+#include "monitor.h"
 #include "params.h"
 #include "utils.h"
 #include "filetables.h"
@@ -64,12 +66,13 @@ extern SYSTEM_CONF_STRUCT system_config;
 *************************************************************************/
 int init_hcfs_system_data(void)
 {
-	int shm_key, errcode;
+	int errcode;
 	size_t ret_size;
 
 #ifdef _ANDROID_ENV_
 	hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 #else
+	int shm_key;
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {
 		errcode = errno;
@@ -232,6 +235,7 @@ int main(int argc, char **argv)
 	pthread_t delete_loop_thread;
 	pthread_t upload_loop_thread;
 	pthread_t cache_loop_thread;
+	pthread_t monitor_loop_thread;
 #else
 #define NUMBER_OF_CHILDREN 3
 	pid_t child_pids[NUMBER_OF_CHILDREN];
@@ -309,6 +313,7 @@ int main(int argc, char **argv)
 		pthread_create(&cache_loop_thread, NULL, &run_cache_loop, NULL);
 		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
 		pthread_create(&upload_loop_thread, NULL, &upload_loop, NULL);
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
 		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
@@ -322,6 +327,7 @@ int main(int argc, char **argv)
 		pthread_join(cache_loop_thread, NULL);
 		pthread_join(delete_loop_thread, NULL);
 		pthread_join(upload_loop_thread, NULL);
+		pthread_join(monitor_loop_thread, NULL);
 	}
 	close_log();
 	destroy_pathlookup();
