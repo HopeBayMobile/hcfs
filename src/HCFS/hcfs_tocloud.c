@@ -631,6 +631,9 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
 		     block_count++) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
+
 			flock(fileno(metafptr), LOCK_EX);
 
 			/*Perhaps the file is deleted already*/
@@ -767,7 +770,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		threads for this inode has returned before starting meta sync*/
 
 		upload_done = FALSE;
-		while (upload_done == FALSE) {
+		while ((upload_done == FALSE) &&
+			(hcfs_system->system_going_down == FALSE)) {
 			nanosleep(&time_to_sleep, NULL);
 			upload_done = TRUE;
 			sem_wait(&(upload_ctl.upload_op_sem));
@@ -791,8 +795,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 		return;
 	}
 
-	/* Abort sync to cloud if error occured */
-	if (sync_error == TRUE) {
+	/* Abort sync to cloud if error occured or system is going down */
+	if ((sync_error == TRUE) || (hcfs_system->system_going_down == TRUE)) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
 		return;

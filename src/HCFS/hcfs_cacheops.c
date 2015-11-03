@@ -296,6 +296,8 @@ void run_cache_loop(void)
 
 	ret = -1;
 	while (ret < 0) {
+		if (hcfs_system->system_going_down == TRUE)
+			break;
 		ret = build_cache_usage();
 		if (ret < 0) {
 			write_log(0, "Error in cache mgmt.\n");
@@ -313,6 +315,8 @@ void run_cache_loop(void)
 		seconds_slept = 0;
 
 		while (hcfs_system->systemdata.cache_size >= CACHE_SOFT_LIMIT) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			if (nonempty_cache_hash_entries <= 0) {
 				/* All empty */
 				ret = build_cache_usage();
@@ -424,6 +428,7 @@ void run_cache_loop(void)
 			seconds_slept++;
 		}
 	}
+	notify_sleep_on_cache();
 }
 
 /************************************************************************
@@ -448,8 +453,8 @@ void sleep_on_cache_full(void)
 *
 * Function name: sleep_on_cache_full
 *        Inputs: None
-*       Summary: Routine for waking threads/processes sleeping using
-*                sleep_on_cache_full when cache not full.
+*       Summary: Routine for waking threads/processes sleeping from using
+*                sleep_on_cache_full.
 *  Return value: None
 *
 *************************************************************************/
@@ -461,7 +466,7 @@ void notify_sleep_on_cache(void)
 		sem_getvalue(&(hcfs_system->num_cache_sleep_sem),
 					&num_cache_sleep_sem_value);
 
-		/*If still have threads/processes waiting on cache not full*/
+		/*If still have threads/processes waiting on cache full*/
 		if (num_cache_sleep_sem_value > 0) {
 			sem_post(&(hcfs_system->check_cache_sem));
 			sem_wait(&(hcfs_system->check_next_sem));

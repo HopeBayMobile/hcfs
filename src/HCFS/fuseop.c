@@ -1334,6 +1334,9 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 	while (((block_page)->block_entries[entry_index].status == ST_CLOUD) ||
 		((block_page)->block_entries[entry_index].status == ST_CtoL)) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			if (hcfs_system->system_going_down == TRUE)
+				return -EBUSY;
+
 			/*Sleep if cache already full*/
 			write_log(10,
 				"debug truncate waiting on full cache\n");
@@ -2106,6 +2109,8 @@ int read_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 	while (((temppage->block_entries[entry_index]).status == ST_CLOUD) ||
 		((temppage->block_entries[entry_index]).status == ST_CtoL)) {
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			if (hcfs_system->system_going_down == TRUE)
+				return -EBUSY;
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
 			write_log(10, "debug read waiting on full cache\n");
@@ -2721,6 +2726,8 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			hcfs_system->systemdata.cache_size,
 			CACHE_HARD_LIMIT);
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			if (hcfs_system->system_going_down == TRUE)
+				return -EBUSY;
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_locked = FALSE;
