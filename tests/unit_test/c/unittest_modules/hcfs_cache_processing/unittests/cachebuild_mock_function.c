@@ -1,6 +1,7 @@
 #include "mock_params.h"
 #include <sys/stat.h>
 #include <sys/types.h>
+#include "global.h"
 
 #define TRUE 1
 #define FALSE 0

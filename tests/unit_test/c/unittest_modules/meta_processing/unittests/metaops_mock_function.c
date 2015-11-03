@@ -8,6 +8,7 @@
 #include "meta_mem_cache.h"
 #include "params.h"
 #include "mount_manager.h"
+#include "global.h"
 
 /* Global vars*/
 int DELETE_DIR_ENTRY_BTREE_RESULT = 1;
