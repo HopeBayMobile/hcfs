@@ -33,6 +33,7 @@ extern SYSTEM_CONF_STRUCT system_config;
 int open_log(char *filename)
 {
 	int ret, errcode;
+	char log_file[500];
 
 	if (logptr != NULL) {
 		write_log(0, "Attempted to open log file twice. Aborting.\n");
@@ -52,7 +53,12 @@ int open_log(char *filename)
 		logptr = NULL;
 		return -errcode;
 	}
-	logptr->fptr = fopen(filename, "a+");
+
+	if (LOG_PATH != NULL)
+		sprintf(log_file, "%s/%s", LOG_PATH, filename);
+	else
+		sprintf(log_file, "%s", filename);
+	logptr->fptr = fopen(log_file, "a+");
 	if (logptr->fptr == NULL) {
 		errcode = errno;
 		write_log(0, "Failed to open log file. Code %d, %s\n",
