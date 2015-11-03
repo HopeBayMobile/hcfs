@@ -556,11 +556,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	ret = fetch_meta_path(thismetapath, this_inode);
 
-#ifdef ARM_32bit_
-	write_log(10, "Sync inode %lld, mode %d\n", ptr->inode, ptr->this_mode);
-#else
-	write_log(10, "Sync inode %ld, mode %d\n", ptr->inode, ptr->this_mode);
-#endif
+	write_log(10, "Sync inode %"FMT_INO_T", mode %d\n", ptr->inode, ptr->this_mode);
 	if (ret < 0) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -885,14 +881,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			sem_post(&(sync_ctl.sync_op_sem));
 		}
 		if (sync_error == TRUE) {
-#ifdef ARM_32bit_
-			write_log(10,
-				  "Sync inode %lld to backend incomplete.\n",
+			write_log(10, "Sync inode %"FMT_INO_T" to backend incomplete.\n",
 				  ptr->inode);
-#else
-			write_log(10, "Sync inode %ld to backend incomplete.\n",
-				  ptr->inode);
-#endif
 			/* TODO: Revert info re last upload if upload
 				fails */
 		} else {
@@ -948,16 +938,9 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug datasync: inode %lld, block %lld\n", this_inode,
+	write_log(10, "Debug datasync: inode %"FMT_INO_T", block %lld\n", this_inode,
 		  block_no);
-	sprintf(curl_handle->id, "upload_blk_%lld_%lld", this_inode, block_no);
-#else
-	write_log(10, "Debug datasync: inode %ld, block %lld\n", this_inode,
-		  block_no);
-	sprintf(curl_handle->id, "upload_blk_%ld_%lld", this_inode, block_no);
-#endif
-
+	sprintf(curl_handle->id, "upload_blk_%"FMT_INO_T"_%lld", this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1096,17 +1079,10 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	int ret_val, errcode, ret;
 	FILE *fptr;
 
-#ifdef ARM_32bit_
-	sprintf(objname, "meta_%lld", this_inode);
-	write_log(10, "Debug datasync: objname %s, inode %lld\n", objname,
+	sprintf(objname, "meta_%"FMT_INO_T, this_inode);
+	write_log(10, "Debug datasync: objname %s, inode %"FMT_INO_T"\n", objname,
 		  this_inode);
-	sprintf(curl_handle->id, "upload_meta_%lld", this_inode);
-#else
-	sprintf(objname, "meta_%ld", this_inode);
-	write_log(10, "Debug datasync: objname %s, inode %ld\n", objname,
-		  this_inode);
-	sprintf(curl_handle->id, "upload_meta_%ld", this_inode);
-#endif
+	sprintf(curl_handle->id, "upload_meta_%"FMT_INO_T, this_inode);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1220,13 +1196,8 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	FILE *fptr;
 
 	topen = FALSE;
-#ifdef ARM_32bit_
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.tmp",
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%"FMT_INO_T".tmp",
 		upload_ctl.upload_threads[which_curl].inode);
-#else
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.tmp",
-		upload_ctl.upload_threads[which_curl].inode);
-#endif
 
 	/* Find a appropriate copied-meta name */
 	count = 0;
@@ -1234,15 +1205,9 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 		ret = access(tempfilename, F_OK);
 		if (ret == 0) {
 			count++;
-#ifdef ARM_32bit_
-			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%lld.%d",
+			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%"FMT_INO_T".%d",
 				upload_ctl.upload_threads[which_curl].inode,
 				count);
-#else
-			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%ld.%d",
-				upload_ctl.upload_threads[which_curl].inode,
-				count);
-#endif
 		} else {
 			errcode = errno;
 			break;
@@ -1320,13 +1285,8 @@ int dispatch_upload_block(int which_curl)
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
 
-#ifdef ARM_32bit_
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%lld_%lld.tmp",
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%"FMT_INO_T"_%lld.tmp",
 		upload_ptr->inode, upload_ptr->blockno);
-#else
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%ld_%lld.tmp",
-		upload_ptr->inode, upload_ptr->blockno);
-#endif
 
 	/* Find an appropriate dispatch-name */
 	count = 0;
@@ -1334,15 +1294,9 @@ int dispatch_upload_block(int which_curl)
 		ret = access(tempfilename, F_OK);
 		if (ret == 0) {
 			count++;
-#ifdef ARM_32bit_
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_block_%lld_%lld.%d",
+				"/dev/shm/hcfs_sync_block_%"FMT_INO_T"_%lld.%d",
 				upload_ptr->inode, upload_ptr->blockno, count);
-#else
-			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_block_%ld_%lld.%d",
-				upload_ptr->inode, upload_ptr->blockno, count);
-#endif
 		} else {
 			errcode = errno;
 			break;
@@ -1458,15 +1412,9 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			sync_threads[count].this_mode = this_mode;
 			sync_threads[count].which_index = count;
 
-#ifdef ARM_32bit_
-			write_log(10, "Before syncing: inode %lld, mode %d\n",
+			write_log(10, "Before syncing: inode %"FMT_INO_T", mode %d\n",
 				  sync_threads[count].inode,
 				  sync_threads[count].this_mode);
-#else
-			write_log(10, "Before syncing: inode %ld, mode %d\n",
-				  sync_threads[count].inode,
-				  sync_threads[count].this_mode);
-#endif
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
 				       NULL, (void *)&sync_single_inode,
 				       (void *)&(sync_threads[count]));
@@ -1544,11 +1492,7 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
-#ifdef ARM_32bit_
-		write_log(10, "Inode to sync is %lld\n", ino_sync);
-#else
-		write_log(10, "Inode to sync is %ld\n", ino_sync);
-#endif
+		write_log(10, "Inode to sync is %"FMT_INO_T"\n", ino_sync);
 		/* Begin to sync the inode */
 		if (ino_sync != 0) {
 			sem_wait(&(sync_ctl.sync_op_sem));
@@ -1612,15 +1556,9 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
 
-#ifdef ARM_32bit_
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%lld", METAPATH,
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%"FMT_INO_T, METAPATH,
 		 root_inode);
-	snprintf(objname, METAPATHLEN - 1, "FSstat%lld", root_inode);
-#else
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%ld", METAPATH,
-		 root_inode);
-	snprintf(objname, METAPATHLEN - 1, "FSstat%ld", root_inode);
-#endif
+	snprintf(objname, METAPATHLEN - 1, "FSstat%"FMT_INO_T, root_inode);
 
 	write_log(10, "Objname %s\n", objname);
 	if (access(fname, F_OK) == -1) {

@@ -28,7 +28,6 @@
 #include <sys/ipc.h>
 #endif
 
-#include <curl/curl.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
 

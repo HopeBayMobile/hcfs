@@ -14,13 +14,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char block_name[200];
 
-#ifdef ARM_32bit_
-	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%lld_%lld",
+	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%lld",
 		this_inode, block_num);
-#else
-	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%ld_%lld",
-		this_inode, block_num);
-#endif
 	strcpy(pathname, block_name);
 	
 	return 0;
@@ -30,13 +25,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char meta_name[200];
 
-#ifdef ARM_32bit_
-	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%lld",
+	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
 			this_inode);
-#else
-	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ld",
-			this_inode);
-#endif
 	strcpy(pathname, meta_name);
 
 	return 0;

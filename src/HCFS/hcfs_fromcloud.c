@@ -23,7 +23,6 @@
 #include <dirent.h>
 #include <sys/mman.h>
 #include <sys/file.h>
-#include <curl/curl.h>
 
 #include "params.h"
 #include "enc.h"
@@ -64,10 +63,8 @@ int fetch_from_cloud(FILE *fptr,
 	/* Get objname by obj_id */
 	obj_id_to_string(obj_id, obj_id_str);
 	sprintf(objname, "data_%s", obj_id_str);
-#elif ARM_32bit_
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%"FMT_INO_T"_%lld", this_inode, block_no);
 #endif
 
 	sem_wait(&download_curl_sem);

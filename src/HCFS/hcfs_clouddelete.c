@@ -595,17 +595,10 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	char objname[1000];
 	int ret_val, ret;
 
-#ifdef ARM_32bit_
-	sprintf(objname, "meta_%lld", this_inode);
-	write_log(10, "Debug meta deletion: objname %s, inode %lld\n",
+	sprintf(objname, "meta_%"FMT_INO_T, this_inode);
+	write_log(10, "Debug meta deletion: objname %s, inode %"FMT_INO_T"\n",
 						objname, this_inode);
-	sprintf(curl_handle->id, "delete_meta_%lld", this_inode);
-#else
-	sprintf(objname, "meta_%ld", this_inode);
-	write_log(10, "Debug meta deletion: objname %s, inode %ld\n",
-						objname, this_inode);
-	sprintf(curl_handle->id, "delete_meta_%ld", this_inode);
-#endif
+	sprintf(curl_handle->id, "delete_meta_%"FMT_INO_T, this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
@@ -655,28 +648,17 @@ int do_block_delete(ino_t this_inode, long long block_no,
 
 	/* Update ddt */
 	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
-#elif defined(ARM_32bit_)
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	/* Force to delete */
-	ddt_ret = 0;
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%"FMT_INO_T"_%lld", this_inode, block_no);
 	/* Force to delete */
 	ddt_ret = 0;
 #endif
 
 	if (ddt_ret == 0) {
-#ifdef ARM_32bit_
 		write_log(10,
-			"Debug delete object: objname %s, inode %lld, block %lld\n",
+			"Debug delete object: objname %s, inode %"FMT_INO_T", block %lld\n",
 						objname, this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%lld_%lld", this_inode, block_no);
-#else
-		write_log(10,
-			"Debug delete object: objname %s, inode %ld, block %lld\n",
-						objname, this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%ld_%lld", this_inode, block_no);
-#endif
+		sprintf(curl_handle->id, "delete_blk_%"FMT_INO_T"_%lld", this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))

@@ -412,11 +412,7 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-#ifdef ARM_32bit_
-	write_log(10, "Root inode is %lld\n", tmpptr->f_ino);
-#else
-	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
-#endif
+	write_log(10, "Root inode is %"FMT_INO_T"\n", tmpptr->f_ino);
 
 	if (ino == 1)
 		return tmpptr->f_ino;
@@ -442,11 +438,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug getattr hit inode %lld\n", hit_inode);
-#else
-	write_log(10, "Debug getattr hit inode %ld\n", hit_inode);
-#endif
+	write_log(10, "Debug getattr hit inode %"FMT_INO_T"\n", hit_inode);
 
 	if (hit_inode > 0) {
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
@@ -455,27 +447,22 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 			return;
 		}
 
-#ifdef ARM_32bit_
-		write_log(10, "Debug getattr return inode %lld\n",
+		write_log(10, "Debug getattr return inode %"FMT_INO_T"\n",
 				tmp_stat.st_ino);
-#else
-		write_log(10, "Debug getattr return inode %ld\n",
-				tmp_stat.st_ino);
-#endif
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		fuse_reply_attr(req, &tmp_stat, 0);
-	 } else {
+	} else {
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
 			(tmp_time2.tv_sec - tmp_time1.tv_sec)
 			+ 0.000001 * (tmp_time2.tv_usec - tmp_time1.tv_usec));
 		fuse_reply_err(req, ENOENT);
-	 }
+	}
 }
 
 /************************************************************************
@@ -828,13 +815,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 
 	parent_inode = real_ino(req, parent);
-#ifdef ARM_32bit_
-	write_log(10, "Debug rmdir: name %s, parent %lld\n", selfname,
+	write_log(10, "Debug rmdir: name %s, parent %"FMT_INO_T"\n", selfname,
 			parent_inode);
-#else
-	write_log(10, "Debug rmdir: name %s, parent %ld\n", selfname,
-			parent_inode);
-#endif
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -879,13 +861,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
-#ifdef ARM_32bit_
-	write_log(10, "Debug rmdir: name %s, %lld\n", temp_dentry.d_name,
-			this_inode);
-#else
-	write_log(10, "Debug rmdir: name %s, %ld\n", temp_dentry.d_name,
-			this_inode);
-#endif
+	write_log(10, "Debug rmdir: name %s, %"FMT_INO_T"\n",
+			temp_dentry.d_name, this_inode);
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0)
@@ -920,13 +897,8 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
-#ifdef ARM_32bit_
-	write_log(10, "Debug lookup parent %lld, name %s\n",
+	write_log(10, "Debug lookup parent %"FMT_INO_T", name %s\n",
 			parent_inode, selfname);
-#else
-	write_log(10, "Debug lookup parent %ld, name %s\n",
-			parent_inode, selfname);
-#endif
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -959,13 +931,8 @@ a directory (for NFS) */
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 
-#ifdef ARM_32bit_
 	write_log(10,
-		"Debug lookup %lld, %s, %d\n", parent_inode, selfname, ret_val);
-#else
-	write_log(10,
-		"Debug lookup %ld, %s, %d\n", parent_inode, selfname, ret_val);
-#endif
+		"Debug lookup %"FMT_INO_T", %s, %d\n", parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
 		ret_val = -ret_val;
@@ -983,13 +950,8 @@ a directory (for NFS) */
 	}
 
 	output_param.generation = this_gen;
-#ifdef ARM_32bit_
-	write_log(10,
-		"Debug lookup inode %lld, gen %ld\n", this_inode, this_gen);
-#else
-	write_log(10,
-		"Debug lookup inode %ld, gen %ld\n", this_inode, this_gen);
-#endif
+	write_log(10, "Debug lookup inode %"FMT_INO_T", gen %ld\n",
+			this_inode, this_gen);
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -2186,13 +2148,8 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		temp_prefetch->block_no = block_index + 1;
 		temp_prefetch->page_start_fpos = this_page_fpos;
 		temp_prefetch->entry_index = eindex + 1;
-#ifdef ARM_32bit_
-		write_log(10, "Prefetching block %lld for inode %lld\n",
+		write_log(10, "Prefetching block %lld for inode %"FMT_INO_T"\n",
 			block_index + 1, this_inode);
-#else
-		write_log(10, "Prefetching block %lld for inode %ld\n",
-			block_index + 1, this_inode);
-#endif
 		ret = pthread_create(&(prefetch_thread),
 			&prefetch_thread_attr, (void *)&prefetch_block,
 			((void *)temp_prefetch));
@@ -3030,7 +2987,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		switch ((temppage).block_entries[entry_index].status) {
 		case ST_NONE:
 		case ST_TODELETE:
-			 /*If not stored anywhere, make it on local disk*/
+			/*If not stored anywhere, make it on local disk*/
 			fh_ptr->blockfptr = fopen(thisblockpath, "a+");
 			if (fh_ptr->blockfptr == NULL) {
 				errnum = errno;
@@ -3629,15 +3586,9 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					(size - buf_pos),
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
-#ifdef ARM_32bit_
-			write_log(10, "Debug readdir entry %s, %lld\n",
+			write_log(10, "Debug readdir entry %s, %"FMT_INO_T"\n",
 				temp_page.dir_entries[count].d_name,
 				tempstat.st_ino);
-#else
-			write_log(10, "Debug readdir entry %s, %ld\n",
-				temp_page.dir_entries[count].d_name,
-				tempstat.st_ino);
-#endif
 			write_log(10, "Debug readdir entry size %ld\n",
 				entry_size);
 			if (entry_size > (size - buf_pos)) {
@@ -3714,11 +3665,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-#ifdef ARM_32bit_
-	write_log(10, "Root inode is %lld\n", tmpptr->f_ino);
-#else
-	write_log(10, "Root inode is %ld\n", tmpptr->f_ino);
-#endif
+	write_log(10, "Root inode is %"FMT_INO_T"\n", tmpptr->f_ino);
 
 	lookup_increase(tmpptr->lookup_table, tmpptr->f_ino, 1, D_ISDIR);
 }
@@ -3735,11 +3682,7 @@ void hfuse_ll_destroy(void *userdata)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-#ifdef ARM_32bit_
-	write_log(10, "Unmounting FS with root inode %lld\n", tmpptr->f_ino);
-#else
-	write_log(10, "Unmounting FS with root inode %ld\n", tmpptr->f_ino);
-#endif
+	write_log(10, "Unmounting FS with root inode %"FMT_INO_T"\n", tmpptr->f_ino);
 }
 
 /************************************************************************
@@ -4875,15 +4818,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-#ifdef ARM_32bit_
-	write_log(10,
-		"DEBUG parent %lld, name %s mode %d\n", parent_inode,
-		name, mode);
-#else
-	write_log(10,
-		"DEBUG parent %ld, name %s mode %d\n", parent_inode,
-		name, mode);
-#endif
+	write_log(10, "DEBUG parent %"FMT_INO_T", name %s mode %d\n",
+			parent_inode, name, mode);
 
 	/* Reject if not creating a regular file */
 	if (!S_ISREG(mode)) {
@@ -5032,13 +4968,8 @@ void *mount_multi_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop_mt(session_ptr);
-#ifdef ARM_32bit_
-	write_log(10, "Unmounting FS with root inode %lld, %d\n", tmpptr->f_ino,
+	write_log(10, "Unmounting FS with root inode %"FMT_INO_T", %d\n", tmpptr->f_ino,
 			tmpptr->is_unmount);
-#else
-	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
-			tmpptr->is_unmount);
-#endif
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
@@ -5054,13 +4985,8 @@ void *mount_single_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop(session_ptr);
-#ifdef ARM_32bit_
-	write_log(10, "Unmounting FS with root inode %lld, %d\n", tmpptr->f_ino,
+	write_log(10, "Unmounting FS with root inode %"FMT_INO_T", %d\n", tmpptr->f_ino,
 			tmpptr->is_unmount);
-#else
-	write_log(10, "Unmounting FS with root inode %ld, %d\n", tmpptr->f_ino,
-			tmpptr->is_unmount);
-#endif
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);

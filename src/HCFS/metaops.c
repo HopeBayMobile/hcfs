@@ -1248,7 +1248,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 		/* Open meta */
 		ret = fetch_meta_path(thismetapath, this_inode);
-		if (ret < 0) 
+		if (ret < 0)
 			return ret;
 
 		metafptr = fopen(thismetapath, "r+");
@@ -1288,19 +1288,19 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				page_pos = seek_page2(&file_meta, metafptr,
 					which_page, 0);
 				if (page_pos <= 0) {
-					count += (MAX_BLOCK_ENTRIES_PER_PAGE 
+					count += (MAX_BLOCK_ENTRIES_PER_PAGE
 						- 1);
 					continue;
 				}
 				current_page = which_page;
 				FSEEK(metafptr, page_pos, SEEK_SET);
-				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE), 
+				FREAD(&tmppage, sizeof(BLOCK_ENTRY_PAGE),
 					1, metafptr);
 			}
 
 			/* Skip if block does not exist */
 			block_status = tmppage.block_entries[e_index].status;
-			if ((block_status == ST_NONE) || 
+			if ((block_status == ST_NONE) ||
 				(block_status == ST_CLOUD))
 				continue;
 
@@ -1352,7 +1352,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	}
 
 	/* unlink markdelete tag because it has been deleted */
-	ret = disk_cleardelete(this_inode, root_inode); 
+	ret = disk_cleardelete(this_inode, root_inode);
 
 	gettimeofday(&end_time, NULL);
 	elapsed_time = (end_time.tv_sec + end_time.tv_usec * 0.000001)
@@ -1394,13 +1394,8 @@ int disk_markdelete(ino_t this_inode, ino_t root_inode)
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
 					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
 
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
@@ -1426,13 +1421,8 @@ int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
 					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
 
 	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
@@ -1459,13 +1449,8 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-#ifdef ARM_32bit_
-	snprintf(pathname, 200, "%s/markdelete/inode%lld_%lld",
+	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
 					METAPATH, this_inode, root_inode);
-#else
-	snprintf(pathname, 200, "%s/markdelete/inode%ld_%ld",
-					METAPATH, this_inode, root_inode);
-#endif
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1512,13 +1497,8 @@ int startup_finish_delete(void)
 	}
 
 	while (tmpptr != NULL) {
-#ifdef ARM_32bit_
-		ret_val = sscanf(tmpent.d_name, "inode%lld_%lld", &tmp_ino,
-					&root_inode);
-#else
-		ret_val = sscanf(tmpent.d_name, "inode%ld_%ld", &tmp_ino,
-					&root_inode);
-#endif
+		ret_val = sscanf(tmpent.d_name, "inode%"FMT_INO_T"_%"FMT_INO_T"",
+				&tmp_ino, &root_inode);
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
 			if (ret < 0) {

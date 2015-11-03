@@ -282,13 +282,8 @@ int build_cache_usage(void)
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-#ifdef ARM_32bit_
-			ret = sscanf(temp_dirent.d_name, "block%lld_%lld",
+			ret = sscanf(temp_dirent.d_name, "block%"FMT_INO_T"_%lld",
 							&this_inode, &blockno);
-#else
-			ret = sscanf(temp_dirent.d_name, "block%ld_%lld",
-							&this_inode, &blockno);
-#endif
 			if (ret != 2) {
 				ret = readdir_r(dirptr, &temp_dirent,
 					&direntptr);
