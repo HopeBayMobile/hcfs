@@ -1577,6 +1577,18 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	}
 #ifdef _ANDROID_ENV_
 	if (parent_inode1 != parent_inode2) {
+		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+							self_inode);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
 		ret_val = pathlookup_write_parent(self_inode, parent_inode2);
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
