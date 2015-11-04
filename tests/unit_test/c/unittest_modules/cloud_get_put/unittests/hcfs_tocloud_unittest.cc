@@ -517,6 +517,7 @@ protected:
 		void *res;
 		char tmppath[200];
 		char tmppath2[200];
+
 		snprintf(tmppath, 199, "%s/FS_sync", METAPATH);
 		snprintf(tmppath2, 199, "%s/FSstat10", tmppath);
 		unlink(tmppath2);
@@ -582,6 +583,7 @@ TEST_F(sync_single_inodeTest, MetaNotExist)
 	SYNC_THREAD_TYPE mock_thread_type;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
+	mock_thread_type.which_index = 0;
 
 	/* Run tested function */
 	sync_single_inode(&mock_thread_type);
@@ -603,18 +605,24 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	system_config.max_block_size = 100;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
+	mock_thread_type.which_index = 0;
+
+	hcfs_system->system_going_down = FALSE;
 
 	/* Run tested function */
 	init_upload_control();
 	init_sync_stat_control();
 	sync_single_inode(&mock_thread_type);
 	sleep(2);
+	hcfs_system->system_going_down = TRUE;
+	sleep(1);
 
 	/* Verify */
+	printf("Begin to verify sync blocks\n");
 	EXPECT_EQ(num_total_blocks, objname_counter);
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
-		char expected_objname[20];
+		char expected_objname[50];
 		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
@@ -622,6 +630,7 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 				mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
+	printf("Begin to check block status\n");
 	metaptr = fopen(metapath, "r+");
 	fseek(metaptr, sizeof(struct stat), SEEK_SET);
 	fread(&filemeta, sizeof(FILE_META_TYPE), 1, metaptr);
@@ -651,6 +660,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	system_config.max_block_size = 1000;
 	mock_thread_type.inode = 1;
 	mock_thread_type.this_mode = S_IFREG;
+	mock_thread_type.which_index = 0;
 
 	/* Run tested function */
 	init_upload_control();
@@ -661,7 +671,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	EXPECT_EQ(num_total_blocks, objname_counter);
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
-		char expected_objname[20];
+		char expected_objname[50];
 		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
@@ -743,8 +753,7 @@ TEST_F(upload_loopTest, UploadLoopWorkSuccess_OnlyTestDirCase)
 	DIR_META_TYPE empty_meta;
 	BLOCK_ENTRY_PAGE mock_block_page;
 
-	init_upload_control();
-	init_sync_control();
+	hcfs_system->system_going_down = FALSE;
 
 	/* Write something into meta, int the unittest, only test
 	   the case that upload dir meta because regfile case has

@@ -105,7 +105,7 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	inode_ptr->status = IS_DIRTY;
 	inode_ptr->in_transit = FALSE;
 	(inode_ptr->inode_stat).st_mode = S_IFDIR;
-	
+
 	if (shm_test_data->tohandle_counter == shm_test_data->num_inode) {
 		inode_ptr->util_ll_next = 0;
 		sys_super_block->head.first_dirty_inode = 0;
