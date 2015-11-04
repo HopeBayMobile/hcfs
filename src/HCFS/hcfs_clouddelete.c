@@ -38,6 +38,7 @@ additional pending meta or block deletion for this inode to finish.*/
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
+#include <inttypes.h>
 
 #include "hcfs_tocloud.h"
 #include "params.h"
@@ -606,10 +607,10 @@ int do_meta_delete(ino_t this_inode, CURL_HANDLE *curl_handle)
 	char objname[1000];
 	int ret_val, ret;
 
-	sprintf(objname, "meta_%"FMT_INO_T, this_inode);
-	write_log(10, "Debug meta deletion: objname %s, inode %"FMT_INO_T"\n",
+	sprintf(objname, "meta_%ju", (uintmax_t)this_inode);
+	write_log(10, "Debug meta deletion: objname %s, inode %ju\n",
 						objname, this_inode);
-	sprintf(curl_handle->id, "delete_meta_%"FMT_INO_T, this_inode);
+	sprintf(curl_handle->id, "delete_meta_%ju", (uintmax_t)this_inode);
 	ret_val = hcfs_delete_object(objname, curl_handle);
 	/* Already retried in get object if necessary */
 	if ((ret_val >= 200) && (ret_val <= 299))
@@ -660,16 +661,16 @@ int do_block_delete(ino_t this_inode, long long block_no,
 	/* Update ddt */
 	ddt_ret = decrease_ddt_el_refcount(obj_id, &tree_root, ddt_fd, &ddt_meta);
 #else
-	sprintf(objname, "data_%"FMT_INO_T"_%lld", this_inode, block_no);
+	sprintf(objname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
 	/* Force to delete */
 	ddt_ret = 0;
 #endif
 
 	if (ddt_ret == 0) {
 		write_log(10,
-			"Debug delete object: objname %s, inode %"FMT_INO_T", block %lld\n",
-						objname, this_inode, block_no);
-		sprintf(curl_handle->id, "delete_blk_%"FMT_INO_T"_%lld", this_inode, block_no);
+			"Debug delete object: objname %s, inode %ju, block %lld\n",
+			objname, (uintmax_t)this_inode, block_no);
+		sprintf(curl_handle->id, "delete_blk_%ju_%lld", this_inode, block_no);
 		ret_val = hcfs_delete_object(objname, curl_handle);
 		/* Already retried in get object if necessary */
 		if ((ret_val >= 200) && (ret_val <= 299))

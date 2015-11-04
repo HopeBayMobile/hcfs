@@ -1,7 +1,9 @@
 #include "gtest/gtest.h"
+#include <stddef.h>
 #include <attr/xattr.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
+#include <inttypes.h>
 #include "mock_params.h"
 extern "C" {
 #include "hcfs_clouddelete.h"
@@ -195,7 +197,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
-			sprintf(path, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",inode, i);
+			sprintf(path, "/tmp/testHCFS/data_%ju_%d", (uintmax_t)inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -623,11 +625,11 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
-				mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "data_%ju_%d",
+				(uintmax_t)mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-		sprintf(expected_objname, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",
-				mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
+				(uintmax_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	printf("Begin to check block status\n");
@@ -673,11 +675,11 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%"FMT_INO_T"_%d",
-				mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "data_%ju_%d",
+				(uintmax_t)mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_%"FMT_INO_T"_%d",
-				mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
+				(uintmax_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	unlink(metapath);

@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <stdarg.h>
+#include <inttypes.h>
 #include "hcfs_tocloud.h"
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -19,8 +20,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%"FMT_INO_T"_%lld",
-		this_inode, block_num);
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%ju_%lld",
+		(uintmax_t)this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -81,7 +82,7 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
 {
 	char deleteobjname[30];
-	sprintf(deleteobjname, "data_%"FMT_INO_T"_%lld", this_inode, block_no);
+	sprintf(deleteobjname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
 	usleep(200000); // Let thread busy
