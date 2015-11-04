@@ -882,13 +882,17 @@ int backup_FS_database(void)
 
 	fptr = NULL;
 	snprintf(upload_handle.id, 256, "FSmgr_upload");
+	upload_handle.curl_backend = NONE;
+	upload_handle.curl = NULL;
+	/* Do not actually init backend until needed */
+/*
 	ret = hcfs_init_backend(&upload_handle);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in backing up FS database\n");
 		goto errcode_handle;
 	}
-
+*/
 	fptr = fopen("/tmp/FSmgr_upload", "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -907,12 +911,12 @@ int backup_FS_database(void)
 	fclose(fptr);
 
 	unlink("/tmp/FSmgr_upload");
-	hcfs_destroy_backend(upload_handle.curl);
+	hcfs_destroy_backend(&upload_handle);
 	return 0;
 
 errcode_handle:
 	if (upload_handle.curl != NULL)
-		hcfs_destroy_backend(upload_handle.curl);
+		hcfs_destroy_backend(&upload_handle);
 
 	if (fptr != NULL)
 		fclose(fptr);
@@ -944,14 +948,17 @@ int restore_FS_database(void)
 	memset(&download_handle, 0, sizeof(CURL_HANDLE));
 
 	snprintf(download_handle.id, 256, "FSmgr_download");
-
+	download_handle.curl_backend = NONE;
+	download_handle.curl = NULL;
+	/* Do not actually init backend until needed */
+/*
 	ret = hcfs_init_backend(&download_handle);
 	if ((ret < 200) || (ret > 299)) {
 		errcode = -EIO;
 		write_log(0, "Error in restoring FS database\n");
 		goto errcode_handle;
 	}
-
+*/
 	fptr = fopen(fs_mgr_path, "w");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -969,12 +976,12 @@ int restore_FS_database(void)
 
 	fclose(fptr);
 
-	hcfs_destroy_backend(download_handle.curl);
+	hcfs_destroy_backend(&download_handle);
 	return 0;
 
 errcode_handle:
 	if (download_handle.curl != NULL)
-		hcfs_destroy_backend(download_handle.curl);
+		hcfs_destroy_backend(&download_handle);
 
 	if (fptr != NULL)
 		fclose(fptr);

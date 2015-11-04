@@ -198,6 +198,10 @@ int _init_download_curl(int count)
 				"download_thread_%d", count);
 
 	curl_handle_mask[count] = FALSE;
+	download_curl_handles[count].curl_backend = NONE;
+	download_curl_handles[count].curl = NULL;
+	/* Do not init backend until actually needed */
+/*
 	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
@@ -206,6 +210,7 @@ int _init_download_curl(int count)
 			hcfs_destroy_backend(download_curl_handles[count].curl);
 		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
 	}
+*/
 	return 0;
 }
 
@@ -259,6 +264,9 @@ int main(int argc, char **argv)
 		exit(-1);
 */
 	}
+
+	/* Only init backend when actual transfer is needed */
+/*
 	if (CURRENT_BACKEND != NONE) {
 		sprintf(curl_handle.id, "main");
 		ret_val = hcfs_init_backend(&curl_handle);
@@ -279,7 +287,7 @@ int main(int argc, char **argv)
 
 		hcfs_destroy_backend(curl_handle.curl);
 	}
-
+*/
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);
