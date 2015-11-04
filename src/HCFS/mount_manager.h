@@ -23,6 +23,9 @@
 #include "params.h"
 #include "fuseop.h"
 #include "lookup_count_types.h"
+#ifdef _ANDROID_ENV_
+#include "path_reconstruct.h"
+#endif
 
 /*
 Binary search tree
@@ -43,6 +46,10 @@ typedef struct {
 typedef struct {
 	ino_t f_ino;
 	char f_name[MAX_FILENAME_LEN+1];
+#ifdef _ANDROID_ENV_
+	char volume_type;
+	PATH_CACHE *vol_path_cache;
+#endif
 	char rootpath[METAPATHLEN];
 	char *f_mp;
 	struct timeval mt_time;

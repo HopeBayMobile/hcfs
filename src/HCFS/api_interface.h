@@ -21,6 +21,10 @@
 #include <semaphore.h>
 #include <time.h>
 
+#ifdef _ANDROID_ENV_
+#include <pthread.h>
+#endif
+
 #define MAX_API_THREADS 32
 #define INIT_API_THREADS 10
 #define PROCESS_WINDOW 30

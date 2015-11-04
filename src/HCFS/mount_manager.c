@@ -25,6 +25,9 @@
 #include "lookup_count.h"
 #include "logger.h"
 #include "macro.h"
+#ifdef _ANDROID_ENV_
+#include "path_reconstruct.h"
+#endif
 
 extern struct fuse_lowlevel_ops hfuse_ops;
 
@@ -474,6 +477,8 @@ errcode_handle:
 /* Helper for unmounting */
 int do_unmount_FS(MOUNT_T *mount_info)
 {
+	int ret;
+
 	if (mount_info->stat_fptr != NULL)
 		fclose(mount_info->stat_fptr);
 	pthread_join(mount_info->mt_thread, NULL);
@@ -482,7 +487,13 @@ int do_unmount_FS(MOUNT_T *mount_info)
 	fuse_session_destroy(mount_info->session_ptr);
 	fuse_unmount(mount_info->f_mp, mount_info->chan_ptr);
 	fuse_opt_free_args(&(mount_info->mount_args));
-
+#ifdef _ANDROID_ENV_
+	if (mount_info->vol_path_cache != NULL) {
+		ret = destroy_pathcache(mount_info->vol_path_cache);
+		if (ret < 0)
+			return ret;
+	}
+#endif
 	return 0;
 }
 
@@ -541,6 +552,18 @@ int mount_FS(char *fsname, char *mp)
 
 	new_info->stat_fptr = NULL;
 	new_info->f_ino = tmp_entry.d_ino;
+#ifdef _ANDROID_ENV_
+	new_info->volume_type = tmp_entry.d_type;
+	if (new_info->volume_type == ANDROID_EXTERNAL) {
+		new_info->vol_path_cache = init_pathcache(new_info->f_ino);
+		if (new_info->vol_path_cache == NULL) {
+			errcode = -ENOMEM;
+			goto errcode_handle;
+		}
+	} else {
+		new_info->vol_path_cache = NULL;
+	}
+#endif
 	ret = fetch_meta_path(new_info->rootpath, new_info->f_ino);
 	if (ret < 0) {
 		errcode = ret;
