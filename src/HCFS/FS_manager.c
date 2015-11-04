@@ -195,22 +195,15 @@ ino_t _create_root_inode(void)
 
 #ifdef _ANDROID_ENV_
         self_mode = S_IFDIR | 0770;
-        this_stat.st_mode = self_mode;
-
-        /*One pointed by the parent, another by self*/
-        this_stat.st_nlink = 2;
-        this_stat.st_uid = 0;  /* root */
-        this_stat.st_gid = 1028;  /* sdcard_r */
-
 #else
-	self_mode = S_IFDIR | 0777;
+	self_mode = S_IFDIR | 0775;
+#endif
 	this_stat.st_mode = self_mode;
 
 	/*One pointed by the parent, another by self*/
 	this_stat.st_nlink = 2;
 	this_stat.st_uid = getuid();
 	this_stat.st_gid = getgid();
-#endif
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
@@ -245,6 +238,14 @@ ino_t _create_root_inode(void)
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
+	this_meta.metaver = CURRENT_META_VER;
+#ifdef _ANDROID_ENV_
+	ret = pathlookup_write_parent(root_inode, 0);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+#endif
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 
@@ -301,12 +302,19 @@ errcode_handle:
 *
 * Function name: add_filesystem
 *        Inputs: char *fsname, DIR_ENTRY *ret_entry
+*        Inputs: (Android) char *fsname, char voltype, DIR_ENTRY *ret_entry
 *       Summary: Creates the filesystem "fsname" if it does not exist.
 *                The root inode for the new FS is returned in ret_entry.
+*                For Android system, will also need to specify if the type
+*                of volume is internal or external storage
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
+#ifdef _ANDROID_ENV_
+int add_filesystem(char *fsname, char voltype, DIR_ENTRY *ret_entry)
+#else
 int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
+#endif
 {
 	DIR_ENTRY_PAGE tpage, new_root, tpage2;
 	DIR_ENTRY temp_entry, overflow_entry;
@@ -381,6 +389,9 @@ int add_filesystem(char *fsname, DIR_ENTRY *ret_entry)
 	}
 
 	temp_entry.d_ino = new_FS_ino;
+#ifdef _ANDROID_ENV_
+	temp_entry.d_type = voltype;
+#endif
 	snprintf(temp_entry.d_name, MAX_FILENAME_LEN+1, "%s", fsname);
 
 
@@ -843,6 +854,8 @@ int backup_FS_database(void)
 	ssize_t ret_ssize;
 	off_t curpos;
 
+	if (CURRENT_BACKEND == NONE)
+		return 0;
 	memset(&upload_handle, 0, sizeof(CURL_HANDLE));
 
 	/* Assume that the access lock is locked already */

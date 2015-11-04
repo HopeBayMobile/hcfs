@@ -32,7 +32,13 @@
 
 #include <time.h>
 #include <math.h>
+
+#ifdef STAT_VFS_H
+#include STAT_VFS_H
+#else
 #include <sys/statvfs.h>
+#endif
+
 #include <unistd.h>
 #include <semaphore.h>
 #include <pthread.h>
@@ -74,6 +80,7 @@
 #include "metaops.h"
 #include "lookup_count.h"
 #include "FS_manager.h"
+#include "path_reconstruct.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -102,8 +109,8 @@ ntpdate / ntpd or manual changes*/
 /* TODO: Will need to implement rollback or error marking when ops failed*/
 
 /* TODO: Pending design for a single cache device, and use pread/pwrite to
-/*   allow multiple threads to access cache concurrently without the need for
-/*   file handles */
+   allow multiple threads to access cache concurrently without the need for
+   file handles */
 
 /* TODO: Need to be able to perform actual operations according to type of
 	folders (cached, non-cached, local) */
@@ -129,20 +136,26 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 		ctime(&(timenow.tv_sec)), ret);
 	if (mode & ATIME) {
 		thisstat->st_atime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_atim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 
 	if (mode & MTIME) {
 		thisstat->st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_mtim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 
 	if (mode & CTIME) {
 		thisstat->st_ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(thisstat->st_ctim), &timenow,
 			sizeof(struct timespec));
+#endif
 	}
 }
 /* Helper function for checking permissions.
@@ -420,6 +433,129 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 		return (ino_t) ino;
 }
 
+#ifdef _ANDROID_ENV_
+/* Internal function for generating the ownership / permission for
+Android external storage */
+uid_t lookup_pkg(char *pkgname)
+{
+/* TODO: This is now a fake. Need to link to real function */
+	return 1010;
+}
+
+int _rewrite_stat(MOUNT_T *tmpptr, struct stat *thisstat)
+{
+	int ret, errcode;
+	char *tmppath;
+	mode_t tmpmask, newpermission;
+	char *tmptok, *tmptoksave, *tmptok_prev;
+	int count;
+	uid_t tmpuid;
+
+	tmppath = NULL;
+	tmptok_prev = NULL;
+	tmptok = NULL;
+	tmptoksave = NULL;
+	ret = construct_path(tmpptr->vol_path_cache, thisstat->st_ino,
+				&tmppath);
+	if (ret < 0) {
+		if (tmppath != NULL)
+			free(tmppath);
+		errcode = ret;
+		goto errcode_handle;
+	}
+	write_log(10, "Debug path lookup %s\n", tmppath);
+
+	for (count = 0; count < 4; count++) {
+		if (count == 0)
+			tmptok = strtok_r(tmppath, "/", &tmptoksave);
+		else
+			tmptok = strtok_r(NULL, "/", &tmptoksave);
+
+		write_log(10, "%s, %s\n", tmptok, tmptok_prev);
+		if (tmptok == NULL) {
+			switch (count) {
+			case 0:
+				/* Is root */
+				thisstat->st_uid = 0;
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
+				break;
+			case 1:
+				/* Is /Android */
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0771;
+				}
+				break;
+			case 2:
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					/* If a subfolder under /Android */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0771;
+				}
+				break;
+			case 3:
+				if (!S_ISDIR(thisstat->st_mode)) {
+					/* If not a directory */
+					thisstat->st_uid = 0;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				} else {
+					/* If this is a package folder */
+					/* Need to lookup package uid */
+					tmpuid = lookup_pkg(tmptok_prev);
+					thisstat->st_uid = tmpuid;
+					thisstat->st_gid = 1028;
+					newpermission = 0770;
+				}
+				break;
+			default:
+				thisstat->st_uid = 0;
+				thisstat->st_gid = 1028;
+				newpermission = 0770;
+				break;
+			}
+			break;
+		}
+		if (count == 3) {
+			tmpuid = lookup_pkg(tmptok_prev);
+			thisstat->st_uid = tmpuid;
+			thisstat->st_gid = 1028;
+			newpermission = 0770;
+			break;
+		}
+		tmptok_prev = tmptok;
+		if ((count == 0) && (strcmp(tmptok, "Android") != 0)) {
+			/* Not under /Android */
+			thisstat->st_uid = 0;
+			thisstat->st_gid = 1028;
+			newpermission = 0770;
+			break;
+		}
+	}
+
+	tmpmask = 0777;
+	tmpmask = ~tmpmask;
+	tmpmask = tmpmask & thisstat->st_mode;
+	thisstat->st_mode = tmpmask | newpermission;
+	free(tmppath);
+	return 0;
+errcode_handle:
+	return errcode;
+}
+#endif
 /************************************************************************
 *
 * Function name: hfuse_ll_getattr
@@ -434,6 +570,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	int ret_code;
 	struct timeval tmp_time1, tmp_time2;
 	struct stat tmp_stat;
+	MOUNT_T *tmpptr;
 
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
@@ -441,11 +578,23 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	write_log(10, "Debug getattr hit inode %"FMT_INO_T"\n", hit_inode);
 
 	if (hit_inode > 0) {
+		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
 		if (ret_code < 0) {
 			fuse_reply_err(req, -ret_code);
 			return;
 		}
+
+#ifdef _ANDROID_ENV_
+		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+			if (tmpptr->vol_path_cache == NULL) {
+				fuse_reply_err(req, EIO);
+				return;
+			}
+			_rewrite_stat(tmpptr, &tmp_stat);
+		}
+#endif
 
 		write_log(10, "Debug getattr return inode %"FMT_INO_T"\n",
 				tmp_stat.st_ino);
@@ -508,12 +657,24 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
 	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -542,14 +703,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_dev = dev;
 	this_stat.st_nlink = 1;
 
-#ifdef _ANDROID_ENV_
-        self_mode = 0770 | S_IFREG;
-        this_stat.st_mode = self_mode;
-
-        this_stat.st_uid = 0;  /* root */
-        this_stat.st_gid = 1028;  /* sdcard_r */
-
-#else
         self_mode = mode | S_IFREG;
         this_stat.st_mode = self_mode;
 
@@ -557,7 +710,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
-#endif
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
@@ -569,8 +721,6 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_stat.st_ino = self_inode;
 
@@ -652,6 +802,18 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
+
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
@@ -674,21 +836,12 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	this_stat.st_nlink = 2; /*One pointed by the parent, another by self*/
 
-#ifdef _ANDROID_ENV_
-        self_mode = 0770 | S_IFDIR;
-        this_stat.st_mode = self_mode;
-
-        this_stat.st_uid = 0;  /* root */
-        this_stat.st_gid = 1028;  /* sdcard_r */
-
-#else
         self_mode = mode | S_IFDIR;
         this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
-#endif
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
@@ -701,8 +854,6 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, ENOSPC);
 		return;
 	}
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_stat.st_ino = self_inode;
 
@@ -756,6 +907,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
+	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
 
@@ -771,6 +923,18 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -813,6 +977,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
+	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
 	write_log(10, "Debug rmdir: name %s, parent %"FMT_INO_T"\n", selfname,
@@ -829,6 +994,18 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
 
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -914,6 +1091,18 @@ a directory (for NFS) */
 		return;
 	}
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
+
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
@@ -949,11 +1138,19 @@ a directory (for NFS) */
 		return;
 	}
 
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &(output_param.attr));
+	}
+#endif
+
 	output_param.generation = this_gen;
 	write_log(10, "Debug lookup inode %"FMT_INO_T", gen %ld\n",
 			this_inode, this_gen);
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	if (S_ISREG((output_param.attr).st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
@@ -1051,6 +1248,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	DIR_ENTRY_PAGE temp_page;
 	int temp_index;
 	struct stat parent_stat1, parent_stat2;
+	MOUNT_T *tmpptr;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1074,6 +1272,18 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat1);
+	}
+#endif
+
 	if (!S_ISDIR(parent_stat1.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
@@ -1093,6 +1303,16 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat2);
+	}
+#endif
 
 	if (!S_ISDIR(parent_stat2.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -1317,6 +1537,31 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 	}
+#ifdef _ANDROID_ENV_
+	if (parent_inode1 != parent_inode2) {
+		ret_val = pathlookup_write_parent(self_inode, parent_inode2);
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
+		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+							self_inode);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
+	}
+#endif
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
 
@@ -2023,6 +2268,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 	int ret_val;
 	struct stat this_stat;
 	int file_flags;
+	MOUNT_T *tmpptr;
 
 	write_log(10, "Debug open inode %ld\n", ino);
 
@@ -2039,6 +2285,18 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &this_stat);
+	}
+#endif
 
 	file_flags = file_info->flags;
 
@@ -2721,6 +2979,8 @@ int write_wait_full_cache(BLOCK_ENTRY_PAGE *temppage, long long entry_index,
 			hcfs_system->systemdata.cache_size,
 			CACHE_HARD_LIMIT);
 		if (hcfs_system->systemdata.cache_size > CACHE_HARD_LIMIT) {
+			if (CURRENT_BACKEND == NONE)
+				return -ENOSPC;
 			/*Sleep if cache already full*/
 			sem_post(&(fh_ptr->block_sem));
 			fh_ptr->meta_cache_locked = FALSE;
@@ -2923,6 +3183,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	size_t this_bytes_written, ret_size;
 	long long entry_index;
 	int ret, errnum, errcode;
+	long long tmpcachesize, tmpdiff;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -2958,6 +3219,42 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 		return 0;
 	}
 	sem_wait(&(fh_ptr->block_sem));
+
+	/* Check if cache space is full */
+	if (access(thisblockpath, F_OK) == 0) {
+		old_cache_size = check_file_size(thisblockpath);
+		tmpcachesize = hcfs_system->systemdata.cache_size;
+		tmpdiff = (offset + size) - old_cache_size;
+		if ((tmpdiff > 0) &&
+			((tmpdiff + tmpcachesize) > CACHE_HARD_LIMIT)) {
+			/* Need to sleep for full here or return ENOSPC */
+			if (fh_ptr->opened_block != -1) {
+				fclose(fh_ptr->blockfptr);
+				fh_ptr->opened_block = -1;
+			}
+			sem_post(&(fh_ptr->block_sem));
+			if (CURRENT_BACKEND == NONE) {
+				*reterr = -ENOSPC;
+				return 0;
+			}
+			/*Sleep if cache already full*/
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+
+			write_log(10, "debug write waiting on full cache\n");
+			sleep_on_cache_full();
+			/*Re-read status*/
+			fh_ptr->meta_cache_ptr =
+				meta_cache_lock_entry(fh_ptr->thisinode);
+			if (fh_ptr->meta_cache_ptr == NULL) {
+				*reterr = -ENOMEM;
+				return 0;
+			}
+			fh_ptr->meta_cache_locked = TRUE;
+
+			sem_wait(&(fh_ptr->block_sem));
+		}
+	}
 
 	/* Check if we can reuse cached block */
 	if (fh_ptr->opened_block != bindex) {
@@ -3292,6 +3589,7 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 
 	sem_post(&(tmpptr->stat_lock));
 
+	/* TODO: If no backend, use cache size as total volume size */
 	buf->f_bsize = 4096;
 	buf->f_frsize = 4096;
 	if (system_size > (50*powl(1024, 3)))
@@ -3320,8 +3618,13 @@ void hfuse_ll_statfs(fuse_req_t req, fuse_ino_t ino)
 	buf->f_ffree = buf->f_files - num_inodes;
 	if (buf->f_ffree < 0)
 		buf->f_ffree = 0;
+
+#ifdef STAT_VFS_H
+        buf->f_namelen = MAX_FILENAME_LEN;
+#else
 	buf->f_favail = buf->f_ffree;
 	buf->f_namemax = MAX_FILENAME_LEN;
+#endif
 
 	write_log(10, "Debug statfs, returning info\n");
 
@@ -3421,6 +3724,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 	int ret_val;
 	struct stat this_stat;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
 
 	thisinode = real_ino(req, ino);
 
@@ -3430,6 +3734,18 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &this_stat);
+	}
+#endif
 
 	if (!S_ISDIR(this_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
@@ -3481,7 +3797,6 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 
 	this_inode = real_ino(req, ino);
 
-/*TODO: Need to include symlinks*/
 	write_log(10, "DEBUG readdir entering readdir, ");
 	write_log(10, "size %ld, offset %ld\n", size, offset);
 
@@ -3758,7 +4073,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		attr_changed = TRUE;
 	}
 
-#ifndef _ANDROID_ENV_
 	if (to_set & FUSE_SET_ATTR_MODE) {
 		write_log(10, "Debug setattr context %d, file %d\n",
 			temp_context->uid, newstat.st_uid);
@@ -3812,7 +4126,6 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		newstat.st_gid = attr->st_gid;
 		attr_changed = TRUE;
 	}
-#endif
 
 	if (to_set & FUSE_SET_ATTR_ATIME) {
 		if ((temp_context->uid != 0) &&
@@ -3826,8 +4139,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 		}
 
 		newstat.st_atime = attr->st_atime;
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_atim), &(attr->st_atim),
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -3842,8 +4157,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_mtime = attr->st_mtime;
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_mtim), &(attr->st_mtim),
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -3862,8 +4179,10 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_atime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_atim), &timenow,
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
@@ -3880,19 +4199,25 @@ void hfuse_ll_setattr(fuse_req_t req, fuse_ino_t ino, struct stat *attr,
 			return;
 		}
 		newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_mtim), &timenow,
 			sizeof(struct timespec));
+#endif
 		attr_changed = TRUE;
 	}
 
 	if (attr_changed == TRUE) {
 		newstat.st_ctime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 		memcpy(&(newstat.st_ctim), &timenow,
 			sizeof(struct timespec));
+#endif
 		if (to_set & FUSE_SET_ATTR_SIZE) {
 			newstat.st_mtime = (time_t)(timenow.tv_sec);
+#ifndef _ANDROID_ENV_
 			memcpy(&(newstat.st_mtim), &timenow,
 				sizeof(struct timespec));
+#endif
 		}
 	}
 
@@ -3919,6 +4244,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 	struct stat thisstat;
 	int ret_val;
 	ino_t thisinode;
+	MOUNT_T *tmpptr;
 
 	thisinode = real_ino(req, ino);
 
@@ -3928,6 +4254,18 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &thisstat);
+	}
+#endif
 
 	if (mode == F_OK) {
 		fuse_reply_err(req, 0);
@@ -4016,6 +4354,15 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int errcode;
 	MOUNT_T *tmpptr;
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		fuse_reply_err(req, ENOTSUP);
+		return;
+	}
+#endif
+
 	parent_inode = real_ino(req, parent);
 
 	/* Reject if name too long */
@@ -4089,18 +4436,11 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	this_stat.st_nlink = 1;
 	this_stat.st_size = strlen(link);
 
-#ifdef _ANDROID_ENV_
-        this_stat.st_mode = 0770 | S_IFLNK;
-
-        this_stat.st_uid = 0;  /* root */
-        this_stat.st_gid = 1028;  /* sdcard_r */
-
-#else
         this_stat.st_mode = S_IFLNK | 0777;
 
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
-#endif
+
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation);
@@ -4108,8 +4448,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		errcode = -ENOSPC;
 		goto error_handle;
 	}
-
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	this_stat.st_ino = self_inode;
 
@@ -4686,6 +5024,15 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	ino_t parent_inode, link_inode;
 	MOUNT_T *tmpptr;
 
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		fuse_reply_err(req, ENOTSUP);
+		return;
+	}
+#endif
+
 	parent_inode = real_ino(req, newparent);
 	link_inode = real_ino(req, ino);
 
@@ -4760,7 +5107,6 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 	}
 
 	/* Reply fuse entry */
-	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
 	memset(&tmp_param, 0, sizeof(struct fuse_entry_param));
 	tmp_param.generation = this_generation;
@@ -4839,6 +5185,19 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+
+	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &parent_stat);
+	}
+#endif
+
 	if (!S_ISDIR(parent_stat.st_mode)) {
 		fuse_reply_err(req, ENOTDIR);
 		return;
@@ -4864,20 +5223,13 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = 0;
 	this_stat.st_nlink = 1;
-#ifdef _ANDROID_ENV_
-        self_mode = 0770 | S_IFREG;
-        this_stat.st_mode = self_mode;
 
-        this_stat.st_uid = 0;  /* root */
-        this_stat.st_gid = 1028;  /* sdcard_r */
-#else
         self_mode = mode | S_IFREG;
         this_stat.st_mode = self_mode;
 
 	/*Use the uid and gid of the fuse caller*/
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
-#endif
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
@@ -4904,6 +5256,17 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	tmp_param.generation = this_generation;
 	tmp_param.ino = (fuse_ino_t) self_inode;
 	memcpy(&(tmp_param.attr), &this_stat, sizeof(struct stat));
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL) {
+		if (tmpptr->vol_path_cache == NULL) {
+			fuse_reply_err(req, EIO);
+			return;
+		}
+		_rewrite_stat(tmpptr, &(tmp_param.attr));
+	}
+#endif
+
 	ret_val = lookup_increase(tmpptr->lookup_table, self_inode, 1, D_ISREG);
 	if (ret_val < 0) {
 		meta_forget_inode(self_inode);
@@ -5022,7 +5385,3 @@ int hook_fuse(int argc, char **argv)
 	return 0;
 }
 
-/* TODO: Operations to implement
-int hfuse_ll_link
-int hfuse_ll_create
-*/
