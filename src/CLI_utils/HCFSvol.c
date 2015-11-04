@@ -10,6 +10,10 @@
 
 #include "global.h"
 #define MAX_FILENAME_LEN 255
+#ifdef _ANDROID_ENV_
+#define ANDROID_INTERNAL 1
+#define ANDROID_EXTERNAL 2
+#endif
 
 typedef struct {
 	ino_t d_ino;
@@ -77,6 +81,31 @@ void main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	case CREATEFS:
+#ifdef _ANDROID_ENV_
+		cmd_len = strlen(argv[2]) + 2;
+		strcpy(buf, argv[2]);
+		if (strcasecmp(argv[3], "external") == 0) {
+			buf[strlen(argv[2]) + 1] = ANDROID_EXTERNAL;
+		} else if (strcasecmp(argv[3], "internal") == 0) {
+			buf[strlen(argv[2]) + 1] = ANDROID_INTERNAL;
+		} else {
+			printf("Unsupported storage type\n");
+			exit(-ENOTSUP);
+		}
+
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
+#endif
 	case DELETEFS:
 	case CHECKFS:
 	case UNMOUNTFS:
@@ -137,8 +166,17 @@ void main(int argc, char **argv)
 			total_recv += size_msg;
 		}
 		total_entries = reply_len / sizeof(DIR_ENTRY);
+#ifdef _ANDROID_ENV_
+		for (count = 0; count < total_entries; count++) {
+			if (tmp[count].d_type == ANDROID_EXTERNAL)
+				printf("%s\tExternal\n", tmp[count].d_name);
+			else
+				printf("%s\tInternal\n", tmp[count].d_name);
+		}
+#else
 		for (count = 0; count < total_entries; count++)
 			printf("%s\n", tmp[count].d_name);
+#endif
 		break;
 	default:
 		break;

@@ -15,6 +15,7 @@
 
 typedef struct {
 	int log_level;
+	char *log_path;
 	char *metapath;
 	char *blockpath;
 	char *superblock_name;
@@ -40,9 +41,11 @@ typedef struct {
 } SYSTEM_CONF_STRUCT;
 
 #define LOG_LEVEL system_config.log_level
+#define LOG_PATH system_config.log_path
 
-#define S3 1
-#define SWIFT 0
+#define S3 2
+#define SWIFT 1
+#define NONE 0
 
 #define CURRENT_BACKEND system_config.current_backend
 
