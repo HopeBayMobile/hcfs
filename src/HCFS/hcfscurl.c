@@ -32,6 +32,7 @@
 #include "logger.h"
 #include "macro.h"
 #include "global.h"
+#include "fuseop.h"
 
 #define MAX_RETRIES 5
 
@@ -1235,6 +1236,8 @@ int _http_is_success(int code)
 }
 int _swift_http_can_retry(int code)
 {
+	if (hcfs_system->system_going_down == TRUE)
+		return FALSE;
 	switch (code) {
 	case 401:
 		return TRUE;
@@ -1254,6 +1257,8 @@ int _swift_http_can_retry(int code)
 }
 int _S3_http_can_retry(int code)
 {
+	if (hcfs_system->system_going_down == TRUE)
+		return FALSE;
 	switch (code) {
 	case 408:
 		return TRUE;

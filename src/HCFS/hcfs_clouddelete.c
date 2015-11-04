@@ -422,6 +422,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		current_page = -1;
 		for (block_count = 0; block_count < total_blocks;
 							block_count++) {
+			if (hcfs_system->system_going_down == TRUE)
+				break;
 			flock(fileno(metafptr), LOCK_EX);
 			mlock = TRUE;
 
@@ -489,7 +491,8 @@ void dsync_single_inode(DSYNC_THREAD_TYPE *ptr)
 		deletion*/
 
 		delete_done = FALSE;
-		while (delete_done == FALSE) {
+		while ((delete_done == FALSE) &&
+			(hcfs_system->system_going_down == FALSE)) {
 			nanosleep(&time_to_sleep, NULL);
 			delete_done = TRUE;
 			sem_wait(&(delete_ctl.delete_op_sem));
@@ -514,6 +517,9 @@ errcode_handle:
 			flock(fileno(metafptr), LOCK_UN);
 		fclose(metafptr);
 	}
+
+	if (hcfs_system->system_going_down == TRUE)
+		return;
 
 	/* Delete meta */
 	sem_wait(&(delete_ctl.delete_queue_sem));
