@@ -64,7 +64,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 
 /* Generic */
 int hcfs_init_backend(CURL_HANDLE *curl_handle);
-void hcfs_destroy_backend(CURL *curl);
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle);
 int hcfs_list_container(CURL_HANDLE *curl_handle);
 int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HTTP_meta *);

@@ -210,7 +210,10 @@ static inline int _init_delete_handle(int index)
 
 	snprintf(delete_curl_handles[index].id, 255,
 				"delete_thread_%d", index);
-
+	delete_curl_handles[index].curl_backend = NONE;
+	delete_curl_handles[index].curl = NULL;
+	/* Do not actually init backend until needed */
+/*
 	ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 
 	while ((ret_val < 200) || (ret_val > 299)) {
@@ -220,6 +223,8 @@ static inline int _init_delete_handle(int index)
 		ret_val = hcfs_init_backend(&(delete_curl_handles[index]));
 	}
 	return ret_val;
+*/
+	return 0;
 }
 
 /************************************************************************
