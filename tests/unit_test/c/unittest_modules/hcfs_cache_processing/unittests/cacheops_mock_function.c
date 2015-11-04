@@ -2,6 +2,7 @@
 #include "super_block.h"
 #include "hcfs_cachebuild.h"
 #include "fuseop.h"
+#include "global.h"
 #include <stdarg.h>
 
 void init_mock_system_config()

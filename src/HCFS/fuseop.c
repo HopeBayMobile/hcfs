@@ -4440,7 +4440,6 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 
 	this_stat.st_uid = temp_context->uid;
 	this_stat.st_gid = temp_context->gid;
-
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
 	self_inode = super_block_new_inode(&this_stat, &this_generation);
@@ -5223,7 +5222,6 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blocks = 0;
 	this_stat.st_dev = 0;
 	this_stat.st_nlink = 1;
-
         self_mode = mode | S_IFREG;
         this_stat.st_mode = self_mode;
 

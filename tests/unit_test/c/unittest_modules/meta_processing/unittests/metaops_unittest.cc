@@ -1064,6 +1064,9 @@ TEST_F(seek_page2Test, QuadrupleIndirectPageSuccess)
 class actual_delete_inodeTest : public ::testing::Test {
 protected:
 	FILE *meta_fp;
+	FILE *statfptr;
+	FS_STAT_T tmp_stat;
+	char statpath[100];
 
 	void SetUp()
 	{
@@ -1078,14 +1081,26 @@ protected:
 
 		snprintf(markdelete_path, 100, "%s/markdelete/inode%d", METAPATH, 
 			INO_DELETE_FILE_BLOCK);
-		mknod(markdelete_path, S_IFREG, 0); 	
+		mknod(markdelete_path, S_IFREG, 0); 
+		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		statfptr = fopen(statpath, "w");
+		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+		tmp_stat.num_inodes = 1;
+
+		fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+		fsync(fileno(statfptr));
+
+		fclose(statfptr);
+	
 	}
 
 	void TearDown()
 	{
 		char thismetapath[100];
 		char thisblockpath[100];
-		
+
+		unlink(statpath);
+
 		/* delete meta */
 		fetch_meta_path(thismetapath, INO_DELETE_FILE_BLOCK);
 		if (!access(thismetapath, F_OK))
@@ -1415,14 +1430,28 @@ TEST(disk_checkdeleteTest, InodeNotExist_Return0)
 class startup_finish_deleteTest : public ::testing::Test {
 protected:
 	int num_inode;
-	
+	FILE *statfptr;
+	FS_STAT_T tmp_stat;
+	char statpath[100];
+
 	void SetUp()
 	{
-	
+		METAPATH = "testpatterns";
+		snprintf(statpath, 100, "%s/stat%ld", METAPATH, ROOT_INODE);
+		statfptr = fopen(statpath, "w");
+		memset(&tmp_stat, 0, sizeof(FS_STAT_T));
+		tmp_stat.num_inodes = 1;
+
+		fwrite(&tmp_stat, sizeof(FS_STAT_T), 1, statfptr);
+		fsync(fileno(statfptr));
+
+		fclose(statfptr);
+
 	}
 
 	void TearDown()
 	{
+		unlink(statpath);
 		for (int i = 0 ; i < num_inode ; i++) {
 			char pathname[200];
 			sprintf(pathname, "testpatterns/markdelete/inode%d_%d",

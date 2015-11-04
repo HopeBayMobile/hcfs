@@ -68,7 +68,7 @@ int init_hcfs_system_data(void)
 	size_t ret_size;
 
 #ifdef _ANDROID_ENV_
-	hcfs_system = malloc(sizeof(SYSTEM_DATA_HEAD));
+	hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
 #else
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {

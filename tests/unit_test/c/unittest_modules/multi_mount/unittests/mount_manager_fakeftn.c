@@ -108,14 +108,9 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	return 0;
 }
-int update_FS_statistics(char *pathname, long long system_size,
-		long long num_inodes)
-{
-	return 0;
-}
-int read_FS_statistics(char *pathname, long long *system_size_ptr,
-		long long *num_inodes_ptr)
-{
-	return 0;
-}
 
+int fetch_stat_path(char *pathname, ino_t this_inode)
+{
+        snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
+        return 0;
+}

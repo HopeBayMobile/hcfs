@@ -235,6 +235,7 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	/* Mock an inode info & a meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFREG;
+	mock_thread_info->which_index = 0;
 	meta_stat.st_size = 1000000; // Let total_blocks = 1000000/100 = 10000
 	MAX_BLOCK_SIZE = 100;
 	
@@ -285,6 +286,7 @@ TEST_F(dsync_single_inodeTest, DeleteDirectorySuccess)
 	/* Mock a dir meta file */
 	mock_thread_info->inode = INODE__FETCH_TODELETE_PATH_SUCCESS;
 	mock_thread_info->this_mode = S_IFDIR;	
+	mock_thread_info->which_index = 0;
 	meta = fopen(TODELETE_PATH, "w+"); // Open mock meta
 	fwrite(&meta_stat, sizeof(struct stat), 1, meta); // Write stat
 	fclose(meta);
