@@ -24,6 +24,10 @@
 #include <pthread.h>
 #endif
 
+#define MAX_DL_CONCURRENCY 16
+
+extern SYSTEM_CONF_STRUCT system_config;
+
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
@@ -34,8 +38,9 @@ typedef struct {
 typedef struct {
 	ino_t this_inode;
 	long long block_no;
-	off_t page_start_fpos;
+	off_t page_pos;
 	char dl_error;
+	char active;
 } DOWNLOAD_BLOCK_INFO;
 
 typedef struct {
@@ -56,5 +61,10 @@ int fetch_from_cloud(FILE *fptr,
 #else
 		ino_t this_inode, long long block_no);
 #endif
+
+void download_block_manager();
+int init_download_control();
+int destroy_download_control();
+int fetch_pinned_blocks(ino_t inode);
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

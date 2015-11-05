@@ -1169,3 +1169,25 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 errcode_handle:
 	return errcode;
 }
+
+/**
+ * fetch_error_download_path
+ *
+ * Fetch a path employed to record error when failing to download block.
+ *
+ * @param path  A char type pointer used to get this path.
+ * @param inode  Inode number of this block failing to download. 
+ *
+ * @return 0
+ */
+int fetch_error_download_path(char *path, ino_t inode)
+{
+
+#ifdef ARM_32bit_
+	sprintf(path, "/dev/shm/download_error_inode_%lld", inode);
+#else
+	sprintf(path, "/dev/shm/download_error_inode_%ld", inode);
+#endif
+
+	return 0;
+}
