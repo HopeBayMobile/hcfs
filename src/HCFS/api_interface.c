@@ -439,6 +439,10 @@ void api_module(void *index)
 		}
 
 		switch (api_code) {
+		case PIN:
+			break;
+		case UNPIN:
+			break;
 		case TERMINATE:
 			/* Terminate the system */
 			unmount_all();
