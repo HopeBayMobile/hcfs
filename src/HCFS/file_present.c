@@ -156,6 +156,19 @@ error_handling:
 	return ret_code;
 }
 
+/* Remove entry when this child inode fail to create meta */
+static inline int dir_remove_fail_node(ino_t parent_inode, ino_t child_inode,
+	const char *childname, mode_t child_mode)
+{
+	META_CACHE_ENTRY_STRUCT *tmp_bodyptr;
+
+	tmp_bodyptr = meta_cache_lock_entry(parent_inode);
+	dir_remove_entry(parent_inode, child_inode, childname, child_mode,
+		tmp_bodyptr);
+	meta_cache_unlock_entry(tmp_bodyptr);
+	return 0;
+}
+
 /************************************************************************
 *
 * Function name: mknod_update_meta
@@ -176,42 +189,20 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	int ret_val;
 	FILE_META_TYPE this_meta;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
-
-	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
-	this_meta.source_arch = ARCH_CODE;
-	this_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_val < 0)
-		return ret_val;
-#endif
-
-	/* Store the inode and file meta of the new file to meta cache */
-	body_ptr = meta_cache_lock_entry(self_inode);
-	if (body_ptr == NULL)
-		return -ENOMEM;
-
-	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
-							NULL, 0, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	ret_val = meta_cache_close_file(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_unlock_entry(body_ptr);
-		return ret_val;
-	}
-	ret_val = meta_cache_unlock_entry(body_ptr);
-
-	if (ret_val < 0)
-		return ret_val;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	/* Add "self_inode" to its parent "parent_inode" */
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
+
+	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -224,6 +215,48 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 	}
 
 	ret_val = meta_cache_unlock_entry(body_ptr);
+
+	/* Init file meta */
+	memset(&this_meta, 0, sizeof(FILE_META_TYPE));
+	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
+        this_meta.source_arch = ARCH_CODE;
+	this_meta.root_inode = root_ino;
+	this_meta.local_pin = pin_status;
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+
+	/* Store the inode and file meta of the new file to meta cache */
+	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return -ENOMEM;
+	}
+
+	ret_val = meta_cache_update_file_data(self_inode, this_stat, &this_meta,
+							NULL, 0, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(body_ptr);
+
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Add path lookup table */
+#ifdef _ANDROID_ENV_
+	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_val < 0)
+		return ret_val;
+#endif
 
 	return 0;
 
@@ -254,48 +287,20 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	DIR_ENTRY_PAGE temppage;
 	int ret_val;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
-
-	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
-	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
-
-	/* Initialize new directory object and save the meta to meta cache */
-	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
-	this_meta.tree_walk_list_head = this_meta.root_entry_page;
-	this_meta.generation = this_gen;
-	this_meta.metaver = CURRENT_META_VER;
-        this_meta.source_arch = ARCH_CODE;
-	this_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_val < 0)
-		return ret_val;
-#endif
-
-	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
-						this_meta.root_entry_page);
-	if (ret_val < 0)
-		return ret_val;
-
-	body_ptr = meta_cache_lock_entry(self_inode);
-	if (body_ptr == NULL)
-		return -ENOMEM;
-
-	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
-							&temppage, body_ptr);
-	if (ret_val < 0)
-		goto error_handling;
-	ret_val = meta_cache_close_file(body_ptr);
-	if (ret_val < 0) {
-		meta_cache_unlock_entry(body_ptr);
-		return ret_val;
-	}
-	ret_val = meta_cache_unlock_entry(body_ptr);
-
-	if (ret_val < 0)
-		return ret_val;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	/* Save the new entry to its parent and update meta */
 	body_ptr = meta_cache_lock_entry(parent_inode);
+	if (body_ptr == NULL)
+		return -ENOMEM;
+	
+	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, body_ptr);
+	if (ret_val < 0)
+		goto error_handling;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+	
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -310,6 +315,58 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 
 	if (ret_val < 0)
 		return ret_val;
+
+	/* Init dir meta and page */
+	memset(&this_meta, 0, sizeof(DIR_META_TYPE));
+	memset(&temppage, 0, sizeof(DIR_ENTRY_PAGE));
+
+	/* Initialize new directory object and save the meta to meta cache */
+	this_meta.root_entry_page = sizeof(struct stat) + sizeof(DIR_META_TYPE);
+	this_meta.tree_walk_list_head = this_meta.root_entry_page;
+	this_meta.generation = this_gen;
+	this_meta.metaver = CURRENT_META_VER;
+        this_meta.source_arch = ARCH_CODE;
+	this_meta.root_inode = root_ino;
+	this_meta.local_pin = pin_status;	
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		selfname, pin_status == TRUE? "PIN" : "UNPIN");
+	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
+						this_meta.root_entry_page);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return ret_val;
+	}
+
+	body_ptr = meta_cache_lock_entry(self_inode);
+	if (body_ptr == NULL) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		return -ENOMEM;
+	}
+
+	ret_val = meta_cache_update_dir_data(self_inode, this_stat, &this_meta,
+							&temppage, body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+	ret_val = meta_cache_close_file(body_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(body_ptr);
+		return ret_val;
+	}
+
+	ret_val = meta_cache_unlock_entry(body_ptr);
+	if (ret_val < 0)
+		return ret_val;
+
+#ifdef _ANDROID_ENV_
+	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_val < 0)
+		return ret_val;
+#endif
 
 	return 0;
 
@@ -482,49 +539,21 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	SYMLINK_META_TYPE symlink_meta;
 	ino_t parent_inode, self_inode;
 	int ret_code;
+	char pin_status;
+	DIR_META_TYPE parent_meta;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 	self_inode = this_stat->st_ino;
 
-	/* Prepare symlink meta */
-	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
-	symlink_meta.link_len = strlen(link);
-	symlink_meta.generation = generation;
-	symlink_meta.metaver = CURRENT_META_VER;
-        symlink_meta.source_arch = ARCH_CODE;
-	symlink_meta.root_inode = root_ino;
-#ifdef _ANDROID_ENV_
-	ret_code = pathlookup_write_parent(self_inode, parent_inode);
-	if (ret_code < 0)
-		return ret_code;
-#endif
-	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
-
-	/* Update self meta data */
-	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
-	if (self_meta_cache_entry == NULL)
-		return -ENOMEM;
-
-	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
-		&symlink_meta, self_meta_cache_entry);
-	if (ret_code < 0) {
-		meta_cache_close_file(self_meta_cache_entry);
-		meta_cache_unlock_entry(self_meta_cache_entry);
-		return ret_code;
-	}
-
-	ret_code = meta_cache_close_file(self_meta_cache_entry);
-	if (ret_code < 0) {
-		meta_cache_unlock_entry(self_meta_cache_entry);
-		return ret_code;
-	}
-	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
-	if (ret_code < 0)
-		return ret_code;
-
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
 	   because it had been locked before calling this function. Just need to
-	   open meta file. */
+	   open meta file. */	
+	ret_code = meta_cache_lookup_dir_data(parent_inode, NULL,
+		&parent_meta, NULL, parent_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
+
 	ret_code = meta_cache_open_file(parent_meta_cache_entry);
 	if (ret_code < 0) {
 		meta_cache_close_file(parent_meta_cache_entry);
@@ -541,6 +570,51 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	ret_code = meta_cache_close_file(parent_meta_cache_entry);
 	if (ret_code < 0)
 		return ret_code;
+
+	/* Prepare symlink meta */
+	memset(&symlink_meta, 0, sizeof(SYMLINK_META_TYPE));
+	symlink_meta.link_len = strlen(link);
+	symlink_meta.generation = generation;
+	symlink_meta.metaver = CURRENT_META_VER;
+        symlink_meta.source_arch = ARCH_CODE;
+	symlink_meta.root_inode = root_ino;
+	symlink_meta.local_pin = pin_status;
+	memcpy(symlink_meta.link_path, link, sizeof(char) * strlen(link));
+	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
+		name, pin_status == TRUE? "PIN" : "UNPIN");
+
+	/* Update self meta data */
+	self_meta_cache_entry = meta_cache_lock_entry(self_inode);
+	if (self_meta_cache_entry == NULL) {
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return -ENOMEM;
+	}
+
+	ret_code = meta_cache_update_symlink_data(self_inode, this_stat,
+		&symlink_meta, self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_close_file(self_meta_cache_entry);
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		dir_remove_entry(parent_inode, self_inode, name,
+			this_stat->st_mode, parent_meta_cache_entry);
+		return ret_code;
+	}
+
+	ret_code = meta_cache_close_file(self_meta_cache_entry);
+	if (ret_code < 0) {
+		meta_cache_unlock_entry(self_meta_cache_entry);
+		return ret_code;
+	}
+	ret_code = meta_cache_unlock_entry(self_meta_cache_entry);
+	if (ret_code < 0)
+		return ret_code;
+
+#ifdef _ANDROID_ENV_
+	ret_code = pathlookup_write_parent(self_inode, parent_inode);
+	if (ret_code < 0)
+		return ret_code;
+#endif
 
 	return 0;
 }

@@ -237,6 +237,7 @@ ino_t _create_root_inode(void)
 	this_meta.root_entry_page = ret_pos;
 	this_meta.tree_walk_list_head = this_meta.root_entry_page;
 	this_meta.root_inode = root_inode;
+	this_meta.local_pin = DEFAULT_PIN;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
 #ifdef _ANDROID_ENV_
