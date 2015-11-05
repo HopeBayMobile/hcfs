@@ -413,8 +413,8 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	fetch_meta_path(metapath, block_info->this_inode);
 	if (access(metapath, F_OK) < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);
-		write_log(0, "Error: %s does not exist. In %s\n",
-			metapath, __func__);
+		write_log(2, "Warn: meta %"FMT_INO_T" does not exist. In %s\n",
+			block_info->this_inode, __func__);
 		return -ENOENT;
 	}
 
@@ -465,7 +465,7 @@ static void _fetch_block(void *ptr)
 	if (block_fptr == NULL) {
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
-		//block_info->dl_error = TRUE;
+		block_info->dl_error = TRUE;
 		return;
 	}
 	fclose(block_fptr);
@@ -474,11 +474,10 @@ static void _fetch_block(void *ptr)
 	if (block_fptr == NULL) {
 		write_log(0, "Error: Fail to open block path %s in %s\n",
 							block_path, __func__);
-		//block_info->dl_error = TRUE;
+		block_info->dl_error = TRUE;
 		return;
 	}
 
-	/* TODO: Error handling when meta is removed */
 	/* Lock block ptr so that status ST_CtoL cannot be met */
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
@@ -575,13 +574,8 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (filemeta.local_pin == FALSE) {
 		flock(fileno(fptr), LOCK_UN);
-#ifdef ARM_32bit
-		write_log(5, "Warning: Inode %lld is detected to be unpinned"
+		write_log(5, "Warning: Inode %"FMT_INO_T" is detected to be unpinned"
 			" in pin-process.\n", inode);
-#else
-		write_log(5, "Warning: Inode %ld is detected to be unpinned"
-			" in pin-process.\n", inode);
-#endif
 		return -EPERM;
 	}
 
@@ -663,15 +657,13 @@ int fetch_pinned_blocks(ino_t inode)
 	current_page = -1;
 	write_log(10, "Debug: Begin to check all blocks\n");
 	for (blkno = 0 ; blkno < total_blocks ; blkno++) {
-		/*if (access(metapath, F_OK) < 0) {
-			write_log(10, "Debug: %s is removed when pinning.",
-				metapath);
-			ret_code = -ENOENT;
-			break;
-		}*/
-
 		if (access(error_path, F_OK) == 0) { /* Some error happened */
 			ret_code = -EIO;
+			break;
+		}
+
+		if (hcfs_system->system_going_down == TRUE) {
+			ret_code = -ESHUTDOWN;
 			break;
 		}
 
@@ -695,7 +687,8 @@ int fetch_pinned_blocks(ino_t inode)
 			flock(fileno(fptr), LOCK_UN);
 			current_page = which_page;
 		}
-		ret_code = _check_fetch_block(metapath, fptr, inode, blkno, page_pos);
+		ret_code = _check_fetch_block(metapath, fptr, inode,
+			blkno, page_pos);
 		if (ret_code < 0)
 			break;
 
@@ -705,7 +698,8 @@ int fetch_pinned_blocks(ino_t inode)
 
 	/* Wait for all threads */
 	all_thread_terminate = FALSE;
-	while (all_thread_terminate == FALSE) {
+	while (all_thread_terminate == FALSE &&
+			hcfs_system->system_going_down == FALSE) {
 		all_thread_terminate = TRUE;
 		sem_wait(&(download_thread_ctl.ctl_op_sem));
 		for (t_idx = 0; t_idx < MAX_DL_CONCURRENCY ; t_idx++) {
@@ -719,6 +713,10 @@ int fetch_pinned_blocks(ino_t inode)
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 	}
+	
+	if (hcfs_system->system_going_down == TRUE) {
+		return ret_code;
+	}
 	/* Check cache size again */
 	if (ret_code == 0) {
 		get_system_size(&cache_size);
@@ -730,11 +728,7 @@ int fetch_pinned_blocks(ino_t inode)
 
 	/* Delete error object */
 	if (access(error_path, F_OK) == 0) {
-#ifdef ARM_32bit
-		write_log(0, "Error: Fail to pin inode %lld\n", inode);
-#else
-		write_log(0, "Error: Fail to pin inode %ld\n", inode);
-#endif
+		write_log(0, "Error: Fail to pin inode %"FMT_INO_T"\n", inode);
 		if (ret_code == 0)
 			ret_code = -EIO;
 		UNLINK(error_path);

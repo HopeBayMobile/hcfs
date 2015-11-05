@@ -12,4 +12,4 @@ pin_test.o: pin_test.c
 	$(CC) $(CFLAGS) -c pin_test.c
 
 clean:
-	rm -rf *.o HCFSvol
+	rm -rf *.o HCFSvol pin_test
