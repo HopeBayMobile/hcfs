@@ -1444,6 +1444,7 @@ TEST_F(hfuse_ll_writeTest, ReWriteCloudWaitCache) {
   fptr = NULL;
 
   fptr = fopen(temppath,"r");
+  ASSERT_NE(fptr != NULL, 0);
   fread(tempbuf, tmp_len, 1, fptr);
   fclose(fptr);
   fptr = NULL;
