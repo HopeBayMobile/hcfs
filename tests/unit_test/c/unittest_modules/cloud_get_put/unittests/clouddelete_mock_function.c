@@ -14,7 +14,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 }
 
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return;
 }
