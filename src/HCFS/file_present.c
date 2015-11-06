@@ -882,8 +882,12 @@ int pin_inode(ino_t this_inode)
 		return ret;
 	}
 
+	ret = pin_ll_enqueue(this_inode);
+	if (ret < 0)
+		return ret;
+
 	/* Check all blocks are in local cache if it is regfile */
-	if (S_ISREG(tempstat.st_mode)) {
+	/*if (S_ISREG(tempstat.st_mode)) {
 		ret = fetch_pinned_blocks(this_inode);
 		if (ret < 0) {
 			ret2 = change_pin_flag(this_inode, tempstat.st_mode,
@@ -893,7 +897,7 @@ int pin_inode(ino_t this_inode)
 			write_log(0, "Code %d in %s.\n", -ret, __func__);
 			return ret;
 		}
-	}
+	}*/
 
 	return 0;
 }

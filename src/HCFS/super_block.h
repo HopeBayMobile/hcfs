@@ -1,5 +1,5 @@
 /*************************************************************************
-*
+
 * Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: super_block.c
@@ -22,11 +22,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* pin-status in super block */
+#define ST_UNPIN 0
+#define ST_PINNING 1
+#define ST_PIN 2
+
 /* SUPER_BLOCK_ENTRY defines the structure for an entry in super block */
 typedef struct {
 	struct stat inode_stat;
 	ino_t util_ll_next;
 	ino_t util_ll_prev;
+	ino_t pin_ll_next; /* Next file to be pinned */
+	ino_t pin_ll_prev;
+	char pin_status; /* ST_UNPIN, ST_PINNING, ST_PIN */
 
 	/* status is one of NO_LL, IS_DIRTY, TO_BE_DELETED, TO_BE_RECLAIMED,
 	or RECLAIMED */
@@ -49,6 +57,8 @@ typedef struct {
 	ino_t last_dirty_inode;
 	ino_t first_to_delete_inode;
 	ino_t last_to_delete_inode;
+	ino_t first_pin_inode; /* first element in pin-queue */
+	ino_t last_pin_inode; /* last element in pin-queue */
 
 	long long num_to_be_reclaimed;
 	long long num_to_be_deleted;
@@ -101,5 +111,7 @@ int super_block_share_locking(void);
 int super_block_share_release(void);
 int super_block_exclusive_locking(void);
 int super_block_exclusive_release(void);
+
+int pin_ll_enqueue(ino_t this_inode)
 
 #endif  /* GW20_HCFS_SUPER_BLOCK_H_ */

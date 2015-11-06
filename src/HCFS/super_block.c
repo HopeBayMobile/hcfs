@@ -87,12 +87,10 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 
 	if (this_inode <= 0) {
 		errcode = EINVAL;
-#ifdef ARM_32bit_
 		write_log(0,
-			"Error in %s, inode number is %lld. Code %d, %s\n",
-			__func__, this_inode, errcode, strerror(errcode));
-#else
-#endif
+			"Error in %s, inode number is %"FMT_INO_T". Code %d,"
+			" %s\n", __func__, this_inode, errcode,
+			strerror(errcode));
 		return -errcode;
 	}
 	ret_val = pread(sys_super_block->iofptr, inode_ptr, SB_ENTRY_SIZE,
@@ -972,6 +970,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 	/*Update the new super inode entry*/
 	memset(&tempentry, 0, SB_ENTRY_SIZE);
+	tempentry.pin_status = (DEFAULT_PIN == TRUE ? ST_PIN : ST_UNPIN);
 	tempentry.this_index = this_inode;
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)
@@ -1305,4 +1304,57 @@ int super_block_exclusive_release(void)
 	sem_post(&(sys_super_block->share_lock_sem));
 	sem_post(&(sys_super_block->exclusive_lock_sem));
 	return 0;
+}
+
+int pin_ll_enqueue(ino_t this_inode)
+{
+	SUPER_BLOCK_ENTRY this_entry, last_entry;
+
+	super_block_exclusive_locking();
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0)
+		goto error_handling;
+
+	/* Return pin-status if this status is not UNPIN */
+	if (this_entry.pin_status != ST_UNPIN) {
+		super_block_exclusive_release();
+		return this_entry.pin_status;
+	}
+
+	if (sys_super_block->head.last_pin_inode == NULL) {
+		this_entry.pin_ll_next = 0;
+		this_entry.pin_ll_prev = 0;
+		this_entry.pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, &this_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		sys_super_block->head.first_pin_inode = this_inode;
+		sys_super_block->head.last_pin_inode = this_inode;
+	} else {
+		this_entry->pin_ll_next = 0;
+		this_entry->pin_ll_prev = sys_super_block->head.last_pin_inode;
+		this_entry.pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, &this_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		ret = read_super_block_entry(
+			sys_super_block->head.last_pin_inode, &last_entry);
+		last_entry.pin_ll_next = this_inode;
+		ret = write_super_block_entry(
+			sys_super_block->head.last_pin_inode, &last_entry);
+		if (ret < 0)
+			goto error_handling;
+
+		sys_super_block->head.last_pin_inode = this_inode;
+	}
+	ret = write_super_block_head();
+
+	super_block_exclusive_release();
+	return 0;
+
+error_handling:
+	super_block_exclusive_release();
+	return ret;
 }
