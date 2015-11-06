@@ -1199,3 +1199,27 @@ void get_system_size(long long *cache_size)
 		*cache_size = hcfs_system->systemdata.cache_size;
 	sem_post(&(hcfs_system->access_sem));
 }
+
+/* Helper for updating per-file statistics in fuseop.c */
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FILE_STATS_TYPE meta_stats;
+
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	meta_stats.num_blocks += num_blocks_delta;
+	meta_stats.num_cached_blocks += num_cached_blocks_delta;
+	meta_stats.cached_size += cached_size_delta;
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	return 0;
+errcode_handle:
+	return errcode;
+}
+

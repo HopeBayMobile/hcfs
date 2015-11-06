@@ -53,4 +53,8 @@ int fetch_error_download_path(char *path, ino_t inode);
 
 void get_system_size(long long *cache_size);
 
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta);
+
 #endif  /* GW20_SRC_UTILS_H_ */

@@ -250,6 +250,13 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			FSEEK(metafptr, ptr->page_start_fpos, SEEK_SET);
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 			       metafptr);
+			ret = update_file_stats(metafptr, 0, 1,
+						tempstat.st_size);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
+
 			fflush(metafptr);
 
 			sem_wait(&(hcfs_system->access_sem));
@@ -257,6 +264,11 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			hcfs_system->systemdata.cache_blocks++;
 			sync_hcfs_system_data(FALSE);
 			sem_post(&(hcfs_system->access_sem));
+			ret = super_block_mark_dirty(ptr->this_inode);
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 		}
 	}
 	flock(fileno(blockfptr), LOCK_UN);
@@ -394,7 +406,7 @@ void download_block_manager()
 }
 
 static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
-	char from_st, char to_st)
+	char from_st, char to_st, long long cache_size_delta)
 {
 	BLOCK_ENTRY_PAGE block_page;
 	int e_index, ret;
@@ -440,6 +452,19 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 		return ret;
 	}
 
+	if (to_st == ST_BOTH) {
+		/* If the download is completed, need to update
+		per-file statistics */
+		ret = meta_cache_open_file(meta_cache_entry);
+		if (ret < 0) {
+			return ret;
+		}
+		ret = update_file_stats(meta_cache_entry->fptr, 0,
+					1, cache_size_delta);
+		if (ret < 0) {
+			return ret;
+		}
+	}
 	ret = meta_cache_unlock_entry(meta_cache_entry);
 	if (ret < 0) {
 		return ret;
@@ -482,7 +507,7 @@ static void _fetch_block(void *ptr)
 	flock(fileno(block_fptr), LOCK_EX);
 	setbuf(block_fptr, NULL);
 
-	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL);
+	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to modify block status in %s."
 			" Code %d", __func__, ret);
@@ -503,18 +528,9 @@ static void _fetch_block(void *ptr)
 		goto thread_error;
 	}
 
-	/* Update status */
-	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH);
-	if (ret < 0) {
-		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);
-		goto thread_error;
-	} else if (ret > 0){ /* Status does not match ST_CtoL */
-		flock(fileno(block_fptr), LOCK_UN);
-		fclose(block_fptr);
-		return;
-	}
-
+	/* TODO: Check if error handling here is fixed later 
+	(a block delete op can happen due to a truncate and that's not
+	an error) */
 	/* Update dirty status and system meta */
 	if (stat(block_path, &blockstat) == 0) {
 		set_block_dirty_status(NULL, block_fptr, FALSE);
@@ -527,8 +543,25 @@ static void _fetch_block(void *ptr)
 			__func__, ret);
 	}
 
+	/* Update status */
+	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH,
+				blockstat.st_size);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to modify block status in %s."
+			" Code %d", __func__, ret);
+		goto thread_error;
+	} else if (ret > 0){ /* Status does not match ST_CtoL */
+		flock(fileno(block_fptr), LOCK_UN);
+		fclose(block_fptr);
+		return;
+	}
+
 	flock(fileno(block_fptr), LOCK_UN);
 	fclose(block_fptr);
+
+	ret = super_block_mark_dirty(block_info->this_inode);
+	if (ret < 0)
+		goto thread_error;
 
 	return;
 
