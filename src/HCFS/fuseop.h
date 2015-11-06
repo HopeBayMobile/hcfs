@@ -153,6 +153,13 @@ typedef struct {
 	char local_pin;
 } FILE_META_TYPE;
 
+/* The structure for keeping statistics for a file */
+typedef struct {
+	long long num_blocks;
+	long long num_cached_blocks;
+	long long cached_size;
+} FILE_STATS_TYPE;
+
 /* Defining the structure of symbolic link meta */
 typedef struct {
 	long long next_xattr_page;

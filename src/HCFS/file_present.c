@@ -186,8 +186,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			struct stat *this_stat, unsigned long this_gen,
 			ino_t root_ino)
 {
-	int ret_val;
+	int ret_val, ret, errcode;
+	size_t ret_size;
 	FILE_META_TYPE this_meta;
+	FILE_STATS_TYPE file_stats;
 	META_CACHE_ENTRY_STRUCT *body_ptr;
 	char pin_status;
 	DIR_META_TYPE parent_meta;
@@ -241,6 +243,17 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			selfname, this_stat->st_mode);
 		goto error_handling;
 	}
+
+	ret_val = meta_cache_open_file(body_ptr);
+	if (ret_val < 0) {
+		dir_remove_fail_node(parent_inode, self_inode,
+			selfname, this_stat->st_mode);
+		goto error_handling;
+	}
+	memset(&file_stats, 0, sizeof(FILE_STATS_TYPE));
+	FSEEK(body_ptr->fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&file_stats, sizeof(FILE_STATS_TYPE), 1, body_ptr->fptr);
 	ret_val = meta_cache_close_file(body_ptr);
 	if (ret_val < 0) {
 		meta_cache_unlock_entry(body_ptr);
@@ -259,7 +272,10 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 #endif
 
 	return 0;
-
+errcode_handle:
+	dir_remove_fail_node(parent_inode, self_inode,
+				selfname, this_stat->st_mode);
+	ret_val = errcode;
 error_handling:
 	meta_cache_close_file(body_ptr);
 	meta_cache_unlock_entry(body_ptr);

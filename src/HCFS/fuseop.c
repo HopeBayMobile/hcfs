@@ -22,6 +22,7 @@
 * 2015/5/25, 5/26  Jiahong adding error handling
 * 2015/6/29 Kewei finished xattr operations.
 * 2015/7/7 Kewei began to add ops about symbolic link
+* 2015/11/5 Jiahong adding changes for per-file statistics
 *
 **************************************************************************/
 
@@ -158,6 +159,7 @@ void set_timestamp_now(struct stat *thisstat, char mode)
 #endif
 	}
 }
+
 /* Helper function for checking permissions.
    Inputs: fuse_req_t req, struct stat *thisstat, char mode
      Note: Mode is bitwise ORs of read, write, exec (4, 2, 1)
@@ -1613,7 +1615,7 @@ int truncate_wait_full_cache(ino_t this_inode, struct stat *inode_stat,
 *  truncated. */
 int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			long long page_index, long long old_last_block,
-			ino_t inode_index)
+			ino_t inode_index, FILE *metafptr)
 {
 	int block_count;
 	char thisblockpath[1024];
@@ -1621,11 +1623,13 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t cache_block_size;
 	off_t total_deleted_cache;
 	long long total_deleted_blocks;
-	int ret_val, errcode;
+	long long total_deleted_fileblocks;
+	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
 
 	total_deleted_cache = 0;
 	total_deleted_blocks = 0;
+	total_deleted_fileblocks = 0;
 
 	write_log(10, "Debug truncate_delete_block, start %d, old_last %lld,",
 		start_index, old_last_block);
@@ -1665,10 +1669,12 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 
 			total_deleted_cache += (long long) cache_block_size;
 			total_deleted_blocks += 1;
+			total_deleted_fileblocks++;
 			break;
 		case ST_CLOUD:
 			tmpentry->status =
 				ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		case ST_BOTH:
 		case ST_LtoC:
@@ -1685,6 +1691,7 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				total_deleted_blocks += 1;
 			}
 			tmpentry->status = ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		case ST_CtoL:
 			ret_val = fetch_block_path(thisblockpath, inode_index,
@@ -1694,18 +1701,28 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			if (access(thisblockpath, F_OK) == 0)
 				unlink(thisblockpath);
 			tmpentry->status = ST_TODELETE;
+			total_deleted_fileblocks++;
 			break;
 		default:
 			break;
 		}
 	}
-	if (total_deleted_blocks > 0)
+	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
 				-total_deleted_blocks);
+		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
+				-total_deleted_blocks, -total_deleted_cache);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
 
 	write_log(10, "Debug truncate_delete_block end\n");
 
 	return 0;
+errcode_handle:
+	return errcode;
 }
 
 /* Helper function for hfuse_truncate. This will truncate the last block
@@ -1722,7 +1739,11 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	struct stat tempstat;
 	off_t old_block_size, new_block_size;
 	int ret, errcode;
+	long long cache_delta;
+	long long cache_block_delta;
 
+	cache_delta = 0;
+	cache_block_delta = 0;
 	/*Offset not on the boundary of the block. Will need to truncate the
 	last block*/
 	ret = truncate_wait_full_cache(this_inode, filestat, tempfilemeta,
@@ -1857,6 +1878,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 				}
 
 				change_system_meta(0, tempstat.st_size, 1);
+				cache_delta += tempstat.st_size;
+				cache_block_delta += 1;
 			}
 		} else {
 			if (stat(thisblockpath, &tempstat) == 0) {
@@ -1888,9 +1911,20 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		change_system_meta(0, new_block_size - old_block_size, 0);
+		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
+		ret = meta_cache_open_file(*body_ptr);
+		if (ret < 0)
+			return ret;
+		ret = update_file_stats((*body_ptr)->fptr, 0,
+				cache_block_delta, cache_delta);
+		if (ret < 0) {
+			meta_cache_close_file(*body_ptr);
+			return ret;
+		}
+
 	} else {
 		if ((temppage->block_entries[last_index]).status == ST_NONE)
 			return 0;
@@ -1947,9 +1981,19 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		new_block_size = check_file_size(thisblockpath);
 
 		change_system_meta(0, new_block_size - old_block_size, 0);
+		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
 		fclose(blockfptr);
+		ret = meta_cache_open_file(*body_ptr);
+		if (ret < 0)
+			return ret;
+		ret = update_file_stats((*body_ptr)->fptr, 0,
+				cache_block_delta, cache_delta);
+		if (ret < 0) {
+			meta_cache_close_file(*body_ptr);
+			return ret;
+		}
 	}
 	return 0;
 }
@@ -2071,9 +2115,15 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 			/*Delete the rest of blocks in this same page
 			as well*/
+			ret = meta_cache_open_file(*body_ptr);
+			if (ret < 0) {
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent\n");
+				return ret;
+			}
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
-				filestat->st_ino);
+				filestat->st_ino, (*body_ptr)->fptr);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2117,9 +2167,15 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				return ret;
 			}
 
+			ret = meta_cache_open_file(*body_ptr);
+			if (ret < 0) {
+				write_log(0, "IO error in truncate. Data may ");
+				write_log(0, "not be consistent\n");
+				return ret;
+			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, old_last_block,
-				filestat->st_ino);
+				filestat->st_ino, (*body_ptr)->fptr);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
@@ -2568,19 +2624,21 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			ret = meta_cache_update_file_data(fh_ptr->thisinode,
 					NULL, NULL, tpage, page_fpos,
 					fh_ptr->meta_cache_ptr);
-			if (ret < 0) {
-				fh_ptr->meta_cache_locked = FALSE;
-				meta_cache_close_file(tmpptr);
-				meta_cache_unlock_entry(tmpptr);
-				if (fh_ptr->blockfptr != NULL) {
-					fclose(fh_ptr->blockfptr);
-					fh_ptr->blockfptr = NULL;
-				}
-				return ret;
-			}
+			if (ret < 0)
+				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
 			change_system_meta(0, tempstat2.st_size, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0)
+				goto error_handling;
+			ret = update_file_stats(tmpptr->fptr, 0,
+					1, tempstat2.st_size);
+			if (ret < 0)
+				goto error_handling;
+			ret = super_block_mark_dirty(fh_ptr->thisinode);
+			if (ret < 0)
+				goto error_handling;
 		}
 	}
 	fh_ptr->meta_cache_locked = FALSE;
@@ -2589,6 +2647,15 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	fh_ptr->opened_block = bindex;
 
 	return 0;
+error_handling:
+	fh_ptr->meta_cache_locked = FALSE;
+	meta_cache_close_file(tmpptr);
+	meta_cache_unlock_entry(tmpptr);
+	if (fh_ptr->blockfptr != NULL) {
+		fclose(fh_ptr->blockfptr);
+		fh_ptr->blockfptr = NULL;
+	}
+	return ret;
 }
 
 /* Function for reading from a single block for read operation. Will fetch
@@ -3025,6 +3092,7 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	char thisblockpath[400];
 	struct stat tempstat2;
 	int ret, errcode;
+	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	ret = fetch_block_path(thisblockpath, this_inode, bindex);
 	if (ret < 0)
@@ -3143,8 +3211,15 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				}
 				return ret;
 			}
-
+			tmpptr = fh_ptr->meta_cache_ptr;
 			change_system_meta(0, tempstat2.st_size, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0)
+				goto error_handling;
+			ret = update_file_stats(tmpptr->fptr, 0,
+					1, tempstat2.st_size);
+			if (ret < 0)
+				goto error_handling;
 		}
 	} else {
 		if (stat(thisblockpath, &tempstat2) == 0) {
@@ -3175,6 +3250,12 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 	fclose(fh_ptr->blockfptr);
 
 	return 0;
+error_handling:
+	if (fh_ptr->blockfptr != NULL) {
+		fclose(fh_ptr->blockfptr);
+		fh_ptr->blockfptr = NULL;
+	}
+	return ret;
 }
 
 /* Function for writing to a single block for write operation. Will fetch
@@ -3191,6 +3272,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	long long entry_index;
 	int ret, errnum, errcode;
 	long long tmpcachesize, tmpdiff;
+	META_CACHE_ENTRY_STRUCT *tmpptr;
 
 	/* Decide the page index for block "bindex" */
 	/*Page indexing starts at zero*/
@@ -3319,7 +3401,21 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				return 0;
 			}
 
+			tmpptr = fh_ptr->meta_cache_ptr;
 			change_system_meta(0, 0, 1);
+			ret = meta_cache_open_file(tmpptr);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
+			ret = update_file_stats(tmpptr->fptr, 1,
+					1, 0);
+			if (ret < 0) {
+				sem_post(&(fh_ptr->block_sem));
+				*reterr = ret;
+				return 0;
+			}
 			break;
 		case ST_LDISK:
 			break;
@@ -3394,8 +3490,24 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 
 	new_cache_size = check_file_size(thisblockpath);
 
-	if (old_cache_size != new_cache_size)
+	if (old_cache_size != new_cache_size){
 		change_system_meta(0, new_cache_size - old_cache_size, 0);
+
+		tmpptr = fh_ptr->meta_cache_ptr;
+		ret = meta_cache_open_file(tmpptr);
+		if (ret < 0) {
+			sem_post(&(fh_ptr->block_sem));
+			*reterr = ret;
+			return 0;
+		}
+		ret = update_file_stats(tmpptr->fptr, 0,
+					0, new_cache_size - old_cache_size);
+		if (ret < 0) {
+			sem_post(&(fh_ptr->block_sem));
+			*reterr = ret;
+			return 0;
+		}
+	}
 
 	flock(fileno(fh_ptr->blockfptr), LOCK_UN);
 	sem_post(&(fh_ptr->block_sem));

@@ -204,6 +204,13 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					goto errcode_handle;
 				}
 				sync_hcfs_system_data(FALSE);
+				ret = update_file_stats(metafptr, 0, -1,
+						-(tempstat.st_size));
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+
 				sem_post(&(hcfs_system->access_sem));
 				ret = super_block_mark_dirty(this_inode);
 				if (ret < 0) {

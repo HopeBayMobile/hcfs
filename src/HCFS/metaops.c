@@ -1333,6 +1333,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				goto errcode_handle;
 			}
 
+			/* Do not need to change per-file statistics here
+			as the file is in the process of being deleted */
 			if (access(thisblockpath, F_OK) == 0) {
 				cache_block_size =
 						check_file_size(thisblockpath);
@@ -1344,8 +1346,6 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 				sem_post(&(hcfs_system->access_sem));
 			}
 		}
-		/* TODO: Change size of data here for each FS (or
-			in the places where this function is called)*/
 		sem_wait(&(hcfs_system->access_sem));
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
 		sync_hcfs_system_data(FALSE);
@@ -1369,7 +1369,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 
 	if (mptr == NULL) {
 		FSEEK(fptr, 0, SEEK_SET);
-		FREAD(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
+		FWRITE(&tmpstat, sizeof(FS_STAT_T), 1, fptr);
 		fclose(fptr);
 	}
 
