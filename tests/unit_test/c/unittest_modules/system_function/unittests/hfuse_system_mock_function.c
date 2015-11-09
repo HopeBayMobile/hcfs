@@ -50,7 +50,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 		return 0;
 }
 
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 
 }
@@ -137,5 +137,13 @@ int init_mount_mgr(void)
 int init_fs_manager(void)
 {
 	return 0;
+}
+int init_pathlookup()
+{
+	return 0;
+}
+void destroy_pathlookup()
+{
+	return;
 }
 

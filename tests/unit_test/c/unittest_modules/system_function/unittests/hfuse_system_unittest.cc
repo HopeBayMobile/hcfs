@@ -185,21 +185,24 @@ class mainTest : public ::testing::Test {
 		char **tmp_argv;
 };
 
+/* Backend init is now remove from system init */
+/*
 TEST_F(mainTest, InitBackendFail)
 {
 	hcfs_list_container_success = TRUE;
-	hcfs_init_backend_success = FALSE;
-	/* Test */	
+	hcfs_init_backend_success = FALSE;*/
+	/* Test */	/*
 	EXPECT_EXIT(main(1, tmp_argv), ::testing::ExitedWithCode(255), "");
 }
 
 TEST_F(mainTest, ListContainerFail)
 {
 	hcfs_list_container_success = FALSE;
-	hcfs_init_backend_success = TRUE;
-	/* Test */
+	hcfs_init_backend_success = TRUE; */
+	/* Test */ /*
 	EXPECT_EXIT(main(1, tmp_argv), testing::ExitedWithCode(255), "");
 }
+*/
 
 TEST_F(mainTest, MainFunctionSuccess)
 {

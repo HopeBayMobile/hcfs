@@ -333,3 +333,13 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
         snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
         return 0;
 }
+int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+{
+	return 0;
+}
+
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+
