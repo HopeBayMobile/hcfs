@@ -180,6 +180,7 @@ typedef struct {
 	long long system_size;
 	long long cache_size;
 	long long cache_blocks;
+	long long pinned_size;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {

@@ -2294,6 +2294,15 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		return ret;
 	}
 
+	if (tempfilemeta.local_pin == TRUE) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size +=
+			(long long)(offset - filestat->st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	/* Update file and system meta here */
 	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
 
@@ -3545,6 +3554,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	int ret, errcode;
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
+	FILE_META_TYPE thisfilemeta;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -3627,8 +3637,8 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	/*Update and flush file meta*/
 
-	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat, NULL,
-					NULL, 0, fh_ptr->meta_cache_ptr);
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+			&thisfilemeta, NULL, 0, fh_ptr->meta_cache_ptr);
 	if (ret < 0) {
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
@@ -3638,6 +3648,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
+		if (thisfilemeta.local_pin == TRUE) {
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->systemdata.pinned_size +=
+				(long long) ((offset + total_bytes_written)
+						- temp_stat.st_size);
+			if (hcfs_system->systemdata.pinned_size < 0)
+				hcfs_system->systemdata.pinned_size = 0;
+			sem_post(&(hcfs_system->access_sem));
+		}
+
 		change_system_meta((long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0, 0);
 		ret = change_mount_stat(tmpptr,

@@ -1347,6 +1347,13 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 			}
 		}
 		sem_wait(&(hcfs_system->access_sem));
+		if (file_meta.local_pin == TRUE) {
+			hcfs_system->systemdata.pinned_size -=
+						this_inode_stat.st_size;
+			if (hcfs_system->systemdata.pinned_size < 0)
+				hcfs_system->systemdata.pinned_size = 0;
+		}
+
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
