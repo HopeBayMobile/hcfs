@@ -1,5 +1,6 @@
 extern "C" {
 #include "hcfscurl.h"
+#include "fuseop.h"
 }
 #include <string.h>
 #include <gtest/gtest.h>
@@ -145,12 +146,15 @@ protected:
 		http_perform_retry_fail = FALSE;
 		write_list_header_flag = FALSE;
 		let_retry = FALSE;
+		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
 	{
 		if (curl_handle)
 			free(curl_handle);
+		free(hcfs_system);
 	}
 
 };
@@ -158,6 +162,7 @@ protected:
 TEST_F(hcfs_list_containerTest, ListSwift_HttpPerformFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	strcpy(curl_handle->id, "_test_");
 	http_perform_retry_fail = TRUE;
 
@@ -171,6 +176,7 @@ TEST_F(hcfs_list_containerTest, ListSwift_HttpPerformFail)
 TEST_F(hcfs_list_containerTest, ListSwift_ParseHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	strcpy(curl_handle->id, "_test_");
 
 	EXPECT_EQ(-1, hcfs_list_container(curl_handle));
@@ -181,6 +187,7 @@ TEST_F(hcfs_list_containerTest, ListSwift_ParseHeaderFail)
 TEST_F(hcfs_list_containerTest, ListSwiftSuccess)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	strcpy(curl_handle->id, "_test_");
 	write_list_header_flag = TRUE;
 
@@ -194,6 +201,7 @@ TEST_F(hcfs_list_containerTest, ListSwiftSuccess)
 TEST_F(hcfs_list_containerTest, ListSwift_Retry_Success) /* Retry list success*/
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	strcpy(curl_handle->id, "_test_");
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
@@ -210,6 +218,7 @@ TEST_F(hcfs_list_containerTest, ListSwift_Retry_Success) /* Retry list success*/
 TEST_F(hcfs_list_containerTest, ListS3_HttpPerformFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	strcpy(curl_handle->id, "_test_");
 	http_perform_retry_fail = TRUE;
 
@@ -223,6 +232,7 @@ TEST_F(hcfs_list_containerTest, ListS3_HttpPerformFail)
 TEST_F(hcfs_list_containerTest, ListS3_ParseHeaderFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	strcpy(curl_handle->id, "_test_");
 
 	EXPECT_EQ(-1, hcfs_list_container(curl_handle));
@@ -233,6 +243,7 @@ TEST_F(hcfs_list_containerTest, ListS3_ParseHeaderFail)
 TEST_F(hcfs_list_containerTest, ListS3Success)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	strcpy(curl_handle->id, "_test_");
 	write_list_header_flag = TRUE;
 
@@ -246,6 +257,7 @@ TEST_F(hcfs_list_containerTest, ListS3Success)
 TEST_F(hcfs_list_containerTest, ListS3_Retry_Success) /* Retry list success */
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	strcpy(curl_handle->id, "_test_");
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
@@ -295,6 +307,8 @@ protected:
 		if (!access(objpath, F_OK));
 			unlink(objpath);
 		fptr = fopen(objpath, "w+");
+		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
@@ -305,6 +319,7 @@ protected:
 		fclose(fptr);
 		if (!access(objpath, F_OK));
 			unlink(objpath);
+		free(hcfs_system);
 	}
 
 };
@@ -312,6 +327,7 @@ protected:
 TEST_F(hcfs_put_objectTest, SwiftPutObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = S3;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
@@ -323,6 +339,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_HttpPerformFail)
 TEST_F(hcfs_put_objectTest, SwiftPutObject_ParseHttpHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 
 	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftputhead_test_.tmp", F_OK));
@@ -331,6 +348,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_ParseHttpHeaderFail)
 TEST_F(hcfs_put_objectTest, SwiftPutObjectSuccess)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
@@ -342,6 +360,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObjectSuccess)
 TEST_F(hcfs_put_objectTest, SwiftPutObject_Retry_Success) /* Retry put success */
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -356,6 +375,7 @@ TEST_F(hcfs_put_objectTest, SwiftPutObject_Retry_Success) /* Retry put success *
 TEST_F(hcfs_put_objectTest, S3PutObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
@@ -367,6 +387,7 @@ TEST_F(hcfs_put_objectTest, S3PutObject_HttpPerformFail)
 TEST_F(hcfs_put_objectTest, S3PutObject_ParseHttpHeaderFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 
 	EXPECT_EQ(-1, hcfs_put_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3puthead_test_.tmp", F_OK));
@@ -375,6 +396,7 @@ TEST_F(hcfs_put_objectTest, S3PutObject_ParseHttpHeaderFail)
 TEST_F(hcfs_put_objectTest, S3PutObjectSuccess)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_put_object(fptr, objname, curl_handle, NULL));
@@ -386,6 +408,7 @@ TEST_F(hcfs_put_objectTest, S3PutObjectSuccess)
 TEST_F(hcfs_put_objectTest, S3PutObject_Retry_Success) /* Retry put success */
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -433,6 +456,9 @@ protected:
 		if (!access(objpath, F_OK));
 			unlink(objpath);
 		fptr = fopen(objpath, "w+");
+		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
+		curl_handle->curl_backend = SWIFT;
 	}
 
 	void TearDown()
@@ -443,12 +469,14 @@ protected:
 		fclose(fptr);
 		if (!access(objpath, F_OK));
 			unlink(objpath);
+		free(hcfs_system);
 	}
 };
 
 TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
@@ -460,6 +488,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpPerformFail)
 TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 
 	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/swiftgethead_test_.tmp", F_OK));
@@ -468,6 +497,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_HttpParseHeaderFail)
 TEST_F(hcfs_get_objectTest, SwiftGetObjectSuccess)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
@@ -479,6 +509,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObjectSuccess)
 TEST_F(hcfs_get_objectTest, SwiftGetObject_Retry_Success) /* Retry get success */
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -493,6 +524,7 @@ TEST_F(hcfs_get_objectTest, SwiftGetObject_Retry_Success) /* Retry get success *
 TEST_F(hcfs_get_objectTest, S3GetObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
@@ -504,6 +536,7 @@ TEST_F(hcfs_get_objectTest, S3GetObject_HttpPerformFail)
 TEST_F(hcfs_get_objectTest, S3GetObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 
 	EXPECT_EQ(-1, hcfs_get_object(fptr, objname, curl_handle, NULL));
 	EXPECT_EQ(-1, access("/run/shm/s3gethead_test_.tmp", F_OK));
@@ -512,6 +545,7 @@ TEST_F(hcfs_get_objectTest, S3GetObject_HttpParseHeaderFail)
 TEST_F(hcfs_get_objectTest, S3GetObjectSuccess)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_get_object(fptr, objname, curl_handle, NULL));
@@ -523,6 +557,7 @@ TEST_F(hcfs_get_objectTest, S3GetObjectSuccess)
 TEST_F(hcfs_get_objectTest, S3GetObject_Retry_Success) /* Retry get success */
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -564,18 +599,22 @@ protected:
 		let_retry = FALSE;
 
 		objname = "here_is_obj";
+		hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+		hcfs_system->system_going_down = FALSE;
 	}
 
 	void TearDown()
 	{
 		if (curl_handle)
 			free(curl_handle);
+		free(hcfs_system);
 	}
 };
 
 TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_delete_object(objname, curl_handle));
@@ -587,6 +626,7 @@ TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_HttpPerformFail)
 TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 
 	EXPECT_EQ(-1, hcfs_delete_object(objname, curl_handle));
 	EXPECT_EQ(-1, access("/run/shm/swiftdeletehead_test_.tmp", F_OK));
@@ -595,6 +635,7 @@ TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_HttpParseHeaderFail)
 TEST_F(hcfs_delete_objectTest, SwiftDeleteObjectSuccess)
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_delete_object(objname, curl_handle));
@@ -606,6 +647,7 @@ TEST_F(hcfs_delete_objectTest, SwiftDeleteObjectSuccess)
 TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_Retry_Success) /* Retry delete */
 {
 	CURRENT_BACKEND = SWIFT;
+	curl_handle->curl_backend = SWIFT;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -620,6 +662,7 @@ TEST_F(hcfs_delete_objectTest, SwiftDeleteObject_Retry_Success) /* Retry delete 
 TEST_F(hcfs_delete_objectTest, S3DeleteObject_HttpPerformFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	http_perform_retry_fail = TRUE;
 
 	EXPECT_EQ(-1, hcfs_delete_object(objname, curl_handle));
@@ -631,6 +674,7 @@ TEST_F(hcfs_delete_objectTest, S3DeleteObject_HttpPerformFail)
 TEST_F(hcfs_delete_objectTest, S3DeleteObject_HttpParseHeaderFail)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 
 	EXPECT_EQ(-1, hcfs_delete_object(objname, curl_handle));
 	EXPECT_EQ(-1, access("/run/shm/s3deletehead_test_.tmp", F_OK));
@@ -639,6 +683,7 @@ TEST_F(hcfs_delete_objectTest, S3DeleteObject_HttpParseHeaderFail)
 TEST_F(hcfs_delete_objectTest, S3DeleteObjectSuccess)
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 
 	EXPECT_EQ(200, hcfs_delete_object(objname, curl_handle));
@@ -650,6 +695,7 @@ TEST_F(hcfs_delete_objectTest, S3DeleteObjectSuccess)
 TEST_F(hcfs_delete_objectTest, S3DeleteObject_Retry_Success) /* Retry delete*/
 {
 	CURRENT_BACKEND = S3;
+	curl_handle->curl_backend = S3;
 	write_list_header_flag = TRUE;
 	let_retry = TRUE;
 
@@ -673,6 +719,7 @@ TEST(hcfs_init_backendTest, InitSwiftBackendGetAuthFail)
 	CURL_HANDLE curl_handle;
 
 	CURRENT_BACKEND = SWIFT;
+	curl_handle.curl_backend = SWIFT;
 
 	http_perform_retry_fail = TRUE;
 	SWIFT_ACCOUNT = "kewei_account";
@@ -689,6 +736,7 @@ TEST(hcfs_init_backendTest, InitS3BackendSuccess)
 	CURL_HANDLE curl_handle;
 
 	CURRENT_BACKEND = S3;
+	curl_handle.curl_backend = S3;
 	strcpy(curl_handle.id, "_test_");
 
 	EXPECT_EQ(200, hcfs_init_backend(&curl_handle));
@@ -702,6 +750,7 @@ TEST(hcfs_init_backendTest, InitS3BackendSuccess)
  */
 class hcfs_destroy_backendTest : public ::testing::Test {
 protected:
+	CURL_HANDLE tmphandle;
 	void SetUp()
 	{
 	}
@@ -718,8 +767,9 @@ TEST_F(hcfs_destroy_backendTest, DestroySwift)
 {
 	swift_destroy = TRUE; /* Destroy swift */
 	CURRENT_BACKEND = SWIFT;
+	tmphandle.curl_backend = SWIFT;
 
-	hcfs_destroy_backend((CURL *)1);
+	hcfs_destroy_backend(&tmphandle);
 
 	EXPECT_EQ(FALSE, swift_destroy);
 	EXPECT_EQ(FALSE, s3_destroy);
@@ -729,8 +779,9 @@ TEST_F(hcfs_destroy_backendTest, DestroyS3)
 {
 	s3_destroy = TRUE; /* Destroy s3 */
 	CURRENT_BACKEND = S3;
+	tmphandle.curl_backend = S3;
 
-	hcfs_destroy_backend((CURL *)1);
+	hcfs_destroy_backend(&tmphandle);
 
 	EXPECT_EQ(FALSE, swift_destroy);
 	EXPECT_EQ(FALSE, s3_destroy);

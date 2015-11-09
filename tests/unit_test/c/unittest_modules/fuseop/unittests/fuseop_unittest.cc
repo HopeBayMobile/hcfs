@@ -100,6 +100,7 @@ class fuseopEnvironment : public ::testing::Environment {
     system_config.max_block_size = 2097152;
     system_config.cache_hard_limit = 3200000;
     system_config.cache_soft_limit = 3200000;
+    system_config.current_backend = 1;
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
@@ -771,10 +772,12 @@ TEST_F(hfuse_utimensTest, UtimeTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 0);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 0);
+#endif
 }
 TEST_F(hfuse_utimensTest, UtimensatTest) {
   int ret_val;
@@ -793,10 +796,12 @@ TEST_F(hfuse_utimensTest, UtimensatTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+#endif
 }
 TEST_F(hfuse_utimensTest, FutimensTest) {
   int ret_val;
@@ -820,10 +825,12 @@ TEST_F(hfuse_utimensTest, FutimensTest) {
   stat("/tmp/test_fuse/testfile1", &tempstat);
   EXPECT_EQ(tempstat.st_atime, 123456);
   EXPECT_EQ(tempstat.st_mtime, 456789);
+#ifndef _ANDROID_ENV_
   EXPECT_EQ(tempstat.st_atim.tv_sec, 123456);
   EXPECT_EQ(tempstat.st_mtim.tv_sec, 456789);
   EXPECT_EQ(tempstat.st_atim.tv_nsec, 2222);
   EXPECT_EQ(tempstat.st_mtim.tv_nsec, 12345678);
+#endif
 }
 
 /* End of the test case for the function hfuse_utimens */
@@ -845,6 +852,9 @@ class hfuse_truncateTest : public ::testing::Test {
     char temppath[1024];
 
     fetch_block_path(temppath, 14, 0);
+    if (access(temppath, F_OK) == 0)
+      unlink(temppath);
+    fetch_trunc_path(temppath, 14);
     if (access(temppath, F_OK) == 0)
       unlink(temppath);
   }

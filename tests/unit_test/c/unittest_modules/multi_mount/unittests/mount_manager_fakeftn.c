@@ -114,3 +114,12 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
         snprintf(pathname, 100, "%s/stat%ld", METAPATH, this_inode);
         return 0;
 }
+PATH_CACHE * init_pathcache(ino_t root_inode)
+{
+	return (PATH_CACHE *) malloc(sizeof(PATH_CACHE));
+}
+int destroy_pathcache(PATH_CACHE *cacheptr)
+{
+	return 0;
+}
+
