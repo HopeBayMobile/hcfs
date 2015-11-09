@@ -77,7 +77,7 @@ errcode_handle:
 *
 *************************************************************************/
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen)
+		unsigned long *ret_gen, char *ret_pin_status)
 {
 	struct stat returned_stat;
 	int ret_code;
@@ -99,14 +99,17 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 		if (ret_code < 0)
 			goto error_handling;
 
-		if (ret_gen != NULL) {
+		if (ret_gen != NULL || ret_pin_status != NULL) {
 			if (S_ISREG(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_file_data(
 						this_inode, NULL, &filemeta,
 						NULL, 0, temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = filemeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = filemeta.local_pin;
+				if (ret_gen)
+					*ret_gen = filemeta.generation;
 			}
 			if (S_ISDIR(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_dir_data(
@@ -114,7 +117,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 						NULL, temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = dirmeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = dirmeta.local_pin;
+				if (ret_gen)
+					*ret_gen = dirmeta.generation;
 			}
 			if (S_ISLNK(returned_stat.st_mode)) {
 				ret_code = meta_cache_lookup_symlink_data(
@@ -122,7 +128,10 @@ int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
 						temp_entry);
 				if (ret_code < 0)
 					goto error_handling;
-				*ret_gen = symlinkmeta.generation;
+				if (ret_pin_status)
+					*ret_pin_status = symlinkmeta.local_pin;
+				if (ret_gen)
+					*ret_gen = symlinkmeta.generation;
 			}
 		}
 
@@ -789,7 +798,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	parent_inode = parent_meta_cache_entry->inode_num;
 
 	/* Fetch stat and generation */
-	ret_val = fetch_inode_stat(link_inode, link_stat, generation);
+	ret_val = fetch_inode_stat(link_inode, link_stat, generation, NULL);
 	if (ret_val < 0)
 		return ret_val;
 
@@ -868,8 +877,9 @@ int pin_inode(ino_t this_inode)
 {
 	int ret, ret2;
 	struct stat tempstat;
+	SUPER_BLOCK_ENTRY sb_entry;
 
-	ret = fetch_inode_stat(this_inode, &tempstat, NULL);
+	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
 	
@@ -882,10 +892,9 @@ int pin_inode(ino_t this_inode)
 		return ret;
 	}
 
-	ret = pin_ll_enqueue(this_inode);
+	ret = super_block_mark_pin(this_inode, tempstat.st_mode);
 	if (ret < 0)
 		return ret;
-
 	/* Check all blocks are in local cache if it is regfile */
 	/*if (S_ISREG(tempstat.st_mode)) {
 		ret = fetch_pinned_blocks(this_inode);
@@ -917,8 +926,9 @@ int unpin_inode(ino_t this_inode)
 {
 	int ret, ret2;
 	struct stat tempstat;
+	SUPER_BLOCK_ENTRY sb_entry;
 
-	ret = fetch_inode_stat(this_inode, &tempstat, NULL);
+	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
 	
@@ -933,6 +943,10 @@ int unpin_inode(ino_t this_inode)
 			this_inode);
 		return ret;
 	}
+
+	ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }

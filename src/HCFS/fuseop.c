@@ -82,6 +82,7 @@
 #include "lookup_count.h"
 #include "FS_manager.h"
 #include "path_reconstruct.h"
+#include "pin_scheduling.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -582,7 +583,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	if (hit_inode > 0) {
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL);
+		ret_code = fetch_inode_stat(hit_inode, &tmp_stat, NULL, NULL);
 		if (ret_code < 0) {
 			fuse_reply_err(req, -ret_code);
 			return;
@@ -640,6 +641,7 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 	unsigned long this_generation;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	write_log(10,
 		"DEBUG parent %ld, name %s mode %d\n", parent, selfname, mode);
@@ -661,7 +663,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -716,7 +719,8 @@ static void hfuse_ll_mknod(fuse_req_t req, fuse_ino_t parent,
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
@@ -786,6 +790,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	struct stat parent_stat;
 	unsigned long this_gen;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	gettimeofday(&tmp_time1, NULL);
 
@@ -797,7 +802,8 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -851,7 +857,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 	this_stat.st_blksize = MAX_BLOCK_SIZE;
 	this_stat.st_blocks = 0;
 
-	self_inode = super_block_new_inode(&this_stat, &this_gen);
+	self_inode = super_block_new_inode(&this_stat, &this_gen, local_pin);
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
 		return;
@@ -919,7 +925,7 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -990,7 +996,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1085,7 +1091,7 @@ a directory (for NFS) */
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 
 	write_log(10, "Debug lookup parent mode %d\n", parent_stat.st_mode);
 	if (ret_val < 0) {
@@ -1134,7 +1140,7 @@ a directory (for NFS) */
 	this_inode = temp_dentry.d_ino;
 	output_param.ino = (fuse_ino_t) this_inode;
 	ret_val = fetch_inode_stat(this_inode, &(output_param.attr),
-			&this_gen);
+			&this_gen, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -1267,7 +1273,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode1, &parent_stat1, NULL);
+	ret_val = fetch_inode_stat(parent_inode1, &parent_stat1, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -1299,7 +1305,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode2, &parent_stat2, NULL);
+	ret_val = fetch_inode_stat(parent_inode2, &parent_stat2, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -2395,7 +2401,7 @@ void hfuse_ll_open(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -3961,7 +3967,7 @@ static void hfuse_ll_opendir(fuse_req_t req, fuse_ino_t ino,
 
 	thisinode = real_ino(req, ino);
 
-	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &this_stat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -4481,7 +4487,7 @@ static void hfuse_ll_access(fuse_req_t req, fuse_ino_t ino, int mode)
 
 	thisinode = real_ino(req, ino);
 
-	ret_val = fetch_inode_stat(thisinode, &thisstat, NULL);
+	ret_val = fetch_inode_stat(thisinode, &thisstat, NULL, NULL);
 
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
@@ -4586,6 +4592,7 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	int result_index;
 	int errcode;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -4620,7 +4627,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -4675,7 +4683,8 @@ static void hfuse_ll_symlink(fuse_req_t req, const char *link,
 	this_stat.st_gid = temp_context->gid;
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 	if (self_inode < 1) {
 		errcode = -ENOSPC;
 		goto error_handle;
@@ -5279,7 +5288,7 @@ static void hfuse_ll_link(fuse_req_t req, fuse_ino_t ino,
 		return;
 	}
 
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL, NULL);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -5393,6 +5402,7 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	unsigned long this_generation;
 	long long fh;
 	MOUNT_T *tmpptr;
+	char local_pin;
 
 	parent_inode = real_ino(req, parent);
 
@@ -5412,7 +5422,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	/* Check parent type */
-	ret_val = fetch_inode_stat(parent_inode, &parent_stat, NULL);
+	ret_val = fetch_inode_stat(parent_inode, &parent_stat,
+			NULL, &local_pin);
 	if (ret_val < 0) {
 		fuse_reply_err(req, -ret_val);
 		return;
@@ -5464,7 +5475,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	/* Use the current time for timestamps */
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
-	self_inode = super_block_new_inode(&this_stat, &this_generation);
+	self_inode = super_block_new_inode(&this_stat, &this_generation,
+			local_pin);
 	/* If cannot get new inode number, error is ENOSPC */
 	if (self_inode < 1) {
 		fuse_reply_err(req, ENOSPC);
@@ -5601,6 +5613,7 @@ int hook_fuse(int argc, char **argv)
 	init_meta_cache_headers();
 	startup_finish_delete();
 	init_download_control();
+	init_pin_scheduler();
 	/* TODO: Ensure that the above is finished before any operation
 		can start */
 	while (hcfs_system->system_going_down == FALSE)
@@ -5609,6 +5622,7 @@ int hook_fuse(int argc, char **argv)
 	destroy_fs_manager();
 	release_meta_cache_headers();
 	destroy_download_control();
+	destroy_pin_scheduler();
 	sync();
 	for (dl_count = 0; dl_count < MAX_DOWNLOAD_CURL_HANDLE; dl_count++)
 		hcfs_destroy_backend(&(download_curl_handles[dl_count]));

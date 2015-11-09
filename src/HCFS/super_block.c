@@ -41,6 +41,17 @@
 #define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
 
+#define _ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_() \
+	{ \
+		int val; \
+		sem_getvalue(&(sys_super_block->exclusive_lock_sem), &val); \
+		if (val > 0) { \
+			write_log(0, "Error: superblock is not locked in %s", \
+				__func__); \
+			return -EPERM; \
+		} \
+	}
+
 extern SYSTEM_CONF_STRUCT system_config;
 
 /************************************************************************
@@ -176,6 +187,7 @@ int super_block_init(void)
 	sem_init(&(sys_super_block->exclusive_lock_sem), 1, 1);
 	sem_init(&(sys_super_block->share_lock_sem), 1, 1);
 	sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1);
+	sem_init(&(sys_super_block->pin_group_sem), 1, 1);
 	sys_super_block->share_counter = 0;
 
 	sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
@@ -517,6 +529,9 @@ int super_block_to_delete(ino_t this_inode)
 
 	ret_val = read_super_block_entry(this_inode, &tempentry);
 	if (ret_val >= 0) {
+		if (tempentry.pin_status == ST_PINNING) {
+			pin_ll_dequeue(this_inode, &tempentry);
+		}
 		if (tempentry.status != TO_BE_DELETED) {
 			ret_val = ll_dequeue(this_inode, &tempentry);
 			if (ret_val < 0) {
@@ -534,6 +549,7 @@ int super_block_to_delete(ino_t this_inode)
 		tempmode = tempentry.inode_stat.st_mode;
 		memset(&(tempentry.inode_stat), 0, sizeof(struct stat));
 		tempentry.inode_stat.st_mode = tempmode;
+		tempentry.pin_status = ST_DEL;
 		ret_val = write_super_block_entry(this_inode, &tempentry);
 
 		if (ret_val >= 0) {
@@ -916,7 +932,7 @@ int super_block_reclaim_fullscan(void)
 *
 *************************************************************************/
 ino_t super_block_new_inode(struct stat *in_stat,
-				unsigned long *ret_generation)
+				unsigned long *ret_generation, char local_pin)
 {
 	ssize_t retsize;
 	ino_t this_inode;
@@ -970,7 +986,7 @@ ino_t super_block_new_inode(struct stat *in_stat,
 
 	/*Update the new super inode entry*/
 	memset(&tempentry, 0, SB_ENTRY_SIZE);
-	tempentry.pin_status = (DEFAULT_PIN == TRUE ? ST_PIN : ST_UNPIN);
+	tempentry.pin_status = (local_pin == TRUE ? ST_PIN : ST_UNPIN);
 	tempentry.this_index = this_inode;
 	tempentry.generation = this_generation;
 	if (ret_generation != NULL)
@@ -1306,26 +1322,124 @@ int super_block_exclusive_release(void)
 	return 0;
 }
 
-int pin_ll_enqueue(ino_t this_inode)
+int super_block_finish_pinning(ino_t this_inode)
 {
-	SUPER_BLOCK_ENTRY this_entry, last_entry;
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
 
 	super_block_exclusive_locking();
+
 	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;	
+	}
+	switch (this_entry.pin_status) {
+	case ST_PINNING:
+		ret = pin_ll_dequeue(this_inode, &this_entry);
+		if (ret < 0)
+			break;
+		this_entry.pin_status = ST_PIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_UNPIN:
+	case ST_PIN:
+	case ST_DEL:
+		break;
+	}
+	
+	super_block_exclusive_release();
+
 	if (ret < 0)
-		goto error_handling;
+		return ret;
+	
+	return 0;
+}
+
+int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+{	
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
+
+	super_block_exclusive_locking();
+	read_super_block_entry(this_inode, &this_entry);
+	switch (this_entry.pin_status) {
+	case ST_UNPIN:
+		if (S_ISREG(this_mode)) {
+			/* Enqueue and set as ST_PINNING */
+			ret = pin_ll_enqueue(this_inode, &this_entry);
+			this_entry.pin_status = ST_PINNING;
+		} else {
+			this_entry.pin_status = ST_PIN;
+		}
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_DEL:
+	case ST_PINNING:
+	case ST_PIN:
+		break;
+	}
+	super_block_exclusive_release();
+
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+
+int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+{
+	SUPER_BLOCK_ENTRY this_entry;
+	int ret;
+
+	super_block_exclusive_locking();
+	read_super_block_entry(this_inode, &this_entry);
+	switch (this_entry.pin_status) {
+	case ST_PINNING:
+		/* Enqueue and set as ST_UNPIN */
+		ret = pin_ll_dequeue(this_inode, &this_entry);
+		this_entry.pin_status = ST_UNPIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		if (!S_ISREG(this_mode)) {
+			write_log(0, "Error: why non-regfile has pin status"
+				" ST_PINNING? In %s\n", __func__);
+			ret = -EIO;
+		}
+		break;
+	case ST_PIN:
+		this_entry.pin_status = ST_UNPIN;
+		ret = write_super_block_entry(this_inode, &this_entry);
+		break;
+	case ST_DEL:
+	case ST_UNPIN:
+		break;
+	}
+	super_block_exclusive_release();
+
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+
+int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+{
+	SUPER_BLOCK_ENTRY last_entry;
+	int ret;
+
+	_ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_();
 
 	/* Return pin-status if this status is not UNPIN */
-	if (this_entry.pin_status != ST_UNPIN) {
-		super_block_exclusive_release();
-		return this_entry.pin_status;
+	if (this_entry->pin_status != ST_UNPIN) {
+		return this_entry->pin_status;
 	}
 
-	if (sys_super_block->head.last_pin_inode == NULL) {
-		this_entry.pin_ll_next = 0;
-		this_entry.pin_ll_prev = 0;
-		this_entry.pin_status = ST_PINNING; /* Pinning */
-		ret = write_super_block_entry(this_inode, &this_entry);
+	if (sys_super_block->head.last_pin_inode == 0) {
+		this_entry->pin_ll_next = 0;
+		this_entry->pin_ll_prev = 0;
+		this_entry->pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, this_entry);
 		if (ret < 0)
 			goto error_handling;
 
@@ -1334,8 +1448,8 @@ int pin_ll_enqueue(ino_t this_inode)
 	} else {
 		this_entry->pin_ll_next = 0;
 		this_entry->pin_ll_prev = sys_super_block->head.last_pin_inode;
-		this_entry.pin_status = ST_PINNING; /* Pinning */
-		ret = write_super_block_entry(this_inode, &this_entry);
+		this_entry->pin_status = ST_PINNING; /* Pinning */
+		ret = write_super_block_entry(this_inode, this_entry);
 		if (ret < 0)
 			goto error_handling;
 
@@ -1349,12 +1463,75 @@ int pin_ll_enqueue(ino_t this_inode)
 
 		sys_super_block->head.last_pin_inode = this_inode;
 	}
+	
+	sys_super_block->head.num_pinning_inodes++;
 	ret = write_super_block_head();
+	if (ret < 0)
+		goto error_handling;
 
-	super_block_exclusive_release();
 	return 0;
 
 error_handling:
-	super_block_exclusive_release();
 	return ret;
+}
+
+
+int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
+{
+	SUPER_BLOCK_ENTRY prev_entry, next_entry;
+	ino_t prev_inode, next_inode;
+	int ret;
+
+	_ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_();
+
+	/* Return pin-status if this status is not UNPIN */
+	if (this_entry->pin_status != ST_PINNING) {
+		//super_block_exclusive_release();
+		return this_entry->pin_status;
+	}
+
+	prev_inode = this_entry->pin_ll_prev;
+	next_inode = this_entry->pin_ll_next;
+	/* Handle prev pointer */
+	if (prev_inode != 0) {
+		ret = read_super_block_entry(prev_inode, &prev_entry);
+		if (ret < 0)
+			goto error_handling;
+		prev_entry.pin_ll_next = next_inode;	
+		ret = write_super_block_entry(prev_inode, &prev_entry);
+		if (ret < 0)
+			goto error_handling;
+	} else {
+		sys_super_block->head.first_pin_inode = next_inode;
+	}
+
+	/* Handle next pointer */
+	if (next_inode != 0) {
+		ret = read_super_block_entry(next_inode, &next_entry);
+		if (ret < 0)
+			goto error_handling;
+		next_entry.pin_ll_prev = prev_inode;		
+		ret = write_super_block_entry(next_inode, &next_entry);
+		if (ret < 0)
+			goto error_handling;
+	} else {	
+		sys_super_block->head.last_pin_inode = prev_inode;
+	}
+
+	/* Handle itself */
+	this_entry->pin_ll_next = 0;
+	this_entry->pin_ll_prev = 0;
+	ret = write_super_block_entry(this_inode, this_entry);
+	if (ret < 0)
+		goto error_handling;
+
+	sys_super_block->head.num_pinning_inodes--;
+	ret = write_super_block_head();
+	if (ret < 0)
+		goto error_handling;
+
+	return 0;
+
+error_handling:
+	return ret;	
 }

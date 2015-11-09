@@ -680,6 +680,9 @@ int fetch_pinned_blocks(ino_t inode)
 	FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
 
+	if (!S_ISREG(tempstat.st_mode))
+		return 0;
+
 	total_size = tempstat.st_size;
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
 
@@ -766,6 +769,9 @@ int fetch_pinned_blocks(ino_t inode)
 			ret_code = -EIO;
 		UNLINK(error_path);
 	}
+
+	if (access(metapath, F_OK) < 0)
+		ret_code = -ENOENT;
 
 	return ret_code;
 

@@ -207,7 +207,7 @@ ino_t _create_root_inode(void)
 
 	set_timestamp_now(&this_stat, ATIME | MTIME | CTIME);
 
-	root_inode = super_block_new_inode(&this_stat, &this_gen);
+	root_inode = super_block_new_inode(&this_stat, &this_gen, DEFAULT_PIN);
 
 	if (root_inode <= 1) {
 		write_log(0, "Error creating new root inode\n");

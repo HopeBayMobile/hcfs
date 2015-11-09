@@ -1529,7 +1529,7 @@ int startup_finish_delete(void)
 		ret_val = sscanf(tmpent.d_name, "inode%"FMT_INO_T"_%"FMT_INO_T"",
 				&tmp_ino, &root_inode);
 		if (ret_val > 0) {
-			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL);
+			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL, NULL);
 			if (ret < 0) {
 				closedir(dirp);
 				return ret;

@@ -25,7 +25,7 @@
 #include "xattr_ops.h"
 
 int fetch_inode_stat(ino_t this_inode, struct stat *inode_stat,
-		unsigned long *ret_gen);
+		unsigned long *ret_gen, char *ret_pin_status);
 
 int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 			const char *selfname,

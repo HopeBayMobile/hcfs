@@ -32,6 +32,7 @@
 #include "FS_manager.h"
 #include "mount_manager.h"
 #include "fuseop.h"
+#include "super_block.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -310,7 +311,10 @@ int pin_inode_handle(int arg_len, char *largebuf)
 	memcpy(&pinned_inode, largebuf, sizeof(ino_t)); 
 	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
 		"arg_len = %d", pinned_inode, sizeof(ino_t), arg_len);
+	// TODO: add semaphore of pinning group of inodes
+	sem_wait(&(sys_super_block->pin_group_sem));
 	retcode = pin_inode(pinned_inode);
+	sem_post(&(sys_super_block->pin_group_sem));
 
 	return retcode;
 }
