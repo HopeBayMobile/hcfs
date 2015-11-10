@@ -2030,7 +2030,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	off_t filepos;
 	BLOCK_ENTRY_PAGE temppage;
 	int last_index;
-	long long temp_trunc_size;
+	long long temp_trunc_size, sizediff;
 	ssize_t ret_ssize;
 	MOUNT_T *tmpptr;
 	size_t ret_size;
@@ -2061,6 +2061,24 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		return 0;
 	}
 
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (filestat->st_size < offset)) {
+		/* If this is a pinned file and we want to extend the file,
+		need to find out if pinned space is still available for this
+		extension */
+		/* If pinned space is available, add the amount of changes
+		to the total usage first */
+		sizediff = (long long) offset - filestat->st_size;
+		sem_wait(&(hcfs_system->access_sem));
+		if ((hcfs_system->systemdata.pinned_size + sizediff)
+			> MAX_PINNED_LIMIT) {
+			sem_post(&(hcfs_system->access_sem));
+			return -ENOSPC;
+		}
+		hcfs_system->systemdata.pinned_size += sizediff;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	/*If need to extend, only need to change st_size. Do that later.*/
 	if (filestat->st_size > offset) {
 		if (offset == 0) {
@@ -2081,8 +2099,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			filepos = seek_page(*body_ptr, last_page, 0);
 		else
 			filepos = 0;
-		if (filepos < 0)
-			return filepos;
+		if (filepos < 0) {
+			errcode = filepos;
+			goto errcode_handle;
+		}
 
 		current_page = last_page;
 
@@ -2095,8 +2115,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			ret = meta_cache_lookup_file_data(this_inode, NULL,
 				NULL, &temppage, filepos,
 				*body_ptr);
-			if (ret < 0)
-				return ret;
+			if (ret < 0) {
+				errcode = ret;
+				goto errcode_handle;
+			}
 
 			/* Do the actual handling here*/
 			last_index = last_block %
@@ -2109,8 +2131,10 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 					&temppage, filepos,
 					body_ptr, last_index,
 					last_block, offset);
-				if (ret < 0)
-					return ret;
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
 			}
 
 			/*Delete the rest of blocks in this same page
@@ -2119,7 +2143,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 			ret = truncate_delete_block(&temppage, last_index+1,
 				current_page, old_last_block,
@@ -2127,7 +2152,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			ret = meta_cache_update_file_data(this_inode, NULL,
@@ -2136,7 +2162,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 		}
 
@@ -2152,7 +2179,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (filepos < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return filepos;
+				errcode = filepos;
+				goto errcode_handle;
 			}
 
 			/* Skipping pages that do not exist */
@@ -2164,14 +2192,16 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			ret = meta_cache_open_file(*body_ptr);
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 			ret = truncate_delete_block(&temppage, 0,
 				current_page, old_last_block,
@@ -2179,7 +2209,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 
 			ret = meta_cache_update_file_data(this_inode, NULL,
@@ -2187,7 +2218,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 			if (ret < 0) {
 				write_log(0, "IO error in truncate. Data may ");
 				write_log(0, "not be consistent\n");
-				return ret;
+				errcode = ret;
+				goto errcode_handle;
 			}
 		}
 		write_log(10, "Debug truncate update xattr\n");
@@ -2197,7 +2229,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0) {
 			write_log(0, "IO error in truncate. Data may ");
 			write_log(0, "not be consistent\n");
-			return ret;
+			errcode = ret;
+			goto errcode_handle;
 		}
 
 		/* First read from meta file, if need
@@ -2271,7 +2304,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				write_log(0, "not be consistent. ");
 				write_log(0, "Code %d, %s\n", errcode,
 						strerror(errcode));
-				return -EIO;
+				errcode = -EIO;
+				goto errcode_handle;
 			}
 		} else {
 			if (ret_ssize < 0) {
@@ -2280,7 +2314,8 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 				write_log(0, "not be consistent. ");
 				write_log(0, "Code %d, %s\n", errcode,
 						strerror(errcode));
-				return -EIO;
+				errcode = -EIO;
+				goto errcode_handle;
 			}
 		}
 #endif /* _ANDROID_ENV_ */
@@ -2291,12 +2326,14 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	if (ret < 0) {
 		write_log(0, "IO error in truncate. Data may ");
 		write_log(0, "not be consistent\n");
-		return ret;
+		errcode = ret;
+		goto errcode_handle;
 	}
 
-	if (tempfilemeta.local_pin == TRUE) {
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (offset < filestat->st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size +=
+		hcfs_system->systemdata.pinned_size -=
 			(long long)(offset - filestat->st_size);
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
@@ -2316,6 +2353,17 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 
 	return 0;
 errcode_handle:
+	/* If an error occurs, need to revert the changes to pinned size */
+	if ((tempfilemeta.local_pin == TRUE) &&
+	    (offset > filestat->st_size)) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -=
+			(long long)(offset - filestat->st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	return errcode;
 }
 
@@ -3555,6 +3603,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	ino_t thisinode;
 	MOUNT_T *tmpptr;
 	FILE_META_TYPE thisfilemeta;
+	long long sizediff, amount_preallocated;
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
@@ -3605,6 +3654,31 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	}
 	fh_ptr->meta_cache_locked = TRUE;
 
+	/* If the file is pinned, need to change the pinned_size
+	first if necessary */
+	ret = meta_cache_lookup_file_data(fh_ptr->thisinode, &temp_stat,
+			&thisfilemeta, NULL, 0, fh_ptr->meta_cache_ptr);
+	if (ret < 0) {
+		fh_ptr->meta_cache_locked = FALSE;
+		meta_cache_close_file(fh_ptr->meta_cache_ptr);
+		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
+		fuse_reply_err(req, -ret);
+		return;
+	}
+
+	amount_preallocated = 0;
+	if ((thisfilemeta.local_pin == TRUE) &&
+	    ((offset + size) > temp_stat.st_size)) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size +=
+			(long long) ((offset + size) - temp_stat.st_size);
+		amount_preallocated =
+			(long long) ((offset + size) - temp_stat.st_size);
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	for (block_index = start_block; block_index <= end_block;
 							block_index++) {
 		current_offset = (offset+total_bytes_written) % MAX_BLOCK_SIZE;
@@ -3624,8 +3698,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 				meta_cache_close_file(fh_ptr->meta_cache_ptr);
 				meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			}
-			fuse_reply_err(req, -errcode);
-			return;
+			goto errcode_handle;
 		}
 
 		total_bytes_written += this_bytes_written;
@@ -3643,21 +3716,29 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		fh_ptr->meta_cache_locked = FALSE;
 		meta_cache_close_file(fh_ptr->meta_cache_ptr);
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
-		fuse_reply_err(req, -ret);
-		return;
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	if ((thisfilemeta.local_pin == TRUE) &&
+	    ((temp_stat.st_size < (offset + size)) &&
+	     (size > total_bytes_written))) {
+		/* If size written not equal to as planned, need
+		to change pinned_size */
+		/* If offset + total_bytes_written < st_size, substract
+		the difference between size and st_size */
+		if (offset + total_bytes_written < temp_stat.st_size)
+			sizediff = (offset + size) - temp_stat.st_size;
+		else
+			sizediff = size - total_bytes_written;
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -= sizediff;
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
 	}
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
-		if (thisfilemeta.local_pin == TRUE) {
-			sem_wait(&(hcfs_system->access_sem));
-			hcfs_system->systemdata.pinned_size +=
-				(long long) ((offset + total_bytes_written)
-						- temp_stat.st_size);
-			if (hcfs_system->systemdata.pinned_size < 0)
-				hcfs_system->systemdata.pinned_size = 0;
-			sem_post(&(hcfs_system->access_sem));
-		}
-
 		change_system_meta((long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0, 0);
 		ret = change_mount_stat(tmpptr,
@@ -3692,6 +3773,19 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 	fuse_reply_write(req, total_bytes_written);
+	return;
+errcode_handle:
+	/* If op failed and size won't be extended, revert the preallocated
+	pinned space */
+	if (amount_preallocated > 0) {
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -= amount_preallocated;
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+		sem_post(&(hcfs_system->access_sem));
+	}
+	fuse_reply_err(req, -errcode);
+	return;
 }
 
 /************************************************************************
