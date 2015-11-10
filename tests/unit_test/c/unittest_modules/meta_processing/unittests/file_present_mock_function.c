@@ -45,24 +45,41 @@ int meta_cache_update_dir_data(ino_t this_inode, const struct stat *inode_stat,
 
 META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
 {
-	/* Don't care the return value except NULL. It is not used. */
-	return 1; 
+	META_CACHE_ENTRY_STRUCT *tmpptr;
+
+	tmpptr = (META_CACHE_ENTRY_STRUCT *)
+			malloc(sizeof(META_CACHE_ENTRY_STRUCT));
+	tmpptr->fptr = NULL;
+	tmpptr->meta_opened = FALSE;
+	return tmpptr;
 }
 
 int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	free(target_ptr);
 	return 0;
 }
 
 
 int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
 {
+	if (body_ptr->meta_opened == FALSE) {
+		mkdir("tmpdir", 0700);
+		body_ptr->fptr = fopen("tmpdir/testfile", "w");
+		body_ptr->meta_opened = TRUE;
+	}
 	return 0;
 }
 
 
 int meta_cache_close_file(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
+	if ((target_ptr->fptr != NULL) && (target_ptr->meta_opened == TRUE)) {
+		fclose(target_ptr->fptr);
+		unlink("tmpdir/testfile");
+		rmdir("tmpdir");
+		target_ptr->meta_opened = FALSE;
+	}
 	return 0;
 }
 
@@ -196,11 +213,6 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 	return 0;
 }
 
-int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
-{
-	return 0;
-}
-
 int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 {
 	if (this_inode == 1) /* Case of failure */
@@ -217,3 +229,12 @@ int fetch_pinned_blocks(ino_t inode)
 	else
 		return -ENOSPC;
 }
+int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
+{
+	return 0;
+}
+int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
+{
+	return 0;
+}
+

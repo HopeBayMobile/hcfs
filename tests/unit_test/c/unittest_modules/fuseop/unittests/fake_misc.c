@@ -820,4 +820,30 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 {
 	return 0;
 }
+int super_block_mark_dirty(ino_t this_inode)
+{
+	return 0;
+}
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta)
+{
+	return 0;
+}
+int init_pin_scheduler()
+{
+	return 0;
+}
+int destroy_pin_scheduler()
+{
+	return 0;
+}
+int init_download_control()
+{
+	return 0;
+}
+int destroy_download_control()
+{
+	return 0;
+}
 

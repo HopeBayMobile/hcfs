@@ -81,3 +81,47 @@ int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
 {
 	return 0;
 }
+int super_block_mark_dirty(ino_t this_inode)
+{
+	return 0;
+}
+int update_file_stats(FILE *metafptr, long long num_blocks_delta,
+			long long num_cached_blocks_delta,
+			long long cached_size_delta)
+{
+	return 0;
+}
+int change_system_meta(long long system_size_delta,
+	long long cache_size_delta, long long cache_blocks_delta)
+{
+	return 0;
+}
+void get_system_size(long long *cache_size) {
+	*cache_size = 100000;
+}
+int fetch_error_download_path(char *path, ino_t inode)
+{
+	return 0;
+}
+long long seek_page2(FILE_META_TYPE *temp_meta, FILE *fptr,
+		long long target_page, long long hint_page)
+{
+	return 0;
+}
+int meta_cache_update_file_data(ino_t this_inode, const struct stat *inode_stat,
+	const FILE_META_TYPE *file_meta_ptr, const BLOCK_ENTRY_PAGE *block_page,
+	const long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+int meta_cache_lookup_file_data(ino_t this_inode, struct stat *inode_stat,
+	FILE_META_TYPE *file_meta_ptr, BLOCK_ENTRY_PAGE *block_page,
+	long long page_pos, META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+int meta_cache_open_file(META_CACHE_ENTRY_STRUCT *body_ptr)
+{
+	return 0;
+}
+
