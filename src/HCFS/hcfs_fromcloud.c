@@ -510,11 +510,15 @@ static void _fetch_block(void *ptr)
 	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);
-		if (ret == -ENOENT) // Remove block because status is st_cloud
+			" Code %d", __func__, ret);	
+		/* When file is removed, unlink this empty block directly
+		because status of this block is st_cloud */
+		if (ret == -ENOENT) 
 			unlink(block_path);
+
 		goto thread_error;
-	} else if (ret > 0){ /* Status does not match ST_CLOUD */
+	
+	} else if (ret > 0) { /* Status does not match ST_CLOUD */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
@@ -539,8 +543,37 @@ static void _fetch_block(void *ptr)
 			hcfs_system->systemdata.cache_size);
 	} else {
 		ret = errno;
-		write_log(0, "Error: stat error in %s. Code %d\n",
-			__func__, ret);
+		if (ret != ENOENT) {
+			write_log(0, "Error: IO error in %s. Code %d",
+				__func__, ret);
+			goto thread_error;
+		}
+
+		ret = _modify_block_status(block_info, ST_CtoL, ST_CLOUD, 0);
+		if (ret < 0) /* IO error */
+			goto thread_error;
+
+		if (ret == 0) { /* Block disappear? Fetch again later */
+			write_log(0, "Error: block_%"FMT_INO_T"_%lld "
+				"disappered. Fetch again later\n",
+				block_info->this_inode, block_info->block_no);
+			goto thread_error;
+
+		} else if (ret = ST_TODELETE) { /* Block is truncated. Finish */
+			write_log(5, "block_%"FMT_INO_T"_%lld is truncated when"
+				" pinning in %s\n", block_info->this_inode,
+				block_info->block_no, __func__);
+			flock(fileno(block_fptr), LOCK_UN);
+			fclose(block_fptr);
+			return;
+
+		} else { /* Strange.. */
+			write_log(5, "block_%"FMT_INO_T"_%lld has status%d when"
+				" pinning in %s\n", block_info->this_inode,
+				block_info->block_no, ret, __func__);
+			goto thread_error;
+		}
+
 	}
 
 	/* Update status */
@@ -703,9 +736,9 @@ int fetch_pinned_blocks(ino_t inode)
 			break;
 		}
 
-		get_system_size(&cache_size);
+		get_system_size(&cache_size, NULL);
 		if (cache_size > CACHE_HARD_LIMIT) {
-			write_log(0, "Error: Cache space is full.\n");
+			write_log(0, "Error: Pinned space is full.\n");
 			ret_code = -ENOSPC;
 			break;
 		}
@@ -755,9 +788,9 @@ int fetch_pinned_blocks(ino_t inode)
 	}
 	/* Check cache size again */
 	if (ret_code == 0) {
-		get_system_size(&cache_size);
+		get_system_size(&cache_size, NULL);
 		if (cache_size > CACHE_HARD_LIMIT) {
-			write_log(0, "Error: Cache space is full.\n");
+			write_log(0, "Error: Pinned space is full.\n");
 			ret_code = -ENOSPC;
 		}
 	}

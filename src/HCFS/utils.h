@@ -51,7 +51,7 @@ int fetch_ddt_path(char *pathname, unsigned char last_char);
 
 int fetch_error_download_path(char *path, ino_t inode);
 
-void get_system_size(long long *cache_size);
+void get_system_size(long long *cache_size, long long *pinned_size);
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,

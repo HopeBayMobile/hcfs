@@ -1192,11 +1192,13 @@ int fetch_error_download_path(char *path, ino_t inode)
 	return 0;
 }
 
-void get_system_size(long long *cache_size)
+void get_system_size(long long *cache_size, long long *pinned_size)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	if (cache_size)
 		*cache_size = hcfs_system->systemdata.cache_size;
+	if (pinned_size)
+		*pinned_size = hcfs_system->systemdata.pinned_size;
 	sem_post(&(hcfs_system->access_sem));
 }
 
