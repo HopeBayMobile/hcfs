@@ -5,6 +5,7 @@
 #include "hcfscurl.h"
 #include "mock_params.h"
 #include "enc.h"
+#include "meta_mem_cache.h"
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
@@ -71,3 +72,12 @@ int set_block_dirty_status(char *path, FILE *fptr, char status)
 	return 0;
 }
 
+META_CACHE_ENTRY_STRUCT *meta_cache_lock_entry(ino_t this_inode)
+{
+	return 1;
+}
+
+int meta_cache_unlock_entry(META_CACHE_ENTRY_STRUCT *target_ptr)
+{
+	return 0;
+}

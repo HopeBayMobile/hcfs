@@ -2,11 +2,11 @@ extern "C" {
 #include "fuseop.h"
 #include "file_present.h"
 #include "meta_mem_cache.h"
+#include "global.h"
 #include <errno.h>
 }
 #include "gtest/gtest.h"
 #include "mock_param.h"
-
 fuse_req_t req1;
 /*
 	Unittest of meta_forget_inode()
@@ -98,16 +98,6 @@ TEST(fetch_inode_statTest, FetchSymlinkGenerationSuccess)
 /*
  	Unittest of mknod_update_meta()
  */
-
-TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
-{
-	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
-	ino_t parent_inode = 1;
-
-	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0, 1));
-}
-
 TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_SUCCESS;
@@ -116,6 +106,17 @@ TEST(mknod_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFREG;
 
+	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
+		"\0", &tmp_stat, 0, 1));
+}
+
+TEST(mknod_update_metaTest, FailTo_meta_cache_update_file_data)
+{
+	ino_t self_inode = INO_META_CACHE_UPDATE_FILE_FAIL;
+	ino_t parent_inode = 1;
+	struct stat tmp_stat;
+
+	tmp_stat.st_mode = S_IFREG;
 	EXPECT_EQ(-1, mknod_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
 }
@@ -139,16 +140,6 @@ TEST(mknod_update_metaTest, FunctionWorkSuccess)
 /*
 	Unittest of mkdir_update_meta()
  */
-
-TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
-{
-	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
-	ino_t parent_inode = 1;
-
-	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
-		"\0", NULL, 0, 1));
-}
-
 TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 {
 	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_SUCCESS;
@@ -157,6 +148,17 @@ TEST(mkdir_update_metaTest, FailTo_dir_add_entry)
 
 	tmp_stat.st_mode = S_IFDIR;
 
+	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
+		"\0", &tmp_stat, 0, 1));
+}
+
+TEST(mkdir_update_metaTest, FailTo_meta_cache_update_dir_data)
+{
+	ino_t self_inode = INO_META_CACHE_UPDATE_DIR_FAIL;
+	ino_t parent_inode = 1;
+	struct stat tmp_stat;
+
+	tmp_stat.st_mode = S_IFDIR;
 	EXPECT_EQ(-1, mkdir_update_meta(self_inode, parent_inode,
 		"\0", &tmp_stat, 0, 1));
 }
@@ -583,3 +585,94 @@ TEST_F(link_update_metaTest, UpdateMetaSuccess)
 /*
 	End of unittest of link_update_meta()
  */
+
+/* Unittest for pin_inode() */
+class pin_inodeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(pin_inodeTest, FailIn_fetch_inode_stat)
+{
+	ino_t inode = 0;
+
+	EXPECT_EQ(-ENOENT, pin_inode(inode));
+}
+
+TEST_F(pin_inodeTest, FailIn_change_pin_flag)
+{
+	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
+
+	EXPECT_EQ(-ENOMEM, pin_inode(inode));
+}
+
+TEST_F(pin_inodeTest, PinFlagTheSameAsOldOne)
+{
+	ino_t inode = 2;
+
+	EXPECT_EQ(1, pin_inode(inode));
+}
+
+TEST_F(pin_inodeTest, FailIn_fetch_pinned_blocks)
+{
+	ino_t inode = INO_REGFILE;
+
+	fetch_pin_blocks_success = FALSE;
+	EXPECT_EQ(-ENOSPC, pin_inode(inode));
+}
+
+TEST_F(pin_inodeTest, SuccessInPinning)
+{
+	ino_t inode = INO_REGFILE;
+
+	fetch_pin_blocks_success = TRUE;
+	EXPECT_EQ(0, pin_inode(inode));
+}
+/* End of unittest for pin_inode() */
+
+/* Unittest for unpin_inode() */
+class unpin_inodeTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(unpin_inodeTest, FailIn_fetch_inode_stat)
+{
+	ino_t inode = 0;
+
+	EXPECT_EQ(-ENOENT, unpin_inode(inode));
+}
+
+TEST_F(unpin_inodeTest, FailIn_change_pin_flag)
+{
+	ino_t inode = 1; /* this inode # will fail in change_pin_flag() */
+
+	EXPECT_EQ(-ENOMEM, unpin_inode(inode));
+}
+
+TEST_F(unpin_inodeTest, PinFlagTheSameAsOldOne)
+{
+	ino_t inode = 2;
+
+	EXPECT_EQ(1, unpin_inode(inode));
+}
+
+TEST_F(unpin_inodeTest, SuccessInUnpinning)
+{
+	ino_t inode = INO_REGFILE;
+
+	EXPECT_EQ(0, unpin_inode(inode));
+}
+/* End of unittest for unpin_inode() */

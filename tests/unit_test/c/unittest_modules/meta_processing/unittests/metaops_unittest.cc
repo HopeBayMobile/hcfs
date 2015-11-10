@@ -19,6 +19,7 @@ extern "C" {
 #include "fuseop.h"
 #include "params.h"
 #include "metaops.h"
+#include "FS_manager.h"
 }
 #include "gtest/gtest.h"
 
@@ -1126,6 +1127,31 @@ protected:
 	}
 };
 
+#ifdef _ANDROID_ENV_
+TEST_F(actual_delete_inodeTest, FailIn_pathlookup_write_parent)
+{
+	MOUNT_T mount_t;
+
+	pathlookup_write_parent_success = FALSE;
+	EXPECT_EQ(-EIO, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
+		ROOT_INODE, &mount_t));
+
+	pathlookup_write_parent_success = TRUE;
+}
+
+TEST_F(actual_delete_inodeTest, FailIn_delete_pathcache_node)
+{
+	MOUNT_T mount_t;
+
+	mount_t.volume_type = ANDROID_EXTERNAL;
+	delete_pathcache_node_success = FALSE;
+	EXPECT_EQ(-EINVAL, actual_delete_inode(INO_DELETE_DIR, D_ISDIR,
+		ROOT_INODE, &mount_t));
+
+	delete_pathcache_node_success = TRUE;
+}
+#endif
+
 TEST_F(actual_delete_inodeTest, DeleteDirSuccess)
 {
 	MOUNT_T mount_t;
@@ -1515,3 +1541,78 @@ TEST_F(startup_finish_deleteTest, DeleteInodeSuccess)
 /*
 	End of unittest of startup_finish_delete()
  */
+
+/* Unittest for change_pin_flag() */
+class change_pin_flagTest : public ::testing::Test {
+protected:
+	void SetUp()
+	{
+	}
+
+	void TearDown()
+	{
+	}
+};
+
+TEST_F(change_pin_flagTest, MetaCacheLockFail)
+{
+	ino_t inode = INO_LOOKUP_FILE_DATA_OK_LOCK_ENTRY_FAIL;
+
+	EXPECT_EQ(-ENOMEM, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, RegfileHadBeenPinned)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE; 
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinRegfileSuccess)
+{
+	ino_t inode = INO_DIRECT_SUCCESS;
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFREG, TRUE));
+}
+
+TEST_F(change_pin_flagTest, DirHadBeenPinned)
+{
+	ino_t inode = 5452345; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE;
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFDIR, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinDirSuccess)
+{
+	ino_t inode = 3142334; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFDIR, TRUE));
+}
+
+TEST_F(change_pin_flagTest, LinkHadBeenPinned)
+{
+	ino_t inode = 5452345; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = TRUE;
+	EXPECT_EQ(1, change_pin_flag(inode, S_IFLNK, TRUE));
+}
+
+TEST_F(change_pin_flagTest, PinLinkSuccess)
+{
+	ino_t inode = 3142334; /* arbitrary inode */
+
+	/* set pin flag in meta when calling meta_cache_lookup_xxx */
+	pin_flag_in_meta = FALSE; 
+	EXPECT_EQ(0, change_pin_flag(inode, S_IFLNK, TRUE));
+}
+
+/* End of unittest for change_pin_flag() */

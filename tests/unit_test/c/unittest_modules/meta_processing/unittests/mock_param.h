@@ -43,6 +43,8 @@ struct stat to_verified_stat;
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
 #define TRUNC_SIZE 65536
+char pathlookup_write_parent_success;
+char delete_pathcache_node_success;
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213
@@ -69,6 +71,12 @@ struct stat to_verified_stat;
 
 /* link_update_meta() */
 #define INO_TOO_MANY_LINKS 279348
+
+/* pin_inode() */
+char fetch_pin_blocks_success;
+
+/* change_pin_falg */
+char pin_flag_in_meta;
 
 /*
 	INO_SEEK_DIR_ENTRY_OK - meta_cache_seek_dir_entry() return 0 and result_index>=0

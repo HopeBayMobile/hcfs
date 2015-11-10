@@ -1,11 +1,13 @@
 #include <sys/stat.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "mock_param.h"
 
 #include "xattr_ops.h"
 #include "meta_mem_cache.h"
 #include "params.h"
+#include "global.h"
 
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,
@@ -22,6 +24,7 @@ int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 			dir_meta_ptr->next_xattr_page = 0;
 		if (this_inode == INO_DIR_XATTR_PAGE_EXIST)
 			dir_meta_ptr->next_xattr_page = sizeof(XATTR_PAGE);
+		dir_meta_ptr->local_pin = 1;
 	}
 
 	return 0;
@@ -193,3 +196,24 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 	return 0;
 }
 
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+
+int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
+{
+	if (this_inode == 1) /* Case of failure */
+		return -ENOMEM;
+	if (this_inode == 2)
+		return 1; /* Case of the same flag as old one */
+	return 0;
+}
+
+int fetch_pinned_blocks(ino_t inode)
+{
+	if (fetch_pin_blocks_success == TRUE)
+		return 0;
+	else
+		return -ENOSPC;
+}

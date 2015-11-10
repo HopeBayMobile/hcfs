@@ -10,6 +10,7 @@ extern "C"{
 #include "hcfs_fromcloud.h"
 #include "fuseop.h"
 #include "mock_params.h"
+#include "meta_mem_cache.h"
 }
 
 extern SYSTEM_DATA_HEAD *hcfs_system;

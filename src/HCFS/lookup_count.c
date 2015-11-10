@@ -118,6 +118,7 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 			sem_post(&(lookup_table[index].entry_sem));
 			return -ENOMEM;
 		}
+		memset(ptr, 0, sizeof(LOOKUP_NODE_TYPE));
 		ptr->this_inode = this_inode;
 		ptr->lookup_count = amount;
 		ptr->to_delete = FALSE;

@@ -849,6 +849,21 @@ error_handle:
 	return ret_val;
 }
 
+/**
+ * pin_inode
+ *
+ * Pin an inode such that it is in local device. This function will first
+ * change pinning flag and fetch all blocks if it is regular file. In case
+ * of failing in fetch blocks (disconnection, system shutdown, file is 
+ * removed by others, be unpinned when pinning), the pin flag will be set
+ * as "unpin" and return negative error code. If the pin flag had already been
+ * set up, then return 1.
+ *
+ * @param this_inode The inode number that should be pinned.
+ *
+ * @return 0 on success, 1 on case that file had been pinned,
+ *         otherwise negative error code.
+ */
 int pin_inode(ino_t this_inode)
 {
 	int ret, ret2;
@@ -862,11 +877,8 @@ int pin_inode(ino_t this_inode)
 	if (ret < 0) {
 		return ret;
 	} else if (ret > 0) {
-#ifdef ARM_32bit
-		write_log(5, "Debug: inode %lld had been pinned\n", this_inode);
-#else
-		write_log(5, "Debug: inode %ld had been pinned\n", this_inode);
-#endif
+		write_log(5, "Debug: inode %"FMT_INO_T"had been pinned\n",
+								this_inode);
 		return ret;
 	}
 
@@ -874,12 +886,10 @@ int pin_inode(ino_t this_inode)
 	if (S_ISREG(tempstat.st_mode)) {
 		ret = fetch_pinned_blocks(this_inode);
 		if (ret < 0) {
-			ret2 = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
-#ifdef ARM_32bit
-			write_log(0, "Error: Fail to pin inode %lld.\n", this_inode);
-#else
-			write_log(0, "Error: Fail to pin inode %ld.\n", this_inode);
-#endif
+			ret2 = change_pin_flag(this_inode, tempstat.st_mode,
+									FALSE);
+			write_log(0, "Error: Fail to pin inode %"FMT_INO_T"\n",
+				this_inode);
 			write_log(0, "Code %d in %s.\n", -ret, __func__);
 			return ret;
 		}
@@ -888,6 +898,17 @@ int pin_inode(ino_t this_inode)
 	return 0;
 }
 
+/**
+ * unpin_inode
+ *
+ * Unpin an pinned file so that it can be paged out and release more
+ * available space. If the inode had been not pinned, return 1.
+ *
+ * @param this_inode The inode number that should be unpinned.
+ *
+ * @return 0 on success, 1 on case that file had been unpinned,
+ *         otherwise negative error code.
+ */
 int unpin_inode(ino_t this_inode)
 {
 	int ret, ret2;
@@ -899,19 +920,13 @@ int unpin_inode(ino_t this_inode)
 	
 	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
 	if (ret < 0) {
-#ifdef ARM_32bit
-		write_log(0, "Error: Fail to unpin inode %lld. Code %d\n", -ret);
-#else
-		write_log(0, "Error: Fail to unpin inode %ld. Code %d\n", -ret);
-#endif
+		write_log(0, "Error: Fail to unpin inode %"FMT_INO_T"."
+			" Code %d\n", -ret);
 		return ret;
 
 	} else if (ret > 0) {
-#ifdef ARM_32bit
-		write_log(5, "Debug: inode %lld had been unpinned\n", this_inode);
-#else
-		write_log(5, "Debug: inode %ld had been unpinned\n", this_inode);
-#endif
+		write_log(5, "Debug: inode %"FMT_INO_T" had been unpinned\n",
+			this_inode);
 		return ret;
 	}
 

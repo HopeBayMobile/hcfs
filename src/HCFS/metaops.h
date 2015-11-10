@@ -60,4 +60,5 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode);
 int startup_finish_delete(void);
 
 int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
+int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status);
 #endif /* GW20_HCFS_METAOPS_H_ */
