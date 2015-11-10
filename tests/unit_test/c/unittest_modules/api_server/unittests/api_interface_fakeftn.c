@@ -73,3 +73,12 @@ int mount_status(char *fsname)
 	return 0;
 }
 
+int pin_inode(ino_t thisinode)
+{
+	return 0;
+}
+int unpin_inode(ino_t thisinode)
+{
+	return 0;
+}
+

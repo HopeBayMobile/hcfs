@@ -846,6 +846,7 @@ class hfuse_truncateTest : public ::testing::Test {
     hcfs_system->systemdata.system_size = 12800000;
     hcfs_system->systemdata.cache_size = 1200000;
     hcfs_system->systemdata.cache_blocks = 13;
+    hcfs_system->systemdata.pinned_size = 10000;
   }
 
   virtual void TearDown() {

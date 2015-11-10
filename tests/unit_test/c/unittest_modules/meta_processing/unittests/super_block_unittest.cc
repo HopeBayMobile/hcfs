@@ -889,7 +889,7 @@ TEST_F(super_block_new_inodeTest, NoReclaimedNodes)
 	generation = 0;
 
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, FALSE);
 	/* Inode 1 is reserved, so start from 2 */
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since system is empty
 
@@ -941,7 +941,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_ManyReclaimedInodes
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 	
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, FALSE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
@@ -985,7 +985,7 @@ TEST_F(super_block_new_inodeTest, GetInodeFromReclaimedNodes_JustOneReclaimedNod
 		sizeof(SUPER_BLOCK_HEAD), 0); // Write Head
 
 	/* Run */
-	ret_node = super_block_new_inode(&expected_stat, &generation);
+	ret_node = super_block_new_inode(&expected_stat, &generation, FALSE);
 	EXPECT_EQ(2, ret_node); // ret_node == 2 since first_reclaimed = 2
 
 	/* Verify */	
