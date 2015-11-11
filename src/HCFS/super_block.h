@@ -83,7 +83,6 @@ typedef struct {
 	sem_t exclusive_lock_sem;
 	sem_t share_lock_sem;
 	sem_t share_CR_lock_sem;
-	sem_t pin_group_sem;
 	int share_counter;
 } SUPER_BLOCK_CONTROL;
 

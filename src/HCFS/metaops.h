@@ -61,4 +61,9 @@ int startup_finish_delete(void);
 
 int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry);
 int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status);
+
+int collect_dir_child(ino_t this_inode, ino_t **dir_node_list,
+	long long *num_dir_node, ino_t **nondir_node_list,
+	long long *num_nondir_node);
+
 #endif /* GW20_HCFS_METAOPS_H_ */

@@ -305,17 +305,18 @@ int pin_inode_handle(int arg_len, char *largebuf)
 {
 	ino_t pinned_inode;
 	int retcode;
+	long long test_size = 0;
 
 	retcode = 0;
 	/* Error on transforming between 32bit and 64 bit ino_t? */
 	memcpy(&pinned_inode, largebuf, sizeof(ino_t)); 
 	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
 		"arg_len = %d", pinned_inode, sizeof(ino_t), arg_len);
-	// TODO: add semaphore of pinning group of inodes
-	sem_wait(&(sys_super_block->pin_group_sem));
-	retcode = pin_inode(pinned_inode);
-	sem_post(&(sys_super_block->pin_group_sem));
 
+	retcode = pin_inode(pinned_inode, &test_size);
+	if (retcode < 0) {
+		unpin_inode(pinned_inode);
+	}
 	return retcode;
 }
 

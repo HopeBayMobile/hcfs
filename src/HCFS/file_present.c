@@ -36,6 +36,8 @@
 #include "metaops.h"
 #include "path_reconstruct.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 /************************************************************************
 *
 * Function name: meta_forget_inode
@@ -858,6 +860,32 @@ error_handle:
 	return ret_val;
 }
 
+int _increase_pinned_size(long long *reserved_pinned_size, long long file_size)
+{
+	int ret = 0;
+	
+	*reserved_pinned_size -= file_size;
+	if (*reserved_pinned_size >= 0) {
+		return 0;
+
+	} else { /* Need more space than expectation */
+		ret = 0;
+		sem_wait(&(hcfs_system->access_sem));
+		if (hcfs_system->systemdata.pinned_size -
+			(*reserved_pinned_size) <= MAX_PINNED_LIMIT) {
+			hcfs_system->systemdata.pinned_size -=
+				(*reserved_pinned_size);
+			*reserved_pinned_size = 0;
+		} else {
+			ret = -ENOSPC;	
+			*reserved_pinned_size = 0;
+		}
+		sem_post(&(hcfs_system->access_sem));
+
+		return ret;
+	}
+}
+
 /**
  * pin_inode
  *
@@ -873,20 +901,28 @@ error_handle:
  * @return 0 on success, 1 on case that file had been pinned,
  *         otherwise negative error code.
  */
-int pin_inode(ino_t this_inode)
+int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 {
-	int ret, ret2;
+	int ret;
 	struct stat tempstat;
-	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t *dir_node_list, *nondir_node_list;
+	long long count, num_dir_node, num_nondir_node;
 
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
+
+	if (S_ISREG(tempstat.st_mode)) {
+		ret = _increase_pinned_size(reserved_pinned_size,
+			tempstat.st_size);
+		if (ret == -ENOSPC)
+			return ret;
+	}
 	
 	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
 	if (ret < 0) {
 		return ret;
-	} else if (ret > 0) {
+	} else if (ret > 0) { /* Return success if it had been pinned */
 		write_log(5, "Debug: inode %"FMT_INO_T"had been pinned\n",
 								this_inode);
 		return ret;
@@ -895,6 +931,47 @@ int pin_inode(ino_t this_inode)
 	ret = super_block_mark_pin(this_inode, tempstat.st_mode);
 	if (ret < 0)
 		return ret;
+
+	/* After pinning self, pin all its children for dir */
+	if (S_ISREG(tempstat.st_mode)) {
+		return 0;
+	
+	} else if (S_ISLNK(tempstat.st_mode)) {
+		return 0;
+	
+	} else { /* expand dir */
+		ret = collect_dir_child(this_inode, &dir_node_list,
+			&num_dir_node, &nondir_node_list, &num_nondir_node);
+		if (ret < 0)
+			return ret;
+
+		/* first pin regfile & symlink */
+		for (count = 0; count < num_nondir_node; count++) {
+			ret = pin_inode(nondir_node_list[count],
+				reserved_pinned_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(nondir_node_list);
+			free(dir_node_list);
+			return ret;
+		}
+		free(nondir_node_list);
+
+		/* pin dir */
+		for (count = 0; count < num_dir_node; count++) {
+			ret = pin_inode(dir_node_list[count],
+				reserved_pinned_size);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(dir_node_list);
+			return ret;
+		}
+		free(dir_node_list);
+	}
 
 	return 0;
 }
@@ -912,9 +989,10 @@ int pin_inode(ino_t this_inode)
  */
 int unpin_inode(ino_t this_inode)
 {
-	int ret, ret2;
+	int ret;
 	struct stat tempstat;
-	SUPER_BLOCK_ENTRY sb_entry;
+	ino_t *dir_node_list, *nondir_node_list;
+	long long count, num_dir_node, num_nondir_node;
 
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
@@ -935,6 +1013,46 @@ int unpin_inode(ino_t this_inode)
 	ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
 	if (ret < 0)
 		return ret;
+
+
+	/* After unpinning itself, unpin all its children for dir */
+	if (S_ISREG(tempstat.st_mode)) {
+		return 0;
+	
+	} else if (S_ISLNK(tempstat.st_mode)) {
+		return 0;
+	
+	} else { /* expand dir */
+		ret = collect_dir_child(this_inode, &dir_node_list,
+			&num_dir_node, &nondir_node_list, &num_nondir_node);
+		if (ret < 0)
+			return ret;
+
+		/* first unpin regfile & symlink */
+		for (count = 0; count < num_nondir_node; count++) {
+			ret = unpin_inode(nondir_node_list[count]);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(nondir_node_list);
+			free(dir_node_list);
+			return ret;
+		}
+		free(nondir_node_list);
+
+		/* unpin dir */
+		for (count = 0; count < num_dir_node; count++) {
+			ret = unpin_inode(dir_node_list[count]);
+			if (ret < 0)
+				break;
+		}
+		if (ret < 0) {
+			free(dir_node_list);
+			return ret;
+		}
+		free(dir_node_list);
+	}
 
 	return 0;
 }

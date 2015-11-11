@@ -1685,3 +1685,130 @@ error_handling:
 	return ret_code;
 }
 
+
+int _check_size(ino_t **ptr, long long num_elem, long long full_elem)
+{
+	ino_t *tmp_ptr;
+
+	if (num_elem >= full_elem) {
+		tmp_ptr = malloc(sizeof(ino_t) * full_elem * 2);
+		if (tmp_ptr == NULL)
+			return -ENOMEM;
+		memcpy(tmp_ptr, *ptr, sizeof(ino_t) * num_elem);
+		free(*ptr);
+		*ptr = tmp_ptr;
+	}
+	return 0;
+}
+
+int collect_dir_child(ino_t this_inode, 
+	ino_t **dir_node_list, long long *num_dir_node,
+	ino_t **nondir_node_list, long long *num_nondir_node)
+{
+	char metapath[300];
+	FILE *fptr;
+	int ret, errcode;
+	int count;
+	long long ret_size, now_page_pos;
+	long long total_children, half;
+	DIR_META_TYPE dir_meta;
+	DIR_ENTRY_PAGE dir_page;
+	DIR_ENTRY *tmpentry;
+	ino_t *tmp_ptr;
+
+	ret = fetch_meta_path(metapath, this_inode);
+	if (ret < 0)
+		return ret;
+
+	fptr = fopen(metapath, "r");
+	if (fptr == NULL) {
+		ret = errno;
+		return -ret;
+	}
+
+	flock(fileno(fptr), LOCK_EX);
+	if (access(metapath, F_OK) < 0)
+		return -ENOENT;
+
+	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
+	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
+	total_children = dir_meta.total_children;
+	now_page_pos = dir_meta.tree_walk_list_head;
+
+	half = total_children / 2 + 1; /* Avoid zero malloc */
+	*dir_node_list = malloc(sizeof(ino_t) * half);
+	*nondir_node_list = malloc(sizeof(ino_t) * half);
+	if (*dir_node_list == NULL || *nondir_node_list == NULL) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return -ENOMEM;
+	}
+
+	*num_dir_node = 0;
+	*num_nondir_node = 0;
+	while (now_page_pos) {
+		FSEEK(fptr, now_page_pos, SEEK_SET);
+		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
+
+		for (count = 0; count < dir_page.num_entries; count++) {
+
+			tmpentry = &(dir_page.dir_entries[count]);
+			if (tmpentry->d_type == D_ISDIR) {
+				ret = _check_size(dir_node_list, 
+						*num_dir_node, half);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				*dir_node_list[*num_dir_node] = tmpentry->d_ino;
+				(*num_dir_node)++;
+
+			} else {
+				ret = _check_size(nondir_node_list, 
+						*num_nondir_node, half);
+				if (ret < 0) {
+					errcode = ret;
+					goto errcode_handle;
+				}
+				*nondir_node_list[*num_nondir_node] = 
+								tmpentry->d_ino;
+				(*num_nondir_node)++;
+			}
+		}
+
+		now_page_pos = dir_page.tree_walk_next;
+	}
+
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+
+	int i;
+	for (i=0 ; i< *num_nondir_node ; i++)
+		write_log(10, "Debug: inode %"FMT_INO_T" is collected\n",
+			*nondir_node_list[i]);
+
+	tmp_ptr = realloc(*dir_node_list, sizeof(ino_t) * *num_dir_node);
+	if (tmp_ptr == NULL) {
+		free(*dir_node_list);
+		free(*nondir_node_list);
+		return -ENOMEM;
+	}
+	*dir_node_list = tmp_ptr;
+
+	tmp_ptr = realloc(*nondir_node_list, sizeof(ino_t) * *num_nondir_node);
+	if (tmp_ptr == NULL) {
+		free(*dir_node_list);
+		free(*nondir_node_list);
+		return -ENOMEM;
+	}
+	*nondir_node_list = tmp_ptr;
+
+	return 0;
+
+errcode_handle:
+	flock(fileno(fptr), LOCK_UN);
+	fclose(fptr);
+	free(*dir_node_list);
+	free(*nondir_node_list);
+	return errcode;	
+}

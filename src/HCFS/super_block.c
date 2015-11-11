@@ -187,7 +187,6 @@ int super_block_init(void)
 	sem_init(&(sys_super_block->exclusive_lock_sem), 1, 1);
 	sem_init(&(sys_super_block->share_lock_sem), 1, 1);
 	sem_init(&(sys_super_block->share_CR_lock_sem), 1, 1);
-	sem_init(&(sys_super_block->pin_group_sem), 1, 1);
 	sys_super_block->share_counter = 0;
 
 	sys_super_block->iofptr = open(SUPERBLOCK, O_RDWR);
@@ -1535,3 +1534,4 @@ int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 error_handling:
 	return ret;	
 }
+
