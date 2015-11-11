@@ -297,6 +297,9 @@ int main(int argc, char **argv)
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
 		exit(ret_val);
+	ret_val = init_dirstat_lookup();
+	if (ret_val < 0)
+		exit(ret_val);
 
 	open_log("hcfs_android_log");
 	write_log(2, "\nStart logging\n");
@@ -319,8 +322,16 @@ int main(int argc, char **argv)
 		pthread_join(upload_loop_thread, NULL);
 	}
 	close_log();
+	destroy_dirstat_lookup();
 	destroy_pathlookup();
 #else
+	ret_val = init_pathlookup();
+	if (ret_val < 0)
+		exit(ret_val);
+	ret_val = init_dirstat_lookup();
+	if (ret_val < 0)
+		exit(ret_val);
+
 	this_pid = fork();
 	if (this_pid == 0) {
 		open_log("cache_maintain_log");
@@ -356,6 +367,8 @@ int main(int argc, char **argv)
 			close_log();
 		}
 	}
+	destroy_dirstat_lookup();
+	destroy_pathlookup();
 #endif  /* _ANDROID_ENV_ */
 	return 0;
 }

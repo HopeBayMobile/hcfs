@@ -2,8 +2,11 @@ CC = gcc
 CPPFLAGS = -DDEDUP_ENABLE=0 -DENCRYPT_ENABLE=1 -DCOMPRESS_ENABLE=0 -D_FILE_OFFSET_BITS=64 -DARM_32bit_ -D_ANDROID_ENV_
 CFLAGS = -g -lfuse -lcurl -pthread -lssl -lcrypto -Wall -Wextra
 
-hcfs: objmeta.o mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o path_reconstruct.o pin_scheduling.o
-	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o objmeta.o path_reconstruct.o pin_scheduling.o -lfuse -lcurl -pthread -lssl -lcrypto
+hcfs: objmeta.o mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o path_reconstruct.o pin_scheduling.o dir_statistics.o
+	$(CC) -g -o hcfs mount_manager.o FS_manager.o api_interface.o logger.o lookup_count.o file_present.o hfuse_system.o utils.o super_block.o fuseop.o metaops.o filetables.o hcfscurl.o hcfs_tocloud.o hcfs_fromcloud.o hcfs_cacheops.o hcfs_clouddelete.o hcfs_cachebuild.o b64encode.o meta_mem_cache.o dir_entry_btree.o xattr_ops.o enc.o compress.o dedup_table.o objmeta.o path_reconstruct.o pin_scheduling.o dir_statistics.o -lfuse -lcurl -pthread -lssl -lcrypto
+
+dir_statistics.o: dir_statistics.c dir_statistics.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c dir_statistics.c
 
 path_reconstruct.o: path_reconstruct.c path_reconstruct.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c path_reconstruct.c
