@@ -33,13 +33,50 @@
  *************************************************************************/
 void monitor_loop()
 {
+	struct timespec timenow;
+	struct timespec idle_time;
+	struct timespec _100_millisecond = {0, 100 * 1000000};
+	int ret;
+
+	write_log(2, "Start monitor loop\n");
+
 #ifdef _ANDROID_ENV_
 	prctl(PR_SET_NAME, "monitor_loop");
 #endif /* _ANDROID_ENV_ */
 
-	write_log(2, "Start monitor loop\n");
-
 	while (hcfs_system->system_going_down == FALSE) {
-		sleep(1);
+		clock_gettime(CLOCK_REALTIME, &timenow);
+		idle_time = diff_time(hcfs_system->access_time, timenow);
+		if (idle_time.tv_sec >= MONITOR_INTERVAL) {
+			/* TODO: check backend */
+		}
+		ret = nanosleep(&_100_millisecond, NULL);
+		if (ret == -1 && errno == EINTR) {
+			write_log(2, "monitor_loop is interrupted by signal\n");
+			break;
+		}
 	}
+	return;
+}
+
+/**************************************************************************
+ *
+ * Function name: diff_time
+ *        Inputs: timespec start
+ *                timespec end
+ *       Summary: Calculate time duration between [start] and [end]
+ *  Return value: Type timespec, duration between [start] and [end]
+ *
+ *************************************************************************/
+struct timespec diff_time(struct timespec start, struct timespec end)
+{
+	struct timespec temp;
+	if ((end.tv_nsec - start.tv_nsec) < 0) {
+		temp.tv_sec = end.tv_sec - start.tv_sec - 1;
+		temp.tv_nsec = 1000000000 + end.tv_nsec - start.tv_nsec;
+	} else {
+		temp.tv_sec = end.tv_sec - start.tv_sec;
+		temp.tv_nsec = end.tv_nsec - start.tv_nsec;
+	}
+	return temp;
 }

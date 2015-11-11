@@ -177,6 +177,7 @@ typedef struct {
 	SYSTEM_DATA_TYPE systemdata;
 	char system_going_down;
 	char backend_is_online;
+	struct timespec access_time;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
 	sem_t check_cache_sem;

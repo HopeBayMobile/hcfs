@@ -82,6 +82,7 @@ typedef struct {
 #define METAPATHLEN 400
 #define BLOCKPATHLEN 400
 #define MAX_FILENAME_LEN 255
+#define MONITOR_INTERVAL 10
 
 #define NUMSUBDIR 1000
 
