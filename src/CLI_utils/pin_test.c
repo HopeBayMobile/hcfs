@@ -33,6 +33,8 @@ void main(int argc, char **argv)
 	char *ptr;
 	struct stat tempstat;
 	ino_t this_inode;
+	long long reserved_size = 0;
+	unsigned int num_inodes = 1;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -63,6 +65,32 @@ void main(int argc, char **argv)
 	printf("status is %d, err %s\n", status, strerror(errno));
 	switch (code) {
 	case PIN:
+
+		cmd_len = sizeof(long long);
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &reserved_size, sizeof(long long), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0) {
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+			break;
+		}
+
+		size_msg = send(fd, &num_inodes, sizeof(unsigned int), 0);
+		size_msg = send(fd, &this_inode, sizeof(ino_t), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		else if (retcode == 1)
+			printf("It had been %s. Do not do that again.\n",
+				code == PIN ? "pinned" : "unpinned");
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
 	case UNPIN:
 		cmd_len = sizeof(ino_t);
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);

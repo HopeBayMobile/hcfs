@@ -55,6 +55,6 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry);
 
 int pin_inode(ino_t this_inode, long long *reserved_pinned_size);
-int unpin_inode(ino_t);
+int unpin_inode(ino_t this_inode, long long *reserved_release_size);
 
 #endif /* GW20_HCFS_FILE_PRESENT_H_ */

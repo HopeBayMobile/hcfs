@@ -860,7 +860,8 @@ error_handle:
 	return ret_val;
 }
 
-int _increase_pinned_size(long long *reserved_pinned_size, long long file_size)
+static int _increase_pinned_size(long long *reserved_pinned_size,
+		long long file_size)
 {
 	int ret = 0;
 	
@@ -912,25 +913,29 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	if (ret < 0)
 		return ret;
 
-	if (S_ISREG(tempstat.st_mode)) {
-		ret = _increase_pinned_size(reserved_pinned_size,
-			tempstat.st_size);
-		if (ret == -ENOSPC)
-			return ret;
-	}
 	
 	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
 	if (ret < 0) {
 		return ret;
-	} else if (ret > 0) { /* Return success if it had been pinned */
+	
+	} else if (ret > 0) {
+	/* Do not need to change pinned size */
 		write_log(5, "Debug: inode %"FMT_INO_T"had been pinned\n",
 								this_inode);
-		return ret;
+	} else { /* Succeed in pinning */
+		/* Change pinned size if succeding in pinning this inode. */
+		if (S_ISREG(tempstat.st_mode)) {
+			ret = _increase_pinned_size(reserved_pinned_size,
+					tempstat.st_size);
+			if (ret == -ENOSPC)
+				return ret;
+		}
+
+		ret = super_block_mark_pin(this_inode, tempstat.st_mode);
+		if (ret < 0)
+			return ret;
 	}
 
-	ret = super_block_mark_pin(this_inode, tempstat.st_mode);
-	if (ret < 0)
-		return ret;
 
 	/* After pinning self, pin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
@@ -946,6 +951,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			return ret;
 
 		/* first pin regfile & symlink */
+		ret = 0;
 		for (count = 0; count < num_nondir_node; count++) {
 			ret = pin_inode(nondir_node_list[count],
 				reserved_pinned_size);
@@ -957,9 +963,11 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			free(dir_node_list);
 			return ret;
 		}
-		free(nondir_node_list);
+		if (num_nondir_node > 0)
+			free(nondir_node_list);
 
 		/* pin dir */
+		ret = 0;
 		for (count = 0; count < num_dir_node; count++) {
 			ret = pin_inode(dir_node_list[count],
 				reserved_pinned_size);
@@ -970,11 +978,31 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 			free(dir_node_list);
 			return ret;
 		}
-		free(dir_node_list);
+		if (num_dir_node > 0)
+			free(dir_node_list);
 	}
 
 	return 0;
 }
+
+
+int _decrease_pinned_size(long long *reserved_release_size, long long file_size)
+{
+	*reserved_release_size -= file_size;
+	if (*reserved_release_size < 0) {
+		sem_wait(&(hcfs_system->access_sem));
+
+		hcfs_system->systemdata.pinned_size += (*reserved_release_size);
+		*reserved_release_size = 0;
+		if (hcfs_system->systemdata.pinned_size <= 0)
+			hcfs_system->systemdata.pinned_size = 0;
+	
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	return 0;
+}
+
 
 /**
  * unpin_inode
@@ -987,7 +1015,8 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
  * @return 0 on success, 1 on case that file had been unpinned,
  *         otherwise negative error code.
  */
-int unpin_inode(ino_t this_inode)
+
+int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 {
 	int ret;
 	struct stat tempstat;
@@ -997,7 +1026,8 @@ int unpin_inode(ino_t this_inode)
 	ret = fetch_inode_stat(this_inode, &tempstat, NULL, NULL);
 	if (ret < 0)
 		return ret;
-	
+
+
 	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to unpin inode %"FMT_INO_T"."
@@ -1005,15 +1035,21 @@ int unpin_inode(ino_t this_inode)
 		return ret;
 
 	} else if (ret > 0) {
+	/* Do not need to change pinned size */
 		write_log(5, "Debug: inode %"FMT_INO_T" had been unpinned\n",
 			this_inode);
-		return ret;
+	
+	} else { /* Succeed in unpinning */
+
+		/* Deduct from reserved size */
+		if (S_ISREG(tempstat.st_mode))
+			 _decrease_pinned_size(reserved_release_size,
+			 		tempstat.st_size);
+
+		ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
+		if (ret < 0)
+			return ret;
 	}
-
-	ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
-	if (ret < 0)
-		return ret;
-
 
 	/* After unpinning itself, unpin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
@@ -1029,8 +1065,10 @@ int unpin_inode(ino_t this_inode)
 			return ret;
 
 		/* first unpin regfile & symlink */
+		ret = 0;
 		for (count = 0; count < num_nondir_node; count++) {
-			ret = unpin_inode(nondir_node_list[count]);
+			ret = unpin_inode(nondir_node_list[count],
+				reserved_release_size);
 			if (ret < 0)
 				break;
 		}
@@ -1039,11 +1077,14 @@ int unpin_inode(ino_t this_inode)
 			free(dir_node_list);
 			return ret;
 		}
-		free(nondir_node_list);
+		if (num_nondir_node > 0)
+			free(nondir_node_list);
 
 		/* unpin dir */
+		ret = 0;
 		for (count = 0; count < num_dir_node; count++) {
-			ret = unpin_inode(dir_node_list[count]);
+			ret = unpin_inode(dir_node_list[count],
+				reserved_release_size);
 			if (ret < 0)
 				break;
 		}
@@ -1051,7 +1092,8 @@ int unpin_inode(ino_t this_inode)
 			free(dir_node_list);
 			return ret;
 		}
-		free(dir_node_list);
+		if (num_dir_node > 0)
+			free(dir_node_list);
 	}
 
 	return 0;

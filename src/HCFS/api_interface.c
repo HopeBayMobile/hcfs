@@ -34,6 +34,8 @@
 #include "fuseop.h"
 #include "super_block.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
 /* TODO: Perhaps should decrease the number of threads if loading not heavy */
@@ -301,22 +303,55 @@ int unmount_all_handle(void)
 	return ret;
 }
 
-int pin_inode_handle(int arg_len, char *largebuf)
+int pin_inode_handle(ino_t *pinned_list, int num_inode,
+		long long total_reserved_size)
 {
-	ino_t pinned_inode;
-	int retcode;
-	long long test_size = 0;
+	int retcode, count, count2;
+	long long total_reserved_size_bak;
 
 	retcode = 0;
-	/* Error on transforming between 32bit and 64 bit ino_t? */
-	memcpy(&pinned_inode, largebuf, sizeof(ino_t)); 
-	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
-		"arg_len = %d", pinned_inode, sizeof(ino_t), arg_len);
 
-	retcode = pin_inode(pinned_inode, &test_size);
-	if (retcode < 0) {
-		unpin_inode(pinned_inode);
+	total_reserved_size_bak = total_reserved_size;
+	
+	for (count = 0; count < num_inode; count++) {
+		write_log(10, "Debug: inode is "FMT_INO_T"\n", pinned_list[count]);
+		retcode = pin_inode(pinned_list[count], &total_reserved_size);
+		if (retcode < 0) {
+			/* Roll back */
+			total_reserved_size = total_reserved_size_bak;
+			for (count2 = 0; count2 <= count; count2++)
+				unpin_inode(pinned_list[count2],
+							&total_reserved_size);
+
+			/* Give pinned space back */
+			sem_wait(&(hcfs_system->access_sem));
+			if (total_reserved_size > 0) /* Return ALL size */
+				hcfs_system->systemdata.pinned_size -=
+					total_reserved_size_bak;
+			if (hcfs_system->systemdata.pinned_size < 0)
+				hcfs_system->systemdata.pinned_size = 0;
+			sem_post(&(hcfs_system->access_sem));
+
+			return retcode;
+		}
 	}
+		
+	/* Remaining size, return these space */
+	if (total_reserved_size > 0) { 
+		write_log(10, "Debug: Remaining reserved pinned size %lld\n",
+				total_reserved_size);
+		sem_wait(&(hcfs_system->access_sem));
+		hcfs_system->systemdata.pinned_size -=
+			total_reserved_size;
+
+		if (hcfs_system->systemdata.pinned_size < 0)
+			hcfs_system->systemdata.pinned_size = 0;
+
+		sem_post(&(hcfs_system->access_sem));
+	}
+
+	write_log(10, "Debug: After pinning, now pinned size is %lld\n", 
+			hcfs_system->systemdata.pinned_size);
 	return retcode;
 }
 
@@ -324,12 +359,18 @@ int unpin_inode_handle(int arg_len, char *largebuf)
 {
 	ino_t unpinned_inode;
 	int retcode;
+	long long zero_reserved_size;
 
 	retcode = 0;
 	memcpy(&unpinned_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug: inode_num = %lld, sizeof(ino_t) = %d, "
 		"arg_len = %d", unpinned_inode, sizeof(ino_t), arg_len);
-	retcode = unpin_inode(unpinned_inode);
+
+	zero_reserved_size = 0;
+	retcode = unpin_inode(unpinned_inode, &zero_reserved_size);
+
+	write_log(10, "Debug: After unpinning, now pinned size is %lld\n", 
+		hcfs_system->systemdata.pinned_size);
 
 	return retcode;
 }
@@ -365,6 +406,10 @@ void api_module(void *index)
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
+
+	long long reserved_pinned_size;
+	unsigned int num_inode;
+	ino_t *pinned_list;
 
 	timer.tv_sec = 0;
 	timer.tv_nsec = 100000000;
@@ -474,7 +519,42 @@ void api_module(void *index)
 
 		switch (api_code) {
 		case PIN:
-			retcode = pin_inode_handle(arg_len, largebuf);
+			memcpy(&reserved_pinned_size, largebuf,
+				sizeof(long long));
+			
+			/* Check required size */
+			sem_wait(&(hcfs_system->access_sem));
+			if (hcfs_system->systemdata.pinned_size +
+				reserved_pinned_size >= MAX_PINNED_LIMIT) {
+				retcode = -ENOSPC;
+				break;
+			} else {
+				hcfs_system->systemdata.pinned_size +=
+					reserved_pinned_size;
+			}		
+			sem_post(&(hcfs_system->access_sem));
+
+			/* Return ok, prepare to get inode list */
+			retcode = 0;
+			send(fd1, &retcode, sizeof(int), 0);
+			write_log(10, "Debug: in %s: %d, retcode %d\n",
+					__func__, __LINE__, retcode);
+
+			/* Receive inode */
+			recv(fd1, &num_inode, sizeof(unsigned int), 0);
+			write_log(10, "Debug: in %s: %d, retcode %d, num_inode = %d\n",
+					__func__, __LINE__, retcode, num_inode);
+			pinned_list = malloc(sizeof(ino_t) * num_inode);
+			if (pinned_list == NULL) {
+				retcode = -ENOMEM;
+				break;
+			}
+
+			recv(fd1, pinned_list, sizeof(ino_t) * num_inode, 0);
+			retcode = pin_inode_handle(pinned_list, num_inode,
+							reserved_pinned_size);
+			free(pinned_list);
+
 			if (retcode == 0) {
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(unsigned int), 0);

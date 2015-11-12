@@ -1686,18 +1686,49 @@ error_handling:
 }
 
 
-int _check_size(ino_t **ptr, long long num_elem, long long full_elem)
+static int _check_extend_size(ino_t **ptr, long long num_elem,
+	long long *max_elem_size)
 {
 	ino_t *tmp_ptr;
 
-	if (num_elem >= full_elem) {
-		tmp_ptr = malloc(sizeof(ino_t) * full_elem * 2);
+	if (num_elem >= *max_elem_size) {
+		*max_elem_size *= 2;
+		tmp_ptr = malloc(sizeof(ino_t) * (*max_elem_size));
 		if (tmp_ptr == NULL)
 			return -ENOMEM;
 		memcpy(tmp_ptr, *ptr, sizeof(ino_t) * num_elem);
 		free(*ptr);
 		*ptr = tmp_ptr;
 	}
+	return 0;
+}
+
+
+static int _check_shrink_size(ino_t **ptr, long long num_elem,
+	long long max_elem_size)
+{	
+	ino_t *tmp_ptr;
+
+	if (num_elem == 0) {
+		free(*ptr);
+		*ptr = NULL;
+		return 0;
+	}
+
+	if (num_elem == max_elem_size)
+		return 0;
+	else if(num_elem > max_elem_size) {
+		write_log(0, "Error: Memory out of bound in %s", __func__);
+		return -ENOMEM;
+	}
+
+	tmp_ptr = malloc(sizeof(ino_t) * num_elem);
+	if (tmp_ptr == NULL)
+		return -ENOMEM;
+	memcpy(tmp_ptr, *ptr, sizeof(ino_t) * num_elem);
+	free(*ptr);
+	*ptr = tmp_ptr;
+
 	return 0;
 }
 
@@ -1710,11 +1741,10 @@ int collect_dir_child(ino_t this_inode,
 	int ret, errcode;
 	int count;
 	long long ret_size, now_page_pos;
-	long long total_children, half;
+	long long total_children, half, now_nondir_size, now_dir_size;
 	DIR_META_TYPE dir_meta;
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
-	ino_t *tmp_ptr;
 
 	ret = fetch_meta_path(metapath, this_inode);
 	if (ret < 0)
@@ -1723,29 +1753,40 @@ int collect_dir_child(ino_t this_inode,
 	fptr = fopen(metapath, "r");
 	if (fptr == NULL) {
 		ret = errno;
+		write_log(0, "Fail to open meta %"FMT_INO_T" in %s. Code %d\n",
+			this_inode, __func__, ret);
 		return -ret;
 	}
 
+	*num_dir_node = 0;
+	*num_nondir_node = 0;
+	
 	flock(fileno(fptr), LOCK_EX);
-	if (access(metapath, F_OK) < 0)
+	if (access(metapath, F_OK) < 0) {
+		write_log(5, "meta %"FMT_INO_T" does not exist in %s\n",
+			this_inode, __func__);
 		return -ENOENT;
+	}
 
 	FSEEK(fptr, sizeof(struct stat), SEEK_SET);
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	total_children = dir_meta.total_children;
 	now_page_pos = dir_meta.tree_walk_list_head;
+	if (total_children == 0 || now_page_pos == 0)
+		return 0;
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
-	*dir_node_list = malloc(sizeof(ino_t) * half);
-	*nondir_node_list = malloc(sizeof(ino_t) * half);
-	if (*dir_node_list == NULL || *nondir_node_list == NULL) {
+	now_dir_size = half;
+	now_nondir_size = half;
+	*dir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_dir_size);
+	*nondir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_nondir_size);
+	if ((*dir_node_list == NULL) || (*nondir_node_list == NULL)) {
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		return -ENOMEM;
 	}
 
-	*num_dir_node = 0;
-	*num_nondir_node = 0;
+	/* Collect all file in this dir */
 	while (now_page_pos) {
 		FSEEK(fptr, now_page_pos, SEEK_SET);
 		FREAD(&dir_page, sizeof(DIR_ENTRY_PAGE), 1, fptr);
@@ -1753,24 +1794,29 @@ int collect_dir_child(ino_t this_inode,
 		for (count = 0; count < dir_page.num_entries; count++) {
 
 			tmpentry = &(dir_page.dir_entries[count]);
+			if (!strcmp(tmpentry->d_name, ".") ||
+				!strcmp(tmpentry->d_name, ".."))
+				continue;
+
 			if (tmpentry->d_type == D_ISDIR) {
-				ret = _check_size(dir_node_list, 
-						*num_dir_node, half);
+				ret = _check_extend_size(dir_node_list, 
+					*num_dir_node, &now_dir_size);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
-				*dir_node_list[*num_dir_node] = tmpentry->d_ino;
+				(*dir_node_list)[*num_dir_node] =
+								tmpentry->d_ino;
 				(*num_dir_node)++;
 
 			} else {
-				ret = _check_size(nondir_node_list, 
-						*num_nondir_node, half);
+				ret = _check_extend_size(nondir_node_list, 
+					*num_nondir_node, &now_nondir_size);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
-				*nondir_node_list[*num_nondir_node] = 
+				(*nondir_node_list)[*num_nondir_node] = 
 								tmpentry->d_ino;
 				(*num_nondir_node)++;
 			}
@@ -1782,26 +1828,33 @@ int collect_dir_child(ino_t this_inode,
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
 
-	int i;
-	for (i=0 ; i< *num_nondir_node ; i++)
-		write_log(10, "Debug: inode %"FMT_INO_T" is collected\n",
-			*nondir_node_list[i]);
+	//int i;
+	//for (i=0 ; i < *num_nondir_node ; i++)
+	//	write_log(10, "Debug: inode %"FMT_INO_T" is collected\n",
+	//		(*nondir_node_list)[i]);
 
-	tmp_ptr = realloc(*dir_node_list, sizeof(ino_t) * *num_dir_node);
-	if (tmp_ptr == NULL) {
+	/* Shrink dir_node_list size */
+	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to malloc in %s\n", __func__);
 		free(*dir_node_list);
 		free(*nondir_node_list);
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
 		return -ENOMEM;
 	}
-	*dir_node_list = tmp_ptr;
 
-	tmp_ptr = realloc(*nondir_node_list, sizeof(ino_t) * *num_nondir_node);
-	if (tmp_ptr == NULL) {
+	/* Shrink nondir_node_list size */
+	ret = _check_shrink_size(nondir_node_list, *num_nondir_node,
+			now_nondir_size);
+	if (ret < 0) {
+		write_log(0, "Error: Fail to malloc in %s\n", __func__);
 		free(*dir_node_list);
 		free(*nondir_node_list);
+		*dir_node_list = NULL;
+		*nondir_node_list = NULL;
 		return -ENOMEM;
 	}
-	*nondir_node_list = tmp_ptr;
 
 	return 0;
 
@@ -1810,5 +1863,8 @@ errcode_handle:
 	fclose(fptr);
 	free(*dir_node_list);
 	free(*nondir_node_list);
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
 	return errcode;	
 }
