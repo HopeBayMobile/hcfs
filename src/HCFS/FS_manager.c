@@ -240,13 +240,19 @@ ino_t _create_root_inode(void)
 	this_meta.local_pin = DEFAULT_PIN;
 	FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 	this_meta.metaver = CURRENT_META_VER;
-#ifdef _ANDROID_ENV_
+
+	/* Init parent lookup. Root inode does not have a parent */
 	ret = pathlookup_write_parent(root_inode, 0);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;
 	}
-#endif
+	/* Init the dir stat for this node */
+	ret = reset_dirstat_lookup(root_inode);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
 
 	FWRITE(&this_meta, sizeof(DIR_META_TYPE), 1, metafptr);
 

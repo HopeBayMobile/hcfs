@@ -251,7 +251,8 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 			FWRITE(&(temppage), sizeof(BLOCK_ENTRY_PAGE), 1,
 			       metafptr);
 			ret = update_file_stats(metafptr, 0, 1,
-						tempstat.st_size);
+						tempstat.st_size,
+						ptr->this_inode);
 			if (ret < 0) {
 				errcode = ret;
 				goto errcode_handle;
@@ -460,7 +461,8 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 			return ret;
 		}
 		ret = update_file_stats(meta_cache_entry->fptr, 0,
-					1, cache_size_delta);
+					1, cache_size_delta,
+					block_info->this_inode);
 		if (ret < 0) {
 			return ret;
 		}

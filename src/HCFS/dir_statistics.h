@@ -30,7 +30,8 @@ int init_dirstat_lookup();
 void destroy_dirstat_lookup();
 
 int reset_dirstat_lookup(ino_t thisinode);
-int update_dirstat_lookup(ino_t baseinode, DIR_STATS_TYPE *newstat);
+int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat);
+int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat);
 int read_dirstat_lookup(ino_t thisinode, DIR_STATS_TYPE *newstat);
 
 #endif  /* GW20_HCFS_DIR_STATISTICS_H_ */

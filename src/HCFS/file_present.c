@@ -15,6 +15,8 @@
 *
 **************************************************************************/
 
+/* TODO: Will need to remove parent update from actual_delete_inode */
+
 #include "file_present.h"
 
 #include <semaphore.h>
@@ -35,6 +37,7 @@
 #include "xattr_ops.h"
 #include "metaops.h"
 #include "path_reconstruct.h"
+#include "dir_statistics.h"
 
 /************************************************************************
 *
@@ -274,11 +277,25 @@ int mknod_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 
 	/* Add path lookup table */
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	ret_val = sem_wait(&(pathlookup_data_lock));
 	if (ret_val < 0)
 		return ret_val;
-#endif
+	ret_val = lookup_add_parent(self_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+	/* Storage location for new file is local */
+	DIR_STATS_TYPE tmpstat;
+	tmpstat.num_local = 1;
+	tmpstat.num_cloud = 0;
+	tmpstat.num_hybrid = 0;
+	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+	sem_post(&(pathlookup_data_lock));
 
 	return 0;
 errcode_handle:
@@ -387,11 +404,20 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	if (ret_val < 0)
 		return ret_val;
 
-#ifdef _ANDROID_ENV_
-	ret_val = pathlookup_write_parent(self_inode, parent_inode);
+	ret_val = sem_wait(&(pathlookup_data_lock));
 	if (ret_val < 0)
 		return ret_val;
-#endif
+	ret_val = lookup_add_parent(self_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+
+	/* Init the dir stat for this node */
+	ret_val = reset_dirstat_lookup(parent_inode);
+	if (ret_val < 0) {
+		return ret_val;
+	}
 
 	return 0;
 
@@ -420,24 +446,31 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 {
 	int ret_val;
 	ino_t this_inode;
-	META_CACHE_ENTRY_STRUCT *body_ptr;
+	META_CACHE_ENTRY_STRUCT *parent_ptr, *self_ptr;
+	DIR_STATS_TYPE tmpstat;
+	char entry_type;
 
 	this_inode = this_entry->d_ino;
 
-	body_ptr = meta_cache_lock_entry(parent_inode);
-	if (body_ptr == NULL)
+	parent_ptr = meta_cache_lock_entry(parent_inode);
+	if (parent_ptr == NULL)
 		return -ENOMEM;
 
+	self_ptr = meta_cache_lock_entry(this_inode);
+	if (self_ptr == NULL)
+		return -ENOMEM;
+
+	entry_type = this_entry->d_type;
 	/* Remove entry */
 	if (this_entry->d_type == D_ISREG) {
 		write_log(10, "Debug unlink_update_meta(): remove regfile.\n");
 		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFREG, body_ptr);
+			this_entry->d_name, S_IFREG, parent_ptr);
 	}
 	if (this_entry->d_type == D_ISLNK) {
 		write_log(10, "Debug unlink_update_meta(): remove symlink.\n");
 		ret_val = dir_remove_entry(parent_inode, this_inode,
-			this_entry->d_name, S_IFLNK, body_ptr);
+			this_entry->d_name, S_IFLNK, parent_ptr);
 	}
 	if (this_entry->d_type == D_ISDIR) {
 		write_log(0, "Error in unlink_update_meta(): unlink a dir.\n");
@@ -446,22 +479,74 @@ int unlink_update_meta(fuse_req_t req, ino_t parent_inode,
 	if (ret_val < 0)
 		goto error_handling;
 
-	ret_val = meta_cache_close_file(body_ptr);
+	ret_val = meta_cache_close_file(parent_ptr);
 	if (ret_val < 0) {
-		meta_cache_unlock_entry(body_ptr);
+		meta_cache_unlock_entry(parent_ptr);
 		return ret_val;
 	}
-	ret_val = meta_cache_unlock_entry(body_ptr);
+	ret_val = meta_cache_unlock_entry(parent_ptr);
 	if (ret_val < 0)
 		return ret_val;
 
+	/* If file being unlinked, need to update dir statistics */
+	if (entry_type == D_ISREG) {
+		/* Check location for deleted file*/
+		ret_val = meta_cache_open_file(self_ptr);
+		if (ret_val < 0) {
+			meta_cache_unlock_entry(self_ptr);
+			return ret_val;
+		}
+
+		ret_val = check_file_storage_location(self_ptr->fptr, &tmpstat);
+		if (ret_val < 0) {
+			meta_cache_close_file(self_ptr);
+			meta_cache_unlock_entry(self_ptr);
+			return ret_val;
+		}
+	}
+
+	ret_val = meta_cache_close_file(self_ptr);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(self_ptr);
+		return ret_val;
+	}
+	ret_val = meta_cache_unlock_entry(self_ptr);
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Process unlink for the file / symlink being unlinked */
 	ret_val = decrease_nlink_inode_file(req, this_inode);
+	if (ret_val < 0)
+		return ret_val;
+
+	/* Delete path lookup table */
+	ret_val = sem_wait(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		return ret_val;
+	ret_val = lookup_delete_parent(this_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+
+	/* If file being unlinked, need to update dir statistics */
+	if (entry_type == D_ISREG) {
+		tmpstat.num_local = -tmpstat.num_local;
+		tmpstat.num_cloud = -tmpstat.num_cloud;
+		tmpstat.num_hybrid = -tmpstat.num_hybrid;
+		ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+		if (ret_val < 0) {
+			sem_post(&(pathlookup_data_lock));
+			return ret_val;
+		}
+	}
+	sem_post(&(pathlookup_data_lock));
 
 	return ret_val;
 
 error_handling:
-	meta_cache_close_file(body_ptr);
-	meta_cache_unlock_entry(body_ptr);
+	meta_cache_close_file(parent_ptr);
+	meta_cache_unlock_entry(parent_ptr);
 
 	return ret_val;
 }
@@ -532,6 +617,20 @@ int rmdir_update_meta(fuse_req_t req, ino_t parent_inode, ino_t this_inode,
 
 	/* Deferring actual deletion to forget */
 	ret_val = mark_inode_delete(req, this_inode);
+
+	/* Delete parent lookup entry */
+	ret_val = sem_wait(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		return ret_val;
+	ret_val = lookup_delete_parent(this_inode, parent_inode);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_val;
+	}
+
+	sem_post(&(pathlookup_data_lock));
+
+	reset_dirstat_lookup(this_inode);
 
 	return ret_val;
 
@@ -635,11 +734,15 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 	if (ret_code < 0)
 		return ret_code;
 
-#ifdef _ANDROID_ENV_
-	ret_code = pathlookup_write_parent(self_inode, parent_inode);
+	ret_code = sem_wait(&(pathlookup_data_lock));
 	if (ret_code < 0)
 		return ret_code;
-#endif
+	ret_code = lookup_add_parent(self_inode, parent_inode);
+	if (ret_code < 0) {
+		sem_post(&(pathlookup_data_lock));
+		return ret_code;
+	}
+	sem_post(&(pathlookup_data_lock));
 
 	return 0;
 }
@@ -790,43 +893,51 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry)
 {
-	META_CACHE_ENTRY_STRUCT *link_meta_cache_entry;
-	struct link_stat;
+	META_CACHE_ENTRY_STRUCT *link_entry;
+	FILE_META_TYPE filemeta;
 	int ret_val;
 	ino_t parent_inode;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 
-	/* Fetch stat and generation */
-	ret_val = fetch_inode_stat(link_inode, link_stat, generation, NULL);
+	link_entry = meta_cache_lock_entry(link_inode);
+	if (!link_entry) {
+		write_log(0, "Lock entry fails in %s\n", __func__);
+		return -ENOMEM;
+	}
+	/* Fetch stat and file meta */
+	ret_val = meta_cache_lookup_file_data(link_inode, link_stat,
+			&filemeta, NULL, 0, link_entry);
 	if (ret_val < 0)
-		return ret_val;
+		goto error_handle;
+
+	*generation = filemeta.generation;
 
 	/* Hard link to dir is not allowed */
 	if (S_ISDIR(link_stat->st_mode)) {
 		write_log(0, "Hard link to a dir is not allowed.\n");
-		return -EISDIR;
+		ret_val = -EISDIR;
+		goto error_handle;
 	}
 
 	/* Check number of links */
 	if (link_stat->st_nlink >= MAX_HARD_LINK) {
 		write_log(0, "Too many links for this file, now %ld links",
 			link_stat->st_nlink);
-		return -EMLINK;
+		ret_val = -EMLINK;
+		goto error_handle;
 	}
 
 	link_stat->st_nlink++; /* Hard link ++ */
 	write_log(10, "Debug: inode %lld has %lld links\n",
 		link_inode, link_stat->st_nlink);
 
-	/* Update only stat */
-	link_meta_cache_entry = meta_cache_lock_entry(link_inode);
-	if (!link_meta_cache_entry) {
-		write_log(0, "Lock entry fails in %s\n", __func__);
-		return -ENOMEM;
-	}
+	ret_val = meta_cache_open_file(link_inode);
+	if (ret_val < 0)
+		goto error_handle;
+
 	ret_val = meta_cache_update_file_data(link_inode, link_stat,
-			NULL, NULL, 0, link_meta_cache_entry);
+			NULL, NULL, 0, link_entry);
 	if (ret_val < 0)
 		goto error_handle;
 
@@ -836,25 +947,49 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	if (ret_val < 0) {
 		link_stat->st_nlink--; /* Recover nlink */
 		meta_cache_update_file_data(link_inode, link_stat,
-			NULL, NULL, 0, link_meta_cache_entry);
+			NULL, NULL, 0, link_entry);
 		goto error_handle;
 	}
 
-	/* Unlock meta cache entry */
-	ret_val = meta_cache_close_file(link_meta_cache_entry);
+	/* Add path lookup table */
+	ret_val = sem_wait(&(pathlookup_data_lock));
+	if (ret_val < 0)
+		goto error_handle;
+	ret_val = lookup_add_parent(link_inode, parent_inode);
 	if (ret_val < 0) {
-		meta_cache_unlock_entry(link_meta_cache_entry);
+		sem_post(&(pathlookup_data_lock));
+		goto error_handle;
+	}
+
+	/* Check location for linked file and update parent to root */
+	DIR_STATS_TYPE tmpstat;
+	ret_val = check_file_storage_location(link_entry->fptr, &tmpstat);
+	if (ret_val < 0)
+		goto error_handle;
+
+	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		goto error_handle;
+	}
+	sem_post(&(pathlookup_data_lock));
+
+	/* Unlock meta cache entry */
+	ret_val = meta_cache_close_file(link_entry);
+	if (ret_val < 0) {
+		meta_cache_unlock_entry(link_entry);
 		return ret_val;
 	}
-	ret_val = meta_cache_unlock_entry(link_meta_cache_entry);
+
+	ret_val = meta_cache_unlock_entry(link_entry);
 	if (ret_val < 0)
 		return ret_val;
 
 	return 0;
 
 error_handle:
-	meta_cache_close_file(link_meta_cache_entry);
-	meta_cache_unlock_entry(link_meta_cache_entry);
+	meta_cache_close_file(link_entry);
+	meta_cache_unlock_entry(link_entry);
 	return ret_val;
 }
 

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <semaphore.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 #include "macro.h"
 #include "path_reconstruct.h"
@@ -110,23 +111,26 @@ errcode_handle:
 
 /************************************************************************
 *
-* Function name: update_dirstat_lookup
-*        Inputs: ino_t baseinode, DIR_STATS_TYPE *newstat
+* Function name: update_dirstat_file
+*        Inputs: ino_t thisinode, DIR_STATS_TYPE *newstat
 *       Summary: Change the dir statistics using the delta specified in
-*                "*newstat", for all inodes on the tree path from "baseinode"
-*                to the root. "baseinode" needs to be a directory.
+*                "*newstat", for all inodes on the tree path from the
+*                parents of "thisinode" to the root.
+*                "thisinode" is the file with the location type change.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int update_dirstat_lookup(ino_t baseinode, DIR_STATS_TYPE *newstat)
+int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
 	ino_t current_inode, parent_inode;
+	ino_t *parentlist;
 	int errcode, ret;
+	int numparents, count;
 	ssize_t ret_ssize;
 
-	if (baseinode <= 0)
+	if (thisinode <= 0)
 		return -EINVAL;
 	ret = sem_wait(&(pathlookup_data_lock));
 	if (ret < 0) {
@@ -136,6 +140,72 @@ int update_dirstat_lookup(ino_t baseinode, DIR_STATS_TYPE *newstat)
 		errcode = -errcode;
 		return errcode;
 	}
+	parentlist = NULL;
+	ret = fetch_all_parents(thisinode, &numparents, parentlist);
+	if (ret < 0) {
+		errcode = ret;
+		goto errcode_handle;
+	}
+
+	for (count = 0; count < numparents; count++) {
+		current_inode = parentlist[count];
+		while (current_inode > 0) {
+			/* Update the statistics of the current inode */
+			filepos = (off_t) ((current_inode - 1) *
+			                    sizeof(DIR_STATS_TYPE));
+			PREAD(fileno(dirstat_lookup_data_fptr), &tmpstat,
+			       sizeof(DIR_STATS_TYPE), filepos);
+			tmpstat.num_local += newstat->num_local;
+			tmpstat.num_cloud += newstat->num_cloud;
+			tmpstat.num_hybrid += newstat->num_hybrid;
+			PWRITE(fileno(dirstat_lookup_data_fptr), &tmpstat,
+			       sizeof(DIR_STATS_TYPE), filepos);
+			/* Find the parent */
+			filepos = (off_t) ((current_inode - 1) * sizeof(ino_t));
+			PREAD(fileno(pathlookup_data_fptr), &parent_inode,
+			      sizeof(ino_t), filepos);
+			current_inode = parent_inode;
+		}
+	}
+
+	free(parentlist);
+	parentlist = NULL;
+	sem_post(&(pathlookup_data_lock));
+	return 0;
+errcode_handle:
+	if (parentlist != NULL) {
+		free(parentlist);
+		parentlist = NULL;
+	}
+	sem_post(&(pathlookup_data_lock));
+	return errcode;
+}
+
+/************************************************************************
+*
+* Function name: update_dirstat_parent
+*        Inputs: ino_t baseinode, DIR_STATS_TYPE *newstat
+*       Summary: Change the dir statistics using the delta specified in
+*                "*newstat", for all inodes on the tree path from "baseinode"
+*                "baseinode" to the root.
+*                pathlookup_data_lock should be locked before calling.
+*  Return value: 0 if successful. Otherwise returns negation of error code.
+*
+*************************************************************************/
+int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
+{
+	DIR_STATS_TYPE tmpstat;
+	off_t filepos;
+	ino_t current_inode, parent_inode;
+	int errcode, ret;
+	ssize_t ret_ssize;
+	int sem_val;
+
+	if (baseinode <= 0)
+		return -EINVAL;
+	ret = sem_getvalue(&(pathlookup_data_lock), &sem_val);
+	if ((sem_val > 0) || (ret < 0))
+		return -EINVAL;
 
 	current_inode = baseinode;
 	while (current_inode > 0) {
@@ -156,10 +226,8 @@ int update_dirstat_lookup(ino_t baseinode, DIR_STATS_TYPE *newstat)
 		current_inode = parent_inode;
 	}
 
-	sem_post(&(pathlookup_data_lock));
 	return 0;
 errcode_handle:
-	sem_post(&(pathlookup_data_lock));
 	return errcode;
 }
 

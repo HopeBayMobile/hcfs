@@ -83,6 +83,7 @@
 #include "FS_manager.h"
 #include "path_reconstruct.h"
 #include "pin_scheduling.h"
+#include "dir_statistics.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -911,7 +912,7 @@ static void hfuse_ll_mkdir(fuse_req_t req, fuse_ino_t parent,
 void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 			const char *selfname)
 {
-	ino_t parent_inode;
+	ino_t parent_inode, this_inode;
 	int ret_val;
 	DIR_ENTRY temp_dentry;
 	struct stat parent_stat;
@@ -962,12 +963,20 @@ void hfuse_ll_unlink(fuse_req_t req, fuse_ino_t parent,
 		fuse_reply_err(req, -ret_val);
 		return;
 	}
+	this_inode = temp_dentry.d_ino;
 
 	ret_val = unlink_update_meta(req, parent_inode, &temp_dentry);
-	if (ret_val < 0)
-		ret_val = -ret_val;
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+						this_inode);
+#endif
 
-	fuse_reply_err(req, ret_val);
+	fuse_reply_err(req, -ret_val);
 }
 
 /************************************************************************
@@ -1040,8 +1049,7 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 	if (ret_val < 0) {
-		ret_val = -ret_val;
-		fuse_reply_err(req, ret_val);
+		fuse_reply_err(req, -ret_val);
 		return;
 	}
 
@@ -1050,9 +1058,18 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 			temp_dentry.d_name, this_inode);
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
-	if (ret_val < 0)
-		ret_val = -ret_val;
-	fuse_reply_err(req, ret_val);
+	if (ret_val < 0) {
+		fuse_reply_err(req, -ret_val);
+		return;
+	}
+
+#ifdef _ANDROID_ENV_
+	if (tmpptr->volume_type == ANDROID_EXTERNAL)
+		ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+						this_inode);
+#endif
+
+	fuse_reply_err(req, -ret_val);
 }
 
 /************************************************************************
@@ -1257,6 +1274,7 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 	int temp_index;
 	struct stat parent_stat1, parent_stat2;
 	MOUNT_T *tmpptr;
+	DIR_STATS_TYPE tmpstat;
 
 	parent_inode1 = real_ino(req, parent);
 	parent_inode2 = real_ino(req, newparent);
@@ -1494,9 +1512,33 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
+		/* If reg file being unlinked, need to update dir statistics */
+		if (S_ISREG(old_target_mode)) {
+			/* Check location for deleted file*/
+			ret_val = meta_cache_open_file(old_target_ptr);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+
+			ret_val = check_file_storage_location(
+					old_target_ptr->fptr, &tmpstat);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
 		meta_cache_close_file(old_target_ptr);
 		meta_cache_unlock_entry(old_target_ptr);
 
+		/* Delete the old target */
 		if (S_ISDIR(old_target_mode)) {
 			/* Deferring actual deletion to forget */
 			ret_val = mark_inode_delete(req, old_target_inode);
@@ -1504,13 +1546,67 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			ret_val = decrease_nlink_inode_file(req,
 					old_target_inode);
 		}
-		old_target_ptr = NULL;
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
 			fuse_reply_err(req, -ret_val);
 			return;
 		}
+
+		/* Delete parent lookup entry for the old target*/
+		ret_val = sem_wait(&(pathlookup_data_lock));
+		if (ret_val < 0) {
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+		ret_val = lookup_delete_parent(old_target_inode, parent_inode2);
+		if (ret_val < 0) {
+			sem_post(&(pathlookup_data_lock));
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+
+		/* If this is a regular file, undo the dir statistics */
+		if (S_ISREG(old_target_mode)) {
+			tmpstat.num_local = -tmpstat.num_local;
+			tmpstat.num_cloud = -tmpstat.num_cloud;
+			tmpstat.num_hybrid = -tmpstat.num_hybrid;
+			ret_val = update_dirstat_parent(parent_inode2,
+						        &tmpstat);
+			if (ret_val < 0) {
+				sem_post(&(pathlookup_data_lock));
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
+		sem_post(&(pathlookup_data_lock));
+
+		/* If this is a directory, reset the dir statistics */
+		if (S_ISDIR(old_target_mode)) {
+			ret_val = reset_dirstat_lookup(old_target_inode);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
+#ifdef _ANDROID_ENV_
+		/* Clear path cache entry if needed */
+		if (tmpptr->volume_type == ANDROID_EXTERNAL)
+			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
+						old_target_inode);
+#endif
+
+		old_target_ptr = NULL;
 	} else {
 		/* If newpath does not exist, add the new entry */
 		ret_val = dir_add_entry(parent_inode2, self_inode,
@@ -1545,9 +1641,46 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 	}
-#ifdef _ANDROID_ENV_
+
+	/* If a file or directory is moved to another parent, statistics for
+	the path from the old parent to the root and for the path from the
+	new parent to the root are changed.*/
 	if (parent_inode1 != parent_inode2) {
-		ret_val = pathlookup_write_parent(self_inode, parent_inode2);
+		if (S_ISDIR(self_mode)) {
+			/* If this inode is a directory, find the dir stat */
+			ret_val = read_dirstat_lookup(self_inode, &tmpstat);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+		if (S_ISREG(self_mode)) {
+			/* Check location for this file*/
+			ret_val = meta_cache_open_file(body_ptr);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+
+			ret_val = check_file_storage_location(body_ptr->fptr,
+							      &tmpstat);
+			if (ret_val < 0) {
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+
+
+		ret_val = sem_wait(&(pathlookup_data_lock));
 		if (ret_val < 0) {
 			_cleanup_rename(body_ptr, old_target_ptr,
 					parent1_ptr, parent2_ptr);
@@ -1556,6 +1689,47 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 			return;
 		}
 
+		/* Change the parent lookup for source inode */
+		ret_val = lookup_replace_parent(self_inode, parent_inode1,
+		                                parent_inode2);
+		if (ret_val < 0) {
+			sem_post(&(pathlookup_data_lock));
+			_cleanup_rename(body_ptr, old_target_ptr,
+					parent1_ptr, parent2_ptr);
+			meta_cache_remove(self_inode);
+			fuse_reply_err(req, -ret_val);
+			return;
+		}
+		/* Process changes to dir statistics */
+		if ((S_ISDIR(self_mode)) || (S_ISREG(self_mode))) {
+			ret_val = update_dirstat_parent(parent_inode2,
+							&tmpstat);
+			if (ret_val < 0) {
+				sem_post(&(pathlookup_data_lock));
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+
+			tmpstat.num_local = -tmpstat.num_local;
+			tmpstat.num_cloud = -tmpstat.num_cloud;
+			tmpstat.num_hybrid = -tmpstat.num_hybrid;
+			ret_val = update_dirstat_parent(parent_inode1,
+							&tmpstat);
+			if (ret_val < 0) {
+				sem_post(&(pathlookup_data_lock));
+				_cleanup_rename(body_ptr, old_target_ptr,
+						parent1_ptr, parent2_ptr);
+				meta_cache_remove(self_inode);
+				fuse_reply_err(req, -ret_val);
+				return;
+			}
+		}
+		sem_post(&(pathlookup_data_lock));
+
+#ifdef _ANDROID_ENV_
 		if (tmpptr->volume_type == ANDROID_EXTERNAL) {
 			ret_val = delete_pathcache_node(tmpptr->vol_path_cache,
 							self_inode);
@@ -1567,9 +1741,8 @@ void hfuse_ll_rename(fuse_req_t req, fuse_ino_t parent,
 				return;
 			}
 		}
-
-	}
 #endif
+	}
 	_cleanup_rename(body_ptr, old_target_ptr,
 			parent1_ptr, parent2_ptr);
 
@@ -1717,7 +1890,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 		change_system_meta(0, -total_deleted_cache,
 				-total_deleted_blocks);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
-				-total_deleted_blocks, -total_deleted_cache);
+				-total_deleted_blocks, -total_deleted_cache,
+				inode_index);
 		if (ret < 0) {
 			errcode = ret;
 			goto errcode_handle;
@@ -1925,7 +2099,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0)
 			return ret;
 		ret = update_file_stats((*body_ptr)->fptr, 0,
-				cache_block_delta, cache_delta);
+				cache_block_delta, cache_delta, this_inode);
 		if (ret < 0) {
 			meta_cache_close_file(*body_ptr);
 			return ret;
@@ -1995,7 +2169,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		if (ret < 0)
 			return ret;
 		ret = update_file_stats((*body_ptr)->fptr, 0,
-				cache_block_delta, cache_delta);
+				cache_block_delta, cache_delta, this_inode);
 		if (ret < 0) {
 			meta_cache_close_file(*body_ptr);
 			return ret;
@@ -2696,7 +2870,8 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-					1, tempstat2.st_size);
+						1, tempstat2.st_size,
+						fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
 			ret = super_block_mark_dirty(fh_ptr->thisinode);
@@ -3280,7 +3455,8 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 			if (ret < 0)
 				goto error_handling;
 			ret = update_file_stats(tmpptr->fptr, 0,
-					1, tempstat2.st_size);
+						1, tempstat2.st_size,
+						fh_ptr->thisinode);
 			if (ret < 0)
 				goto error_handling;
 		}
@@ -3473,7 +3649,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 				return 0;
 			}
 			ret = update_file_stats(tmpptr->fptr, 1,
-					1, 0);
+						1, 0, fh_ptr->thisinode);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
 				*reterr = ret;
@@ -3564,7 +3740,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			return 0;
 		}
 		ret = update_file_stats(tmpptr->fptr, 0,
-					0, new_cache_size - old_cache_size);
+					0, new_cache_size - old_cache_size,
+					fh_ptr->thisinode);
 		if (ret < 0) {
 			sem_post(&(fh_ptr->block_sem));
 			*reterr = ret;
