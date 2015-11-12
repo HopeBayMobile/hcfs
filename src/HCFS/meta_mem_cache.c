@@ -30,13 +30,13 @@
 #include "logger.h"
 #include "utils.h"
 
-/* If cache lock not locked, return -1*/
+/* If cache lock not locked, return -EINVAL*/
 #define _ASSERT_CACHE_LOCK_IS_LOCKED_(ptr_sem) \
 	{ \
 		int sem_val; \
 		sem_getvalue((ptr_sem), &sem_val); \
 		if (sem_val > 0) \
-			return -1; \
+			return -EINVAL; \
 	}
 /* TODO: Consider whether want to use write-back mode for meta caching */
 

@@ -1202,24 +1202,80 @@ void get_system_size(long long *cache_size, long long *pinned_size)
 	sem_post(&(hcfs_system->access_sem));
 }
 
+static inline void _translate_storage_location(FILE_STATS_TYPE *in,
+					DIR_STATS_TYPE *out)
+{
+	/* Find out what's the original storage location */
+	memset(out, 0, sizeof(DIR_STATS_TYPE));
+	if ((in->num_blocks == 0) ||
+	    (in->num_blocks == in->num_cached_blocks)) {
+		/* If local */
+		out->num_local = 1;
+	} else if (in->num_cached_blocks == 0) {
+		/* If cloud */
+		out->num_cloud = 1;
+	} else {
+		out->num_hybrid = 1;
+	}
+}
+
 /* Helper for updating per-file statistics in fuseop.c */
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta)
+			long long cached_size_delta, ino_t thisinode)
+{
+	int ret, errcode;
+	size_t ret_size;
+	FILE_STATS_TYPE meta_stats;
+	DIR_STATS_TYPE olddirstats, newdirstats, diffstats;
+
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+
+	_translate_storage_location(&meta_stats, &olddirstats);
+	meta_stats.num_blocks += num_blocks_delta;
+	meta_stats.num_cached_blocks += num_cached_blocks_delta;
+	meta_stats.cached_size += cached_size_delta;
+	_translate_storage_location(&meta_stats, &newdirstats);
+
+	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+		SEEK_SET);
+	FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+
+	diffstats.num_local = newdirstats.num_local - olddirstats.num_local;
+	diffstats.num_cloud = newdirstats.num_cloud - olddirstats.num_cloud;
+	diffstats.num_hybrid = newdirstats.num_hybrid - olddirstats.num_hybrid;
+
+	/* If the storage location of the file changes, need to update
+	all parents to root */
+	if ((diffstats.num_local != 0) ||
+	    ((diffstats.num_cloud != 0) ||
+	     (diffstats.num_hybrid != 0))) {
+		ret = update_dirstat_file(thisinode, &diffstats);
+		if (ret < 0) {
+			errcode = ret;
+			goto errcode_handle;
+		}
+	}
+
+	return 0;
+errcode_handle:
+	return errcode;
+}
+
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat)
 {
 	int ret, errcode;
 	size_t ret_size;
 	FILE_STATS_TYPE meta_stats;
 
-	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
+	FSEEK(fptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
 		SEEK_SET);
-	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
-	meta_stats.num_blocks += num_blocks_delta;
-	meta_stats.num_cached_blocks += num_cached_blocks_delta;
-	meta_stats.cached_size += cached_size_delta;
-	FSEEK(metafptr, sizeof(struct stat) + sizeof(FILE_META_TYPE),
-		SEEK_SET);
-	FWRITE(&meta_stats, sizeof(FILE_STATS_TYPE), 1, metafptr);
+	FREAD(&meta_stats, sizeof(FILE_STATS_TYPE), 1, fptr);
+
+	_translate_storage_location(&meta_stats, newstat);
+
 	return 0;
 errcode_handle:
 	return errcode;

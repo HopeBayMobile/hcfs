@@ -17,6 +17,17 @@
 #define TRUE 1
 #define FALSE 0
 
+/* Defines the version of the current meta defs */
+#define CURRENT_META_VER 3
+#define BACKWARD_COMPATIBILITY 3
+/* TODO: force backward compability check when reading meta file */
+
+#define X64 1
+#define ARM_32BIT 2
+#define ANDROID_32BIT 3
+
+#define ARCH_CODE ANDROID_32BIT
+
 /* List of API codes */
 #define TERMINATE 0
 #define VOLSTAT 1
@@ -32,5 +43,15 @@
 #define UNMOUNTALL 11
 #define PIN 12
 #define UNPIN 13
+#define CHECKDIRSTAT 14
+
+#define DEFAULT_PIN FALSE
+
+/* Print format for ino_t is different in raspberry pi */
+#ifdef ARM_32bit_
+#define FMT_INO_T "lld"
+#else
+#define FMT_INO_T "ld"
+#endif
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <stdio.h>
 
+#include "dir_statistics.h"
+
 /*BEGIN string utility definition*/
 
 /*Will copy the filename of the meta file to pathname*/
@@ -55,6 +57,8 @@ void get_system_size(long long *cache_size, long long *pinned_size);
 
 int update_file_stats(FILE *metafptr, long long num_blocks_delta,
 			long long num_cached_blocks_delta,
-			long long cached_size_delta);
+			long long cached_size_delta, ino_t thisinode);
+/* Function for checking if a file is local, cloud, or hybrid */
+int check_file_storage_location(FILE *fptr,  DIR_STATS_TYPE *newstat);
 
 #endif  /* GW20_SRC_UTILS_H_ */

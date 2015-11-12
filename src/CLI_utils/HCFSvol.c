@@ -30,6 +30,8 @@ void main(int argc, char **argv)
 	char buf[4096];
 	DIR_ENTRY *tmp;
 	char *ptr;
+	ino_t tmpino;
+	long long num_local, num_cloud, num_hybrid;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -53,6 +55,8 @@ void main(int argc, char **argv)
 		code = CHECKMOUNT;
 	else if (strcasecmp(argv[1], "unmountall") == 0)
 		code = UNMOUNTALL;
+	else if (strcasecmp(argv[1], "checknode") == 0)
+		code = CHECKDIRSTAT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -123,6 +127,26 @@ void main(int argc, char **argv)
 				-retcode, strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
+		break;
+	case CHECKDIRSTAT:
+		tmpino = atol(argv[2]);
+		cmd_len = sizeof(ino_t);
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		if (reply_len == (3 * sizeof(long long))) {
+			size_msg = recv(fd, &num_local, sizeof(long long), 0);
+			size_msg = recv(fd, &num_cloud, sizeof(long long), 0);
+			size_msg = recv(fd, &num_hybrid, sizeof(long long), 0);
+			printf("Reply len %d\n", reply_len);
+			printf("Num: local %lld, cloud %lld, hybrid %lld\n",
+				num_local, num_cloud, num_hybrid);
+		} else {
+			size_msg = recv(fd, &retcode, sizeof(int), 0);
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		}
 		break;
 	case MOUNTFS:
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);

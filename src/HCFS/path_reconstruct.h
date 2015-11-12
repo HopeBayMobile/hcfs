@@ -69,5 +69,11 @@ int init_pathlookup();
 void destroy_pathlookup();
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode);
 int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr);
+int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t *parentlist);
+int lookup_add_parent(ino_t self_inode, ino_t parent_inode);
+int lookup_delete_parent(ino_t self_inode, ino_t parent_inode);
+int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
+			  ino_t parent_inode2);
+
 #endif  /* GW20_HCFS_PATH_RECONSTRUCT_H_ */
 

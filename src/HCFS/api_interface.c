@@ -34,6 +34,7 @@
 #include "fuseop.h"
 #include "super_block.h"
 #include "file_present.h"
+#include "dir_statistics.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -396,6 +397,24 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 	return retcode;
 }
 
+int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstat)
+{
+	ino_t target_inode;
+	int retcode;
+
+	memcpy(&target_inode, largebuf, sizeof(ino_t));
+	write_log(10, "Debug API: target inode %"FMT_INO_T"\n", target_inode);
+	retcode = read_dirstat_lookup(target_inode, tmpstat);
+	if (retcode < 0) {
+		tmpstat->num_local = retcode;
+		tmpstat->num_cloud = retcode;
+		tmpstat->num_hybrid = retcode;
+	}
+	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
+		tmpstat->num_local, tmpstat->num_cloud, tmpstat->num_hybrid);
+	return retcode;
+}
+
 /************************************************************************
 *
 * Function name: api_module
@@ -427,6 +446,7 @@ void api_module(void *index)
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
+	DIR_STATS_TYPE tmpstat;
 
 	long long reserved_pinned_size;
 	unsigned int num_inode, i;
@@ -602,6 +622,20 @@ void api_module(void *index)
 				ret_len = sizeof(int);
 				send(fd1, &ret_len, sizeof(unsigned int), 0);
 				send(fd1, &retcode, sizeof(int), 0);
+			}
+			break;
+		case CHECKDIRSTAT:
+			retcode = check_dir_stat_handle(arg_len, largebuf,
+							&tmpstat);
+			if (retcode == 0) {
+				ret_len = 3 * sizeof(long long);
+				send(fd1, &ret_len, sizeof(unsigned int), 0);
+				send(fd1, &(tmpstat.num_local),
+				     sizeof(long long), 0);
+				send(fd1, &(tmpstat.num_cloud),
+				     sizeof(long long), 0);
+				send(fd1, &(tmpstat.num_hybrid),
+				     sizeof(long long), 0);
 			}
 			break;
 		case TERMINATE:
