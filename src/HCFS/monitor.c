@@ -53,8 +53,14 @@ void monitor_loop()
 		clock_gettime(CLOCK_REALTIME, &timenow);
 		idle_time = diff_time(hcfs_system->access_time, timenow);
 		if (idle_time.tv_sec >= MONITOR_INTERVAL) {
-			/* TODO: check backend */
-
+			ret = hcfs_test_backend(&monitor_curl_handle);
+			if (ret == HTTP_204_NO_CONTENT) {
+				hcfs_system->backend_is_online = 1;
+			} else {
+				hcfs_system->backend_is_online = 0;
+			}
+			hcfs_system->access_time.tv_sec = timenow.tv_sec;
+			hcfs_system->access_time.tv_nsec = timenow.tv_nsec;
 		}
 		/* wait 0.1 second */
 		ret = nanosleep(&_100_millisecond, NULL);
