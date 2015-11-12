@@ -42,4 +42,41 @@
 #define CHECKMOUNT 10
 #define UNMOUNTALL 11
 
+#define HTTP_200_OK                        200
+#define HTTP_201_CREATED                   201
+#define HTTP_202_ACCEPTED                  202
+#define HTTP_204_NO_CONTENT                204
+#define HTTP_206_PARTIAL_CONTENT           206
+
+#define HTTP_301_MOVED_PERMANENTLY         301
+#define HTTP_302_MOVED_TEMPORARILY         302
+#define HTTP_302_REDIRECT                  302
+#define HTTP_303_SEE_OTHER                 303
+#define HTTP_304_NOT_MODIFIED              304
+#define HTTP_307_TEMPORARY_REDIRECT        307
+
+#define HTTP_400_BAD_REQUEST               400
+#define HTTP_401_UNAUTHORIZED              401
+#define HTTP_402_PAYMENT_REQUIRED          402
+#define HTTP_403_FORBIDDEN                 403
+#define HTTP_404_NOT_FOUND                 404
+#define HTTP_405_NOT_ALLOWED               405
+#define HTTP_406_NOT_ACCEPTABLE            406
+#define HTTP_408_REQUEST_TIME_OUT          408
+#define HTTP_409_CONFLICT                  409
+#define HTTP_410_GONE                      410
+#define HTTP_411_LENGTH_REQUIRED           411
+#define HTTP_413_REQUEST_ENTITY_TOO_LARGE  413
+#define HTTP_414_REQUEST_URI_TOO_LARGE     414
+#define HTTP_415_UNSUPPORTED_MEDIA_TYPE    415
+#define HTTP_416_RANGE_NOT_SATISFIABLE     416
+
+#define HTTP_500_INTERNAL_SERVER_ERROR     500
+#define HTTP_500_SERVER_ERROR              500
+#define HTTP_501_NOT_IMPLEMENTED           501
+#define HTTP_502_BAD_GATEWAY               502
+#define HTTP_503_SERVICE_UNAVAILABLE       503
+#define HTTP_504_GATEWAY_TIME_OUT          504
+#define HTTP_507_INSUFFICIENT_STORAGE      507
+
 #endif  /* GW20_SRC_GLOBAL_H_ */

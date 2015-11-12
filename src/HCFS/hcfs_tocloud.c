@@ -90,6 +90,7 @@ void collect_finished_sync_threads(void *ptr)
 {
 	int count;
 	struct timespec time_to_sleep;
+	UNUSED(ptr);
 
 	time_to_sleep.tv_sec = 0;
 
@@ -124,7 +125,9 @@ static inline int _upload_terminate_thread(int index)
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
+#if (DEDUP_ENABLE)
 	unsigned char blk_obj_id[OBJID_LENGTH];
+#endif
 	ino_t this_inode;
 	off_t page_filepos;
 	long long e_index;

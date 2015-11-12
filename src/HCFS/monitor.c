@@ -21,6 +21,9 @@
 #include "fuseop.h"
 #include "global.h"
 #include "logger.h"
+#include "hcfscurl.h"
+
+CURL_HANDLE monitor_curl_handle;
 
 /**************************************************************************
  *
@@ -37,6 +40,8 @@ void monitor_loop()
 	struct timespec idle_time;
 	struct timespec _100_millisecond = {0, 100 * 1000000};
 	int ret;
+	monitor_curl_handle.curl_backend = NONE;
+	monitor_curl_handle.curl = NULL;
 
 	write_log(2, "Start monitor loop\n");
 
@@ -49,7 +54,9 @@ void monitor_loop()
 		idle_time = diff_time(hcfs_system->access_time, timenow);
 		if (idle_time.tv_sec >= MONITOR_INTERVAL) {
 			/* TODO: check backend */
+
 		}
+		/* wait 0.1 second */
 		ret = nanosleep(&_100_millisecond, NULL);
 		if (ret == -1 && errno == EINTR) {
 			write_log(2, "monitor_loop is interrupted by signal\n");
