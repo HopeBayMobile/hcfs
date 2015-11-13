@@ -1709,15 +1709,16 @@ static int _check_shrink_size(ino_t **ptr, long long num_elem,
 {	
 	ino_t *tmp_ptr;
 
-	if (num_elem == 0) {
+	if (num_elem == 0) { /* free memory when # of elem is zero */
 		free(*ptr);
 		*ptr = NULL;
 		return 0;
 	}
 
-	if (num_elem == max_elem_size)
+	if (num_elem == max_elem_size)/*Do nothing when size is exactly enough*/
 		return 0;
-	else if(num_elem > max_elem_size) {
+
+	else if (num_elem > max_elem_size) { /* Error when size exceeds limit */
 		write_log(0, "Error: Memory out of bound in %s", __func__);
 		return -ENOMEM;
 	}
@@ -1746,6 +1747,11 @@ int collect_dir_child(ino_t this_inode,
 	DIR_ENTRY_PAGE dir_page;
 	DIR_ENTRY *tmpentry;
 
+	*num_dir_node = 0;
+	*num_nondir_node = 0;
+	*dir_node_list = NULL;
+	*nondir_node_list = NULL;
+	
 	ret = fetch_meta_path(metapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -1758,13 +1764,12 @@ int collect_dir_child(ino_t this_inode,
 		return -ret;
 	}
 
-	*num_dir_node = 0;
-	*num_nondir_node = 0;
-	
 	flock(fileno(fptr), LOCK_EX);
 	if (access(metapath, F_OK) < 0) {
 		write_log(5, "meta %"FMT_INO_T" does not exist in %s\n",
 			this_inode, __func__);
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
 		return -ENOENT;
 	}
 
@@ -1772,8 +1777,11 @@ int collect_dir_child(ino_t this_inode,
 	FREAD(&dir_meta, sizeof(DIR_META_TYPE), 1, fptr);
 	total_children = dir_meta.total_children;
 	now_page_pos = dir_meta.tree_walk_list_head;
-	if (total_children == 0 || now_page_pos == 0)
+	if (total_children == 0 || now_page_pos == 0) {
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
 		return 0;
+	}
 
 	half = total_children / 2 + 1; /* Avoid zero malloc */
 	now_dir_size = half;
@@ -1781,9 +1789,8 @@ int collect_dir_child(ino_t this_inode,
 	*dir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_dir_size);
 	*nondir_node_list = (ino_t *) malloc(sizeof(ino_t) * now_nondir_size);
 	if ((*dir_node_list == NULL) || (*nondir_node_list == NULL)) {
-		flock(fileno(fptr), LOCK_UN);
-		fclose(fptr);
-		return -ENOMEM;
+		errcode = -ENOMEM;
+		goto errcode_handle;
 	}
 
 	/* Collect all file in this dir */
@@ -1827,11 +1834,6 @@ int collect_dir_child(ino_t this_inode,
 
 	flock(fileno(fptr), LOCK_UN);
 	fclose(fptr);
-
-	//int i;
-	//for (i=0 ; i < *num_nondir_node ; i++)
-	//	write_log(10, "Debug: inode %"FMT_INO_T" is collected\n",
-	//		(*nondir_node_list)[i]);
 
 	/* Shrink dir_node_list size */
 	ret = _check_shrink_size(dir_node_list, *num_dir_node, now_dir_size);

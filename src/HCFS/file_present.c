@@ -866,7 +866,7 @@ static int _increase_pinned_size(long long *reserved_pinned_size,
 	int ret = 0;
 	
 	*reserved_pinned_size -= file_size;
-	if (*reserved_pinned_size >= 0) {
+	if (*reserved_pinned_size > 0) {
 		return 0;
 
 	} else { /* Need more space than expectation */
@@ -920,7 +920,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	
 	} else if (ret > 0) {
 	/* Do not need to change pinned size */
-		write_log(5, "Debug: inode %"FMT_INO_T"had been pinned\n",
+		write_log(5, "Debug: inode %"FMT_INO_T" had been pinned\n",
 								this_inode);
 	} else { /* Succeed in pinning */
 		/* Change pinned size if succeding in pinning this inode. */
@@ -961,10 +961,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 		if (ret < 0) {
 			free(nondir_node_list);
 			free(dir_node_list);
-			return ret;
+			return ret; /* Return fail */
 		}
-		if (num_nondir_node > 0)
-			free(nondir_node_list);
+		free(nondir_node_list);
 
 		/* pin dir */
 		ret = 0;
@@ -976,10 +975,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 		}
 		if (ret < 0) {
 			free(dir_node_list);
-			return ret;
+			return ret; /* Retuan fail */
 		}
-		if (num_dir_node > 0)
-			free(dir_node_list);
+		free(dir_node_list);
 	}
 
 	return 0;
@@ -988,6 +986,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 
 int _decrease_pinned_size(long long *reserved_release_size, long long file_size)
 {
+	write_log(10, "Test: ----------file size = %lld----------, "
+		"reserved_release_size = %lld, system pinned size = %lld\n",
+		file_size, *reserved_release_size, hcfs_system->systemdata.pinned_size);
 	*reserved_release_size -= file_size;
 	if (*reserved_release_size < 0) {
 		sem_wait(&(hcfs_system->access_sem));
@@ -1042,9 +1043,11 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	} else { /* Succeed in unpinning */
 
 		/* Deduct from reserved size */
-		if (S_ISREG(tempstat.st_mode))
+		if (S_ISREG(tempstat.st_mode)) {
+		write_log(10, "Test: ----------file size = %lld----------\n", tempstat.st_size);
 			 _decrease_pinned_size(reserved_release_size,
 			 		tempstat.st_size);
+		}
 
 		ret = super_block_mark_unpin(this_inode, tempstat.st_mode);
 		if (ret < 0)
@@ -1077,8 +1080,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 			free(dir_node_list);
 			return ret;
 		}
-		if (num_nondir_node > 0)
-			free(nondir_node_list);
+		free(nondir_node_list);
 
 		/* unpin dir */
 		ret = 0;
@@ -1092,8 +1094,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 			free(dir_node_list);
 			return ret;
 		}
-		if (num_dir_node > 0)
-			free(dir_node_list);
+		free(dir_node_list);
 	}
 
 	return 0;

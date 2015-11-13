@@ -33,8 +33,10 @@ void main(int argc, char **argv)
 	char *ptr;
 	struct stat tempstat;
 	ino_t this_inode;
-	long long reserved_size = 0;
-	unsigned int num_inodes = 1;
+	long long reserved_size = 1234567;
+	unsigned int num_inodes = 0;
+	ino_t inode_list[1000];
+	int i;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -51,11 +53,17 @@ void main(int argc, char **argv)
 		exit(-ENOTSUP);
 	}
 
-	if (stat(argv[2], &tempstat) < 0) {
-		printf("%s does not exist\n", argv[2]);
-		exit(-ENOENT);
-	} else {
-		this_inode = tempstat.st_ino;
+	for (i = 2; i < argc; i++) {
+		if (stat(argv[i], &tempstat) < 0) {
+			printf("%s does not exist\n", argv[i]);
+			exit(-ENOENT);
+		} else {
+			this_inode = tempstat.st_ino;
+		}
+		inode_list[num_inodes] = this_inode;
+		num_inodes++;
+
+		printf("%s - inode %lld - num_inode %d\n", argv[i], this_inode, num_inodes);
 	}
 
 	addr.sun_family = AF_UNIX;
@@ -66,10 +74,11 @@ void main(int argc, char **argv)
 	switch (code) {
 	case PIN:
 
-		cmd_len = sizeof(long long);
+		cmd_len = sizeof(long long); // reserved size
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &reserved_size, sizeof(long long), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0) {
 			printf("Command error: Code %d, %s\n",
@@ -78,7 +87,7 @@ void main(int argc, char **argv)
 		}
 
 		size_msg = send(fd, &num_inodes, sizeof(unsigned int), 0);
-		size_msg = send(fd, &this_inode, sizeof(ino_t), 0);
+		size_msg = send(fd, inode_list, sizeof(ino_t) * num_inodes, 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
@@ -92,10 +101,11 @@ void main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 	case UNPIN:
-		cmd_len = sizeof(ino_t);
+		cmd_len = sizeof(unsigned int); // number of inodes
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = send(fd, &this_inode, sizeof(ino_t), 0);
+		size_msg = send(fd, &num_inodes, sizeof(unsigned int), 0);
+		size_msg = send(fd, inode_list, sizeof(ino_t) * num_inodes, 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
