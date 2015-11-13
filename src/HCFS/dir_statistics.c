@@ -141,7 +141,7 @@ int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 		return errcode;
 	}
 	parentlist = NULL;
-	ret = fetch_all_parents(thisinode, &numparents, parentlist);
+	ret = fetch_all_parents(thisinode, &numparents, &parentlist);
 	if (ret < 0) {
 		errcode = ret;
 		goto errcode_handle;

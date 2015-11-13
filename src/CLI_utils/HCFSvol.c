@@ -37,9 +37,13 @@ void main(int argc, char **argv)
 		printf("Invalid number of arguments\n");
 		exit(-EPERM);
 	}
-	if (strcasecmp(argv[1], "create") == 0)
+	if (strcasecmp(argv[1], "create") == 0) {
+		if (argc < 4) {
+			printf("Usage: HCFSvol create <Vol name> internal/external\n");
+			exit(-EINVAL);
+		}
 		code = CREATEFS;
-	else if (strcasecmp(argv[1], "delete") == 0)
+	} else if (strcasecmp(argv[1], "delete") == 0)
 		code = DELETEFS;
 	else if (strcasecmp(argv[1], "check") == 0)
 		code = CHECKFS;
