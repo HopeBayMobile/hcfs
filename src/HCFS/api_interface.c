@@ -406,6 +406,7 @@ void api_module(void *index)
 	int msg_index;
 	unsigned long num_entries;
 	unsigned int api_code, arg_len, ret_len;
+	long long llretval;
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
@@ -571,6 +572,22 @@ void api_module(void *index)
 			ret_len = strlen(buf)+1;
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, buf, strlen(buf)+1, 0);
+			break;
+		case GETMAXPINSIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			llretval = MAX_PINNED_LIMIT;
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETMAXCACHESIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			llretval = CACHE_HARD_LIMIT;
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
 			break;
 		case TESTAPI:
 			/* Simulate a long API call of 5 seconds */
