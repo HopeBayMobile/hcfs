@@ -42,19 +42,19 @@ void main(int argc, char **argv)
 			printf("Usage: HCFSvol create <Vol name> internal/external\n");
 			exit(-EINVAL);
 		}
-		code = CREATEFS;
+		code = CREATEVOL;
 	} else if (strcasecmp(argv[1], "delete") == 0)
-		code = DELETEFS;
+		code = DELETEVOL;
 	else if (strcasecmp(argv[1], "check") == 0)
-		code = CHECKFS;
+		code = CHECKVOL;
 	else if (strcasecmp(argv[1], "list") == 0)
-		code = LISTFS;
+		code = LISTVOL;
 	else if (strcasecmp(argv[1], "terminate") == 0)
 		code = TERMINATE;
 	else if (strcasecmp(argv[1], "mount") == 0)
-		code = MOUNTFS;
+		code = MOUNTVOL;
 	else if (strcasecmp(argv[1], "unmount") == 0)
-		code = UNMOUNTFS;
+		code = UNMOUNTVOL;
 	else if (strcasecmp(argv[1], "checkmount") == 0)
 		code = CHECKMOUNT;
 	else if (strcasecmp(argv[1], "unmountall") == 0)
@@ -88,7 +88,7 @@ void main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	case CREATEFS:
+	case CREATEVOL:
 #ifdef _ANDROID_ENV_
 		cmd_len = strlen(argv[2]) + 2;
 		strcpy(buf, argv[2]);
@@ -114,9 +114,9 @@ void main(int argc, char **argv)
 			printf("Returned value is %d\n", retcode);
 		break;
 #endif
-	case DELETEFS:
-	case CHECKFS:
-	case UNMOUNTFS:
+	case DELETEVOL:
+	case CHECKVOL:
+	case UNMOUNTVOL:
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
 		strcpy(buf, argv[2]);
@@ -152,7 +152,7 @@ void main(int argc, char **argv)
 				-retcode, strerror(-retcode));
 		}
 		break;
-	case MOUNTFS:
+	case MOUNTVOL:
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
 		fsname_len = strlen(argv[2]) + 1;
 		memcpy(buf, &fsname_len, sizeof(int));
@@ -171,7 +171,7 @@ void main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
-	case LISTFS:
+	case LISTVOL:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);

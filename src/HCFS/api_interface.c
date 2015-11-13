@@ -273,7 +273,7 @@ int check_FS_handle(int arg_len, char *largebuf)
 	memcpy(buf, largebuf, arg_len);
 	buf[arg_len] = 0;
 	ret = check_filesystem(buf, &temp_entry);
-	write_log(10, "Debug check FS %s returns %d\n", buf, ret);
+	write_log(10, "Debug check volume %s returns %d\n", buf, ret);
 
 	free(buf);
 	return ret;
@@ -286,14 +286,14 @@ int list_FS_handle(DIR_ENTRY **entryarray, unsigned long *ret_entries)
 
 	ret = list_filesystem(0, NULL, &num_entries);
 
-	write_log(10, "Debug list FS num FS %ld\n", num_entries);
+	write_log(10, "Debug list volume num volumes %ld\n", num_entries);
 	if (ret < 0)
 		return ret;
 	if (num_entries > 0) {
 		*entryarray = malloc(sizeof(DIR_ENTRY) * num_entries);
 		ret = list_filesystem(num_entries, *entryarray, &temp);
 	}
-	write_log(10, "Debug list FS %d, %ld\n", ret, temp);
+	write_log(10, "Debug list volume %d, %ld\n", ret, temp);
 	*ret_entries = num_entries;
 	return ret;
 }
@@ -715,7 +715,7 @@ void api_module(void *index)
 			}
 
 			break;
-		case CREATEFS:
+		case CREATEVOL:
 			retcode = create_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -723,7 +723,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case DELETEFS:
+		case DELETEVOL:
 			retcode = delete_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -731,7 +731,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case CHECKFS:
+		case CHECKVOL:
 			retcode = check_FS_handle(arg_len, largebuf);
 			write_log(10, "retcode is %d\n", retcode);
 			if (retcode == 0) {
@@ -740,7 +740,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case LISTFS:
+		case LISTVOL:
 			/*Echos the arguments back to the caller*/
 			retcode = list_FS_handle(&entryarray, &num_entries);
 			tmpptr = (char *) entryarray;
@@ -760,7 +760,7 @@ void api_module(void *index)
 			if (num_entries > 0)
 				free(entryarray);
 			break;
-		case MOUNTFS:
+		case MOUNTVOL:
 			retcode = mount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
@@ -768,7 +768,7 @@ void api_module(void *index)
 				send(fd1, &retcode, sizeof(int), 0);
 			}
 			break;
-		case UNMOUNTFS:
+		case UNMOUNTVOL:
 			retcode = unmount_FS_handle(arg_len, largebuf);
 			if (retcode == 0) {
 				ret_len = sizeof(int);
