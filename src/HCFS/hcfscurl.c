@@ -652,10 +652,11 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 
 	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
 	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curl, CURLOPT_HEADER, 1L);
+	curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "HEAD");
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
@@ -668,7 +669,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	res = curl_easy_perform(curl);
 
 	if (res == CURLE_OK) {
-		ret_val = parse_swift_list_header(swift_header_fptr);
+		curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &ret_val);
 	} else {
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
 	}
@@ -1469,7 +1470,6 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 		}
 	}
 
-	write_log(10, "Debug start hcfs_test_backend\n");
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_test_backend(curl_handle);
