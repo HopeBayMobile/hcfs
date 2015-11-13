@@ -2513,7 +2513,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	if ((tempfilemeta.local_pin == TRUE) &&
 	    (offset < filestat->st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size -=
+		hcfs_system->systemdata.pinned_size +=
 			(long long)(offset - filestat->st_size);
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
