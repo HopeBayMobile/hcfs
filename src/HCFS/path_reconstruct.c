@@ -665,17 +665,17 @@ errcode_handle:
 /************************************************************************
 *
 * Function name: fetch_all_parents
-*        Inputs: ino_t self_inode, int *parentnum, ino_t *parentlist
+*        Inputs: ino_t self_inode, int *parentnum, ino_t **parentlist
 *       Summary: Returns the list of parents for "self_inode" in "parentlist".
 *                The number of parents is returned in "parentnum".
-*                When calling the function, "parentlist" should be NULL, and
+*                When calling the function, "*parentlist" should be NULL, and
 *                after the function returns, the caller should free
 *                "parentlist".
 *                pathlookup_data_lock should be locked before calling.
 *  Return value: 0 if successful. Otherwise returns negation of error code.
 *
 *************************************************************************/
-int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t *parentlist)
+int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t **parentlist)
 {
 	int totalnum;
 	ino_t tmpinode;
@@ -695,10 +695,10 @@ int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t *parentlist)
 	PREAD(fileno(pathlookup_data_fptr), &tmpinode, sizeof(ino_t), filepos);
 
 	*parentnum = 1;
-	parentlist = calloc(1, sizeof(ino_t));
-	if (parentlist == NULL)
+	*parentlist = calloc(1, sizeof(ino_t));
+	if (*parentlist == NULL)
 		return -ENOMEM;
-	memcpy(parentlist, &tmpinode, sizeof(ino_t));
+	memcpy(*parentlist, &tmpinode, sizeof(ino_t));
 	return 0;
 errcode_handle:
 	return errcode;

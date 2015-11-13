@@ -413,8 +413,10 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 		return ret_val;
 	}
 
+	sem_post(&(pathlookup_data_lock));
+
 	/* Init the dir stat for this node */
-	ret_val = reset_dirstat_lookup(parent_inode);
+	ret_val = reset_dirstat_lookup(self_inode);
 	if (ret_val < 0) {
 		return ret_val;
 	}

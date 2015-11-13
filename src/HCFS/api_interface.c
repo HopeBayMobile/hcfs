@@ -34,6 +34,8 @@
 #include "fuseop.h"
 #include "super_block.h"
 #include "dir_statistics.h"
+#include "file_present.h"
+#include "utils.h"
 
 /* TODO: Error handling if the socket path is already occupied and cannot
 be deleted */
@@ -334,21 +336,45 @@ int unpin_inode_handle(int arg_len, char *largebuf)
 	return retcode;
 }
 
-int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstat)
+int check_dir_stat_handle(int arg_len, char *largebuf, DIR_STATS_TYPE *tmpstats)
 {
 	ino_t target_inode;
 	int retcode;
+	struct stat structstat;
+	char metapath[METAPATHLEN];
 
 	memcpy(&target_inode, largebuf, sizeof(ino_t));
 	write_log(10, "Debug API: target inode %"FMT_INO_T"\n", target_inode);
-	retcode = read_dirstat_lookup(target_inode, tmpstat);
+	retcode = fetch_meta_path(metapath, target_inode);
 	if (retcode < 0) {
-		tmpstat->num_local = retcode;
-		tmpstat->num_cloud = retcode;
-		tmpstat->num_hybrid = retcode;
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
+		return retcode;
+	}
+
+	if (access(metapath, F_OK) != 0) {
+		retcode = -ENOENT;
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
+		return retcode;
+	}
+
+	retcode = fetch_inode_stat(target_inode, &structstat, NULL, NULL);
+	if (retcode == 0) {
+		if (S_ISDIR(structstat.st_mode))
+			retcode = read_dirstat_lookup(target_inode, tmpstats);
+		else
+			memset(tmpstats, 0, sizeof(DIR_STATS_TYPE));
+	}
+	if (retcode < 0) {
+		tmpstats->num_local = retcode;
+		tmpstats->num_cloud = retcode;
+		tmpstats->num_hybrid = retcode;
 	}
 	write_log(10, "Dir stat lookup %lld, %lld, %lld\n",
-		tmpstat->num_local, tmpstat->num_cloud, tmpstat->num_hybrid);
+		tmpstats->num_local, tmpstats->num_cloud, tmpstats->num_hybrid);
 	return retcode;
 }
 
