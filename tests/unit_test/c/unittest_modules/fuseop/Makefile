@@ -58,6 +58,7 @@ all : setup $(TESTS)
 
 clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
+	-sudo umount /tmp/test_fuse
 
 test : setup $(TESTS)
 	./fuseop_unittest
@@ -65,7 +66,7 @@ test : setup $(TESTS)
 
 .PHONY : setup
 setup :
-	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1
@@ -101,10 +102,6 @@ gtest_main.a : gtest-all.o gtest_main.o
 fuseop.o : $(USER_DIR)/fuseop.c $(USER_DIR)/fuseop.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/fuseop.c
 
-# TODO: fack path_reconstruct?
-path_reconstruct.o : $(USER_DIR)/path_reconstruct.c $(USER_DIR)/path_reconstruct.h $(GTEST_HEADERS)
-	$(CXX) $(CPPFLAGS) $(CFLAGS) -c $(USER_DIR)/path_reconstruct.c
-
 fake_meta_mem_cache.o : $(UNITTEST_DIR)/fake_meta_mem_cache.c
 	$(CXX) $(CPPFLAGS) $(CFAKEFLAGS) -c $(UNITTEST_DIR)/fake_meta_mem_cache.c
 
@@ -115,7 +112,7 @@ fuseop_unittest.o : $(UNITTEST_DIR)/fuseop_unittest.cc \
                      $(USER_DIR)/fuseop.h $(GTEST_HEADERS)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $(UNITTEST_DIR)/fuseop_unittest.cc
 
-fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o path_reconstruct.o gtest_main.a
+fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lfuse
 
 
