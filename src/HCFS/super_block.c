@@ -32,6 +32,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -40,17 +41,6 @@
 
 #define SB_ENTRY_SIZE ((int)sizeof(SUPER_BLOCK_ENTRY))
 #define SB_HEAD_SIZE ((int)sizeof(SUPER_BLOCK_HEAD))
-
-#define _ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_() \
-	{ \
-		int val; \
-		sem_getvalue(&(sys_super_block->exclusive_lock_sem), &val); \
-		if (val > 0) { \
-			write_log(0, "Error: superblock is not locked in %s", \
-				__func__); \
-			return -EPERM; \
-		} \
-	}
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -1321,6 +1311,19 @@ int super_block_exclusive_release(void)
 	return 0;
 }
 
+/**
+ * Mark pin_status from ST_PINNING to ST_PIN
+ *
+ * This function is used when a file in super block pinning queue
+ * finishes fetching all block from cloud to local. If the pin_status
+ * is still ST_PINNING, it is dequeued from pinning queue and pin_status
+ * will be changed to ST_PIN. In case that pin_status is ST_UNPIN,
+ * ST_PIN, ST_DEL, ignore them and do nothing.
+ *
+ * @param this_inode Inode number to be mark as ST_PIN
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int super_block_finish_pinning(ino_t this_inode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
@@ -1341,9 +1344,9 @@ int super_block_finish_pinning(ino_t this_inode)
 		this_entry.pin_status = ST_PIN;
 		ret = write_super_block_entry(this_inode, &this_entry);
 		break;
-	case ST_UNPIN:
-	case ST_PIN:
-	case ST_DEL:
+	case ST_UNPIN: /* It may be unpinned by others when pinnning */
+	case ST_PIN: /* What happened? */
+	case ST_DEL: /* It may be deleted by others */
 		break;
 	}
 	
@@ -1355,13 +1358,30 @@ int super_block_finish_pinning(ino_t this_inode)
 	return 0;
 }
 
+/**
+ * Let status of an inode be ST_PIN or ST_PINNING
+ *
+ * If the inode number with status ST_UNPIN, then it will be push into
+ * pinning queue and set pin_status as ST_PINNING when it is a regfile.
+ * Otherwise pin_status will be directly set to ST_PIN.
+ *
+ * @param this_inode Inode number to be handled
+ * @param this_mode Mode of "this_inode"
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 {	
 	SUPER_BLOCK_ENTRY this_entry;
 	int ret;
 
 	super_block_exclusive_locking();
-	read_super_block_entry(this_inode, &this_entry);
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;	
+	}
+
 	switch (this_entry.pin_status) {
 	case ST_UNPIN:
 		if (S_ISREG(this_mode)) {
@@ -1373,9 +1393,9 @@ int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 		}
 		ret = write_super_block_entry(this_inode, &this_entry);
 		break;
-	case ST_DEL:
-	case ST_PINNING:
-	case ST_PIN:
+	case ST_DEL: /* It may be deleted by others */
+	case ST_PINNING: /* It may be pinned by others */
+	case ST_PIN: /* It may be pinned by others */
 		break;
 	}
 	super_block_exclusive_release();
@@ -1386,32 +1406,48 @@ int super_block_mark_pin(ino_t this_inode, mode_t this_mode)
 	return 0;
 }
 
-
+/**
+ * Let status of an inode be ST_UNPIN
+ *
+ * If pin_status is ST_PINNING, it means the inode is in pinning queue, so
+ * dequeue from the pinning queue and set status to ST_UNPIN. On the other
+ * hand, ST_PIN means all blocks of the file are local, so just change the
+ * status to ST_UNPIN directly.
+ *
+ * @param this_inode Inode number to be handled
+ * @param this_mode Mode of "this_inode"
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int super_block_mark_unpin(ino_t this_inode, mode_t this_mode)
 {
 	SUPER_BLOCK_ENTRY this_entry;
 	int ret;
 
 	super_block_exclusive_locking();
-	read_super_block_entry(this_inode, &this_entry);
+	ret = read_super_block_entry(this_inode, &this_entry);
+	if (ret < 0) {
+		super_block_exclusive_release();
+		return ret;	
+	}
+
 	switch (this_entry.pin_status) {
-	case ST_PINNING:
+	case ST_PINNING: /* regfile in pinning queue */
 		/* Enqueue and set as ST_UNPIN */
 		ret = pin_ll_dequeue(this_inode, &this_entry);
 		this_entry.pin_status = ST_UNPIN;
 		ret = write_super_block_entry(this_inode, &this_entry);
 		if (!S_ISREG(this_mode)) {
-			write_log(0, "Error: why non-regfile has pin status"
+			write_log(2, "Error: why non-regfile has pin status"
 				" ST_PINNING? In %s\n", __func__);
-			ret = -EIO;
 		}
 		break;
-	case ST_PIN:
+	case ST_PIN: /* Case dir, symlnk, or regfile with all local blocks */
 		this_entry.pin_status = ST_UNPIN;
 		ret = write_super_block_entry(this_inode, &this_entry);
 		break;
-	case ST_DEL:
-	case ST_UNPIN:
+	case ST_DEL: /* To be deleted */
+	case ST_UNPIN: /* It had been unpinned */
 		break;
 	}
 	super_block_exclusive_release();
@@ -1426,8 +1462,6 @@ int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY last_entry;
 	int ret;
-
-	_ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_();
 
 	/* Return pin-status if this status is not UNPIN */
 	if (this_entry->pin_status != ST_UNPIN) {
@@ -1444,6 +1478,7 @@ int pin_ll_enqueue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 
 		sys_super_block->head.first_pin_inode = this_inode;
 		sys_super_block->head.last_pin_inode = this_inode;
+
 	} else {
 		this_entry->pin_ll_next = 0;
 		this_entry->pin_ll_prev = sys_super_block->head.last_pin_inode;
@@ -1474,23 +1509,27 @@ error_handling:
 	return ret;
 }
 
-
 int pin_ll_dequeue(ino_t this_inode, SUPER_BLOCK_ENTRY *this_entry)
 {
 	SUPER_BLOCK_ENTRY prev_entry, next_entry;
 	ino_t prev_inode, next_inode;
 	int ret;
 
-	_ASSERT_EXCLUSIVE_LOCK_IS_LOCKED_();
-
-	/* Return pin-status if this status is not UNPIN */
+	/* Return pin-status if this status is not PINNING */
 	if (this_entry->pin_status != ST_PINNING) {
-		//super_block_exclusive_release();
 		return this_entry->pin_status;
 	}
 
 	prev_inode = this_entry->pin_ll_prev;
 	next_inode = this_entry->pin_ll_next;
+	if ((next_inode == 0) && (prev_inode == 0) &&
+		(sys_super_block->head.first_pin_inode != this_inode)) {
+		write_log(0, "Error: Inode %ju is not in pinning "
+			"queue but be requested to dequeue. In %s\n",
+			(uintmax_t)this_inode, __func__);
+		return -EIO;
+	}
+
 	/* Handle prev pointer */
 	if (prev_inode != 0) {
 		ret = read_super_block_entry(prev_inode, &prev_entry);
