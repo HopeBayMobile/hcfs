@@ -293,6 +293,7 @@ int main(int argc, char **argv)
 		exit(-1);
 
 	/* TODO: error handling for log files */
+	init_sync_stat_control();
 #ifdef _ANDROID_ENV_
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
