@@ -62,7 +62,9 @@ clean :
 test : setup $(TESTS)
 	./FS_manager_unittest
 	./mount_manager_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

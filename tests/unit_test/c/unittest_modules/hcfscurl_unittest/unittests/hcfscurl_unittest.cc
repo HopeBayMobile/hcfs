@@ -38,10 +38,10 @@ protected:
 
 	void SetUp()
 	{
-		swift_user = (char*)"kewei";
-		swift_password = (char*)"kewei";
-		swift_url = (char*)"127.0.0.1";
-		SWIFT_PROTOCOL = (char*)"https";
+		swift_user = "kewei";
+		swift_password = "kewei";
+		swift_url = "127.0.0.1";
+		SWIFT_PROTOCOL = "https";
 		curl_handle = (CURL_HANDLE *)malloc(sizeof(CURL_HANDLE));
 
 		http_perform_retry_fail = FALSE;
@@ -112,8 +112,8 @@ TEST_F(hcfs_init_swift_backendTest, InitBackendGetAuthFail)
 	CURL_HANDLE curl_handle;
 
 	http_perform_retry_fail = TRUE;
-	SWIFT_ACCOUNT = (char*)"kewei_account";
-	SWIFT_USER = (char*)"kewei";
+	SWIFT_ACCOUNT = "kewei_account";
+	SWIFT_USER = "kewei";
 	strcpy(curl_handle.id, "_test_");
 
 	EXPECT_EQ(-1, hcfs_init_swift_backend(&curl_handle));
@@ -137,11 +137,11 @@ protected:
 		strcpy(swift_url_string, "https://127.0.0.1/fake_url");
 		strcpy(swift_auth_string,
 			"X-Auth-Token: hello_swift_auth_string");
-		SWIFT_CONTAINER = (char*)"test_container";
-		S3_BUCKET = (char*)"fake_bucket";
-		S3_SECRET = (char*)"test_secret_key";
-		S3_ACCESS = (char*)"test_access_key";
-		S3_BUCKET_URL = (char*)"https://fake_bucket.s3.hicloud.net.tw";
+		SWIFT_CONTAINER = "test_container";
+		S3_BUCKET = "fake_bucket";
+		S3_SECRET = "test_secret_key";
+		S3_ACCESS = "test_access_key";
+		S3_BUCKET_URL = "https://fake_bucket.s3.hicloud.net.tw";
 
 		http_perform_retry_fail = FALSE;
 		write_list_header_flag = FALSE;
@@ -292,11 +292,11 @@ protected:
 		strcpy(swift_url_string, "https://127.0.0.1/fake_url");
 		strcpy(swift_auth_string,
 			"X-Auth-Token: hello_swift_auth_string");
-		SWIFT_CONTAINER = (char*)"test_container";
-		S3_BUCKET = (char*)"fake_bucket";
-		S3_SECRET = (char*)"test_secret_key";
-		S3_ACCESS = (char*)"test_access_key";
-		S3_BUCKET_URL = (char*)"https://fake_bucket.s3.hicloud.net.tw";
+		SWIFT_CONTAINER = "test_container";
+		S3_BUCKET = "fake_bucket";
+		S3_SECRET = "test_secret_key";
+		S3_ACCESS = "test_access_key";
+		S3_BUCKET_URL = "https://fake_bucket.s3.hicloud.net.tw";
 
 		http_perform_retry_fail = FALSE;
 		write_list_header_flag = FALSE;
@@ -722,7 +722,7 @@ TEST(hcfs_init_backendTest, InitSwiftBackendGetAuthFail)
 	curl_handle.curl_backend = SWIFT;
 
 	http_perform_retry_fail = TRUE;
-	SWIFT_ACCOUNT = (char*)"kewei_account";
+	SWIFT_ACCOUNT = "kewei_account";
 	SWIFT_USER = "kewei";
 	strcpy(curl_handle.id, "_test_");
 

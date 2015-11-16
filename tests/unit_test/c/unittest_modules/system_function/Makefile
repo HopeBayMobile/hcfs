@@ -62,7 +62,9 @@ clean :
 test : setup $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

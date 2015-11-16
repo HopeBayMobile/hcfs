@@ -61,7 +61,9 @@ clean :
 
 test : setup $(TESTS)
 	./meta_mem_cache_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

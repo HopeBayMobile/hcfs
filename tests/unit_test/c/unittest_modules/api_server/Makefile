@@ -61,7 +61,9 @@ clean :
 
 test : setup $(TESTS)
 	./api_interface_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

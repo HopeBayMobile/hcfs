@@ -62,7 +62,9 @@ clean :
 test : setup $(TESTS)
 	./hcfs_cachebuild_unittest
 	./hcfs_cacheops_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

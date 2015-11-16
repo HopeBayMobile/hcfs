@@ -63,7 +63,9 @@ test : setup $(TESTS)
 	./utils_unittest
 	./dir_entry_btree_unittest
 	./logger_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :

@@ -41,6 +41,11 @@ CURLcode curl_easy_setopt(CURL *handle, CURLoption option, ...)
 
 }
 
+#undef curl_easy_getinfo
+CURLcode curl_easy_getinfo(CURL *curl, CURLINFO info, ...){
+	return CURLE_OK;
+}
+
 struct curl_slist *curl_slist_append(struct curl_slist * list,
 	const char * string )
 {
@@ -124,9 +129,4 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 	int *outlen, int inputlen)
 {
 	strcpy(outputstr, "test_b64encode");
-}
-
-#undef curl_easy_getinfo
-CURL_EXTERN CURLcode curl_easy_getinfo(CURL *curl, CURLINFO info, ...){
-	return CURLE_OK;
 }

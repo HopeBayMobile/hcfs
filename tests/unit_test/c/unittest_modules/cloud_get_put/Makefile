@@ -63,7 +63,9 @@ test : setup $(TESTS)
 	./hcfs_fromcloud_unittest
 	./hcfs_tocloud_unittest
 	./hcfs_clouddelete_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :
