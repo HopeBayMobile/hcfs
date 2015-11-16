@@ -181,6 +181,9 @@ typedef struct {
 	long long cache_size;
 	long long cache_blocks;
 	long long pinned_size;
+	long long backend_size;
+	long long backend_inodes;
+	long long dirty_cache_size;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {

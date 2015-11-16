@@ -1567,9 +1567,14 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		ret_val = -1;
 		break;
 	}
+	/* Truncate output if not successful */
+	if (!_http_is_success(ret_val))
+		FTRUNCATE(fileno(fptr), 0);
 	return ret_val;
 
 errcode_handle:
+	/* Truncate output if not successful */
+	FTRUNCATE(fileno(fptr), 0);
 	return -1;
 }
 

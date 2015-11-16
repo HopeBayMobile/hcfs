@@ -31,7 +31,7 @@ void main(int argc, char **argv)
 	DIR_ENTRY *tmp;
 	char *ptr;
 	ino_t tmpino;
-	long long num_local, num_cloud, num_hybrid;
+	long long num_local, num_cloud, num_hybrid, retllcode;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -61,6 +61,22 @@ void main(int argc, char **argv)
 		code = UNMOUNTALL;
 	else if (strcasecmp(argv[1], "checknode") == 0)
 		code = CHECKDIRSTAT;
+	else if (strcasecmp(argv[1], "volsize") == 0)
+		code = GETVOLSIZE;
+	else if (strcasecmp(argv[1], "cloudsize") == 0)
+		code = GETCLOUDSIZE;
+	else if (strcasecmp(argv[1], "pinsize") == 0)
+		code = GETPINSIZE;
+	else if (strcasecmp(argv[1], "cachesize") == 0)
+		code = GETCACHESIZE;
+	else if (strcasecmp(argv[1], "location") == 0)
+		code = CHECKLOC;
+	else if (strcasecmp(argv[1], "ispin") == 0)
+		code = CHECKPIN;
+	else if (strcasecmp(argv[1], "maxpinsize") == 0)
+		code = GETMAXPINSIZE;
+	else if (strcasecmp(argv[1], "maxcachesize") == 0)
+		code = GETMAXCACHESIZE;
 	else
 		code = -1;
 	if (code < 0) {
@@ -87,6 +103,24 @@ void main(int argc, char **argv)
 				-retcode, strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
+		break;
+	case GETPINSIZE:
+	case GETCACHESIZE:
+	case GETMAXPINSIZE:
+	case GETMAXCACHESIZE:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		if (retllcode < 0) {
+			retcode = (int) retllcode;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		} else {
+			printf("Returned value is %d\n", retllcode);
+		}
 		break;
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_
@@ -132,6 +166,29 @@ void main(int argc, char **argv)
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
+	case GETVOLSIZE:
+	case GETCLOUDSIZE:
+		if (argc >= 3) {
+			cmd_len = strlen(argv[2]) + 1;
+			strcpy(buf, argv[2]);
+		} else {
+			cmd_len = 1;
+			buf[0] = 0;
+		}
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, buf, (cmd_len), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retllcode, sizeof(long long), 0);
+		if (retllcode < 0) {
+			retcode = (int) retllcode;
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		} else {
+			printf("Returned value is %lld\n", retllcode);
+		}
+		break;
 	case CHECKDIRSTAT:
 		tmpino = atol(argv[2]);
 		cmd_len = sizeof(ino_t);
@@ -152,6 +209,22 @@ void main(int argc, char **argv)
 				-retcode, strerror(-retcode));
 		}
 		break;
+	case CHECKLOC:
+	case CHECKPIN:
+		tmpino = atol(argv[2]);
+		cmd_len = sizeof(ino_t);
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &tmpino, sizeof(ino_t), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		if (retcode < 0)
+			printf("Command error: Code %d, %s\n",
+				-retcode, strerror(-retcode));
+		else
+			printf("Returned value is %d\n", retcode);
+		break;
+
 	case MOUNTVOL:
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
 		fsname_len = strlen(argv[2]) + 1;
