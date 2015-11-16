@@ -79,7 +79,13 @@ int hcfs_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle, HTTP_me
 	return 200;
 }
 
-int do_block_delete(ino_t this_inode, long long block_no, CURL_HANDLE *curl_handle)
+#if (DEDUP_ENABLE)
+int do_block_delete(ino_t this_inode, long long block_no, unsigned char *obj_id,
+		    CURL_HANDLE *curl_handle)
+#else
+int do_block_delete(ino_t this_inode, long long block_no,
+		    CURL_HANDLE *curl_handle)
+#endif
 {
 	char deleteobjname[30];
 	sprintf(deleteobjname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
@@ -181,4 +187,3 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	strcpy(pathname, "/tmp/testHCFS/mock_trunc");
 	return 0;
 }
-

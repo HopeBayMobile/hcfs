@@ -625,9 +625,8 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
 	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) { // Check uploaded-object is recorded
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%ju_%d",
-				(uintmax_t)mock_thread_type.inode, blockno);
-		/* TODO: Fix me FAILED */
+		sprintf(expected_objname, "data_%lld_%d",
+				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
 		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
 				(uintmax_t)mock_thread_type.inode, blockno);
@@ -657,6 +656,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	BLOCK_ENTRY_PAGE block_page;
 	FILE *metaptr;
 
+	hcfs_system->system_going_down = FALSE;
 	/* Mock data */
 	hcfs_system->system_going_down = FALSE;
 	write_mock_meta_file(metapath, total_page, ST_TODELETE);
@@ -672,17 +672,18 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	sleep(1);
 
 	/* Verify */
-	/* TODO: Fix me FAILED */
 	EXPECT_EQ(num_total_blocks, objname_counter);
-	qsort(objname_list, objname_counter, sizeof(char *), sync_single_inodeTest::objname_cmp);
-	for (int blockno = 0 ; blockno < num_total_blocks - 1 ; blockno++) {  // Check deleted-object is recorded
+	qsort(objname_list, objname_counter, sizeof(char *),
+	      sync_single_inodeTest::objname_cmp);
+	for (int blockno = 0; blockno < num_total_blocks - 1;
+	     blockno++) { // Check deleted-object is recorded
 		char expected_objname[50];
 		sprintf(expected_objname, "data_%ju_%d",
-				(uintmax_t)mock_thread_type.inode, blockno);
-		/* TODO: Fix me FAILED */
-		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "objname = " << objname_list[blockno];
+			(uintmax_t)mock_thread_type.inode, blockno);
+		ASSERT_STREQ(expected_objname, objname_list[blockno])
+		    << "objname = " << objname_list[blockno];
 		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
-				(uintmax_t)mock_thread_type.inode, blockno);
+			(uintmax_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	unlink(metapath);
@@ -1031,4 +1032,3 @@ TEST_F(update_backend_statTest, DownloadUpdate) {
  }
 
 /* End of the test case for the function update_backend_stat */
-

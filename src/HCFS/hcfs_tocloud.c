@@ -994,8 +994,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	obj_id_to_string(obj_id, obj_id_str);
 	// hash_to_string(hash_key, hash_key_str);
 	sprintf(objname, "data_%s", obj_id_str);
-	sprintf(objname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
 #else
+	sprintf(objname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
 	/* Force to upload */
 	ret = 1;
 #endif
