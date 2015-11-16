@@ -755,7 +755,11 @@ int _dsync_use_thread(int index, ino_t this_inode, mode_t this_mode)
 *  Return value: None
 *
 *************************************************************************/
-void *delete_loop(void *arg)
+#ifdef _ANDROID_ENV_
+void *delete_loop(void *ptr)
+#else
+void delete_loop(void)
+#endif
 {
 	ino_t inode_to_dsync, inode_to_check;
 	SUPER_BLOCK_ENTRY tempentry;

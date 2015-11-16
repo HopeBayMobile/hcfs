@@ -12,7 +12,6 @@
 * 2015/6/1 Jiahong changing logger
 *
 **************************************************************************/
-#define _GNU_SOURCE
 #include "hfuse_system.h"
 
 #include <sys/time.h>

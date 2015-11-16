@@ -44,10 +44,12 @@ if md5sum --quiet -c "$setup_status_file"; then
 fi
 rm -f "$setup_status_file"
 
-echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
-
-if [ $verbose -eq 0 ]; then set +x; else set -x; fi
-
+if [ $verbose -eq 0 ]; then
+	set +x;
+else
+	echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
+	set -x;
+fi
 
 case "$setup_dev_env_mode" in
 unit_test )

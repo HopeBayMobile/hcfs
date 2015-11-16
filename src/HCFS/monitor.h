@@ -20,7 +20,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void monitor_loop();
+#ifdef _ANDROID_ENV_
+void *monitor_loop(void *ptr);
+#else
+void monitor_loop(void);
+#endif
 struct timespec diff_time(struct timespec start, struct timespec end);
 
 #endif  /* GW20_HCFS_MONITOR_H_ */

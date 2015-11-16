@@ -34,7 +34,11 @@ CURL_HANDLE monitor_curl_handle;
  *  Return value: None
  *
  *************************************************************************/
-void monitor_loop()
+#ifdef _ANDROID_ENV_
+void *monitor_loop(void *ptr)
+#else
+void monitor_loop(void)
+#endif
 {
 	const struct timespec _100_millisecond = {0, 100 * 1000000};
 	struct timespec *access_time = &hcfs_system->access_time;

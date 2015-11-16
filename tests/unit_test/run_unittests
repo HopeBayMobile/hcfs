@@ -9,6 +9,9 @@ $WORKSPACE/utils/setup_dev_env.sh -vm unit_test
 
 # Unit test
 cd $UNITTEST_DIR
-make clean
-make test
+make=make
+if type -a colormake; then
+	make=colormake
+fi
+$make clean test
 gcovr -r $WORKSPACE/src .

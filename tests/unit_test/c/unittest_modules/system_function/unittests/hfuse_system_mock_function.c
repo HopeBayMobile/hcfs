@@ -52,7 +52,6 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 
 void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
-
 }
 
 void ENGINE_load_builtin_engines(void)
@@ -97,6 +96,10 @@ void *run_cache_loop(void *ptr)
 {
 	return NULL;
 }
+void *monitor_loop(void *ptr)
+{
+	return NULL;
+}
 #else
 void upload_loop(void)
 {
@@ -107,6 +110,10 @@ void upload_loop(void)
 void run_cache_loop(void)
 {
 	/* kill child process */
+	exit(0);
+}
+void monitor_loop(void)
+{
 	exit(0);
 }
 #endif
@@ -138,11 +145,11 @@ int init_fs_manager(void)
 {
 	return 0;
 }
-int init_pathlookup()
+int init_pathlookup(void)
 {
 	return 0;
 }
-void destroy_pathlookup()
+void destroy_pathlookup(void)
 {
 	return;
 }

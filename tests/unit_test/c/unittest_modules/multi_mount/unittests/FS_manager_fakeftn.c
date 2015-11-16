@@ -5,6 +5,7 @@
 #include "global.h"
 #include "hcfscurl.h"
 #include "FS_manager_unittest.h"
+#include "path_reconstruct.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -157,3 +158,12 @@ int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
 	return 0;
 }
 
+int destroy_pathcache(PATH_CACHE *cacheptr)
+{
+	return 0;
+}
+
+PATH_CACHE * init_pathcache(ino_t root_inode)
+{
+	return NULL;
+}

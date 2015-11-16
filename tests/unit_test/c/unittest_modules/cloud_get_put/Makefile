@@ -67,7 +67,7 @@ test : setup $(TESTS)
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1

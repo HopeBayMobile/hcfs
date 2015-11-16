@@ -125,3 +125,8 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 {
 	strcpy(outputstr, "test_b64encode");
 }
+
+#undef curl_easy_getinfo
+CURL_EXTERN CURLcode curl_easy_getinfo(CURL *curl, CURLINFO info, ...){
+	return CURLE_OK;
+}
