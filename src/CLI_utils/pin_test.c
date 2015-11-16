@@ -33,7 +33,7 @@ void main(int argc, char **argv)
 	char *ptr;
 	struct stat tempstat;
 	ino_t this_inode;
-	long long reserved_size = 1234567;
+	long long reserved_size = 12345670;
 	unsigned int num_inodes = 0;
 	ino_t inode_list[1000];
 	int i;
@@ -74,47 +74,40 @@ void main(int argc, char **argv)
 	switch (code) {
 	case PIN:
 
-		cmd_len = sizeof(long long); // reserved size
+		cmd_len = sizeof(long long) + sizeof(unsigned int) + 
+			num_inodes * sizeof(ino_t);
+		memcpy(buf, &reserved_size, sizeof(long long)); /* Pre-allocating pinned size (be allowed to be 0) */
+		memcpy(buf + sizeof(long long), &num_inodes, /* # of inodes */
+			sizeof(unsigned int));
+		memcpy(buf + sizeof(long long) + sizeof(unsigned int), /* inode array */
+			inode_list, sizeof(ino_t) * num_inodes);
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = send(fd, &reserved_size, sizeof(long long), 0);
-		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
-		size_msg = recv(fd, &retcode, sizeof(int), 0);
-		if (retcode < 0) {
-			printf("Command error: Code %d, %s\n",
-				-retcode, strerror(-retcode));
-			break;
-		}
-
-		size_msg = send(fd, &num_inodes, sizeof(unsigned int), 0);
-		size_msg = send(fd, inode_list, sizeof(ino_t) * num_inodes, 0);
+		size_msg = send(fd, buf, cmd_len, 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
-		else if (retcode == 1)
-			printf("It had been %s. Do not do that again.\n",
-				code == PIN ? "pinned" : "unpinned");
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
 	case UNPIN:
-		cmd_len = sizeof(unsigned int); // number of inodes
+		cmd_len = sizeof(unsigned int) + num_inodes * sizeof(ino_t);
+		memcpy(buf, &num_inodes, sizeof(unsigned int)); /* # of inodes */
+		memcpy(buf + sizeof(unsigned int), /* inode array */
+			inode_list, sizeof(ino_t) * num_inodes);
+
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-		size_msg = send(fd, &num_inodes, sizeof(unsigned int), 0);
-		size_msg = send(fd, inode_list, sizeof(ino_t) * num_inodes, 0);
+		size_msg = send(fd, buf, cmd_len, 0);
 
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
-		else if (retcode == 1)
-			printf("It had been %s. Do not do that again.\n",
-				code == PIN ? "pinned" : "unpinned");
 		else
 			printf("Returned value is %d\n", retcode);
 		break;

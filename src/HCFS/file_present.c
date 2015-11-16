@@ -860,16 +860,14 @@ error_handle:
 	return ret_val;
 }
 
-static int _increase_pinned_size(long long *reserved_pinned_size,
+int increase_pinned_size(long long *reserved_pinned_size,
 		long long file_size)
 {
-	int ret = 0;
-	
-	*reserved_pinned_size -= file_size;
-	if (*reserved_pinned_size > 0) {
-		return 0;
+	int ret;
 
-	} else { /* Need more space than expectation */
+	ret = 0;
+	*reserved_pinned_size -= file_size; /*Deduct from pre-allocated quota*/
+	if (*reserved_pinned_size <= 0) { /* Need more space than expectation */
 		ret = 0;
 		sem_wait(&(hcfs_system->access_sem));
 		if (hcfs_system->systemdata.pinned_size -
@@ -877,14 +875,21 @@ static int _increase_pinned_size(long long *reserved_pinned_size,
 			hcfs_system->systemdata.pinned_size -=
 				(*reserved_pinned_size);
 			*reserved_pinned_size = 0;
+
 		} else {
 			ret = -ENOSPC;	
 			*reserved_pinned_size = 0;
 		}
 		sem_post(&(hcfs_system->access_sem));
 
-		return ret;
 	}
+
+	write_log(10, "Debug: file size = %lld, reserved pinned size = %lld,"
+		" system pinned size = %lld\n, in %s", file_size,
+		*reserved_pinned_size,
+		hcfs_system->systemdata.pinned_size, __func__);
+
+	return ret;
 }
 
 /**
@@ -925,7 +930,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	} else { /* Succeed in pinning */
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.st_mode)) {
-			ret = _increase_pinned_size(reserved_pinned_size,
+			ret = increase_pinned_size(reserved_pinned_size,
 					tempstat.st_size);
 			if (ret == -ENOSPC)
 				return ret;
@@ -984,11 +989,9 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 }
 
 
-int _decrease_pinned_size(long long *reserved_release_size, long long file_size)
+int decrease_pinned_size(long long *reserved_release_size, long long file_size)
 {
-	write_log(10, "Test: ----------file size = %lld----------, "
-		"reserved_release_size = %lld, system pinned size = %lld\n",
-		file_size, *reserved_release_size, hcfs_system->systemdata.pinned_size);
+
 	*reserved_release_size -= file_size;
 	if (*reserved_release_size < 0) {
 		sem_wait(&(hcfs_system->access_sem));
@@ -1000,6 +1003,11 @@ int _decrease_pinned_size(long long *reserved_release_size, long long file_size)
 	
 		sem_post(&(hcfs_system->access_sem));
 	}
+
+	write_log(10, "Debug: file size = %lld, reserved release size = %lld,"
+		" system pinned size = %lld\n, in %s", file_size,
+		*reserved_release_size,
+		hcfs_system->systemdata.pinned_size, __func__);
 
 	return 0;
 }
@@ -1044,8 +1052,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 		/* Deduct from reserved size */
 		if (S_ISREG(tempstat.st_mode)) {
-		write_log(10, "Test: ----------file size = %lld----------\n", tempstat.st_size);
-			 _decrease_pinned_size(reserved_release_size,
+			 decrease_pinned_size(reserved_release_size,
 			 		tempstat.st_size);
 		}
 

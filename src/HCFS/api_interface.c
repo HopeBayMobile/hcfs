@@ -561,21 +561,18 @@ void api_module(void *index)
 				reserved_pinned_size,
 				hcfs_system->systemdata.pinned_size);
 
-			/* Return ok, prepare to get inode list */
-			retcode = 0;
-			ret_len = sizeof(int);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &retcode, sizeof(int), 0);
+			/* Prepare inode array */
+			memcpy(&num_inode, largebuf + sizeof(long long),
+					sizeof(unsigned int));
 
-			/* Receive inode */
-			recv(fd1, &num_inode, sizeof(unsigned int), 0);
 			pinned_list = malloc(sizeof(ino_t) * num_inode);
 			if (pinned_list == NULL) {
-				retcode = -ENOMEM; /* TODO: error handling. Remember to first send ret_len and then retcode */
+				retcode = -ENOMEM;
 				break;
 			}
-
-			recv(fd1, pinned_list, sizeof(ino_t) * num_inode, 0);
+			memcpy(pinned_list, largebuf + sizeof(long long) +
+				sizeof(unsigned int),
+				sizeof(ino_t) * num_inode);
 
 			/* Begin to pin all of them */
 			retcode = pin_inode_handle(pinned_list, num_inode,
@@ -591,11 +588,12 @@ void api_module(void *index)
 			memcpy(&num_inode, largebuf, sizeof(unsigned int));
 			unpinned_list = malloc(sizeof(ino_t) * num_inode);
 			if (unpinned_list == NULL) {
-				retcode = -ENOMEM; /* TODO: error handling */
+				retcode = -ENOMEM;
 				break;
 			}
 			
-			recv(fd1, unpinned_list, sizeof(ino_t) * num_inode, 0);
+			memcpy(unpinned_list, largebuf + sizeof(unsigned int),
+				sizeof(ino_t) * num_inode);
 		
 			/* Begin to unpin all of them */	
 			retcode = unpin_inode_handle(unpinned_list, num_inode);

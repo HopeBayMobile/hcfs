@@ -54,6 +54,12 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	struct stat *link_stat, unsigned long *generation,
 	META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry);
 
+int increase_pinned_size(long long *reserved_pinned_size,
+		long long file_size);
+
+int decrease_pinned_size(long long *reserved_release_size,
+		long long file_size);
+
 int pin_inode(ino_t this_inode, long long *reserved_pinned_size);
 int unpin_inode(ino_t this_inode, long long *reserved_release_size);
 
