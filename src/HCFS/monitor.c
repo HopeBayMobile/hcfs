@@ -87,8 +87,7 @@ void monitor_loop(void)
 		/* wait 0.1 second */
 		ret = nanosleep(&_100_millisecond, NULL);
 		if (ret == -1 && errno == EINTR) {
-			write_log(2, "[Backend Monitor]
-					monitor_loop is interrupted\n");
+			write_log(2, "[Backend Monitor] interrupted\n");
 			break;
 		}
 	}

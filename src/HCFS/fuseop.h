@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdint.h>
 
 #include <fuse/fuse_opt.h>
 
@@ -175,8 +176,8 @@ typedef struct {
 typedef struct {
 	FILE *system_val_fptr;
 	SYSTEM_DATA_TYPE systemdata;
-	char system_going_down;
-	char backend_is_online;
+	uint8_t system_going_down;
+	uint8_t backend_is_online;
 	struct timespec access_time;
 	sem_t access_sem;
 	sem_t num_cache_sleep_sem;
