@@ -33,7 +33,7 @@ void main(int argc, char **argv)
 	char *ptr;
 	struct stat tempstat;
 	ino_t this_inode;
-	long long reserved_size = 12345670;
+	long long reserved_size = 123;
 	unsigned int num_inodes = 0;
 	ino_t inode_list[1000];
 	int i;
