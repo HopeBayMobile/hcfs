@@ -3857,6 +3857,9 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 		if ((hcfs_system->systemdata.pinned_size + sizediff)
 			> MAX_PINNED_LIMIT) {
 			sem_post(&(hcfs_system->access_sem));
+			fh_ptr->meta_cache_locked = FALSE;
+			meta_cache_close_file(fh_ptr->meta_cache_ptr);
+			meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 			fuse_reply_err(req, ENOSPC);
 			return;
 		}
