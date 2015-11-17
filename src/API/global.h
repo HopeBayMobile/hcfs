@@ -11,8 +11,8 @@
 *
 **************************************************************************/
 
-#ifndef GW20_SRC_GLOBAL_H_
-#define GW20_SRC_GLOBAL_H_
+#ifndef GW20_API_GLOBAL_H_
+#define GW20_API_GLOBAL_H_
 
 #define TRUE 1
 #define FALSE 0
@@ -36,4 +36,4 @@
 #define PIN 12
 #define UNPIN 13
 
-#endif  /* GW20_SRC_GLOBAL_H_ */
+#endif  /* GW20_API_GLOBAL_H_ */

@@ -38,8 +38,8 @@ int process_request(int thread_idx)
 
 	int fd;
 	int ret_code, to_recv;
-	unsigned int api_code;
-	ssize_t size_msg, msg_len, arg_len;
+	unsigned int api_code, arg_len;
+	ssize_t size_msg, msg_len;
 	char buf_reused;
 	char buf[512];
 	char *largebuf;
@@ -60,6 +60,7 @@ int process_request(int thread_idx)
 		printf("Error recv 2\n");
 		return -1;
 	}
+
 	memcpy(&arg_len, &buf[0], sizeof(unsigned int));
 	printf("arg_len == %ld\n", arg_len);
 
@@ -93,9 +94,17 @@ int process_request(int thread_idx)
 
 	switch (api_code) {
 	case PIN:
+		printf("Pin by path\n");
 		ret_code = pin_by_path(largebuf, arg_len);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
+
+	case UNPIN:
+		printf("Unpin by path\n");
+		ret_code = unpin_by_path(largebuf, arg_len);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);

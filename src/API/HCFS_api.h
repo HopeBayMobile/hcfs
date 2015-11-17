@@ -1,3 +1,6 @@
+#ifndef GW20_HCFS_API_H_
+#define GW20_HCFS_API_H_
+
 /*Set config
  * @json_res result string in json format.
  * @key field in HCFS configuration.
@@ -148,3 +151,5 @@ void HCFS_pin_status(char *json_res, char *pathname);
  */
 void HCFS_file_status(char *json_res, char *pathname);
 
+
+#endif  /* GW20_HCFS_API_H_ */

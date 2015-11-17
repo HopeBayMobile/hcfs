@@ -13,6 +13,8 @@
 
 #include "pin_ops.h"
 #include "global.h"
+#include "marco.h"
+
 
 int _json_response(char *json_str, char result, int code, json_t *data)
 {
@@ -51,22 +53,144 @@ int _api_socket_conn()
 void HCFS_pin_path(char *json_res, char *pin_path)
 {
 
-        int fd, code, status, size_msg, ret_code;
-        unsigned int cmd_len, reply_len;
+	int fd, code, size_msg, ret_code;
+	unsigned int cmd_len, reply_len;
+	ssize_t path_len;
+	char buf[500];
 
 	fd = _api_socket_conn();
-	if (fd < 0)
-		return -1;
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
 
 	code = PIN;
-	cmd_len = strlen(pin_path) + 1;
+	cmd_len = 0;
+
+	/* Append paths to socket msg */
+	CONCAT_PIN_ARG(pin_path);
 
 	size_msg = send(fd, &code, sizeof(unsigned int), 0);
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
-	size_msg = send(fd, pin_path, cmd_len, 0);
+	size_msg = send(fd, buf, cmd_len, 0);
 
 	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
-	_json_response(json_res, TRUE, ret_code, NULL);
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
+		  char *sd0_path, char *sd1_path)
+{
+
+	int num_path;
+	int fd, code, status, size_msg, ret_code;
+	unsigned int reply_len, cmd_len;
+	ssize_t path_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = PIN;
+	cmd_len = 0;
+
+	/* Append paths to socket msg */
+	CONCAT_PIN_ARG(app_path)
+	CONCAT_PIN_ARG(data_path)
+	CONCAT_PIN_ARG(sd0_path)
+	CONCAT_PIN_ARG(sd1_path)
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
+}
+
+void HCFS_unpin_path(char *json_res, char *pin_path)
+{
+
+	int fd, code, size_msg, ret_code;
+	unsigned int cmd_len, reply_len;
+	ssize_t path_len;
+	char buf[500];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = UNPIN;
+	cmd_len = 0;
+
+	/* Append paths to socket msg */
+	CONCAT_PIN_ARG(pin_path);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+
+void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
+		    char *sd0_path, char *sd1_path)
+{
+
+	int num_path;
+	int fd, code, status, size_msg, ret_code;
+	unsigned int reply_len, cmd_len;
+	ssize_t path_len;
+	char buf[1000];
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = UNPIN;
+	cmd_len = 0;
+
+	/* Append paths to socket msg */
+	CONCAT_PIN_ARG(app_path)
+	CONCAT_PIN_ARG(data_path)
+	CONCAT_PIN_ARG(sd0_path)
+	CONCAT_PIN_ARG(sd1_path)
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
+
+	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+
 }

@@ -69,13 +69,15 @@ int _get_path_stat(char *pathname, ino_t *inode, long long *total_size)
 		return ret_code;
 
 	if (S_ISREG(stat_buf.st_mode)) {
-		*total_size += stat_buf.st_size;
 		*inode = stat_buf.st_ino;
+		if (total_size != NULL)
+			*total_size += stat_buf.st_size;
 	} else if (S_ISDIR(stat_buf.st_mode)) {
-		_walk_folder(pathname, total_size);
 		*inode = stat_buf.st_ino;
+		if (total_size != NULL)
+			_walk_folder(pathname, total_size);
 	} else
-		return -99999;
+		return -1;
 
 	return 0;
 
@@ -92,7 +94,7 @@ int _pin_by_inode(const long long reserved_size, const unsigned int num_inodes,
 
 	fd = _socket_conn();
 	if (fd < 0)
-		return -1;
+		return fd;
 
 	code = PIN;
 	cmd_len = sizeof(long long) + sizeof(unsigned int) +
@@ -111,7 +113,79 @@ int _pin_by_inode(const long long reserved_size, const unsigned int num_inodes,
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	printf("Recv\n");
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	printf("Pin result - %d\n", ret_code);
+
+	close(fd);
+	return ret_code;
+
+}
+
+int pin_by_path(char *buf, unsigned int arg_len)
+{
+
+	int ret_code;
+	unsigned int msg_len, num_inodes;
+	long long total_size = 0;
+	char inode_array[1600];
+	char path[400];
+	ssize_t path_len;
+	ino_t tmp_inode;
+
+	num_inodes = 0;
+	msg_len = 0;
+
+	while (msg_len < arg_len) {
+		path_len = 0;
+		memcpy(&path_len, &(buf[msg_len]), sizeof(ssize_t));
+		msg_len += sizeof(ssize_t);
+
+		memcpy(path, &(buf[msg_len]), path_len);
+		msg_len += path_len;
+
+		ret_code = _get_path_stat(path, &tmp_inode, &total_size);
+		if (ret_code < 0)
+			return ret_code;
+
+		memcpy(&(inode_array[num_inodes*sizeof(ino_t)]),
+				&tmp_inode, sizeof(ino_t));
+
+		num_inodes += 1;
+	}
+
+	ret_code = _pin_by_inode(total_size, num_inodes, inode_array);
+
+	return ret_code;
+
+}
+
+int _unpin_by_inode(const unsigned int num_inodes, const char *inode_array)
+{
+
+	int fd, code, status, size_msg, count, ret_code;
+	int buf_idx;
+	unsigned int cmd_len, reply_len, total_recv, to_recv;
+	char buf[1000];
+
+	fd = _socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = UNPIN;
+	cmd_len = sizeof(long long) + sizeof(unsigned int) +
+		num_inodes * sizeof(ino_t);
+
+	buf_idx = 0;
+	memcpy(&(buf[buf_idx]), &num_inodes, sizeof(unsigned int));
+
+	buf_idx += sizeof(unsigned int);
+	memcpy(&(buf[buf_idx]), inode_array, sizeof(ino_t)*num_inodes);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, buf, cmd_len, 0);
 
 	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(int), 0);
@@ -123,29 +197,39 @@ int _pin_by_inode(const long long reserved_size, const unsigned int num_inodes,
 
 }
 
-int pin_by_path(char *buf, ssize_t arg_len)
+int unpin_by_path(char *buf, unsigned int arg_len)
 {
 
 	int ret_code;
-	unsigned int num_inodes = 1;
-	long long total_size = 0;
-	char inode_array[300];
+	unsigned int msg_len, num_inodes;
+	char inode_array[1600];
 	char path[400];
+	ssize_t path_len;
 	ino_t tmp_inode;
 
-	memcpy(path, buf, arg_len);
-	printf("%s\n", path);
-	printf("%d\n", arg_len);
-	ret_code = _get_path_stat(path, &tmp_inode, &total_size);
-	if (ret_code < 0)
-		return -1;
+	num_inodes = 0;
+	msg_len = 0;
 
-	memcpy(inode_array, &tmp_inode, sizeof(ino_t));
-	ret_code = _pin_by_inode(total_size, num_inodes, inode_array);
+	while (msg_len < arg_len) {
+		path_len = 0;
+		memcpy(&path_len, &(buf[msg_len]), sizeof(ssize_t));
+		msg_len += sizeof(ssize_t);
+
+		memcpy(path, &(buf[msg_len]), path_len);
+		msg_len += path_len;
+
+		ret_code = _get_path_stat(path, &tmp_inode, NULL);
+		if (ret_code < 0)
+			return ret_code;
+
+		memcpy(&(inode_array[num_inodes*sizeof(ino_t)]),
+				&tmp_inode, sizeof(ino_t));
+
+		num_inodes += 1;
+	}
+
+	ret_code = _unpin_by_inode(num_inodes, inode_array);
 
 	return ret_code;
-
 }
-
-
 
