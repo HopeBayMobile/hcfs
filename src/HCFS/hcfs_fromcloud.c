@@ -540,7 +540,7 @@ static void _fetch_block(void *ptr)
 	/* Update dirty status and system meta */
 	if (stat(block_path, &blockstat) == 0) {
 		set_block_dirty_status(NULL, block_fptr, FALSE);
-		change_system_meta(0, blockstat.st_size, 1);
+		change_system_meta(0, blockstat.st_size, 1, 0);
 		write_log(10, "Debug: Now cache size %lld",
 			hcfs_system->systemdata.cache_size);
 	} else {

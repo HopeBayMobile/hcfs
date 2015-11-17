@@ -860,14 +860,15 @@ off_t check_file_size(const char *path)
 *
 * Function name: change_system_meta
 *        Inputs: long long system_size_delta, long long cache_size_delta,
-*                long long cache_blocks_delta
+*                long long cache_blocks_delta, long long dirty_cache_delta
 *       Summary: Update system meta (total volume size, cache size, num
-*                of cache entries) and sync to disk.
+*                of cache entries, dirty cache size) and sync to disk.
 *  Return value: 0 if successful. Otherwise returns -1.
 *
 *************************************************************************/
 int change_system_meta(long long system_size_delta,
-	long long cache_size_delta, long long cache_blocks_delta)
+	long long cache_size_delta, long long cache_blocks_delta,
+	long long dirty_cache_delta)
 {
 	sem_wait(&(hcfs_system->access_sem));
 	hcfs_system->systemdata.system_size += system_size_delta;
@@ -879,6 +880,9 @@ int change_system_meta(long long system_size_delta,
 	hcfs_system->systemdata.cache_blocks += cache_blocks_delta;
 	if (hcfs_system->systemdata.cache_blocks < 0)
 		hcfs_system->systemdata.cache_blocks = 0;
+	hcfs_system->systemdata.dirty_cache_size += dirty_cache_delta;
+	if (hcfs_system->systemdata.dirty_cache_size < 0)
+		hcfs_system->systemdata.dirty_cache_size = 0;
 	sync_hcfs_system_data(FALSE);
 	sem_post(&(hcfs_system->access_sem));
 

@@ -1204,6 +1204,7 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 	char rootpath[METAPATHLEN];
 	FILE *fptr;
 	FS_STAT_T tmpstat;
+	SYSTEM_DATA_TYPE *statptr;
 
 	if (mptr == NULL) {
 		ret = fetch_stat_path(rootpath, root_inode);
@@ -1328,9 +1329,20 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 						check_file_size(thisblockpath);
 				UNLINK(thisblockpath);
 				sem_wait(&(hcfs_system->access_sem));
-				hcfs_system->systemdata.cache_size -=
+				statptr = &(hcfs_system->systemdata);
+				statptr->cache_size -=
 						(long long) cache_block_size;
-				hcfs_system->systemdata.cache_blocks -= 1;
+				if (statptr->cache_size < 0)
+					statptr->cache_size = 0;
+				if ((block_status == ST_LDISK) ||
+				    (block_status == ST_LtoC))
+					statptr->dirty_cache_size -=
+						(long long) cache_block_size;
+				if (statptr->dirty_cache_size < 0)
+					statptr->dirty_cache_size = 0;
+				statptr->cache_blocks -= 1;
+				if (statptr->cache_blocks < 0)
+					statptr->cache_blocks = 0;
 				sem_post(&(hcfs_system->access_sem));
 			}
 		}
@@ -1343,6 +1355,8 @@ int actual_delete_inode(ino_t this_inode, char d_type, ino_t root_inode,
 		}
 
 		hcfs_system->systemdata.system_size -= this_inode_stat.st_size;
+		if (hcfs_system->systemdata.system_size < 0)
+			hcfs_system->systemdata.system_size = 0;
 		sync_hcfs_system_data(FALSE);
 		sem_post(&(hcfs_system->access_sem));
 		if (mptr != NULL) {

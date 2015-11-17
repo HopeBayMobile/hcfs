@@ -134,6 +134,8 @@ static inline int _upload_terminate_thread(int index)
 	size_t tmp_size, ret_size;
 	DELETE_THREAD_TYPE *tmp_del;
 	char need_delete_object;
+	SYSTEM_DATA_TYPE *statptr;
+	off_t cache_block_size;
 
 	if (upload_ctl.threads_in_use[index] == 0)
 		return 0;
@@ -241,6 +243,14 @@ static inline int _upload_terminate_thread(int index)
 						errcode = ret;
 						goto errcode_handle;
 					}
+					cache_block_size =
+						check_file_size(blockpath);
+					sem_wait(&(hcfs_system->access_sem));
+					statptr = &(hcfs_system->systemdata);
+					if (statptr->dirty_cache_size < 0)
+						statptr->dirty_cache_size = 0;
+					sem_post(&(hcfs_system->access_sem));
+
 					FSEEK(metafptr, page_filepos, SEEK_SET);
 					FWRITE(&temppage, tmp_size, 1,
 					       metafptr);

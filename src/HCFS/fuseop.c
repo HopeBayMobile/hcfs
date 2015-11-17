@@ -1803,10 +1803,12 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	off_t total_deleted_cache;
 	long long total_deleted_blocks;
 	long long total_deleted_fileblocks;
+	off_t total_deleted_dirty_cache;
 	int ret_val, errcode, ret;
 	BLOCK_ENTRY *tmpentry;
 
 	total_deleted_cache = 0;
+	total_deleted_dirty_cache = 0;
 	total_deleted_blocks = 0;
 	total_deleted_fileblocks = 0;
 
@@ -1847,6 +1849,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 				tmpentry->status = ST_NONE;
 
 			total_deleted_cache += (long long) cache_block_size;
+			total_deleted_dirty_cache +=
+						(long long) cache_block_size;
 			total_deleted_blocks += 1;
 			total_deleted_fileblocks++;
 			break;
@@ -1856,6 +1860,21 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 			total_deleted_fileblocks++;
 			break;
 		case ST_BOTH:
+			ret_val = fetch_block_path(thisblockpath, inode_index,
+				tmp_blk_index);
+			if (ret_val < 0)
+				return ret_val;
+			if (access(thisblockpath, F_OK) == 0) {
+				cache_block_size =
+					check_file_size(thisblockpath);
+				unlink(thisblockpath);
+				total_deleted_cache +=
+					(long long) cache_block_size;
+				total_deleted_blocks += 1;
+			}
+			tmpentry->status = ST_TODELETE;
+			total_deleted_fileblocks++;
+			break;
 		case ST_LtoC:
 			ret_val = fetch_block_path(thisblockpath, inode_index,
 				tmp_blk_index);
@@ -1866,6 +1885,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 					check_file_size(thisblockpath);
 				unlink(thisblockpath);
 				total_deleted_cache +=
+					(long long) cache_block_size;
+				total_deleted_dirty_cache +=
 					(long long) cache_block_size;
 				total_deleted_blocks += 1;
 			}
@@ -1888,7 +1909,8 @@ int truncate_delete_block(BLOCK_ENTRY_PAGE *temppage, int start_index,
 	}
 	if (total_deleted_blocks > 0) {
 		change_system_meta(0, -total_deleted_cache,
-				-total_deleted_blocks);
+		                   -total_deleted_blocks,
+		                   -total_deleted_dirty_cache);
 		ret = update_file_stats(metafptr, -total_deleted_fileblocks,
 				-total_deleted_blocks, -total_deleted_cache,
 				inode_index);
@@ -1921,6 +1943,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	int ret, errcode;
 	long long cache_delta;
 	long long cache_block_delta;
+	char tmpstatus;
 
 	cache_delta = 0;
 	cache_block_delta = 0;
@@ -1977,6 +2000,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			return ret;
 		}
 
+		tmpstatus = (temppage->block_entries[last_index]).status;
 		if (((temppage->block_entries[last_index]).status ==
 			 ST_CLOUD) ||
 			((temppage->block_entries[last_index]).status ==
@@ -2057,7 +2081,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 					return ret;
 				}
 
-				change_system_meta(0, tempstat.st_size, 1);
+				change_system_meta(0, tempstat.st_size, 1,
+				                   tempstat.st_size);
 				cache_delta += tempstat.st_size;
 				cache_block_delta += 1;
 			}
@@ -2090,7 +2115,12 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 0);
+		if (tmpstatus == ST_BOTH)
+			change_system_meta(0, new_block_size - old_block_size,
+					0, new_block_size);
+		else
+			change_system_meta(0, new_block_size - old_block_size,
+					0, new_block_size - old_block_size);
 		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
@@ -2108,6 +2138,8 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	} else {
 		if ((temppage->block_entries[last_index]).status == ST_NONE)
 			return 0;
+
+		tmpstatus = (temppage->block_entries[last_index]).status;
 
 		/* TODO: Error handling here if block status is not ST_NONE
 			but cannot find block on local disk */
@@ -2160,7 +2192,13 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		ftruncate(fileno(blockfptr), (offset % MAX_BLOCK_SIZE));
 		new_block_size = check_file_size(thisblockpath);
 
-		change_system_meta(0, new_block_size - old_block_size, 0);
+		if (tmpstatus == ST_BOTH)
+			change_system_meta(0, new_block_size - old_block_size,
+					0, new_block_size);
+		else
+			change_system_meta(0, new_block_size - old_block_size,
+					0, new_block_size - old_block_size);
+
 		cache_delta += new_block_size - old_block_size;
 
 		flock(fileno(blockfptr), LOCK_UN);
@@ -2521,7 +2559,7 @@ int hfuse_ll_truncate(ino_t this_inode, struct stat *filestat,
 	}
 
 	/* Update file and system meta here */
-	change_system_meta((long long)(offset - filestat->st_size), 0, 0);
+	change_system_meta((long long)(offset - filestat->st_size), 0, 0, 0);
 
 	ret = change_mount_stat(tmpptr,
 			(long long) (offset - filestat->st_size), 0);
@@ -2865,7 +2903,7 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				goto error_handling;
 
 			/* Update system meta to reflect correct cache size */
-			change_system_meta(0, tempstat2.st_size, 1);
+			change_system_meta(0, tempstat2.st_size, 1, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3450,7 +3488,8 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 				return ret;
 			}
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, tempstat2.st_size, 1);
+			change_system_meta(0, tempstat2.st_size, 1,
+					tempstat2.st_size);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0)
 				goto error_handling;
@@ -3641,7 +3680,7 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 			}
 
 			tmpptr = fh_ptr->meta_cache_ptr;
-			change_system_meta(0, 0, 1);
+			change_system_meta(0, 0, 1, 0);
 			ret = meta_cache_open_file(tmpptr);
 			if (ret < 0) {
 				sem_post(&(fh_ptr->block_sem));
@@ -3730,7 +3769,8 @@ size_t _write_block(const char *buf, size_t size, long long bindex,
 	new_cache_size = check_file_size(thisblockpath);
 
 	if (old_cache_size != new_cache_size){
-		change_system_meta(0, new_cache_size - old_cache_size, 0);
+		change_system_meta(0, new_cache_size - old_cache_size, 0,
+				new_cache_size - old_cache_size);
 
 		tmpptr = fh_ptr->meta_cache_ptr;
 		ret = meta_cache_open_file(tmpptr);
@@ -3932,7 +3972,7 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 
 	if (temp_stat.st_size < (offset + total_bytes_written)) {
 		change_system_meta((long long) ((offset + total_bytes_written)
-						- temp_stat.st_size), 0, 0);
+						- temp_stat.st_size), 0, 0, 0);
 		ret = change_mount_stat(tmpptr,
 			(long long) ((offset + total_bytes_written)
 						- temp_stat.st_size), 0);

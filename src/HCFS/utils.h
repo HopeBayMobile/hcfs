@@ -43,7 +43,8 @@ int validate_system_config(void);
 off_t check_file_size(const char *path);
 
 int change_system_meta(long long system_size_delta,
-		long long cache_size_delta, long long cache_blocks_delta);
+		long long cache_size_delta, long long cache_blocks_delta,
+		long long dirty_cache_delta);
 
 int set_block_dirty_status(char *path, FILE *fptr, char status);
 int get_block_dirty_status(char *path, FILE *fptr, char *status);
