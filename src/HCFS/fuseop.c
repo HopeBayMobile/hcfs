@@ -3853,10 +3853,16 @@ void hfuse_ll_write(fuse_req_t req, fuse_ino_t ino, const char *buf,
 	if ((thisfilemeta.local_pin == TRUE) &&
 	    ((offset + size) > temp_stat.st_size)) {
 		sem_wait(&(hcfs_system->access_sem));
-		hcfs_system->systemdata.pinned_size +=
-			(long long) ((offset + size) - temp_stat.st_size);
-		amount_preallocated =
-			(long long) ((offset + size) - temp_stat.st_size);
+		sizediff = (long long) ((offset + size) - temp_stat.st_size);
+		if ((hcfs_system->systemdata.pinned_size + sizediff)
+			> MAX_PINNED_LIMIT) {
+			sem_post(&(hcfs_system->access_sem));
+			fuse_reply_err(req, ENOSPC);
+			return;
+		}
+
+		hcfs_system->systemdata.pinned_size += sizediff;
+		amount_preallocated = sizediff;
 		if (hcfs_system->systemdata.pinned_size < 0)
 			hcfs_system->systemdata.pinned_size = 0;
 		sem_post(&(hcfs_system->access_sem));
