@@ -878,10 +878,9 @@ int increase_pinned_size(long long *reserved_pinned_size,
 
 		} else {
 			ret = -ENOSPC;	
-			*reserved_pinned_size = 0;
+			*reserved_pinned_size += file_size; /* Recover */
 		}
 		sem_post(&(hcfs_system->access_sem));
-
 	}
 
 	write_log(10, "Debug: file size = %lld, reserved pinned size = %lld,"
@@ -895,16 +894,15 @@ int increase_pinned_size(long long *reserved_pinned_size,
 /**
  * pin_inode
  *
- * Pin an inode such that it is in local device. This function will first
- * change pinning flag and fetch all blocks if it is regular file. In case
- * of failing in fetch blocks (disconnection, system shutdown, file is 
- * removed by others, be unpinned when pinning), the pin flag will be set
- * as "unpin" and return negative error code. If the pin flag had already been
- * set up, then return 1.
+ * Change local pin flag in meta cache to "TRUE" and set pin_status
+ * in super block to ST_PINNING in case of regfile, ST_PIN for dir/ symlink.
+ * When a regfile is set to ST_PINNING, it will be pushed into pinning queue
+ * and all blocks will be fetched from cloud by other thread.
  *
  * @param this_inode The inode number that should be pinned.
+ * @param reserved_pinned_size The reserved pinned quota had been deducted.
  *
- * @return 0 on success, 1 on case that file had been pinned,
+ * @return 0 on success, 1 on case that regfile/symlink had been pinned,
  *         otherwise negative error code.
  */
 int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
@@ -944,13 +942,17 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 
 	/* After pinning self, pin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
-		return 0;
+		return ret;
 	
 	} else if (S_ISLNK(tempstat.st_mode)) {
-		return 0;
+		return ret;
 	
 	} else { /* expand dir */
-		ret = collect_dir_child(this_inode, &dir_node_list,
+		num_dir_node = 0;
+		num_nondir_node = 0;
+		dir_node_list = NULL;
+		nondir_node_list = NULL;
+		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list, &num_nondir_node);
 		if (ret < 0)
 			return ret;
@@ -991,7 +993,6 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 
 int decrease_pinned_size(long long *reserved_release_size, long long file_size)
 {
-
 	*reserved_release_size -= file_size;
 	if (*reserved_release_size < 0) {
 		sem_wait(&(hcfs_system->access_sem));
@@ -1017,11 +1018,18 @@ int decrease_pinned_size(long long *reserved_release_size, long long file_size)
  * unpin_inode
  *
  * Unpin an pinned file so that it can be paged out and release more
- * available space. If the inode had been not pinned, return 1.
+ * available space. An inode will be check pin flag in meta cache
+ * and then let pin_status in super block entry be ST_UNPIN if succeeds
+ * in unpinning this inode. In case that inode is a regfile with 
+ * pin_status "ST_PINNING", it will be dequeued from pinning queue in
+ * "super_block_unpin". When inode is a dir, all of its children will
+ * be unpinned recursively.
  *
  * @param this_inode The inode number that should be unpinned.
+ * @param reserved_release_size The reserved pinned quota being 
+ *        going to release.
  *
- * @return 0 on success, 1 on case that file had been unpinned,
+ * @return 0 on success, 1 on case that regfile/symlink had been unpinned,
  *         otherwise negative error code.
  */
 
@@ -1063,13 +1071,17 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 	/* After unpinning itself, unpin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
-		return 0;
+		return ret;
 	
 	} else if (S_ISLNK(tempstat.st_mode)) {
-		return 0;
+		return ret;
 	
 	} else { /* expand dir */
-		ret = collect_dir_child(this_inode, &dir_node_list,
+		num_dir_node = 0;
+		num_nondir_node = 0;
+		dir_node_list = NULL;
+		nondir_node_list = NULL;
+		ret = collect_dir_children(this_inode, &dir_node_list,
 			&num_dir_node, &nondir_node_list, &num_nondir_node);
 		if (ret < 0)
 			return ret;

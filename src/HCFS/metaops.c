@@ -1593,7 +1593,13 @@ int lookup_dir(ino_t parent, const char *childname, DIR_ENTRY *dentry)
 }
 
 /**
+ * Change "local_pin" flag in meta cache. "new_pin_status" is either
+ * TRUE or FALSE. local_pin equals TRUE means this inode is pinned at local
+ * device but not neccessarily all blocks are local now.
  *
+ * @param this_inode Inode of the meta to be changed.
+ * @param this_mode Mode of this inode.
+ * @param new_pin_status New "local_pin" status that is going to updated.
  *
  * @return 0 when succeding in change pin-flag, 1 when new pin-flag is the
  *         same as old one. Otherwise return negative error code.
@@ -1733,7 +1739,7 @@ static int _check_shrink_size(ino_t **ptr, long long num_elem,
 	return 0;
 }
 
-int collect_dir_child(ino_t this_inode, 
+int collect_dir_children(ino_t this_inode, 
 	ino_t **dir_node_list, long long *num_dir_node,
 	ino_t **nondir_node_list, long long *num_nondir_node)
 {

@@ -6,6 +6,7 @@ char CREATEDFS;
 char DELETEDFS;
 char CHECKEDFS;
 char LISTEDFS;
+char PIN_INODE_ROLLBACK;
 int numlistedFS;
 
 char recvFSname[100];
