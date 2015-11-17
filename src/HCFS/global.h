@@ -41,7 +41,7 @@
 #define UNMOUNTFS 9
 #define CHECKMOUNT 10
 #define UNMOUNTALL 11
-#define CLOUDSTAT 12
+#define CLOUDSTAT 23
 
 #define HTTP_200_OK                        200
 #define HTTP_201_CREATED                   201
