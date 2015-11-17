@@ -901,6 +901,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	FILE_META_TYPE filemeta;
 	int ret_val;
 	ino_t parent_inode;
+	DIR_STATS_TYPE tmpstat;
 
 	parent_inode = parent_meta_cache_entry->inode_num;
 
@@ -966,7 +967,18 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	}
 
 	/* Check location for linked file and update parent to root */
-	DIR_STATS_TYPE tmpstat;
+	ret_val = check_file_storage_location(link_entry->fptr, &tmpstat);
+	if (ret_val < 0)
+		goto error_handle;
+
+	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
+	if (ret_val < 0) {
+		sem_post(&(pathlookup_data_lock));
+		goto error_handle;
+	}
+	sem_post(&(pathlookup_data_lock));
+
+	/* Check location for linked file and update parent to root */
 	ret_val = check_file_storage_location(link_entry->fptr, &tmpstat);
 	if (ret_val < 0)
 		goto error_handle;
