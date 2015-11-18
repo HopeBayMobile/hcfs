@@ -264,11 +264,11 @@ TEST_F(dsync_single_inodeTest, DeleteAllBlockSuccess)
 	qsort(objname_list, expected_num_objname, sizeof(char *), dsync_single_inodeTest::objname_cmp);
 	for (int block = 0 ; block < expected_num_objname - 1 ; block++) {
 		char expected_objname[size_objname];
-		sprintf(expected_objname, "data_%ju_%d", (uintmax_t)mock_thread_info->inode, block);
+		sprintf(expected_objname, "data_%" PRIu64 "_%d", (uint64_t)mock_thread_info->inode, block);
 		ASSERT_STREQ(expected_objname, objname_list[block]); // Check all obj was recorded.
 	}
 	char expected_objname[size_objname];
-	sprintf(expected_objname, "meta_%ju", (uintmax_t)mock_thread_info->inode);
+	sprintf(expected_objname, "meta_%" PRIu64 "", (uint64_t)mock_thread_info->inode);
 	EXPECT_STREQ(expected_objname, objname_list[expected_num_objname - 1]); // Check meta was recorded.
 	
 	EXPECT_EQ(0, pthread_cancel(delete_ctl.delete_handler_thread));

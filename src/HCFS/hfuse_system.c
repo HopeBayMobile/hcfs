@@ -49,8 +49,6 @@
 #include "FS_manager.h"
 #include "path_reconstruct.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
 
@@ -69,15 +67,16 @@ int init_hcfs_system_data(void)
 	size_t ret_size;
 
 #ifdef _ANDROID_ENV_
-	hcfs_system = (SYSTEM_DATA_HEAD *) malloc(sizeof(SYSTEM_DATA_HEAD));
+	hcfs_system = (SYSTEM_DATA_HEAD *)malloc(sizeof(SYSTEM_DATA_HEAD));
 #else
 	int shm_key;
+
 	shm_key = shmget(2345, sizeof(SYSTEM_DATA_HEAD), IPC_CREAT | 0666);
 	if (shm_key < 0) {
 		errcode = errno;
 		return -errcode;
 	}
-	hcfs_system = (SYSTEM_DATA_HEAD *) shmat(shm_key, NULL, 0);
+	hcfs_system = (SYSTEM_DATA_HEAD *)shmat(shm_key, NULL, 0);
 	if (hcfs_system == (void *)-1) {
 		errcode = errno;
 		return -errcode;
@@ -90,38 +89,38 @@ int init_hcfs_system_data(void)
 	sem_init(&(hcfs_system->check_cache_sem), 1, 0);
 	sem_init(&(hcfs_system->check_next_sem), 1, 0);
 	hcfs_system->system_going_down = FALSE;
-	hcfs_system->backend_is_online = FALSE;
+	hcfs_system->backend_status_is_online = FALSE;
 
 	hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 	if (hcfs_system->system_val_fptr == NULL) {
 		errcode = errno;
 		if (errcode != ENOENT) {
 			write_log(0, "Error reading system file. Code %d, %s\n",
-				errcode, strerror(errcode));
+				  errcode, strerror(errcode));
 			return -errcode;
 		}
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "w+");
 		if (hcfs_system->system_val_fptr == NULL) {
 			errcode = errno;
 			write_log(0, "Error reading system file. Code %d, %s\n",
-				errcode, strerror(errcode));
+				  errcode, strerror(errcode));
 			return -errcode;
 		}
 
-		FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE),
-					1, hcfs_system->system_val_fptr);
+		FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
+		       hcfs_system->system_val_fptr);
 		fclose(hcfs_system->system_val_fptr);
 		hcfs_system->system_val_fptr = fopen(HCFSSYSTEM, "r+");
 		if (hcfs_system->system_val_fptr == NULL) {
 			errcode = errno;
 			write_log(0, "Error reading system file. Code %d, %s\n",
-				errcode, strerror(errcode));
+				  errcode, strerror(errcode));
 			return -errcode;
 		}
 	}
 	setbuf(hcfs_system->system_val_fptr, NULL);
 	FREAD(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
-						hcfs_system->system_val_fptr);
+	      hcfs_system->system_val_fptr);
 
 	return 0;
 errcode_handle:
@@ -148,7 +147,7 @@ int sync_hcfs_system_data(char need_lock)
 		sem_wait(&(hcfs_system->access_sem));
 	FSEEK(hcfs_system->system_val_fptr, 0, SEEK_SET);
 	FWRITE(&(hcfs_system->systemdata), sizeof(SYSTEM_DATA_TYPE), 1,
-						hcfs_system->system_val_fptr);
+	       hcfs_system->system_val_fptr);
 	if (need_lock == TRUE)
 		sem_post(&(hcfs_system->access_sem));
 
@@ -197,23 +196,28 @@ int _init_download_curl(int count)
 {
 	int ret_val;
 
-	snprintf(download_curl_handles[count].id, 255,
-				"download_thread_%d", count);
+	snprintf(download_curl_handles[count].id,
+		 sizeof(((CURL_HANDLE *)0)->id) - 1, "download_thread_%d",
+		 count);
 
 	curl_handle_mask[count] = FALSE;
 	download_curl_handles[count].curl_backend = NONE;
 	download_curl_handles[count].curl = NULL;
+	UNUSED(ret_val);
 	/* Do not init backend until actually needed */
-/*
-	ret_val = hcfs_init_backend(&(download_curl_handles[count]));
-
-	while ((ret_val < 200) || (ret_val > 299)) {
-		write_log(0, "error in connecting to backend\n");
-		if (download_curl_handles[count].curl != NULL)
-			hcfs_destroy_backend(download_curl_handles[count].curl);
+	/*
 		ret_val = hcfs_init_backend(&(download_curl_handles[count]));
-	}
-*/
+
+		while ((ret_val < 200) || (ret_val > 299)) {
+			write_log(0, "error in connecting to backend\n");
+			if (download_curl_handles[count].curl != NULL)
+				hcfs_destroy_backend(
+					download_curl_handles[count].curl);
+			ret_val = hcfs_init_backend(
+					&(download_curl_handles[count])
+				);
+		}
+	*/
 	return 0;
 }
 
@@ -231,19 +235,17 @@ int main(int argc, char **argv)
 	CURL_HANDLE curl_handle;
 	int ret_val;
 	struct rlimit nofile_limit;
-#ifdef _ANDROID_ENV_
 	pthread_t delete_loop_thread;
+	pthread_t monitor_loop_thread;
+#ifdef _ANDROID_ENV_
 	pthread_t upload_loop_thread;
 	pthread_t cache_loop_thread;
-	pthread_t monitor_loop_thread;
 #else
-#define NUMBER_OF_CHILDREN 3
-	pid_t child_pids[NUMBER_OF_CHILDREN];
+	pid_t child_pids[CHILD_NUM];
 	pid_t this_pid;
-	int process_num;
-#endif  /* _ANDROID_ENV_ */
+	int proc_idx;
+#endif /* _ANDROID_ENV_ */
 	int count;
-
 
 	logptr = NULL;
 
@@ -274,34 +276,38 @@ int main(int argc, char **argv)
 		/* exit(-1); */
 	}
 
+	UNUSED(curl_handle);
 	/* Only init backend when actual transfer is needed */
-/*
-	if (CURRENT_BACKEND != NONE) {
-		sprintf(curl_handle.id, "main");
-		ret_val = hcfs_init_backend(&curl_handle);
-		if ((ret_val < 200) || (ret_val > 299)) {
-			write_log(0,
-				"Error in connecting to backend. Code %d\n",
-				ret_val);
-			write_log(0, "Backend %d\n", CURRENT_BACKEND);
-			exit(-1);
-		}
+	/*
+		if (CURRENT_BACKEND != NONE) {
+			sprintf(curl_handle.id, "main");
+			ret_val = hcfs_init_backend(&curl_handle);
+			if ((ret_val < 200) || (ret_val > 299)) {
+				write_log(0,
+					"Error in connecting to backend. Code
+	   %d\n",
+					ret_val);
+				write_log(0, "Backend %d\n", CURRENT_BACKEND);
+				exit(-1);
+			}
 
-		ret_val = hcfs_list_container(&curl_handle);
-		if (((ret_val < 200) || (ret_val > 299)) && (ret_val != 404)) {
-			write_log(0, "Error in connecting to backend\n");
-			exit(-1);
-		}
-		write_log(10, "ret code %d\n", ret_val);
+			ret_val = hcfs_list_container(&curl_handle);
+			if (((ret_val < 200) || (ret_val > 299)) && (ret_val !=
+	   404)) {
+				write_log(0, "Error in connecting to
+	   backend\n");
+				exit(-1);
+			}
+			write_log(10, "ret code %d\n", ret_val);
 
-		hcfs_destroy_backend(curl_handle.curl);
-	}
-*/
+			hcfs_destroy_backend(curl_handle.curl);
+		}
+	*/
 	ret_val = init_hfuse();
 	if (ret_val < 0)
 		exit(-1);
 
-	/* TODO: error handling for log files */
+/* TODO: error handling for log files */
 #ifdef _ANDROID_ENV_
 	ret_val = init_pathlookup();
 	if (ret_val < 0)
@@ -316,7 +322,7 @@ int main(int argc, char **argv)
 		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
 		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
 		sem_init(&download_curl_control_sem, 0, 1);
-		for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
+		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
 			_init_download_curl(count);
 	}
 	hook_fuse(argc, argv);
@@ -333,55 +339,51 @@ int main(int argc, char **argv)
 	destroy_pathlookup();
 #else
 	/* Start up children */
-	for (process_num = 0; process_num < NUMBER_OF_CHILDREN;
-			++process_num) {
+	for (proc_idx = 0; proc_idx < CHILD_NUM; ++proc_idx) {
 		this_pid = fork();
 		if (this_pid != 0) {
-			child_pids[process_num] = this_pid;
+			child_pids[proc_idx] = this_pid;
 			continue;
 		}
-		/* children process */
-		if(process_num == 0) {
-			open_log("cache_maintain.log");
-			write_log(2, "\nStart logging cache cleanup\n");
-			run_cache_loop();
-			close_log();
-		}
-		else if(process_num == 1) {
-			open_log("backend_upload.log");
-			write_log(2, "\nStart logging backend upload\n");
-			pthread_create(&delete_loop_thread, NULL, &delete_loop,
-					NULL);
-			upload_loop();
-			pthread_join(delete_loop_thread, NULL);
-			close_log();
-		}
-		else if(process_num == 2) {
-			open_log("backend_connection.log");
-			write_log(2, "\nStart logging backend connection\n");
-			monitor_loop();
-			close_log();
-		}
-		return 0;
-		/* children process end */
+		/* exit with proc_idx from 0 to CHILD_NUM */
+		break;
 	}
 
-	/* Only main process runs to here */
-	open_log("fuse.log");
-	write_log(2, "\nStart logging fuse\n");
-	sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
-	sem_init(&download_curl_control_sem, 0, 1);
+	switch (proc_idx) {
+	case 0:
+		/* main process */
+		open_log("fuse.log");
+		write_log(2, "\nStart logging fuse\n");
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1);
 
-	for (count = 0; count <	MAX_DOWNLOAD_CURL_HANDLE; count++)
-		_init_download_curl(count);
+		for (count = 0; count < MAX_DOWNLOAD_CURL_HANDLE; count++)
+			_init_download_curl(count);
 
-	hook_fuse(argc, argv);
-	write_log(2, "Waiting for subprocesses to terminate\n");
-	for (process_num = 0; process_num < NUMBER_OF_CHILDREN;
-			++process_num) {
-		waitpid(child_pids[process_num], NULL, 0);
+		hook_fuse(argc, argv);
+		write_log(2, "Waiting for subprocesses to terminate\n");
+		for (proc_idx = 1; proc_idx <= CHILD_NUM; ++proc_idx)
+			waitpid(child_pids[proc_idx], NULL, 0);
+		close_log();
+		break;
+	/* children processed begin */
+	case 1:
+		open_log("cache_maintain.log");
+		write_log(2, "\nStart logging cache cleanup\n");
+		run_cache_loop();
+		close_log();
+		break;
+	case 2:
+		open_log("backend_upload.log");
+		write_log(2, "\nStart logging backend upload\n");
+		pthread_create(&delete_loop_thread, NULL, &delete_loop, NULL);
+		pthread_create(&monitor_loop_thread, NULL, &monitor_loop, NULL);
+		upload_loop();
+		pthread_join(delete_loop_thread, NULL);
+		pthread_join(monitor_loop_thread, NULL);
+		close_log();
+		break;
 	}
-	close_log();
-#endif  /* _ANDROID_ENV_ */
+#endif /* _ANDROID_ENV_ */
 	return 0;
 }

@@ -569,10 +569,7 @@ void api_module(void *index)
 			break;
 		case CLOUDSTAT:
 			/* Terminate the system */
-			ret_len = sizeof(uint8_t);
-			send(fd1, &ret_len, sizeof(unsigned int), 0);
-			send(fd1, &(hcfs_system->backend_is_online),
-			     sizeof(uint8_t), 0);
+			retcode = (int)hcfs_system->backend_status_is_online;
 			break;
 		default:
 			retcode = ENOTSUP;

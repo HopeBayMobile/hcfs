@@ -197,7 +197,7 @@ public:
 			FILE *ptr;
 			char path[50];
 			int index;
-			sprintf(path, "/tmp/testHCFS/data_%ju_%d", (uintmax_t)inode, i);
+			sprintf(path, "/tmp/testHCFS/data_%" PRIu64 "_%d", (uint64_t)inode, i);
 			ptr = fopen(path, "w+");
 			fclose(ptr);
 			setxattr(path, "user.dirty", "T", 1, 0);
@@ -628,8 +628,8 @@ TEST_F(sync_single_inodeTest, SyncBlockFileSuccess)
 		sprintf(expected_objname, "data_%lld_%d",
 				mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno]) << "blockno = " << blockno;
-		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
-				(uintmax_t)mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
+				(uint64_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	printf("Begin to check block status\n");
@@ -678,12 +678,12 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	for (int blockno = 0; blockno < num_total_blocks - 1;
 	     blockno++) { // Check deleted-object is recorded
 		char expected_objname[50];
-		sprintf(expected_objname, "data_%ju_%d",
-			(uintmax_t)mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "data_%" PRIu64 "_%d",
+			(uint64_t)mock_thread_type.inode, blockno);
 		ASSERT_STREQ(expected_objname, objname_list[blockno])
 		    << "objname = " << objname_list[blockno];
-		sprintf(expected_objname, "/tmp/testHCFS/data_%ju_%d",
-			(uintmax_t)mock_thread_type.inode, blockno);
+		sprintf(expected_objname, "/tmp/testHCFS/data_%" PRIu64 "_%d",
+			(uint64_t)mock_thread_type.inode, blockno);
 		unlink(expected_objname);
 	}
 	unlink(metapath);

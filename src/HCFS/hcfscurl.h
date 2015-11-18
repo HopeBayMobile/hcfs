@@ -18,8 +18,17 @@
 #include <curl/curl.h>
 #include <semaphore.h>
 #include "objmeta.h"
+#include "params.h"
 
 #define MAX_DOWNLOAD_CURL_HANDLE 16
+
+extern SYSTEM_CONF_STRUCT system_config;
+
+typedef struct {
+	FILE *fptr;
+	off_t object_size;
+	off_t remaining_size;
+} object_put_control;
 
 typedef struct {
 	CURL *curl;

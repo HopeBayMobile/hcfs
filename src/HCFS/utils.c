@@ -70,8 +70,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%ju",
-		METAPATH, sub_dir, (uintmax_t)this_inode);
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/meta%" PRIu64 "",
+		METAPATH, sub_dir, (uint64_t)this_inode);
 
 	return 0;
 errcode_handle:
@@ -113,8 +113,8 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%ju",
-			METAPATH, sub_dir, (uintmax_t)this_inode);
+	snprintf(pathname, METAPATHLEN, "%s/todelete/sub_%d/meta%" PRIu64 "",
+			METAPATH, sub_dir, (uint64_t)this_inode);
 	return 0;
 errcode_handle:
 	return errcode;
@@ -147,8 +147,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%ju,_%lld",
-			BLOCKPATH, sub_dir, (uintmax_t)this_inode, block_num);
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 ",_%lld",
+			BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
 
@@ -1123,8 +1123,8 @@ int fetch_stat_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, METAPATHLEN, "%s/sub_%d/stat/stat%ju",
-			METAPATH, sub_dir, (uintmax_t)this_inode);
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/stat/stat%" PRIu64 "",
+			METAPATH, sub_dir, (uint64_t)this_inode);
 	return 0;
 errcode_handle:
 	return errcode;
@@ -1164,8 +1164,8 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, METAPATHLEN, "%s/sub_%d/trunc/trunc%ju",
-			METAPATH, sub_dir, (uintmax_t)this_inode);
+	snprintf(pathname, METAPATHLEN, "%s/sub_%d/trunc/trunc%" PRIu64 "",
+			METAPATH, sub_dir, (uint64_t)this_inode);
 	return 0;
 errcode_handle:
 	return errcode;

@@ -57,6 +57,8 @@ int main(int argc, char **argv)
 		code = CHECKMOUNT;
 	else if (strcasecmp(argv[1], "unmountall") == 0)
 		code = UNMOUNTALL;
+	else if (strcasecmp(argv[1], "cloudstat") == 0)
+		code = CLOUDSTAT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -182,6 +184,16 @@ int main(int argc, char **argv)
 		for (count = 0; count < total_entries; count++)
 			printf("%s\n", tmp[count].d_name);
 #endif
+		break;
+	case CLOUDSTAT:
+		if(status == -1)
+			break;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		printf("backend is %s\n", retcode ? "online" : "offline");
 		break;
 	default:
 		break;

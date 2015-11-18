@@ -36,14 +36,6 @@
 
 #define MAX_RETRIES 5
 
-extern SYSTEM_CONF_STRUCT system_config;
-
-typedef struct {
-	FILE *fptr;
-	off_t object_size;
-	off_t remaining_size;
-} object_put_control;
-
 /************************************************************************
 *
 * Function name: write_file_function
@@ -279,18 +271,23 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 	const int nonce_meta_len = strlen(nonce_meta);
 
 	char *s, *backup;
+
 	s = strtok_r(httpheader, "\n", &backup);
 	while (s) {
 		char *s2;
 		char *backup_s2;
+		int s2_len;
+		int len_diff;
+
 		s2 = strtok_r(s, ":", &backup_s2);
-		int s2_len = strlen(s2);
+		s2_len = strlen(s2);
 		if (s2_len <= meta_len)
 			goto cont;
 		if (memcmp(s2, meta, meta_len) != 0)
 			goto cont;
 
-		int len_diff = s2_len - meta_len;
+		len_diff = s2_len - meta_len;
+
 		switch (len_diff) {
 		case 3:
 			if (memcmp(enc_meta, s2 + meta_len, enc_meta_len) ==
@@ -326,7 +323,7 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 			break;
 		}
 
-	cont:
+cont:
 		s = strtok_r(NULL, "\n", &backup);
 	}
 	return 0;
@@ -634,8 +631,8 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	char header_filename[100];
 	int ret_val, errcode;
 
-	sprintf(header_filename, "/dev/shm/swiftaccounthead%s.tmp",
-		curl_handle->id);
+	snprintf(header_filename, sizeof(header_filename),
+		 "/dev/shm/swiftaccounthead%s.tmp", curl_handle->id);
 	curl = curl_handle->curl;
 
 	swift_header_fptr = fopen(header_filename, "w+");
@@ -656,7 +653,7 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
 	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
 	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "HEAD");
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
 	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
 	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
@@ -668,21 +665,19 @@ int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
 
 	res = curl_easy_perform(curl);
 
-	if (res == CURLE_OK) {
+	if (res == CURLE_OK)
 		curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &ret_val);
-	} else {
+	else
 		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
-	}
 
 	fclose(swift_header_fptr);
 	unlink(header_filename);
 	curl_slist_free_all(chunk);
 
-	if (res == CURLE_OK) {
+	if (res == CURLE_OK)
 		return ret_val;
-	} else {
+	else
 		return -1;
-	}
 }
 
 /************************************************************************
@@ -1473,7 +1468,7 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 	switch (CURRENT_BACKEND) {
 	case SWIFT:
 		ret_val = hcfs_swift_test_backend(curl_handle);
-		if (ret_val == HTTP_401_UNAUTHORIZED) {
+		if (ret_val == 401) {
 			write_log(2, "Retrying backend login");
 			ret_val = hcfs_swift_reauth(curl_handle);
 			if ((ret_val < 200) || (ret_val > 299))
@@ -1483,7 +1478,7 @@ int hcfs_test_backend(CURL_HANDLE *curl_handle)
 		break;
 	case S3:
 		ret_val = hcfs_S3_test_backend(curl_handle);
-		if (ret_val == HTTP_401_UNAUTHORIZED) {
+		if (ret_val == 401) {
 			write_log(2, "Retrying backend login");
 			ret_val = hcfs_S3_reauth(curl_handle);
 			if ((ret_val < 200) || (ret_val > 299))

@@ -1,6 +1,6 @@
 /*************************************************************************
 *
-* Copyright © 2014-2015 Hope Bay Technologies, Inc. All rights reserved.
+* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
 *
 * File Name: HCFSvol.h
 * Abstract: The header file for HCFSvol

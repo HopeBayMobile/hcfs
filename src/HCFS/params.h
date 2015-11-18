@@ -83,6 +83,7 @@ typedef struct {
 #define BLOCKPATHLEN 400
 #define MAX_FILENAME_LEN 255
 #define MONITOR_INTERVAL 60
+#define MONITOR_TEST_TIMEOUT 10L
 
 #define NUMSUBDIR 1000
 

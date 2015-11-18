@@ -20,8 +20,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char mock_block_path[50];
 	FILE *ptr;
-	sprintf(mock_block_path, "/tmp/testHCFS/data_%ju_%lld",
-		(uintmax_t)this_inode, block_num);
+	sprintf(mock_block_path, "/tmp/testHCFS/data_%" PRIu64 "_%lld",
+		(uint64_t)this_inode, block_num);
 	ptr = fopen(mock_block_path, "w+");
 	truncate(mock_block_path, EXTEND_FILE_SIZE);
 	fclose(ptr);
@@ -88,7 +88,7 @@ int do_block_delete(ino_t this_inode, long long block_no,
 #endif
 {
 	char deleteobjname[30];
-	sprintf(deleteobjname, "data_%ju_%lld", (uintmax_t)this_inode, block_no);
+	sprintf(deleteobjname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 	printf("Test: mock data %s is deleted\n", deleteobjname);
 
 	usleep(200000); // Let thread busy

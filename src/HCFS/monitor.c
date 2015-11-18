@@ -45,13 +45,13 @@ void *monitor_loop(void *ptr)
 void monitor_loop(void)
 #endif
 {
-	const struct timespec _100_millisecond = {0, 100 * 1000000};
-	struct timespec *access_time = &hcfs_system->access_time;
+	const struct timespec sleep_time = {1, 0}; /* sleep 1 second */
+	struct timespec *last_time = &hcfs_system->backend_status_last_time;
 	struct timespec test_start;
 	struct timespec test_stop;
 	struct timespec backend_idle_time;
 	struct timespec test_duration;
-	int32_t ret;
+	int32_t ret_val;
 #ifdef _ANDROID_ENV_
 	UNUSED(ptr);
 	prctl(PR_SET_NAME, "monitor_loop");
@@ -60,33 +60,35 @@ void monitor_loop(void)
 	monitor_curl_handle.curl_backend = NONE;
 	monitor_curl_handle.curl = NULL;
 
-	write_log(2, "[Backend status] Start monitor loop\n");
+	write_log(2, "[Backend Monitor] Start monitor loop\n");
 
 	while (hcfs_system->system_going_down == FALSE) {
 		clock_gettime(CLOCK_REALTIME, &test_start);
-		backend_idle_time = diff_time(*access_time, test_start);
+		backend_idle_time = diff_time(*last_time, test_start);
 		if (backend_idle_time.tv_sec >= MONITOR_INTERVAL) {
-			ret = hcfs_test_backend(&monitor_curl_handle);
+
+			ret_val = hcfs_test_backend(&monitor_curl_handle);
+
+			if ((ret_val >= 200) && (ret_val <= 299))
+				hcfs_system->backend_status_is_online = 1;
+			else
+				hcfs_system->backend_status_is_online = 0;
+
 			clock_gettime(CLOCK_REALTIME, &test_stop);
 			test_duration = diff_time(test_start, test_stop);
-			if (ret == HTTP_204_NO_CONTENT)
-				hcfs_system->backend_is_online = 1;
-			else
-				hcfs_system->backend_is_online = 0;
-
 			write_log(
 			    10,
 			    "[Backend Monitor] backend is %s, test time %f\n",
-			    hcfs_system->backend_is_online ? "online"
-							   : "offline",
+			    hcfs_system->backend_status_is_online ? "online"
+								  : "offline",
 			    test_duration.tv_sec +
 				test_start.tv_nsec / 1000000000.0);
-			access_time->tv_sec = test_start.tv_sec;
-			access_time->tv_nsec = test_start.tv_nsec;
+			last_time->tv_sec = test_start.tv_sec;
+			last_time->tv_nsec = test_start.tv_nsec;
 		}
 		/* wait 0.1 second */
-		ret = nanosleep(&_100_millisecond, NULL);
-		if (ret == -1 && errno == EINTR) {
+		ret_val = nanosleep(&sleep_time, NULL);
+		if (ret_val == -1 && errno == EINTR) {
 			write_log(2, "[Backend Monitor] interrupted\n");
 			break;
 		}

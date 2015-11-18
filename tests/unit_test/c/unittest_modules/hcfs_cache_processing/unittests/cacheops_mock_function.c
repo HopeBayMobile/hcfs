@@ -16,8 +16,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char block_name[200];
 
-	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%ju_%lld",
-			(uintmax_t)this_inode, block_num);
+	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%lld",
+			(uint64_t)this_inode, block_num);
 	strcpy(pathname, block_name);
 	
 	return 0;
@@ -27,8 +27,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char meta_name[200];
 
-	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%ju",
-			(uintmax_t)this_inode);
+	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+			(uint64_t)this_inode);
 	strcpy(pathname, meta_name);
 
 	return 0;
