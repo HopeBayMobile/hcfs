@@ -45,4 +45,6 @@
 #define GETMAXPINSIZE 21
 #define GETMAXCACHESIZE 22
 
+#define GETSTAT 50
+
 #endif  /* GW20_API_GLOBAL_H_ */

@@ -24,7 +24,10 @@ void _json_response(char **json_str, char result, int code, json_t *data)
 	res_obj = json_object();
 	json_object_set_new(res_obj, "result", json_boolean(result));
 	json_object_set_new(res_obj, "code", json_integer(code));
-	json_object_set_new(res_obj, "data", json_object());
+	if (data == NULL)
+		json_object_set_new(res_obj, "data", json_object());
+	else
+		json_object_set_new(res_obj, "data", data);
 
 	*json_str = json_dumps(res_obj, JSON_COMPACT);
 
@@ -49,6 +52,68 @@ int _api_socket_conn()
 
 void HCFS_set_config(char **json_res, char *key, char *value)
 {
+}
+
+void HCFS_stat(char **json_res)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len, buf_idx;
+	long long cloud_usage;
+	long long cache_total, cache_used, cache_dirty;
+	long long pin_max, pin_total;
+	char buf[512];
+	json_t *data;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = GETSTAT;
+	cmd_len = 0;
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	if (reply_len == 0) {
+		size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	} else {
+		ret_code = 0;
+		size_msg = recv(fd, buf, reply_len, 0);
+
+		buf_idx = 0;
+		memcpy(&cloud_usage, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		memcpy(&cache_total, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		memcpy(&cache_used, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		memcpy(&cache_dirty, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		memcpy(&pin_max, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		memcpy(&pin_total, &(buf[buf_idx]), sizeof(long long));
+		buf_idx += sizeof(long long);
+
+		data = json_object();
+		json_object_set_new(data, "cloud_used", json_integer(cloud_usage));
+		json_object_set_new(data, "cache_total", json_integer(cache_total));
+		json_object_set_new(data, "cache_used", json_integer(cache_used));
+		json_object_set_new(data, "cache_dirty", json_integer(cache_dirty));
+		json_object_set_new(data, "pin_max", json_integer(pin_max));
+		json_object_set_new(data, "pin_total", json_integer(pin_total));
+
+		_json_response(json_res, TRUE, ret_code, data);
+	}
 }
 
 void HCFS_pin_path(char **json_res, char *pin_path)

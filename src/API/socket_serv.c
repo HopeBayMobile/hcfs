@@ -15,6 +15,7 @@
 
 #include "global.h"
 #include "pin_ops.h"
+#include "hcfs_stat.h"
 
 SOCK_THREAD thread_pool[MAX_THREAD];
 
@@ -36,14 +37,16 @@ int _get_unused_thread()
 int process_request(int thread_idx)
 {
 
-	int fd;
-	int ret_code, to_recv;
+	int fd, ret_code, to_recv, buf_idx;
 	unsigned int api_code, arg_len, ret_len;
 	ssize_t size_msg, msg_len;
+	long long cloud_usage;
+	long long cache_total, cache_used, cache_dirty;
+	long long pin_max, pin_total;
 	char buf_reused;
 	char buf[512];
+	char res_buf[512];
 	char *largebuf;
-	char path[1024];
 
 	msg_len = 0;
 	ret_len = 0;
@@ -77,6 +80,9 @@ int process_request(int thread_idx)
 	}
 
 	while (1) {
+		if (arg_len == 0)
+			break;
+
 		if ((arg_len - msg_len) > 1024)
 			to_recv = 1024;
 		else
@@ -122,6 +128,37 @@ int process_request(int thread_idx)
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
+	case GETSTAT:
+		printf("Get statistics\n");
+		ret_len = 0;
+		ret_code = get_hcfs_stat(&cloud_usage, &cache_total,
+					 &cache_used, &cache_dirty,
+					 &pin_max, &pin_total);
+		if (ret_code < 0) {
+			size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+			size_msg = send(fd, &ret_code, sizeof(int), 0);
+		}
+
+		memcpy(&(res_buf[ret_len]), &cloud_usage, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &cache_total, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &cache_used, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &cache_dirty, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &pin_max, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		memcpy(&(res_buf[ret_len]), &pin_total, sizeof(long long));
+		ret_len += sizeof(long long);
+
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, res_buf, ret_len, 0);
 	}
 
 	printf("Get API code - %d from fd - %d\n", api_code, fd);

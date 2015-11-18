@@ -38,12 +38,12 @@ void HCFS_get_config(char **json_res, char *key);
  *     cloud_total: Bytes,
  *     cloud_used: Bytes,
  *     cache_total: Bytes,
- *     cache_dirty_used: Bytes,
- *     cache_clean_used: Bytes,
+ *     cache_used: Bytes,
+ *     cache_dirty: Bytes,
+ *     pin_max: Bytes,
  *     pin_total: Bytes,
- *     pin_used: Bytes,
- *     bw_upload: Bytes,
- *     bw_download: Bytes,
+ *     xfer_up: Bytes,
+ *     xfer_down: Bytes,
  *     cloud_conn: True|False,
  * }
  * ```

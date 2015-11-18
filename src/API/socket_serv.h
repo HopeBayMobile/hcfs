@@ -5,6 +5,7 @@
 
 #define MAX_THREAD 16
 
+
 typedef struct {
 	char in_used;
 	pthread_t thread;

@@ -65,6 +65,11 @@ int main()
 	HCFS_file_status(&res5, pin_path);
 	printf("%s\n", res5);
 	free(res5);
+
+	char *res6;
+	HCFS_stat(&res6);
+	printf("%s\n", res6);
+	free(res6);
 }
 
 
