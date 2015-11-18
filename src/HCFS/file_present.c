@@ -930,8 +930,13 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 		if (S_ISREG(tempstat.st_mode)) {
 			ret = increase_pinned_size(reserved_pinned_size,
 					tempstat.st_size);
-			if (ret == -ENOSPC)
+			if (ret == -ENOSPC) {
+				/* Roll back local_pin because the size
+				had not been added to system pinned size */
+				change_pin_flag(this_inode,
+					tempstat.st_mode, FALSE);
 				return ret;
+			}
 		}
 
 		ret = super_block_mark_pin(this_inode, tempstat.st_mode);

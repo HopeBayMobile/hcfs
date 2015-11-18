@@ -331,8 +331,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 
 			/* Give pinned space back */
 			sem_wait(&(hcfs_system->access_sem));
-			if (total_reserved_size > 0) /* Return ALL size */
-				hcfs_system->systemdata.pinned_size -=
+			hcfs_system->systemdata.pinned_size -=
 					total_reserved_size_bak;
 			if (hcfs_system->systemdata.pinned_size < 0)
 				hcfs_system->systemdata.pinned_size = 0;
