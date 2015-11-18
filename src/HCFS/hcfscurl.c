@@ -812,6 +812,13 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	swift_header_fptr = NULL;
 	UNLINK(header_filename);
 
+	if (_http_is_success(ret_val)) {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		(hcfs_system->systemdata).xfer_size_upload += objsize;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	return ret_val;
 
 errcode_handle:
@@ -1507,13 +1514,12 @@ errcode_handle:
 *  Return value: Return code from request (HTTP return code), or -1 if error.
 *
 *************************************************************************/
-/* TODO: Fix handling in reauthing in SWIFT.
-	Now will try to reauth for any HTTP error*/
 int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		    HCFS_encode_object_meta *object_meta)
 {
 	int ret_val, num_retries;
 	int ret, errcode;
+	long ret_pos;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1568,8 +1574,18 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 		break;
 	}
 	/* Truncate output if not successful */
-	if (!_http_is_success(ret_val))
+	if (!_http_is_success(ret_val)) {
 		FTRUNCATE(fileno(fptr), 0);
+	} else {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		FSEEK(fptr, 0, SEEK_END);
+		FTELL(fptr);
+		FSEEK(fptr, 0, SEEK_SET);
+		(hcfs_system->systemdata).xfer_size_download += ret_pos;
+		sem_post(&(hcfs_system->access_sem));
+	}
+
 	return ret_val;
 
 errcode_handle:
@@ -1769,6 +1785,12 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	fclose(S3_header_fptr);
 	S3_header_fptr = NULL;
 	UNLINK(header_filename);
+	if (_http_is_success(ret_val)) {
+		/* Update xfer statistics if successful */
+		sem_wait(&(hcfs_system->access_sem));
+		(hcfs_system->systemdata).xfer_size_upload += objsize;
+		sem_post(&(hcfs_system->access_sem));
+	}
 
 	return ret_val;
 

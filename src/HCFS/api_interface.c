@@ -753,7 +753,7 @@ void api_module(void *index)
 	int msg_index;
 	unsigned long num_entries;
 	unsigned int api_code, arg_len, ret_len;
-	long long llretval;
+	long long llretval, llretval2;
 
 	DIR_ENTRY *entryarray;
 	char *tmpptr;
@@ -1008,6 +1008,39 @@ void api_module(void *index)
 			sem_post(&(hcfs_system->access_sem));
 			send(fd1, &ret_len, sizeof(unsigned int), 0);
 			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETDIRTYCACHESIZE:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long);
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.dirty_cache_size;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, ret_len, 0);
+			break;
+		case GETXFERSTAT:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(long long) * 2;
+			sem_wait(&(hcfs_system->access_sem));
+			llretval = hcfs_system->systemdata.xfer_size_download;
+			llretval2 = hcfs_system->systemdata.xfer_size_upload;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &llretval, sizeof(long long), 0);
+			send(fd1, &llretval2, sizeof(long long), 0);
+			break;
+		case RESETXFERSTAT:
+			buf[0] = 0;
+			retcode = 0;
+			ret_len = sizeof(int);
+			sem_wait(&(hcfs_system->access_sem));
+			hcfs_system->systemdata.xfer_size_download = 0;
+			hcfs_system->systemdata.xfer_size_upload = 0;
+			sem_post(&(hcfs_system->access_sem));
+			send(fd1, &ret_len, sizeof(unsigned int), 0);
+			send(fd1, &retcode, sizeof(int), 0);
 			break;
 		case GETMAXPINSIZE:
 			buf[0] = 0;

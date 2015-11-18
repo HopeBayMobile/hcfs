@@ -247,6 +247,8 @@ static inline int _upload_terminate_thread(int index)
 						check_file_size(blockpath);
 					sem_wait(&(hcfs_system->access_sem));
 					statptr = &(hcfs_system->systemdata);
+					statptr->dirty_cache_size -=
+						cache_block_size;
 					if (statptr->dirty_cache_size < 0)
 						statptr->dirty_cache_size = 0;
 					sem_post(&(hcfs_system->access_sem));

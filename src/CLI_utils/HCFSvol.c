@@ -44,6 +44,7 @@ int main(int argc, char **argv)
 	char *ptr;
 	ino_t tmpino;
 	long long num_local, num_cloud, num_hybrid, retllcode;
+	long long downxfersize, upxfersize;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -89,6 +90,12 @@ int main(int argc, char **argv)
 		code = GETMAXPINSIZE;
 	else if (strcasecmp(argv[1], "maxcachesize") == 0)
 		code = GETMAXCACHESIZE;
+	else if (strcasecmp(argv[1], "dirtysize") == 0)
+		code = GETDIRTYCACHESIZE;
+	else if (strcasecmp(argv[1], "getxfer") == 0)
+		code = GETXFERSTAT;
+	else if (strcasecmp(argv[1], "resetxfer") == 0)
+		code = RESETXFERSTAT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -104,6 +111,7 @@ int main(int argc, char **argv)
 	switch (code) {
 	case TERMINATE:
 	case UNMOUNTALL:
+	case RESETXFERSTAT:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -120,6 +128,7 @@ int main(int argc, char **argv)
 	case GETCACHESIZE:
 	case GETMAXPINSIZE:
 	case GETMAXCACHESIZE:
+	case GETDIRTYCACHESIZE:
 		cmd_len = 0;
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
@@ -220,6 +229,17 @@ int main(int argc, char **argv)
 			printf("Command error: Code %d, %s\n",
 				-retcode, strerror(-retcode));
 		}
+		break;
+	case GETXFERSTAT:
+		cmd_len = 0;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+		size_msg = recv(fd, &downxfersize, sizeof(long long), 0);
+		size_msg = recv(fd, &upxfersize, sizeof(long long), 0);
+		printf("Reply len %d\n", reply_len);
+		printf("Download %lld bytes, upload %lld bytes\n",
+				downxfersize, upxfersize);
 		break;
 	case CHECKLOC:
 	case CHECKPIN:

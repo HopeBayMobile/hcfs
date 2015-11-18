@@ -52,8 +52,11 @@
 #define CHECKPIN 20
 #define GETMAXPINSIZE 21
 #define GETMAXCACHESIZE 22
+#define GETDIRTYCACHESIZE 24
+#define GETXFERSTAT 25
+#define RESETXFERSTAT 26
 
-#define DEFAULT_PIN FALSE
+#define DEFAULT_PIN TRUE
 
 /* Print format for ino_t is different in raspberry pi */
 #ifdef ARM_32bit_
