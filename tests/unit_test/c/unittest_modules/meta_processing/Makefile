@@ -61,7 +61,7 @@ clean :
 	rm -rf $(TESTS) gtest.a gtest_main.a *.o *.gcda *.gcov *.gcno
 
 test : setup $(TESTS)
-	#./metaops_unittest wait keiwei's fix
+	./metaops_unittest
 	./file_present_unittest
 	./super_block_unittest
 	./lookup_count_unittest
