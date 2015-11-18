@@ -65,8 +65,8 @@ int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result);
 
 int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete);
 
-int init_pathlookup();
-void destroy_pathlookup();
+int init_pathlookup(void);
+void destroy_pathlookup(void);
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode);
 int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr);
 #endif  /* GW20_HCFS_PATH_RECONSTRUCT_H_ */

@@ -104,7 +104,7 @@ int hcfs_init_backend(CURL_HANDLE *curl_handle)
 		return 404;
 	return 200;
 }
-void hcfs_destroy_backend(CURL *curl)
+void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 {
 	return 200;
 }
@@ -152,4 +152,8 @@ int update_FS_statistics(char *pathname, long long system_size,
 	return 0;
 }
 
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
 

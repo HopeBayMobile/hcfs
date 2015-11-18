@@ -567,6 +567,7 @@ TEST_F(mount_FSTest, MountedFS) {
   ASSERT_STREQ("/tmp/testmount", mount_mgr.root->mt_entry->f_mp);
 
   free(mount_mgr.root->mt_entry->f_mp);
+  free(mount_mgr.root->mt_entry->vol_path_cache);
   pthread_join(mount_mgr.root->mt_entry->mt_thread, NULL);
  }
 

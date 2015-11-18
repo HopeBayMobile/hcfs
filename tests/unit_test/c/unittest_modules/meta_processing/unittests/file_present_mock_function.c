@@ -188,4 +188,8 @@ int meta_cache_lookup_symlink_data(ino_t this_inode, struct stat *inode_stat,
 	}
 	return 0;
 }
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
 

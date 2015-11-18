@@ -804,3 +804,20 @@ int fetch_trunc_path(char *pathname, ino_t this_inode)
 	return 0;
 }
 
+int construct_path(PATH_CACHE *cacheptr, ino_t thisinode, char **result)
+{
+	*result = malloc(10);
+	snprintf(*result, 10, "/test");
+	return 0;
+}
+
+int delete_pathcache_node(PATH_CACHE *cacheptr, ino_t todelete)
+{
+	return 0;
+}
+
+int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode)
+{
+	return 0;
+}
+

@@ -655,6 +655,7 @@ TEST_F(sync_single_inodeTest, Sync_Todelete_BlockFileSuccess)
 	FILE *metaptr;
 
 	/* Mock data */
+	hcfs_system->system_going_down = FALSE;
 	write_mock_meta_file(metapath, total_page, ST_TODELETE);
 
 	system_config.max_block_size = 1000;

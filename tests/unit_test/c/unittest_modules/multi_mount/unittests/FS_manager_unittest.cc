@@ -219,7 +219,7 @@ TEST_F(add_filesystemTest, AddOneFS) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -260,7 +260,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -272,7 +272,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   fakeino = 3;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS1", &tmp_entry);
+  ret = add_filesystem("testFS1", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -286,7 +286,7 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   treesplit = TRUE;
   fakeino = 4;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS2", &tmp_entry);
+  ret = add_filesystem("testFS2", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -343,7 +343,7 @@ TEST_F(add_filesystemTest, NameTooLong) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem(verylongname, &tmp_entry);
+  ret = add_filesystem(verylongname, ANDROID_INTERNAL, &tmp_entry);
   EXPECT_EQ(-ENAMETOOLONG, ret);
  }
 
@@ -426,7 +426,7 @@ TEST_F(delete_filesystemTest, NoRootMeta) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -451,7 +451,7 @@ TEST_F(delete_filesystemTest, RootNotEmpty) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -489,7 +489,7 @@ TEST_F(delete_filesystemTest, DeleteOneFS) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -586,7 +586,7 @@ TEST_F(check_filesystemTest, FSFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -613,7 +613,7 @@ TEST_F(check_filesystemTest, FSNotFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", &tmp_entry);
+  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -877,7 +877,7 @@ class backup_FS_databaseTest : public ::testing::Test {
     treesplit = FALSE;
     failedcurlinit = FALSE;
     failedput = FALSE;
-
+    CURRENT_BACKEND = SWIFT;
    }
 
   virtual void TearDown() {
@@ -935,6 +935,8 @@ TEST_F(backup_FS_databaseTest, UploadDone) {
 
  }
 
+/* Init backend is done in get object op now */
+/*
 TEST_F(backup_FS_databaseTest, FailedInit) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
@@ -963,7 +965,7 @@ TEST_F(backup_FS_databaseTest, FailedInit) {
     unlink("/tmp/FSmgr_upload");
 
  }
-
+*/
 TEST_F(backup_FS_databaseTest, FailedPut) {
   int ret, errcode;
   DIR_META_TYPE tmphead;
@@ -1050,7 +1052,8 @@ TEST_F(restore_FS_databaseTest, CannotCreate) {
   if (fs_mgr_path != NULL)
     free(fs_mgr_path);
  }
-
+/* Init backend is done in get object op now */
+/*
 TEST_F(restore_FS_databaseTest, CurlInitFailed) {
   int ret;
 
@@ -1070,6 +1073,7 @@ TEST_F(restore_FS_databaseTest, CurlInitFailed) {
   if (fs_mgr_path != NULL)
     free(fs_mgr_path);
  }
+*/
 
 TEST_F(restore_FS_databaseTest, CurlGetFailed) {
   int ret;
