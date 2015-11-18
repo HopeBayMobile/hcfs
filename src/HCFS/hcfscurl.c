@@ -34,6 +34,7 @@
 #include "global.h"
 #include "fuseop.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
 #define MAX_RETRIES 5
 
 /************************************************************************
