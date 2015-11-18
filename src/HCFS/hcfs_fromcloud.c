@@ -101,6 +101,8 @@ int fetch_from_cloud(FILE *fptr,
                                  &(download_curl_handles[which_curl_handle]),
                                  object_meta);
 
+	/* TODO: Should process failed get here */
+
 #if defined(__ANDROID__) || defined(_ANDROID_ENV_)
 	fseek(get_fptr, 0, SEEK_END);
 	tmplen = ftell(get_fptr);

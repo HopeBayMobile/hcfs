@@ -184,6 +184,8 @@ typedef struct {
 	long long backend_size;
 	long long backend_inodes;
 	long long dirty_cache_size;
+	long long xfer_size_download;
+	long long xfer_size_upload;
 } SYSTEM_DATA_TYPE;
 
 typedef struct {
