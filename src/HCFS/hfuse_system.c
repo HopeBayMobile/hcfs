@@ -49,6 +49,8 @@
 #include "FS_manager.h"
 #include "path_reconstruct.h"
 
+extern SYSTEM_CONF_STRUCT system_config;
+
 /* TODO: A monitor thread to write system info periodically to a
 	special directory in /dev/shm */
 
