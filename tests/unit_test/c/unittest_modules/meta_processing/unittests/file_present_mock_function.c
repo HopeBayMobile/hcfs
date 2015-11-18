@@ -1,11 +1,13 @@
 #include <sys/stat.h>
 #include <stdio.h>
+#include <errno.h>
 
 #include "mock_param.h"
 
 #include "xattr_ops.h"
 #include "meta_mem_cache.h"
 #include "params.h"
+#include "global.h"
 
 int meta_cache_lookup_dir_data(ino_t this_inode, struct stat *inode_stat,
 	DIR_META_TYPE *dir_meta_ptr, DIR_ENTRY_PAGE *dir_page,

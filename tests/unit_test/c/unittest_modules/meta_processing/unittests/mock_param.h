@@ -43,6 +43,8 @@ struct stat to_verified_stat;
 #define INO_DELETE_DIR 12345
 #define INO_DELETE_LNK 13142
 #define TRUNC_SIZE 65536
+char pathlookup_write_parent_success;
+char delete_pathcache_node_success;
 
 /* fetch_inode_stat() & fetch_xattr_page() */
 #define INO_REGFILE 12213

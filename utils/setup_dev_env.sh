@@ -44,10 +44,12 @@ if md5sum --quiet -c "$setup_status_file"; then
 fi
 rm -f "$setup_status_file"
 
-echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
-
-if [ $verbose -eq 0 ]; then set +x; else set -x; fi
-
+if [ $verbose -eq 0 ]; then
+	set +x;
+else
+	echo -e "\n======== ${BASH_SOURCE[0]} mode $setup_dev_env_mode ========"
+	set -x;
+fi
 
 case "$setup_dev_env_mode" in
 unit_test )
@@ -81,7 +83,8 @@ functional_test )
 	fi
 	;;
 docker_host )
-	if ! hash docker || [[ $(sudo docker version | grep -c "Version:      1.8.2") -ne 2 ]]; then
+	if ! hash docker || [[ $(sudo docker version | grep -E -c "Version:.*1\.9\.0") -ne 2 ]]; then
+		echo `sudo docker version`
 		echo "Install/upgrade Docker"
 		sudo apt-key adv --recv-key --keyserver keyserver.ubuntu.com 58118E89F3A912897C070ADBF76221572C52609D
 		curl https://get.docker.com | sudo sh

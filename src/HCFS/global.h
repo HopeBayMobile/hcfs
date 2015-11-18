@@ -41,12 +41,6 @@
 #define UNMOUNTFS 9
 #define CHECKMOUNT 10
 #define UNMOUNTALL 11
-
-/* Print format for ino_t is different in raspberry pi */
-#ifdef ARM_32bit_
-#define FMT_INO_T "lld"
-#else
-#define FMT_INO_T "ld"
-#endif
+#define CLOUDSTAT 23
 
 #endif  /* GW20_SRC_GLOBAL_H_ */

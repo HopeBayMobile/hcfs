@@ -1,14 +1,27 @@
 #!/bin/bash
 
+set -e
 UNITTEST_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 WORKSPACE="$( cd "$UNITTEST_DIR/../.." && pwd )"
 
+. $WORKSPACE/utils/trace_error.bash
+
 # Install dependencies
 $WORKSPACE/utils/setup_dev_env.sh -vm unit_test
+$WORKSPACE/utils/install_ccache.bash
 . $WORKSPACE/utils/env_config.sh
 
 # Unit test
 cd $UNITTEST_DIR
-make clean
-make test
+
+if type -a colormake; then
+	make=colormake
+else
+	make=make
+fi
+
+$make clean
+$make
+TERM=xterm-color make -k GTEST_COLOR=yes NOGCOVR=1 test
+
 gcovr -r $WORKSPACE/src .

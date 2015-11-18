@@ -73,7 +73,7 @@ int init_api_interface(void)
 			sizeof(pthread_t) * MAX_API_THREADS);
 
 	api_server->sock.addr.sun_family = AF_UNIX;
-	strcpy(api_server->sock.addr.sun_path, SOCK_PATH);
+	snprintf(api_server->sock.addr.sun_path, sizeof(SOCK_PATH), SOCK_PATH);
 	api_server->sock.fd = socket(AF_UNIX, SOCK_STREAM, 0);
 
 	if (api_server->sock.fd < 0) {
@@ -179,7 +179,7 @@ int create_FS_handle(int arg_len, char *largebuf)
 
 	buf = malloc(arg_len + 10);
 #ifdef _ANDROID_ENV_
-	memcpy(buf, largebuf, arg_len -1);
+	memcpy(buf, largebuf, arg_len - 1);
 	buf[arg_len - 1] = 0;
 	tmptype = largebuf[arg_len - 1];
 	ret = add_filesystem(buf, tmptype, &tmp_entry);
@@ -362,7 +362,7 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(unsigned int)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid API code received\n");
 			retcode = EINVAL;
@@ -382,7 +382,7 @@ void api_module(void *index)
 			if (msg_len >= 4)
 				break;
 		}
-		if (msg_len < sizeof(unsigned int)) {
+		if (msg_len < (ssize_t)sizeof(unsigned int)) {
 			/* Error reading API code. Return EINVAL. */
 			write_log(5, "Invalid arg length received\n");
 			retcode = EINVAL;
@@ -453,7 +453,7 @@ void api_module(void *index)
 			buf[0] = 0;
 			retcode = 0;
 			sem_wait(&(hcfs_system->access_sem));
-			sprintf(buf, "%lld %lld %lld",
+			snprintf(buf, sizeof(buf), "%lld %lld %lld",
 				hcfs_system->systemdata.system_size,
 				hcfs_system->systemdata.cache_size,
 				hcfs_system->systemdata.cache_blocks);
@@ -566,6 +566,10 @@ void api_module(void *index)
 				send(fd1, &ret_len, sizeof(unsigned int), 0);
 				send(fd1, &retcode, sizeof(int), 0);
 			}
+			break;
+		case CLOUDSTAT:
+			/* Terminate the system */
+			retcode = (int)hcfs_system->backend_status_is_online;
 			break;
 		default:
 			retcode = ENOTSUP;
@@ -704,6 +708,5 @@ void api_server_monitor(void)
 		}
 
 		sem_post(&(api_server->job_lock));
-
 	}
 }
