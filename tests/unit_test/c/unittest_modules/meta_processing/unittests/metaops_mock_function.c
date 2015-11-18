@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <errno.h>
 #include <fuse/fuse_lowlevel.h>
+#include <inttypes.h>
 
 #include "mock_param.h"
 
@@ -126,7 +127,7 @@ int meta_cache_remove(ino_t this_inode)
 	char metapath[METAPATHLEN];
 
 	/* Remove todel file here */
-	sprintf(metapath, "testpatterns/inode_%"FMT_INO_T"_meta_file.todel", this_inode);
+	sprintf(metapath, "testpatterns/inode_%" PRIu64 "_meta_file.todel", (uint64_t)this_inode);
 	if (!access(metapath, F_OK))
 		unlink(metapath);
 
@@ -253,7 +254,8 @@ off_t check_file_size(const char *path)
 
 int fetch_todelete_path(char *pathname, ino_t this_inode)
 {
-	//sprintf(pathname, "testpatterns/inode_%"FMT_INO_T"_meta_file.todel", this_inode);
+	//sprintf(pathname, "testpatterns/inode_%" PRIu64 "_meta_file.todel",
+	//(uint64_t)this_inode);
 	strcpy(pathname, TO_DELETE_METAPATH);
 	if (this_inode == INO_RENAME_FAIL) {
 		strcpy(pathname, "\0");
@@ -270,7 +272,7 @@ int fetch_todelete_path(char *pathname, ino_t this_inode)
 
 int fetch_meta_path(char *pathname, ino_t this_inode)
 {
-	sprintf(pathname, "%s_%"FMT_INO_T"", MOCK_META_PATH, this_inode);
+	sprintf(pathname, "%s_%" PRIu64 "", MOCK_META_PATH, (uint64_t)this_inode);
 	//strcpy(pathname, MOCK_META_PATH);
 	return 0;
 }
@@ -278,8 +280,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 
 int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
-	sprintf(pathname, "testpatterns/inode_%"FMT_INO_T"_block_%d", this_inode,
-			block_num);
+	sprintf(pathname, "testpatterns/inode_%" PRIu64 "_block_%d",
+			(uint64_t)this_inode, block_num);
 	return 0;
 }
 

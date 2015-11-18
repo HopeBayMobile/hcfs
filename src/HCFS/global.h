@@ -43,6 +43,7 @@
 #define UNMOUNTALL 11
 #define PIN 12
 #define UNPIN 13
+#define CLOUDSTAT 23
 
 #define DEFAULT_PIN FALSE
 

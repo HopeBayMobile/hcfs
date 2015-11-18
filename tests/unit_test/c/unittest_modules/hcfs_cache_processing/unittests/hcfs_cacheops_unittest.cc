@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include "gtest/gtest.h"
 extern "C" {
 #include "hcfs_cacheops.h"
@@ -59,13 +60,13 @@ protected:
 			ino_t inode = inode_cache_usage_hash[i]->this_inode;
 
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
-				inode);
+				"/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 			unlink(meta_name);
 			for (int blockno = 0; blockno < 10 ; blockno++) {	
 				sprintf(block_name,
-					"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d", 
-					inode, blockno);
+					"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d", 
+					(uint64_t)inode, blockno);
 				unlink(block_name);
 			}
 		}
@@ -123,8 +124,8 @@ private:
 		for (int i = 0; i < file_entry.num_entries ; i++)
 			file_entry.block_entries[i].status = ST_BOTH;
 
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
-				inode);
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 		fptr = fopen(meta_name, "w+");
 		fseek(fptr, 0, SEEK_SET);
 		fwrite(&file_stat, sizeof(struct stat), 1, fptr);
@@ -134,8 +135,8 @@ private:
 
 		for (int blockno = 0; blockno < file_stat.st_size/MAX_BLOCK_SIZE ; blockno++) {	
 			sprintf(meta_name,
-				"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d",
-				inode, blockno);
+				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
+				(uint64_t)inode, blockno);
 			mknod(meta_name, 0700, 0);
 			truncate(meta_name, MAX_BLOCK_SIZE);
 		}
@@ -193,8 +194,8 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 		ino_t inode;
 		
 		inode = inode_cache_usage_hash[i]->this_inode;
-		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
-				inode);
+		sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+				(uint64_t)inode);
 		fptr = fopen(meta_name, "r");
 		
 		fseek(fptr, 0, SEEK_SET);
@@ -208,8 +209,8 @@ TEST_F(run_cache_loopTest, DeleteLocalBlockSuccess)
 			
 			ASSERT_EQ(ST_CLOUD, file_entry.block_entries[entry].status);
 			sprintf(block_name,
-				"/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%d",
-				inode, entry);
+				"/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%d",
+				(uint64_t)inode, entry);
 			ASSERT_TRUE(access(block_name, F_OK) < 0);
 
 			expected_block_num--;

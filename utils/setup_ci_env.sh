@@ -18,6 +18,7 @@ packages+=" cmake git build-essential"	# Required by oclint / bear
 packages+=" openjdk-7-jdk wget unzip"	# Required by PMD for CPD(duplicate code)
 packages+=" cloc"						# Install cloc for check code of line
 packages+=" mono-complete wget unzip"	# Required mono and CCM for complexity
+packages+=" colormake"					# colorful logs
 
 install_pkg
 

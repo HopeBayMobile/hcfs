@@ -219,7 +219,11 @@ TEST_F(add_filesystemTest, AddOneFS) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -260,7 +264,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -272,7 +280,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
 
   fakeino = 3;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS1", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS1", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS1", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -286,7 +298,11 @@ TEST_F(add_filesystemTest, AddThreeFSSplit) {
   treesplit = TRUE;
   fakeino = 4;
   snprintf(tmppath, 100, "%s/meta%ld", METAPATH, fakeino);
-  ret = add_filesystem("testFS2", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS2", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS2", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -343,7 +359,11 @@ TEST_F(add_filesystemTest, NameTooLong) {
   ret = init_fs_manager();
   ASSERT_EQ(0, ret);
 
+#ifdef _ANDROID_ENV_
   ret = add_filesystem(verylongname, ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem(verylongname, &tmp_entry);
+#endif
   EXPECT_EQ(-ENAMETOOLONG, ret);
  }
 
@@ -426,7 +446,11 @@ TEST_F(delete_filesystemTest, NoRootMeta) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -451,7 +475,11 @@ TEST_F(delete_filesystemTest, RootNotEmpty) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -489,7 +517,11 @@ TEST_F(delete_filesystemTest, DeleteOneFS) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -586,7 +618,11 @@ TEST_F(check_filesystemTest, FSFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);
@@ -613,7 +649,11 @@ TEST_F(check_filesystemTest, FSNotFound) {
   ASSERT_EQ(0, ret);
 
   entry_in_database = FALSE;
-  ret = add_filesystem("testFS", ANDROID_INTERNAL, &tmp_entry);
+#ifdef _ANDROID_ENV_
+  ret = add_filesystem((char*)"testFS", ANDROID_INTERNAL, &tmp_entry);
+#else
+  ret = add_filesystem((char*)"testFS", &tmp_entry);
+#endif
   if (ret != 0)
     unlink(tmppath);
   ASSERT_EQ(0, ret);

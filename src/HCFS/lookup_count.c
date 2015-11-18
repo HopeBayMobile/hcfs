@@ -27,6 +27,7 @@
 
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -82,8 +83,8 @@ int lookup_increase(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	write_log(10, "Debug lookup increase for inode %"FMT_INO_T", amount %d\n",
-			this_inode, amount);
+	write_log(10, "Debug lookup increase for inode %" PRIu64 ", amount %d\n",
+			(uint64_t)this_inode, amount);
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -163,8 +164,8 @@ int lookup_decrease(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode,
 	char found;
 	LOOKUP_NODE_TYPE *ptr, *prev_ptr;
 
-	write_log(10, "Debug lookup decrease for inode %"FMT_INO_T", amount %d\n",
-			this_inode, amount);
+	write_log(10, "Debug lookup decrease for inode %" PRIu64 ", amount %d\n",
+			(uint64_t)this_inode, amount);
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -251,8 +252,8 @@ int lookup_markdelete(LOOKUP_HEAD_TYPE *lookup_table, ino_t this_inode)
 	char found;
 	LOOKUP_NODE_TYPE *ptr;
 
-	write_log(10, "Debug lookup markdelete for inode %"FMT_INO_T"\n",
-			this_inode);
+	write_log(10, "Debug lookup markdelete for inode %" PRIu64 "\n",
+			(uint64_t)this_inode);
 
 	if (lookup_table == NULL)
 		return -ENOMEM;
@@ -338,8 +339,8 @@ int lookup_destroy(LOOKUP_HEAD_TYPE *lookup_table, MOUNT_T *tmpptr)
 		ptr = lookup_table[count].head;
 
 		while (ptr != NULL) {
-			write_log(10, "Debug check delete %"FMT_INO_T"\n",
-				ptr->this_inode);
+			write_log(10, "Debug check delete %" PRIu64 "\n",
+				(uint64_t)ptr->this_inode);
 			ret_val = disk_checkdelete(ptr->this_inode,
 						tmpptr->f_ino);
 

@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <sys/mman.h>
+#include <inttypes.h>
 
 #include "params.h"
 #include "fuseop.h"
@@ -282,7 +283,7 @@ int build_cache_usage(void)
 			if (hcfs_system->system_going_down == TRUE)
 				break;
 			errcode = 0;
-			ret = sscanf(temp_dirent.d_name, "block%"FMT_INO_T"_%lld",
+			ret = sscanf(temp_dirent.d_name, "block%" PRIu64 "_%lld",
 							&this_inode, &blockno);
 			if (ret != 2) {
 				ret = readdir_r(dirptr, &temp_dirent,

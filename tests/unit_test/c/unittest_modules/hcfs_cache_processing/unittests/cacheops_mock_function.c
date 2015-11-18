@@ -1,8 +1,9 @@
+#include <stdarg.h>
+#include <inttypes.h>
 #include "mock_params.h"
 #include "super_block.h"
 #include "hcfs_cachebuild.h"
 #include "fuseop.h"
-#include "global.h"
 #include <stdarg.h>
 
 void init_mock_system_config()
@@ -15,8 +16,8 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 {
 	char block_name[200];
 
-	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%"FMT_INO_T"_%lld",
-		this_inode, block_num);
+	sprintf(block_name, "/tmp/testHCFS/run_cache_loop_block%" PRIu64 "_%lld",
+			(uint64_t)this_inode, block_num);
 	strcpy(pathname, block_name);
 	
 	return 0;
@@ -26,8 +27,8 @@ int fetch_meta_path(char *pathname, ino_t this_inode)
 {
 	char meta_name[200];
 
-	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%"FMT_INO_T,
-			this_inode);
+	sprintf(meta_name, "/tmp/testHCFS/run_cache_loop_filemeta%" PRIu64 "",
+			(uint64_t)this_inode);
 	strcpy(pathname, meta_name);
 
 	return 0;
