@@ -473,6 +473,17 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	return 0;
 }
 
+/**
+ * fetch_backend_block
+ *
+ * This function aims to download a block from cloud and modify status
+ * from ST_CLOUD to ST_LDISK. It may directly return when this block
+ * is downloaded by other threads.
+ *
+ * @param ptr A pointer with type DOWNLOAD_BLOCK_INFO.
+ *
+ * @return none.
+ */
 void fetch_backend_block(void *ptr)
 {
 	char block_path[400];
@@ -511,7 +522,7 @@ void fetch_backend_block(void *ptr)
 	if (ret < 0) {
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
-		if (ret == -ENOENT) 
+		if (ret == -ENOENT)
 			unlink(block_path);
 		else
 			write_log(0, "Error: Fail to modify block status in %s."
@@ -582,8 +593,12 @@ void fetch_backend_block(void *ptr)
 	ret = _modify_block_status(block_info, ST_CtoL, ST_BOTH,
 				blockstat.st_size);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);
+		if (ret == -ENOENT)
+			write_log(5, "Fail to modify block status in %s because"
+				" meta is removed. Code %d", __func__, ret);
+		else
+			write_log(0, "Error: Fail to modify block status in %s."
+				" Code %d", __func__, ret);
 		goto thread_error;
 	} else if (ret > 0) { 
 		/* Status does not match ST_CtoL. It may be truncated */
@@ -680,6 +695,16 @@ errcode_handle:
 	return errcode;
 }
 
+/**
+ * fetch_pinned_blocks
+ *
+ * Given a inode, arrange those blocks with status ST_CLOUD to be downloaded.
+ * When system is going shutdown, it will rapidly stop and return.
+ *
+ * @param inode The inode number to be pinned.
+ *
+ * @return 0 on success, otherwise negative error code.
+ */
 int fetch_pinned_blocks(ino_t inode)
 {
 	char metapath[300];

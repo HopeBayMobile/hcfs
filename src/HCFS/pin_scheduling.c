@@ -72,16 +72,17 @@ void pinning_loop()
 		rest_times = 0;
 		ret = fetch_pinned_blocks(now_inode);
 		if (ret < 0) {
-			if (ret == -ENOSPC) {
+			if (ret == -ENOSPC) { /* Retry it later */
 				write_log(4, "Warn: No space available to pin"
 					" inode %"FMT_INO_T"\n", now_inode);
 				sleep(5);
-			} else if (ret == -EIO) {
+			} else if (ret == -EIO) { /* Retry it later */
 				write_log(0, "Error: IO error when pinning"
 					" inode %"FMT_INO_T". Try it later\n",
 					now_inode);
 				sleep(5);
-			} else if (ret == -ENOENT) {
+			} else if (ret == -ENOENT) { 
+				/* It was deleted and dequeued */
 				write_log(10, "Debug: Inode %"FMT_INO_T" is "
 					"deleted when pinning\n", now_inode);
 			} else if (ret == -ENOTCONN) {
@@ -97,4 +98,6 @@ void pinning_loop()
 				now_inode, -ret);
 		}
 	}
+
+	write_log(10, "Debug: Leave pin_loop and system is going down\n");
 }
