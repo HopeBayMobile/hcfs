@@ -1,3 +1,15 @@
+/*************************************************************************
+*
+* Copyright © 2015 Hope Bay Technologies, Inc. All rights reserved.
+*
+* File Name: HCFSvol.c
+* Abstract: The c source file for CLI utilities
+*
+* Revision History
+* 2015/11/9 Jiahong adding this header
+*
+**************************************************************************/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -21,9 +33,9 @@ typedef struct {
 	char d_type;
 } DIR_ENTRY;
 
-void main(int argc, char **argv)
+int main(int argc, char **argv)
 {
-	int fd,size_msg, status, count, retcode, code, fsname_len;
+	int fd, size_msg, status, count, retcode, code, fsname_len;
 	unsigned int cmd_len, reply_len, total_recv, to_recv;
 	int total_entries;
 	struct sockaddr_un addr;
@@ -87,7 +99,7 @@ void main(int argc, char **argv)
 	addr.sun_family = AF_UNIX;
 	strcpy(addr.sun_path, "/dev/shm/hcfs_reporter");
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	status = connect(fd, &addr, sizeof(addr));
+	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
 	printf("status is %d, err %s\n", status, strerror(errno));
 	switch (code) {
 	case TERMINATE:
@@ -283,5 +295,5 @@ void main(int argc, char **argv)
 		break;
 	}
 	close(fd);
-	return;
+	return 0;
 }
