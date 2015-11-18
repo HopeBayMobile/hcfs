@@ -473,7 +473,7 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	return 0;
 }
 
-static void _fetch_block(void *ptr)
+void fetch_backend_block(void *ptr)
 {
 	char block_path[400];
 	FILE *block_fptr;
@@ -509,16 +509,18 @@ static void _fetch_block(void *ptr)
 
 	ret = _modify_block_status(block_info, ST_CLOUD, ST_CtoL, 0);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to modify block status in %s."
-			" Code %d", __func__, ret);	
 		/* When file is removed, unlink this empty block directly
 		because status of this block is st_cloud */
 		if (ret == -ENOENT) 
 			unlink(block_path);
-
+		else
+			write_log(0, "Error: Fail to modify block status in %s."
+				" Code %d", __func__, ret);
 		goto thread_error;
 	
-	} else if (ret > 0) { /* Status does not match ST_CLOUD */
+	} else if (ret > 0) {
+		/* Status does not match ST_CLOUD, it may be
+		modified by another one */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
@@ -550,7 +552,7 @@ static void _fetch_block(void *ptr)
 		}
 
 		ret = _modify_block_status(block_info, ST_CtoL, ST_CLOUD, 0);
-		if (ret < 0) /* IO error */
+		if (ret < 0) /* IO/memory error */
 			goto thread_error;
 
 		if (ret == 0) { /* Block disappear? Fetch again later */
@@ -559,7 +561,7 @@ static void _fetch_block(void *ptr)
 				block_info->this_inode, block_info->block_no);
 			goto thread_error;
 
-		} else if (ret = ST_TODELETE) { /* Block is truncated. Finish */
+		} else if (ret == ST_TODELETE) { /* Block is truncated. Finish */
 			write_log(5, "block_%"FMT_INO_T"_%lld is truncated when"
 				" pinning in %s\n", block_info->this_inode,
 				block_info->block_no, __func__);
@@ -583,7 +585,8 @@ static void _fetch_block(void *ptr)
 		write_log(0, "Error: Fail to modify block status in %s."
 			" Code %d", __func__, ret);
 		goto thread_error;
-	} else if (ret > 0){ /* Status does not match ST_CtoL */
+	} else if (ret > 0) { 
+		/* Status does not match ST_CtoL. It may be truncated */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
 		return;
@@ -594,7 +597,7 @@ static void _fetch_block(void *ptr)
 
 	ret = super_block_mark_dirty(block_info->this_inode);
 	if (ret < 0)
-		goto thread_error;
+		block_info->dl_error = TRUE;
 
 	return;
 
@@ -662,7 +665,7 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 		download_thread_ctl.block_info[which_th].dl_error = FALSE;
 		download_thread_ctl.block_info[which_th].active = TRUE;
 		pthread_create(&(download_thread_ctl.download_thread[which_th]),
-				NULL, (void *)&_fetch_block,
+				NULL, (void *)&fetch_backend_block,
 				(void *)&(download_thread_ctl.block_info[which_th]));
 
 		download_thread_ctl.active_th++;
@@ -701,20 +704,22 @@ int fetch_pinned_blocks(ino_t inode)
 	fptr = fopen(metapath, "r+");
 	if (fptr == NULL) {
 		write_log(2, "Cannot open %s in %s\n", metapath, __func__);
-		return 0;
+		return -ENOENT;
 	}
 
 	flock(fileno(fptr), LOCK_EX);
 	setbuf(fptr, NULL);
 	FSEEK(fptr, 0, SEEK_SET);
 	FREAD(&tempstat, sizeof(struct stat), 1, fptr);
+	if (!S_ISREG(tempstat.st_mode)) { /* It is not a regfile? wtf */
+		flock(fileno(fptr), LOCK_UN);
+		fclose(fptr);
+		return 0;
+	}
 	/* Do not need to re-load meta in loop because just need to check those
 	blocks that existing before setting local_pin = true.*/
 	FREAD(&this_meta, sizeof(FILE_META_TYPE), 1, fptr);
 	flock(fileno(fptr), LOCK_UN);
-
-	if (!S_ISREG(tempstat.st_mode))
-		return 0;
 
 	total_size = tempstat.st_size;
 	total_blocks = total_size ? ((total_size - 1) / MAX_BLOCK_SIZE + 1) : 0;
@@ -737,7 +742,7 @@ int fetch_pinned_blocks(ino_t inode)
 		}
 
 		get_system_size(&cache_size, NULL);
-		if (cache_size > CACHE_HARD_LIMIT) {
+		if (cache_size >= CACHE_HARD_LIMIT) {
 			write_log(0, "Error: Cache space is full.\n");
 			ret_code = -ENOSPC;
 			break;
@@ -760,7 +765,6 @@ int fetch_pinned_blocks(ino_t inode)
 			blkno, page_pos);
 		if (ret_code < 0)
 			break;
-
 	}
 
 	fclose(fptr);

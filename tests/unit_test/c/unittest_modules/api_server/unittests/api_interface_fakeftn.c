@@ -83,5 +83,7 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 
 int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 {
+	if (UNPIN_INODE_FAIL == TRUE)
+		return -EIO;
 	return 0;
 }

@@ -751,7 +751,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   unsigned int num_inode;
   ino_t inode_list[1];
 
-  PIN_INODE_ROLLBACK = FALSE;
+  PIN_INODE_ROLLBACK = FALSE; /* pin_inode() success */
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
   ret_val = access(SOCK_PATH, F_OK);
@@ -763,7 +763,7 @@ TEST_F(api_moduleTest, pin_inodeTest_Success) {
   reserved_size = 10;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(long long) + sizeof(unsigned int);
+  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(long long));
   memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
   memcpy(buf + sizeof(long long) + sizeof(unsigned int),
@@ -797,7 +797,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   unsigned int num_inode;
   ino_t inode_list[1];
 
-  PIN_INODE_ROLLBACK = TRUE;
+  PIN_INODE_ROLLBACK = TRUE; /* pin_inode() fail */
   ret_val = init_api_interface();
   ASSERT_EQ(0, ret_val);
   ret_val = access(SOCK_PATH, F_OK);
@@ -809,7 +809,7 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   reserved_size = 10;
   num_inode = 1;
   inode_list[0] = 5;
-  cmd_len = sizeof(long long) + sizeof(unsigned int);
+  cmd_len = sizeof(long long) + sizeof(unsigned int) + sizeof(ino_t);
   memcpy(buf, &reserved_size, sizeof(long long));
   memcpy(buf + sizeof(long long), &num_inode, sizeof(unsigned int));
   memcpy(buf + sizeof(long long) + sizeof(unsigned int),
@@ -834,6 +834,93 @@ TEST_F(api_moduleTest, pin_inodeTest_RollBack) {
   ASSERT_EQ(-EIO, errcode);
  }
 
+TEST_F(api_moduleTest, unpin_inodeTest_Success) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  UNPIN_INODE_FAIL = FALSE; /* unpin_inode() success */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+
+  code = UNPIN;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(0, errcode);
+ }
+
+TEST_F(api_moduleTest, unpin_inodeTest_Fail) {
+
+  int ret_val, errcode;
+  unsigned int code, cmd_len, size_msg;
+  char buf[300];
+  unsigned int num_inode;
+  ino_t inode_list[1];
+
+  UNPIN_INODE_FAIL = TRUE; /* unpin_inode() success */
+  ret_val = init_api_interface();
+  ASSERT_EQ(0, ret_val);
+  ret_val = access(SOCK_PATH, F_OK);
+  ASSERT_EQ(0, ret_val);
+  ret_val = connect_sock();
+  ASSERT_EQ(0, ret_val);
+  ASSERT_NE(0, fd);
+
+  code = UNPIN;
+  num_inode = 1;
+  inode_list[0] = 5;
+  cmd_len = sizeof(unsigned int) + sizeof(ino_t);
+  memcpy(buf, &num_inode, sizeof(unsigned int));
+  memcpy(buf + sizeof(unsigned int),
+  		&inode_list, sizeof(ino_t));
+  CACHE_HARD_LIMIT = 500; 
+  hcfs_system->systemdata.pinned_size = 0;
+  
+  printf("Start sending\n");
+  size_msg=send(fd, &code, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &cmd_len, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  size_msg=send(fd, &buf, cmd_len, 0);
+  ASSERT_EQ(cmd_len, size_msg);
+
+  printf("Start recv\n");
+  ret_val = recv(fd, &size_msg, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(sizeof(unsigned int), size_msg);
+  ret_val = recv(fd, &errcode, sizeof(unsigned int), 0);
+  ASSERT_EQ(sizeof(unsigned int), ret_val);
+  ASSERT_EQ(-EIO, errcode);
+ }
 
 /* End of the test case for the function api_module */
 

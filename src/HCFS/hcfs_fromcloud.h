@@ -65,6 +65,7 @@ int fetch_from_cloud(FILE *fptr,
 void download_block_manager();
 int init_download_control();
 int destroy_download_control();
+void fetch_backend_block(void *ptr);
 int fetch_pinned_blocks(ino_t inode);
 
 #endif  /* GW20_HCFS_HCFS_FROMCLOUD_H_ */

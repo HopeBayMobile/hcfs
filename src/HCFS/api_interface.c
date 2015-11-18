@@ -380,12 +380,12 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 						&zero_reserved_size);
 		if (retcode < 0) {
 			write_log(5, "Fail to unpin. Begin to roll back\n");
-			for (count2 = 0; count2 <= count; count2++) {
+			/*for (count2 = 0; count2 <= count; count2++) {
 				write_log(5, "Fail to unpin, Roll back inode %"
 					FMT_INO_T"\n", unpinned_list[count2]);
 				pin_inode(unpinned_list[count2],
 							&zero_reserved_size);
-			}
+			}*/
 			break;
 		}		
 	}
