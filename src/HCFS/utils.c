@@ -147,7 +147,7 @@ int fetch_block_path(char *pathname, ino_t this_inode, long long block_num)
 	if (access(tempname, F_OK) == -1)
 		MKDIR(tempname, 0700);
 
-	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 ",_%lld",
+	snprintf(pathname, BLOCKPATHLEN, "%s/sub_%d/block%" PRIu64 "_%lld",
 			BLOCKPATH, sub_dir, (uint64_t)this_inode, block_num);
 
 	return 0;
