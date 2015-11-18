@@ -16,10 +16,9 @@
 #include "marco.h"
 
 
-int _json_response(char *json_str, char result, int code, json_t *data)
+void _json_response(char **json_str, char result, int code, json_t *data)
 {
 
-	char *res_str;
 	json_t *res_obj;
 
 	res_obj = json_object();
@@ -27,10 +26,8 @@ int _json_response(char *json_str, char result, int code, json_t *data)
 	json_object_set_new(res_obj, "code", json_integer(code));
 	json_object_set_new(res_obj, "data", json_object());
 
-	res_str = json_dumps(res_obj, JSON_COMPACT);
-	sprintf(json_str, res_str);
+	*json_str = json_dumps(res_obj, JSON_COMPACT);
 
-	free(res_str);
 	json_decref(res_obj);
 }
 
@@ -50,11 +47,15 @@ int _api_socket_conn()
 	return fd;
 }
 
-void HCFS_pin_path(char *json_res, char *pin_path)
+void HCFS_set_config(char **json_res, char *key, char *value)
+{
+}
+
+void HCFS_pin_path(char **json_res, char *pin_path)
 {
 
-	int fd, code, size_msg, ret_code;
-	unsigned int cmd_len, reply_len;
+	int fd, size_msg, ret_code;
+	unsigned int code, cmd_len, reply_len;
 	ssize_t path_len;
 	char buf[500];
 
@@ -74,7 +75,7 @@ void HCFS_pin_path(char *json_res, char *pin_path)
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
 	if (ret_code < 0)
@@ -83,13 +84,12 @@ void HCFS_pin_path(char *json_res, char *pin_path)
 		_json_response(json_res, TRUE, ret_code, NULL);
 }
 
-void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
+void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 		  char *sd0_path, char *sd1_path)
 {
 
-	int num_path;
-	int fd, code, status, size_msg, ret_code;
-	unsigned int reply_len, cmd_len;
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
 	ssize_t path_len;
 	char buf[1000];
 
@@ -112,7 +112,7 @@ void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
 	if (ret_code < 0)
@@ -122,11 +122,11 @@ void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
 
 }
 
-void HCFS_unpin_path(char *json_res, char *pin_path)
+void HCFS_unpin_path(char **json_res, char *pin_path)
 {
 
-	int fd, code, size_msg, ret_code;
-	unsigned int cmd_len, reply_len;
+	int fd, size_msg, ret_code;
+	unsigned int code, cmd_len, reply_len;
 	ssize_t path_len;
 	char buf[500];
 
@@ -146,7 +146,7 @@ void HCFS_unpin_path(char *json_res, char *pin_path)
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
 	if (ret_code < 0)
@@ -156,13 +156,12 @@ void HCFS_unpin_path(char *json_res, char *pin_path)
 }
 
 
-void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
+void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 		    char *sd0_path, char *sd1_path)
 {
 
-	int num_path;
-	int fd, code, status, size_msg, ret_code;
-	unsigned int reply_len, cmd_len;
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
 	ssize_t path_len;
 	char buf[1000];
 
@@ -185,7 +184,7 @@ void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
 	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 	size_msg = send(fd, buf, cmd_len, 0);
 
-	//size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
 
 	if (ret_code < 0)
@@ -193,4 +192,60 @@ void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
 	else
 		_json_response(json_res, TRUE, ret_code, NULL);
 
+}
+
+void HCFS_pin_status(char **json_res, char *pathname)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CHECKPIN;
+	cmd_len = strlen(pathname);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, pathname, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
+}
+
+void HCFS_file_status(char **json_res, char *pathname)
+{
+
+	int fd, status, size_msg, ret_code;
+	unsigned int code, reply_len, cmd_len;
+
+	fd = _api_socket_conn();
+	if (fd < 0) {
+		_json_response(json_res, FALSE, -fd, NULL);
+		return;
+	}
+
+	code = CHECKLOC;
+	cmd_len = strlen(pathname);
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, pathname, cmd_len, 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(unsigned int), 0);
+
+	if (ret_code < 0)
+		_json_response(json_res, FALSE, -ret_code, NULL);
+	else
+		_json_response(json_res, TRUE, ret_code, NULL);
 }

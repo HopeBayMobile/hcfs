@@ -38,13 +38,15 @@ int process_request(int thread_idx)
 
 	int fd;
 	int ret_code, to_recv;
-	unsigned int api_code, arg_len;
+	unsigned int api_code, arg_len, ret_len;
 	ssize_t size_msg, msg_len;
 	char buf_reused;
 	char buf[512];
 	char *largebuf;
 	char path[1024];
 
+	msg_len = 0;
+	ret_len = 0;
 
 	fd = thread_pool[thread_idx].fd;
 
@@ -54,6 +56,7 @@ int process_request(int thread_idx)
 		return -1;
 	}
 	memcpy(&api_code, &buf[0], sizeof(unsigned int));
+	printf("API code is %d\n", api_code);
 
 	size_msg = recv(fd, &buf[0], sizeof(unsigned int), 0);
 	if (size_msg < sizeof(unsigned int)) {
@@ -62,7 +65,7 @@ int process_request(int thread_idx)
 	}
 
 	memcpy(&arg_len, &buf[0], sizeof(unsigned int));
-	printf("arg_len == %ld\n", arg_len);
+	printf("arg_len == %d\n", arg_len);
 
 	if (arg_len < 500) {
 		largebuf = &buf[0];
@@ -73,7 +76,6 @@ int process_request(int thread_idx)
 			return -1;
 	}
 
-	msg_len = 0;
 	while (1) {
 		if ((arg_len - msg_len) > 1024)
 			to_recv = 1024;
@@ -91,17 +93,32 @@ int process_request(int thread_idx)
 	if (msg_len < arg_len)
 		return -1;
 
-
 	switch (api_code) {
 	case PIN:
 		printf("Pin by path\n");
 		ret_code = pin_by_path(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
 	case UNPIN:
 		printf("Unpin by path\n");
 		ret_code = unpin_by_path(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
+	case CHECKLOC:
+		printf("Check file loc\n");
+		ret_code = check_file_loc(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
+		size_msg = send(fd, &ret_code, sizeof(int), 0);
+		break;
+
+	case CHECKPIN:
+		printf("Check pin status\n");
+		ret_code = check_pin_status(largebuf, arg_len);
+		size_msg = send(fd, &ret_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, &ret_code, sizeof(int), 0);
 		break;
 
@@ -111,7 +128,7 @@ int process_request(int thread_idx)
 
 	close(fd);
 
-	if (!(largebuf == NULL) && !buf_reused)
+	if (largebuf != NULL && !buf_reused)
 		free(largebuf);
 
 	thread_pool[thread_idx].in_used = FALSE;

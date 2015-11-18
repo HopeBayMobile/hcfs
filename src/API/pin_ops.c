@@ -11,22 +11,8 @@
 #include "pin_ops.h"
 
 #include "global.h"
+#include "utils.h"
 
-
-int _socket_conn()
-{
-	int fd, status;
-	struct sockaddr_un addr;
-
-	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, SOCK_PATH);
-	fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	status = connect(fd, &addr, sizeof(addr));
-	if (status < 0)
-		return -errno;
-
-	return fd;
-}
 
 int _walk_folder(char *pathname, long long *total_size)
 {
@@ -87,12 +73,12 @@ int _pin_by_inode(const long long reserved_size, const unsigned int num_inodes,
 		  const char *inode_array)
 {
 
-	int fd, code, status, size_msg, count, ret_code;
+	int fd, size_msg, count, ret_code;
 	int buf_idx;
-	unsigned int cmd_len, reply_len, total_recv, to_recv;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
 	char buf[1000];
 
-	fd = _socket_conn();
+	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
 
@@ -164,12 +150,12 @@ int pin_by_path(char *buf, unsigned int arg_len)
 int _unpin_by_inode(const unsigned int num_inodes, const char *inode_array)
 {
 
-	int fd, code, status, size_msg, count, ret_code;
+	int fd, size_msg, count, ret_code;
 	int buf_idx;
-	unsigned int cmd_len, reply_len, total_recv, to_recv;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
 	char buf[1000];
 
-	fd = _socket_conn();
+	fd = get_hcfs_socket_conn();
 	if (fd < 0)
 		return fd;
 
@@ -194,7 +180,6 @@ int _unpin_by_inode(const unsigned int num_inodes, const char *inode_array)
 
 	close(fd);
 	return ret_code;
-
 }
 
 int unpin_by_path(char *buf, unsigned int arg_len)
@@ -233,3 +218,70 @@ int unpin_by_path(char *buf, unsigned int arg_len)
 	return ret_code;
 }
 
+int check_pin_status(char *buf, unsigned int arg_len)
+{
+
+	int fd, size_msg, count, ret_code;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	char path[400];
+	ino_t tmp_inode;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CHECKPIN;
+	cmd_len = sizeof(ino_t);
+
+	memcpy(path, &(buf[0]), arg_len);
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0) {
+		close(fd);
+		return ret_code;
+	}
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	close(fd);
+	return ret_code;
+}
+
+int check_file_loc(char *buf, unsigned int arg_len)
+{
+
+	int fd, size_msg, count, ret_code;
+	unsigned int code, cmd_len, reply_len, total_recv, to_recv;
+	char path[400];
+	ino_t tmp_inode;
+
+	fd = get_hcfs_socket_conn();
+	if (fd < 0)
+		return fd;
+
+	code = CHECKLOC;
+	cmd_len = sizeof(ino_t);
+
+	memcpy(path, &(buf[0]), arg_len);
+
+	ret_code = _get_path_stat(path, &tmp_inode, NULL);
+	if (ret_code < 0) {
+		close(fd);
+		return ret_code;
+	}
+
+	size_msg = send(fd, &code, sizeof(unsigned int), 0);
+	size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+	size_msg = send(fd, &tmp_inode, sizeof(ino_t), 0);
+
+	size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
+	size_msg = recv(fd, &ret_code, sizeof(int), 0);
+
+	close(fd);
+	return ret_code;
+}

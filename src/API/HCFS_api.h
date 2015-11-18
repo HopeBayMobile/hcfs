@@ -17,7 +17,7 @@
  * | swift_container| container name|
  * | swift_protocol| http/https|
  */
-void HCFS_set_config(char *json_res, char *key, char *value);
+void HCFS_set_config(char **json_res, char *key, char *value);
 
 /*Get config
  * @json_res result string in json format.
@@ -25,7 +25,7 @@ void HCFS_set_config(char *json_res, char *key, char *value);
  *
  * Get the Value of specific field. (Supported keys are listed in <HCFS_set_config>.)
  */
-void HCFS_get_config(char *json_res, char *key);
+void HCFS_get_config(char **json_res, char *key);
 
 /*Statistic
  * @json_res result string in json format.
@@ -48,7 +48,7 @@ void HCFS_get_config(char *json_res, char *key);
  * }
  * ```
  */
-void HCFS_stat(char *json_res);
+void HCFS_stat(char **json_res);
 
 /*Set property
  * @json_res result string in json format.
@@ -62,7 +62,7 @@ void HCFS_stat(char *json_res);
  * | cloudsync     | on/off|
  * | clouddl       | on/off|
  */
-void HCFS_set_property(char *json_res, char *key, char *value);
+void HCFS_set_property(char **json_res, char *key, char *value);
 
 /*Get property
  * @json_res result string in json format.
@@ -70,7 +70,7 @@ void HCFS_set_property(char *json_res, char *key, char *value);
  *
  * To get value of property for HCFS. (Supported keys are listed in <HCFS_set_property>.)
  */
-void HCFS_get_property(char *json_res, char *key);
+void HCFS_get_property(char **json_res, char *key);
 
 /*Volume mount
  * @json_res result string in json format.
@@ -79,7 +79,7 @@ void HCFS_get_property(char *json_res, char *key);
  *
  * To mount HCFS volume.
  */
-void HCFS_vol_mount(char *json_res, char *vol_name, char *mpt);
+void HCFS_vol_mount(char **json_res, char *vol_name, char *mpt);
 
 /*Volume umount
  * @json_res result string in json format.
@@ -87,7 +87,7 @@ void HCFS_vol_mount(char *json_res, char *vol_name, char *mpt);
  *
  * To unmount HCFS volume.
  */
-void HCFS_vol_umount(char *json_res, char *vol_name);
+void HCFS_vol_umount(char **json_res, char *vol_name);
 
 /*Pin file
  * @json_res result string in json format.
@@ -97,7 +97,7 @@ void HCFS_vol_umount(char *json_res, char *vol_name);
  * If the given (pin_path) is a directory, HCFS_pin_path() will recursively
  * pin all files and files in subdirectories.
  */
-void HCFS_pin_path(char *json_res, char *pin_path);
+void HCFS_pin_path(char **json_res, char *pin_path);
 
 /*Pin app
  * @json_res result string in json format.
@@ -109,7 +109,7 @@ void HCFS_pin_path(char *json_res, char *pin_path);
  * Pin all binaries and data files created by a app.
  * Input are four possible path where contain files belong to this app.
  */
-void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
+void HCFS_pin_app(char **json_res, char *app_path, char *data_path,
 		  char *sd0_path, char *sd1_path);
 
 /*Unpin file
@@ -120,7 +120,7 @@ void HCFS_pin_app(char *json_res, char *app_path, char *data_path,
  * HCFS_unpin_path() will recursively unpin all files and
  * files in subdirectories.
  */
-void HCFS_unpin_path(char *json_res, char *pin_path);
+void HCFS_unpin_path(char **json_res, char *pin_path);
 
 /*Unpin app
  * @json_res result string in json format.
@@ -132,7 +132,7 @@ void HCFS_unpin_path(char *json_res, char *pin_path);
  * Unpin all binaries and data files created by a app.
  * Input are four possible path where contain files belong to this app.
  */
-void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
+void HCFS_unpin_app(char **json_res, char *app_path, char *data_path,
 		    char *sd0_path, char *sd1_path);
 
 /*Pin status
@@ -141,7 +141,7 @@ void HCFS_unpin_app(char *json_res, char *app_path, char *data_path,
  *
  * To check a given (pathname) is pinned or unpinned.
  */
-void HCFS_pin_status(char *json_res, char *pathname);
+void HCFS_pin_status(char **json_res, char *pathname);
 
 /*File status
  * @json_res result string in json format.
@@ -149,7 +149,7 @@ void HCFS_pin_status(char *json_res, char *pathname);
  *
  * To get the status of (pathname).
  */
-void HCFS_file_status(char *json_res, char *pathname);
+void HCFS_file_status(char **json_res, char *pathname);
 
 
 #endif  /* GW20_HCFS_API_H_ */

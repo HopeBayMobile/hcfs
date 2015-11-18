@@ -35,5 +35,14 @@
 #define UNMOUNTALL 11
 #define PIN 12
 #define UNPIN 13
+#define CHECKDIRSTAT 14
+#define GETVOLSIZE 15
+#define GETCLOUDSIZE 16
+#define GETPINSIZE 17
+#define GETCACHESIZE 18
+#define CHECKLOC 19
+#define CHECKPIN 20
+#define GETMAXPINSIZE 21
+#define GETMAXCACHESIZE 22
 
 #endif  /* GW20_API_GLOBAL_H_ */
