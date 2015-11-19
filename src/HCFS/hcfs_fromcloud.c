@@ -426,8 +426,8 @@ static int _modify_block_status(const DOWNLOAD_BLOCK_INFO *block_info,
 	fetch_meta_path(metapath, block_info->this_inode);
 	if (access(metapath, F_OK) < 0) {
 		meta_cache_unlock_entry(meta_cache_entry);
-		write_log(2, "Warn: meta %"FMT_INO_T" does not exist. In %s\n",
-			block_info->this_inode, __func__);
+		write_log(2, "Warn: meta %"PRIu64" does not exist. In %s\n",
+			(uint64_t)block_info->this_inode, __func__);
 		return -ENOENT;
 	}
 
@@ -568,22 +568,25 @@ void fetch_backend_block(void *ptr)
 			goto thread_error;
 
 		if (ret == 0) { /* Block disappear? Fetch again later */
-			write_log(0, "Error: block_%"FMT_INO_T"_%lld "
+			write_log(0, "Error: block_%"PRIu64"_%lld "
 				"disappered. Fetch again later\n",
-				block_info->this_inode, block_info->block_no);
+				(uint64_t)block_info->this_inode,
+				block_info->block_no);
 			goto thread_error;
 
 		} else if (ret == ST_TODELETE) { /* Block is truncated. Finish */
-			write_log(5, "block_%"FMT_INO_T"_%lld is truncated when"
-				" pinning in %s\n", block_info->this_inode,
+			write_log(5, "block_%"PRIu64"_%lld is truncated when"
+				" pinning in %s\n",
+				(uint64_t)block_info->this_inode,
 				block_info->block_no, __func__);
 			flock(fileno(block_fptr), LOCK_UN);
 			fclose(block_fptr);
 			return;
 
 		} else { /* Strange.. */
-			write_log(5, "block_%"FMT_INO_T"_%lld has status%d when"
-				" pinning in %s\n", block_info->this_inode,
+			write_log(5, "block_%"PRIu64"_%lld has status %d when"
+				" pinning in %s\n",
+				(uint64_t)block_info->this_inode,
 				block_info->block_no, ret, __func__);
 			goto thread_error;
 		}
@@ -659,8 +662,8 @@ static int _check_fetch_block(const char *metapath, FILE *fptr,
 	FREAD(&filemeta, sizeof(FILE_META_TYPE), 1, fptr);
 	if (filemeta.local_pin == FALSE) {
 		flock(fileno(fptr), LOCK_UN);
-		write_log(5, "Warning: Inode %"FMT_INO_T" is detected to be unpinned"
-			" in pin-process.\n", inode);
+		write_log(5, "Warning: Inode %"PRIu64" is detected to be "
+			"unpinned in pin-process.\n", (uint64_t)inode);
 		return -EPERM;
 	}
 
@@ -829,7 +832,8 @@ int fetch_pinned_blocks(ino_t inode)
 
 	/* Delete error object */
 	if (access(error_path, F_OK) == 0) {
-		write_log(0, "Error: Fail to pin inode %"FMT_INO_T"\n", inode);
+		write_log(0, "Error: Fail to pin inode %"PRIu64"\n",
+			(uint64_t)inode);
 		if (ret_code == 0)
 			ret_code = -EIO;
 		unlink(error_path);

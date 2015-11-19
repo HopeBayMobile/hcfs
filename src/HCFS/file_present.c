@@ -23,6 +23,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/file.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "super_block.h"
@@ -923,8 +924,8 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	
 	} else if (ret > 0) {
 	/* Do not need to change pinned size */
-		write_log(5, "Debug: inode %"FMT_INO_T" had been pinned\n",
-								this_inode);
+		write_log(5, "Debug: inode %"PRIu64" had been pinned\n",
+							(uint64_t)this_inode);
 	} else { /* Succeed in pinning */
 		/* Change pinned size if succeding in pinning this inode. */
 		if (S_ISREG(tempstat.st_mode)) {
@@ -1052,14 +1053,14 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 
 	ret = change_pin_flag(this_inode, tempstat.st_mode, FALSE);
 	if (ret < 0) {
-		write_log(0, "Error: Fail to unpin inode %"FMT_INO_T"."
-			" Code %d\n", -ret);
+		write_log(0, "Error: Fail to unpin inode %"PRIu64"."
+			" Code %d\n", (uint64_t)-ret);
 		return ret;
 
 	} else if (ret > 0) {
 	/* Do not need to change pinned size */
-		write_log(5, "Debug: inode %"FMT_INO_T" had been unpinned\n",
-			this_inode);
+		write_log(5, "Debug: inode %"PRIu64" had been unpinned\n",
+			(uint64_t)this_inode);
 	
 	} else { /* Succeed in unpinning */
 

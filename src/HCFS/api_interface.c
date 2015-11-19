@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <inttypes.h>
 
 #include "macro.h"
 #include "global.h"
@@ -315,16 +316,17 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 	total_reserved_size_bak = total_reserved_size;
 	
 	for (count = 0; count < num_inode; count++) {
-		write_log(10, "Debug: Prepare to pin inode %"FMT_INO_T
+		write_log(10, "Debug: Prepare to pin inode %"PRIu64
 			", remaining reserved pinned size %lld\n",
-			pinned_list[count], total_reserved_size);
+			(uint64_t)pinned_list[count], total_reserved_size);
 		retcode = pin_inode(pinned_list[count], &total_reserved_size);
 		if (retcode < 0) {
 			/* Roll back */
 			total_reserved_size = total_reserved_size_bak;
 			for (count2 = 0; count2 <= count; count2++) {
 				write_log(5, "Fail to pin, Roll back inode %"
-					FMT_INO_T"\n", pinned_list[count2]);
+					PRIu64"\n",
+					(uint64_t)pinned_list[count2]);
 				unpin_inode(pinned_list[count2],
 							&total_reserved_size);
 			}
@@ -373,18 +375,12 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 	zero_reserved_size = 0; /* There is no reserved size when unpin */
 
 	for (count = 0; count < num_inode; count++) {
-		write_log(10, "Debug: Prepare to unpin inode %"FMT_INO_T"\n",
-			unpinned_list[count]);
+		write_log(10, "Debug: Prepare to unpin inode %"PRIu64"\n",
+			(uint64_t)unpinned_list[count]);
 		retcode = unpin_inode(unpinned_list[count],
 						&zero_reserved_size);
 		if (retcode < 0) {
 			write_log(5, "Fail to unpin. Begin to roll back\n");
-			/*for (count2 = 0; count2 <= count; count2++) {
-				write_log(5, "Fail to unpin, Roll back inode %"
-					FMT_INO_T"\n", unpinned_list[count2]);
-				pin_inode(unpinned_list[count2],
-							&zero_reserved_size);
-			}*/
 			break;
 		}		
 	}

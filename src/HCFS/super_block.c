@@ -33,6 +33,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "fuseop.h"
 #include "global.h"
@@ -89,8 +90,8 @@ int read_super_block_entry(ino_t this_inode, SUPER_BLOCK_ENTRY *inode_ptr)
 	if (this_inode <= 0) {
 		errcode = EINVAL;
 		write_log(0,
-			"Error in %s, inode number is %"FMT_INO_T". Code %d,"
-			" %s\n", __func__, this_inode, errcode,
+			"Error in %s, inode number is %"PRIu64". Code %d,"
+			" %s\n", __func__, (uint64_t)this_inode, errcode,
 			strerror(errcode));
 		return -errcode;
 	}

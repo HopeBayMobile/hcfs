@@ -14,6 +14,7 @@
 #include "pin_scheduling.h"
 
 #include <pthread.h>
+#include <inttypes.h>
 
 #include "super_block.h"
 #include "hcfs_fromcloud.h"
@@ -84,17 +85,19 @@ void pinning_loop()
 		if (ret < 0) {
 			if (ret == -ENOSPC) { /* Retry it later */
 				write_log(4, "Warn: No space available to pin"
-					" inode %"FMT_INO_T"\n", now_inode);
+					" inode %"PRIu64"\n",
+					(uint64_t)now_inode);
 				sleep(5);
 			} else if (ret == -EIO) { /* Retry it later */
 				write_log(0, "Error: IO error when pinning"
-					" inode %"FMT_INO_T". Try it later\n",
-					now_inode);
+					" inode %"PRIu64". Try it later\n",
+					(uint64_t)now_inode);
 				sleep(5);
 			} else if (ret == -ENOENT) {
 				/* It was deleted and dequeued */
-				write_log(10, "Debug: Inode %"FMT_INO_T" is "
-					"deleted when pinning\n", now_inode);
+				write_log(10, "Debug: Inode %"PRIu64" is "
+					"deleted when pinning\n",
+					(uint64_t)now_inode);
 			} else if (ret == -ENOTCONN) {
 				// TODO: error handling in case of disconnection
 			} else if (ret == -ESHUTDOWN) {
@@ -107,9 +110,9 @@ void pinning_loop()
 
 		ret = super_block_finish_pinning(now_inode);
 		if (ret < 0) {
-			write_log(0, "Error: Fail to mark inode%"FMT_INO_T" as"
+			write_log(0, "Error: Fail to mark inode%"PRIu64" as"
 				" finishing pinning. Code %d\n",
-				now_inode, -ret);
+				(uint64_t)now_inode, -ret);
 		}
 	}
 

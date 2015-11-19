@@ -1766,15 +1766,15 @@ int collect_dir_children(ino_t this_inode,
 	fptr = fopen(metapath, "r");
 	if (fptr == NULL) {
 		ret = errno;
-		write_log(0, "Fail to open meta %"FMT_INO_T" in %s. Code %d\n",
-			this_inode, __func__, ret);
+		write_log(0, "Fail to open meta %"PRIu64" in %s. Code %d\n",
+			(uint64_t)this_inode, __func__, ret);
 		return -ret;
 	}
 
 	flock(fileno(fptr), LOCK_EX);
 	if (access(metapath, F_OK) < 0) {
-		write_log(5, "meta %"FMT_INO_T" does not exist in %s\n",
-			this_inode, __func__);
+		write_log(5, "meta %"PRIu64" does not exist in %s\n",
+			(uint64_t)this_inode, __func__);
 		flock(fileno(fptr), LOCK_UN);
 		fclose(fptr);
 		return -ENOENT;
