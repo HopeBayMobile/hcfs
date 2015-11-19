@@ -22,8 +22,7 @@
 #include "meta_mem_cache.h"
 #include "fuseop.h"
 #include "macro.h"
-
-extern SYSTEM_CONF_STRUCT system_config;
+#include "utils.h"
 
 /************************************************************************
 *

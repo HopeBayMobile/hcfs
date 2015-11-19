@@ -33,8 +33,6 @@
 #include "dir_entry_btree.h"
 #include "utils.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /************************************************************************
 *
 * Function name: init_fs_manager

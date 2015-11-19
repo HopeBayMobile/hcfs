@@ -85,8 +85,6 @@
 #include "path_reconstruct.h"
 #include "pin_scheduling.h"
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /* Steps for allowing opened files / dirs to be accessed after deletion
 
 	1. in lookup_count, add a field "to_delete". rmdir, unlink

@@ -43,8 +43,6 @@
 
 #define BLK_INCREMENTS MAX_BLOCK_ENTRIES_PER_PAGE
 
-extern SYSTEM_CONF_STRUCT system_config;
-
 /* TODO: Consider whether need to update block status when throwing
 out blocks and sync to cloud, and how this may interact with meta
 sync in upload process */

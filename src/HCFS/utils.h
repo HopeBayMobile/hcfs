@@ -16,6 +16,9 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include "params.h"
+
+extern SYSTEM_CONF_STRUCT system_config;
 
 /*BEGIN string utility definition*/
 
