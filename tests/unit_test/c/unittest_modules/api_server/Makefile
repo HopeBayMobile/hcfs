@@ -114,4 +114,3 @@ api_interface_unittest.o : $(UNITTEST_DIR)/api_interface_unittest.cc \
 
 api_interface_unittest : api_interface.o api_interface_fakeftn.o api_interface_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-

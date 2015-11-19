@@ -119,5 +119,3 @@ fuseop_unittest.o : $(UNITTEST_DIR)/fuseop_unittest.cc \
 
 fuseop_unittest : fuseop.o fake_meta_mem_cache.o fake_misc.o fuseop_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lfuse
-
-

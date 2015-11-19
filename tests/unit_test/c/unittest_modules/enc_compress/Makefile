@@ -122,5 +122,3 @@ hcfs_enc_compress_unittest.o : $(UNITTEST_DIR)/hcfs_enc_compress_unittest.cc \
 
 hcfs_enc_compress_unittest : mock_function.o b64encode.o enc.o compress.o hcfs_enc_compress_unittest.o  gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++ -lcrypto -llz4
-
-

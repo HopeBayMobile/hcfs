@@ -144,4 +144,3 @@ logger_unittest.o : $(UNITTEST_DIR)/logger_unittest.cc \
 
 logger_unittest : logger.o logger_unittest.o gtest_main.a
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -lpthread $^ -o $@ -lstdc++
-
