@@ -26,6 +26,7 @@
 #include <curl/curl.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 #include "b64encode.h"
 #include "params.h"
@@ -727,7 +728,7 @@ int hcfs_swift_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char header_filename[100];
 	int ret_val, ret, errcode;
 	int num_retries;
-	long ret_pos;
+	int64_t ret_pos;
 
 	sprintf(header_filename, "/dev/shm/swiftputhead%s.tmp",
 		curl_handle->id);
@@ -1519,7 +1520,7 @@ int hcfs_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 {
 	int ret_val, num_retries;
 	int ret, errcode;
-	long ret_pos;
+	int64_t ret_pos;
 
 	if (curl_handle->curl_backend == NONE) {
 		ret_val = hcfs_init_backend(curl_handle);
@@ -1688,7 +1689,7 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	unsigned char S3_signature[200];
 	int ret_val, ret, errcode;
 	unsigned char resource[200];
-	long ret_pos;
+	int64_t ret_pos;
 	int num_retries;
 
 	sprintf(header_filename, "/dev/shm/s3puthead%s.tmp", curl_handle->id);

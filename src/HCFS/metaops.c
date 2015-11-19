@@ -28,6 +28,7 @@
 #include <dirent.h>
 #include <semaphore.h>
 #include <sys/mman.h>
+#include <stdint.h>
 
 #include "global.h"
 #include "utils.h"
@@ -108,7 +109,7 @@ int dir_add_entry(ino_t parent_inode, ino_t child_inode, const char *childname,
 	size_t ret_size;
 	int sem_val;
 	char no_need_rewrite;
-	long ret_pos;
+	int64_t ret_pos;
 	DIR_ENTRY temp_dir_entries[(MAX_DIR_ENTRIES_PER_PAGE+2)];
 	long long temp_child_page_pos[(MAX_DIR_ENTRIES_PER_PAGE+3)];
 
@@ -713,7 +714,7 @@ long long _load_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	PTR_ENTRY_PAGE tmp_ptr_page;
 	int count, ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -873,7 +874,7 @@ long long _create_indirect(long long target_page, FILE_META_TYPE *temp_meta,
 	int count, ret, errcode;
 	BLOCK_ENTRY_PAGE temppage;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 
 	tmp_page_index = target_page - 1;
 
@@ -1022,7 +1023,7 @@ long long create_page(META_CACHE_ENTRY_STRUCT *body_ptr, long long target_page)
 	FILE_META_TYPE temp_meta;
 	int which_indirect;
 	int ret, errcode;
-	long ret_pos;
+	int64_t ret_pos;
 
 	/* First check if meta cache is locked */
 	/* Create page here */

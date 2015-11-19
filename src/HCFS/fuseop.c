@@ -84,6 +84,7 @@
 #include "path_reconstruct.h"
 #include "pin_scheduling.h"
 #include "dir_statistics.h"
+#include "parent_lookup.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 

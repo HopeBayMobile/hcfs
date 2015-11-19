@@ -7,6 +7,7 @@
 *
 * Revision History
 * 2015/10/26 Jiahong created this file
+* 2015/11/19 Jiahong moved parent lookup content to parent_lookup
 *
 **************************************************************************/
 #ifndef GW20_HCFS_PATH_RECONSTRUCT_H_
@@ -69,11 +70,6 @@ int init_pathlookup(void);
 void destroy_pathlookup(void);
 int pathlookup_write_parent(ino_t self_inode, ino_t parent_inode);
 int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr);
-int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t **parentlist);
-int lookup_add_parent(ino_t self_inode, ino_t parent_inode);
-int lookup_delete_parent(ino_t self_inode, ino_t parent_inode);
-int lookup_replace_parent(ino_t self_inode, ino_t parent_inode1,
-			  ino_t parent_inode2);
 
 #endif  /* GW20_HCFS_PATH_RECONSTRUCT_H_ */
 

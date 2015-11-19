@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <stdint.h>
 
 #include "macro.h"
 #include "fuseop.h"
@@ -225,7 +226,7 @@ ino_t _create_root_inode(void)
 	char temppath[METAPATHLEN];
 	int ret, errcode;
 	size_t ret_size;
-	long ret_pos;
+	int64_t ret_pos;
 	unsigned long this_gen;
 	FS_STAT_T tmp_stat;
 
@@ -821,7 +822,7 @@ int list_filesystem(unsigned long buf_num, DIR_ENTRY *ret_entry,
 	DIR_META_TYPE tmp_head;
 	int errcode;
 	ssize_t ret_ssize;
-	unsigned long num_walked;
+	int64_t num_walked;
 	long long next_node_pos;
 	int count;
 
@@ -931,7 +932,7 @@ int backup_FS_database(void)
 		if (ret_ssize <= 0)
 			break;
 		curpos += ret_ssize;
-		FWRITE(buf, 1, ret_ssize, fptr);
+		FWRITE(buf, 1, (size_t) ret_ssize, fptr);
 	}
 
 	fclose(fptr);

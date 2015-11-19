@@ -23,6 +23,7 @@
 
 #include "macro.h"
 #include "path_reconstruct.h"
+#include "parent_lookup.h"
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -124,11 +125,12 @@ int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	ino_t current_inode, parent_inode;
+	ino_t current_inode;
 	ino_t *parentlist;
 	int errcode, ret;
 	int numparents, count;
 	ssize_t ret_ssize;
+	PRIMARY_PARENT_T tmpparent;
 
 	if (thisinode <= 0)
 		return -EINVAL;
@@ -161,10 +163,11 @@ int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 			PWRITE(fileno(dirstat_lookup_data_fptr), &tmpstat,
 			       sizeof(DIR_STATS_TYPE), filepos);
 			/* Find the parent */
-			filepos = (off_t) ((current_inode - 1) * sizeof(ino_t));
-			PREAD(fileno(pathlookup_data_fptr), &parent_inode,
-			      sizeof(ino_t), filepos);
-			current_inode = parent_inode;
+			filepos = (off_t) ((current_inode - 1) *
+						sizeof(PRIMARY_PARENT_T));
+			PREAD(fileno(pathlookup_data_fptr), &tmpparent,
+			      sizeof(PRIMARY_PARENT_T), filepos);
+			current_inode = tmpparent.parentinode;
 		}
 	}
 
@@ -196,10 +199,11 @@ int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 {
 	DIR_STATS_TYPE tmpstat;
 	off_t filepos;
-	ino_t current_inode, parent_inode;
+	ino_t current_inode;
 	int errcode, ret;
 	ssize_t ret_ssize;
 	int sem_val;
+	PRIMARY_PARENT_T tmpparent;
 
 	if (baseinode <= 0)
 		return -EINVAL;
@@ -220,10 +224,11 @@ int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 		PWRITE(fileno(dirstat_lookup_data_fptr), &tmpstat,
 		       sizeof(DIR_STATS_TYPE), filepos);
 		/* Find the parent */
-		filepos = (off_t) ((current_inode - 1) * sizeof(ino_t));
-		PREAD(fileno(pathlookup_data_fptr), &parent_inode,
-		      sizeof(ino_t), filepos);
-		current_inode = parent_inode;
+		filepos = (off_t) ((current_inode - 1) *
+					sizeof(PRIMARY_PARENT_T));
+		PREAD(fileno(pathlookup_data_fptr), &tmpparent,
+		      sizeof(PRIMARY_PARENT_T), filepos);
+		current_inode = tmpparent.parentinode;
 	}
 
 	return 0;

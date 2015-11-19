@@ -14,6 +14,9 @@
 #ifndef GW20_SRC_GLOBAL_H_
 #define GW20_SRC_GLOBAL_H_
 
+#include <stdint.h>
+
+#define BOOL uint8_t
 #define TRUE 1
 #define FALSE 0
 
