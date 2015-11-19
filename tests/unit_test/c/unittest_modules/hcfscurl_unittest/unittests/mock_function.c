@@ -130,3 +130,5 @@ int b64encode_str(unsigned char *inputstr, unsigned char *outputstr,
 {
 	strcpy(outputstr, "test_b64encode");
 }
+
+void update_backend_status(int status, struct timespec *status_time) {}
