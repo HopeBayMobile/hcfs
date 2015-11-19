@@ -57,18 +57,28 @@ void pinning_loop()
 
 	rest_times = 0;
 	while (hcfs_system->system_going_down == FALSE) {
-		super_block_share_locking();
-		if (sys_super_block->head.num_pinning_inodes == 0) {
-			super_block_share_release();
+		/* Check backend status */
+		if (hcfs_system->backend_status_is_online == FALSE) {
+			write_log(10, "Debug: backend offline. pinning"
+				" manager takes a break\n");
 			_sleep_a_while(rest_times);
-			write_log(10, "Debug: pinning manager takes a break\n");
 			rest_times++;
 			continue;
 		}
-		
+
+		/* Check inodes in queue */
+		super_block_share_locking();
+		if (sys_super_block->head.num_pinning_inodes == 0) {
+			super_block_share_release();
+			write_log(10, "Debug: pinning manager takes a break\n");
+			_sleep_a_while(rest_times);
+			rest_times++;
+			continue;
+		}
 		now_inode = sys_super_block->head.first_pin_inode;
 		super_block_share_release();
-		
+
+		/* Begin to pin this inode */
 		rest_times = 0;
 		ret = fetch_pinned_blocks(now_inode);
 		if (ret < 0) {
@@ -81,16 +91,20 @@ void pinning_loop()
 					" inode %"FMT_INO_T". Try it later\n",
 					now_inode);
 				sleep(5);
-			} else if (ret == -ENOENT) { 
+			} else if (ret == -ENOENT) {
 				/* It was deleted and dequeued */
 				write_log(10, "Debug: Inode %"FMT_INO_T" is "
 					"deleted when pinning\n", now_inode);
 			} else if (ret == -ENOTCONN) {
-				// TODO: error handling on case of disconnection
+				// TODO: error handling in case of disconnection
+			} else if (ret == -ESHUTDOWN) {
+				/* When system going down, do not mark finish
+				and directly leave the loop */
+				break;
 			}
 			continue; /* Do not dequeue when failing in pinning */
 		}
-		
+
 		ret = super_block_finish_pinning(now_inode);
 		if (ret < 0) {
 			write_log(0, "Error: Fail to mark inode%"FMT_INO_T" as"

@@ -814,6 +814,8 @@ int fetch_pinned_blocks(ino_t inode)
 	}
 	
 	if (hcfs_system->system_going_down == TRUE) {
+		if (access(error_path, F_OK) == 0)
+			unlink(error_path);
 		return ret_code;
 	}
 	/* Check cache size again */
@@ -830,9 +832,10 @@ int fetch_pinned_blocks(ino_t inode)
 		write_log(0, "Error: Fail to pin inode %"FMT_INO_T"\n", inode);
 		if (ret_code == 0)
 			ret_code = -EIO;
-		UNLINK(error_path);
+		unlink(error_path);
 	}
 
+	/* If meta is removed, don't care errors above */
 	if (access(metapath, F_OK) < 0)
 		ret_code = -ENOENT;
 
