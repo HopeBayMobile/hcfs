@@ -4,7 +4,7 @@ date
 set -x -e
 
 local_repo="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
-docker_workspace=/home/jenkins/workspace/HCFS
+docker_workspace=/var/jenkins/workspace/HCFS
 
 sudo rm -rf $local_repo/utils/.setup_*
 $local_repo/utils/setup_dev_env.sh -v -m docker_host
@@ -17,6 +17,7 @@ SLAVE_ID=$(sudo docker run -d -t \
 		-v /tmp/ccache:/home/jenkins/.ccache \
 		-v $local_repo:/home/jenkins/workspace/HCFS \
 		-v /var/run/docker.sock:/var/run/docker.sock \
+        -v /var/jenkins/workspace/HCFS:/var/jenkins/workspace/HCFS \
 		--name=hcfs_test \
 		docker:5000/docker_hcfs_test_slave)
 SLAVE_IP=$(sudo docker inspect --format '{{ .NetworkSettings.IPAddress }}' $SLAVE_ID)
