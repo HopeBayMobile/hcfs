@@ -37,6 +37,7 @@ sudo cloc --by-file --xml --out=$WORKSPACE/cloc-result.xml $srcdir/HCFS/
 
 # Publish CCM analysis results (Cyclomatic Complexity)
 sudo mono /CCM.exe . /xml > $WORKSPACE/ccm-result.xml
+sudo sed -i 's/<file>/<file>\/var\/jenkins\/workspace\/HCFS/g'  $WORKSPACE/ccm-result.xml
 
 # Run unit test
 cd $testdir/unit_test
