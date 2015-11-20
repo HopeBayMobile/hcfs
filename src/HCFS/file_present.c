@@ -938,7 +938,7 @@ int link_update_meta(ino_t link_inode, const char *newname,
 	write_log(10, "Debug: inode %lld has %lld links\n",
 		link_inode, link_stat->st_nlink);
 
-	ret_val = meta_cache_open_file(link_inode);
+	ret_val = meta_cache_open_file(link_entry);
 	if (ret_val < 0)
 		goto error_handle;
 
@@ -966,18 +966,6 @@ int link_update_meta(ino_t link_inode, const char *newname,
 		sem_post(&(pathlookup_data_lock));
 		goto error_handle;
 	}
-
-	/* Check location for linked file and update parent to root */
-	ret_val = check_file_storage_location(link_entry->fptr, &tmpstat);
-	if (ret_val < 0)
-		goto error_handle;
-
-	ret_val = update_dirstat_parent(parent_inode, &tmpstat);
-	if (ret_val < 0) {
-		sem_post(&(pathlookup_data_lock));
-		goto error_handle;
-	}
-	sem_post(&(pathlookup_data_lock));
 
 	/* Check location for linked file and update parent to root */
 	ret_val = check_file_storage_location(link_entry->fptr, &tmpstat);

@@ -687,6 +687,7 @@ int pathlookup_read_parent(ino_t self_inode, ino_t *parentptr)
 	}
 
 	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
+	memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
 	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	       sizeof(PRIMARY_PARENT_T), filepos);
 	*parentptr = tmpparent.parentinode;

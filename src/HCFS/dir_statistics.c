@@ -157,12 +157,14 @@ int update_dirstat_file(ino_t thisinode, DIR_STATS_TYPE *newstat)
 			                    sizeof(DIR_STATS_TYPE));
 			PREAD(fileno(dirstat_lookup_data_fptr), &tmpstat,
 			       sizeof(DIR_STATS_TYPE), filepos);
+
 			tmpstat.num_local += newstat->num_local;
 			tmpstat.num_cloud += newstat->num_cloud;
 			tmpstat.num_hybrid += newstat->num_hybrid;
 			PWRITE(fileno(dirstat_lookup_data_fptr), &tmpstat,
 			       sizeof(DIR_STATS_TYPE), filepos);
 			/* Find the parent */
+			memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
 			filepos = (off_t) ((current_inode - 1) *
 						sizeof(PRIMARY_PARENT_T));
 			PREAD(fileno(pathlookup_data_fptr), &tmpparent,
@@ -224,6 +226,7 @@ int update_dirstat_parent(ino_t baseinode, DIR_STATS_TYPE *newstat)
 		PWRITE(fileno(dirstat_lookup_data_fptr), &tmpstat,
 		       sizeof(DIR_STATS_TYPE), filepos);
 		/* Find the parent */
+		memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
 		filepos = (off_t) ((current_inode - 1) *
 					sizeof(PRIMARY_PARENT_T));
 		PREAD(fileno(pathlookup_data_fptr), &tmpparent,

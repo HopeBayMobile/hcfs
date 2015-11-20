@@ -62,6 +62,7 @@ int fetch_all_parents(ino_t self_inode, int *parentnum, ino_t **parentlist)
 		return -EINVAL;
 
 	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
+	memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
 	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	      sizeof(PRIMARY_PARENT_T), filepos);
 
@@ -293,6 +294,7 @@ int lookup_add_parent(ino_t self_inode, ino_t parent_inode)
 	if ((sem_val > 0) || (ret < 0))
 		return -EINVAL;
 
+	memset(&tmpparent, 0, sizeof(PRIMARY_PARENT_T));
 	filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
 	PREAD(fileno(pathlookup_data_fptr), &tmpparent,
 	      sizeof(PRIMARY_PARENT_T), filepos);
@@ -375,14 +377,15 @@ errcode_handle:
 int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 {
 	off_t filepos;
-	ino_t tmpinode;
 	int errcode, ret;
 	ssize_t ret_ssize;
 	int sem_val;
-	int64_t prevllpos, prevpagepos, tmppos;
+	int64_t prevllpos, prevpagepos, tmppos, tmpnextpos;
 	PRIMARY_PARENT_T tmpparent;
 	int hashval;
-	PLOOKUP_PAGE_T tmppage;
+	PLOOKUP_PAGE_T tmppage, prevpage, nextpage;
+	uint8_t deleteall;
+	int8_t count;
 
 	if ((self_inode <= 0) || (parent_inode <= 0))
 		return -EINVAL;
@@ -431,9 +434,120 @@ int lookup_delete_parent(ino_t self_inode, ino_t parent_inode)
 		return -ENOENT;
 	}
 
-/* TODO: Search the page list for the inode found */
-	return 0;
+	/* Search the page list for the inode found */
+	/* Starts reading the parents from here */
+	prevpagepos = 0;
+	while (tmppos != 0) {
+		for (count = 0; count < tmppage.num_parents; count++) {
+			if (tmppage.parents[count] == parent_inode)
+				break;
+		}
+		if (count < tmppage.num_parents) /* If found */
+			break;
+		prevpagepos = tmppos; /* This is for tracking linked list */
+		tmppos = tmppage.nextpage;
+		if (tmppos != 0) {
+			/* Read the next page in the same inode */
+			PREAD(fileno(plookup2_fptr), &tmppage,
+			      sizeof(PLOOKUP_PAGE_T), tmppos);
+		}
+	}
 
+	/* Did not find the parent to be replaced */
+	if (tmppos == 0)
+		return -ENOENT;
+
+	/* Found the entry. Need to delete */
+	tmppage.num_parents--;
+	if (tmppage.num_parents > 0) {
+		/* If there are other parents in this page */
+		if ((tmppage.num_parents - count) > 0)
+			memmove(&(tmppage.parents[count]),
+			        &(tmppage.parents[count+1]),
+			        sizeof(ino_t) * (tmppage.num_parents - count));
+		PWRITE(fileno(plookup2_fptr), &tmppage,
+		       sizeof(PLOOKUP_PAGE_T), tmppos);
+		return 0;
+	}
+
+	/* There is nothing left in this page. Delete and put to gc */
+	tmpnextpos = tmppage.nextpage;
+	if ((prevpagepos == 0) && (tmpnextpos == 0)) {
+		/* Nothing left for this inode */
+		deleteall = TRUE;
+		tmpnextpos = tmppage.nextlookup;
+	} else {
+		deleteall = FALSE;
+	}
+
+	if (deleteall == FALSE) {
+		if (prevpagepos != 0) {
+			PREAD(fileno(plookup2_fptr), &prevpage,
+			      sizeof(PLOOKUP_PAGE_T), prevpagepos);
+			prevpage.nextpage = tmpnextpos;
+			PWRITE(fileno(plookup2_fptr), &prevpage,
+			       sizeof(PLOOKUP_PAGE_T), prevpagepos);
+		} else if (prevllpos == 0) {
+			/* The next page is the new head. Need to
+			change the linked list for the hash */
+			/* Here the new head is also the first in the
+			hash linked list */
+			PREAD(fileno(plookup2_fptr), &nextpage,
+			      sizeof(PLOOKUP_PAGE_T), tmpnextpos);
+			nextpage.nextlookup = tmppage.nextlookup;
+			PWRITE(fileno(plookup2_fptr), &nextpage,
+			       sizeof(PLOOKUP_PAGE_T), tmpnextpos);
+			parent_lookup_head.hash_head[hashval] = tmpnextpos;
+			PWRITE(fileno(plookup2_fptr), &parent_lookup_head,
+			       sizeof(PLOOKUP_HEAD_T), 0);
+		} else {
+			/* The next page is the new head. Need to
+			change the linked list for the hash */
+			/* Here also need to update the link in the previous
+			inode on the hash linked list */
+			PREAD(fileno(plookup2_fptr), &nextpage,
+			      sizeof(PLOOKUP_PAGE_T), tmpnextpos);
+			nextpage.nextlookup = tmppage.nextlookup;
+			PWRITE(fileno(plookup2_fptr), &nextpage,
+			       sizeof(PLOOKUP_PAGE_T), tmpnextpos);
+			PREAD(fileno(plookup2_fptr), &prevpage,
+			      sizeof(PLOOKUP_PAGE_T), prevllpos);
+			prevpage.nextlookup = tmpnextpos;
+			PWRITE(fileno(plookup2_fptr), &prevpage,
+			      sizeof(PLOOKUP_PAGE_T), prevllpos);
+		}
+	} else {
+		/* If need to delete the entire inode from the secondary db */
+		if (prevllpos == 0) {
+			parent_lookup_head.hash_head[hashval] = tmpnextpos;
+			PWRITE(fileno(plookup2_fptr), &parent_lookup_head,
+			       sizeof(PLOOKUP_HEAD_T), 0);
+		} else {
+			PREAD(fileno(plookup2_fptr), &prevpage,
+			      sizeof(PLOOKUP_PAGE_T), prevllpos);
+			prevpage.nextlookup = tmpnextpos;
+			PWRITE(fileno(plookup2_fptr), &prevpage,
+			      sizeof(PLOOKUP_PAGE_T), prevllpos);
+		}
+		/* Mark haveothers as FALSE in the primary lookup db */
+		filepos = (off_t) ((self_inode - 1) * sizeof(PRIMARY_PARENT_T));
+		PREAD(fileno(pathlookup_data_fptr), &tmpparent,
+		      sizeof(PRIMARY_PARENT_T), filepos);
+		tmpparent.haveothers = FALSE;
+		PWRITE(fileno(pathlookup_data_fptr), &tmpparent,
+		      sizeof(PRIMARY_PARENT_T), filepos);
+	}
+
+	/* Recycle the old page */
+	memset(&tmppage, 0, sizeof(PLOOKUP_PAGE_T));
+	tmppage.gc_next = parent_lookup_head.gc_head;
+	parent_lookup_head.gc_head = tmppos;
+	PWRITE(fileno(plookup2_fptr), &tmppage,
+		       sizeof(PLOOKUP_PAGE_T), tmppos);
+	PWRITE(fileno(plookup2_fptr), &parent_lookup_head,
+		       sizeof(PLOOKUP_HEAD_T), 0);
+
+	return 0;
 
 errcode_handle:
 	return errcode;

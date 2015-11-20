@@ -180,6 +180,8 @@
 			errcode = -errcode;\
 			goto errcode_handle;\
 		} \
+		if (ret_ssize == 0)\
+			memset(B, 0, C);\
 	}
 
 #define PWRITE(A, B, C, D)\
