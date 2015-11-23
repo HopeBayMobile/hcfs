@@ -1184,11 +1184,8 @@ errcode_handle:
 int fetch_error_download_path(char *path, ino_t inode)
 {
 
-#ifdef ARM_32bit_
-	sprintf(path, "/dev/shm/download_error_inode_%lld", inode);
-#else
-	sprintf(path, "/dev/shm/download_error_inode_%ld", inode);
-#endif
+	snprintf(path, 200, "/dev/shm/download_error_inode_%"PRIu64"",
+			(uint64_t)inode);
 
 	return 0;
 }
