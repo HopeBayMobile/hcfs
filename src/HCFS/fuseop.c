@@ -56,6 +56,7 @@
 #ifndef _ANDROID_ENV_
 #include <attr/xattr.h>
 #endif
+#include <inttypes.h>
 
 /* Headers from the other libraries */
 #include <fuse/fuse_lowlevel.h>
@@ -430,7 +431,7 @@ ino_t real_ino(fuse_req_t req, fuse_ino_t ino)
 
 	tmpptr = (MOUNT_T *) fuse_req_userdata(req);
 
-	write_log(10, "Root inode is %"FMT_INO_T"\n", tmpptr->f_ino);
+	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
 
 	if (ino == 1)
 		return tmpptr->f_ino;
@@ -580,7 +581,7 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 	write_log(10, "Debug getattr inode %ld\n", ino);
 	hit_inode = real_ino(req, ino);
 
-	write_log(10, "Debug getattr hit inode %"FMT_INO_T"\n", hit_inode);
+	write_log(10, "Debug getattr hit inode %" PRIu64 "\n", (uint64_t)hit_inode);
 
 	if (hit_inode > 0) {
 		tmpptr = (MOUNT_T *) fuse_req_userdata(req);
@@ -601,8 +602,8 @@ static void hfuse_ll_getattr(fuse_req_t req, fuse_ino_t ino,
 		}
 #endif
 
-		write_log(10, "Debug getattr return inode %"FMT_INO_T"\n",
-				tmp_stat.st_ino);
+		write_log(10, "Debug getattr return inode %" PRIu64 "\n",
+				(uint64_t)tmp_stat.st_ino);
 		gettimeofday(&tmp_time2, NULL);
 
 		write_log(10, "getattr elapse %f\n",
@@ -998,8 +999,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	MOUNT_T *tmpptr;
 
 	parent_inode = real_ino(req, parent);
-	write_log(10, "Debug rmdir: name %s, parent %"FMT_INO_T"\n", selfname,
-			parent_inode);
+	write_log(10, "Debug rmdir: name %s, parent %" PRIu64 "\n", selfname,
+			(uint64_t)parent_inode);
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
 		fuse_reply_err(req, ENAMETOOLONG);
@@ -1055,8 +1056,8 @@ void hfuse_ll_rmdir(fuse_req_t req, fuse_ino_t parent,
 	}
 
 	this_inode = temp_dentry.d_ino;
-	write_log(10, "Debug rmdir: name %s, %"FMT_INO_T"\n",
-			temp_dentry.d_name, this_inode);
+	write_log(10, "Debug rmdir: name %s, %" PRIu64 "\n",
+			temp_dentry.d_name, (uint64_t)this_inode);
 	ret_val = rmdir_update_meta(req, parent_inode, this_inode, selfname);
 
 	if (ret_val < 0) {
@@ -1100,8 +1101,8 @@ a directory (for NFS) */
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(10, "Debug lookup parent %"FMT_INO_T", name %s\n",
-			parent_inode, selfname);
+	write_log(10, "Debug lookup parent %" PRIu64 ", name %s\n",
+			(uint64_t)parent_inode, selfname);
 
 	/* Reject if name too long */
 	if (strlen(selfname) > MAX_FILENAME_LEN) {
@@ -1147,7 +1148,7 @@ a directory (for NFS) */
 	ret_val = lookup_dir(parent_inode, selfname, &temp_dentry);
 
 	write_log(10,
-		"Debug lookup %"FMT_INO_T", %s, %d\n", parent_inode, selfname, ret_val);
+		"Debug lookup %" PRIu64 ", %s, %d\n", (uint64_t)parent_inode, selfname, ret_val);
 
 	if (ret_val < 0) {
 		ret_val = -ret_val;
@@ -1175,8 +1176,8 @@ a directory (for NFS) */
 #endif
 
 	output_param.generation = this_gen;
-	write_log(10, "Debug lookup inode %"FMT_INO_T", gen %ld\n",
-			this_inode, this_gen);
+	write_log(10, "Debug lookup inode %" PRIu64 ", gen %ld\n",
+			(uint64_t)this_inode, this_gen);
 
 	if (S_ISREG((output_param.attr).st_mode))
 		ret_val = lookup_increase(tmpptr->lookup_table, this_inode,
@@ -1945,6 +1946,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	long long cache_delta;
 	long long cache_block_delta;
 	char tmpstatus;
+	BLOCK_ENTRY *last_block_entry;
 
 	cache_delta = 0;
 	cache_block_delta = 0;
@@ -1960,8 +1962,9 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 	if (ret < 0)
 		return ret;
 
-	if (((temppage->block_entries[last_index]).status == ST_CLOUD) ||
-		((temppage->block_entries[last_index]).status == ST_CtoL)) {
+	last_block_entry = &(temppage->block_entries[last_index]);
+	if ((last_block_entry->status == ST_CLOUD) ||
+		(last_block_entry->status == ST_CtoL)) {
 		/*Download from backend */
 		blockfptr = fopen(thisblockpath, "a+");
 		if (blockfptr == NULL) {
@@ -2002,14 +2005,10 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		}
 
 		tmpstatus = (temppage->block_entries[last_index]).status;
-		if (((temppage->block_entries[last_index]).status ==
-			 ST_CLOUD) ||
-			((temppage->block_entries[last_index]).status ==
-				ST_CtoL)) {
-			if ((temppage->block_entries[last_index]).status ==
-				ST_CLOUD) {
-				(temppage->block_entries[last_index]).status =
-					ST_CtoL;
+		if ((last_block_entry->status == ST_CLOUD) ||
+				(last_block_entry->status == ST_CtoL)) {
+			if (last_block_entry->status == ST_CLOUD) {
+				last_block_entry->status = ST_CtoL;
 				ret = meta_cache_update_file_data(this_inode,
 					NULL, NULL, temppage, currentfilepos,
 					*body_ptr);
@@ -2025,7 +2024,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_unlock_entry(*body_ptr);
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, temppage->block_entries[last_index].obj_id);
+			ret = fetch_from_cloud(blockfptr, last_block_entry->obj_id);
 #else
 			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
 					last_block);
@@ -2060,8 +2059,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			}
 
 			if (stat(thisblockpath, &tempstat) == 0) {
-				(temppage->block_entries[last_index]).status =
-					ST_LDISK;
+				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
@@ -2089,8 +2087,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			}
 		} else {
 			if (stat(thisblockpath, &tempstat) == 0) {
-				(temppage->block_entries[last_index]).status =
-					ST_LDISK;
+				last_block_entry->status = ST_LDISK;
 				ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 				if (ret < 0) {
@@ -2137,7 +2134,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		}
 
 	} else {
-		if ((temppage->block_entries[last_index]).status == ST_NONE)
+		if (last_block_entry->status == ST_NONE)
 			return 0;
 
 		tmpstatus = (temppage->block_entries[last_index]).status;
@@ -2167,7 +2164,7 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 		/* TODO: check if it is possible for a block to be deleted
 			when truncate is conducted (meta is locked) */
 		if (stat(thisblockpath, &tempstat) == 0) {
-			(temppage->block_entries[last_index]).status = ST_LDISK;
+			last_block_entry->status = ST_LDISK;
 			ret = set_block_dirty_status(thisblockpath,
 						NULL, TRUE);
 			if (ret < 0) {
@@ -2743,8 +2740,8 @@ int read_prefetch_cache(BLOCK_ENTRY_PAGE *tpage, long long eindex,
 		temp_prefetch->block_no = block_index + 1;
 		temp_prefetch->page_start_fpos = this_page_fpos;
 		temp_prefetch->entry_index = eindex + 1;
-		write_log(10, "Prefetching block %lld for inode %"FMT_INO_T"\n",
-			block_index + 1, this_inode);
+		write_log(10, "Prefetching block %lld for inode %" PRIu64 "\n",
+			block_index + 1, (uint64_t)this_inode);
 		ret = pthread_create(&(prefetch_thread),
 			&prefetch_thread_attr, (void *)&prefetch_block,
 			((void *)temp_prefetch));
@@ -4367,9 +4364,9 @@ void hfuse_ll_readdir(fuse_req_t req, fuse_ino_t ino, size_t size,
 					(size - buf_pos),
 					temp_page.dir_entries[count].d_name,
 					&tempstat, nextentry_pos);
-			write_log(10, "Debug readdir entry %s, %"FMT_INO_T"\n",
+			write_log(10, "Debug readdir entry %s, %" PRIu64 "\n",
 				temp_page.dir_entries[count].d_name,
-				tempstat.st_ino);
+				(uint64_t)tempstat.st_ino);
 			write_log(10, "Debug readdir entry size %ld\n",
 				entry_size);
 			if (entry_size > (size - buf_pos)) {
@@ -4446,7 +4443,7 @@ void hfuse_ll_init(void *userdata, struct fuse_conn_info *conn)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-	write_log(10, "Root inode is %"FMT_INO_T"\n", tmpptr->f_ino);
+	write_log(10, "Root inode is %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
 
 	lookup_increase(tmpptr->lookup_table, tmpptr->f_ino, 1, D_ISDIR);
 }
@@ -4463,7 +4460,7 @@ void hfuse_ll_destroy(void *userdata)
 	MOUNT_T *tmpptr;
 
 	tmpptr = (MOUNT_T *)userdata;
-	write_log(10, "Unmounting FS with root inode %"FMT_INO_T"\n", tmpptr->f_ino);
+	write_log(10, "Unmounting FS with root inode %" PRIu64 "\n", (uint64_t)tmpptr->f_ino);
 }
 
 /************************************************************************
@@ -5633,8 +5630,8 @@ static void hfuse_ll_create(fuse_req_t req, fuse_ino_t parent,
 
 	parent_inode = real_ino(req, parent);
 
-	write_log(10, "DEBUG parent %"FMT_INO_T", name %s mode %d\n",
-			parent_inode, name, mode);
+	write_log(10, "DEBUG parent %" PRIu64 ", name %s mode %d\n",
+			(uint64_t)parent_inode, name, mode);
 
 	/* Reject if not creating a regular file */
 	if (!S_ISREG(mode)) {
@@ -5801,8 +5798,8 @@ void *mount_multi_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop_mt(session_ptr);
-	write_log(10, "Unmounting FS with root inode %"FMT_INO_T", %d\n", tmpptr->f_ino,
-			tmpptr->is_unmount);
+	write_log(10, "Unmounting FS with root inode %" PRIu64 ", %d\n",
+			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);
@@ -5818,8 +5815,8 @@ void *mount_single_thread(void *ptr)
 
 	session_ptr = tmpptr->session_ptr;
 	fuse_session_loop(session_ptr);
-	write_log(10, "Unmounting FS with root inode %"FMT_INO_T", %d\n", tmpptr->f_ino,
-			tmpptr->is_unmount);
+	write_log(10, "Unmounting FS with root inode %" PRIu64 ", %d\n",
+			(uint64_t)tmpptr->f_ino, tmpptr->is_unmount);
 
 	if (tmpptr->is_unmount == FALSE)
 		unmount_event(tmpptr->f_name);

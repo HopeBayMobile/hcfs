@@ -21,17 +21,7 @@
 #include <unistd.h>
 
 #include "global.h"
-#define MAX_FILENAME_LEN 255
-#ifdef _ANDROID_ENV_
-#define ANDROID_INTERNAL 1
-#define ANDROID_EXTERNAL 2
-#endif
-
-typedef struct {
-	ino_t d_ino;
-	char d_name[MAX_FILENAME_LEN+1];
-	char d_type;
-} DIR_ENTRY;
+#include "HCFSvol.h"
 
 int main(int argc, char **argv)
 {
@@ -45,6 +35,8 @@ int main(int argc, char **argv)
 	ino_t tmpino;
 	long long num_local, num_cloud, num_hybrid, retllcode;
 	long long downxfersize, upxfersize;
+	char shm_hcfs_reporter[] = "/dev/shm/hcfs_reporter";
+	int first_size, rest_size;
 
 	if (argc < 2) {
 		printf("Invalid number of arguments\n");
@@ -96,6 +88,8 @@ int main(int argc, char **argv)
 		code = GETXFERSTAT;
 	else if (strcasecmp(argv[1], "resetxfer") == 0)
 		code = RESETXFERSTAT;
+	else if (strcasecmp(argv[1], "cloudstat") == 0)
+		code = CLOUDSTAT;
 	else
 		code = -1;
 	if (code < 0) {
@@ -104,7 +98,7 @@ int main(int argc, char **argv)
 	}
 
 	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, "/dev/shm/hcfs_reporter");
+	strncpy(addr.sun_path, shm_hcfs_reporter, sizeof(addr.sun_path));
 	fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	status = connect(fd, (const struct sockaddr *) &addr, sizeof(addr));
 	printf("status is %d, err %s\n", status, strerror(errno));
@@ -119,8 +113,8 @@ int main(int argc, char **argv)
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
-			printf("Command error: Code %d, %s\n",
-				-retcode, strerror(-retcode));
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
@@ -146,7 +140,7 @@ int main(int argc, char **argv)
 	case CREATEVOL:
 #ifdef _ANDROID_ENV_
 		cmd_len = strlen(argv[2]) + 2;
-		strcpy(buf, argv[2]);
+		strncpy(buf, argv[2], sizeof(buf));
 		if (strcasecmp(argv[3], "external") == 0) {
 			buf[strlen(argv[2]) + 1] = ANDROID_EXTERNAL;
 		} else if (strcasecmp(argv[3], "internal") == 0) {
@@ -163,8 +157,8 @@ int main(int argc, char **argv)
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
-			printf("Command error: Code %d, %s\n",
-				-retcode, strerror(-retcode));
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
@@ -174,7 +168,7 @@ int main(int argc, char **argv)
 	case UNMOUNTVOL:
 	case CHECKMOUNT:
 		cmd_len = strlen(argv[2]) + 1;
-		strcpy(buf, argv[2]);
+		strncpy(buf, argv[2], sizeof(buf));
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
@@ -182,8 +176,8 @@ int main(int argc, char **argv)
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
-			printf("Command error: Code %d, %s\n",
-				-retcode, strerror(-retcode));
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
@@ -261,9 +255,11 @@ int main(int argc, char **argv)
 		cmd_len = strlen(argv[2]) + strlen(argv[3]) + 2 + sizeof(int);
 		fsname_len = strlen(argv[2]) + 1;
 		memcpy(buf, &fsname_len, sizeof(int));
-		snprintf(&(buf[sizeof(int)]), 4092, "%s", argv[2]);
-		snprintf(&(buf[sizeof(int) + fsname_len]),
-					4092 - fsname_len, "%s", argv[3]);
+		first_size = sizeof(int);
+		rest_size = sizeof(buf) - first_size;
+		snprintf(&(buf[first_size]), rest_size, "%s", argv[2]);
+		snprintf(&(buf[sizeof(int) + fsname_len]), 4092 - fsname_len,
+			 "%s", argv[3]);
 		size_msg = send(fd, &code, sizeof(unsigned int), 0);
 		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
 		size_msg = send(fd, buf, (cmd_len), 0);
@@ -271,8 +267,8 @@ int main(int argc, char **argv)
 		size_msg = recv(fd, &reply_len, sizeof(unsigned int), 0);
 		size_msg = recv(fd, &retcode, sizeof(int), 0);
 		if (retcode < 0)
-			printf("Command error: Code %d, %s\n",
-				-retcode, strerror(-retcode));
+			printf("Command error: Code %d, %s\n", -retcode,
+			       strerror(-retcode));
 		else
 			printf("Returned value is %d\n", retcode);
 		break;
@@ -288,14 +284,13 @@ int main(int argc, char **argv)
 			break;
 		}
 		total_recv = 0;
-		ptr = (char *) tmp;
+		ptr = (char *)tmp;
 		while (total_recv < reply_len) {
 			if ((reply_len - total_recv) > 1024)
 				to_recv = 1024;
 			else
 				to_recv = reply_len - total_recv;
-			size_msg = recv(fd, &ptr[total_recv],
-				to_recv, 0);
+			size_msg = recv(fd, &ptr[total_recv], to_recv, 0);
 			total_recv += size_msg;
 		}
 		total_entries = reply_len / sizeof(DIR_ENTRY);
@@ -310,6 +305,16 @@ int main(int argc, char **argv)
 		for (count = 0; count < total_entries; count++)
 			printf("%s\n", tmp[count].d_name);
 #endif
+		break;
+	case CLOUDSTAT:
+		if(status == -1)
+			break;
+		size_msg = send(fd, &code, sizeof(unsigned int), 0);
+		size_msg = send(fd, &cmd_len, sizeof(unsigned int), 0);
+
+		size_msg = recv(fd, &reply_len, sizeof(int), 0);
+		size_msg = recv(fd, &retcode, sizeof(int), 0);
+		printf("backend is %s\n", retcode ? "online" : "offline");
 		break;
 	default:
 		break;

@@ -45,6 +45,7 @@ TODO: Cleanup temp files in /dev/shm at system startup
 #include <attr/xattr.h>
 #endif
 #include <openssl/sha.h>
+#include <inttypes.h>
 
 #include "hcfs_clouddelete.h"
 #include "params.h"
@@ -89,6 +90,7 @@ void collect_finished_sync_threads(void *ptr)
 {
 	int count;
 	struct timespec time_to_sleep;
+	UNUSED(ptr);
 
 	time_to_sleep.tv_sec = 0;
 
@@ -123,7 +125,9 @@ static inline int _upload_terminate_thread(int index)
 	FILE *metafptr;
 	char thismetapath[METAPATHLEN];
 	char blockpath[400];
+#if (DEDUP_ENABLE)
 	unsigned char blk_obj_id[OBJID_LENGTH];
+#endif
 	ino_t this_inode;
 	off_t page_filepos;
 	long long e_index;
@@ -578,7 +582,7 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 
 	ret = fetch_meta_path(thismetapath, this_inode);
 
-	write_log(10, "Sync inode %"FMT_INO_T", mode %d\n", ptr->inode, ptr->this_mode);
+	write_log(10, "Sync inode %" PRIu64 ", mode %d\n", (uint64_t)ptr->inode, ptr->this_mode);
 	if (ret < 0) {
 		super_block_update_transit(ptr->inode, FALSE, TRUE);
 		sync_ctl.threads_finished[ptr->which_index] = TRUE;
@@ -907,8 +911,8 @@ void sync_single_inode(SYNC_THREAD_TYPE *ptr)
 			sem_post(&(sync_ctl.sync_op_sem));
 		}
 		if (sync_error == TRUE) {
-			write_log(10, "Sync inode %"FMT_INO_T" to backend incomplete.\n",
-				  ptr->inode);
+			write_log(10, "Sync inode %" PRIu64 " to backend incomplete.\n",
+				  (uint64_t)ptr->inode);
 			/* TODO: Revert info re last upload if upload
 				fails */
 		} else {
@@ -959,14 +963,14 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	off_t obj_size;
 	FILE *fptr, *ddt_fptr;
 	int ret_val, errcode, ret;
-	int ddt_fd;
-	int ver_tag, result_idx;
+	int ddt_fd=-1;
+	int ver_tag, result_idx=-1;
 	DDT_BTREE_NODE tree_root, result_node;
 	DDT_BTREE_META ddt_meta;
 
-	write_log(10, "Debug datasync: inode %"FMT_INO_T", block %lld\n", this_inode,
-		  block_no);
-	sprintf(curl_handle->id, "upload_blk_%"FMT_INO_T"_%lld", this_inode, block_no);
+	write_log(10, "Debug datasync: inode %" PRIu64 ", block %lld\n",
+			(uint64_t)this_inode, block_no);
+	sprintf(curl_handle->id, "upload_blk_%" PRIu64 "_%lld", this_inode, block_no);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1003,12 +1007,8 @@ int do_block_sync(ino_t this_inode, long long block_no,
 	obj_id_to_string(obj_id, obj_id_str);
 	// hash_to_string(hash_key, hash_key_str);
 	sprintf(objname, "data_%s", obj_id_str);
-#elif defined(ARM_32bit_)
-	sprintf(objname, "data_%lld_%lld", this_inode, block_no);
-	/* Force to upload */
-	ret = 1;
 #else
-	sprintf(objname, "data_%ld_%lld", this_inode, block_no);
+	sprintf(objname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 	/* Force to upload */
 	ret = 1;
 #endif
@@ -1105,10 +1105,10 @@ int do_meta_sync(ino_t this_inode, CURL_HANDLE *curl_handle, char *filename)
 	int ret_val, errcode, ret;
 	FILE *fptr;
 
-	sprintf(objname, "meta_%"FMT_INO_T, this_inode);
-	write_log(10, "Debug datasync: objname %s, inode %"FMT_INO_T"\n", objname,
+	sprintf(objname, "meta_%" PRIu64 "", (uint64_t)this_inode);
+	write_log(10, "Debug datasync: objname %s, inode %" PRIu64 "\n", objname,
 		  this_inode);
-	sprintf(curl_handle->id, "upload_meta_%"FMT_INO_T, this_inode);
+	sprintf(curl_handle->id, "upload_meta_%" PRIu64 "", (uint64_t)this_inode);
 	fptr = fopen(filename, "r");
 	if (fptr == NULL) {
 		errcode = errno;
@@ -1222,8 +1222,8 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 	FILE *fptr;
 
 	topen = FALSE;
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%"FMT_INO_T".tmp",
-		upload_ctl.upload_threads[which_curl].inode);
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%" PRIu64 ".tmp",
+		(uint64_t)upload_ctl.upload_threads[which_curl].inode);
 
 	/* Find a appropriate copied-meta name */
 	count = 0;
@@ -1231,8 +1231,8 @@ int schedule_sync_meta(FILE *metafptr, int which_curl)
 		ret = access(tempfilename, F_OK);
 		if (ret == 0) {
 			count++;
-			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%"FMT_INO_T".%d",
-				upload_ctl.upload_threads[which_curl].inode,
+			sprintf(tempfilename, "/dev/shm/hcfs_sync_meta_%" PRIu64 ".%d",
+				(uint64_t)upload_ctl.upload_threads[which_curl].inode,
 				count);
 		} else {
 			errcode = errno;
@@ -1311,8 +1311,8 @@ int dispatch_upload_block(int which_curl)
 
 	upload_ptr = &(upload_ctl.upload_threads[which_curl]);
 
-	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%"FMT_INO_T"_%lld.tmp",
-		upload_ptr->inode, upload_ptr->blockno);
+	sprintf(tempfilename, "/dev/shm/hcfs_sync_block_%" PRIu64 "_%lld.tmp",
+		(uint64_t)upload_ptr->inode, upload_ptr->blockno);
 
 	/* Find an appropriate dispatch-name */
 	count = 0;
@@ -1321,8 +1321,9 @@ int dispatch_upload_block(int which_curl)
 		if (ret == 0) {
 			count++;
 			sprintf(tempfilename,
-				"/dev/shm/hcfs_sync_block_%"FMT_INO_T"_%lld.%d",
-				upload_ptr->inode, upload_ptr->blockno, count);
+					"/dev/shm/hcfs_sync_block_%" PRIu64 "_%lld.%d",
+					(uint64_t)upload_ptr->inode,
+					upload_ptr->blockno, count);
 		} else {
 			errcode = errno;
 			break;
@@ -1438,8 +1439,8 @@ static inline int _sync_mark(ino_t this_inode, mode_t this_mode,
 			sync_threads[count].this_mode = this_mode;
 			sync_threads[count].which_index = count;
 
-			write_log(10, "Before syncing: inode %"FMT_INO_T", mode %d\n",
-				  sync_threads[count].inode,
+			write_log(10, "Before syncing: inode %" PRIu64 ", mode %d\n",
+				  (uint64_t)sync_threads[count].inode,
 				  sync_threads[count].this_mode);
 			pthread_create(&(sync_ctl.inode_sync_thread[count]),
 				       NULL, (void *)&sync_single_inode,
@@ -1522,7 +1523,7 @@ void upload_loop(void)
 			}
 		}
 		super_block_exclusive_release();
-		write_log(10, "Inode to sync is %"FMT_INO_T"\n", ino_sync);
+		write_log(10, "Inode to sync is %" PRIu64 "\n", (uint64_t)ino_sync);
 		/* Begin to sync the inode */
 		if (ino_sync != 0) {
 			sem_wait(&(sync_ctl.sync_op_sem));
@@ -1586,11 +1587,11 @@ int update_backend_stat(ino_t root_inode, long long system_size_delta,
 	is_fopen = FALSE;
 	sem_wait(&(sync_stat_ctl.stat_op_sem));
 
-	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%"FMT_INO_T,
-		 METAPATH, root_inode);
-	snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%"FMT_INO_T,
-		 METAPATH, root_inode);
-	snprintf(objname, METAPATHLEN - 1, "FSstat%"FMT_INO_T, root_inode);
+	snprintf(fname, METAPATHLEN - 1, "%s/FS_sync/FSstat%" PRIu64 "",
+			METAPATH, (uint64_t)root_inode);
+        snprintf(tmpname, METAPATHLEN - 1, "%s/FS_sync/tmpFSstat%"FMT_INO_T,
+                 METAPATH, root_inode);
+	snprintf(objname, METAPATHLEN - 1, "FSstat%" PRIu64 "", (uint64_t)root_inode);
 
 	/* If updating backend statistics for the first time, delete local
 	copy for this volume */

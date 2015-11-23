@@ -8,6 +8,9 @@ ENV USE_CCACHE="1"
 ENV DEBIAN_FRONTEND=noninteractive
 RUN echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 
+ENV TZ=Asia/Taipei
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 RUN adduser --gecos "jenkins" --disabled-password jenkins && \
 	echo "jenkins:qwert1234" | chpasswd && \
 	echo "jenkins ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \

@@ -788,7 +788,7 @@ int mount_status(char *fsname)
 *************************************************************************/
 int unmount_all(void)
 {
-	int ret, errcode;
+	/* TODO: errcode_handle */
 	MOUNT_T *ret_info;
 	MOUNT_NODE_T *ret_node;
 	char fsname[MAX_FILENAME_LEN+1];
@@ -807,7 +807,8 @@ int unmount_all(void)
 		pthread_kill(ret_info->mt_thread, SIGHUP);
 		do_unmount_FS(ret_info);
 
-		ret = delete_mount(fsname, &ret_node);
+		/* TODO: check return value */
+		delete_mount(fsname, &ret_node);
 
 		free((ret_node->mt_entry)->f_mp);
 		free(ret_node->mt_entry);
@@ -819,11 +820,6 @@ int unmount_all(void)
 	sem_post(&(fs_mgr_head->op_lock));
 
 	return 0;
-
-errcode_handle:
-	sem_post(&(mount_mgr.mount_lock));
-	sem_post(&(fs_mgr_head->op_lock));
-	return errcode;
 }
 
 /************************************************************************
@@ -865,7 +861,7 @@ int change_mount_stat(MOUNT_T *mptr, long long system_size_delta,
 *************************************************************************/
 int update_FS_statistics(MOUNT_T *mptr)
 {
-	int ret, errcode;
+	int errcode;
 	int tmpfd;
 	ssize_t ret_ssize;
 
@@ -892,7 +888,7 @@ errcode_handle:
 *************************************************************************/
 int read_FS_statistics(MOUNT_T *mptr)
 {
-	int ret, errcode;
+	int errcode;
 	int tmpfd;
 	ssize_t ret_ssize;
 

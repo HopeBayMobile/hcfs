@@ -62,11 +62,13 @@ clean :
 test : setup $(TESTS)
 	./filetable_unittest
 	./hfuse_system_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1

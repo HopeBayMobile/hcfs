@@ -15,6 +15,8 @@
 
 #include "logger.h"
 
+#define UNUSED(x) ((void)x)
+
 #define FSEEK(A, B, C)\
 	{\
 		errcode = 0;\

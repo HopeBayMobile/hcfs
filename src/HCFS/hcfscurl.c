@@ -35,15 +35,8 @@
 #include "global.h"
 #include "fuseop.h"
 
-#define MAX_RETRIES 5
-
 extern SYSTEM_CONF_STRUCT system_config;
-
-typedef struct {
-	FILE *fptr;
-	off_t object_size;
-	off_t remaining_size;
-} object_put_control;
+#define MAX_RETRIES 5
 
 /************************************************************************
 *
@@ -56,13 +49,14 @@ typedef struct {
 size_t write_file_function(void *ptr, size_t size, size_t nmemb, void *fstream)
 {
 	size_t ret_size;
-	int errcode;
+	int errcode = -1;
 
 	FWRITE(ptr, size, nmemb, (FILE *)fstream);
 
 	return ret_size * size;
 
 errcode_handle:
+	errno = errcode;
 	return 0;
 }
 
@@ -279,18 +273,23 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 	const int nonce_meta_len = strlen(nonce_meta);
 
 	char *s, *backup;
+
 	s = strtok_r(httpheader, "\n", &backup);
 	while (s) {
 		char *s2;
 		char *backup_s2;
+		int s2_len;
+		int len_diff;
+
 		s2 = strtok_r(s, ":", &backup_s2);
-		int s2_len = strlen(s2);
+		s2_len = strlen(s2);
 		if (s2_len <= meta_len)
 			goto cont;
 		if (memcmp(s2, meta, meta_len) != 0)
 			goto cont;
 
-		int len_diff = s2_len - meta_len;
+		len_diff = s2_len - meta_len;
+
 		switch (len_diff) {
 		case 3:
 			if (memcmp(enc_meta, s2 + meta_len, enc_meta_len) ==
@@ -326,7 +325,7 @@ int parse_http_header_coding_meta(HCFS_encode_object_meta *object_meta,
 			break;
 		}
 
-	cont:
+cont:
 		s = strtok_r(NULL, "\n", &backup);
 	}
 	return 0;
@@ -602,7 +601,7 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 		return 0;
 
 	fptr = put_control->fptr;
-	if ((size * nmemb) > put_control->remaining_size)
+	if ((size * nmemb) > (size_t)put_control->remaining_size)
 		actual_to_read = put_control->remaining_size;
 	else
 		actual_to_read = size * nmemb;
@@ -612,7 +611,75 @@ size_t read_file_function(void *ptr, size_t size, size_t nmemb,
 
 	return ret_size;
 errcode_handle:
+	errno = errcode;
 	return 0;
+}
+
+/************************************************************************
+*
+* Function name: hcfs_swift_test_backend
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: For Swift backends, displays information of the account.
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
+int hcfs_swift_test_backend(CURL_HANDLE *curl_handle)
+{
+	/*TODO: How to actually export the list of objects to other functions*/
+	struct curl_slist *chunk = NULL;
+	CURLcode res;
+	FILE *swift_header_fptr;
+	CURL *curl;
+	char header_filename[100];
+	int ret_val, errcode;
+
+	snprintf(header_filename, sizeof(header_filename),
+		 "/dev/shm/swiftaccounthead%s.tmp", curl_handle->id);
+	curl = curl_handle->curl;
+
+	swift_header_fptr = fopen(header_filename, "w+");
+	if (swift_header_fptr == NULL) {
+		errcode = errno;
+		write_log(0, "IO error in %s. Code %d, %s\n", __func__, errcode,
+			  strerror(errcode));
+		return -1;
+	}
+
+	chunk = NULL;
+
+	chunk = curl_slist_append(chunk, swift_auth_string);
+
+	curl_easy_setopt(curl, CURLOPT_URL, swift_url_string);
+	curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+	curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+	curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 50L);
+	curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "HEAD");
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, MONITOR_TEST_TIMEOUT);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+	curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+	curl_easy_setopt(curl, CURLOPT_UPLOAD, 0L);
+	curl_easy_setopt(curl, CURLOPT_PUT, 0L);
+	curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, write_file_function);
+	curl_easy_setopt(curl, CURLOPT_WRITEHEADER, swift_header_fptr);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_file_function);
+	curl_easy_setopt(curl, CURLOPT_VERBOSE, 0L);
+
+	res = curl_easy_perform(curl);
+
+	if (res == CURLE_OK)
+		curl_easy_getinfo (curl, CURLINFO_RESPONSE_CODE, &ret_val);
+	else
+		write_log(5, "Curl op failed %s\n", curl_easy_strerror(res));
+
+	fclose(swift_header_fptr);
+	unlink(header_filename);
+	curl_slist_free_all(chunk);
+
+	if (res == CURLE_OK)
+		return ret_val;
+	else
+		return -1;
 }
 
 /************************************************************************
@@ -1021,14 +1088,14 @@ errcode_handle:
 *  Return value: None.
 *
 *************************************************************************/
-void convert_currenttime(unsigned char *date_string)
+void convert_currenttime(char *date_string)
 {
-	unsigned char current_time[100];
-	unsigned char wday[5];
-	unsigned char month[5];
-	unsigned char mday[5];
-	unsigned char timestr[20];
-	unsigned char year[6];
+	char current_time[100];
+	char wday[5];
+	char month[5];
+	char mday[5];
+	char timestr[20];
+	char year[6];
 	struct tm tmp_gmtime;
 	time_t tmptime;
 
@@ -1041,7 +1108,7 @@ void convert_currenttime(unsigned char *date_string)
 	sscanf(current_time, "%s %s %s %s %s\n", wday, month, mday, timestr,
 	       year);
 
-	sprintf(date_string, "%s, %s %s %s %s GMT", wday, mday, month, year,
+	sprintf((char *)date_string, "%s, %s %s %s %s GMT", wday, mday, month, year,
 		timestr);
 
 	write_log(10, "converted string %s\n", date_string);
@@ -1057,20 +1124,20 @@ void convert_currenttime(unsigned char *date_string)
 *
 *************************************************************************/
 void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
-		       unsigned char *key, int *outputlen)
+		       char *key, int *outputlen)
 {
 	unsigned char finalhash[4096];
-	int len_finalhash;
+	unsigned int len_finalhash;
 	HMAC_CTX myctx;
-	int count;
+	/* int count; */
 
 	write_log(10, "key: %s\n", key);
 	write_log(10, "input: %s\n", input_str);
-	write_log(10, "%d, %d\n", strlen(key), strlen(input_str));
+	write_log(10, "%d, %d\n", strlen((char*)key), strlen((char*)input_str));
 	HMAC_CTX_init(&myctx);
 
-	HMAC_Init_ex(&myctx, key, strlen(key), EVP_sha1(), NULL);
-	HMAC_Update(&myctx, input_str, strlen(input_str));
+	HMAC_Init_ex(&myctx, key, strlen((char*)key), EVP_sha1(), NULL);
+	HMAC_Update(&myctx, input_str, strlen((char*)input_str));
 	HMAC_Final(&myctx, finalhash, &len_finalhash);
 	HMAC_CTX_cleanup(&myctx);
 
@@ -1093,8 +1160,8 @@ void compute_hmac_sha1(unsigned char *input_str, unsigned char *output_str,
 *  Return value: None.
 *
 *************************************************************************/
-void generate_S3_sig(unsigned char *method, unsigned char *date_string,
-		     unsigned char *sig_string, unsigned char *resource_string,
+void generate_S3_sig(char *method, char *date_string,
+		     char *sig_string, char *resource_string,
 		     HTTP_meta *object_meta)
 {
 	char sig_temp1[4096] = {0};
@@ -1125,7 +1192,7 @@ void generate_S3_sig(unsigned char *method, unsigned char *date_string,
 	compute_hmac_sha1((unsigned char *)sig_temp1, sig_temp2, S3_SECRET,
 			  &hashlen);
 	write_log(10, "sig temp2: %s\n", sig_temp2);
-	b64encode_str(sig_temp2, sig_string, &len_signature, hashlen);
+	b64encode_str(sig_temp2, (unsigned char*)sig_string, &len_signature, hashlen);
 
 	write_log(10, "final sig: %s, %d\n", sig_string, hashlen);
 }
@@ -1147,11 +1214,11 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	FILE *S3_list_header_fptr, *S3_list_body_fptr;
 	CURL *curl;
 	char header_filename[100], body_filename[100];
-	unsigned char date_string[100];
+	char date_string[100];
 	char date_string_header[100];
-	unsigned char AWS_auth_string[200];
-	unsigned char S3_signature[200];
-	unsigned char resource[200];
+	char AWS_auth_string[200];
+	char S3_signature[200];
+	char resource[200];
 	int ret_val, errcode;
 	int num_retries;
 
@@ -1233,6 +1300,20 @@ int hcfs_S3_list_container(CURL_HANDLE *curl_handle)
 	curl_slist_free_all(chunk);
 
 	return ret_val;
+}
+/************************************************************************
+*
+* Function name: hcfs_S3_test_backend
+*        Inputs: CURL_HANDLE *curl_handle
+*       Summary: For S3 backends, displays information of the account.
+*  Return value: Return code from request (HTTP return code), or -1 if error.
+*
+*************************************************************************/
+int hcfs_S3_test_backend(CURL_HANDLE *curl_handle)
+{
+	/*TODO: Finish S3 test */
+	UNUSED(curl_handle);
+	return -1;
 }
 
 int _http_is_success(int code)
@@ -1366,6 +1447,59 @@ void hcfs_destroy_backend(CURL_HANDLE *curl_handle)
 	}
 	curl_handle->curl_backend = NONE;
 	curl_handle->curl = NULL;
+}
+
+/************************************************************************
+*
+* Function name: hcfs_test_backend
+*        Inputs: CURL_HANDLE *curl_handle
+*      Summary : Use HEAD / v1 / { account } to displays information of
+*                the account. This function is called by monitor. In
+*                order to detect connection errors, it WILL NOT retry
+*                connection
+*  Return value: Return code from request(HTTP return code), or -1 if error.
+*                It should return HTTP_204_NO_CONTENT if success.
+*
+*************************************************************************/
+int hcfs_test_backend(CURL_HANDLE *curl_handle)
+{
+	int ret_val;
+
+	if (curl_handle->curl_backend == NONE) {
+		ret_val = hcfs_init_backend(curl_handle);
+		if (_http_is_success(ret_val) == FALSE) {
+			write_log(5, "Error connecting to backend\n");
+			sleep(5);
+			return ret_val;
+		}
+	}
+
+	switch (CURRENT_BACKEND) {
+	case SWIFT:
+		ret_val = hcfs_swift_test_backend(curl_handle);
+		if (ret_val == 401) {
+			write_log(2, "Retrying backend login");
+			ret_val = hcfs_swift_reauth(curl_handle);
+			if ((ret_val < 200) || (ret_val > 299))
+				return ret_val;
+			ret_val = hcfs_swift_test_backend(curl_handle);
+		}
+		break;
+	case S3:
+		ret_val = hcfs_S3_test_backend(curl_handle);
+		if (ret_val == 401) {
+			write_log(2, "Retrying backend login");
+			ret_val = hcfs_S3_reauth(curl_handle);
+			if ((ret_val < 200) || (ret_val > 299))
+				return ret_val;
+			ret_val = hcfs_S3_test_backend(curl_handle);
+		}
+		break;
+	default:
+		ret_val = -1;
+		break;
+	}
+	return ret_val;
 }
 
 /************************************************************************
@@ -1682,13 +1816,13 @@ int hcfs_S3_put_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	CURL *curl;
 	char header_filename[100];
 
-	unsigned char date_string[100];
+	char date_string[100];
 	char object_string[150];
 	char date_string_header[100];
-	unsigned char AWS_auth_string[200];
-	unsigned char S3_signature[200];
+	char AWS_auth_string[200];
+	char S3_signature[200];
 	int ret_val, ret, errcode;
-	unsigned char resource[200];
+	char resource[200];
 	int64_t ret_pos;
 	int num_retries;
 
@@ -1828,11 +1962,11 @@ int hcfs_S3_get_object(FILE *fptr, char *objname, CURL_HANDLE *curl_handle,
 	char header_filename[100];
 	int ret_val, ret, errcode;
 
-	unsigned char date_string[100];
+	char date_string[100];
 	char date_string_header[100];
-	unsigned char AWS_auth_string[200];
-	unsigned char S3_signature[200];
-	unsigned char resource[200];
+	char AWS_auth_string[200];
+	char S3_signature[200];
+	char resource[200];
 	int num_retries;
 
 	sprintf(header_filename, "/dev/shm/s3gethead%s.tmp", curl_handle->id);
@@ -1944,11 +2078,11 @@ int hcfs_S3_delete_object(char *objname, CURL_HANDLE *curl_handle)
 	CURL *curl;
 	char header_filename[100];
 	int ret_val, errcode, ret;
-	unsigned char date_string[100];
+	char date_string[100];
 	char date_string_header[100];
-	unsigned char AWS_auth_string[200];
-	unsigned char S3_signature[200];
-	unsigned char resource[200];
+	char AWS_auth_string[200];
+	char S3_signature[200];
+	char resource[200];
 	int num_retries;
 
 	sprintf(header_filename, "/dev/shm/s3deletehead%s.tmp",

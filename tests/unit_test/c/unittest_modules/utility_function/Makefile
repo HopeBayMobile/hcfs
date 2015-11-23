@@ -63,11 +63,13 @@ test : setup $(TESTS)
 	./utils_unittest
 	./dir_entry_btree_unittest
 	./logger_unittest
+ifndef NOGCOVR
 	gcovr -r $(USER_DIR) .
+endif
 
 .PHONY : setup
 setup :
-	$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
+	@$(USER_DIR)/../../utils/setup_dev_env.sh -m unit_test
 
 export PATH := /usr/lib/ccache:$(PATH)
 export USE_CCACHE := 1

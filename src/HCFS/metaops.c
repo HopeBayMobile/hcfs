@@ -29,6 +29,7 @@
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #include "global.h"
 #include "utils.h"
@@ -1426,8 +1427,8 @@ int disk_markdelete(ino_t this_inode, ino_t root_inode)
 	if (access(pathname, F_OK) != 0)
 		MKDIR(pathname, 0700);
 
-	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
-					METAPATH, this_inode, root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) != 0)
 		MKNOD(pathname, S_IFREG | 0700, 0);
@@ -1453,8 +1454,8 @@ int disk_cleardelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
-					METAPATH, this_inode, root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		UNLINK(pathname);
@@ -1481,8 +1482,8 @@ int disk_checkdelete(ino_t this_inode, ino_t root_inode)
 		return -errcode;
 	}
 
-	snprintf(pathname, 200, "%s/markdelete/inode%"FMT_INO_T"_%"FMT_INO_T,
-					METAPATH, this_inode, root_inode);
+	snprintf(pathname, 200, "%s/markdelete/inode%" PRIu64 "_%" PRIu64 "", METAPATH,
+			(uint64_t)this_inode, (uint64_t)root_inode);
 
 	if (access(pathname, F_OK) == 0)
 		return 1;
@@ -1529,7 +1530,7 @@ int startup_finish_delete(void)
 	}
 
 	while (tmpptr != NULL) {
-		ret_val = sscanf(tmpent.d_name, "inode%"FMT_INO_T"_%"FMT_INO_T"",
+		ret_val = sscanf(tmpent.d_name, "inode%" PRIu64 "_%" PRIu64 "",
 				&tmp_ino, &root_inode);
 		if (ret_val > 0) {
 			ret = fetch_inode_stat(tmp_ino, &tmpstat, NULL, NULL);
