@@ -259,7 +259,7 @@ int _remove_synced_block(ino_t this_inode, struct timeval *builttime,
 					break;
 
 				flock(fileno(metafptr), LOCK_EX);
-				
+
 				/* Check pin status before paging blocks out */
 				FSEEK(metafptr, sizeof(struct stat), SEEK_SET);
 				FREAD(&temphead, sizeof(FILE_META_TYPE),

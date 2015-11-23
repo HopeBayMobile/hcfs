@@ -47,7 +47,7 @@
 *  Return value: 0 if successful, or negation of error code.
 *
 *************************************************************************/
-int fetch_from_cloud(FILE *fptr,
+int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		     unsigned char *obj_id)
 #else
@@ -69,7 +69,10 @@ int fetch_from_cloud(FILE *fptr,
 	sprintf(objname, "data_%" PRIu64 "_%lld", (uint64_t)this_inode, block_no);
 #endif
 
+	if (action_from == PIN_BLOCK) /* Get sem if action from pinning file. */
+		sem_wait(&pin_download_curl_sem);
 	sem_wait(&download_curl_sem);
+
 	FSEEK(fptr, 0, SEEK_SET);
 	FTRUNCATE(fileno(fptr), 0);
 
@@ -130,6 +133,9 @@ int fetch_from_cloud(FILE *fptr,
 
 	sem_wait(&download_curl_control_sem);
 	curl_handle_mask[which_curl_handle] = FALSE;
+
+	if (action_from == PIN_BLOCK)/*Release sem if action from pinning file*/
+		sem_post(&pin_download_curl_sem);
 	sem_post(&download_curl_sem);
 	sem_post(&download_curl_control_sem);
 
@@ -225,11 +231,11 @@ void prefetch_block(PREFETCH_STRUCT_TYPE *ptr)
 		flock(fileno(metafptr), LOCK_UN);
 		mlock = FALSE;
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(
-		    blockfptr, temppage.block_entries[entry_index].obj_id);
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+			temppage.block_entries[entry_index].obj_id);
 #else
-		ret =
-		    fetch_from_cloud(blockfptr, ptr->this_inode, ptr->block_no);
+		ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+			ptr->this_inode, ptr->block_no);
 #endif
 		if (ret < 0) {
 			write_log(0, "Error prefetching\n");
@@ -529,7 +535,7 @@ void fetch_backend_block(void *ptr)
 			write_log(0, "Error: Fail to modify block status in %s."
 				" Code %d", __func__, ret);
 		goto thread_error;
-	
+
 	} else if (ret > 0) {
 		/* Status does not match ST_CLOUD, it may be
 		modified by another one */
@@ -539,14 +545,14 @@ void fetch_backend_block(void *ptr)
 	}
 
 	/* Fetch block from cloud */
-	ret = fetch_from_cloud(block_fptr, block_info->this_inode,
+	ret = fetch_from_cloud(block_fptr, PIN_BLOCK, block_info->this_inode,
 						block_info->block_no);
 	if (ret < 0) {
 		write_log(0, "Error: Fail to fetch block in %s\n", __func__);
 		goto thread_error;
 	}
 
-	/* TODO: Check if error handling here is fixed later 
+	/* TODO: Check if error handling here is fixed later
 	(a block delete op can happen due to a truncate and that's not
 	an error) */
 	/* Update dirty status and system meta */
@@ -604,7 +610,7 @@ void fetch_backend_block(void *ptr)
 			write_log(0, "Error: Fail to modify block status in %s."
 				" Code %d", __func__, ret);
 		goto thread_error;
-	} else if (ret > 0) { 
+	} else if (ret > 0) {
 		/* Status does not match ST_CtoL. It may be truncated */
 		flock(fileno(block_fptr), LOCK_UN);
 		fclose(block_fptr);
@@ -815,7 +821,7 @@ int fetch_pinned_blocks(ino_t inode)
 		sem_post(&(download_thread_ctl.ctl_op_sem));
 		nanosleep(&time_to_sleep, NULL);
 	}
-	
+
 	if (hcfs_system->system_going_down == TRUE) {
 		if (access(error_path, F_OK) == 0)
 			unlink(error_path);

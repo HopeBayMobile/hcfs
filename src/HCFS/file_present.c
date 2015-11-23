@@ -322,13 +322,13 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	body_ptr = meta_cache_lock_entry(parent_inode);
 	if (body_ptr == NULL)
 		return -ENOMEM;
-	
+
 	ret_val = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, body_ptr);
 	if (ret_val < 0)
 		goto error_handling;
 	pin_status = parent_meta.local_pin; /* Inherit parent pin-status */
-	
+
 	ret_val = dir_add_entry(parent_inode, self_inode, selfname,
 						this_stat->st_mode, body_ptr);
 	if (ret_val < 0)
@@ -355,7 +355,7 @@ int mkdir_update_meta(ino_t self_inode, ino_t parent_inode,
 	this_meta.metaver = CURRENT_META_VER;
         this_meta.source_arch = ARCH_CODE;
 	this_meta.root_inode = root_ino;
-	this_meta.local_pin = pin_status;	
+	this_meta.local_pin = pin_status;
 	write_log(10, "Debug: File %s inherits parent pin status = %s\n",
 		selfname, pin_status == TRUE? "PIN" : "UNPIN");
 	ret_val = init_dir_page(&temppage, self_inode, parent_inode,
@@ -575,7 +575,7 @@ int symlink_update_meta(META_CACHE_ENTRY_STRUCT *parent_meta_cache_entry,
 
 	/* Add entry to parent dir. Do NOT need to lock parent meta cache entry
 	   because it had been locked before calling this function. Just need to
-	   open meta file. */	
+	   open meta file. */
 	ret_code = meta_cache_lookup_dir_data(parent_inode, NULL,
 		&parent_meta, NULL, parent_meta_cache_entry);
 	if (ret_code < 0)
@@ -861,6 +861,11 @@ error_handle:
 	return ret_val;
 }
 
+/*
+ * Helper used in pinning inode. This function will deduct pinning space from
+ * reserved pinned size. If reserved pinned size is insufficient, then it will
+ * increase system pinned space.
+ */
 int increase_pinned_size(long long *reserved_pinned_size,
 		long long file_size)
 {
@@ -878,7 +883,7 @@ int increase_pinned_size(long long *reserved_pinned_size,
 			*reserved_pinned_size = 0;
 
 		} else {
-			ret = -ENOSPC;	
+			ret = -ENOSPC;
 			*reserved_pinned_size += file_size; /* Recover */
 		}
 		sem_post(&(hcfs_system->access_sem));
@@ -917,11 +922,11 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	if (ret < 0)
 		return ret;
 
-	
+
 	ret = change_pin_flag(this_inode, tempstat.st_mode, TRUE);
 	if (ret < 0) {
 		return ret;
-	
+
 	} else if (ret > 0) {
 	/* Do not need to change pinned size */
 		write_log(5, "Debug: inode %"PRIu64" had been pinned\n",
@@ -949,10 +954,10 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	/* After pinning self, pin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
 		return ret;
-	
+
 	} else if (S_ISLNK(tempstat.st_mode)) {
 		return ret;
-	
+
 	} else { /* expand dir */
 		num_dir_node = 0;
 		num_nondir_node = 0;
@@ -996,7 +1001,10 @@ int pin_inode(ino_t this_inode, long long *reserved_pinned_size)
 	return 0;
 }
 
-
+/*
+ * This function will deduct pinned space from reserved_release_size. If space
+ * is insufficient, it will decrease system pinned size.
+ */
 int decrease_pinned_size(long long *reserved_release_size, long long file_size)
 {
 	*reserved_release_size -= file_size;
@@ -1007,7 +1015,7 @@ int decrease_pinned_size(long long *reserved_release_size, long long file_size)
 		*reserved_release_size = 0;
 		if (hcfs_system->systemdata.pinned_size <= 0)
 			hcfs_system->systemdata.pinned_size = 0;
-	
+
 		sem_post(&(hcfs_system->access_sem));
 	}
 
@@ -1026,13 +1034,13 @@ int decrease_pinned_size(long long *reserved_release_size, long long file_size)
  * Unpin an pinned file so that it can be paged out and release more
  * available space. An inode will be check pin flag in meta cache
  * and then let pin_status in super block entry be ST_UNPIN if succeeds
- * in unpinning this inode. In case that inode is a regfile with 
+ * in unpinning this inode. In case that inode is a regfile with
  * pin_status "ST_PINNING", it will be dequeued from pinning queue in
  * "super_block_unpin". When inode is a dir, all of its children will
  * be unpinned recursively.
  *
  * @param this_inode The inode number that should be unpinned.
- * @param reserved_release_size The reserved pinned quota being 
+ * @param reserved_release_size The reserved pinned quota being
  *        going to release.
  *
  * @return 0 on success, 1 on case that regfile/symlink had been unpinned,
@@ -1061,7 +1069,7 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	/* Do not need to change pinned size */
 		write_log(5, "Debug: inode %"PRIu64" had been unpinned\n",
 			(uint64_t)this_inode);
-	
+
 	} else { /* Succeed in unpinning */
 
 		/* Deduct from reserved size */
@@ -1078,10 +1086,10 @@ int unpin_inode(ino_t this_inode, long long *reserved_release_size)
 	/* After unpinning itself, unpin all its children for dir */
 	if (S_ISREG(tempstat.st_mode)) {
 		return ret;
-	
+
 	} else if (S_ISLNK(tempstat.st_mode)) {
 		return ret;
-	
+
 	} else { /* expand dir */
 		num_dir_node = 0;
 		num_nondir_node = 0;

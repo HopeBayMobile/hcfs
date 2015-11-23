@@ -93,7 +93,7 @@ protected:
 
 		sprintf(tmp_filename, "/tmp/testHCFS/local_space%d", *(int *)block_no);
 		fptr = fopen(tmp_filename, "w+");
-		ret = fetch_from_cloud(fptr, 1, *(int *)block_no);
+		ret = fetch_from_cloud(fptr, READ_BLOCK, 1, *(int *)block_no);
 		fclose(fptr);
 		unlink(tmp_filename);
 		return NULL;
@@ -510,6 +510,11 @@ protected:
 		download_thread_ctl.block_info[0].this_inode = 1;
 		download_thread_ctl.block_info[0].block_no = 0;
 		download_thread_ctl.block_info[0].dl_error = FALSE;
+
+		sem_init(&download_curl_sem, 0, MAX_DOWNLOAD_CURL_HANDLE);
+		sem_init(&download_curl_control_sem, 0, 1); 
+		sem_init(&pin_download_curl_sem, 0,
+				MAX_DOWNLOAD_CURL_HANDLE / 2);
 	}
 
 	void TearDown()

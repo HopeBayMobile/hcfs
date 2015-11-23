@@ -1177,7 +1177,7 @@ errcode_handle:
  * Fetch an error path employed to record error when failing to download block.
  *
  * @param path  A char type pointer used to get this path.
- * @param inode  Inode number of this block failing to download. 
+ * @param inode  Inode number of this block failing to download.
  *
  * @return 0
  */

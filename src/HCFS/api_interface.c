@@ -314,7 +314,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 	retcode = 0;
 
 	total_reserved_size_bak = total_reserved_size;
-	
+
 	for (count = 0; count < num_inode; count++) {
 		write_log(10, "Debug: Prepare to pin inode %"PRIu64
 			", remaining reserved pinned size %lld\n",
@@ -345,9 +345,9 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 			return retcode;
 		}
 	}
-		
+
 	/* Remaining size, return these space */
-	if (total_reserved_size > 0) { 
+	if (total_reserved_size > 0) {
 		write_log(10, "Debug: Remaining reserved pinned size %lld\n",
 				total_reserved_size);
 		sem_wait(&(hcfs_system->access_sem));
@@ -360,7 +360,7 @@ int pin_inode_handle(ino_t *pinned_list, int num_inode,
 		sem_post(&(hcfs_system->access_sem));
 	}
 
-	write_log(10, "Debug: After pinning, now system pinned size is %lld\n", 
+	write_log(10, "Debug: After pinning, now system pinned size is %lld\n",
 			hcfs_system->systemdata.pinned_size);
 	return retcode;
 }
@@ -382,7 +382,7 @@ int unpin_inode_handle(ino_t *unpinned_list, unsigned int num_inode)
 		if (retcode < 0) {
 			write_log(5, "Fail to unpin. Begin to roll back\n");
 			break;
-		}		
+		}
 	}
 
 	write_log(10, "Debug:After unpinning, now system pinned size is %lld\n",
@@ -549,7 +549,7 @@ void api_module(void *index)
 			} else {
 				hcfs_system->systemdata.pinned_size +=
 					reserved_pinned_size;
-			}		
+			}
 			sem_post(&(hcfs_system->access_sem));
 			write_log(10, "Debug: Preallocate pinned size %lld. "
 				"Now system pinned size %lld\n",
@@ -586,11 +586,11 @@ void api_module(void *index)
 				retcode = -ENOMEM;
 				break;
 			}
-			
+
 			memcpy(unpinned_list, largebuf + sizeof(unsigned int),
 				sizeof(ino_t) * num_inode);
-		
-			/* Begin to unpin all of them */	
+
+			/* Begin to unpin all of them */
 			retcode = unpin_inode_handle(unpinned_list, num_inode);
 			free(unpinned_list);
 			if (retcode == 0) {

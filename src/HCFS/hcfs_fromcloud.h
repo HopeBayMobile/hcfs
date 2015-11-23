@@ -25,6 +25,9 @@
 #endif
 
 #define MAX_DL_CONCURRENCY 16
+#define READ_BLOCK 0
+#define PIN_BLOCK 1
+
 
 extern SYSTEM_CONF_STRUCT system_config;
 
@@ -55,7 +58,7 @@ typedef struct {
 DOWNLOAD_THREAD_CTL download_thread_ctl;
 pthread_attr_t prefetch_thread_attr;
 void prefetch_block(PREFETCH_STRUCT_TYPE *ptr);
-int fetch_from_cloud(FILE *fptr,
+int fetch_from_cloud(FILE *fptr, char action_from,
 #if (DEDUP_ENABLE)
 		unsigned char *obj_id);
 #else

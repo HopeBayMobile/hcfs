@@ -1825,10 +1825,11 @@ int truncate_truncate(ino_t this_inode, struct stat *filestat,
 			meta_cache_unlock_entry(*body_ptr);
 
 #if (DEDUP_ENABLE)
-			ret = fetch_from_cloud(blockfptr, last_block_entry->obj_id);
+			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+					last_block_entry->obj_id);
 #else
-			ret = fetch_from_cloud(blockfptr, filestat->st_ino,
-					last_block);
+			ret = fetch_from_cloud(blockfptr, READ_BLOCK,
+					filestat->st_ino, last_block);
 
 #endif
 			if (ret < 0) {
@@ -2627,9 +2628,11 @@ int read_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		}
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[eindex].obj_id);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				tpage->block_entries[eindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				this_inode, bindex);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {
@@ -3214,9 +3217,11 @@ int _write_fetch_backend(ino_t this_inode, long long bindex, FH_ENTRY *fh_ptr,
 		meta_cache_unlock_entry(fh_ptr->meta_cache_ptr);
 
 #if (DEDUP_ENABLE)
-		ret = fetch_from_cloud(fh_ptr->blockfptr, tpage->block_entries[bindex].obj_id);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				tpage->block_entries[bindex].obj_id);
 #else
-		ret = fetch_from_cloud(fh_ptr->blockfptr, this_inode, bindex);
+		ret = fetch_from_cloud(fh_ptr->blockfptr, READ_BLOCK,
+				this_inode, bindex);
 #endif
 		if (ret < 0) {
 			if (fh_ptr->blockfptr != NULL) {

@@ -1631,7 +1631,7 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 		if (file_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
-			file_meta.local_pin = new_pin_status;	
+			file_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_file_data(this_inode, NULL,
 				&file_meta, NULL, 0, meta_cache_entry);
 			if (ret < 0) {
@@ -1651,7 +1651,7 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 		if (dir_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
-			dir_meta.local_pin = new_pin_status;	
+			dir_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_dir_data(this_inode, NULL,
 				&dir_meta, NULL, meta_cache_entry);
 			if (ret < 0) {
@@ -1672,7 +1672,7 @@ int change_pin_flag(ino_t this_inode, mode_t this_mode, char new_pin_status)
 		if (symlink_meta.local_pin == new_pin_status) {
 			ret_code = 1;
 		} else {
-			symlink_meta.local_pin = new_pin_status;	
+			symlink_meta.local_pin = new_pin_status;
 			ret = meta_cache_update_symlink_data(this_inode, NULL,
 					&symlink_meta, meta_cache_entry);
 			if (ret < 0) {
@@ -1692,7 +1692,10 @@ error_handling:
 	return ret_code;
 }
 
-
+/*
+ * Subroutin used to check size of the array and extend the
+ * array size if it is full.
+ */
 static int _check_extend_size(ino_t **ptr, long long num_elem,
 	long long *max_elem_size)
 {
@@ -1710,10 +1713,13 @@ static int _check_extend_size(ino_t **ptr, long long num_elem,
 	return 0;
 }
 
-
+/*
+ * Subroutine used to shrink the array size so that eliminate wasting
+ * on memory.
+ */
 static int _check_shrink_size(ino_t **ptr, long long num_elem,
 	long long max_elem_size)
-{	
+{
 	ino_t *tmp_ptr;
 
 	if (num_elem == 0) { /* free memory when # of elem is zero */
@@ -1740,7 +1746,23 @@ static int _check_shrink_size(ino_t **ptr, long long num_elem,
 	return 0;
 }
 
-int collect_dir_children(ino_t this_inode, 
+/**
+ * collect_dir_children
+ *
+ * Given a dir inode, collect all the children and classify them as
+ * dir nodes and non-dir nodes. This function takes advantage of
+ * tree-walk pointer in meta of a dir.
+ *
+ * @param this_inode The inode number of the dir
+ * @param dir_node_list Address of a pointer used to point to dir-children-array
+ * @param num_dir_node Number of elements in the dir-array
+ * @param nondir_node_list Address of a pointer used to point to
+ *                         non-dir-children-array
+ * @param num_nondir_node Number of elements in the non-dir-array
+ *
+ * @return 0 on success, otherwise negative error code
+ */
+int collect_dir_children(ino_t this_inode,
 	ino_t **dir_node_list, long long *num_dir_node,
 	ino_t **nondir_node_list, long long *num_nondir_node)
 {
@@ -1758,7 +1780,7 @@ int collect_dir_children(ino_t this_inode,
 	*num_nondir_node = 0;
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
-	
+
 	ret = fetch_meta_path(metapath, this_inode);
 	if (ret < 0)
 		return ret;
@@ -1808,12 +1830,12 @@ int collect_dir_children(ino_t this_inode,
 		for (count = 0; count < dir_page.num_entries; count++) {
 
 			tmpentry = &(dir_page.dir_entries[count]);
-			if (!strcmp(tmpentry->d_name, ".") ||
+			if (!strcmp(tmpentry->d_name, ".") || /* Ingore */
 				!strcmp(tmpentry->d_name, ".."))
 				continue;
 
 			if (tmpentry->d_type == D_ISDIR) {
-				ret = _check_extend_size(dir_node_list, 
+				ret = _check_extend_size(dir_node_list,
 					*num_dir_node, &now_dir_size);
 				if (ret < 0) {
 					errcode = ret;
@@ -1824,13 +1846,13 @@ int collect_dir_children(ino_t this_inode,
 				(*num_dir_node)++;
 
 			} else {
-				ret = _check_extend_size(nondir_node_list, 
+				ret = _check_extend_size(nondir_node_list,
 					*num_nondir_node, &now_nondir_size);
 				if (ret < 0) {
 					errcode = ret;
 					goto errcode_handle;
 				}
-				(*nondir_node_list)[*num_nondir_node] = 
+				(*nondir_node_list)[*num_nondir_node] =
 								tmpentry->d_ino;
 				(*num_nondir_node)++;
 			}
@@ -1875,5 +1897,5 @@ errcode_handle:
 	*dir_node_list = NULL;
 	*nondir_node_list = NULL;
 	write_log(0, "Error: Error occured in %s. Code %d", __func__, -errcode);
-	return errcode;	
+	return errcode;
 }
